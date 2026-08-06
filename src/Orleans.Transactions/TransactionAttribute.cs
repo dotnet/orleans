@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -38,6 +39,23 @@ namespace Orleans
         public bool ReadOnly { get; set; }
     }
 
+    /// <summary>
+    /// The UseExclusiveLock attribute is used to mark transactional methods that should acquire
+    /// exclusive locks even for read operations. This prevents frequent lock upgrade conflicts under high contention.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// [UseExclusiveLock]
+    /// [Transaction(TransactionOption.CreateOrJoin)]
+    /// Task&lt;uint&gt; GetBalance();
+    /// </code>
+    /// </example>
+    [InvokableCustomInitializer("SetExclusiveLock", true)]
+    [AttributeUsage(AttributeTargets.Method)]
+    public sealed class UseExclusiveLockAttribute : Attribute
+    {
+    }
+
     public enum TransactionOption
     {
         Suppress,     // Logic is not transactional but can be called from within a transaction.  If called within the context of a transaction, the context will not be passed to the call.
@@ -64,7 +82,7 @@ namespace Orleans
         private Serializer<OrleansTransactionAbortedException> _serializer;
 
         [NonSerialized]
-        private ITransactionAgent _transactionAgent;
+        private ITransactionAgent? _transactionAgent;
 
         private ITransactionAgent TransactionAgent => _transactionAgent ?? throw new OrleansTransactionsDisabledException();
 
@@ -72,7 +90,10 @@ namespace Orleans
         public TransactionOption TransactionOption { get; set; }
 
         [Id(1)]
-        public TransactionInfo TransactionInfo { get; set; }
+        public TransactionInfo? TransactionInfo { get; set; }
+
+        [Id(2)]
+        public bool UseExclusiveLock { get; set; }
 
         [GeneratedActivatorConstructor]
         protected TransactionRequestBase(Serializer<OrleansTransactionAbortedException> exceptionSerializer, IServiceProvider serviceProvider)
@@ -105,6 +126,11 @@ namespace Orleans
             this.TransactionOption = txOption;
         }
 
+        protected void SetExclusiveLock(bool value)
+        {
+            this.UseExclusiveLock = value;
+        }
+
         async Task IOutgoingGrainCallFilter.Invoke(IOutgoingGrainCallContext context)
         {
             var transactionInfo = SetTransactionInfo();
@@ -131,7 +157,7 @@ namespace Orleans
             }
         }
 
-        private TransactionInfo SetTransactionInfo()
+        private TransactionInfo? SetTransactionInfo()
         {
             // Clear transaction info if transaction operation requires new transaction.
             var transactionInfo = TransactionContext.GetTransactionInfo();
@@ -185,6 +211,12 @@ namespace Orleans
                     startedNewTransaction = true;
                 }
 
+                // Apply this flag if requested by Attribute
+                if (this.UseExclusiveLock && transactionInfo != null)
+                {
+                    transactionInfo.UseExclusiveLock = true;
+                }
+
                 TransactionContext.SetTransactionInfo(transactionInfo);
                 response = await BaseInvoke();
             }
@@ -207,7 +239,7 @@ namespace Orleans
                     transactionInfo.RecordException(invokeException, _serializer);
                 }
 
-                OrleansTransactionException transactionException = transactionInfo.MustAbort(_serializer);
+                OrleansTransactionException? transactionException = transactionInfo.MustAbort(_serializer);
 
                 // This request started the transaction, so we try to commit before returning,
                 // or if it must abort, tell participants that it aborted
@@ -256,10 +288,10 @@ namespace Orleans
     public sealed class TransactionResponse : Response
     {
         [Id(0)]
-        private Response _response;
+        private Response _response = null!;
 
         [Id(1)]
-        public TransactionInfo TransactionInfo { get; set; }
+        public TransactionInfo? TransactionInfo { get; set; }
 
         public static TransactionResponse Create(Response response, TransactionInfo transactionInfo)
         {
@@ -272,7 +304,7 @@ namespace Orleans
 
         public Response InnerResponse => _response;
 
-        public override object Result
+        public override object? Result
         {
             get
             {
@@ -287,7 +319,7 @@ namespace Orleans
             set => _response.Result = value;
         }
 
-        public override Exception Exception
+        public override Exception? Exception
         {
             get
             {
@@ -300,7 +332,9 @@ namespace Orleans
             set => _response.Exception = value;
         }
 
-        public Exception GetException() => _response.Exception;
+        public Exception? GetException() => _response.Exception;
+
+        public override string ToString() => _response?.ToString() ?? "[null]";
 
         public override void Dispose()
         {
@@ -308,6 +342,7 @@ namespace Orleans
             _response.Dispose();
         }
 
+        [return: MaybeNull]
         public override T GetResult<T>() => _response.GetResult<T>();
     }
 

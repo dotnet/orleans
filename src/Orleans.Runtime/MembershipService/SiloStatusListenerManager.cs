@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
@@ -12,21 +11,25 @@ namespace Orleans.Runtime.MembershipService;
 /// <summary>
 /// Manages <see cref="ISiloStatusListener"/> instances.
 /// </summary>
-internal partial class SiloStatusListenerManager : ILifecycleParticipant<ISiloLifecycle>
+internal sealed partial class SiloStatusListenerManager : ILifecycleParticipant<ISiloLifecycle>
 {
+#if NET9_0_OR_GREATER
+    private readonly Lock _listenersLock = new();
+#else
     private readonly object _listenersLock = new();
+#endif
     private readonly CancellationTokenSource _cancellation = new();
-    private readonly MembershipTableManager _membershipTableManager;
+    private readonly IMembershipManager _membershipService;
     private readonly ILogger<SiloStatusListenerManager> _logger;
     private readonly IFatalErrorHandler _fatalErrorHandler;
     private ImmutableList<WeakReference<ISiloStatusListener>> _listeners = [];
 
     public SiloStatusListenerManager(
-        MembershipTableManager membershipTableManager,
+        IMembershipManager membershipManager,
         ILogger<SiloStatusListenerManager> log,
         IFatalErrorHandler fatalErrorHandler)
     {
-        _membershipTableManager = membershipTableManager;
+        _membershipService = membershipManager;
         _logger = log;
         _fatalErrorHandler = fatalErrorHandler;
     }
@@ -78,7 +81,7 @@ internal partial class SiloStatusListenerManager : ILifecycleParticipant<ISiloLi
         try
         {
             LogDebugStartingToProcessMembershipUpdates();
-            await foreach (var tableSnapshot in _membershipTableManager.MembershipTableUpdates.WithCancellation(_cancellation.Token))
+            await foreach (var tableSnapshot in _membershipService.MembershipUpdates.WithCancellation(_cancellation.Token))
             {
                 var snapshot = tableSnapshot.CreateClusterMembershipSnapshot();
 
@@ -145,8 +148,8 @@ internal partial class SiloStatusListenerManager : ILifecycleParticipant<ISiloLi
     {
         Task? task = null;
 
-        lifecycle.Subscribe(nameof(SiloStatusListenerManager), ServiceLifecycleStage.AfterRuntimeGrainServices, OnStart, _ => Task.CompletedTask);
-        lifecycle.Subscribe(nameof(SiloStatusListenerManager), ServiceLifecycleStage.RuntimeInitialize, _ => Task.CompletedTask, OnStop);
+        lifecycle.Subscribe(nameof(SiloStatusListenerManager), ServiceLifecycleStage.AfterRuntimeGrainServices, OnStart, NoOpStop);
+        lifecycle.Subscribe(nameof(SiloStatusListenerManager), ServiceLifecycleStage.RuntimeInitialize, NoOpStart, OnStop);
 
         Task OnStart(CancellationToken ct)
         {
@@ -162,6 +165,9 @@ internal partial class SiloStatusListenerManager : ILifecycleParticipant<ISiloLi
                 await task.WaitAsync(ct).SuppressThrowing();
             }
         }
+
+        static Task NoOpStart(CancellationToken _) => Task.CompletedTask;
+        static Task NoOpStop(CancellationToken _) => Task.CompletedTask;
     }
 
     [LoggerMessage(

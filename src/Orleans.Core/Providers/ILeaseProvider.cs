@@ -25,7 +25,7 @@ namespace Orleans.LeaseProviders
         /// Lease token, which will be null if acquiring or renewing the lease failed
         /// </summary>
         [Id(2)]
-        public string Token { get; }
+        public string? Token { get; }
 
         /// <summary>
         /// Caller side start time for this lease, which is when the lease is acquired or renewed
@@ -40,7 +40,7 @@ namespace Orleans.LeaseProviders
         /// <param name="duration"></param>
         /// <param name="token"></param>
         /// <param name="startTimeUtc"></param>
-        public AcquiredLease(string resourceKey, TimeSpan duration, string token, DateTime startTimeUtc)
+        public AcquiredLease(string resourceKey, TimeSpan duration, string? token, DateTime startTimeUtc)
         {
             this.ResourceKey = resourceKey;
             this.Duration = duration;
@@ -68,7 +68,7 @@ namespace Orleans.LeaseProviders
         /// Acquired lease, which will be null if acquire or renew operation failed.
         /// </summary>
         [Id(0)]
-        public AcquiredLease AcquiredLease { get; }
+        public AcquiredLease? AcquiredLease { get; }
 
         /// <summary>
         /// Response status
@@ -80,9 +80,9 @@ namespace Orleans.LeaseProviders
         /// If acquiring or renewing the lease failed, this is the exception which caused it. This field would be null if operation succeed.
         /// </summary>
         [Id(2)]
-        public Exception FailureException { get; }
+        public Exception? FailureException { get; }
 
-        public AcquireLeaseResult(AcquiredLease acquiredLease, ResponseCode statusCode, Exception failureException)
+        public AcquireLeaseResult(AcquiredLease? acquiredLease, ResponseCode statusCode, Exception? failureException)
         {
             this.AcquiredLease = acquiredLease;
             this.StatusCode = statusCode;

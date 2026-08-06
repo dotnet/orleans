@@ -34,7 +34,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use AWS DynamoDB storage as the default grain storage.
         /// </summary>
-        public static IServiceCollection AddDynamoDBGrainStorageAsDefault(this IServiceCollection services, Action<OptionsBuilder<DynamoDBStorageOptions>> configureOptions = null)
+        public static IServiceCollection AddDynamoDBGrainStorageAsDefault(this IServiceCollection services, Action<OptionsBuilder<DynamoDBStorageOptions>>? configureOptions = null)
         {
             return services.AddDynamoDBGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
         }
@@ -43,7 +43,7 @@ namespace Orleans.Hosting
         /// Configure silo to use AWS DynamoDB storage for grain storage.
         /// </summary>
         public static IServiceCollection AddDynamoDBGrainStorage(this IServiceCollection services, string name,
-            Action<OptionsBuilder<DynamoDBStorageOptions>> configureOptions = null)
+            Action<OptionsBuilder<DynamoDBStorageOptions>>? configureOptions = null)
         {
             configureOptions?.Invoke(services.AddOptions<DynamoDBStorageOptions>(name));
             services.AddTransient<IConfigurationValidator>(sp => new DynamoDBGrainStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<DynamoDBStorageOptions>>().Get(name), name));

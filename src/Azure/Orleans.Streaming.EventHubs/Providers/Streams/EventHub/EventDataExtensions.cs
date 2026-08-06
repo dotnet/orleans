@@ -17,7 +17,7 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         /// <param name="eventData"></param>
         /// <param name="streamNamespace"></param>
-        public static void SetStreamNamespaceProperty(this EventData eventData, string streamNamespace)
+        public static void SetStreamNamespaceProperty(this EventData eventData, string? streamNamespace)
         {
             eventData.Properties[EventDataPropertyStreamNamespaceKey] = streamNamespace;
         }
@@ -27,9 +27,9 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         /// <param name="eventData"></param>
         /// <returns></returns>
-        public static string GetStreamNamespaceProperty(this EventData eventData)
+        public static string? GetStreamNamespaceProperty(this EventData eventData)
         {
-            object namespaceObj;
+            object? namespaceObj;
             if (eventData.Properties.TryGetValue(EventDataPropertyStreamNamespaceKey, out namespaceObj))
             {
                 return (string)namespaceObj;
@@ -51,7 +51,8 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         public static IDictionary<string, object> DeserializeProperties(this ArraySegment<byte> bytes, Serialization.Serializer serializer)
         {
-            return serializer.Deserialize<List<KeyValuePair<string, object>>>(bytes.AsSpan()).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            // Serialized EventData properties always contain a property list.
+            return serializer.Deserialize<List<KeyValuePair<string, object>>>(bytes.AsSpan())!.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
         }
     }
 }

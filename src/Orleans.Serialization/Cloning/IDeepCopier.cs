@@ -1,4 +1,3 @@
-﻿#nullable enable
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -70,6 +69,7 @@ namespace Orleans.Serialization.Cloning
         /// <summary>
         /// Creates a deep copy of the provided untyped input. The type must still match the copier instance!
         /// </summary>
+        [return: NotNullIfNotNull(nameof(input))]
         object? DeepCopy(object? input, CopyContext context);
     }
 
@@ -89,6 +89,7 @@ namespace Orleans.Serialization.Cloning
         public static readonly ShallowCopier Instance = new();
 
         public bool IsShallowCopyable() => true;
+        [return: NotNullIfNotNull(nameof(input))]
         public object? DeepCopy(object? input, CopyContext _) => input;
     }
 
@@ -103,6 +104,7 @@ namespace Orleans.Serialization.Cloning
         public T DeepCopy(T input, CopyContext _) => input;
 
         /// <summary>Returns the input value.</summary>
+        [return: NotNullIfNotNull(nameof(input))]
         public object? DeepCopy(object? input, CopyContext _) => input;
     }
 
@@ -119,8 +121,10 @@ namespace Orleans.Serialization.Cloning
         /// <param name="input">The input.</param>
         /// <param name="context">The context.</param>
         /// <returns>A copy of <paramref name="input"/>.</returns>
+        [return: NotNullIfNotNull(nameof(input))]
         T DeepCopy(T input, CopyContext context);
 
+        [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => input is null ? null : DeepCopy((T)input, context);
     }
 
@@ -359,13 +363,14 @@ namespace Orleans.Serialization.Cloning
 
         public T DeepCopy(T original, CopyContext context) => (T)_copier.DeepCopy(original, context)!;
 
+        [return: NotNullIfNotNull(nameof(original))]
         public object? DeepCopy(object? original, CopyContext context) => _copier.DeepCopy(original, context);
     }
 
     /// <summary>
     /// Object pool for <see cref="CopyContext"/> instances.
     /// </summary>
-    public sealed class CopyContextPool
+    public sealed class CopyContextPool : IDisposable
     {
         private readonly ConcurrentObjectPool<CopyContext, PoolPolicy> _pool;
 
@@ -384,6 +389,9 @@ namespace Orleans.Serialization.Cloning
         /// </summary>
         /// <returns>A <see cref="CopyContext"/>.</returns>
         public CopyContext GetContext() => _pool.Get();
+
+        /// <inheritdoc/>
+        public void Dispose() => _pool.Dispose();
 
         /// <summary>
         /// Returns the specified copy context to the pool.

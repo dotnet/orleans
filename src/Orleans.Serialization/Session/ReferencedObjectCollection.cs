@@ -39,8 +39,8 @@ namespace Orleans.Serialization.Session
         private int _objectToReferenceCount;
         private readonly ReferencePair[] _objectToReference = new ReferencePair[64];
 
-        private Dictionary<uint, object> _referenceToObjectOverflow;
-        private Dictionary<object, uint> _objectToReferenceOverflow;
+        private Dictionary<uint, object>? _referenceToObjectOverflow;
+        private Dictionary<object, uint>? _objectToReferenceOverflow;
         private uint _currentReferenceId;
 
         /// <summary>
@@ -48,7 +48,7 @@ namespace Orleans.Serialization.Session
         /// </summary>
         /// <param name="reference">The reference.</param>
         /// <returns>The referenced object with the specified id if found, <see langword="null" /> otherwise.</returns>
-        public object TryGetReferencedObject(uint reference)
+        public object? TryGetReferencedObject(uint reference)
         {
             var refs = _referenceToObject.AsSpan(0, ReferenceToObjectCount);
             for (int i = 0; i < refs.Length; ++i)
@@ -78,7 +78,7 @@ namespace Orleans.Serialization.Session
         /// <param name="reference">The reference.</param>
         /// <returns><see langword="true" /> if a reference already existed, <see langword="false" /> otherwise.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool GetOrAddReference(object value, out uint reference)
+        public bool GetOrAddReference(object? value, out uint reference)
         {
             // Unconditionally bump the reference counter since a call to this method signifies a potential reference.
             var nextReference = ++_currentReferenceId;
@@ -152,7 +152,7 @@ namespace Orleans.Serialization.Session
         /// <param name="value">The value.</param>
         /// <returns>The index of the reference, or <c>-1</c> if the object has not been encountered before.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int GetReferenceIndex(object value)
+        public int GetReferenceIndex(object? value)
         {
             if (value is null)
             {
@@ -262,7 +262,7 @@ namespace Orleans.Serialization.Session
         /// </summary>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RecordReferenceField(object value) => RecordReferenceField(value, ++_currentReferenceId);
+        public void RecordReferenceField(object? value) => RecordReferenceField(value, ++_currentReferenceId);
 
         /// <summary>
         /// Records a reference field with the specified identifier.
@@ -270,7 +270,7 @@ namespace Orleans.Serialization.Session
         /// <param name="value">The value.</param>
         /// <param name="referenceId">The reference identifier.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RecordReferenceField(object value, uint referenceId)
+        public void RecordReferenceField(object? value, uint referenceId)
         {
             if (value is null)
             {

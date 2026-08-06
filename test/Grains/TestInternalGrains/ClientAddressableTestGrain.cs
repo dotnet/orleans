@@ -5,7 +5,7 @@ namespace UnitTests.Grains
 {
     public class ClientAddressableTestGrain : Grain, IClientAddressableTestGrain
     {
-        private IClientAddressableTestClientObject target;
+        private IClientAddressableTestClientObject target = null!;
 
         public Task SetTarget(IClientAddressableTestClientObject target)
         {

@@ -11,7 +11,7 @@ namespace Orleans.Transactions.TestKit.Consistency
     public class ConsistencyTestHarness
     {
         private readonly ConsistencyTestOptions options;
-        private Action<string> output;
+        private Action<string> output = null!;
 
         private readonly Dictionary<int,       // Grain
                           SortedDictionary<int, // SeqNo

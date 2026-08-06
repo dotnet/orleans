@@ -10,24 +10,24 @@ namespace Orleans.Hosting
 {
     public static partial class RedisGrainStorageServiceCollectionExtensions
     {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddRedisGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.RedisStorageOptions>> configureOptions = null) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddRedisGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.RedisStorageOptions>>? configureOptions = null) { throw null; }
 
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddRedisGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Persistence.RedisStorageOptions> configureOptions) { throw null; }
 
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddRedisGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.RedisStorageOptions>> configureOptions = null) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddRedisGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.RedisStorageOptions>>? configureOptions = null) { throw null; }
 
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddRedisGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Persistence.RedisStorageOptions> configureOptions) { throw null; }
     }
 
     public static partial class RedisSiloBuilderExtensions
     {
-        public static ISiloBuilder AddRedisGrainStorage(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.RedisStorageOptions>> configureOptionsBuilder) { throw null; }
+        public static ISiloBuilder AddRedisGrainStorage(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.RedisStorageOptions>>? configureOptionsBuilder) { throw null; }
 
         public static ISiloBuilder AddRedisGrainStorage(this ISiloBuilder builder, string name, System.Action<Persistence.RedisStorageOptions> configureOptions) { throw null; }
 
         public static ISiloBuilder AddRedisGrainStorage(this ISiloBuilder builder, string name) { throw null; }
 
-        public static ISiloBuilder AddRedisGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.RedisStorageOptions>> configureOptionsBuilder) { throw null; }
+        public static ISiloBuilder AddRedisGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.RedisStorageOptions>>? configureOptionsBuilder) { throw null; }
 
         public static ISiloBuilder AddRedisGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Persistence.RedisStorageOptions> configureOptions) { throw null; }
 
@@ -37,11 +37,15 @@ namespace Orleans.Hosting
 
 namespace Orleans.Persistence
 {
-    public partial class RedisGrainStorage : Storage.IGrainStorage, ILifecycleParticipant<Runtime.ISiloLifecycle>
+    public partial class RedisGrainStorage : Storage.IGrainStorage, ILifecycleParticipant<Runtime.ISiloLifecycle>, System.IDisposable, System.IAsyncDisposable
     {
         public RedisGrainStorage(string name, RedisStorageOptions options, Storage.IGrainStorageSerializer grainStorageSerializer, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, Serialization.Serializers.IActivatorProvider activatorProvider, Microsoft.Extensions.Logging.ILogger<RedisGrainStorage> logger) { }
 
         public System.Threading.Tasks.Task ClearStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
+
+        public void Dispose() { }
+
+        public System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
 
         public void Participate(Runtime.ISiloLifecycle lifecycle) { }
 
@@ -59,7 +63,7 @@ namespace Orleans.Persistence
     {
         public StackExchange.Redis.ConfigurationOptions? ConfigurationOptions { get { throw null; } set { } }
 
-        public System.Func<RedisStorageOptions, System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer>> CreateMultiplexer { get { throw null; } set { } }
+        public System.Func<RedisStorageOptions, System.Threading.Tasks.Task<(StackExchange.Redis.IConnectionMultiplexer Multiplexer, bool IsShared)>> CreateMultiplexer { get { throw null; } set { } }
 
         public bool DeleteStateOnClear { get { throw null; } set { } }
 
@@ -67,11 +71,11 @@ namespace Orleans.Persistence
 
         public System.Func<string, Runtime.GrainId, StackExchange.Redis.RedisKey>? GetStorageKey { get { throw null; } set { } }
 
-        public Storage.IGrainStorageSerializer? GrainStorageSerializer { get { throw null; } set { } }
+        public Storage.IGrainStorageSerializer GrainStorageSerializer { get { throw null; } set { } }
 
         public int InitStage { get { throw null; } set { } }
 
-        public static System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer> DefaultCreateMultiplexer(RedisStorageOptions options) { throw null; }
+        public static System.Threading.Tasks.Task<(StackExchange.Redis.IConnectionMultiplexer Multiplexer, bool IsShared)> DefaultCreateMultiplexer(RedisStorageOptions options) { throw null; }
     }
 
     public static partial class RedisStorageOptionsExtensions
@@ -98,7 +102,7 @@ namespace Orleans.Persistence.Redis
 
 namespace OrleansCodeGen.Orleans.Persistence.Redis
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_RedisStorageException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Persistence.Redis.RedisStorageException>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Persistence.Redis.RedisStorageException>, global::Orleans.Serialization.Serializers.IBaseCodec
@@ -116,7 +120,7 @@ namespace OrleansCodeGen.Orleans.Persistence.Redis
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_RedisStorageException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Persistence.Redis.RedisStorageException, System.Exception>

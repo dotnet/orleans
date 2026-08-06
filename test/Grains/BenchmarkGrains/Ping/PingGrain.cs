@@ -5,7 +5,7 @@ namespace BenchmarkGrains.Ping
 {
     public class PingGrain : IGrainBase, IPingGrain
     {
-        private IPingGrain _self;
+        private IPingGrain _self = null!;
 
         public PingGrain(IGrainContext context)
         {

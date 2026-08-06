@@ -43,9 +43,12 @@ namespace Orleans.Transactions
         public int NumberWrites;
 
         // the state for this transaction, and the sequence number of this state
-        public TState State;
+        public TState State = default!;
         public long SequenceNumber;
         public bool HasCopiedState;
+
+        // indicate that this transaction holds an exclusive lock
+        public bool IsExclusiveLock;
 
         public void AddRead()
         {
@@ -59,20 +62,20 @@ namespace Orleans.Transactions
         public CommitRole Role;
 
         // used for readonly and local commit
-        public TaskCompletionSource<TransactionalStatus> PromiseForTA;
+        public TaskCompletionSource<TransactionalStatus> PromiseForTA = null!;
 
         // used for local and remote commit
         public ParticipantId TransactionManager;
 
         // used for local commit
-        public List<ParticipantId> WriteParticipants;
+        public List<ParticipantId> WriteParticipants = null!;
         public int WaitCount;
         public DateTime WaitingSince;
 
         // used for remote commit
         public DateTime? LastSent;
         public bool PrepareIsPersisted;
-        public TaskCompletionSource<bool> ConfirmationResponsePromise;
+        public TaskCompletionSource<bool>? ConfirmationResponsePromise;
 
 
         /// <summary>

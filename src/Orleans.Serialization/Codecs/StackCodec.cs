@@ -31,7 +31,7 @@ public sealed class StackCodec<T> : IFieldCodec<Stack<T>>
 
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Stack<T> value) where TBufferWriter : IBufferWriter<byte>
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Stack<T> value) where TBufferWriter : IBufferWriter<byte>
     {
         if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
         {
@@ -55,6 +55,7 @@ public sealed class StackCodec<T> : IFieldCodec<Stack<T>>
     }
 
     /// <inheritdoc/>
+    [return: System.Diagnostics.CodeAnalysis.MaybeNull]
     public Stack<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         if (field.WireType == WireType.Reference)
@@ -65,7 +66,7 @@ public sealed class StackCodec<T> : IFieldCodec<Stack<T>>
         field.EnsureWireTypeTagDelimited();
 
         var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-        T[] array = null;
+        T[]? array = null;
         var i = 0;
         uint fieldId = 0;
         while (true)
@@ -81,10 +82,7 @@ public sealed class StackCodec<T> : IFieldCodec<Stack<T>>
             {
                 case 0:
                     var length = (int)UInt32Codec.ReadValue(ref reader, header);
-                    if (length > 10240 && length > reader.Length)
-                    {
-                        ThrowInvalidSizeException(length);
-                    }
+                    reader.EnsureAvailable((uint)length);
 
                     array = new T[length];
                     i = length - 1;
@@ -95,7 +93,7 @@ public sealed class StackCodec<T> : IFieldCodec<Stack<T>>
                         ThrowLengthFieldMissing();
                     }
 
-                    array[i--] = _fieldCodec.ReadValue(ref reader, header);
+                    array![i--] = _fieldCodec.ReadValue(ref reader, header)!;
                     break;
                 default:
                     reader.ConsumeUnknownField(header);
@@ -106,11 +104,8 @@ public sealed class StackCodec<T> : IFieldCodec<Stack<T>>
         array ??= [];
         var result = new Stack<T>(array);
         ReferenceCodec.RecordObject(reader.Session, array, placeholderReferenceId);
-        return result;
+        return result!;
     }
-
-    private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-        $"Declared length of {typeof(Stack<T>)}, {length}, is greater than total length of input.");
 
     private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized stack is missing its length field.");
 }
@@ -139,12 +134,12 @@ public sealed class StackCopier<T> : IDeepCopier<Stack<T>>, IBaseCopier<Stack<T>
     {
         if (context.TryGetCopy<Stack<T>>(input, out var result))
         {
-            return result;
+            return result!;
         }
 
         if (input.GetType() != _fieldType)
         {
-            return context.DeepCopy(input);
+            return context.DeepCopy(input)!;
         }
 
         result = new Stack<T>(input.Count);

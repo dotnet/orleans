@@ -16,9 +16,9 @@ namespace Orleans.Hosting;
 
 internal sealed class AzureTableStorageGrainStorageProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.AddAzureTableGrainStorage(name, (OptionsBuilder<AzureTableStorageOptions> optionsBuilder) =>
+        builder.AddAzureTableGrainStorage(name!, (OptionsBuilder<AzureTableStorageOptions> optionsBuilder) =>
             optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {
                 var tableName = configurationSection["TableName"];
@@ -35,7 +35,7 @@ internal sealed class AzureTableStorageGrainStorageProviderBuilder : IProviderBu
                 }
                 else
                 {
-                    // Construct a connection multiplexer from a connection string.
+                    // Construct a table service client from a connection string.
                     var connectionName = configurationSection["ConnectionName"];
                     var connectionString = configurationSection["ConnectionString"];
                     if (!string.IsNullOrEmpty(connectionName) && string.IsNullOrEmpty(connectionString))
@@ -48,11 +48,11 @@ internal sealed class AzureTableStorageGrainStorageProviderBuilder : IProviderBu
                     {
                         if (Uri.TryCreate(connectionString, UriKind.Absolute, out var uri))
                         {
-                            options.TableServiceClient = new TableServiceClient(uri);
+                            options.SetTableServiceClient(uri);
                         }
                         else
                         {
-                            options.TableServiceClient = new TableServiceClient(connectionString);
+                            options.SetTableServiceClient(connectionString);
                         }
                     }
                 }

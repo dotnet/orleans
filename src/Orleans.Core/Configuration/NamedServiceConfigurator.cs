@@ -67,7 +67,7 @@ namespace Orleans.Hosting
         /// <typeparam name="TOptions">
         /// The underlying options type.
         /// </typeparam>
-        public static void Configure<TOptions>(this INamedServiceConfigurator configurator, Action<OptionsBuilder<TOptions>> configureOptions)
+        public static void Configure<TOptions>(this INamedServiceConfigurator configurator, Action<OptionsBuilder<TOptions>>? configureOptions)
             where TOptions : class, new()
         {
             configurator.ConfigureDelegate(services =>
@@ -85,7 +85,7 @@ namespace Orleans.Hosting
         /// <param name="configurator">The named configurator which the component and options will be configured for.</param>
         /// <param name="factory">The factory used to create the component for the named service.</param>
         /// <param name="configureOptions">The delegate used to configure options for the named service.</param>
-        public static void ConfigureComponent<TOptions, TComponent>(this INamedServiceConfigurator configurator, Func<IServiceProvider, string, TComponent> factory, Action<OptionsBuilder<TOptions>> configureOptions = null)
+        public static void ConfigureComponent<TOptions, TComponent>(this INamedServiceConfigurator configurator, Func<IServiceProvider, string, TComponent> factory, Action<OptionsBuilder<TOptions>>? configureOptions = null)
             where TOptions : class, new()
             where TComponent : class
         {
@@ -104,7 +104,7 @@ namespace Orleans.Hosting
         {
             configurator.ConfigureDelegate(services =>
             {
-                services.AddKeyedSingleton<TComponent>(configurator.Name, (sp, key) => factory(sp, key as string));
+                services.AddKeyedSingleton<TComponent>(configurator.Name, (sp, key) => factory(sp, (key as string)!));
             });
         }
 

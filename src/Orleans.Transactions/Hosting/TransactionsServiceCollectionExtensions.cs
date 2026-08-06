@@ -28,11 +28,16 @@ namespace Orleans.Hosting
 
         internal static IServiceCollection AddTransactionsBaseline(this IServiceCollection services)
         {
+            services.AddMetrics();
+            services.TryAddSingleton<OrleansInstruments>();
             services.TryAddSingleton<IClock, Clock>();
             services.AddSingleton<ITransactionAgent, TransactionAgent>();
             services.AddSingleton<ITransactionClient, TransactionClient>();
             services.TryAddSingleton<ITransactionAgentStatistics, TransactionAgentStatistics>();
-            services.TryAddSingleton<ITransactionOverloadDetector, TransactionOverloadDetector>();
+            services.TryAddSingleton<ITransactionOverloadDetector>(sp => new TransactionOverloadDetector(
+                sp.GetRequiredService<ITransactionAgentStatistics>(),
+                sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<TransactionRateLoadSheddingOptions>>(),
+                sp.GetKeyedService<TimeProvider>(TransactionTimeProviderNames.Transactions) ?? TimeProvider.System));
             return services;
         }
     }

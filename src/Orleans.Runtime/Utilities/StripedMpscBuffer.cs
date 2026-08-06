@@ -142,7 +142,7 @@ internal sealed class StripedMpscBuffer<T> where T : class
 [DebuggerDisplay("Count = {Count}/{Capacity}")]
 internal sealed class MpscBoundedBuffer<T> where T : class
 {
-    private T[] _buffer;
+    private T?[] _buffer;
     private readonly int _mask;
     private PaddedHeadAndTail _headAndTail; // mutable struct, don't mark readonly
 
@@ -158,7 +158,7 @@ internal sealed class MpscBoundedBuffer<T> where T : class
         // must be power of 2 to use & slotsMask instead of %
         boundedLength = BitOps.CeilingPowerOfTwo(boundedLength);
 
-        _buffer = new T[boundedLength];
+        _buffer = new T?[boundedLength];
         _mask = boundedLength - 1;
     }
 
@@ -242,7 +242,7 @@ internal sealed class MpscBoundedBuffer<T> where T : class
     /// <remarks>
     /// Thread safe for single try take/drain + multiple try add.
     /// </remarks>
-    public BufferStatus TryTake(out T item)
+    public BufferStatus TryTake(out T? item)
     {
         int head = Volatile.Read(ref _headAndTail.Head);
         int tail = _headAndTail.Tail;
@@ -310,7 +310,7 @@ internal sealed class MpscBoundedBuffer<T> where T : class
         {
             int index = head & _mask;
 
-            T item = Volatile.Read(ref localBuffer[index]);
+            T? item = Volatile.Read(ref localBuffer[index]);
 
             if (item == null)
             {

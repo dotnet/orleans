@@ -2,12 +2,14 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Core.Diagnostics;
 using Orleans.Internal;
 
 namespace Orleans.Runtime.Messaging
@@ -20,20 +22,23 @@ namespace Orleans.Runtime.Messaging
         private readonly ConcurrentDictionary<SiloAddress, ConnectionEntry> connections = new();
         private readonly ConnectionOptions connectionOptions;
         private readonly ConnectionFactory connectionFactory;
-        private readonly NetworkingTrace trace;
+        private readonly ILogger logger;
         private readonly CancellationTokenSource shutdownCancellation = new();
-        private readonly object lockObj = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock lockObj = new();
+#else
+        private readonly object lockObj = new();
+#endif
         private readonly TaskCompletionSource<int> closedTaskCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public ConnectionManager(
             IOptions<ConnectionOptions> connectionOptions,
             ConnectionFactory connectionFactory,
-            NetworkingTrace trace)
+            ILogger<ConnectionManager> logger)
         {
-            if (trace == null) throw new ArgumentNullException(nameof(trace));
             this.connectionOptions = connectionOptions.Value;
             this.connectionFactory = connectionFactory;
-            this.trace = trace;
+            this.logger = logger;
         }
 
         public int ConnectionCount => connections.Sum(e => e.Value.Connections.Length);
@@ -58,8 +63,7 @@ namespace Orleans.Runtime.Messaging
             // Start a new connection attempt since there are no suitable connections.
             return new(this.GetConnectionAsync(endpoint));
         }
-
-        public bool TryGetConnection(SiloAddress endpoint, out Connection connection)
+        public bool TryGetConnection(SiloAddress endpoint, [NotNullWhen(true)] out Connection? connection)
         {
             if (this.connections.TryGetValue(endpoint, out var entry) && entry.NextConnection() is { } c)
             {
@@ -120,7 +124,7 @@ namespace Orleans.Runtime.Messaging
 
         public void OnConnected(SiloAddress address, Connection connection) => OnConnected(address, connection, null);
 
-        private void OnConnected(SiloAddress address, Connection connection, ConnectionEntry entry)
+        private void OnConnected(SiloAddress address, Connection connection, ConnectionEntry? entry)
         {
             lock (this.lockObj)
             {
@@ -130,12 +134,14 @@ namespace Orleans.Runtime.Messaging
                 entry.PendingConnection = null;
             }
 
-            LogInformationConnectionEstablished(this.trace, connection, address);
+            ConnectionEvents.EmitEstablished(connection, address);
+            LogInformationConnectionEstablished(this.logger, connection, address);
         }
 
-        public void OnConnectionTerminated(SiloAddress address, Connection connection, Exception exception)
+        public void OnConnectionTerminated(SiloAddress address, Connection connection, Exception? exception)
         {
             if (connection is null) return;
+            ConnectionEvents.EmitTerminated(connection, exception);
 
             lock (this.lockObj)
             {
@@ -157,11 +163,11 @@ namespace Orleans.Runtime.Messaging
 
             if (exception != null && !this.shutdownCancellation.IsCancellationRequested)
             {
-                LogWarningConnectionTerminated(this.trace, exception, connection);
+                LogWarningConnectionTerminated(this.logger, exception, connection);
             }
             else
             {
-                LogDebugConnectionClosed(this.trace, connection);
+                LogDebugConnectionClosed(this.logger, connection);
             }
         }
 
@@ -170,11 +176,12 @@ namespace Orleans.Runtime.Messaging
         private async Task<Connection> ConnectAsync(SiloAddress address, ConnectionEntry entry)
         {
             await Task.Yield();
-            CancellationTokenSource openConnectionCancellation = default;
+            CancellationTokenSource? openConnectionCancellation = default;
 
             try
             {
-                LogInformationEstablishingConnection(this.trace, address);
+                ConnectionEvents.EmitConnecting(address);
+                LogInformationEstablishingConnection(this.logger, address);
 
                 // Cancel pending connection attempts either when the host terminates or after the configured time limit.
                 openConnectionCancellation = CancellationTokenSource.CreateLinkedTokenSource(this.shutdownCancellation.Token, default);
@@ -182,7 +189,8 @@ namespace Orleans.Runtime.Messaging
 
                 var connection = await this.connectionFactory.ConnectAsync(address, openConnectionCancellation.Token);
 
-                LogInformationConnectedToEndpoint(this.trace, address);
+                ConnectionEvents.EmitConnected(address);
+                LogInformationConnectedToEndpoint(this.logger, address);
 
                 this.StartConnection(address, connection);
 
@@ -195,7 +203,7 @@ namespace Orleans.Runtime.Messaging
             {
                 this.OnConnectionFailed(entry);
 
-                LogWarningConnectionAttemptFailed(this.trace, exception, address);
+                LogWarningConnectionAttemptFailed(this.logger, exception, address);
 
                 if (exception is OperationCanceledException && openConnectionCancellation?.IsCancellationRequested == true && !shutdownCancellation.IsCancellationRequested)
                     throw new ConnectionFailedException($"Connection attempt to endpoint {address} timed out after {connectionOptions.OpenConnectionTimeout}");
@@ -252,7 +260,7 @@ namespace Orleans.Runtime.Messaging
         {
             try
             {
-                LogDebugShuttingDownConnections(this.trace);
+                LogDebugShuttingDownConnections(this.logger);
 
                 this.shutdownCancellation.Cancel(throwOnFirstException: false);
 
@@ -285,13 +293,13 @@ namespace Orleans.Runtime.Messaging
                     await Task.Delay(10);
                     if (++cycles > 100 && cycles % 500 == 0 && this.ConnectionCount is var remaining and > 0)
                     {
-                        LogWarningWaitingForConnectionsToTerminate(this.trace, remaining);
+                        LogWarningWaitingForConnectionsToTerminate(this.logger, remaining);
                     }
                 }
             }
             catch (Exception exception)
             {
-                LogWarningExceptionDuringShutdown(this.trace, exception);
+                LogWarningExceptionDuringShutdown(this.logger, exception);
             }
             finally
             {
@@ -303,14 +311,14 @@ namespace Orleans.Runtime.Messaging
         {
             ThreadPool.UnsafeQueueUserWorkItem(state =>
             {
-                var (t, address, connection) = ((ConnectionManager, SiloAddress, Connection))state;
+                var (t, address, connection) = ((ConnectionManager, SiloAddress, Connection))state!;
                 t.RunConnectionAsync(address, connection).Ignore();
             }, (this, address, connection));
         }
 
         private async Task RunConnectionAsync(SiloAddress address, Connection connection)
         {
-            Exception error = default;
+            Exception? error = default;
             try
             {
                 using (this.BeginConnectionScope(connection))
@@ -328,11 +336,11 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private IDisposable BeginConnectionScope(Connection connection)
+        private IDisposable? BeginConnectionScope(Connection connection)
         {
-            if (this.trace.IsEnabled(LogLevel.Critical))
+            if (this.logger.IsEnabled(LogLevel.Critical))
             {
-                return this.trace.BeginScope(new ConnectionLogScope(connection));
+                return this.logger.BeginScope(new ConnectionLogScope(connection));
             }
 
             return null;
@@ -340,7 +348,7 @@ namespace Orleans.Runtime.Messaging
 
         private sealed class ConnectionEntry
         {
-            public Task PendingConnection { get; set; }
+            public Task? PendingConnection { get; set; }
             public DateTime LastFailure { get; set; }
             public ImmutableArray<Connection> Connections { get; set; } = ImmutableArray<Connection>.Empty;
 
@@ -362,7 +370,7 @@ namespace Orleans.Runtime.Messaging
 
             public bool HasSufficientConnections(ConnectionOptions options) => Connections.Length >= options.ConnectionsPerEndpoint;
 
-            public Connection NextConnection()
+            public Connection? NextConnection()
             {
                 var connections = this.Connections;
                 if (connections.IsEmpty)

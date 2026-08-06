@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.WireProtocol;
@@ -12,7 +13,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class TypeSerializerCodec : IFieldCodec<Type>, IDerivedTypeCodec
     {
-        void IFieldCodec<Type>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Type value)
+        void IFieldCodec<Type>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Type value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, typeof(Type), value))
             {
@@ -68,6 +69,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         Type IFieldCodec<Type>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
@@ -77,6 +79,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static Type ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -90,7 +93,7 @@ namespace Orleans.Serialization.Codecs
             uint fieldId = 0;
             var schemaType = default(SchemaType);
             uint id = 0;
-            Type result = null;
+            Type? result = null;
             while (true)
             {
                 reader.ReadFieldHeader(ref field);
@@ -143,10 +146,14 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
+        [DoesNotReturn]
         private static void ThrowInvalidSchemaType(SchemaType schemaType) => throw new NotSupportedException(
             $"SchemaType {schemaType} is not supported by {nameof(TypeSerializerCodec)}.");
 
+        [DoesNotReturn]
         private static void ThrowUnknownWellKnownType(uint id) => throw new UnknownWellKnownTypeException(id);
+
+        [DoesNotReturn]
         private static void ThrowMissingType() => throw new TypeMissingException();
     }
 }

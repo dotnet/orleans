@@ -37,15 +37,15 @@ namespace UnitTests.Grains
     public class ConsumerObserver : IAsyncObserver<StreamItem>, IConsumerObserver
     {
         [NonSerialized]
-        private ILogger _logger;
+        private ILogger _logger = null!;
         [NonSerialized]
-        private StreamSubscriptionHandle<StreamItem> _subscription;
+        private StreamSubscriptionHandle<StreamItem>? _subscription;
         [Id(0)]
         private int _itemsConsumed;
         [Id(1)]
         private Guid _streamId;
         [Id(2)]
-        private string _streamNamespace;
+        private string _streamNamespace = null!;
 
         public Task<int> ItemsConsumed
         {
@@ -65,7 +65,7 @@ namespace UnitTests.Grains
             return new ConsumerObserver(logger);
         }
 
-        public Task OnNextAsync(StreamItem item, StreamSequenceToken token = null)
+        public Task OnNextAsync(StreamItem item, StreamSequenceToken? token = null)
         {
             if (!item.StreamId.Equals(_streamId))
             {
@@ -114,7 +114,7 @@ namespace UnitTests.Grains
 
             _streamId = streamId;
             ProviderName = streamProvider.Name;
-            _streamNamespace = string.IsNullOrWhiteSpace(streamNamespace) ? null : streamNamespace.Trim();
+            _streamNamespace = string.IsNullOrWhiteSpace(streamNamespace) ? null! : streamNamespace.Trim();
             IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(streamNamespace, streamId);
 
             _subscription = await stream.SubscribeAsync(this);
@@ -145,7 +145,7 @@ namespace UnitTests.Grains
         }
 
         [Id(3)]
-        public string ProviderName { get; private set; }
+        public string ProviderName { get; private set; } = null!;
     }
 
     [Serializable]
@@ -153,9 +153,9 @@ namespace UnitTests.Grains
     public class ProducerObserver : IProducerObserver
     {
         [NonSerialized]
-        private ILogger _logger;
+        private ILogger _logger = null!;
         [NonSerialized]
-        private IAsyncObserver<StreamItem> _observer;
+        private IAsyncObserver<StreamItem>? _observer;
         [NonSerialized]
         private Dictionary<IDisposable, TimerState> _timers;
         [Id(0)]
@@ -165,9 +165,9 @@ namespace UnitTests.Grains
         [Id(2)]
         private Guid _streamId;
         [Id(3)]
-        private string _streamNamespace;
+        private string _streamNamespace = null!;
         [Id(4)]
-        private string _providerName;
+        private string _providerName = null!;
         [Id(5)]
         private readonly InterlockedFlag _cleanedUpFlag;
         [NonSerialized]
@@ -186,7 +186,7 @@ namespace UnitTests.Grains
             _itemsProduced = 0;
             _expectedItemsProduced = 0;
             _streamId = default;
-            _providerName = null;
+            _providerName = null!;
             _cleanedUpFlag = new InterlockedFlag();
             _observerDisposedYet = false;
             _grainFactory = grainFactory;
@@ -209,7 +209,7 @@ namespace UnitTests.Grains
             _logger.LogInformation("ProducerObserver.BecomeProducer: producer requires no disposal; test short-circuited.");
             _observerDisposedYet = true; // TODO BPETIT remove that
             _streamId = streamId;
-            _streamNamespace = string.IsNullOrWhiteSpace(streamNamespace) ? null : streamNamespace.Trim();
+            _streamNamespace = string.IsNullOrWhiteSpace(streamNamespace) ? null! : streamNamespace.Trim();
             _providerName = streamProvider.Name;
         }
 
@@ -230,7 +230,7 @@ namespace UnitTests.Grains
                 return false;
 
             StreamItem item = new StreamItem(data, _streamId);
-            await _observer.OnNextAsync(item);
+            await _observer!.OnNextAsync(item);
             _itemsProduced++;
             var logLevel = DEBUG_STREAMING_GRAINS ? LogLevel.Information : LogLevel.Debug;
             _logger.Log(logLevel, "ProducerObserver.ProduceItem: StreamId: {StreamId}, Data: {Data}, NumProduced so far: {ItemsProduced}.", _streamId, data, _itemsProduced);
@@ -360,7 +360,7 @@ namespace UnitTests.Grains
                         _logger.LogError(exc, "StopBeingProducer: Timer Dispose() has thrown");
                     }
                 }
-                _timers = null;
+                _timers = null!;
             }
             _observer = null; // Disposing
             return Task.CompletedTask;
@@ -381,7 +381,7 @@ namespace UnitTests.Grains
         private class TimerState : IDisposable
         {
             private bool _started;
-            public IDisposable Handle { get; private set; }
+            public IDisposable Handle { get; private set; } = null!;
             private int _counter;
             private readonly Func<string, Task<bool>> _produceItemFunc;
             private readonly Action<IDisposable> _onDisposeFunc;
@@ -444,7 +444,7 @@ namespace UnitTests.Grains
                     return;
                 _onDisposeFunc(Handle);
                 Handle.Dispose();
-                Handle = null;
+                Handle = null!;
             }
         }
     }
@@ -452,9 +452,9 @@ namespace UnitTests.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class Streaming_ProducerGrain : Grain<Streaming_ProducerGrain_State>, IStreaming_ProducerGrain
     {
-        private InterlockedFlag _cleanedUpFlag;
-        private ILogger _logger;
-        protected List<IProducerObserver> _producers;
+        private InterlockedFlag _cleanedUpFlag = null!;
+        private ILogger _logger = null!;
+        protected List<IProducerObserver> _producers = null!;
         protected readonly IGrainContext _grainContext;
 
         public Streaming_ProducerGrain(IGrainContext grainContext)
@@ -511,7 +511,7 @@ namespace UnitTests.Grains
 
             await Task.WhenAll(_producers.Select(p => p.ProducePeriodicSeries(timerCallback =>
                 {
-                    return this.RegisterGrainTimer(timerCallback, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(10));
+                    return this.RegisterGrainTimer(timerCallback, null!, TimeSpan.Zero, TimeSpan.FromMilliseconds(10));
                 },count)).ToArray());
         }
 
@@ -572,7 +572,7 @@ namespace UnitTests.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class PersistentStreaming_ProducerGrain : Streaming_ProducerGrain, IStreaming_ProducerGrain
     {
-        private ILogger _logger;
+        private ILogger _logger = null!;
 
         public PersistentStreaming_ProducerGrain(IGrainContext grainContext) : base(grainContext)
         {
@@ -643,9 +643,9 @@ namespace UnitTests.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class Streaming_ConsumerGrain : Grain<Streaming_ConsumerGrain_State>, IStreaming_ConsumerGrain
     {
-        private ILogger _logger;
-        protected List<IConsumerObserver> _observers;
-        private string _providerToUse;
+        private ILogger _logger = null!;
+        protected List<IConsumerObserver> _observers = null!;
+        private string _providerToUse = null!;
         protected readonly IGrainContext _grainContext;
 
         public Streaming_ConsumerGrain(IGrainContext grainContext)
@@ -710,7 +710,7 @@ namespace UnitTests.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class PersistentStreaming_ConsumerGrain : Streaming_ConsumerGrain, IPersistentStreaming_ConsumerGrain
     {
-        private ILogger _logger;
+        private ILogger _logger = null!;
 
         public PersistentStreaming_ConsumerGrain(IGrainContext grainContext) : base(grainContext)
         {
@@ -763,11 +763,11 @@ namespace UnitTests.Grains
     [Reentrant]
     public class Streaming_Reentrant_ProducerConsumerGrain : Streaming_ProducerConsumerGrain, IStreaming_Reentrant_ProducerConsumerGrain
     {
-        private ILogger _logger;
+        private ILogger _logger = null!;
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            var activationId = RuntimeContext.Current.ActivationId;
+            var activationId = RuntimeContext.Current!.ActivationId;
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_Reentrant_ProducerConsumerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + activationId) ;
             _logger.LogInformation("OnActivateAsync");
             await base.OnActivateAsync(cancellationToken);
@@ -776,14 +776,14 @@ namespace UnitTests.Grains
 
     public class Streaming_ProducerConsumerGrain : Grain, IStreaming_ProducerConsumerGrain
     {
-        private ILogger _logger;
-        private ProducerObserver _producer;
-        private ConsumerObserver _consumer;
-        private string _providerToUseForConsumer;
+        private ILogger _logger = null!;
+        private ProducerObserver? _producer;
+        private ConsumerObserver? _consumer;
+        private string? _providerToUseForConsumer;
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            var activationId = RuntimeContext.Current.ActivationId;
+            var activationId = RuntimeContext.Current!.ActivationId;
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_ProducerConsumerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + activationId);
             _logger.LogInformation("OnActivateAsync");
             return Task.CompletedTask;
@@ -803,30 +803,30 @@ namespace UnitTests.Grains
 
         public Task ProduceSequentialSeries(int count)
         {
-            return _producer.ProduceSequentialSeries(count);
+            return _producer!.ProduceSequentialSeries(count);
         }
 
         public Task ProduceParallelSeries(int count)
         {
-            return _producer.ProduceParallelSeries(count);
+            return _producer!.ProduceParallelSeries(count);
         }
 
         public Task ProducePeriodicSeries(int count)
         {
-            return _producer.ProducePeriodicSeries(timerCallback =>
+            return _producer!.ProducePeriodicSeries(timerCallback =>
             {
-                return this.RegisterGrainTimer(timerCallback, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(10));
+                return this.RegisterGrainTimer(timerCallback, null!, TimeSpan.Zero, TimeSpan.FromMilliseconds(10));
             }, count);
         }
 
         public Task<int> GetItemsProduced()
         {
-            return _producer.ItemsProduced;
+            return _producer!.ItemsProduced;
         }
 
         public Task AddNewConsumerGrain(Guid consumerGrainId)
         {
-            return _producer.AddNewConsumerGrain(consumerGrainId);
+            return _producer!.AddNewConsumerGrain(consumerGrainId);
         }
 
         public async Task BecomeConsumer(Guid streamId, string providerToUse, string streamNamespace)
@@ -838,38 +838,38 @@ namespace UnitTests.Grains
 
         public async Task<int> GetItemsConsumed()
         {
-            return await _consumer.ItemsConsumed;
+            return await _consumer!.ItemsConsumed;
         }
 
         public async Task<int> GetExpectedItemsProduced()
         {
-            return await _producer.ExpectedItemsProduced;
+            return await _producer!.ExpectedItemsProduced;
         }
 
         public async Task<int> GetConsumerCount()
         {
-            return await _consumer.ConsumerCount;
+            return await _consumer!.ConsumerCount;
         }
 
         public async Task<int> GetProducerCount()
         {
-            return await _producer.ProducerCount;
+            return await _producer!.ProducerCount;
         }
 
         public async Task StopBeingConsumer()
         {
-            await _consumer.StopBeingConsumer(this.GetStreamProvider(_providerToUseForConsumer));
+            await _consumer!.StopBeingConsumer(this.GetStreamProvider(_providerToUseForConsumer!));
             _consumer = null;
         }
 
         public async Task StopBeingProducer()
         {
-            await _producer.StopBeingProducer();
+            await _producer!.StopBeingProducer();
         }
 
         public async Task VerifyFinished()
         {
-            await _producer.VerifyFinished();
+            await _producer!.VerifyFinished();
             _producer = null;
         }
 
@@ -889,12 +889,12 @@ namespace UnitTests.Grains
 
     public abstract class Streaming_ImplicitlySubscribedConsumerGrainBase : Grain, IStreamSubscriptionObserver
     {
-        private ILogger _logger;
-        private Dictionary<string, IConsumerObserver> _observers;
+        private ILogger _logger = null!;
+        private Dictionary<string, IConsumerObserver>? _observers;
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            var activationId = RuntimeContext.Current.ActivationId;
+            var activationId = RuntimeContext.Current!.ActivationId;
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_ImplicitConsumerGrain1 " + RuntimeIdentity + "/" + IdentityString + "/" + activationId);
             _logger.LogInformation("{Type}.OnActivateAsync", GetType().FullName);
             _observers = new Dictionary<string, IConsumerObserver>();
@@ -909,7 +909,7 @@ namespace UnitTests.Grains
 
         public async Task BecomeConsumer(Guid streamGuid, string providerToUse, string streamNamespace)
         {
-            if (_observers.ContainsKey(providerToUse))
+            if (_observers!.ContainsKey(providerToUse))
             {
                 throw new InvalidOperationException(string.Format("consumer already established for provider {0}.", providerToUse));
             }
@@ -927,7 +927,7 @@ namespace UnitTests.Grains
         public virtual async Task<int> GetItemsConsumed()
         {
             int result = 0;
-            foreach (var o in _observers.Values)
+            foreach (var o in _observers!.Values)
             {
                 result += await o.ItemsConsumed;
             }
@@ -952,7 +952,7 @@ namespace UnitTests.Grains
 
         public async Task StopBeingConsumer()
         {
-            await Task.WhenAll(_observers.Select(i => i.Value.StopBeingConsumer(this.GetStreamProvider(i.Key))));
+            await Task.WhenAll(_observers!.Select(i => i.Value.StopBeingConsumer(this.GetStreamProvider(i.Key))));
             _observers = null;
         }
 

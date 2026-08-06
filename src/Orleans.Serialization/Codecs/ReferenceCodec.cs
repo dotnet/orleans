@@ -3,6 +3,7 @@ using Orleans.Serialization.Session;
 using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Codecs
@@ -24,7 +25,10 @@ namespace Orleans.Serialization.Codecs
         /// This overload is suitable only for static codecs where expected type is statically known.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static bool TryWriteReferenceFieldExpected<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldId, object value) where TBufferWriter : IBufferWriter<byte>
+        internal static bool TryWriteReferenceFieldExpected<TBufferWriter>(
+            ref Writer<TBufferWriter> writer,
+            uint fieldId,
+            [NotNullWhen(false)] object? value) where TBufferWriter : IBufferWriter<byte>
         {
             if (!writer.Session.ReferencedObjects.GetOrAddReference(value, out var reference))
             {
@@ -49,8 +53,8 @@ namespace Orleans.Serialization.Codecs
         public static bool TryWriteReferenceField<TBufferWriter>(
             ref Writer<TBufferWriter> writer,
             uint fieldId,
-            Type expectedType,
-            object value) where TBufferWriter : IBufferWriter<byte>
+            Type? expectedType,
+            [NotNullWhen(false)] object? value) where TBufferWriter : IBufferWriter<byte>
         {
             if (!writer.Session.ReferencedObjects.GetOrAddReference(value, out var reference))
             {
@@ -77,9 +81,9 @@ namespace Orleans.Serialization.Codecs
         public static bool TryWriteReferenceField<TBufferWriter>(
             ref Writer<TBufferWriter> writer,
             uint fieldId,
-            Type expectedType,
+            Type? expectedType,
             Type actualType,
-            object value) where TBufferWriter : IBufferWriter<byte>
+            [NotNullWhen(false)] object? value) where TBufferWriter : IBufferWriter<byte>
         {
             if (!writer.Session.ReferencedObjects.GetOrAddReference(value, out var reference))
             {
@@ -116,7 +120,8 @@ namespace Orleans.Serialization.Codecs
         /// <param name="field">The field.</param>
         /// <returns>The referenced value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static T ReadReference<T, TInput>(ref Reader<TInput> reader, Field field) => (T)ReadReference(ref reader, field.FieldType ?? typeof(T));
+        [return: MaybeNull]
+        public static T ReadReference<T, TInput>(ref Reader<TInput> reader, Field field) => (T)ReadReference(ref reader, field.FieldType ?? typeof(T))!;
 
         /// <summary>
         /// Reads the reference.
@@ -126,7 +131,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="fieldType">The field type.</param>
         /// <returns>The referenced value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static object ReadReference<TInput>(ref Reader<TInput> reader, Type fieldType)
+        public static object? ReadReference<TInput>(ref Reader<TInput> reader, Type? fieldType)
         {
             MarkValueField(reader.Session);
             var reference = reader.ReadVarUInt32();
@@ -136,7 +141,7 @@ namespace Orleans.Serialization.Codecs
             return ReadReference(ref reader, fieldType, reference);
         }
 
-        private static object ReadReference<TInput>(ref Reader<TInput> reader, Type fieldType, uint reference)
+        private static object? ReadReference<TInput>(ref Reader<TInput> reader, Type? fieldType, uint reference)
         {
             var value = reader.Session.ReferencedObjects.TryGetReferencedObject(reference);
             if (value is null) throw new ReferenceNotFoundException(fieldType, reference);
@@ -148,9 +153,9 @@ namespace Orleans.Serialization.Codecs
             };
         }
 
-        private static object DeserializeFromMarker<TInput>(
+        private static object? DeserializeFromMarker<TInput>(
             ref Reader<TInput> reader,
-            Type fieldType,
+            Type? fieldType,
             UnknownFieldMarker marker,
             uint reference)
         {
@@ -171,7 +176,7 @@ namespace Orleans.Serialization.Codecs
                 fieldType = marker.Field.FieldType ?? fieldType;
 
                 // Get a serializer for that type.
-                var specificSerializer = session.CodecProvider.GetCodec(fieldType);
+                var specificSerializer = session.CodecProvider.GetCodec(fieldType!);
 
                 // Reset the session's reference id so that the deserialized objects overwrite the placeholder markers.
                 referencedObjects.CurrentReferenceId = reference - 1;
@@ -200,7 +205,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="session">The session.</param>
         /// <param name="value">The value.</param>
         /// <param name="referenceId">The reference identifier.</param>
-        public static void RecordObject(SerializerSession session, object value, uint referenceId) => session.ReferencedObjects.RecordReferenceField(value, referenceId);
+        public static void RecordObject(SerializerSession session, object? value, uint referenceId) => session.ReferencedObjects.RecordReferenceField(value, referenceId);
 
         /// <summary>
         /// Records and returns a placeholder reference id for objects which cannot be immediately deserialized.

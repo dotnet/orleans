@@ -18,9 +18,9 @@ public class FanoutBenchmark : IDisposable
 {
     private readonly ConsoleCancelEventHandler _onCancelEvent;
     private readonly List<IHost> hosts = new();
-    private readonly ITreeGrain grain;
-    private readonly IClusterClient client;
-    private readonly IHost clientHost;
+    private readonly ITreeGrain? grain;
+    private readonly IClusterClient? client;
+    private readonly IHost? clientHost;
 
     public FanoutBenchmark() : this(2, true) { }
 
@@ -93,23 +93,23 @@ public class FanoutBenchmark : IDisposable
 
         _onCancelEvent = CancelPressed;
         Console.CancelKeyPress += _onCancelEvent;
-        AppDomain.CurrentDomain.FirstChanceException += (object sender, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e) => Console.WriteLine("FIRST CHANCE EXCEPTION: " + LogFormatter.PrintException(e.Exception));
+        AppDomain.CurrentDomain.FirstChanceException += (object? sender, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e) => Console.WriteLine("FIRST CHANCE EXCEPTION: " + LogFormatter.PrintException(e.Exception));
         AppDomain.CurrentDomain.UnhandledException += (object sender, UnhandledExceptionEventArgs e) => Console.WriteLine("UNHANDLED EXCEPTION: " + LogFormatter.PrintException((Exception)e.ExceptionObject));
     }
 
-    private void CancelPressed(object sender, ConsoleCancelEventArgs e)
+    private void CancelPressed(object? sender, ConsoleCancelEventArgs e)
     {
         Environment.Exit(0);
     }
 
     [Benchmark]
-    public ValueTask Ping() => grain.Ping();
+    public ValueTask Ping() => grain!.Ping();
 
     public async Task PingForever()
     {
         while (true)
         {
-            await grain.Ping();
+            await grain!.Ping();
         }
     }
 

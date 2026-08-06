@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
@@ -23,7 +24,11 @@ namespace Orleans.GrainReferences
     /// </summary>
     public sealed class GrainReferenceActivator
     {
-        private readonly object _lockObj = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock _lockObj = new();
+#else
+        private readonly object _lockObj = new();
+#endif
         private readonly IServiceProvider _serviceProvider;
         private readonly IGrainReferenceActivatorProvider[] _providers;
         private Dictionary<(GrainType, GrainInterfaceType), IGrainReferenceActivator> _activators = new();
@@ -71,7 +76,7 @@ namespace Orleans.GrainReferences
             {
                 if (!_activators.TryGetValue((grainType, interfaceType), out var entry))
                 {
-                    IGrainReferenceActivator activator = null;
+                    IGrainReferenceActivator? activator = null;
                     foreach (var provider in _providers)
                     {
                         if (provider.TryGet(grainType, interfaceType, out activator))
@@ -103,7 +108,7 @@ namespace Orleans.GrainReferences
         private readonly CodecProvider _codecProvider;
         private readonly GrainVersionManifest _versionManifest;
         private readonly IServiceProvider _serviceProvider;
-        private IGrainReferenceRuntime _grainReferenceRuntime;
+        private IGrainReferenceRuntime? _grainReferenceRuntime;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="UntypedGrainReferenceActivatorProvider"/> class.
@@ -125,7 +130,7 @@ namespace Orleans.GrainReferences
         }
 
         /// <inheritdoc />
-        public bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, out IGrainReferenceActivator activator)
+        public bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, [NotNullWhen(true)] out IGrainReferenceActivator? activator)
         {
             if (!interfaceType.IsDefault)
             {
@@ -216,7 +221,7 @@ namespace Orleans.GrainReferences
             static Type GetMainInterface(Type t)
             {
                 var all = t.GetInterfaces();
-                Type result = null;
+                Type? result = null;
                 foreach (var candidate in all)
                 {
                     if (result is null)
@@ -234,8 +239,8 @@ namespace Orleans.GrainReferences
 
                 return result switch
                 {
-                    { IsGenericType: true } => result.GetGenericTypeDefinition(),
-                    _ => result
+                    { IsGenericType: true } => result!.GetGenericTypeDefinition(),
+                    _ => result!
                 };
             }
         }
@@ -246,10 +251,10 @@ namespace Orleans.GrainReferences
         /// <param name="interfaceType">The grain interface type.</param>
         /// <param name="result">The proxy object type.</param>
         /// <returns>A value indicating whether a suitable type was found and was able to be constructed.</returns>
-        public bool TryGet(GrainInterfaceType interfaceType, [NotNullWhen(true)] out Type result)
+        public bool TryGet(GrainInterfaceType interfaceType, [NotNullWhen(true)] out Type? result)
         {
             GrainInterfaceType lookupId;
-            Type[] args;
+            Type[]? args;
             if (GenericGrainInterfaceType.TryParse(interfaceType, out var genericId))
             {
                 lookupId = genericId.GetGenericGrainType().Value;
@@ -286,7 +291,7 @@ namespace Orleans.GrainReferences
         private readonly GrainPropertiesResolver _propertiesResolver;
         private readonly RpcProvider _rpcProvider;
         private readonly GrainVersionManifest _grainVersionManifest;
-        private IGrainReferenceRuntime _grainReferenceRuntime;
+        private IGrainReferenceRuntime? _grainReferenceRuntime;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainReferenceActivatorProvider"/> class.
@@ -314,7 +319,7 @@ namespace Orleans.GrainReferences
         }
 
         /// <inheritdoc />
-        public bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, out IGrainReferenceActivator activator)
+        public bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, [NotNullWhen(true)] out IGrainReferenceActivator? activator)
         {
             if (!_rpcProvider.TryGet(interfaceType, out var proxyType))
             {
@@ -393,7 +398,7 @@ namespace Orleans.GrainReferences
         /// <param name="interfaceType">The grain interface type.</param>
         /// <param name="activator">The grain activator.</param>
         /// <returns>A value indicating whether a suitable grain activator was found.</returns>
-        bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, [NotNullWhen(true)] out IGrainReferenceActivator activator);
+        bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, [NotNullWhen(true)] out IGrainReferenceActivator? activator);
     }
 
     /// <summary>

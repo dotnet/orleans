@@ -1,3 +1,5 @@
+using Docker.DotNet;
+using DotNet.Testcontainers.Configurations;
 using Testcontainers.Azurite;
 using Xunit;
 
@@ -12,10 +14,16 @@ namespace TestExtensions;
 public static class AzuriteContainerManager
 {
     private const string ConnectionStringEnvVar = "ORLEANS_AZURITE_CONNECTION_STRING";
+    private const string DockerUnavailableSkipReason = "Docker is unavailable, so Azure Storage tests are skipped.";
+    private const string WindowsDockerModeSkipReason = "Docker is running in Windows container mode, so Azure Storage tests are skipped.";
 
-    private static readonly AzuriteContainer _container = new AzuriteBuilder()
-        .WithImage("mcr.microsoft.com/azure-storage/azurite:3.35.0")
+    private static readonly AzuriteContainer _container = new AzuriteBuilder(
+        "mcr.microsoft.com/azure-storage/azurite:3.35.0@sha256:647c63a91102a9d8e8000aab803436e1fc85fbb285e7ce830a82ee5d6661cf37")
+        .WithCommand("--skipApiVersionCheck")
         .Build();
+
+    private static readonly Lazy<string?> DockerDaemonOsTypeLazy = new(GetDockerDaemonOsType);
+    private static readonly Lazy<string?> EnsureStartedSkipReasonLazy = new(() => EnsureStartedAndGetSkipReasonAsync().GetAwaiter().GetResult());
 
     /// <summary>
     /// Gets the connection string for the running Azurite container.
@@ -35,8 +43,6 @@ public static class AzuriteContainerManager
         }
     }
 
-    private static readonly Lazy<bool> _ensureStartedLazy = new(() => EnsureStartedAsync().Result);
-
     /// <summary>
     /// Ensures Azurite is available by starting the container if not already running.
     /// If the connection string is already available via environment variable (e.g. in a child process),
@@ -48,8 +54,9 @@ public static class AzuriteContainerManager
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(ConnectionStringEnvVar)))
             return;
 
-        if (!_ensureStartedLazy.Value)
-            throw new SkipException("Azurite container could not be started. Skipping.");
+        var skipReason = EnsureStartedSkipReasonLazy.Value;
+        if (skipReason is not null)
+            throw new SkipException(skipReason);
     }
 
     /// <summary>
@@ -60,19 +67,74 @@ public static class AzuriteContainerManager
     /// <returns><see langword="true"/> if Azurite is available; <see langword="false"/> if it could not be started.</returns>
     public static async Task<bool> EnsureStartedAsync()
     {
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(ConnectionStringEnvVar)))
+            return true;
+
+        return await EnsureStartedAndGetSkipReasonAsync() is null;
+    }
+
+    private static async Task<string?> EnsureStartedAndGetSkipReasonAsync()
+    {
+        var skipReason = GetDockerSkipReason();
+        if (skipReason is not null)
+            return skipReason;
+
         try
         {
             await _container.StartAsync();
             Environment.SetEnvironmentVariable(ConnectionStringEnvVar, _container.GetConnectionString());
-            return true;
+            return null;
+        }
+        catch (HttpRequestException exception)
+        {
+            return $"{DockerUnavailableSkipReason} {exception.Message}";
+        }
+        catch (OperationCanceledException exception)
+        {
+            return $"{DockerUnavailableSkipReason} {exception.Message}";
+        }
+        catch (DockerApiException exception)
+        {
+            return $"{DockerUnavailableSkipReason} {exception.Message}";
+        }
+    }
+
+    private static string? GetDockerSkipReason()
+    {
+        var dockerDaemonOsType = DockerDaemonOsTypeLazy.Value;
+        if (string.IsNullOrWhiteSpace(dockerDaemonOsType))
+            return DockerUnavailableSkipReason;
+
+        return string.Equals(dockerDaemonOsType, "windows", StringComparison.OrdinalIgnoreCase)
+            ? WindowsDockerModeSkipReason
+            : null;
+    }
+
+    private static string? GetDockerDaemonOsType()
+    {
+        try
+        {
+            using var dockerClient = TestcontainersSettings.OS.DockerEndpointAuthConfig
+                .GetDockerClientConfiguration(Guid.NewGuid())
+                .CreateClient();
+            var dockerInfo = dockerClient.System.GetSystemInfoAsync().GetAwaiter().GetResult();
+            return dockerInfo.OSType;
         }
         catch (HttpRequestException)
         {
-            return false;
+            return null;
         }
         catch (OperationCanceledException)
         {
-            return false;
+            return null;
+        }
+        catch (DockerApiException)
+        {
+            return null;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
         }
     }
 }

@@ -63,12 +63,12 @@ namespace TestGrains
 
         private static readonly ConcurrentDictionary<Guid, FaultsState> FaultInjectionTracker = new ConcurrentDictionary<Guid, FaultsState>();
 
-        private FaultsState myFaults;
+        private FaultsState? myFaults;
         private FaultsState Faults { get { return myFaults ?? (myFaults = FaultInjectionTracker.GetOrAdd(this.GetPrimaryKey(), key => new FaultsState())); } }
      
         // grain instance state
         private readonly ILogger logger;
-        private IAsyncStream<GeneratedEvent> stream;
+        private IAsyncStream<GeneratedEvent> stream = null!;
 
         public ImplicitSubscription_TransientError_RecoverableStream_CollectorGrain(ILoggerFactory loggerFactory)
         {
@@ -91,18 +91,18 @@ namespace TestGrains
             }
 
             var streamProvider = this.GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
-            stream = streamProvider.GetStream<GeneratedEvent>(State.StreamNamespace, State.StreamGuid);
+            stream = streamProvider.GetStream<GeneratedEvent>(State.StreamNamespace!, State.StreamGuid); // The namespace is initialized above before the stream is retrieved.
             foreach (StreamSubscriptionHandle<GeneratedEvent> handle in await stream.GetAllSubscriptionHandles())
             {
                 await handle.ResumeAsync(OnNextAsync, OnErrorAsync, State.RecoveryToken);
             }
         }
 
-        private async Task OnNextAsync(GeneratedEvent evt, StreamSequenceToken sequenceToken)
+        private async Task OnNextAsync(GeneratedEvent evt, StreamSequenceToken? sequenceToken)
         {
 
             // ignore duplicates
-            if (State.IsDuplicate(sequenceToken))
+            if (State.IsDuplicate(sequenceToken!)) // Generated streams always provide sequence tokens.
             {
                 logger.LogInformation("Received duplicate event.  StreamGuid: {StreamGuid}, SequenceToken: {SequenceToken}", State.StreamGuid, sequenceToken);
                 return;
@@ -115,7 +115,7 @@ namespace TestGrains
 
             // We will only update the start token if this is the first event we're processed
             // In that case, we'll want to save the start token in case something goes wrong.
-            if (State.TryUpdateStartToken(sequenceToken))
+            if (State.TryUpdateStartToken(sequenceToken!)) // Generated streams always provide sequence tokens.
             {
                 Faults.onFirstMessageFault.TryFire(InjectFault);
                 await WriteStateAsync();

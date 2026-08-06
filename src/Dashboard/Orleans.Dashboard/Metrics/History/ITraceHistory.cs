@@ -17,5 +17,5 @@ internal interface ITraceHistory
 
     IEnumerable<TraceAggregate> GroupByGrainAndSilo();
 
-    IEnumerable<GrainMethodAggregate> AggregateByGrainMethod(string[] exclusions = null);
+    IEnumerable<GrainMethodAggregate> AggregateByGrainMethod(string[]? exclusions = null);
 }

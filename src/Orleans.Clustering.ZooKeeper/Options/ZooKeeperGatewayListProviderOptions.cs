@@ -1,4 +1,4 @@
-﻿namespace Orleans.Configuration
+namespace Orleans.Configuration
 {
     public class ZooKeeperGatewayListProviderOptions
     {
@@ -6,6 +6,6 @@
         /// Connection string for ZooKeeper storage
         /// </summary>
         [Redact]
-        public string ConnectionString { get; set; }
+        public string ConnectionString { get; set; } = null!;
     }
 }

@@ -4,7 +4,7 @@ namespace UnitTests.Grains
 {
     public class ClientAddressableTestConsumerGrain : Grain, IClientAddressableTestConsumer
     {
-        private IClientAddressableTestProducer producer;
+        private IClientAddressableTestProducer producer = null!;
         
         public async Task<int> PollProducer()
         {

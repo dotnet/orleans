@@ -26,12 +26,12 @@ namespace Orleans.Streams
             LogCreatedPersistentStreamProducer(logger, stream, typeof(T), this.queueAdapter.Name);
         }
 
-        public Task OnNextAsync(T item, StreamSequenceToken token)
+        public Task OnNextAsync(T item, StreamSequenceToken? token)
         {
             return this.queueAdapter.QueueMessageAsync(this.stream.StreamId, item, token, RequestContextExtensions.Export(this.deepCopier));
         }
 
-        public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken token)
+        public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken? token)
         {
             return this.queueAdapter.QueueMessageBatchAsync(this.stream.StreamId, batch, token, RequestContextExtensions.Export(this.deepCopier));
 

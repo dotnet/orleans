@@ -14,7 +14,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Adds a custom storage log consistency provider as default consistency provider"/>
         /// </summary>
-        public static ISiloBuilder AddCustomStorageBasedLogConsistencyProviderAsDefault(this ISiloBuilder builder, string primaryCluster = null)
+        public static ISiloBuilder AddCustomStorageBasedLogConsistencyProviderAsDefault(this ISiloBuilder builder, string? primaryCluster = null)
         {
             return builder.AddCustomStorageBasedLogConsistencyProvider(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, primaryCluster);
         }
@@ -22,19 +22,19 @@ namespace Orleans.Hosting
         /// <summary>
         /// Adds a custom storage log consistency provider"/>
         /// </summary>
-        public static ISiloBuilder AddCustomStorageBasedLogConsistencyProvider(this ISiloBuilder builder, string name = "LogStorage", string primaryCluster = null)
+        public static ISiloBuilder AddCustomStorageBasedLogConsistencyProvider(this ISiloBuilder builder, string name = "LogStorage", string? primaryCluster = null)
         {
             return builder.ConfigureServices(services => services.AddCustomStorageBasedLogConsistencyProvider(name, primaryCluster));
         }
 
-        internal static void AddCustomStorageBasedLogConsistencyProvider(this IServiceCollection services, string name, string primaryCluster)
+        internal static void AddCustomStorageBasedLogConsistencyProvider(this IServiceCollection services, string name, string? primaryCluster)
         {
             services.AddLogConsistencyProtocolServicesFactory();
             services.AddOptions<CustomStorageLogConsistencyOptions>(name)
                     .Configure(options => options.PrimaryCluster = primaryCluster);
             services.ConfigureNamedOptionForLogging<CustomStorageLogConsistencyOptions>(name)
                 .AddKeyedSingleton<ILogViewAdaptorFactory>(name, (sp, key) => LogConsistencyProviderFactory.Create(sp, key as string))
-                .TryAddSingleton<ILogViewAdaptorFactory>(sp => sp.GetKeyedService<ILogViewAdaptorFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+                .TryAddSingleton<ILogViewAdaptorFactory>(sp => sp.GetKeyedService<ILogViewAdaptorFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)!);
         }
     }
 }

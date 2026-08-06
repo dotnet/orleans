@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -15,7 +14,7 @@ using StackExchange.Redis;
 
 namespace Orleans.GrainDirectory.Redis
 {
-    public partial class RedisGrainDirectory : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle>
+    public partial class RedisGrainDirectory : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle>, IDisposable, IAsyncDisposable
     {
         private readonly RedisGrainDirectoryOptions _directoryOptions;
         private readonly ClusterOptions _clusterOptions;
@@ -26,6 +25,7 @@ namespace Orleans.GrainDirectory.Redis
         // Both are initialized in the Initialize method.
         private IConnectionMultiplexer _redis = null!;
         private IDatabase _database = null!;
+        private bool _redisIsShared;
 
         private bool _disposed;
 
@@ -173,12 +173,12 @@ namespace Orleans.GrainDirectory.Redis
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(nameof(RedisGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, Initialize, Uninitialize);
+            lifecycle.Subscribe(nameof(RedisGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, Initialize);
         }
 
         public async Task Initialize(CancellationToken ct = default)
         {
-            _redis = await _directoryOptions.CreateMultiplexer(_directoryOptions);
+            (_redis, _redisIsShared) = await _directoryOptions.CreateMultiplexer(_directoryOptions);
 
             // Configure logging
             _redis.ConnectionRestored += LogConnectionRestored;
@@ -189,16 +189,53 @@ namespace Orleans.GrainDirectory.Redis
             _database = _redis.GetDatabase();
         }
 
-        private async Task Uninitialize(CancellationToken arg)
+        public void Dispose()
         {
-            if (_redis != null && _redis.IsConnected)
-            {
-                _disposed = true;
+            _disposed = true;
 
-                await _redis.CloseAsync();
-                _redis.Dispose();
-                _redis = null!;
-                _database = null!;
+            var redis = _redis;
+            if (redis is null)
+            {
+                return;
+            }
+
+            var redisIsShared = _redisIsShared;
+            redis.ConnectionRestored -= LogConnectionRestored;
+            redis.ConnectionFailed -= LogConnectionFailed;
+            redis.ErrorMessage -= LogErrorMessage;
+            redis.InternalError -= LogInternalError;
+            _redis = null!;
+            _database = null!;
+            _redisIsShared = false;
+
+            if (!redisIsShared)
+            {
+                redis.Dispose();
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            _disposed = true;
+
+            var redis = _redis;
+            if (redis is null)
+            {
+                return;
+            }
+
+            var redisIsShared = _redisIsShared;
+            redis.ConnectionRestored -= LogConnectionRestored;
+            redis.ConnectionFailed -= LogConnectionFailed;
+            redis.ErrorMessage -= LogErrorMessage;
+            redis.InternalError -= LogInternalError;
+            _redis = null!;
+            _database = null!;
+            _redisIsShared = false;
+
+            if (!redisIsShared)
+            {
+                await redis.DisposeAsync().ConfigureAwait(false);
             }
         }
 

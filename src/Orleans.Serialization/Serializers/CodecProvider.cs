@@ -2,6 +2,8 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Activators;
@@ -19,7 +21,11 @@ namespace Orleans.Serialization.Serializers
     {
         private static readonly Type ObjectType = typeof(object);
 
+#if NET9_0_OR_GREATER
+        private readonly Lock _initializationLock = new();
+#else
         private readonly object _initializationLock = new();
+#endif
 
         private readonly ConcurrentDictionary<Type, IFieldCodec> _untypedCodecs = new();
         private readonly ConcurrentDictionary<Type, IFieldCodec> _typedCodecs = new();
@@ -135,7 +141,7 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
-        public IFieldCodec<TField> TryGetCodec<TField>()
+        public IFieldCodec<TField>? TryGetCodec<TField>()
         {
             var fieldType = typeof(TField);
             if (_typedCodecs.TryGetValue(fieldType, out var existing))
@@ -163,7 +169,7 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
-        public IFieldCodec TryGetCodec(Type fieldType)
+        public IFieldCodec? TryGetCodec(Type fieldType)
         {
             // If the field type is unavailable, return the void codec which can at least handle references.
             return fieldType is null ? _voidCodec
@@ -171,7 +177,7 @@ namespace Orleans.Serialization.Serializers
                 : TryCreateCodec(fieldType) is { } res ? _untypedCodecs.GetOrAdd(fieldType, res) : null;
         }
 
-        private IFieldCodec TryCreateCodec(Type fieldType)
+        private IFieldCodec? TryCreateCodec(Type fieldType)
         {
             if (!_initialized) Initialize();
 
@@ -214,7 +220,7 @@ namespace Orleans.Serialization.Serializers
             return (IActivator<T>)res;
         }
 
-        private IBaseCodec<TField> TryCreateBaseCodec<TField>(Type fieldType) where TField : class
+        private IBaseCodec<TField>? TryCreateBaseCodec<TField>(Type fieldType) where TField : class
         {
             if (!_initialized) Initialize();
 
@@ -301,7 +307,7 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
-        public IDeepCopier<T> TryGetDeepCopier<T>()
+        public IDeepCopier<T>? TryGetDeepCopier<T>()
         {
             var type = typeof(T);
             if (_typedCopiers.TryGetValue(type, out var existing))
@@ -329,7 +335,7 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
-        public IDeepCopier TryGetDeepCopier(Type fieldType)
+        public IDeepCopier? TryGetDeepCopier(Type fieldType)
         {
             // If the field type is unavailable, return the void copier which can at least handle references.
             return fieldType is null ? _voidCopier
@@ -338,7 +344,7 @@ namespace Orleans.Serialization.Serializers
                 : null;
         }
 
-        private IDeepCopier TryCreateCopier(Type fieldType)
+        private IDeepCopier? TryCreateCopier(Type fieldType)
         {
             if (!_initialized) Initialize();
 
@@ -362,13 +368,13 @@ namespace Orleans.Serialization.Serializers
             return fieldType.IsInterface || fieldType.IsAbstract ? _objectCopier : null;
         }
 
-        private object GetValueSerializerInner(Type concreteType, Type searchType)
+        private object? GetValueSerializerInner(Type concreteType, Type searchType)
         {
             if (!_initialized) Initialize();
 
             ThrowIfUnsupportedType(concreteType);
 
-            object[] constructorArguments = null;
+            object[]? constructorArguments = null;
             if (_valueSerializers.TryGetValue(searchType, out var serializerType))
             {
                 if (serializerType.IsGenericTypeDefinition)
@@ -393,13 +399,13 @@ namespace Orleans.Serialization.Serializers
             return result;
         }
 
-        private object GetBaseCopierInner(Type concreteType, Type searchType)
+        private object? GetBaseCopierInner(Type concreteType, Type searchType)
         {
             if (!_initialized) Initialize();
 
             ThrowIfUnsupportedType(concreteType);
 
-            object[] constructorArguments = null;
+            object[]? constructorArguments = null;
             if (_baseCopiers.TryGetValue(searchType, out var copierType))
             {
                // Use the detected copier type. 
@@ -473,7 +479,7 @@ namespace Orleans.Serialization.Serializers
             }
         }
 
-        private object GetServiceOrCreateInstance(Type type, object[] constructorArguments = null)
+        private object GetServiceOrCreateInstance(Type type, object[]? constructorArguments = null)
         {
             var result = OrleansGeneratedCodeHelper.TryGetService(type);
             if (result != null)
@@ -491,12 +497,12 @@ namespace Orleans.Serialization.Serializers
             return result;
         }
 
-        private IFieldCodec CreateCodecInstance(Type fieldType, Type searchType)
+        private IFieldCodec? CreateCodecInstance(Type fieldType, Type searchType)
         {
             if (searchType == ObjectType)
                 return _objectCodec;
 
-            object[] constructorArguments = null;
+            object[]? constructorArguments = null;
             if (_fieldCodecs.TryGetValue(searchType, out var codecType))
             {
                 if (codecType.IsGenericTypeDefinition)
@@ -530,7 +536,7 @@ namespace Orleans.Serialization.Serializers
             {
                 // Depending on the type of the array, select the base array codec or the multi-dimensional codec.
                 var arrayCodecType = fieldType.IsSZArray ? typeof(ArrayCodec<>) : typeof(MultiDimensionalArrayCodec<>);
-                codecType = arrayCodecType.MakeGenericType(fieldType.GetElementType());
+                codecType = arrayCodecType.MakeGenericType(fieldType.GetElementType()!);
             }
             else if (fieldType.IsEnum)
             {
@@ -543,7 +549,7 @@ namespace Orleans.Serialization.Serializers
             }
             else if (searchType.BaseType is object
                 && CreateCodecInstance(
-                    fieldType.BaseType,
+                    fieldType.BaseType!,
                     searchType.BaseType switch
                     {
                         { IsConstructedGenericType: true } => searchType.BaseType.GetGenericTypeDefinition(),
@@ -557,7 +563,7 @@ namespace Orleans.Serialization.Serializers
             return codecType != null ? (IFieldCodec)GetServiceOrCreateInstance(codecType, constructorArguments) : null;
         }
 
-        private bool TryGetSurrogateCodec(Type fieldType, Type searchType, out Type surrogateCodecType, out object[] constructorArguments)
+        private bool TryGetSurrogateCodec(Type fieldType, Type searchType, [NotNullWhen(true)] out Type? surrogateCodecType, [NotNullWhen(true)] out object[]? constructorArguments)
         {
             if (_converters.TryGetValue(searchType, out var converterType))
             {
@@ -600,9 +606,9 @@ namespace Orleans.Serialization.Serializers
             return false;
         }
 
-        private IBaseCodec CreateBaseCodecInstance(Type fieldType, Type searchType)
+        private IBaseCodec? CreateBaseCodecInstance(Type fieldType, Type searchType)
         {
-            object[] constructorArguments = null;
+            object[]? constructorArguments = null;
             if (_baseCodecs.TryGetValue(searchType, out var codecType))
             {
                 if (codecType.IsGenericTypeDefinition)
@@ -618,12 +624,12 @@ namespace Orleans.Serialization.Serializers
             return codecType != null ? (IBaseCodec)GetServiceOrCreateInstance(codecType, constructorArguments) : null;
         }
 
-        private IDeepCopier CreateCopierInstance(Type fieldType, Type searchType)
+        private IDeepCopier? CreateCopierInstance(Type fieldType, Type searchType)
         {
             if (searchType == ObjectType)
                 return _objectCopier;
 
-            object[] constructorArguments = null;
+            object[]? constructorArguments = null;
             if (_copiers.TryGetValue(searchType, out var copierType))
             {
                 if (copierType.IsGenericTypeDefinition)
@@ -639,46 +645,55 @@ namespace Orleans.Serialization.Serializers
             {
                 // Depending on the type of the array, select the base array copier or the multi-dimensional copier.
                 var arrayCopierType = fieldType.IsSZArray ? typeof(ArrayCopier<>) : typeof(MultiDimensionalArrayCopier<>);
-                copierType = arrayCopierType.MakeGenericType(fieldType.GetElementType());
+                copierType = arrayCopierType.MakeGenericType(fieldType.GetElementType()!);
             }
             else if (TryGetSurrogateCodec(fieldType, searchType, out var surrogateCodecType, out constructorArguments))
             {
                 copierType = surrogateCodecType;
             }
-            else if (searchType.BaseType is { } baseType)
+            else if (searchType.BaseType is { } baseType
+                && CreateCopierInstance(
+                    fieldType.BaseType!,
+                    baseType switch
+                    {
+                        { IsConstructedGenericType: true } => baseType.GetGenericTypeDefinition(),
+                        _ => baseType
+                    }) is IDerivedTypeCopier derivedTypeCopier)
             {
-                // Find copiers which generalize over all subtypes.
-                if (CreateCopierInstance(fieldType, baseType) is IDerivedTypeCopier baseCopier)
-                {
-                    return baseCopier;
-                }
-                else if (baseType.IsGenericType
-                    && baseType.IsConstructedGenericType
-                    && CreateCopierInstance(fieldType, baseType.GetGenericTypeDefinition()) is IDerivedTypeCopier genericBaseCopier)
-                {
-                    return genericBaseCopier;
-                }
+                // Find copiers which generalize over all subtypes. The field type and search type are advanced in
+                // lockstep so that the generic arguments used to construct the copier always match the arity of the
+                // copier's declared type, even when a subtype changes arity (e.g. the internal frozen collection types).
+                return derivedTypeCopier;
             }
 
             return copierType != null ? (IDeepCopier)GetServiceOrCreateInstance(copierType, constructorArguments) : null;
         }
 
+        [DoesNotReturn]
         private static void ThrowPointerType(Type fieldType) => throw new NotSupportedException($"Type {fieldType} is a pointer type and is therefore not supported.");
 
+        [DoesNotReturn]
         private static void ThrowByRefType(Type fieldType) => throw new NotSupportedException($"Type {fieldType} is a by-ref type and is therefore not supported.");
 
+        [DoesNotReturn]
         private static void ThrowGenericTypeDefinition(Type fieldType) => throw new InvalidOperationException($"Type {fieldType} is a non-constructed generic type and is therefore unsupported.");
 
+        [DoesNotReturn]
         private static void ThrowCodecNotFound(Type fieldType) => throw new CodecNotFoundException($"Could not find a codec for type {fieldType}.");
 
+        [DoesNotReturn]
         private static void ThrowCopierNotFound(Type type) => throw new CodecNotFoundException($"Could not find a copier for type {type}.");
 
+        [DoesNotReturn]
         private static void ThrowBaseCodecNotFound(Type fieldType) => throw new KeyNotFoundException($"Could not find a base type serializer for type {fieldType}.");
 
+        [DoesNotReturn]
         private static void ThrowValueSerializerNotFound(Type fieldType) => throw new KeyNotFoundException($"Could not find a value serializer for type {fieldType}.");
 
+        [DoesNotReturn]
         private static void ThrowActivatorNotFound(Type type) => throw new KeyNotFoundException($"Could not find an activator for type {type}.");
 
+        [DoesNotReturn]
         private static void ThrowBaseCopierNotFound(Type type) => throw new KeyNotFoundException($"Could not find a base type copier for type {type}.");
     }
 }

@@ -13,7 +13,7 @@ namespace TestGrains
         public const string StreamNamespace = "Generated";
 
         private readonly ILogger logger;
-        private IAsyncStream<GeneratedEvent> stream;
+        private IAsyncStream<GeneratedEvent> stream = null!;
         private int accumulated;
 
         public GeneratedEventCollectorGrain(ILoggerFactory loggerFactory)

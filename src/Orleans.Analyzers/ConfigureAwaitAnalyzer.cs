@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Analyzers;
 
@@ -122,7 +123,7 @@ public class ConfigureAwaitAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private static bool IsConfigureAwaitCall(InvocationExpressionSyntax invocation, out string methodName)
+    private static bool IsConfigureAwaitCall(InvocationExpressionSyntax invocation, [NotNullWhen(true)] out string? methodName)
     {
         methodName = null;
 
@@ -162,7 +163,7 @@ public class ConfigureAwaitAnalyzer : DiagnosticAnalyzer
         return false;
     }
 
-    private static bool IsTaskLikeType(INamedTypeSymbol type)
+    private static bool IsTaskLikeType(INamedTypeSymbol? type)
     {
         if (type is null)
         {
@@ -180,7 +181,7 @@ public class ConfigureAwaitAnalyzer : DiagnosticAnalyzer
             || fullName.StartsWith("System.Runtime.CompilerServices.ConfiguredCancelableAsyncEnumerable", StringComparison.Ordinal);
     }
 
-    private static bool IsConfigureAwaitOptionsType(ITypeSymbol type)
+    private static bool IsConfigureAwaitOptionsType(ITypeSymbol? type)
     {
         if (type is null)
         {

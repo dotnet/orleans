@@ -14,7 +14,7 @@ namespace Orleans.Providers.Streams.Common
         private readonly StreamId streamId;
         private readonly SimpleQueueCache cache;
         private readonly ILogger logger;
-        private IBatchContainer current; // this is a pointer to the current element in the cache. It is what will be returned by GetCurrent().
+        private IBatchContainer? current; // this is a pointer to the current element in the cache. It is what will be returned by GetCurrent().
 
         // This is also a pointer to the current element in the cache. It differs from current, in
         // that current is just the batch, and is null before the first call to MoveNext after
@@ -23,8 +23,8 @@ namespace Orleans.Providers.Streams.Common
         // needed to implement the Enumerator pattern properly, since in that pattern MoveNext gets called
         // before the first access of (Get)Current.
 
-        internal LinkedListNode<SimpleQueueCacheItem> Element { get; private set; }
-        internal StreamSequenceToken SequenceToken { get; private set; }
+        internal LinkedListNode<SimpleQueueCacheItem>? Element { get; private set; }
+        internal StreamSequenceToken? SequenceToken { get; private set; }
 
         internal bool IsSet => Element != null;
 
@@ -35,7 +35,7 @@ namespace Orleans.Providers.Streams.Common
             SequenceToken = item.Value.SequenceToken;
         }
 
-        internal void UnSet(StreamSequenceToken token)
+        internal void UnSet(StreamSequenceToken? token)
         {
             Element = null;
             SequenceToken = token;
@@ -62,7 +62,7 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public virtual IBatchContainer GetCurrent(out Exception exception)
+        public virtual IBatchContainer? GetCurrent(out Exception? exception)
         {
             LogDebugGetCurrent(current);
 
@@ -73,13 +73,13 @@ namespace Orleans.Providers.Streams.Common
         /// <inheritdoc />
         public virtual bool MoveNext()
         {
-            if (current == null && IsSet && IsInStream(Element.Value.Batch))
+            if (current == null && IsSet && IsInStream(Element!.Value.Batch)) // IsSet is true, so Element is non-null.
             {
-                current = Element.Value.Batch;
+                current = Element!.Value.Batch;
                 return true;
             }
 
-            IBatchContainer next;
+            IBatchContainer? next;
             while (cache.TryGetNextMessage(this, out next))
             {
                 if(IsInStream(next))
@@ -106,11 +106,11 @@ namespace Orleans.Providers.Streams.Common
         {
             if (IsSet && current != null)
             {
-                Element.Value.DeliveryFailure = true;
+                Element!.Value.DeliveryFailure = true; // IsSet is true, so Element is non-null.
             }
         }
 
-        private bool IsInStream(IBatchContainer batchContainer)
+        private bool IsInStream(IBatchContainer? batchContainer)
         {
             return batchContainer != null &&
                     batchContainer.StreamId.Equals(this.streamId);
@@ -151,6 +151,6 @@ namespace Orleans.Providers.Streams.Common
             Level = LogLevel.Debug,
             Message = "SimpleQueueCacheCursor.GetCurrent: {Current}"
         )]
-        private partial void LogDebugGetCurrent(IBatchContainer current);
+        private partial void LogDebugGetCurrent(IBatchContainer? current);
     }
 }

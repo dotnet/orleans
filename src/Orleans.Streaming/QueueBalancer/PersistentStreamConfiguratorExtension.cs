@@ -64,9 +64,9 @@ namespace Orleans.Hosting
         /// <param name="configurator">The configuration builder.</param>
         /// <param name="configureOptions">The configure options.</param>
         public static void UseLeaseBasedQueueBalancer(this ISiloPersistentStreamConfigurator configurator, 
-            Action<OptionsBuilder<LeaseBasedQueueBalancerOptions>> configureOptions = null)
+            Action<OptionsBuilder<LeaseBasedQueueBalancerOptions>>? configureOptions = null)
         {
-            configurator.ConfigurePartitionBalancing((s, n) => LeaseBasedQueueBalancer.Create(s, n),
+            configurator.ConfigureComponent((s, n) => LeaseBasedQueueBalancer.Create(s, n),
                 configureOptions);
         }
     }

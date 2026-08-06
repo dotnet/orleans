@@ -245,7 +245,7 @@ namespace Orleans.TestingHost.Tests
     /// </summary>
     public class TestClusterTests : IAsyncLifetime
     {
-        private TestCluster _testCluster;
+        private TestCluster? _testCluster;
 
         /// <summary>
         /// Tests basic TestCluster initialization and grain communication.

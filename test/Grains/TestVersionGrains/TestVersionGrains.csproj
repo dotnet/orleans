@@ -7,6 +7,7 @@
     <PublishRoot>bin\$(Configuration)\publish\</PublishRoot>
     <PublishDir>$(PublishRoot)$(TargetFramework)</PublishDir>
     <SatelliteResourceLanguages>en-US</SatelliteResourceLanguages>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <!-- Declare that this is version 1 of our code. This is used for #ifdefs in the code -->

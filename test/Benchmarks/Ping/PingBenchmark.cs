@@ -16,9 +16,9 @@ public class PingBenchmark : IDisposable
 {
     private readonly ConsoleCancelEventHandler _onCancelEvent;
     private readonly List<IHost> hosts = new List<IHost>();
-    private readonly IPingGrain grain;
-    private readonly IClusterClient client;
-    private readonly IHost clientHost;
+    private readonly IPingGrain? grain;
+    private readonly IClusterClient? client;
+    private readonly IHost? clientHost;
 
     public PingBenchmark() : this(1, true) { }
 
@@ -77,41 +77,41 @@ public class PingBenchmark : IDisposable
         Console.CancelKeyPress += _onCancelEvent;
     }
 
-    private void CancelPressed(object sender, ConsoleCancelEventArgs e)
+    private void CancelPressed(object? sender, ConsoleCancelEventArgs e)
     {
         Environment.Exit(0);
     }
 
     [Benchmark]
-    public ValueTask Ping() => grain.Run();
+    public ValueTask Ping() => grain!.Run();
 
     public async Task PingForever()
     {
         while (true)
         {
-            await grain.Run();
+            await grain!.Run();
         }
     }
 
     public Task PingConcurrentForever() => this.Run(
         runs: int.MaxValue,
-        grainFactory: this.client,
+        grainFactory: this.client!,
         blocksPerWorker: 10);
 
     public Task PingConcurrent() => this.Run(
-        runs: 3,
-        grainFactory: this.client,
+        runs: 10,
+        grainFactory: this.client!,
         blocksPerWorker: 10);
 
     public Task PingConcurrentHostedClient(int blocksPerWorker = 30) => this.Run(
-        runs: 3,
-        grainFactory: (IGrainFactory)this.hosts[0].Services.GetService(typeof(IGrainFactory)),
+        runs: 10,
+        grainFactory: (IGrainFactory)this.hosts[0].Services.GetService(typeof(IGrainFactory))!,
         blocksPerWorker: blocksPerWorker);
 
     private async Task Run(int runs, IGrainFactory grainFactory, int blocksPerWorker)
     {
         var loadGenerator = new ConcurrentLoadGenerator<IPingGrain>(
-            maxConcurrency: 250,
+            maxConcurrency: 100,
             blocksPerWorker: blocksPerWorker,
             requestsPerBlock: 500,
             issueRequest: g => g.Run(),
@@ -122,10 +122,10 @@ public class PingBenchmark : IDisposable
 
     public async Task PingPongForever()
     {
-        var other = this.client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
+        var other = this.client!.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
         while (true)
         {
-            await grain.PingPongInterleave(other, 100);
+            await grain!.PingPongInterleave(other, 100);
         }
     }
 

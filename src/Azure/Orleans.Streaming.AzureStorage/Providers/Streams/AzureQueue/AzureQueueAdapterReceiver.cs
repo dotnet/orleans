@@ -16,9 +16,9 @@ namespace Orleans.Providers.Streams.AzureQueue
     /// </summary>
     internal partial class AzureQueueAdapterReceiver : IQueueAdapterReceiver
     {
-        private AzureQueueDataManager queue;
+        private AzureQueueDataManager? queue;
         private long lastReadMessage;
-        private Task outstandingTask;
+        private Task? outstandingTask;
         private readonly ILogger logger;
         private readonly IQueueDataAdapter<string, IBatchContainer> dataAdapter;
         private readonly List<PendingDelivery> pending;
@@ -107,9 +107,9 @@ namespace Orleans.Providers.Streams.AzureQueue
                 var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.
                 if (messages.Count == 0 || queueRef==null) return;
                 // get sequence tokens of delivered messages
-                List<StreamSequenceToken> deliveredTokens = messages.Select(message => message.SequenceToken).ToList();
+                List<StreamSequenceToken> deliveredTokens = messages.Select(message => message.SequenceToken!).ToList();
                 // find oldest delivered message
-                StreamSequenceToken oldest = deliveredTokens.Max();
+                StreamSequenceToken oldest = deliveredTokens.Max()!;
                 // finalize all pending messages at or befor the oldest
                 List<PendingDelivery> finalizedDeliveries = pending
                     .Where(pendingDelivery => !pendingDelivery.Token.Newer(oldest))

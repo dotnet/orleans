@@ -1,63 +1,130 @@
-using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-
-#nullable enable
+using Orleans.Runtime.Diagnostics;
 
 namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed partial class GrainDirectoryPartition
 {
-    async ValueTask<DirectoryResult<GrainAddress>> IGrainDirectoryPartition.RegisterAsync(MembershipVersion version, GrainAddress address, GrainAddress? currentRegistration)
+    async ValueTask<DirectoryResult<GrainAddress>> IGrainDirectoryPartition.RegisterAsync(
+        MembershipVersion version,
+        GrainAddress address,
+        GrainAddress? currentRegistration,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(address);
         LogRegisterAsync(version, address, currentRegistration);
 
-        // Ensure that the current membership version is new enough.
-        await WaitForRange(address.GrainId, version);
-        if (!IsOwner(CurrentView, address.GrainId))
+        var currentView = await WaitForOwnershipViewAsync(address.GrainId, version, cancellationToken);
+        if (!IsOwner(currentView, address.GrainId))
         {
-            return DirectoryResult.RefreshRequired<GrainAddress>(CurrentView.Version);
+            return DirectoryResult.RefreshRequired<GrainAddress>(currentView.Version);
         }
 
-        DebugAssertOwnership(address.GrainId);
-        return DirectoryResult.FromResult(RegisterCore(address, currentRegistration), version);
+        DebugAssertOwnership(currentView, address.GrainId);
+
+        if (_deadSiloLeaseDuration > TimeSpan.Zero)
+        {
+            var utcNow = _timeProvider.GetUtcNow();
+            var rangeHash = address.GrainId.GetUniformHashCode();
+            var isExistingRegistration = currentRegistration is not null && address.Matches(currentRegistration);
+
+            // Range lease holds
+            for (var i = _rangeLeaseHolds.Count - 1; !isExistingRegistration && i >= 0; i--)
+            {
+                var (lockedRange, expiration) = _rangeLeaseHolds[i];
+
+                if (utcNow >= expiration)
+                {
+                    // We use this opportunity to cleanup this expired range lease hold.
+                    _rangeLeaseHolds.RemoveAt(i);
+                    continue;
+                }
+
+                // If it is still active, does it block this request?
+                if (lockedRange.Contains(rangeHash))
+                {
+                    var retryAfter = expiration - utcNow;
+                    GrainDirectoryEvents.EmitRegistrationBlockedByRangeLease(_id, address.GrainId, lockedRange, expiration, retryAfter);
+                    return DirectoryResult.RetryAfter<GrainAddress>(retryAfter);
+                }
+            }
+
+            // Grain lease holds
+            if (_directory.TryGetValue(address.GrainId, out var existingActivation))
+            {
+                if (_siloLeaseHolds.TryGetValue(existingActivation.SiloAddress!, out var expiration) && utcNow < expiration)
+                {
+                    // This grain belongs to this partition, and the activation is sitting on a silo that has an active lease hold.
+                    // We need to check if the request includes the previous activation id, and if it does it's a valid update/override,
+                    // otherwise it's a new activation trying to "steal" the id while the lease is active, so we reject it!
+                    if (currentRegistration is null || !existingActivation.Matches(currentRegistration))
+                    {
+                        var retryAfter = expiration - utcNow;
+                        GrainDirectoryEvents.EmitRegistrationBlockedBySiloLease(_id, address.GrainId, existingActivation.SiloAddress!, expiration, retryAfter);
+                        return DirectoryResult.RetryAfter<GrainAddress>(retryAfter);
+                    }
+                }
+            }
+        }
+
+        return DirectoryResult.FromResult(RegisterCore(address, currentRegistration, currentView.Version), version);
     }
 
-    async ValueTask<DirectoryResult<GrainAddress?>> IGrainDirectoryPartition.LookupAsync(MembershipVersion version, GrainId grainId)
+    async ValueTask<DirectoryResult<GrainAddress?>> IGrainDirectoryPartition.LookupAsync(
+        MembershipVersion version,
+        GrainId grainId,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         LogLookupAsync(version, grainId);
 
-        // Ensure we can serve the request.
-        await WaitForRange(grainId, version);
-        if (!IsOwner(CurrentView, grainId))
+        var currentView = await WaitForOwnershipViewAsync(grainId, version, cancellationToken);
+        if (!IsOwner(currentView, grainId))
         {
-            return DirectoryResult.RefreshRequired<GrainAddress?>(CurrentView.Version);
+            return DirectoryResult.RefreshRequired<GrainAddress?>(currentView.Version);
         }
 
         return DirectoryResult.FromResult(LookupCore(grainId), version);
     }
 
-    async ValueTask<DirectoryResult<bool>> IGrainDirectoryPartition.DeregisterAsync(MembershipVersion version, GrainAddress address)
+    async ValueTask<DirectoryResult<bool>> IGrainDirectoryPartition.DeregisterAsync(
+        MembershipVersion version,
+        GrainAddress address,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(address);
         LogDeregisterAsync(version, address);
 
-        await WaitForRange(address.GrainId, version);
-        if (!IsOwner(CurrentView, address.GrainId))
+        var currentView = await WaitForOwnershipViewAsync(address.GrainId, version, cancellationToken);
+        if (!IsOwner(currentView, address.GrainId))
         {
-            return DirectoryResult.RefreshRequired<bool>(CurrentView.Version);
+            return DirectoryResult.RefreshRequired<bool>(currentView.Version);
         }
 
-        DebugAssertOwnership(address.GrainId);
+        DebugAssertOwnership(currentView, address.GrainId);
         return DirectoryResult.FromResult(DeregisterCore(address), version);
     }
 
     private bool DeregisterCore(GrainAddress address)
     {
-        if (_directory.TryGetValue(address.GrainId, out var existing) && (existing.Matches(address) || IsSiloDead(existing)))
+        if (!_directory.TryGetValue(address.GrainId, out var existing))
+        {
+            return false;
+        }
+
+        if (_deadSiloLeaseDuration > TimeSpan.Zero
+            && existing.SiloAddress is { } siloAddress
+            && _siloLeaseHolds.TryGetValue(siloAddress, out var expiration)
+            && _timeProvider.GetUtcNow() < expiration)
+        {
+            return false;
+        }
+
+        if (existing.Matches(address) || IsSiloDead(existing))
         {
             return _directory.Remove(address.GrainId);
         }
@@ -75,13 +142,34 @@ internal sealed partial class GrainDirectoryPartition
         return null;
     }
 
-    private GrainAddress RegisterCore(GrainAddress newAddress, GrainAddress? existingAddress)
+    private async ValueTask<DirectoryMembershipSnapshot> WaitForOwnershipViewAsync(
+        GrainId grainId,
+        MembershipVersion version,
+        CancellationToken cancellationToken)
+    {
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, ShutdownToken);
+        while (true)
+        {
+            // Requests which arrive with a stale membership version must still wait for any in-flight ownership
+            // transition in the current view before deciding whether this partition can serve them.
+            var currentView = CurrentView;
+            var waitVersion = currentView.Version > version ? currentView.Version : version;
+            await WaitForRange(grainId, waitVersion, linkedCts.Token);
+            linkedCts.Token.ThrowIfCancellationRequested();
+            if (ReferenceEquals(currentView, CurrentView))
+            {
+                return currentView;
+            }
+        }
+    }
+
+    private GrainAddress RegisterCore(GrainAddress newAddress, GrainAddress? existingAddress, MembershipVersion currentVersion)
     {
         ref var existing = ref CollectionsMarshal.GetValueRefOrAddDefault(_directory, newAddress.GrainId, out _);
 
         if (existing is null || existing.Matches(existingAddress) || IsSiloDead(existing))
         {
-            if (newAddress.MembershipVersion != CurrentView.Version)
+            if (newAddress.MembershipVersion != currentVersion)
             {
                 // Set the membership version to match the view number in which it was registered.
                 newAddress = new()
@@ -89,7 +177,7 @@ internal sealed partial class GrainDirectoryPartition
                     GrainId = newAddress.GrainId,
                     SiloAddress = newAddress.SiloAddress,
                     ActivationId = newAddress.ActivationId,
-                    MembershipVersion = CurrentView.Version
+                    MembershipVersion = currentVersion
                 };
             }
 
@@ -99,7 +187,8 @@ internal sealed partial class GrainDirectoryPartition
         return existing;
     }
 
-    private bool IsSiloDead(GrainAddress existing) => _owner.ClusterMembershipSnapshot.GetSiloStatus(existing.SiloAddress) == SiloStatus.Dead;
+    private bool IsSiloDead(GrainAddress existing)
+        => existing.SiloAddress is null || _owner.ClusterMembershipSnapshot.GetSiloStatus(existing.SiloAddress, existing.MembershipVersion) == SiloStatus.Dead;
 
     [LoggerMessage(
         Level = LogLevel.Trace,

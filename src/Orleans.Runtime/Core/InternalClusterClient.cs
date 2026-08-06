@@ -26,35 +26,35 @@ namespace Orleans.Runtime
         public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string grainClassNamePrefix = null)
+        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithGuidKey
         {
             return this.grainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix);
         }
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string grainClassNamePrefix = null)
+        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithIntegerKey
         {
             return this.grainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix);
         }
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string grainClassNamePrefix = null)
+        public TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithStringKey
         {
             return this.grainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix);
         }
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string grainClassNamePrefix = null)
+        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithGuidCompoundKey
         {
             return this.grainFactory.GetGrain<TGrainInterface>(primaryKey, keyExtension, grainClassNamePrefix);
         }
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string grainClassNamePrefix = null)
+        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithIntegerCompoundKey
         {
             return this.grainFactory.GetGrain<TGrainInterface>(primaryKey, keyExtension, grainClassNamePrefix);

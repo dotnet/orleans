@@ -39,7 +39,7 @@ namespace Orleans
 
         public System.Type InvokableBaseType { get { throw null; } }
 
-        public string ProxyInvokeMethodName { get { throw null; } init { } }
+        public string? ProxyInvokeMethodName { get { throw null; } init { } }
 
         public System.Type ReturnType { get { throw null; } }
     }
@@ -63,7 +63,7 @@ namespace Orleans
     }
 
     [System.AttributeUsage(System.AttributeTargets.Constructor)]
-    public sealed partial class GeneratedActivatorConstructorAttribute : System.Attribute
+    public sealed partial class GeneratedActivatorConstructorAttribute : Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute
     {
     }
 
@@ -128,7 +128,7 @@ namespace Orleans
 
         public System.Type ProxyBaseClass { get { throw null; } }
 
-        public string ProxyInvokeMethodName { get { throw null; } init { } }
+        public string? ProxyInvokeMethodName { get { throw null; } init { } }
 
         public System.Type ReturnType { get { throw null; } }
     }
@@ -144,7 +144,7 @@ namespace Orleans
 
         public int AttributeArgumentName { get { throw null; } init { } }
 
-        public object MethodArgumentValue { get { throw null; } }
+        public object? MethodArgumentValue { get { throw null; } }
 
         public string MethodName { get { throw null; } }
     }
@@ -169,6 +169,7 @@ namespace Orleans
     }
 
     [System.AttributeUsage(System.AttributeTargets.Constructor)]
+    [System.Obsolete("Use GeneratedActivatorConstructorAttribute instead. This attribute is not recognized by Orleans.")]
     public sealed partial class OrleansConstructorAttribute : Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute
     {
     }

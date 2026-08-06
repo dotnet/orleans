@@ -31,13 +31,13 @@ namespace Orleans.Reminders.AzureStorage
 {
     public partial class AzureStorageOperationOptions
     {
-        public Azure.Data.Tables.TableClientOptions ClientOptions { get { throw null; } set { } }
+        public Azure.Data.Tables.TableClientOptions? ClientOptions { get { throw null; } set { } }
 
         public AzureStoragePolicyOptions StoragePolicyOptions { get { throw null; } }
 
         public virtual string TableName { get { throw null; } set { } }
 
-        public Azure.Data.Tables.TableServiceClient TableServiceClient { get { throw null; } set { } }
+        public Azure.Data.Tables.TableServiceClient? TableServiceClient { get { throw null; } set { } }
 
         [System.Obsolete("Set the TableServiceClient property directly.")]
         public void ConfigureTableServiceClient(System.Func<System.Threading.Tasks.Task<Azure.Data.Tables.TableServiceClient>> createClientCallback) { }
@@ -60,9 +60,9 @@ namespace Orleans.Reminders.AzureStorage
 
     public partial class AzureStorageOperationOptionsValidator<TOptions> : IConfigurationValidator where TOptions : AzureStorageOperationOptions
     {
-        public AzureStorageOperationOptionsValidator(TOptions options, string name = null) { }
+        public AzureStorageOperationOptionsValidator(TOptions options, string? name = null) { }
 
-        public string Name { get { throw null; } }
+        public string? Name { get { throw null; } }
 
         public TOptions Options { get { throw null; } }
 
@@ -79,6 +79,8 @@ namespace Orleans.Reminders.AzureStorage
 
         public int MaxOperationRetries { get { throw null; } set { } }
 
+        public System.TimeSpan MaxPauseBetweenOperationRetries { get { throw null; } set { } }
+
         public System.TimeSpan OperationTimeout { get { throw null; } set { } }
 
         public System.TimeSpan PauseBetweenCreationRetries { get { throw null; } set { } }
@@ -94,7 +96,7 @@ namespace Orleans.Reminders.AzureStorage
 
     public partial class AzureTableReminderStorageOptionsValidator : AzureStorageOperationOptionsValidator<AzureTableReminderStorageOptions>
     {
-        public AzureTableReminderStorageOptionsValidator(AzureTableReminderStorageOptions options, string name) : base(default!, default!) { }
+        public AzureTableReminderStorageOptionsValidator(AzureTableReminderStorageOptions options, string name) : base(default!, default) { }
     }
 }
 
@@ -104,7 +106,7 @@ namespace Orleans.Runtime.ReminderService
     {
         public AzureBasedReminderTable(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Options.IOptions<Reminders.AzureStorage.AzureTableReminderStorageOptions> storageOptions) { }
 
-        public System.Threading.Tasks.Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName) { throw null; }
+        public System.Threading.Tasks.Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName) { throw null; }
 
         public System.Threading.Tasks.Task<ReminderTableData> ReadRows(GrainId grainId) { throw null; }
 
@@ -118,6 +120,6 @@ namespace Orleans.Runtime.ReminderService
 
         public System.Threading.Tasks.Task TestOnlyClearTable() { throw null; }
 
-        public System.Threading.Tasks.Task<string> UpsertRow(ReminderEntry entry) { throw null; }
+        public System.Threading.Tasks.Task<string?> UpsertRow(ReminderEntry entry) { throw null; }
     }
 }

@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure;
 using Azure.Core;
@@ -27,12 +29,12 @@ namespace Orleans.GrainDirectory.AzureStorage
 {
     public class AzureStorageOperationOptions
     {
-        private TableServiceClient _tableServiceClient;
+        private TableServiceClient? _tableServiceClient;
 
         /// <summary>
         /// Table name for Azure Storage
         /// </summary>
-        public virtual string TableName { get; set; }
+        public virtual string TableName { get; set; } = null!;
 
         /// <summary>
         /// Azure Storage Policy Options
@@ -42,21 +44,23 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <summary>
         /// Options to be used when configuring the table storage client, or <see langword="null"/> to use the default options.
         /// </summary>
-        public TableClientOptions ClientOptions { get; set; }
+        public TableClientOptions? ClientOptions { get; set; }
 
         /// <summary>
         /// The delegate used to create a <see cref="TableServiceClient"/> instance.
         /// </summary>
-        internal Func<Task<TableServiceClient>> CreateClient { get; private set; }
+        internal Func<Task<TableServiceClient>> CreateClient { get; private set; } = null!;
 
         /// <summary>
         /// Gets or sets the client used to access the Azure Table Service.
         /// </summary>
-        public TableServiceClient TableServiceClient
+        [DisallowNull]
+        public TableServiceClient? TableServiceClient
         {
             get => _tableServiceClient;
             set
             {
+                ArgumentNullException.ThrowIfNull(value);
                 _tableServiceClient = value;
                 CreateClient = () => Task.FromResult(value);
             }
@@ -68,8 +72,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         [Obsolete($"Set the {nameof(TableServiceClient)} property directly.")]
         public void ConfigureTableServiceClient(string connectionString)
         {
-            if (string.IsNullOrWhiteSpace(connectionString)) throw new ArgumentNullException(nameof(connectionString));
-            TableServiceClient = new TableServiceClient(connectionString, ClientOptions);
+            SetTableServiceClient(connectionString);
         }
 
         /// <summary>
@@ -78,8 +81,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         [Obsolete($"Set the {nameof(TableServiceClient)} property directly.")]
         public void ConfigureTableServiceClient(Uri serviceUri)
         {
-            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
-            TableServiceClient = new TableServiceClient(serviceUri, ClientOptions);
+            SetTableServiceClient(serviceUri);
         }
 
         /// <summary>
@@ -97,7 +99,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         [Obsolete($"Set the {nameof(TableServiceClient)} property directly.")]
         public void ConfigureTableServiceClient(Uri serviceUri, TokenCredential tokenCredential)
         {
-            TableServiceClient = new TableServiceClient(serviceUri, tokenCredential, ClientOptions);
+            SetTableServiceClient(serviceUri, tokenCredential);
         }
 
         /// <summary>
@@ -106,7 +108,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         [Obsolete($"Set the {nameof(TableServiceClient)} property directly.")]
         public void ConfigureTableServiceClient(Uri serviceUri, AzureSasCredential azureSasCredential)
         {
-            TableServiceClient = new TableServiceClient(serviceUri, azureSasCredential, ClientOptions);
+            SetTableServiceClient(serviceUri, azureSasCredential);
         }
 
         /// <summary>
@@ -115,10 +117,72 @@ namespace Orleans.GrainDirectory.AzureStorage
         [Obsolete($"Set the {nameof(TableServiceClient)} property directly.")]
         public void ConfigureTableServiceClient(Uri serviceUri, TableSharedKeyCredential sharedKeyCredential)
         {
-            TableServiceClient = new TableServiceClient(serviceUri, sharedKeyCredential, ClientOptions);
+            SetTableServiceClient(serviceUri, sharedKeyCredential);
         }
 
-        internal void Validate(string name)
+        internal void SetTableServiceClient(string connectionString)
+        {
+            if (string.IsNullOrWhiteSpace(connectionString)) throw new ArgumentNullException(nameof(connectionString));
+            _tableServiceClient = null;
+            CreateClient = () => Task.FromResult(new TableServiceClient(connectionString, GetTableClientOptions()));
+        }
+
+        internal void SetTableServiceClient(Uri serviceUri)
+        {
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            _tableServiceClient = null;
+            CreateClient = () => Task.FromResult(new TableServiceClient(serviceUri, GetTableClientOptions()));
+        }
+
+        internal void SetTableServiceClient(Uri serviceUri, TokenCredential tokenCredential)
+        {
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (tokenCredential is null) throw new ArgumentNullException(nameof(tokenCredential));
+            _tableServiceClient = null;
+            CreateClient = () => Task.FromResult(new TableServiceClient(serviceUri, tokenCredential, GetTableClientOptions()));
+        }
+
+        internal void SetTableServiceClient(Uri serviceUri, AzureSasCredential azureSasCredential)
+        {
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (azureSasCredential is null) throw new ArgumentNullException(nameof(azureSasCredential));
+            _tableServiceClient = null;
+            CreateClient = () => Task.FromResult(new TableServiceClient(serviceUri, azureSasCredential, GetTableClientOptions()));
+        }
+
+        internal void SetTableServiceClient(Uri serviceUri, TableSharedKeyCredential sharedKeyCredential)
+        {
+            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            if (sharedKeyCredential is null) throw new ArgumentNullException(nameof(sharedKeyCredential));
+            _tableServiceClient = null;
+            CreateClient = () => Task.FromResult(new TableServiceClient(serviceUri, sharedKeyCredential, GetTableClientOptions()));
+        }
+
+        internal TableClientOptions GetTableClientOptions()
+        {
+            var clientOptions = ClientOptions ??= new TableClientOptions();
+            ConfigureRetryOptions(clientOptions.Retry, StoragePolicyOptions);
+            return clientOptions;
+        }
+
+        private static void ConfigureRetryOptions(RetryOptions retryOptions, AzureStoragePolicyOptions storagePolicyOptions)
+        {
+            // Keep this aligned with AzureStoragePolicyOptions defaults, which mirror Azure Storage SDK retry settings.
+            var delay = storagePolicyOptions.PauseBetweenOperationRetries > TimeSpan.Zero
+                ? storagePolicyOptions.PauseBetweenOperationRetries
+                : TimeSpan.FromSeconds(0.8);
+
+            var maxDelay = storagePolicyOptions.MaxPauseBetweenOperationRetries == Timeout.InfiniteTimeSpan
+                ? TimeSpan.FromMinutes(1)
+                : storagePolicyOptions.MaxPauseBetweenOperationRetries;
+
+            retryOptions.Mode = RetryMode.Exponential;
+            retryOptions.Delay = delay;
+            retryOptions.MaxDelay = maxDelay >= delay ? maxDelay : delay;
+            retryOptions.MaxRetries = Math.Max(0, storagePolicyOptions.MaxOperationRetries);
+        }
+
+        internal void Validate(string? name)
         {
             if (CreateClient is null)
             {
@@ -134,21 +198,21 @@ namespace Orleans.GrainDirectory.AzureStorage
                 throw GetException($"{nameof(TableName)} is not valid.", ex);
             }
 
-            Exception GetException(string message, Exception inner = null) =>
-                new OrleansConfigurationException($"Configuration for {GetType().Name} {name} is invalid. {message}", inner);
+            Exception GetException(string message, Exception? inner = null) =>
+                new OrleansConfigurationException($"Configuration for {GetType().Name} {name} is invalid. {message}", inner!);
         }
     }
 
     public class AzureStorageOperationOptionsValidator<TOptions> : IConfigurationValidator where TOptions : AzureStorageOperationOptions
     {
-        public AzureStorageOperationOptionsValidator(TOptions options, string name = null)
+        public AzureStorageOperationOptionsValidator(TOptions options, string? name = null)
         {
             Options = options;
             Name = name;
         }
 
         public TOptions Options { get; }
-        public string Name { get; }
+        public string? Name { get; }
 
         public virtual void ValidateConfiguration()
         {

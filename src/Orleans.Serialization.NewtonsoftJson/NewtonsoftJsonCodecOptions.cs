@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using System;
 
 namespace Orleans.Serialization;
@@ -11,15 +11,15 @@ public class NewtonsoftJsonCodecOptions
     /// <summary>
     /// Gets or sets the <see cref="JsonSerializerSettings"/>.
     /// </summary>
-    public JsonSerializerSettings SerializerSettings { get; set; }
+    public JsonSerializerSettings? SerializerSettings { get; set; }
 
     /// <summary>
     /// Gets or sets a delegate used to determine if a type is supported by the JSON serializer for serialization and deserialization.
     /// </summary>
-    public Func<Type, bool?> IsSerializableType { get; set; }
+    public Func<Type, bool?>? IsSerializableType { get; set; }
 
     /// <summary>
     /// Gets or sets a delegate used to determine if a type is supported by the JSON serializer for copying.
     /// </summary>
-    public Func<Type, bool?> IsCopyableType { get; set; }
+    public Func<Type, bool?>? IsCopyableType { get; set; }
 }

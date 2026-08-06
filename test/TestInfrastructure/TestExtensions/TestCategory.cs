@@ -29,6 +29,6 @@ public class CategoryDiscoverer : ITraitDiscoverer
     public IEnumerable<KeyValuePair<string, string>> GetTraits(IAttributeInfo traitAttribute)
     {
         var ctorArgs = traitAttribute.GetConstructorArguments().ToList();
-        yield return new KeyValuePair<string, string>("Category", ctorArgs[0].ToString());
+        yield return new KeyValuePair<string, string>("Category", ctorArgs[0].ToString()!);
     }
 }

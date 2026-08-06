@@ -14,6 +14,10 @@ namespace Orleans.Serialization.TestKit
         {
         }
 
+        protected ValueTypeFieldCodecTester(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
+        {
+        }
+
         [Fact]
         public void ValueSerializerRoundTrip()
         {

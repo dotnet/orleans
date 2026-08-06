@@ -1,12 +1,10 @@
+using System.Collections.Immutable;
+using System.Composition;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Collections.Immutable;
-using System.Composition;
-using System.Linq;
-using System.Threading.Tasks;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.Analyzers;
@@ -19,7 +17,9 @@ public class IdClashAttributeCodeFix : CodeFixProvider
 
     public override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
-        var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
+        var root = (await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false))!;
+        var semanticModel = (await context.Document.GetSemanticModelAsync(context.CancellationToken).ConfigureAwait(false))!;
+        var idAttributeSymbol = semanticModel.Compilation.GetTypeByMetadataName(Constants.IdAttributeFullyQualifiedName);
         var diagnostic = context.Diagnostics.First();
         if (root.FindNode(diagnostic.Location.SourceSpan) is not AttributeSyntax attribute)
         {
@@ -36,12 +36,12 @@ public class IdClashAttributeCodeFix : CodeFixProvider
                     var newIdValue = root
                         .DescendantNodes()
                         .OfType<AttributeSyntax>()
-                        .Where(a => a.IsAttribute(Constants.IdAttributeName))
-                        .Select(a => int.Parse(a.ArgumentList.Arguments.Single().ToString()))
+                        .Where(a => a.IsAttribute(semanticModel, idAttributeSymbol))
+                        .Select(a => int.Parse(a.ArgumentList!.Arguments.Single().ToString()))
                         .Max() + 1;
 
                     var newAttribute = attribute.ReplaceNode(
-                        attribute.ArgumentList.Arguments[0].Expression,
+                        attribute.ArgumentList!.Arguments[0].Expression,
                         LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(newIdValue)));
 
                     var newRoot = root.ReplaceNode(attribute, newAttribute);

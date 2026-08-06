@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Internal;
 using Orleans.Runtime.Scheduler;
 using Orleans.Statistics;
@@ -30,11 +31,11 @@ namespace Orleans.Runtime
         private readonly ILogger _logger;
 
         private long _lastUpdateDateTimeTicks;
-        private IDisposable _publishTimer;
+        private IDisposable? _publishTimer;
 
         public ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> PeriodicStatistics => _periodicStats;
 
-        public SiloRuntimeStatistics LocalRuntimeStatistics { get; private set; }
+        public SiloRuntimeStatistics LocalRuntimeStatistics { get; private set; } = null!;
 
         public DeploymentLoadPublisher(
             ILocalSiloDetails siloDetails,
@@ -74,7 +75,7 @@ namespace Orleans.Runtime
                 // but also upon start publish my stats to everyone and take everyone's stats for me to start with something.
                 var randomTimerOffset = RandomTimeSpan.Next(_statisticsRefreshTime);
                 _publishTimer = RegisterTimer(
-                    static state => ((DeploymentLoadPublisher)state).PublishStatistics(),
+                    static state => ((DeploymentLoadPublisher)state!).PublishStatistics(),
                     this,
                     randomTimerOffset,
                     _statisticsRefreshTime);
@@ -104,6 +105,7 @@ namespace Orleans.Runtime
                 // Update statistics locally.
                 LocalRuntimeStatistics = myStats;
                 UpdateRuntimeStatisticsInternal(_siloDetails.SiloAddress, myStats);
+                DeploymentLoadPublisherEvents.EmitPublished(_siloDetails.SiloAddress, myStats);
 
                 // Inform other cluster members about our refreshed statistics.
                 var members = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys;
@@ -111,7 +113,7 @@ namespace Orleans.Runtime
                 foreach (var siloAddress in members)
                 {
                     // No need to make a grain call to ourselves.
-                    if (siloAddress == _siloDetails.SiloAddress)
+                    if (siloAddress.Equals(_siloDetails.SiloAddress))
                     {
                         continue;
                     }
@@ -128,6 +130,7 @@ namespace Orleans.Runtime
                 }
 
                 await Task.WhenAll(tasks);
+                DeploymentLoadPublisherEvents.EmitClusterRefreshed(_siloDetails.SiloAddress, _periodicStats);
             }
             catch (Exception exc)
             {
@@ -157,6 +160,7 @@ namespace Orleans.Runtime
 
             _periodicStats[siloAddress] = siloStats;
             NotifyAllStatisticsChangeEventsSubscribers(siloAddress, siloStats);
+            DeploymentLoadPublisherEvents.EmitReceived(siloAddress, _siloDetails.SiloAddress, siloStats);
         }
 
         internal async Task RefreshClusterStatistics()
@@ -207,7 +211,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private void NotifyAllStatisticsChangeEventsSubscribers(SiloAddress silo, SiloRuntimeStatistics stats)
+        private void NotifyAllStatisticsChangeEventsSubscribers(SiloAddress silo, SiloRuntimeStatistics? stats)
         {
             lock (_siloStatisticsChangeListeners)
             {
@@ -237,6 +241,7 @@ namespace Orleans.Runtime
         {
             if (!status.IsTerminating()) return;
 
+            DeploymentLoadPublisherEvents.EmitRemoved(updatedSilo, _siloDetails.SiloAddress);
             _periodicStats.TryRemove(updatedSilo, out _);
             NotifyAllStatisticsChangeEventsSubscribers(updatedSilo, null);
         }
@@ -247,11 +252,13 @@ namespace Orleans.Runtime
                 nameof(DeploymentLoadPublisher),
                 ServiceLifecycleStage.RuntimeGrainServices,
                 StartAsync,
-                ct =>
+                DisposePublishTimer);
+
+            Task DisposePublishTimer(CancellationToken ct)
             {
-                _publishTimer.Dispose();
+                _publishTimer!.Dispose(); // Preserve the existing lifecycle contract that publishing is enabled.
                 return Task.CompletedTask;
-            });
+            }
         }
 
         [LoggerMessage(

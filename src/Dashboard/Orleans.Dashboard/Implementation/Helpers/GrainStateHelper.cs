@@ -8,9 +8,9 @@ namespace Orleans.Dashboard.Implementation.Helpers;
 
 internal static class GrainStateHelper
 {
-    public static (object, string) GetGrainId(string id, Type implementationType)
+    public static (object?, string) GetGrainId(string id, Type implementationType)
     {
-        object grainId = null;
+        object? grainId = null;
         string keyExtension = "";
         var splitedGrainId = id.Split(",");
 

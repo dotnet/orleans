@@ -22,7 +22,7 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="configurator">The configuration builder.</param>
         /// <param name="configureOptions">The configuration delegate.</param>
-        public static void ConfigurePullingAgent(this ISiloPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamPullingAgentOptions>> configureOptions = null)
+        public static void ConfigurePullingAgent(this ISiloPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamPullingAgentOptions>>? configureOptions = null)
         {
             configurator.Configure(configureOptions);
         }

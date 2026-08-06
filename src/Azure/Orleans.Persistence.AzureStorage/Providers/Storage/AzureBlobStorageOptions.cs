@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Azure;
 using Azure.Core;
@@ -13,7 +14,7 @@ namespace Orleans.Configuration
 {
     public class AzureBlobStorageOptions : IStorageProviderSerializerOptions
     {
-        private BlobServiceClient _blobServiceClient;
+        private BlobServiceClient? _blobServiceClient;
 
         /// <summary>
         /// Container name where grain stage is stored
@@ -24,12 +25,12 @@ namespace Orleans.Configuration
         /// <summary>
         /// Options to be used when configuring the blob storage client, or <see langword="null"/> to use the default options.
         /// </summary>
-        public BlobClientOptions ClientOptions { get; set; }
+        public BlobClientOptions? ClientOptions { get; set; }
 
         /// <summary>
         /// The optional delegate used to create a <see cref="BlobServiceClient"/> instance.
         /// </summary>
-        internal Func<Task<BlobServiceClient>> CreateClient { get; private set; }
+        internal Func<Task<BlobServiceClient>> CreateClient { get; private set; } = null!;
 
         /// <summary>
         /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
@@ -38,15 +39,18 @@ namespace Orleans.Configuration
         public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
 
         /// <inheritdoc/>
-        public IGrainStorageSerializer GrainStorageSerializer { get; set; }
+        public IGrainStorageSerializer GrainStorageSerializer { get; set; } = null!;
 
         /// <summary>
         /// Gets or sets the client used to access the Azure Blob Service.
         /// </summary>
-        public BlobServiceClient BlobServiceClient
+        [DisallowNull]
+        public BlobServiceClient? BlobServiceClient
         {
-            get => _blobServiceClient; set
+            get => _blobServiceClient;
+            set
             {
+                ArgumentNullException.ThrowIfNull(value);
                 _blobServiceClient = value;
                 CreateClient = () => Task.FromResult(value);
             }
@@ -149,7 +153,7 @@ namespace Orleans.Configuration
                 AzureBlobUtils.ValidateContainerName(options.ContainerName);
                 AzureBlobUtils.ValidateBlobName(this.name);
             }
-            catch(ArgumentException e)
+            catch (ArgumentException e)
             {
                 throw new OrleansConfigurationException(
                     $"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(this.options.ContainerName)} is not valid", e);

@@ -61,9 +61,12 @@ public static class TokenCredentialHelper
     /// <param name="msiClientId">Client ID for the Managed Identity.</param>
     /// <param name="audience">Target audience. For public clouds should be api://AzureADTokenExchange.</param>
     /// <returns>If successful, returns an access token.</returns>
-    public static string GetManagedIdentityToken(string msiClientId, string audience)
+    public static string GetManagedIdentityToken(string? msiClientId, string audience)
     {
-        var miCredential = new ManagedIdentityCredential(msiClientId);
+        var managedIdentityId = string.IsNullOrEmpty(msiClientId)
+            ? ManagedIdentityId.SystemAssigned
+            : ManagedIdentityId.FromUserAssignedClientId(msiClientId);
+        var miCredential = new ManagedIdentityCredential(managedIdentityId);
         return miCredential.GetToken(new TokenRequestContext(new[] { $"{audience}/.default" })).Token;
     }
 }

@@ -1,0 +1,4 @@
+﻿HEX: 0113000000080000000705400B616C706861400962657461
+DISASSEMBLY:
+[entry 0] frame-version=1 length=19 streamId=8 payload-bytes=15
+0000  07 05 40 0B 61 6C 70 68  61 40 09 62 65 74 61      |..@.alpha@.beta|

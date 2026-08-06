@@ -10,7 +10,7 @@ namespace Orleans.Serialization.Session
     /// </summary>
     public sealed class ReferencedTypeCollection
     {
-        private readonly Dictionary<uint, Type> _referencedTypes = new();
+        private readonly Dictionary<uint, Type?> _referencedTypes = new();
         private readonly Dictionary<Type, uint> _referencedTypeToIdMap = new();
 
         private uint _currentReferenceId;
@@ -20,7 +20,7 @@ namespace Orleans.Serialization.Session
         /// </summary>
         /// <param name="reference">The reference id.</param>
         /// <returns>The referenced type.</returns>
-        public Type GetReferencedType(uint reference)
+        public Type? GetReferencedType(uint reference)
         {
             if (!_referencedTypes.TryGetValue(reference, out var type))
                 ThrowUnknownReferencedType(reference);
@@ -35,12 +35,12 @@ namespace Orleans.Serialization.Session
         /// <param name="reference">The reference id.</param>
         /// <param name="type">The referenced type.</param>
         /// <returns><see langword="true" /> if the referenced type was found, <see langword="false" /> otherwise.</returns>
-        public bool TryGetReferencedType(uint reference, out Type type) => _referencedTypes.TryGetValue(reference, out type);
+        public bool TryGetReferencedType(uint reference, out Type? type) => _referencedTypes.TryGetValue(reference, out type);
 
         /// <summary>
         /// Records a type with the specified identifier.
         /// </summary>
-        public void RecordReferencedType(Type type) => _referencedTypes.Add(++_currentReferenceId, type);
+        public void RecordReferencedType(Type? type) => _referencedTypes.Add(++_currentReferenceId, type);
 
         /// <summary>
         /// Gets the identifier for the specified type.

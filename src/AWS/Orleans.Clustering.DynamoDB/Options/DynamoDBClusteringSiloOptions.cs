@@ -1,4 +1,4 @@
-﻿namespace Orleans.Configuration
+namespace Orleans.Configuration
 {
     public class DynamoDBClusteringSiloOptions
     {
@@ -6,6 +6,6 @@
         /// Connection string for DynamoDB Storage
         /// </summary>
         [RedactConnectionString]
-        public string ConnectionString { get; set; }
+        public string ConnectionString { get; set; } = null!;
     }
 }

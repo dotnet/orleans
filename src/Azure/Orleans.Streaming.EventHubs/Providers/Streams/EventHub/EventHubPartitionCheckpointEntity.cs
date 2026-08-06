@@ -7,8 +7,8 @@ namespace Orleans.Streaming.EventHubs
     internal class EventHubPartitionCheckpointEntity : ITableEntity
     {
         public string Offset { get; set; }
-        public string PartitionKey { get; set; }
-        public string RowKey { get; set; }
+        public string PartitionKey { get; set; } = null!;
+        public string RowKey { get; set; } = null!;
         public DateTimeOffset? Timestamp { get; set; }
         public ETag ETag { get; set; }
 

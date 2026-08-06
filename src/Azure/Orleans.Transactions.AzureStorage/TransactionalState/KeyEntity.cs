@@ -14,8 +14,8 @@ namespace Orleans.Transactions.AzureStorage
         }
 
         public long CommittedSequenceId { get; set; }
-        public string Metadata { get; set; }
-        public string PartitionKey { get; set; }
+        public string? Metadata { get; set; }
+        public string PartitionKey { get; set; } = null!;
         public string RowKey { get; set; }
         public DateTimeOffset? Timestamp { get; set; }
         public ETag ETag { get; set; }

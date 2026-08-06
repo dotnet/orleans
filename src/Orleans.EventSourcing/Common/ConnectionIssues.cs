@@ -13,7 +13,7 @@ namespace Orleans.EventSourcing.Common
         /// The exception that was caught when communicating with the primary.
         /// </summary>
         [Id(0)]
-        public Exception Exception { get; set; }
+        public Exception Exception { get; set; } = null!;
 
         /// <inheritdoc/>
         public override TimeSpan ComputeRetryDelay(TimeSpan? previous)

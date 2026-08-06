@@ -19,7 +19,7 @@ namespace Orleans.Hosting
         /// <param name="configure">The configuration delegate.</param>
         /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddMemoryStreams(this ISiloBuilder builder, string name,
-                Action<ISiloMemoryStreamConfigurator> configure = null)
+                Action<ISiloMemoryStreamConfigurator>? configure = null)
         {
             return AddMemoryStreams<DefaultMemoryMessageBodySerializer>(builder, name, configure);
         }
@@ -33,7 +33,7 @@ namespace Orleans.Hosting
         /// <param name="configure">The configuration delegate.</param>
         /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddMemoryStreams<TSerializer>(this ISiloBuilder builder, string name,
-            Action<ISiloMemoryStreamConfigurator> configure = null)
+            Action<ISiloMemoryStreamConfigurator>? configure = null)
              where TSerializer : class, IMemoryMessageBodySerializer
         {
             //the constructor wire up DI with all default components of the streams , so need to be called regardless of configureStream null or not

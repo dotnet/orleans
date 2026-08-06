@@ -16,14 +16,14 @@ public sealed class InProcessTestClusterOptions
     /// </summary>
     /// <seealso cref="ClusterOptions.ClusterId"/>
     /// <value>The cluster identifier.</value>
-    public string ClusterId { get; set; }
+    public string ClusterId { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets the service identifier.
     /// </summary>
     /// <seealso cref="ClusterOptions.ServiceId"/>
     /// <value>The service identifier.</value>
-    public string ServiceId { get; set; }
+    public string ServiceId { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets the base silo port, which is the port for the first silo. Other silos will use subsequent ports.
@@ -42,6 +42,12 @@ public sealed class InProcessTestClusterOptions
     /// </summary>
     /// <value><see langword="true" /> if test cluster membership should be used; otherwise, <see langword="false" />.</value>
     internal bool UseTestClusterMembership { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to use test cluster grain directory, which is only applicable if <see cref="UseTestClusterMembership"/> is <see langword="true"/>.
+    /// </summary>
+    /// <value><see langword="true" /> if test cluster grain directory should be used; otherwise, <see langword="false" />.</value>
+    internal bool UseTestClusterGrainDirectory { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether to use the real environment statistics.

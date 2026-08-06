@@ -1,11 +1,16 @@
 
 using System;
+using System.Threading;
 
 namespace Orleans.Transactions
 {
     public class CausalClock
     {
-        private readonly object lockable = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock lockable = new();
+#else
+        private readonly object lockable = new();
+#endif
         private readonly IClock clock;
         private long previous;
 

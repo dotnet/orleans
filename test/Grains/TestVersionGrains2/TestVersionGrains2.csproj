@@ -10,6 +10,7 @@
     <PublishDir>$(PublishRoot)$(TargetFramework)</PublishDir>
     <SatelliteResourceLanguages>en-US</SatelliteResourceLanguages>
     <SourceDir>$(MSBuildThisFileDirectory)../TestVersionGrains/</SourceDir>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <!-- Declare that this is version 2 of our code. This is used for #ifdefs in the code -->

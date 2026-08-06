@@ -18,10 +18,10 @@ namespace Orleans.Runtime.Messaging
         public GrainId NodeIdentity { get; init; }
 
         [Id(2)]
-        public SiloAddress SiloAddress { get; init; }
+        public SiloAddress? SiloAddress { get; init; }
 
         [Id(3)]
-        public string ClusterId { get; init; }
+        public string ClusterId { get; init; } = null!;
     }
 
     internal sealed class ConnectionPreambleHelper
@@ -108,7 +108,8 @@ namespace Orleans.Runtime.Messaging
 
             try
             {
-                var preamble = _preambleSerializer.Deserialize(payloadBuffer);
+                // A valid connection preamble payload always deserializes to an instance.
+                var preamble = _preambleSerializer.Deserialize(payloadBuffer)!;
                 return preamble;
             }
             finally

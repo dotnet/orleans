@@ -16,14 +16,14 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Cache monitor which is used to report cache related metrics
         /// </summary>
-        public ICacheMonitor CacheMonitor { set; private get; }
+        public ICacheMonitor? CacheMonitor { set; private get; }
 
         /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="logger"></param>
         /// <param name="monitor"></param>
-        public AggregatedCachePressureMonitor(ILogger logger, ICacheMonitor monitor = null)
+        public AggregatedCachePressureMonitor(ILogger logger, ICacheMonitor? monitor = null)
         {
             this.isUnderPressure = false;
             this.logger = logger;

@@ -2,6 +2,7 @@
   <PropertyGroup>
     <RootNamespace>Orleans.Transactions.Azure.Tests</RootNamespace>
     <AssemblyName>Orleans.Transactions.Azure.Tests</AssemblyName>
+    <Nullable>enable</Nullable>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
@@ -14,6 +15,6 @@
     <ProjectReference Include="$(SourceRoot)test\Transactions\Orleans.Transactions.Tests\Orleans.Transactions.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Transactions.AzureStorage\Orleans.Transactions.AzureStorage.csproj" />
-    <ProjectReference Include="..\..\Extensions\TesterAzureUtils\Tester.AzureUtils.csproj" />
+    <ProjectReference Include="..\..\Extensions\Orleans.Azure.Tests\Orleans.Azure.Tests.csproj" />
   </ItemGroup>
 </Project>

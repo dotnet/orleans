@@ -81,16 +81,16 @@ namespace Orleans.Hosting.Kubernetes
         /// <summary>
         /// The Kubernetes namespace which this silo and all other silos belong to.
         /// </summary>
-        internal string Namespace { get; set; }
+        internal string? Namespace { get; set; }
 
         /// <summary>
         /// The name of the Kubernetes pod which this silo is executing in.
         /// </summary>
-        internal string PodName { get; set; }
+        internal string? PodName { get; set; }
 
         /// <summary>
         /// The PodIP of the Kubernetes pod which this silo is executing in.
         /// </summary>
-        internal string PodIP { get; set; }
+        internal string? PodIP { get; set; }
     }
 }

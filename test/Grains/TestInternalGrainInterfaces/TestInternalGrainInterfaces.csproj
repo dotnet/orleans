@@ -1,9 +1,10 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>UnitTests.GrainInterfaces</RootNamespace>
     <AssemblyName>TestInternalGrainInterfaces</AssemblyName>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,4 +14,13 @@
   <ItemGroup>
     <PackageReference Include="FSharp.Core" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.DefaultCluster.Tests" />
+    <InternalsVisibleTo Include="Orleans.Placement.Tests" />
+    <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
+    <InternalsVisibleTo Include="Orleans.Runtime.Tests" />
+    <InternalsVisibleTo Include="TestInternalGrains" />
+  </ItemGroup>
 </Project>
+

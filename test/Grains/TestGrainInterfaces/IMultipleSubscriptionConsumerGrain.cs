@@ -17,5 +17,14 @@ namespace UnitTests.GrainInterfaces
         Task ClearNumberConsumed();
 
         Task Deactivate();
+
+        Task RegisterCountObserver(Guid handleId, int expectedCount, IMultipleSubscriptionConsumerObserver observer);
+    }
+
+    public interface IMultipleSubscriptionConsumerObserver : IGrainObserver
+    {
+        void ConsumedCountReached(Guid handleId, int count);
+
+        void ConsumptionFailed(Guid handleId, int errorCount);
     }
 }

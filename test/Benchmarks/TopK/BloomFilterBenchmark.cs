@@ -16,16 +16,16 @@ namespace Benchmarks.TopK;
 [GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory), CategoriesColumn]
 public class BloomFilterBenchmark
 {
-    private BloomFilter _bloomFilter;
-    private BloomFilter _bloomFilterWithSamples;
-    private OriginalBloomFilter _originalBloomFilter;
-    private OriginalBloomFilter _originalBloomFilterWithSamples;
-    private BlockedBloomFilter _blockedBloomFilter;
-    private BlockedBloomFilter _blockedBloomFilterWithSamples;
-    private GrainId[] _population;
-    private HashSet<GrainId> _set;
-    private ZipfRejectionSampler _sampler;
-    private GrainId[] _samples;
+    private BloomFilter _bloomFilter = null!;
+    private BloomFilter _bloomFilterWithSamples = null!;
+    private OriginalBloomFilter _originalBloomFilter = null!;
+    private OriginalBloomFilter _originalBloomFilterWithSamples = null!;
+    private BlockedBloomFilter _blockedBloomFilter = null!;
+    private BlockedBloomFilter _blockedBloomFilterWithSamples = null!;
+    private GrainId[] _population = null!;
+    private HashSet<GrainId> _set = null!;
+    private ZipfRejectionSampler _sampler = null!;
+    private GrainId[] _samples = null!;
 
     [Params(1_000_000, Priority = 4)]
     public int Pop { get; set; }
@@ -323,4 +323,3 @@ internal sealed class BloomFilter
 
     private static uint CeilingPowerOfTwo(uint x) => 1u << -BitOperations.LeadingZeroCount(x - 1);
 }
-

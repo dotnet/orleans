@@ -60,7 +60,7 @@ namespace Orleans.Providers
 
         void IGrainMigrationParticipant.OnRehydrate(IRehydrationContext rehydrationContext)
         {
-            if (rehydrationContext.TryGetValue("queue", out Queue<MemoryMessageData> value))
+            if (rehydrationContext.TryGetValue<Queue<MemoryMessageData>>("queue", out var value))
             {
                 _eventQueue = value;
             }

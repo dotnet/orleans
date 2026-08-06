@@ -8,12 +8,12 @@ namespace Orleans.Runtime;
 
 internal class HistogramAggregator
 {
-    private readonly KeyValuePair<string, object>[] _tags;
+    private readonly KeyValuePair<string, object?>[] _tags;
     private readonly HistogramBucketAggregator[] _buckets;
     private long _count;
     private long _sum;
 
-    public HistogramAggregator(long[] buckets, KeyValuePair<string, object>[] tags, Func<long, KeyValuePair<string, object>> getLabel)
+    public HistogramAggregator(long[] buckets, KeyValuePair<string, object?>[] tags, Func<long, KeyValuePair<string, object?>> getLabel)
     {
         if (buckets[^1] != long.MaxValue)
         {

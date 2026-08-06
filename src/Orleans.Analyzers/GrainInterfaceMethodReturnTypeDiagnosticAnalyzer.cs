@@ -10,8 +10,6 @@ namespace Orleans.Analyzers
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class GrainInterfaceMethodReturnTypeDiagnosticAnalyzer : DiagnosticAnalyzer
     {
-        private const string BaseInterfaceName = "Orleans.Runtime.IAddressable";
-
         public const string DiagnosticId = "ORLEANS0009";
         public const string Title = "Grain interfaces methods must return a compatible type";
         public const string MessageFormat = $"Grain interfaces methods must return a compatible type, such as Task, Task<T>, ValueTask, ValueTask<T>, or void";
@@ -27,7 +25,7 @@ namespace Orleans.Analyzers
             context.EnableConcurrentExecution();
             context.RegisterCompilationStartAction(context =>
             {
-                if (context.Compilation.GetTypeByMetadataName(BaseInterfaceName) is not { } baseInterface)
+                if (context.Compilation.GetTypeByMetadataName(Constants.IAddressibleFullyQualifiedName) is not { } baseInterface)
                 {
                     return;
                 }
@@ -45,7 +43,7 @@ namespace Orleans.Analyzers
             });
 
 
-            static void AddIfNotNull(ImmutableHashSet<ITypeSymbol>.Builder builder, INamedTypeSymbol symbol)
+            static void AddIfNotNull(ImmutableHashSet<ITypeSymbol>.Builder builder, INamedTypeSymbol? symbol)
             {
                 if (symbol is not null)
                 {

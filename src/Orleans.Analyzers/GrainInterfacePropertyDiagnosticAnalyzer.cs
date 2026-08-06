@@ -9,7 +9,6 @@ namespace Orleans.Analyzers
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class GrainInterfacePropertyDiagnosticAnalyzer : DiagnosticAnalyzer
     {
-        private const string BaseInterfaceName = "Orleans.Runtime.IAddressable";
         public const string DiagnosticId = "ORLEANS0008";
         public const string Title = "Grain interfaces must not contain properties";
         public const string MessageFormat = Title;
@@ -30,7 +29,7 @@ namespace Orleans.Analyzers
         {
             if (context.Node is not PropertyDeclarationSyntax syntax) return;
 
-            var symbol = context.SemanticModel.GetDeclaredSymbol(syntax, context.CancellationToken);
+            var symbol = context.SemanticModel.GetDeclaredSymbol(syntax, context.CancellationToken)!;
 
             if (symbol.ContainingType.TypeKind != TypeKind.Interface) return;
 
@@ -40,7 +39,7 @@ namespace Orleans.Analyzers
             var isIAddressableInterface = false;
             foreach (var implementedInterface in symbol.ContainingType.AllInterfaces)
             {
-                if (BaseInterfaceName.Equals(implementedInterface.ToDisplayString(NullableFlowState.None), System.StringComparison.Ordinal))
+                if (Constants.IAddressibleFullyQualifiedName.Equals(implementedInterface.ToDisplayString(NullableFlowState.None), StringComparison.Ordinal))
                 {
                     isIAddressableInterface = true;
                     break;

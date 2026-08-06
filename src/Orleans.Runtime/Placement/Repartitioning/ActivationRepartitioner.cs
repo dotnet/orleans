@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,7 +8,6 @@ using System.Runtime.CompilerServices;
 using System.Diagnostics;
 using System.Collections.Immutable;
 using System.Data;
-using System.Threading;
 using Orleans.Internal;
 using Orleans.Configuration;
 using Orleans.Runtime.Utilities;
@@ -17,12 +15,60 @@ using System.Runtime.InteropServices;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Orleans.Placement.Repartitioning;
+using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Concurrent;
 
 namespace Orleans.Runtime.Placement.Repartitioning;
 
 // See: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/06/eurosys16loca_camera_ready-1.pdf
 internal sealed partial class ActivationRepartitioner : SystemTarget, IActivationRepartitionerSystemTarget, ILifecycleParticipant<ISiloLifecycle>, IDisposable, ISiloStatusListener
 {
+    internal sealed class DeactivatedGrainQueue : IActivationWorkingSetObserver
+    {
+        // Exchanges can be skipped for long periods, so keep this best-effort queue bounded.
+        internal const int MaxTrackedDeactivatedGrains = 16_384;
+        private readonly ConcurrentQueue<GrainId> _deactivatedGrains = new();
+        private int _count;
+
+        public int Count => Volatile.Read(ref _count);
+
+        public void DrainTo(HashSet<GrainId> destination)
+        {
+            while (_deactivatedGrains.TryDequeue(out var grainId))
+            {
+                Interlocked.Decrement(ref _count);
+                destination.Add(grainId);
+            }
+        }
+
+        void IActivationWorkingSetObserver.OnDeactivated(IActivationWorkingSetMember member)
+        {
+            if (member is IGrainContext context)
+            {
+                Add(context.GrainId);
+            }
+        }
+
+        internal bool Add(GrainId grainId)
+        {
+            while (true)
+            {
+                var count = Volatile.Read(ref _count);
+                if (count >= MaxTrackedDeactivatedGrains)
+                {
+                    return false;
+                }
+
+                if (Interlocked.CompareExchange(ref _count, count + 1, count) == count)
+                {
+                    _deactivatedGrains.Enqueue(grainId);
+                    return true;
+                }
+            }
+        }
+    }
+
+    private readonly DeactivatedGrainQueue _deactivatedGrains;
     private readonly ILogger _logger;
     private readonly ISiloStatusOracle _siloStatusOracle;
     private readonly IInternalGrainFactory _grainFactory;
@@ -49,11 +95,13 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
         IImbalanceToleranceRule toleranceRule,
         IActivationMigrationManager migrationManager,
         ActivationDirectory activationDirectory,
+        DeactivatedGrainQueue deactivatedGrainQueue,
         IOptions<ActivationRepartitionerOptions> options,
-        TimeProvider timeProvider,
+        [FromKeyedServices(TimeProviderNames.ActivationManagement)] TimeProvider timeProvider,
         SystemTargetShared shared)
         : base(Constants.ActivationRepartitionerType, shared)
     {
+        _deactivatedGrains = deactivatedGrainQueue;
         _logger = loggerFactory.CreateLogger<ActivationRepartitioner>();
         _options = options.Value;
         _siloStatusOracle = siloStatusOracle;
@@ -64,15 +112,16 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
         _activationDirectory = activationDirectory;
         _timeProvider = timeProvider;
         _edgeWeights = new(options.Value.MaxEdgeCount);
-        _pendingMessages = new StripedMpscBuffer<Message>(Environment.ProcessorCount, options.Value.MaxUnprocessedEdges / Environment.ProcessorCount);
-        _anchoredFilter = options.Value.AnchoringFilterEnabled ?
-            new BlockedBloomFilter(100_000, options.Value.ProbabilisticFilteringMaxAllowedErrorRate) :
-            null;
-       
         _lastExchangedStopwatch = CoarseStopwatch.StartNew();
+        _pendingMessages = new StripedMpscBuffer<Message>(Environment.ProcessorCount, options.Value.MaxUnprocessedEdges / Environment.ProcessorCount);
         shared.ActivationDirectory.RecordNewTarget(this);
         _siloStatusOracle.SubscribeToSiloStatusEvents(this);
         _timer = RegisterTimer(_ => TriggerExchangeRequest().AsTask(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+
+        if (options.Value.AnchoringFilterEnabled)
+        {
+            _anchoredFilter = new AnchoredGrainsFilter(100_000, options.Value.ProbabilisticFilteringMaxAllowedErrorRate, options.Value.AnchoringFilterGenerations);
+        }
     }
 
     private Task OnActiveStart(CancellationToken cancellationToken)
@@ -111,6 +160,11 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
 
     public async ValueTask TriggerExchangeRequest()
     {
+        if (_anchoredFilter is { } filter)
+        {
+            filter.Rotate();
+        }
+
         var coolDown = _options.RecoveryPeriod - _lastExchangedStopwatch.Elapsed;
         if (coolDown > TimeSpan.Zero)
         {
@@ -234,7 +288,7 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
             var remoteActivations = request.ActivationCountSnapshot;
             var localActivations = GetLocalActivationCount();
 
-            var initialImbalance =  CalculateImbalance(remoteActivations, localActivations);
+            var initialImbalance = CalculateImbalance(remoteActivations, localActivations);
             int imbalance = initialImbalance;
             LogImbalance(imbalance, remoteActivations, localActivations);
 
@@ -457,9 +511,12 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
     /// </summary>
     /// <param name="giving">The grain ids to migrate to the remote host.</param>
     /// <param name="accepting">The grain ids to which are migrating to the local host.</param>
-    private async Task FinalizeProtocol(ImmutableArray<GrainId> giving, ImmutableArray<GrainId> accepting, SiloAddress targetSilo, HashSet<GrainId> newlyAnchoredGrains)
+    internal async Task FinalizeProtocol(ImmutableArray<GrainId> giving, ImmutableArray<GrainId> accepting, SiloAddress targetSilo, HashSet<GrainId> newlyAnchoredGrains)
     {
         // The protocol concluded that 'this' silo should take on 'set', so we hint to the director accordingly.
+        var affected = new HashSet<GrainId>(giving.Length + accepting.Length + _deactivatedGrains.Count);
+        _deactivatedGrains.DrainTo(affected);
+
         try
         {
             Dictionary<string, object> migrationRequestContext = new() { [IPlacementDirector.PlacementHintKey] = targetSilo };
@@ -468,8 +525,17 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
             {
                 if (_activationDirectory.FindTarget(grainId) is { } localActivation)
                 {
-                    localActivation.Migrate(migrationRequestContext);
-                    deactivationTasks.Add(localActivation.Deactivated);
+                    if (localActivation is ActivationData activation)
+                    {
+                        if (activation.TryStartMigration(migrationRequestContext))
+                        {
+                            deactivationTasks.Add(activation.Deactivated);
+                        }
+                    }
+                    else
+                    {
+                        localActivation.Migrate(migrationRequestContext);
+                    }
                 }
             }
 
@@ -481,11 +547,6 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
             // Even if some fail, the algorithm will eventually run again, so activations will have more chances to migrate.
             LogErrorOnMigratingActivations(exception);
         }
-
-        // Avoid mutating the source while enumerating it.
-        var iterations = 0;
-        var toRemove = new List<Edge>();
-        var affected = new HashSet<GrainId>(giving.Length + accepting.Length);
 
         if (_anchoredFilter is { } filter)
         {
@@ -506,12 +567,30 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
             affected.Add(id);
         }
 
-        var yieldStopwatch = CoarseStopwatch.StartNew();
+        await PruneAffectedEdges(_edgeWeights, affected, _anchoredFilter);
+
+        // Stamp this silos exchange for a potential next pair exchange request.
+        _lastExchangedStopwatch.Restart();
+        if (_logger.IsEnabled(LogLevel.Trace))
+        {
+            LogProtocolFinalizedTrace(string.Join(", ", giving), string.Join(", ", accepting));
+        }
+        else if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            LogProtocolFinalized(giving.Length, accepting.Length);
+        }
+    }
+
+    internal static async Task PruneAffectedEdges(FrequentEdgeCounter edgeWeights, HashSet<GrainId> affected, AnchoredGrainsFilter? anchoredFilter)
+    {
         if (affected.Count > 0)
         {
-            foreach (var (edge, _, _) in _edgeWeights.Elements)
+            var iterations = 0;
+            var toRemove = new List<Edge>();
+            var yieldStopwatch = CoarseStopwatch.StartNew();
+            foreach (var (edge, _, _) in edgeWeights.Elements)
             {
-                if (affected.Contains(edge.Source.Id) || affected.Contains(edge.Target.Id) || _anchoredFilter is not null && (_anchoredFilter.Contains(edge.Source.Id) || _anchoredFilter.Contains(edge.Target.Id)))
+                if (affected.Contains(edge.Source.Id) || affected.Contains(edge.Target.Id) || anchoredFilter is not null && (anchoredFilter.Contains(edge.Source.Id) || anchoredFilter.Contains(edge.Target.Id)))
                 {
                     toRemove.Add(edge);
                 }
@@ -528,23 +607,12 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
 
                 // Totally remove this counter, as one or both vertices has migrated. By not doing this it would skew results for the next protocol cycle.
                 // We remove only the affected counters, as there could be other counters that 'this' silo has connections with another silo (which is not part of this exchange cycle).
-                _edgeWeights.Remove(edge);
+                edgeWeights.Remove(edge);
             }
-        }
-
-        // Stamp this silos exchange for a potential next pair exchange request.
-        _lastExchangedStopwatch.Restart();
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
-            LogProtocolFinalizedTrace(string.Join(", ", giving), string.Join(", ", accepting));
-        }
-        else if (_logger.IsEnabled(LogLevel.Debug))
-        {
-            LogProtocolFinalized(giving.Length, accepting.Length);
         }
     }
 
-    private List<(SiloAddress Silo, List<CandidateVertex> Candidates, long TransferScore)> CreateCandidateSets(List<IGrouping<GrainId, VertexEdge>> migrationCandidates, ImmutableArray<SiloAddress> silos)
+    private List<(SiloAddress Silo, List<CandidateVertex> Candidates, long TransferScore)> CreateCandidateSets(List<IGrouping<GrainId, VertexEdge>> migrationCandidates, SiloAddress[] silos)
     {
         List<(SiloAddress Silo, List<CandidateVertex> Candidates, long TransferScore)> candidateSets = new(silos.Length - 1);
 
@@ -650,7 +718,7 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
 
             if (accLocalScore > accRemoteScore)
             {
-               anchoredGrains.Add(grainEdges.Key);
+                anchoredGrains.Add(grainEdges.Key);
             }
         }
 

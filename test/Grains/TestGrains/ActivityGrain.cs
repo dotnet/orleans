@@ -11,14 +11,14 @@ namespace UnitTests.Grains
             var activity = Activity.Current;
             if (activity == null)
             {
-                return Task.FromResult(default(ActivityData));
+                return Task.FromResult(default(ActivityData)!);
             }
 
             var result = new ActivityData()
             {
                 Id = activity.Id,
                 TraceState = activity.TraceStateString,
-                Baggage = activity.Baggage.ToList(),
+                Baggage = activity.Baggage.ToList()!,
             };
 
             return Task.FromResult(result);
@@ -43,7 +43,7 @@ namespace UnitTests.Grains
                     {
                         Id = activity.Id,
                         TraceState = activity.TraceStateString,
-                        Baggage = activity.Baggage.ToList(),
+                        Baggage = activity.Baggage.ToList()!,
                     };
 
                 yield return data;

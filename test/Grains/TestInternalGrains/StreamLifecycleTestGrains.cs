@@ -15,11 +15,11 @@ namespace UnitTests.Grains
         // For producer and consumer
         // -- only need to store this because of how we run our unit tests against multiple providers
         [Id(0)]
-        public string StreamProviderName { get; set; }
+        public string? StreamProviderName { get; set; }
 
         // For producer only.
         [Id(1)]
-        public IAsyncStream<int> Stream { get; set; }
+        public IAsyncStream<int>? Stream { get; set; }
         [Id(2)]
         public bool IsProducer { get; set; }
         [Id(3)]
@@ -48,7 +48,7 @@ namespace UnitTests.Grains
             B = b;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             var item = obj as GenericArg;
             if (item == null)
@@ -85,11 +85,11 @@ namespace UnitTests.Grains
     public class StreamLifecycleTestGrainBase : Grain<StreamLifecycleTestGrainState>
     {
         protected ILogger logger;
-        protected string _lastProviderName;
-        protected IStreamProvider _streamProvider;
+        protected string? _lastProviderName;
+        protected IStreamProvider _streamProvider = null!;
 
 #if COUNT_ACTIVATE_DEACTIVATE
-        private IActivateDeactivateWatcherGrain watcher;
+        private IActivateDeactivateWatcherGrain watcher = null!;
 #endif
 
         public StreamLifecycleTestGrainBase(ILoggerFactory loggerFactory)
@@ -143,7 +143,7 @@ namespace UnitTests.Grains
             State.Stream = stream;
             State.StreamProviderName = providerToUse;
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("InitStream returning with Stream={0} with ref type = {1}", State.Stream, State.Stream.GetType().FullName);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("InitStream returning with Stream={0} with ref type = {1}", State.Stream, State.Stream!.GetType().FullName);
         }
     }
 
@@ -159,7 +159,7 @@ namespace UnitTests.Grains
             this.streamProviderRuntime = streamProviderRuntime;
         }
 
-        protected IDictionary<StreamSubscriptionHandle<int>, MyStreamObserver<int>> Observers { get; set; }
+        protected IDictionary<StreamSubscriptionHandle<int>, MyStreamObserver<int>> Observers { get; set; } = null!;
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
@@ -221,7 +221,7 @@ namespace UnitTests.Grains
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("BecomeConsumer StreamId={0} StreamProvider={1} Grain={2}", streamId, providerToUse, this.AsReference<IStreamLifecycleConsumerGrain>());
             InitStream(streamId, providerToUse);
             var observer = new MyStreamObserver<int>(logger);
-            var subsHandle = await State.Stream.SubscribeAsync(observer);
+            var subsHandle = await State.Stream!.SubscribeAsync(observer);
             State.ConsumerSubscriptionHandles.Add(subsHandle);
             Observers.Add(subsHandle, observer);
             await WriteStateAsync();
@@ -236,13 +236,13 @@ namespace UnitTests.Grains
 
             var (myExtension, myExtensionReference) = this.streamProviderRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
                 () => new StreamConsumerExtension(streamProviderRuntime));
-            string extKey = providerName + "_" + Encoding.UTF8.GetString(State.Stream.StreamId.Namespace.ToArray());
+            string extKey = providerName + "_" + Encoding.UTF8.GetString(State.Stream!.StreamId.Namespace.ToArray());
             var id = new QualifiedStreamId(providerName, streamId);
             IPubSubRendezvousGrain pubsub = GrainFactory.GetGrain<IPubSubRendezvousGrain>(id.ToString());
             GuidId subscriptionId = GuidId.GetNewGuidId();
-            await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream).InternalStreamId, myExtensionReference.GetGrainId(), null);
+            await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream).InternalStreamId, myExtensionReference.GetGrainId(), null!);
 
-            myExtension.SetObserver(subscriptionId, ((StreamImpl<int>)State.Stream), observer, null, null, null);
+            myExtension.SetObserver(subscriptionId, ((StreamImpl<int>)State.Stream), observer, null!, null!, null!);
         }
 
         public async Task RemoveConsumer(StreamId streamId, string providerName, StreamSubscriptionHandle<int> subsHandle)
@@ -324,7 +324,7 @@ namespace UnitTests.Grains
         {
             if (!State.IsProducer || State.Stream == null) throw new InvalidOperationException("Not a Producer");
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("SendItem Item={0}", item);
-            Exception error = null;
+            Exception? error = null;
             try
             {
                 await State.Stream.OnNextAsync(item);
@@ -354,7 +354,7 @@ namespace UnitTests.Grains
             State.IsProducer = true;
 
             // Send an initial message to ensure we are properly initialized as a Producer.
-            await State.Stream.OnNextAsync(0);
+            await State.Stream!.OnNextAsync(0);
             State.NumMessagesSent++;
             await WriteStateAsync();
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Finished BecomeProducer for StreamId={0} StreamProvider={1}", streamId, providerName);
@@ -391,14 +391,14 @@ namespace UnitTests.Grains
         internal int NumErrors { get; private set; }
 
         [Id(2)]
-        private readonly ILogger logger;
+        private readonly ILogger? logger;
 
         internal MyStreamObserver(ILogger logger)
         {
             this.logger = logger;
         }
 
-        public Task OnNextAsync(T item, StreamSequenceToken token)
+        public Task OnNextAsync(T item, StreamSequenceToken? token)
         {
             NumItems++;
 
@@ -445,6 +445,6 @@ namespace UnitTests.Grains
 
     internal class ClosedTypeStreamSubscriptionHandle : StreamSubscriptionHandleImpl<StreamSubscriptionHandleArg>
     {
-        public ClosedTypeStreamSubscriptionHandle() : base(null, null) { /* not a subject to the creation */ }
+        public ClosedTypeStreamSubscriptionHandle() : base(null!, null!) { /* This test-only type is never instantiated through the normal creation path. */ }
     }
 }

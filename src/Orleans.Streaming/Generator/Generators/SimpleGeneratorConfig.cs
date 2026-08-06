@@ -17,7 +17,7 @@ namespace Orleans.Hosting
         /// </summary>
         /// <value>The stream namespace.</value>
         [Id(0)]
-        public string StreamNamespace { get; set; }
+        public string StreamNamespace { get; set; } = null!; // Set by configuration/object initializer before use.
 
         /// <summary>
         /// Gets the stream generator type

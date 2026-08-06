@@ -31,8 +31,8 @@ namespace Orleans.Serialization
 #pragma warning restore SYSLIB0050 // Type or member is obsolete
         private readonly Action<object, SerializationInfo, StreamingContext> _baseExceptionConstructor;
         private readonly TypeConverter _typeConverter;
-        private readonly IFieldCodec<Dictionary<object, object>> _dictionaryCodec;
-        private readonly IDeepCopier<Dictionary<object, object>> _dictionaryCopier;
+        private readonly IFieldCodec<Dictionary<object, object?>> _dictionaryCodec;
+        private readonly IDeepCopier<Dictionary<object, object?>> _dictionaryCopier;
         private readonly IDeepCopier<Exception> _exceptionCopier;
         private readonly ExceptionSerializationOptions _options;
 
@@ -46,8 +46,8 @@ namespace Orleans.Serialization
         /// <param name="exceptionSerializationOptions">The exception serialization options.</param>
         public ExceptionCodec(
             TypeConverter typeConverter,
-            IFieldCodec<Dictionary<object, object>> dictionaryCodec,
-            IDeepCopier<Dictionary<object, object>> dictionaryCopier,
+            IFieldCodec<Dictionary<object, object?>> dictionaryCodec,
+            IDeepCopier<Dictionary<object, object?>> dictionaryCopier,
             IDeepCopier<Exception> exceptionCopier,
             IOptions<ExceptionSerializationOptions> exceptionSerializationOptions)
         {
@@ -67,10 +67,10 @@ namespace Orleans.Serialization
         public void Deserialize<TInput>(ref Reader<TInput> reader, Exception value)
         {
             uint fieldId = 0;
-            string message = null;
-            string stackTrace = null;
-            Exception innerException = null;
-            Dictionary<object, object> data = null;
+            string? message = null;
+            string? stackTrace = null;
+            Exception? innerException = null;
+            Dictionary<object, object?>? data = null;
             int hResult = 0;
             while (true)
             {
@@ -132,7 +132,7 @@ namespace Orleans.Serialization
         /// <param name="innerException">The inner exception.</param>
         /// <param name="hResult">The HResult.</param>
         /// <param name="data">The data.</param>
-        public void SetBaseProperties(Exception value, string message, string stackTrace, Exception innerException, int hResult, Dictionary<object, object> data)
+        public void SetBaseProperties(Exception value, string? message, string? stackTrace, Exception? innerException, int hResult, Dictionary<object, object?>? data)
         {
 #pragma warning disable SYSLIB0050 // Type or member is obsolete
             var info = new SerializationInfo(typeof(Exception), _formatterConverter);
@@ -176,14 +176,14 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="exception">The exception.</param>
         /// <returns>The provided exception's <see cref="Exception.Data"/> property.</returns>
-        public Dictionary<object, object> GetDataProperty(Exception exception)
+        public Dictionary<object, object?>? GetDataProperty(Exception exception)
         {
             if (exception.Data is null or { Count: 0 })
             {
                 return null;
             }
 
-            var tmp = new Dictionary<object, object>(exception.Data.Count);
+            var tmp = new Dictionary<object, object?>(exception.Data.Count);
             var enumerator = exception.Data.GetEnumerator();
             while (enumerator.MoveNext())
             {
@@ -199,11 +199,11 @@ namespace Orleans.Serialization
         {
             StringCodec.WriteField(ref writer, 0, value.Message);
             StringCodec.WriteField(ref writer, 1, value.StackTrace);
-            WriteField(ref writer, 1, typeof(Exception), value.InnerException);
+            WriteField(ref writer, 1, typeof(Exception), value.InnerException!);
             Int32Codec.WriteField(ref writer, 1, value.HResult);
             if (GetDataProperty(value) is { } dataDictionary)
             {
-                _dictionaryCodec.WriteField(ref writer, 1, typeof(Dictionary<object, object>), dataDictionary);
+                _dictionaryCodec.WriteField(ref writer, 1, typeof(Dictionary<object, object?>), dataDictionary);
             }
         }
 
@@ -213,16 +213,16 @@ namespace Orleans.Serialization
             StringCodec.WriteField(ref writer, 0, _typeConverter.Format(value.GetType()));
             StringCodec.WriteField(ref writer, 1, value.Message);
             StringCodec.WriteField(ref writer, 1, value.StackTrace);
-            WriteField(ref writer, 1, typeof(Exception), value.InnerException);
+            WriteField(ref writer, 1, typeof(Exception), value.InnerException!);
             Int32Codec.WriteField(ref writer, 1, value.HResult);
             if (GetDataProperty(value) is { } dataDictionary)
             {
-                _dictionaryCodec.WriteField(ref writer, 1, typeof(Dictionary<object, object>), dataDictionary);
+                _dictionaryCodec.WriteField(ref writer, 1, typeof(Dictionary<object, object?>), dataDictionary);
             }
         }
 
         /// <inheritdoc />
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Exception value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Exception value) where TBufferWriter : IBufferWriter<byte>
         {
             if (value is null)
             {
@@ -277,7 +277,7 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc />
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] object? value) where TBufferWriter : IBufferWriter<byte>
         {
             if (value is null)
             {
@@ -292,6 +292,7 @@ namespace Orleans.Serialization
        }
 
         /// <inheritdoc />
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public Exception ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             // In order to handle null values.
@@ -309,7 +310,7 @@ namespace Orleans.Serialization
                 return null;
             }
 
-            Type valueType = field.FieldType;
+            Type? valueType = field.FieldType;
             if (valueType is null || valueType == typeof(Exception))
             {
                 return DeserializeException(ref reader, field);
@@ -319,7 +320,8 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc />
-        object IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
+        object? IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
             {
@@ -335,11 +337,11 @@ namespace Orleans.Serialization
             ReferenceCodec.MarkValueField(reader.Session);
 
             uint fieldId = 0;
-            string typeName = null;
-            string message = null;
-            string stackTrace = null;
-            Exception innerException = null;
-            Dictionary<object, object> data = null;
+            string? typeName = null;
+            string? message = null;
+            string? stackTrace = null;
+            Exception? innerException = null;
+            Dictionary<object, object?>? data = null;
             int hResult = 0;
             while (true)
             {
@@ -377,7 +379,7 @@ namespace Orleans.Serialization
             }
 
             Exception result;
-            if (!_typeConverter.TryParse(typeName, out var type))
+            if (!_typeConverter.TryParse(typeName!, out var type))
             {
                 result = new UnavailableExceptionFallbackException
                 {
@@ -390,7 +392,7 @@ namespace Orleans.Serialization
                 {
                     if (type.GetConstructor(Array.Empty<Type>()) is not null)
                     {
-                        result = (Exception)Activator.CreateInstance(type);
+                        result = (Exception)Activator.CreateInstance(type)!;
                     }
                     else
                     {
@@ -423,9 +425,9 @@ namespace Orleans.Serialization
                 // Get the message from object data in case the property is overridden as it is with AggregateException
                 info.GetString("Message"),
                 input.StackTrace,
-                _exceptionCopier.DeepCopy(input.InnerException, context),
+                _exceptionCopier.DeepCopy(input.InnerException!, context),
                 input.HResult,
-                _dictionaryCopier.DeepCopy(GetDataProperty(input), context));
+                _dictionaryCopier.DeepCopy(GetDataProperty(input)!, context));
         }
 
         /// <inheritdoc />
@@ -466,7 +468,7 @@ namespace Orleans.Serialization
         public override void ConvertToSurrogate(AggregateException value, ref AggregateExceptionSurrogate surrogate)
         {
             var info = _baseCodec.GetObjectData(value);
-            surrogate.Message = info.GetString("Message");
+            surrogate.Message = info.GetString("Message")!;
             surrogate.StackTrace = value.StackTrace;
             surrogate.HResult = value.HResult;
             var data = info.GetValue("Data", typeof(IDictionary));
@@ -489,10 +491,10 @@ namespace Orleans.Serialization
         public string Message;
 
         [Id(1)]
-        public string StackTrace;
+        public string? StackTrace;
 
         [Id(2)]
-        public Dictionary<object, object> Data;
+        public Dictionary<object, object?>? Data;
 
         [Id(3)]
         public int HResult;

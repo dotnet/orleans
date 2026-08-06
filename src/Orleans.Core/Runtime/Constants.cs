@@ -63,4 +63,3 @@ namespace Orleans.Runtime
         public static bool IsSingletonSystemTarget(GrainType id) => SingletonSystemTargetNames.ContainsKey(id);
     }
 }
-

@@ -7,7 +7,7 @@ using System.Collections.ObjectModel;
 namespace Orleans.Serialization.Codecs
 {
     [RegisterSerializer]
-    public sealed class ReadOnlyDictionaryCodec<TKey, TValue> : GeneralizedReferenceTypeSurrogateCodec<ReadOnlyDictionary<TKey, TValue>, ReadOnlyDictionarySurrogate<TKey, TValue>>
+    public sealed class ReadOnlyDictionaryCodec<TKey, TValue> : GeneralizedReferenceTypeSurrogateCodec<ReadOnlyDictionary<TKey, TValue>, ReadOnlyDictionarySurrogate<TKey, TValue>> where TKey : notnull
     {
         public ReadOnlyDictionaryCodec(IValueSerializer<ReadOnlyDictionarySurrogate<TKey, TValue>> surrogateSerializer) : base(surrogateSerializer)
         {
@@ -19,14 +19,14 @@ namespace Orleans.Serialization.Codecs
     }
 
     [GenerateSerializer]
-    public struct ReadOnlyDictionarySurrogate<TKey, TValue>
+    public struct ReadOnlyDictionarySurrogate<TKey, TValue> where TKey : notnull
     {
         [Id(0)]
         public Dictionary<TKey, TValue> Values;
     }
 
     [RegisterCopier]
-    public sealed class ReadOnlyDictionaryCopier<TKey, TValue> : IDeepCopier<ReadOnlyDictionary<TKey, TValue>>
+    public sealed class ReadOnlyDictionaryCopier<TKey, TValue> : IDeepCopier<ReadOnlyDictionary<TKey, TValue>> where TKey : notnull
     {
         private readonly Type _fieldType = typeof(ReadOnlyDictionary<TKey, TValue>);
         private readonly IDeepCopier<TKey> _keyCopier;
@@ -42,12 +42,12 @@ namespace Orleans.Serialization.Codecs
         {
             if (context.TryGetCopy<ReadOnlyDictionary<TKey, TValue>>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             if (input.GetType() as object != _fieldType as object)
             {
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
             }
 
             // There is a possibility for infinite recursion here if any value in the input collection is able to take part in a cyclic reference.

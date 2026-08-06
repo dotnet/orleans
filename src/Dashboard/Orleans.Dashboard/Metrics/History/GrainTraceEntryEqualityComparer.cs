@@ -17,7 +17,7 @@ internal sealed class GrainTraceEqualityComparer : IEqualityComparer<GrainTraceE
         _withSiloAddress = withSiloAddress;
     }
 
-    public bool Equals(GrainTraceEntry x, GrainTraceEntry y)
+    public bool Equals(GrainTraceEntry? x, GrainTraceEntry? y)
     {
         if (ReferenceEquals(x, y))
         {

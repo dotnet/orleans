@@ -13,7 +13,7 @@ namespace Orleans.Runtime
             get
             {
                 Assembly thisProg = typeof(RuntimeVersion).Assembly;
-                var ApiVersion = thisProg.GetName().Version.ToString();
+                var ApiVersion = thisProg.GetName().Version!.ToString();
                 if (string.IsNullOrWhiteSpace(thisProg.Location))
                 {
                     return ApiVersion;

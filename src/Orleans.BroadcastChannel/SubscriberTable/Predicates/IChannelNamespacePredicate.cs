@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Orleans.BroadcastChannel
 {
     /// <summary>
@@ -30,6 +32,6 @@ namespace Orleans.BroadcastChannel
         /// <summary>
         /// Get the predicate matching the provided pattern. Returns <see langword="false"/> if this provider cannot match the predicate.
         /// </summary>
-        bool TryGetPredicate(string predicatePattern, out IChannelNamespacePredicate predicate);
+        bool TryGetPredicate(string predicatePattern, [NotNullWhen(true)] out IChannelNamespacePredicate? predicate);
     }
 }

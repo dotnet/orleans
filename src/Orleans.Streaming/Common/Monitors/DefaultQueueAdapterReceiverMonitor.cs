@@ -23,36 +23,41 @@ namespace Orleans.Providers.Streams.Common
         private readonly ObservableCounter<long> _messagesReceivedCounter;
         private readonly ObservableGauge<long> _oldestMessageReadEnqueueTimeToNowCounter;
         private readonly ObservableGauge<long> _newestMessageReadEnqueueTimeToNowCounter;
-        private readonly KeyValuePair<string, object>[] _dimensions;
+        private readonly KeyValuePair<string, object?>[] _dimensions;
         private ValueStopwatch _oldestMessageReadEnqueueAge;
         private ValueStopwatch _newestMessageReadEnqueueAge;
         private long _messagesReceived;
 
-        protected DefaultQueueAdapterReceiverMonitor(KeyValuePair<string,object>[] dimensions)
+        protected DefaultQueueAdapterReceiverMonitor(KeyValuePair<string, object>[] dimensions, OrleansInstruments instruments)
+            : this(dimensions, instruments.Meter)
         {
-            _dimensions = dimensions;
-            _initializationFailureCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_INITIALIZATION_FAILURES);
-            _initializationCallTimeCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_INITIALIZATION_DURATION);
-            _initializationExceptionCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_INITIALIZATION_EXCEPTIONS);
-
-            _readFailureCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_READ_FAILURES);
-            _readCallTimeCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_READ_DURATION);
-            _readExceptionCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_READ_EXCEPTIONS);
-
-            _shutdownFailureCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_SHUTDOWN_FAILURES);
-            _shutdownCallTimeCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_SHUTDOWN_DURATION);
-            _shutdownExceptionCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_SHUTDOWN_EXCEPTIONS);
-
-            _messagesReceivedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_QUEUE_MESSAGES_RECEIVED, GetMessagesReceivedCount);
-            _oldestMessageReadEnqueueTimeToNowCounter = Instruments.Meter.CreateObservableGauge<long>(InstrumentNames.STREAMS_QUEUE_OLDEST_MESSAGE_ENQUEUE_AGE, GetOldestMessageReadEnqueueAge);
-            _newestMessageReadEnqueueTimeToNowCounter = Instruments.Meter.CreateObservableGauge<long>(InstrumentNames.STREAMS_QUEUE_NEWEST_MESSAGE_ENQUEUE_AGE, GetNewestMessageReadEnqueueAge);
         }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="DefaultQueueAdapterReceiverMonitor"/> class.
-        /// </summary>
-        /// <param name="dimensions">The dimensions.</param>
-        public DefaultQueueAdapterReceiverMonitor(ReceiverMonitorDimensions dimensions) : this(new KeyValuePair<string,object>[] { new("QueueId", dimensions.QueueId) })
+        private DefaultQueueAdapterReceiverMonitor(KeyValuePair<string, object>[] dimensions, Meter meter)
+        {
+            // The tag values are never actually null here; the cast only widens the nullability annotation of the array element
+            // type to satisfy the (nullable-annotated) System.Diagnostics.Metrics APIs below, which is safe since the underlying
+            // CLR array type is identical regardless of the element's nullable annotation.
+            _dimensions = (KeyValuePair<string, object?>[])(object)dimensions;
+            _initializationFailureCounter = meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_INITIALIZATION_FAILURES);
+            _initializationCallTimeCounter = meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_INITIALIZATION_DURATION);
+            _initializationExceptionCounter = meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_INITIALIZATION_EXCEPTIONS);
+
+            _readFailureCounter = meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_READ_FAILURES);
+            _readCallTimeCounter = meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_READ_DURATION);
+            _readExceptionCounter = meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_READ_EXCEPTIONS);
+
+            _shutdownFailureCounter = meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_SHUTDOWN_FAILURES);
+            _shutdownCallTimeCounter = meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_SHUTDOWN_DURATION);
+            _shutdownExceptionCounter = meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_SHUTDOWN_EXCEPTIONS);
+
+            _messagesReceivedCounter = meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_QUEUE_MESSAGES_RECEIVED, GetMessagesReceivedCount);
+            _oldestMessageReadEnqueueTimeToNowCounter = meter.CreateObservableGauge<long>(InstrumentNames.STREAMS_QUEUE_OLDEST_MESSAGE_ENQUEUE_AGE, GetOldestMessageReadEnqueueAge);
+            _newestMessageReadEnqueueTimeToNowCounter = meter.CreateObservableGauge<long>(InstrumentNames.STREAMS_QUEUE_NEWEST_MESSAGE_ENQUEUE_AGE, GetNewestMessageReadEnqueueAge);
+        }
+
+        public DefaultQueueAdapterReceiverMonitor(ReceiverMonitorDimensions dimensions, OrleansInstruments instruments)
+            : this(new KeyValuePair<string, object>[] { new("QueueId", dimensions.QueueId) }, instruments.Meter)
         {
         }
 
@@ -61,7 +66,7 @@ namespace Orleans.Providers.Streams.Common
         private Measurement<long> GetMessagesReceivedCount() => new(_messagesReceived, _dimensions);
 
         /// <inheritdoc />
-        public void TrackInitialization(bool success, TimeSpan callTime, Exception exception)
+        public void TrackInitialization(bool success, TimeSpan callTime, Exception? exception)
         {
             _initializationFailureCounter.Add(success ? 0 : 1, _dimensions);
             _initializationCallTimeCounter.Add(callTime.Ticks, _dimensions);
@@ -69,7 +74,7 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public void TrackRead(bool success, TimeSpan callTime, Exception exception)
+        public void TrackRead(bool success, TimeSpan callTime, Exception? exception)
         {
             _readFailureCounter.Add(success ? 0 : 1, _dimensions);
             _readCallTimeCounter.Add(callTime.Ticks, _dimensions);
@@ -95,7 +100,7 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public void TrackShutdown(bool success, TimeSpan callTime, Exception exception)
+        public void TrackShutdown(bool success, TimeSpan callTime, Exception? exception)
         {
             _shutdownFailureCounter.Add(success ? 0 : 1, _dimensions);
             _shutdownCallTimeCounter.Add(callTime.Ticks, _dimensions);

@@ -9,7 +9,7 @@ namespace TestExtensions;
 
 public abstract class BaseInProcessTestClusterFixture : Xunit.IAsyncLifetime
 {
-    private readonly ExceptionDispatchInfo preconditionsException;
+    private readonly ExceptionDispatchInfo? preconditionsException;
 
     static BaseInProcessTestClusterFixture()
     {
@@ -40,13 +40,13 @@ public abstract class BaseInProcessTestClusterFixture : Xunit.IAsyncLifetime
     {
     }
 
-    public InProcessTestCluster HostedCluster { get; private set; }
+    public InProcessTestCluster HostedCluster { get; private set; } = null!;
 
     public IGrainFactory GrainFactory => Client;
 
-    public IClusterClient Client => HostedCluster?.Client;
+    public IClusterClient Client => HostedCluster.Client;
 
-    public ILogger Logger { get; private set; }
+    public ILogger Logger { get; private set; } = null!;
 
     public string GetClientServiceId() => Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
 

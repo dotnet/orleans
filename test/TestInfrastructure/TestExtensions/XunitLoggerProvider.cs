@@ -5,6 +5,8 @@ namespace TestExtensions
 {
     public class XunitLoggerProvider : ILoggerProvider
     {
+        private const string NoActiveTestExceptionMessage = "There is no currently active test.";
+
         private readonly ITestOutputHelper output;
 
         public XunitLoggerProvider(ITestOutputHelper output)
@@ -29,15 +31,23 @@ namespace TestExtensions
                 this.category = category;
             }
             
-            public IDisposable BeginScope<TState>(TState state) => this;
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => this;
 
             public void Dispose() { }
 
             public bool IsEnabled(LogLevel logLevel) => true;
 
-            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
             {
-                this.output.WriteLine($"{logLevel} [{this.category}.{eventId.Name ?? eventId.Id.ToString()}] {formatter(state, exception)}");
+                var message = $"{logLevel} [{this.category}.{eventId.Name ?? eventId.Id.ToString()}] {formatter(state, exception)}";
+                try
+                {
+                    this.output.WriteLine(message);
+                }
+                catch (InvalidOperationException invalidOperationException) when (invalidOperationException.Message == NoActiveTestExceptionMessage)
+                {
+                    Console.Error.WriteLine(message);
+                }
             }
         }
     }

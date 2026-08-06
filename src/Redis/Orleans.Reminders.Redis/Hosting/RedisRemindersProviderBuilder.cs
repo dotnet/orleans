@@ -15,7 +15,7 @@ namespace Orleans.Hosting;
 
 internal sealed class RedisRemindersProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseRedisReminderService(_ => { });
         builder.Services.AddOptions<RedisReminderTableOptions>()
@@ -26,7 +26,7 @@ internal sealed class RedisRemindersProviderBuilder : IProviderBuilder<ISiloBuil
                 {
                     // Get a connection multiplexer instance by name.
                     var multiplexer = services.GetRequiredKeyedService<IConnectionMultiplexer>(serviceKey);
-                    options.CreateMultiplexer = _ => Task.FromResult(multiplexer);
+                    options.CreateMultiplexer = _ => Task.FromResult((Multiplexer: multiplexer, IsShared: true));
                     options.ConfigurationOptions = new ConfigurationOptions();
                 }
                 else

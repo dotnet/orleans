@@ -13,10 +13,10 @@ namespace Orleans
         /// <summary>
         /// Gets or sets the state.
         /// </summary>
-        T State { get; set; }
+        T? State { get; set; }
 
         /// <summary>Gets or sets the ETag that allows optimistic concurrency checks at the storage provider level.</summary>
-        string ETag { get; set; }
+        string? ETag { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether the record exists in storage.
@@ -34,11 +34,11 @@ namespace Orleans
     {
         /// <inheritdoc />
         [Id(0)]
-        public T State { get; set; }
+        public T? State { get; set; }
 
         /// <inheritdoc />
         [Id(1)]
-        public string ETag { get; set; }
+        public string? ETag { get; set; }
 
         /// <inheritdoc />
         [Id(2)]
@@ -57,7 +57,7 @@ namespace Orleans
         /// <param name="state">
         /// The initial value of the state.
         /// </param>
-        public GrainState(T state) : this(state, null)
+        public GrainState(T? state) : this(state, null)
         {
         }
 
@@ -70,7 +70,7 @@ namespace Orleans
         /// <param name="eTag">
         /// The initial e-tag value that allows optimistic concurrency checks at the storage provider level.
         /// </param>
-        public GrainState(T state, string eTag)
+        public GrainState(T? state, string? eTag)
         {
             State = state;
             ETag = eTag;

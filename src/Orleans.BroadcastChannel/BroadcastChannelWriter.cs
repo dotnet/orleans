@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.BroadcastChannel.Diagnostics;
 using Orleans.BroadcastChannel.SubscriberTable;
 using Orleans.Runtime;
 
@@ -18,13 +20,13 @@ namespace Orleans.BroadcastChannel
         /// Publish an element to the channel.
         /// </summary>
         /// <param name="item">The element to publish.</param>
-        Task Publish(T item);
+        Task Publish([DisallowNull] T item);
     }
 
     /// <inheritdoc />
     internal partial class BroadcastChannelWriter<T> : IBroadcastChannelWriter<T>
     {
-        private static readonly string LoggingCategory = typeof(BroadcastChannelWriter<>).FullName;
+        private static readonly string LoggingCategory = typeof(BroadcastChannelWriter<>).FullName!;
 
         private readonly InternalChannelId _channelId;
         private readonly IGrainFactory _grainFactory;
@@ -47,7 +49,7 @@ namespace Orleans.BroadcastChannel
         }
 
         /// <inheritdoc />
-        public async Task Publish(T item)
+        public async Task Publish([DisallowNull] T item)
         {
             var subscribers = _subscriberTable.GetImplicitSubscribers(_channelId, _grainFactory);
 
@@ -58,6 +60,8 @@ namespace Orleans.BroadcastChannel
             }
 
             LogDebugPublishingItem(_logger, item, subscribers.Count);
+
+            BroadcastChannelEvents.EmitItemPublished(_channelId.ProviderName, _channelId.ChannelId, subscribers.Count);
 
             if (_fireAndForgetDelivery)
             {
@@ -79,7 +83,7 @@ namespace Orleans.BroadcastChannel
                 }
                 catch (Exception)
                 {
-                    throw new AggregateException(tasks.Select(t => t.Exception).Where(ex => ex != null));
+                    throw new AggregateException(tasks.Select(t => t.Exception!).Where(ex => ex != null));
                 }
             }
         }
@@ -88,7 +92,7 @@ namespace Orleans.BroadcastChannel
         {
             try
             {
-                await consumer.OnPublished(_channelId, item);
+                await consumer.OnPublished(_channelId, item!);
             }
             catch (Exception ex)
             {
@@ -119,4 +123,3 @@ namespace Orleans.BroadcastChannel
         private static partial void LogErrorExceptionWhenSendingItem(ILogger logger, Exception exception, GrainId grainId);
     }
 }
-

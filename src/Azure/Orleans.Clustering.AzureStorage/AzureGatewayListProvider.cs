@@ -11,7 +11,7 @@ namespace Orleans.AzureUtils
 {
     internal class AzureGatewayListProvider : IGatewayListProvider
     {
-        private OrleansSiloInstanceManager siloInstanceManager;
+        private OrleansSiloInstanceManager siloInstanceManager = null!;
         private readonly string clusterId;
         private readonly AzureStorageGatewayOptions options;
         private readonly ILoggerFactory loggerFactory;

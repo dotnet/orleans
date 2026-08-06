@@ -1,10 +1,10 @@
-#nullable enable
 using System;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
@@ -98,7 +98,7 @@ namespace Orleans.Hosting
         /// The endpoint of the primary silo, or <see langword="null"/> to use this silo as the primary.
         /// </param>
         /// <returns>The silo builder.</returns>
-        public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, IPEndPoint primarySiloEndpoint)
+        public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, IPEndPoint? primarySiloEndpoint)
         {
             return builder.UseDevelopmentClustering(optionsBuilder => ConfigurePrimarySiloEndpoint(optionsBuilder, primarySiloEndpoint));
         }
@@ -163,7 +163,13 @@ namespace Orleans.Hosting
             }
 
             // Distributed Grain Directory
-            services.TryAddSingleton<DirectoryMembershipService>();
+            services.AddOptions<GrainDirectoryOptions>();
+            services.TryAddSingleton(static sp => new DirectoryMembershipService(
+                sp.GetRequiredService<ClusterMembershipService>(),
+                sp.GetRequiredService<IInternalGrainFactory>(),
+                sp.GetRequiredService<ILogger<DirectoryMembershipService>>(),
+                sp.GetRequiredService<IOptions<GrainDirectoryOptions>>().Value.PartitionsPerSilo,
+                DirectoryMembershipSnapshot.DefaultGetRingBoundaries));
             if (!services.Contains(DirectoryDescriptor))
             {
                 services.Add(DirectoryDescriptor);

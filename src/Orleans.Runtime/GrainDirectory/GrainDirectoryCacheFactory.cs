@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
@@ -18,36 +19,69 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="options">The options.</param>
         /// <returns>The newly created <see cref="IGrainDirectoryCache"/> instance.</returns>
         public static IGrainDirectoryCache CreateGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options)
+            => CreateGrainDirectoryCache(services, options, out _);
+
+        internal static IGrainDirectoryCache CreateGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options, out bool disposeCache, DirectoryInstruments? directoryInstruments = null)
         {
             if (options.CacheSize <= 0)
+            {
+                disposeCache = true;
                 return new NullGrainDirectoryCache();
+            }
 
             switch (options.CachingStrategy)
             {
                 case GrainDirectoryOptions.CachingStrategyType.None:
+                    disposeCache = true;
                     return new NullGrainDirectoryCache();
                 case GrainDirectoryOptions.CachingStrategyType.LRU:
 #pragma warning disable CS0618 // Type or member is obsolete
                 case GrainDirectoryOptions.CachingStrategyType.Adaptive:
 #pragma warning restore CS0618 // Type or member is obsolete
-                    return new LruGrainDirectoryCache(options.CacheSize);
+                    disposeCache = true;
+                    return CreateLruGrainDirectoryCache(services, options, directoryInstruments);
                 case GrainDirectoryOptions.CachingStrategyType.Custom:
                 default:
+                    disposeCache = false;
                     return services.GetRequiredService<IGrainDirectoryCache>();
             }
         }
 
         internal static IGrainDirectoryCache CreateCustomGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options)
+            => CreateCustomGrainDirectoryCache(services, options, out _);
+
+        internal static IGrainDirectoryCache CreateCustomGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options, out bool disposeCache, DirectoryInstruments? directoryInstruments = null)
         {
             var grainDirectoryCache = services.GetService<IGrainDirectoryCache>();
-            if (grainDirectoryCache != null)
+            if (grainDirectoryCache is not null)
             {
+                disposeCache = false;
                 return grainDirectoryCache;
             }
-            else
+
+            disposeCache = true;
+            return CreateLruGrainDirectoryCache(services, options, directoryInstruments);
+        }
+
+        internal static ValueTask DisposeGrainDirectoryCacheAsync(IGrainDirectoryCache cache)
+        {
+            switch (cache)
             {
-                return new LruGrainDirectoryCache(options.CacheSize);
+                case IAsyncDisposable asyncDisposable:
+                    return asyncDisposable.DisposeAsync();
+                case IDisposable disposable:
+                    disposable.Dispose();
+                    break;
             }
+
+            return default;
+        }
+
+        private static IGrainDirectoryCache CreateLruGrainDirectoryCache(IServiceProvider? services, GrainDirectoryOptions options, DirectoryInstruments? directoryInstruments)
+        {
+            var timeProvider = services?.GetKeyedService<TimeProvider>(TimeProviderNames.GrainDirectory) ?? TimeProvider.System;
+            directoryInstruments ??= services?.GetService<DirectoryInstruments>();
+            return new LruGrainDirectoryCache(options.CacheSize, options.MaximumCacheTTL, timeProvider, directoryInstruments);
         }
     }
 
@@ -65,7 +99,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
         }
 
-        public bool LookUp(GrainId key, out GrainAddress result, out int version)
+        public bool LookUp(GrainId key, [NotNullWhen(true)] out GrainAddress? result, out int version)
         {
             result = default;
             version = default;
@@ -78,4 +112,3 @@ namespace Orleans.Runtime.GrainDirectory
         }
     }
 }
-

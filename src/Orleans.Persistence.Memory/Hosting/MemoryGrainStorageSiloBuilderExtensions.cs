@@ -44,7 +44,7 @@ namespace Orleans.Hosting
         /// <param name="builder">The builder.</param>
         /// <param name="configureOptions">The configuration delegate.</param>
         /// <returns>The silo builder.</returns>
-        public static ISiloBuilder AddMemoryGrainStorageAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<MemoryGrainStorageOptions>> configureOptions = null)
+        public static ISiloBuilder AddMemoryGrainStorageAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<MemoryGrainStorageOptions>>? configureOptions = null)
         {
             return builder.AddMemoryGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
         }
@@ -56,7 +56,7 @@ namespace Orleans.Hosting
         /// <param name="name">The name of the storage provider. This must match with the <c>StorageName</c> property specified when injecting state into a grain.</param>
         /// <param name="configureOptions">The configuration delegate.</param>
         /// <returns>The silo builder.</returns>
-        public static ISiloBuilder AddMemoryGrainStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<MemoryGrainStorageOptions>> configureOptions = null)
+        public static ISiloBuilder AddMemoryGrainStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<MemoryGrainStorageOptions>>? configureOptions = null)
         {
             return builder
                 .ConfigureServices(services =>

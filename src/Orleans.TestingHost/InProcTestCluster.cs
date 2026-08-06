@@ -7,7 +7,9 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Core.Internal;
 using Orleans.Runtime;
+using Orleans.Runtime.Placement;
 using Orleans.TestingHost.Utils;
 using Microsoft.Extensions.Configuration;
 using Orleans.Configuration;
@@ -35,6 +37,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     private readonly List<InProcessSiloHandle> _silos = [];
     private readonly StringBuilder _log = new();
     private readonly InMemoryTransportConnectionHub _transportHub = new();
+    private readonly GrainDirectoryObserver _grainDirectoryObserver = new();
     private readonly InProcessGrainDirectory _grainDirectory;
     private readonly InProcessMembershipTable _membershipTable;
     private bool _disposed;
@@ -65,17 +68,19 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <summary>
     /// The internal client interface.
     /// </summary>
-    internal IHost ClientHost { get; private set; }
+    internal IHost? ClientHost { get; private set; }
 
     /// <summary>
     /// The internal client interface.
     /// </summary>
-    internal IInternalClusterClient InternalClient => ClientHost?.Services.GetRequiredService<IInternalClusterClient>();
+    internal IInternalClusterClient? InternalClient => ClientHost?.Services.GetRequiredService<IInternalClusterClient>();
 
     /// <summary>
     /// The client.
     /// </summary>
-    public IClusterClient Client => ClientHost?.Services.GetRequiredService<IInternalClusterClient>();
+    /// <exception cref="InvalidOperationException">The cluster has not been deployed or the client has been stopped.</exception>
+    public IClusterClient Client => InternalClient ?? throw new InvalidOperationException(
+        "The test cluster client is unavailable because the cluster has not been deployed or has been stopped.");
 
     /// <summary>
     /// The port allocator.
@@ -100,7 +105,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// </summary>
     /// <param name="silo">The silo process to the the service provider for.</param>
     /// <remarks>If <paramref name="silo"/> is <see langword="null"/> one of the existing silos will be picked randomly.</remarks>
-    public IServiceProvider GetSiloServiceProvider(SiloAddress silo = null)
+    public IServiceProvider GetSiloServiceProvider(SiloAddress? silo = null)
     {
         if (silo != null)
         {
@@ -114,6 +119,113 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             return Silos[index].SiloHost.Services;
         }
     }
+
+    /// <summary>
+    /// Attempts to find the <see cref="IGrainContext"/> for the grain with the specified <paramref name="grainId"/>
+    /// by searching all silos in the cluster.
+    /// </summary>
+    /// <param name="grainId">The ID of the grain to find.</param>
+    /// <param name="grainContext">When this method returns, contains the grain context if found; otherwise, <see langword="null"/>.</param>
+    /// <returns><see langword="true"/> if the grain was found in one of the silos; otherwise, <see langword="false"/>.</returns>
+    public bool TryGetGrainContext(GrainId grainId, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IGrainContext? grainContext)
+    {
+        foreach (var silo in Silos)
+        {
+            var activationDirectory = silo.SiloHost.Services.GetRequiredService<ActivationDirectory>();
+            grainContext = activationDirectory.FindTarget(grainId);
+            if (grainContext is not null)
+            {
+                return true;
+            }
+        }
+
+        grainContext = null;
+        return false;
+    }
+
+    /// <summary>
+    /// Gets a <see cref="Task"/> that completes when the current activation of the specified grain
+    /// finishes deactivating. If the grain is not currently activated, returns <see cref="Task.CompletedTask"/>.
+    /// </summary>
+    /// <param name="grainId">The ID of the grain to observe.</param>
+    /// <returns>A task that completes when the grain's current activation has deactivated.</returns>
+    /// <remarks>
+    /// There may be scenarios where this task needs to be captured before calling DeactivateOnIdle/MigrateOnIdle in the test
+    /// to avoid a race where the grain deactivates and is reactivated before the returned task is obtained.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var deactivated = cluster.WaitForDeactivationAsync(grain.GetGrainId());
+    /// await grain.DoDeactivate();
+    /// await deactivated;
+    /// </code>
+    /// </example>
+    public Task WaitForDeactivationAsync(GrainId grainId)
+    {
+        if (TryGetGrainContext(grainId, out var grainContext))
+        {
+            return grainContext.Deactivated;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Deactivates the current activation of the specified grain and waits for deactivation to complete.
+    /// </summary>
+    /// <param name="grainId">The ID of the grain to deactivate.</param>
+    /// <returns>A task that completes when the grain has been deactivated.</returns>
+    /// <example>
+    /// <code>
+    /// await cluster.DeactivateAsync(grain.GetGrainId());
+    /// </code>
+    /// </example>
+    public async Task DeactivateAsync(GrainId grainId)
+    {
+        if (TryGetGrainContext(grainId, out var grainContext))
+        {
+            grainContext.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationRequested, $"{nameof(DeactivateAsync)} was called."));
+            await grainContext.Deactivated;
+        }
+    }
+
+    /// <summary>
+    /// Migrates the current activation of the specified grain to a different silo and waits for migration to complete.
+    /// If <paramref name="targetSilo"/> is specified, a placement hint is set to guide migration to that silo.
+    /// </summary>
+    /// <param name="grainId">The ID of the grain to migrate.</param>
+    /// <param name="targetSilo">The target silo address, or <see langword="null"/> to let the placement director choose.</param>
+    /// <returns>A task that completes when the grain has been migrated (deactivated on the source silo).</returns>
+    /// <example>
+    /// <code>
+    /// var targetSilo = cluster.GetActiveSilos().First(s => s.SiloAddress != originalHost).SiloAddress;
+    /// await cluster.MigrateAsync(grain.GetGrainId(), targetSilo);
+    /// </code>
+    /// </example>
+    public async Task MigrateAsync(GrainId grainId, SiloAddress? targetSilo = null)
+    {
+        var deactivated = WaitForDeactivationAsync(grainId);
+        if (targetSilo is not null)
+        {
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, targetSilo);
+        }
+
+        await Client.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle();
+        await deactivated;
+    }
+
+    /// <inheritdoc cref="WaitForDeactivationAsync(GrainId)"/>
+    /// <param name="grain">The grain to observe.</param>
+    public Task WaitForDeactivationAsync(IAddressable grain) => WaitForDeactivationAsync(grain.GetGrainId());
+
+    /// <inheritdoc cref="DeactivateAsync(GrainId)"/>
+    /// <param name="grain">The grain to deactivate.</param>
+    public Task DeactivateAsync(IAddressable grain) => DeactivateAsync(grain.GetGrainId());
+
+    /// <inheritdoc cref="MigrateAsync(GrainId, SiloAddress?)"/>
+    /// <param name="grain">The grain to migrate.</param>
+    /// <param name="targetSilo">The target silo address, or <see langword="null"/> to let the placement director choose.</param>
+    public Task MigrateAsync(IAddressable grain, SiloAddress? targetSilo = null) => MigrateAsync(grain.GetGrainId(), targetSilo);
 
     /// <summary>
     /// Deploys the cluster using the specified configuration and starts the client in-process.
@@ -181,7 +293,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
 
             foreach (var silo in silos)
             {
-                var hooks = InternalClient.GetTestHooks(silo);
+                var hooks = InternalClient!.GetTestHooks(silo); // Membership stabilization requires a deployed client.
                 var statuses = await hooks.GetApproximateSiloStatuses();
                 var activeCount = statuses.Count(s => s.Value == SiloStatus.Active);
                 if (activeCount != expectedCount) break;
@@ -231,7 +343,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// </summary>
     /// <param name="siloAddress">Silo address to be found.</param>
     /// <returns>SiloHandle of the appropriate silo, or <c>null</c> if not found.</returns>
-    public InProcessSiloHandle GetSiloForAddress(SiloAddress siloAddress)
+    public InProcessSiloHandle? GetSiloForAddress(SiloAddress siloAddress)
     {
         var activeSilos = GetActiveSilos().ToList();
         var ret = activeSilos.Find(s => s.SiloAddress.Equals(siloAddress));
@@ -244,11 +356,51 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <param name="didKill">Whether recent membership changes we done by graceful Stop.</param>
     public async Task WaitForLivenessToStabilizeAsync(bool didKill = false)
     {
-        var clusterMembershipOptions = Client.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
+        var clusterMembershipOptions = Client!.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value; // Stabilization requires a deployed client.
         TimeSpan stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
-        WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
-        await Task.Delay(stabilizationTime);
-        WriteLog("WaitForLivenessToStabilize is done sleeping");
+        var activeSilos = GetActiveSilos().ToArray();
+        var testHooks = activeSilos.Select(static silo => (ITestHooks)silo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>()).ToArray();
+        var gatewayManager = Client.ServiceProvider.GetRequiredService<GatewayManager>();
+        Func<TimeSpan, Task<bool>>? waitForGrainDirectoryConvergence =
+            GrainDirectoryObserver.CanObserve(activeSilos)
+                ? timeout => _grainDirectoryObserver.WaitForConvergenceAsync(activeSilos, timeout)
+                : null;
+        WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is waiting up to {0} for {1} active silo(s)", stabilizationTime, activeSilos.Length);
+        if (await LivenessStabilizationHelper.WaitForExpectedActiveSilosAndGatewaysAsync(
+            activeSilos,
+            testHooks,
+            gatewayManager,
+            stabilizationTime,
+            waitForGrainDirectoryConvergence))
+        {
+            WriteLog("WaitForLivenessToStabilize observed stable active silo and gateway views");
+        }
+        else
+        {
+            WriteLog("WaitForLivenessToStabilize reached the fallback wait of {0}", stabilizationTime);
+        }
+    }
+
+    /// <summary>
+    /// Wait for active silos to observe cluster manifest updates for all active silos.
+    /// </summary>
+    /// <param name="didKill">Whether recent membership changes were done by graceful Stop.</param>
+    public async Task WaitForClusterManifestToStabilizeAsync(bool didKill = false)
+    {
+        var clusterMembershipOptions = Client!.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value; // Stabilization requires a deployed client.
+        var stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
+        var activeSilos = GetActiveSilos().ToArray();
+        var testHooks = activeSilos.Select(static silo => (ITestHooks)silo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>()).ToArray();
+
+        WriteLog(Environment.NewLine + Environment.NewLine + "WaitForClusterManifestToStabilize is waiting up to {0} for {1} active silo manifest(s)", stabilizationTime, activeSilos.Length);
+        if (await ClusterManifestStabilizationHelper.WaitForExpectedClusterManifestAsync(activeSilos, testHooks, stabilizationTime))
+        {
+            WriteLog("WaitForClusterManifestToStabilize observed stable cluster manifests");
+        }
+        else
+        {
+            WriteLog("WaitForClusterManifestToStabilize reached the fallback wait of {0}", stabilizationTime);
+        }
     }
 
     /// <summary>
@@ -474,9 +626,9 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// Do a Stop or Kill of the specified silo, followed by a restart.
     /// </summary>
     /// <param name="instance">Silo to be restarted.</param>
-    public async Task<InProcessSiloHandle> RestartSiloAsync(InProcessSiloHandle instance)
+    public async Task<InProcessSiloHandle?> RestartSiloAsync(InProcessSiloHandle instance)
     {
-        if (instance != null)
+        if (instance is not null)
         {
             var instanceNumber = instance.InstanceNumber;
             await StopSiloAsync(instance);
@@ -550,8 +702,17 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
 
         TryConfigureFileLogging(Options, hostBuilder.Services, "TestClusterClient");
 
-        ClientHost = hostBuilder.Build();
-        await ClientHost.StartAsync();
+        var clientHost = hostBuilder.Build();
+        try
+        {
+            await clientHost.StartAsync();
+            ClientHost = clientHost;
+        }
+        catch
+        {
+            await DisposeAsync(clientHost);
+            throw;
+        }
     }
 
     private async Task InitializeAsync()
@@ -624,7 +785,10 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                 if (Options.UseTestClusterMembership)
                 {
                     services.AddSingleton<IMembershipTable>(_membershipTable);
-                    siloBuilder.AddGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (_, _) => _grainDirectory);
+                    if (Options.UseTestClusterGrainDirectory)
+                    {
+                        siloBuilder.AddGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (_, _) => _grainDirectory);
+                    }
                 }
 
                 siloBuilder.UseInMemoryConnectionTransport(_transportHub);
@@ -733,13 +897,13 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         return _log.ToString();
     }
 
-    private void ReportUnobservedException(object sender, UnhandledExceptionEventArgs eventArgs)
+    private void ReportUnobservedException(object? sender, UnhandledExceptionEventArgs eventArgs)
     {
         Exception exception = (Exception)eventArgs.ExceptionObject;
         WriteLog("Unobserved exception: {0}", exception);
     }
 
-    private void WriteLog(string format, params object[] args)
+    private void WriteLog(string format, params object?[] args)
     {
         _log.AppendFormat(format + Environment.NewLine, args);
     }
@@ -768,6 +932,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             ClientHost = null;
 
             PortAllocator?.Dispose();
+            _grainDirectoryObserver.Dispose();
         });
 
         _disposed = true;
@@ -787,12 +952,14 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         }
 
         ClientHost?.Dispose();
+        ClientHost = null;
         PortAllocator?.Dispose();
+        _grainDirectoryObserver.Dispose();
 
         _disposed = true;
     }
 
-    private static async Task DisposeAsync(IDisposable value)
+    private static async Task DisposeAsync(IDisposable? value)
     {
         if (value is IAsyncDisposable asyncDisposable)
         {

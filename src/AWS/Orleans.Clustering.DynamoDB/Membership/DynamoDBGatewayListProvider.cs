@@ -15,7 +15,7 @@ namespace Orleans.Clustering.DynamoDB
 {
     internal class DynamoDBGatewayListProvider : IGatewayListProvider
     {
-        private DynamoDBStorage storage;
+        private DynamoDBStorage storage = null!;
         private readonly string clusterId;
         private readonly string INSTANCE_STATUS_ACTIVE = ((int)SiloStatus.Active).ToString();
         private readonly ILogger logger;

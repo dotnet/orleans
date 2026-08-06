@@ -8,7 +8,6 @@ using Orleans.Internal;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Utilities;
 
-#nullable enable
 namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed partial class DirectoryMembershipService : IAsyncDisposable
@@ -18,8 +17,12 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     private readonly CancellationTokenSource _shutdownCts = new();
     private readonly Task _runTask;
     private readonly AsyncEnumerable<DirectoryMembershipSnapshot> _viewUpdates;
+    private readonly int _partitionsPerSilo;
+    private readonly Func<SiloAddress, int, uint[]> _getRingBoundaries;
 
     public DirectoryMembershipSnapshot CurrentView { get; private set; } = DirectoryMembershipSnapshot.Default;
+
+    public int PartitionsPerSilo => _partitionsPerSilo;
 
     public IAsyncEnumerable<DirectoryMembershipSnapshot> ViewUpdates => _viewUpdates;
 
@@ -42,8 +45,16 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         return CurrentView;
     }
 
-    public DirectoryMembershipService(ClusterMembershipService clusterMembershipService, IInternalGrainFactory grainFactory, ILogger<DirectoryMembershipService> logger)
+    public DirectoryMembershipService(
+        ClusterMembershipService clusterMembershipService,
+        IInternalGrainFactory grainFactory,
+        ILogger<DirectoryMembershipService> logger,
+        int partitionsPerSilo,
+        Func<SiloAddress, int, uint[]> getRingBoundaries)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(partitionsPerSilo, 1);
+        _partitionsPerSilo = partitionsPerSilo;
+        _getRingBoundaries = getRingBoundaries;
         _viewUpdates = new(
             DirectoryMembershipSnapshot.Default,
             (previous, proposed) => proposed.Version >= previous.Version,
@@ -65,7 +76,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
                 {
                     await foreach (var update in ClusterMembershipService.MembershipUpdates.WithCancellation(_shutdownCts.Token))
                     {
-                        var view = new DirectoryMembershipSnapshot(update, _grainFactory);
+                        var view = new DirectoryMembershipSnapshot(update, _grainFactory, _partitionsPerSilo, _getRingBoundaries);
                         _viewUpdates.Publish(view);
                     }
                 }

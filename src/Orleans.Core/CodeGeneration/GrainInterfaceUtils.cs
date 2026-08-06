@@ -111,9 +111,9 @@ namespace Orleans.CodeGeneration
             {
             }
 
-            public bool Equals(MethodInfo x, MethodInfo y)
+            public bool Equals(MethodInfo? x, MethodInfo? y)
             {
-                if (!string.Equals(x.Name, y.Name, StringComparison.Ordinal))
+                if (!string.Equals(x!.Name, y!.Name, StringComparison.Ordinal))
                 {
                     return false;
                 }
@@ -169,9 +169,9 @@ namespace Orleans.CodeGeneration
                 return hashCode;
             }
 
-            public int Compare(MethodInfo x, MethodInfo y)
+            public int Compare(MethodInfo? x, MethodInfo? y)
             {
-                var result = StringComparer.Ordinal.Compare(x.Name, y.Name);
+                var result = StringComparer.Ordinal.Compare(x!.Name, y!.Name);
                 if (result != 0)
                 {
                     return result;

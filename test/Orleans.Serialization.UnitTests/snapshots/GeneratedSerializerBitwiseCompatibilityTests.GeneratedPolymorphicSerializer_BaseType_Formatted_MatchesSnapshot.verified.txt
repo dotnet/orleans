@@ -1,0 +1,9 @@
+0x0056 [#1 TagDelimited Id: 0 SchemaType: Encoded RuntimeType: Orleans.Serialization.UnitTests.BaselineDerived (name: Encoded "TypeName "Orleans.Serialization.UnitTests.BaselineDerived,Orleans.Serialization.UnitTests" (hash DFBF1B0A)" (Orleans.Serialization.UnitTests.BaselineDerived,Orleans.Serialization.UnitTests))] Value: {
+0x0057  [#2 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0058   [#3 VarInt Id: 0 SchemaType: Expected] Value: 22 (0x16)
+0x005A  }
+0x005B  - End of base type fields -
+0x005C  [#4 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x005D   [#5 VarInt Id: 0 SchemaType: Expected] Value: 44 (0x2C)
+0x005F  }
+0x0060 }

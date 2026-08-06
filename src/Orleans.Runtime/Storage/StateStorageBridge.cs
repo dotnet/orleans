@@ -1,4 +1,4 @@
-#nullable enable
+using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -21,6 +21,7 @@ namespace Orleans.Core
     public partial class StateStorageBridge<TState> : IStorage<TState>, IGrainMigrationParticipant
     {
         private readonly IGrainContext _grainContext;
+        private readonly StorageInstruments _storageInstruments;
         private readonly StateStorageBridgeShared<TState> _shared;
         private GrainState<TState>? _grainState;
 
@@ -32,10 +33,10 @@ namespace Orleans.Core
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
                 if (_grainState is { } grainState)
                 {
-                    return grainState.State;
+                    return grainState.State!; // ReadStateAsync initializes state before consumers access it.
                 }
 
-                return default!;
+                return default!; // Access before ReadStateAsync is outside the storage lifecycle contract.
             }
 
             set
@@ -71,6 +72,7 @@ namespace Orleans.Core
             ArgumentNullException.ThrowIfNull(store);
 
             _grainContext = grainContext;
+            _storageInstruments = grainContext.ActivationServices.GetRequiredService<StorageInstruments>();
             var sharedInstances = ActivatorUtilities.GetServiceOrCreateInstance<StateStorageBridgeSharedMap>(grainContext.ActivationServices);
             _shared = sharedInstances.Get<TState>(name, store);
         }
@@ -101,11 +103,11 @@ namespace Orleans.Core
                 var sw = ValueStopwatch.StartNew();
                 await _shared.Store.ReadStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
                 IsStateInitialized = true;
-                StorageInstruments.OnStorageRead(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
+                _storageInstruments.OnStorageRead(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
             }
             catch (Exception exc)
             {
-                StorageInstruments.OnStorageReadError(_shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
+                _storageInstruments.OnStorageReadError(_shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
                 OnError(exc, ErrorCode.StorageProvider_ReadFailed, nameof(ReadStateAsync));
             }
         }
@@ -134,11 +136,11 @@ namespace Orleans.Core
 
                 var sw = ValueStopwatch.StartNew();
                 await _shared.Store.WriteStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
-                StorageInstruments.OnStorageWrite(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
+                _storageInstruments.OnStorageWrite(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
             }
             catch (Exception exc)
             {
-                StorageInstruments.OnStorageWriteError(_shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
+                _storageInstruments.OnStorageWriteError(_shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
                 OnError(exc, ErrorCode.StorageProvider_WriteFailed, nameof(WriteStateAsync));
             }
         }
@@ -172,11 +174,11 @@ namespace Orleans.Core
                 sw.Stop();
 
                 // Update counters
-                StorageInstruments.OnStorageDelete(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
+                _storageInstruments.OnStorageDelete(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
             }
             catch (Exception exc)
             {
-                StorageInstruments.OnStorageDeleteError(_shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
+                _storageInstruments.OnStorageDeleteError(_shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
                 OnError(exc, ErrorCode.StorageProvider_DeleteFailed, nameof(ClearStateAsync));
             }
         }
@@ -220,8 +222,22 @@ namespace Orleans.Core
             var errorString = errorCode is { Length: > 0 } ? $" Error: {errorCode}" : null;
 
             var grainId = _grainContext.GrainId;
-            // TODO: pending on https://github.com/dotnet/runtime/issues/110570
-            _shared.Logger.LogError((int)id, exception, "Error from storage provider {ProviderName}.{StateName} during {Operation} for grain {GrainId}{ErrorCode}", _shared.ProviderTypeName, _shared.Name, operation, grainId, errorString);
+            switch (id)
+            {
+                case ErrorCode.StorageProvider_ReadFailed:
+                    LogErrorStorageReadFailed(_shared.Logger, exception, _shared.ProviderTypeName, _shared.Name, operation, grainId, errorString);
+                    break;
+                case ErrorCode.StorageProvider_WriteFailed:
+                    LogErrorStorageWriteFailed(_shared.Logger, exception, _shared.ProviderTypeName, _shared.Name, operation, grainId, errorString);
+                    break;
+                case ErrorCode.StorageProvider_DeleteFailed:
+                    LogErrorStorageDeleteFailed(_shared.Logger, exception, _shared.ProviderTypeName, _shared.Name, operation, grainId, errorString);
+                    break;
+                default:
+                    var message = $"Error from storage provider {_shared.ProviderTypeName}.{_shared.Name} during {operation} for grain {grainId}{errorString}";
+                    _shared.Logger.Log(LogLevel.Error, new EventId((int)id), message, exception, static (state, _) => state);
+                    break;
+            }
 
             // If error is not specialization of OrleansException, wrap it
             if (exception is not OrleansException)
@@ -244,6 +260,27 @@ namespace Orleans.Core
             Message = "Failed to rehydrate state named {StateName} for grain {GrainId}"
         )]
         private static partial void LogErrorOnRehydrate(ILogger logger, Exception exception, string stateName, GrainId grainId);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.StorageProvider_ReadFailed,
+            Level = LogLevel.Error,
+            Message = "Error from storage provider {ProviderName}.{StateName} during {Operation} for grain {GrainId}{ErrorCode}"
+        )]
+        private static partial void LogErrorStorageReadFailed(ILogger logger, Exception exception, string providerName, string stateName, string operation, GrainId grainId, string? errorCode);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.StorageProvider_WriteFailed,
+            Level = LogLevel.Error,
+            Message = "Error from storage provider {ProviderName}.{StateName} during {Operation} for grain {GrainId}{ErrorCode}"
+        )]
+        private static partial void LogErrorStorageWriteFailed(ILogger logger, Exception exception, string providerName, string stateName, string operation, GrainId grainId, string? errorCode);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.StorageProvider_DeleteFailed,
+            Level = LogLevel.Error,
+            Message = "Error from storage provider {ProviderName}.{StateName} during {Operation} for grain {GrainId}{ErrorCode}"
+        )]
+        private static partial void LogErrorStorageDeleteFailed(ILogger logger, Exception exception, string providerName, string stateName, string operation, GrainId grainId, string? errorCode);
     }
 
     internal sealed class StateStorageBridgeSharedMap(ILoggerFactory loggerFactory, IActivatorProvider activatorProvider)

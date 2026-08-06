@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
@@ -13,15 +14,15 @@ internal sealed class DashboardClient(IGrainFactory grainFactory) : IDashboardCl
     private readonly IDashboardRemindersGrain _remindersGrain = grainFactory.GetGrain<IDashboardRemindersGrain>(0);
     private readonly IGrainFactory _grainFactory = grainFactory;
 
-    public async Task<Immutable<DashboardCounters>> DashboardCounters(string[] exclusions) => await _dashboardGrain.GetCounters(exclusions);
+    public async Task<Immutable<DashboardCounters>> DashboardCounters(string[]? exclusions) => await _dashboardGrain.GetCounters(exclusions);
 
     public async Task<Immutable<Dictionary<string, GrainTraceEntry>>> ClusterStats() => await _dashboardGrain.GetClusterTracing();
 
     public async Task<Immutable<ReminderResponse>> GetReminders(int pageNumber, int pageSize) => await _remindersGrain.GetReminders(pageNumber, pageSize);
 
-    public async Task<Immutable<SiloRuntimeStatistics[]>> HistoricalStats(string siloAddress) => await Silo(siloAddress).GetRuntimeStatistics();
+    public async Task<Immutable<SiloRuntimeStatistics?[]>> HistoricalStats(string siloAddress) => await Silo(siloAddress).GetRuntimeStatistics();
 
-    public async Task<Immutable<Dictionary<string, string>>> SiloProperties(string siloAddress) => await Silo(siloAddress).GetExtendedProperties();
+    public async Task<Immutable<Dictionary<string, string?>>> SiloProperties(string siloAddress) => await Silo(siloAddress).GetExtendedProperties();
 
     public async Task<Immutable<Dictionary<string, string>>> SiloMetadata(string siloAddress) => await Silo(siloAddress).GetMetadata();
 
@@ -32,11 +33,30 @@ internal sealed class DashboardClient(IGrainFactory grainFactory) : IDashboardCl
     public async Task<Immutable<Dictionary<string, Dictionary<string, GrainTraceEntry>>>> GrainStats(
         string grainName) => await _dashboardGrain.GetGrainTracing(grainName);
 
-    public async Task<Immutable<Dictionary<string, GrainMethodAggregate[]>>> TopGrainMethods(int take, string[] exclusions) => await _dashboardGrain.TopGrainMethods(take, exclusions);
+    public async Task<Immutable<Dictionary<string, GrainMethodAggregate[]>>> TopGrainMethods(int take, string[]? exclusions) => await _dashboardGrain.TopGrainMethods(take, exclusions);
 
     private ISiloGrainProxy Silo(string siloAddress) => _grainFactory.GetGrain<ISiloGrainProxy>(siloAddress);
 
-    public async Task<Immutable<string>> GetGrainState(string id, string grainType) => await _dashboardGrain.GetGrainState(id, grainType);
+    public async Task<Immutable<string>> GetGrainState(string? id, string? grainType) => await _dashboardGrain.GetGrainState(id, grainType);
 
-    public async Task<Immutable<string[]>> GetGrainTypes(string[] exclusions = null) => await _dashboardGrain.GetGrainTypes(exclusions);
+    public async Task<Immutable<string[]>> GetGrainTypes(string[]? exclusions = null) => await _dashboardGrain.GetGrainTypes(exclusions);
+
+    public async Task<Immutable<LifecycleStageInfo[]>> GetLifecycleStages()
+    {
+        // All silos run an identical lifecycle, so we only need to ask one of them.
+        // Use the management grain to find an active host, then call its dashboard
+        // silo grain proxy.
+        var management = _grainFactory.GetGrain<IManagementGrain>(0);
+        var hosts = await management.GetHosts(onlyActive: true);
+        var siloAddress = hosts
+            .Where(x => x.Value == SiloStatus.Active)
+            .Select(x => x.Key)
+            .FirstOrDefault();
+        if (siloAddress is null)
+        {
+            return new LifecycleStageInfo[0].AsImmutable();
+        }
+
+        return await Silo(siloAddress.ToParsableString()).GetLifecycleStages();
+    }
 }

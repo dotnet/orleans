@@ -14,7 +14,7 @@ namespace Orleans.Transactions
 
         public TransactionManagerExtension(IGrainContextAccessor contextAccessor)
         {
-            this.factories = contextAccessor.GrainContext.GetResourceFactoryRegistry<ITransactionManager>();
+            this.factories = contextAccessor.GrainContext.GetResourceFactoryRegistry<ITransactionManager>()!;
             this.managers = new Dictionary<string, ITransactionManager>();
         }
 
@@ -35,7 +35,7 @@ namespace Orleans.Transactions
 
         private ITransactionManager GetManager(string resourceId)
         {
-            if (!this.managers.TryGetValue(resourceId, out ITransactionManager manager))
+            if (!this.managers.TryGetValue(resourceId, out ITransactionManager? manager))
             {
                 this.managers[resourceId] = manager = this.factories[resourceId].Invoke();
             }

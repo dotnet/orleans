@@ -16,7 +16,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
     [TestCategory("AzureStorage"), TestCategory("Transactions"), TestCategory("Functional")]
     public class TransactionRecoveryTests : TestClusterPerTest
     {
-        private TransactionRecoveryTestsRunnerxUnit testRunner;
+        private TransactionRecoveryTestsRunnerxUnit testRunner = null!;
         private readonly ITestOutputHelper helper;
 
         public TransactionRecoveryTests(ITestOutputHelper helper)

@@ -133,9 +133,9 @@ namespace Orleans.Runtime
         /// <returns>
         /// A <see cref="string"/> representation of this instance.
         /// </returns>
-        public override string? ToString() => _value.ToString();
+        public override string ToString() => _value.ToString();
 
-        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString() ?? "";
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
             => _value.TryFormat(destination, out charsWritten);

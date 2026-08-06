@@ -12,18 +12,19 @@ using Orleans.Dashboard.Core;
 
 namespace Orleans.Dashboard.Implementation;
 
-internal sealed class SiloGrainService : GrainService, ISiloGrainService
+internal sealed partial class SiloGrainService : GrainService, ISiloGrainService
 {
     private const int DefaultTimerIntervalMs = 1000; // 1 second
-    private readonly Queue<SiloRuntimeStatistics> _statistics;
+    private readonly Queue<SiloRuntimeStatistics?> _statistics;
     private readonly Dictionary<string, StatCounter> _counters = [];
     private readonly DashboardOptions _options;
     private readonly IGrainProfiler _profiler;
     private readonly IGrainFactory _grainFactory;
+    private readonly ISiloLifecycleSubject _siloLifecycle;
     private readonly ILogger<SiloGrainService> _logger;
-    private IDisposable _timer;
-    private string _versionOrleans;
-    private string _versionHost;
+    private IDisposable? _timer;
+    private string? _versionOrleans;
+    private string? _versionHost;
 
     public SiloGrainService(
         GrainId grainId,
@@ -31,12 +32,14 @@ internal sealed class SiloGrainService : GrainService, ISiloGrainService
         ILoggerFactory loggerFactory,
         IGrainProfiler profiler,
         IOptions<DashboardOptions> options,
-        IGrainFactory grainFactory) : base(grainId, silo, loggerFactory)
+        IGrainFactory grainFactory,
+        ISiloLifecycleSubject siloLifecycle) : base(grainId, silo, loggerFactory)
     {
         _profiler = profiler;
         _options = options.Value;
         _grainFactory = grainFactory;
-        _statistics = new Queue<SiloRuntimeStatistics>(_options.HistoryLength + 1);
+        _siloLifecycle = siloLifecycle;
+        _statistics = new Queue<SiloRuntimeStatistics?>(_options.HistoryLength + 1);
         _logger = loggerFactory.CreateLogger<SiloGrainService>();
     }
 
@@ -52,13 +55,13 @@ internal sealed class SiloGrainService : GrainService, ISiloGrainService
         );
         try
         {
-            _timer = RegisterTimer(x => CollectStatistics((bool) x), true, updateInterval, updateInterval);
+            _timer = RegisterTimer(x => CollectStatistics((bool)x!), true, updateInterval, updateInterval);
 
             await CollectStatistics(false);
         }
         catch (InvalidOperationException)
         {
-            _logger.LogWarning("Not running in Orleans runtime");
+            LogWarningNotRunningInOrleansRuntime(_logger);
         }
 
         await base.Start();
@@ -99,9 +102,9 @@ internal sealed class SiloGrainService : GrainService, ISiloGrainService
         return Task.CompletedTask;
     }
 
-    public Task<Immutable<Dictionary<string, string>>> GetExtendedProperties()
+    public Task<Immutable<Dictionary<string, string?>>> GetExtendedProperties()
     {
-        var results = new Dictionary<string, string>
+        var results = new Dictionary<string, string?>
         {
             ["hostVersion"] = _versionHost,
             ["orleansVersion"] = _versionOrleans
@@ -123,7 +126,7 @@ internal sealed class SiloGrainService : GrainService, ISiloGrainService
         return Task.CompletedTask;
     }
 
-    public Task<Immutable<SiloRuntimeStatistics[]>> GetRuntimeStatistics()
+    public Task<Immutable<SiloRuntimeStatistics?[]>> GetRuntimeStatistics()
     {
         return Task.FromResult(_statistics.ToArray().AsImmutable());
     }
@@ -133,10 +136,21 @@ internal sealed class SiloGrainService : GrainService, ISiloGrainService
         return Task.FromResult(_counters.Values.OrderBy(x => x.Name).ToArray().AsImmutable());
     }
 
+    public Task<Immutable<LifecycleStageInfo[]>> GetLifecycleStages()
+    {
+        return Task.FromResult(LifecycleStageInspector.GetStages(_siloLifecycle).AsImmutable());
+    }
+
     public Task Enable(bool enabled)
     {
         _profiler.Enable(enabled);
 
         return Task.CompletedTask;
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Not running in Orleans runtime"
+    )]
+    private static partial void LogWarningNotRunningInOrleansRuntime(ILogger logger);
 }

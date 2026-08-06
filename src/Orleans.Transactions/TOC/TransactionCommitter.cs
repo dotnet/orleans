@@ -23,7 +23,7 @@ namespace Orleans.Transactions
         private readonly ActivationLifetime activationLifetime;
         private readonly ILogger logger;
         private ParticipantId participantId;
-        private TransactionQueue<OperationState> queue;
+        private TransactionQueue<OperationState> queue = null!;
 
         private bool detectReentrancy;
 
@@ -61,11 +61,11 @@ namespace Orleans.Transactions
 
             info.Participants.TryGetValue(this.participantId, out var recordedaccesses);
 
-            return this.queue.RWLock.EnterLock<bool>(info.TransactionId, info.Priority, recordedaccesses, false,
+            return this.queue.RWLock.EnterLock<bool>(info.TransactionId, info.Priority, recordedaccesses, false, info.UseExclusiveLock,
                 () =>
                 {
                     // check if we expired while waiting
-                    if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<OperationState> record))
+                    if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<OperationState>? record))
                     {
                         throw new OrleansCascadingAbortException(info.TransactionId.ToString());
                     }
@@ -143,7 +143,7 @@ namespace Orleans.Transactions
         public sealed class OperationState
         {
             [Id(0)]
-            public ITransactionCommitOperation<TService> Operation { get; set; }
+            public ITransactionCommitOperation<TService> Operation { get; set; } = null!;
         }
 
         [LoggerMessage(

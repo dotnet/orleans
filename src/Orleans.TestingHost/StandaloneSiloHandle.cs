@@ -23,7 +23,7 @@ namespace Orleans.TestingHost
         private readonly TaskCompletionSource<bool> _errorCloseEvent;
         private readonly EventHandler _processExitHandler;
         private bool isActive = true;
-        private Task _runTask;
+        private Task _runTask = null!;
 
         /// <summary>
         /// The configuration key used to identify the process to launch.
@@ -61,7 +61,7 @@ namespace Orleans.TestingHost
                 RedirectStandardError = true,
                 RedirectStandardOutput = true,
                 RedirectStandardInput = true,
-                WorkingDirectory = new FileInfo(executablePath).Directory.FullName,
+                WorkingDirectory = new FileInfo(executablePath).Directory!.FullName,
                 UseShellExecute = false,
             };
 
@@ -145,7 +145,7 @@ namespace Orleans.TestingHost
             IConfiguration configuration)
         {
             var executablePath = configuration[ExecutablePathConfigKey];
-            var result = new StandaloneSiloHandle(siloName, configuration, executablePath);
+            var result = new StandaloneSiloHandle(siloName, configuration, executablePath!);
             await result.StartAsync();
             return result;
         }
@@ -226,7 +226,7 @@ namespace Orleans.TestingHost
                     Process.BeginErrorReadLine();
 
                     var waitForExit = Task.Factory.StartNew(
-                        process => ((Process)process).WaitForExit(-1),
+                        process => ((Process)process!).WaitForExit(-1),
                         Process,
                         CancellationToken.None,
                         TaskCreationOptions.LongRunning | TaskCreationOptions.RunContinuationsAsynchronously,

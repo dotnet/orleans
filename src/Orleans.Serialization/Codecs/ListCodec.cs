@@ -32,7 +32,7 @@ namespace Orleans.Serialization.Codecs
 
         /// <inheritdoc/>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, List<T> value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] List<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -47,6 +47,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public List<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -57,7 +58,7 @@ namespace Orleans.Serialization.Codecs
             field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-            List<T> result = null;
+            List<T>? result = null;
             uint fieldId = 0;
             while (true)
             {
@@ -72,10 +73,7 @@ namespace Orleans.Serialization.Codecs
                 {
                     case 0:
                         var length = (int)UInt32Codec.ReadValue(ref reader, header);
-                        if (length > 10240 && length > reader.Length)
-                        {
-                            ThrowInvalidSizeException(length);
-                        }
+                        reader.EnsureAvailable((uint)length);
 
                         result = new(length);
                         ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
@@ -86,7 +84,7 @@ namespace Orleans.Serialization.Codecs
                             ListCodec<T>.ThrowLengthFieldMissing();
                         }
 
-                        result.Add(_fieldCodec.ReadValue(ref reader, header));
+                        result!.Add(_fieldCodec.ReadValue(ref reader, header)!);
                         break;
                     default:
                         reader.ConsumeUnknownField(header);
@@ -100,11 +98,8 @@ namespace Orleans.Serialization.Codecs
                 ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             }
 
-            return result;
+            return result!;
         }
-
-        private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-            $"Declared length of {typeof(List<T>)}, {length}, is greater than total length of input.");
 
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 
@@ -142,17 +137,14 @@ namespace Orleans.Serialization.Codecs
                 {
                     case 0:
                         var length = (int)UInt32Codec.ReadValue(ref reader, header);
-                        if (length > 10240 && length > reader.Length)
-                        {
-                            ThrowInvalidSizeException(length);
-                        }
+                        reader.EnsureAvailable((uint)length);
 
 #if NET6_0_OR_GREATER
                         value.EnsureCapacity(length);
 #endif
                         break;
                     case 1:
-                        value.Add(_fieldCodec.ReadValue(ref reader, header));
+                        value.Add(_fieldCodec.ReadValue(ref reader, header)!);
                         break;
                     default:
                         reader.ConsumeUnknownField(header);
@@ -185,12 +177,12 @@ namespace Orleans.Serialization.Codecs
         {
             if (context.TryGetCopy<List<T>>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             if (input.GetType() != typeof(List<T>))
             {
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
             }
 
             result = new List<T>(input.Count);

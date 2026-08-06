@@ -18,4 +18,12 @@
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="LoadTestGrains" />
+    <InternalsVisibleTo Include="Orleans.CodeGeneration.Build" />
+    <InternalsVisibleTo Include="Orleans.Runtime" />
+    <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
+  </ItemGroup>
 </Project>
+

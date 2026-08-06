@@ -6,11 +6,11 @@ namespace Orleans.Serialization.Activators
 {
     internal abstract class DefaultActivator<T> : IActivator<T>
     {
-        private static readonly Func<T> DefaultConstructorFunction = Init();
-        protected readonly Func<T> Constructor = DefaultConstructorFunction;
+        private static readonly Func<T>? DefaultConstructorFunction = Init();
+        protected readonly Func<T>? Constructor = DefaultConstructorFunction;
         protected readonly Type Type = typeof(T);
 
-        private static Func<T> Init()
+        private static Func<T>? Init()
         {
             var ctor = typeof(T).GetConstructor(Type.EmptyTypes);
             if (ctor is null)

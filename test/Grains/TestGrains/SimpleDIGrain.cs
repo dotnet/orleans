@@ -14,7 +14,7 @@ namespace UnitTests.Grains
         private readonly IGrainFactory injectedGrainFactory;
         private readonly int grainFactoryId;
         private readonly IGrainContextAccessor grainContextAccessor;
-        private IGrainContext originalGrainContext;
+        private IGrainContext originalGrainContext = null!;
 
         public DIGrainWithInjectedServices(IInjectedService injectedService, IInjectedScopedService injectedScopedService,  IGrainFactory injectedGrainFactory, IGrainContextAccessor grainContextAccessor)
         {

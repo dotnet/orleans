@@ -25,6 +25,7 @@ namespace UnitTests.GrainInterfaces
         Task StartTimer(string name, TimeSpan dueTime, string operationType);
         Task RestartTimer(string name, TimeSpan dueTime);
         Task RestartTimer(string name, TimeSpan dueTime, TimeSpan period);
+        Task TestTimerChangeArguments();
         Task StopTimer(string name);
         Task RunSelfDisposingTimer();
     }

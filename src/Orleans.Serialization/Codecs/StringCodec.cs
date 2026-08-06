@@ -15,6 +15,7 @@ namespace Orleans.Serialization.Codecs
     public sealed class StringCodec : IFieldCodec<string>
     {
         /// <inheritdoc />
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         string IFieldCodec<string>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
@@ -25,6 +26,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static string ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -45,6 +47,10 @@ namespace Orleans.Serialization.Codecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static string ReadRaw<TInput>(ref Reader<TInput> reader, uint numBytes)
         {
+            reader.EnsureAvailable(numBytes);
+            if (numBytes > int.MaxValue)
+                ThrowInvalidSizeException(numBytes);
+
             if (reader.TryReadBytes((int)numBytes, out var span))
                 return Encoding.UTF8.GetString(span);
 
@@ -61,7 +67,11 @@ namespace Orleans.Serialization.Codecs
             return res;
         }
 
-        void IFieldCodec<string>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, string value)
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowInvalidSizeException(uint numBytes) => throw new IndexOutOfRangeException(
+            $"The declared string length, {numBytes}, exceeds the maximum supported length.");
+
+        void IFieldCodec<string>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] string value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
                 return;
@@ -80,7 +90,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="fieldIdDelta">The field identifier delta.</param>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, string value) where TBufferWriter : IBufferWriter<byte>
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] string value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceFieldExpected(ref writer, fieldIdDelta, value))
             {

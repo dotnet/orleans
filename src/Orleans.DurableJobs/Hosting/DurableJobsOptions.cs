@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.DurableJobs;
+using Orleans.Journaling;
 
 namespace Orleans.Hosting;
 
@@ -27,6 +30,20 @@ public sealed class DurableJobsOptions
     public TimeSpan ShardActivationBufferPeriod { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>
+    /// Gets or sets the number of writable shards to use for each shard time bucket.
+    /// Increasing this value distributes jobs with the same due-time bucket across multiple shard journals.
+    /// Default: 1.
+    /// </summary>
+    public int ShardStripeCount { get; set; } = 1;
+
+    /// <summary>
+    /// Gets or sets the delay before polling an asynchronous durable job handler again.
+    /// The job continues holding its concurrency slot while it is polled.
+    /// Default: 1 second.
+    /// </summary>
+    public TimeSpan JobStatusPollInterval { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>
     /// Gets or sets the maximum number of jobs that can be executed concurrently on a single silo.
     /// Default: 10,000 × processor count.
     /// </summary>
@@ -40,12 +57,111 @@ public sealed class DurableJobsOptions
     public TimeSpan OverloadBackoffDelay { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
+    /// Gets or sets whether concurrent job slow start is enabled.
+    /// When enabled, job concurrency is gradually increased during startup to avoid starvation
+    /// issues that can occur before caches, connection pools, and thread pool sizing have warmed up.
+    /// Concurrency starts at <see cref="SlowStartInitialConcurrency"/> and doubles every
+    /// <see cref="SlowStartInterval"/> until <see cref="MaxConcurrentJobsPerSilo"/> is reached.
+    /// Default: <see langword="true"/>.
+    /// </summary>
+    public bool ConcurrencySlowStartEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the initial number of concurrent jobs allowed per silo when slow start is enabled.
+    /// Concurrency will exponentially increase from this value until <see cref="MaxConcurrentJobsPerSilo"/> is reached.
+    /// Default: <see cref="Environment.ProcessorCount"/>.
+    /// </summary>
+    public int SlowStartInitialConcurrency { get; set; } = Environment.ProcessorCount;
+
+    /// <summary>
+    /// Gets or sets the interval at which concurrency is doubled during slow start ramp-up.
+    /// Default: 10 seconds.
+    /// </summary>
+    public TimeSpan SlowStartInterval { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>
     /// Gets or sets the function that determines whether a failed job should be retried and when.
     /// The function receives the job context and the exception that caused the failure, and returns
     /// the time when the job should be retried, or <see langword="null"/> if the job should not be retried.
     /// Default: Retry up to 5 times with exponential backoff (2^n seconds).
     /// </summary>
     public Func<IJobRunContext, Exception, DateTimeOffset?> ShouldRetry { get; set; } = DefaultShouldRetry;
+
+    /// <summary>
+    /// Gets or sets the maximum amount of time the shard operation processor will wait for
+    /// additional mutations to join an in-flight batch after the first one arrives.
+    /// </summary>
+    /// <remarks>
+    /// When set to a positive value, the operation processor delays for up to this duration after
+    /// dequeuing the first mutation, giving subsequent mutations a chance to be coalesced into
+    /// the same journal write. This trades a bounded latency increase for the first request in
+    /// each batch against larger batch sizes under bursty/moderate load. Defaults to
+    /// <see cref="TimeSpan.Zero"/> (no linger, behavior unchanged).
+    /// </remarks>
+    public TimeSpan ShardBatchLingerDelay { get; set; } = TimeSpan.Zero;
+
+    /// <summary>
+    /// Gets or sets the maximum number of times a shard can be adopted from a dead owner before
+    /// being marked as poisoned. A shard that repeatedly causes silos to crash will exceed this
+    /// threshold as it bounces between owners. When the next adoption would cause the adopted count
+    /// to exceed this value, the shard is considered poisoned and will no longer be assigned to any silo.
+    /// Default: 3.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The adopted count is only incremented when a shard is taken from a dead silo (i.e., the previous
+    /// owner crashed). It is NOT incremented when a silo gracefully shuts down and releases ownership.
+    /// </para>
+    /// <para>
+    /// When a shard completes successfully (all jobs processed), the adopted count is reset to 0.
+    /// </para>
+    /// </remarks>
+    public int MaxAdoptedCount { get; set; } = 3;
+
+    /// <summary>
+    /// Gets or sets the maximum number of orphaned shards a silo may claim immediately
+    /// after startup. The cumulative budget grows linearly from this value to
+    /// <see cref="ShardClaimMaxBudget"/> over <see cref="ShardClaimRampUpDuration"/>,
+    /// after which the limit is removed entirely.
+    /// This prevents a freshly started silo from overwhelming itself by claiming all orphaned shards
+    /// at once during disaster-recovery scenarios.
+    /// Default: 2.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// options.ShardClaimInitialBudget = 1;
+    /// </code>
+    /// </example>
+    public int ShardClaimInitialBudget { get; set; } = 2;
+
+    /// <summary>
+    /// Gets or sets the total number of orphaned shards the silo is allowed to have claimed
+    /// by the end of the shard-claim ramp-up period. The cumulative budget is linearly
+    /// interpolated between <see cref="ShardClaimInitialBudget"/> at startup and this value
+    /// at <see cref="ShardClaimRampUpDuration"/>.
+    /// Default: 20.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// options.ShardClaimMaxBudget = 50;
+    /// </code>
+    /// </example>
+    public int ShardClaimMaxBudget { get; set; } = 20;
+
+    /// <summary>
+    /// Gets or sets the duration of the shard-claim ramp-up period after silo activation.
+    /// While the silo has been running for less than this duration, the number of orphaned shards
+    /// it may claim is limited by a linearly increasing budget. Once this period elapses the
+    /// silo claims all available orphaned shards without limit.
+    /// Set to <see cref="TimeSpan.Zero"/> to disable shard-claim ramp-up entirely.
+    /// Default: 5 minutes.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// options.ShardClaimRampUpDuration = TimeSpan.FromMinutes(10);
+    /// </code>
+    /// </example>
+    public TimeSpan ShardClaimRampUpDuration { get; set; } = TimeSpan.FromMinutes(5);
 
     private static DateTimeOffset? DefaultShouldRetry(IJobRunContext jobContext, Exception ex)
     {
@@ -59,7 +175,7 @@ public sealed class DurableJobsOptions
     }
 }
 
-public sealed class DurableJobsOptionsValidator : IConfigurationValidator
+public sealed partial class DurableJobsOptionsValidator : IConfigurationValidator
 {
     private readonly ILogger<DurableJobsOptionsValidator> _logger;
     private readonly IOptions<DurableJobsOptions> _options;
@@ -77,10 +193,150 @@ public sealed class DurableJobsOptionsValidator : IConfigurationValidator
         {
             throw new OrleansConfigurationException("DurableJobsOptions.ShardDuration must be greater than zero.");
         }
-        if (options.ShouldRetry == null)
+        if (options.ShardStripeCount <= 0)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.ShardStripeCount must be greater than zero.");
+        }
+        if (options.ShardStripeCount > 32 * 1024)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.ShardStripeCount must be less than or equal to 32768.");
+        }
+        if (options.JobStatusPollInterval <= TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.JobStatusPollInterval must be greater than zero.");
+        }
+        if (options.ShouldRetry is null)
         {
             throw new OrleansConfigurationException("DurableJobsOptions.ShouldRetry must not be null.");
         }
-        _logger.LogInformation("DurableJobsOptions validated: ShardDuration={ShardDuration}", options.ShardDuration);
+        if (options.ConcurrencySlowStartEnabled && options.SlowStartInitialConcurrency <= 0)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.SlowStartInitialConcurrency must be greater than zero.");
+        }
+        if (options.ConcurrencySlowStartEnabled && options.SlowStartInterval <= TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.SlowStartInterval must be greater than zero when slow start is enabled.");
+        }
+        if (options.ConcurrencySlowStartEnabled && options.SlowStartInitialConcurrency > options.MaxConcurrentJobsPerSilo)
+        {
+            LogWarningSlowStartInitialConcurrencyExceedsMax(_logger, options.SlowStartInitialConcurrency, options.MaxConcurrentJobsPerSilo);
+        }
+        if (options.MaxAdoptedCount < 0)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.MaxAdoptedCount must be greater than or equal to zero.");
+        }
+        if (options.ShardBatchLingerDelay < TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.ShardBatchLingerDelay must be non-negative.");
+        }
+        if (options.ShardClaimInitialBudget < 0)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.ShardClaimInitialBudget must be non-negative.");
+        }
+        if (options.ShardClaimMaxBudget < options.ShardClaimInitialBudget)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.ShardClaimMaxBudget must be greater than or equal to ShardClaimInitialBudget.");
+        }
+        if (options.ShardClaimRampUpDuration < TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.ShardClaimRampUpDuration must be non-negative.");
+        }
+        LogInformationOptionsValidated(_logger, options.ShardDuration);
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "DurableJobsOptions.SlowStartInitialConcurrency ({SlowStartInitialConcurrency}) exceeds MaxConcurrentJobsPerSilo ({MaxConcurrentJobsPerSilo}); slow start will not be applied."
+    )]
+    private static partial void LogWarningSlowStartInitialConcurrencyExceedsMax(ILogger logger, int slowStartInitialConcurrency, int maxConcurrentJobsPerSilo);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "DurableJobsOptions validated: ShardDuration={ShardDuration}"
+    )]
+    private static partial void LogInformationOptionsValidated(ILogger logger, TimeSpan shardDuration);
+}
+
+internal sealed class DurableJobsJournalingConfigurationValidator : IConfigurationValidator
+{
+    private readonly IServiceProvider _serviceProvider;
+
+    public DurableJobsJournalingConfigurationValidator(IServiceProvider serviceProvider)
+    {
+        _serviceProvider = serviceProvider;
+    }
+
+    public void ValidateConfiguration()
+    {
+        var missingServices = new List<string>();
+        var serviceProviderIsService = _serviceProvider.GetService<IServiceProviderIsService>();
+
+        CheckService<IJournalStorageProvider>(serviceProviderIsService, missingServices);
+        CheckService<IJournalStorageCatalog>(serviceProviderIsService, missingServices);
+        CheckService<IJournaledStateManagerFactory>(serviceProviderIsService, missingServices);
+        CheckService<JobShardManager>(serviceProviderIsService, missingServices);
+
+        if (missingServices.Count > 0)
+        {
+            throw new OrleansConfigurationException(
+                $"DurableJobs requires Orleans.Journaling storage. Configure DurableJobs storage using UseInMemoryDurableJobs() or UseAzureBlobDurableJobs(...) before starting the silo. Missing services: {string.Join(", ", missingServices)}.");
+        }
+
+        var shardManager = ResolveRequiredService<JobShardManager>();
+        if (shardManager is not JournaledJobShardManager)
+        {
+            throw new OrleansConfigurationException(
+                $"DurableJobs requires the journaled shard manager, but '{shardManager.GetType().FullName}' is registered. Configure DurableJobs storage using UseInMemoryDurableJobs() or UseAzureBlobDurableJobs(...).");
+        }
+    }
+
+    private void CheckService<TService>(IServiceProviderIsService? serviceProviderIsService, List<string> missingServices)
+        where TService : class
+    {
+        if (serviceProviderIsService is not null)
+        {
+            if (!serviceProviderIsService.IsService(typeof(TService)))
+            {
+                missingServices.Add(typeof(TService).Name);
+            }
+
+            return;
+        }
+
+        if (ResolveService<TService>() is null)
+        {
+            missingServices.Add(typeof(TService).Name);
+        }
+    }
+
+    private TService? ResolveService<TService>()
+        where TService : class
+    {
+        try
+        {
+            return _serviceProvider.GetService<TService>();
+        }
+        catch (Exception exception)
+        {
+            throw CreateServiceResolutionException<TService>(exception);
+        }
+    }
+
+    private TService ResolveRequiredService<TService>()
+        where TService : notnull
+    {
+        try
+        {
+            return _serviceProvider.GetRequiredService<TService>();
+        }
+        catch (Exception exception)
+        {
+            throw CreateServiceResolutionException<TService>(exception);
+        }
+    }
+
+    private static OrleansConfigurationException CreateServiceResolutionException<TService>(Exception exception)
+        => new(
+            $"DurableJobs requires Orleans.Journaling storage, but service '{typeof(TService).Name}' could not be resolved. Configure DurableJobs storage using UseInMemoryDurableJobs() or UseAzureBlobDurableJobs(...).",
+            exception);
 }

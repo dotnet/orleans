@@ -16,18 +16,28 @@ namespace Orleans.EventSourcing.StateStorage
         /// Gets and Sets StateAndMetaData
         /// </summary>
         [Id(0)]
-        public GrainStateWithMetaData<TView> StateAndMetaData { get; set; }
+        public GrainStateWithMetaData<TView> StateAndMetaData
+        {
+            get => field ??= new GrainStateWithMetaData<TView>();
+            set => field = value ?? new GrainStateWithMetaData<TView>();
+        }
 
         /// <summary>
         /// Gets and Sets Etag
         /// </summary>
         [Id(1)]
-        public string ETag { get; set; }
+        public string? ETag { get; set; }
 
         [Id(2)]
         public bool RecordExists { get; set; }
 
         public GrainStateWithMetaData<TView> State { get => StateAndMetaData; set => StateAndMetaData = value; }
+
+        GrainStateWithMetaData<TView>? IGrainState<GrainStateWithMetaData<TView>>.State
+        {
+            get => State;
+            set => StateAndMetaData = value ?? new GrainStateWithMetaData<TView>();
+        }
 
         /// <summary>
         /// Initialize a new instance of GrainStateWithMetaDataAndETag class with an initialView

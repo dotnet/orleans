@@ -35,7 +35,7 @@ namespace Orleans.EventSourcing.Common
     {
         /// <summary>The notification messages contained in this batch.</summary>
         [Id(0)]
-        public List<INotificationMessage> Notifications { get; set; }
+        public List<INotificationMessage> Notifications { get; set; } = null!;
 
         /// <summary>The version number - for a batch, this is the maximum version contained.</summary>
         public int Version {

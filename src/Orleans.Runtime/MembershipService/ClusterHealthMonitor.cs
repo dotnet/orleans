@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Threading;
@@ -17,13 +18,14 @@ namespace Orleans.Runtime.MembershipService
 {
     /// <summary>
     /// Responsible for ensuring that this silo monitors other silos in the cluster.
+    /// This is the default, probe-based implementation of <see cref="IClusterHealthMonitor"/>.
     /// </summary>
-    internal partial class ClusterHealthMonitor : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor.ITestAccessor, IDisposable, IAsyncDisposable
+    internal partial class ClusterHealthMonitor : IClusterHealthMonitor, ClusterHealthMonitor.ITestAccessor, IDisposable, IAsyncDisposable
     {
         private readonly CancellationTokenSource shutdownCancellation = new CancellationTokenSource();
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly IServiceProvider serviceProvider;
-        private readonly MembershipTableManager membershipService;
+        private readonly IMembershipManager membershipManager;
         private readonly ILogger<ClusterHealthMonitor> log;
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly IOptionsMonitor<ClusterMembershipOptions> clusterMembershipOptions;
@@ -45,7 +47,7 @@ namespace Orleans.Runtime.MembershipService
 
         public ClusterHealthMonitor(
             ILocalSiloDetails localSiloDetails,
-            MembershipTableManager membershipService,
+            IMembershipManager membershipManager,
             ILogger<ClusterHealthMonitor> log,
             IOptionsMonitor<ClusterMembershipOptions> clusterMembershipOptions,
             IFatalErrorHandler fatalErrorHandler,
@@ -53,7 +55,7 @@ namespace Orleans.Runtime.MembershipService
         {
             this.localSiloDetails = localSiloDetails;
             this.serviceProvider = serviceProvider;
-            this.membershipService = membershipService;
+            this.membershipManager = membershipManager;
             this.log = log;
             this.fatalErrorHandler = fatalErrorHandler;
             this.clusterMembershipOptions = clusterMembershipOptions;
@@ -70,14 +72,14 @@ namespace Orleans.Runtime.MembershipService
         /// <summary>
         /// Gets the collection of monitored silos.
         /// </summary>
-        public ImmutableDictionary<SiloAddress, SiloHealthMonitor> SiloMonitors => this.monitoredSilos;
+        public IReadOnlyDictionary<SiloAddress, SiloHealthMonitor> SiloMonitors => this.monitoredSilos;
 
         private async Task ProcessMembershipUpdates()
         {
             try
             {
                 LogDebugStartingToProcessMembershipUpdates(log);
-                await foreach (var tableSnapshot in this.membershipService.MembershipTableUpdates.WithCancellation(this.shutdownCancellation.Token))
+                await foreach (var tableSnapshot in this.membershipManager.MembershipUpdates.WithCancellation(this.shutdownCancellation.Token))
                 {
                     var utcNow = DateTime.UtcNow;
 
@@ -130,9 +132,9 @@ namespace Orleans.Runtime.MembershipService
                     try
                     {
                         LogDebugStaleSiloFound(log);
-                        await this.membershipService.TryToSuspectOrKill(member.Key);
+                        await this.membershipManager.TrySuspectSilo(member.Key, null, this.shutdownCancellation.Token);
                     }
-                    catch(Exception exception)
+                    catch (Exception exception)
                     {
                         LogErrorTryToSuspectOrKillFailed(log, exception, member.Value.SiloAddress, member.Value.Status);
                     }
@@ -156,8 +158,9 @@ namespace Orleans.Runtime.MembershipService
             ImmutableDictionary<SiloAddress, SiloHealthMonitor> monitoredSilos,
             DateTime now)
         {
-            // If I am still not fully functional, I should not be probing others.
-            if (!membership.Entries.TryGetValue(this.localSiloDetails.SiloAddress, out var self) || !IsFunctionalForMembership(self.Status))
+            // If this silo cannot evict peers, it should not be probing others.
+            if (!membership.Entries.TryGetValue(this.localSiloDetails.SiloAddress, out var self)
+                || !CanEvictPeers(self.Status))
             {
                 return ImmutableDictionary<SiloAddress, SiloHealthMonitor>.Empty;
             }
@@ -175,7 +178,7 @@ namespace Orleans.Runtime.MembershipService
             foreach (var (candidate, entry) in membership.Entries)
             {
                 // Watch shutting-down silos as well, so we can properly ensure they become dead.
-                if (!IsFunctionalForMembership(entry.Status))
+                if (!CanBeEvictedByPeers(entry.Status))
                 {
                     continue;
                 }
@@ -209,35 +212,38 @@ namespace Orleans.Runtime.MembershipService
             // silo must be evicted before another failed silo can be detected).
             // The idea to use an expander graph is taken from "Stable and Consistent Membership at Scale with Rapid" by Lalith Suresh et al:
             // https://www.usenix.org/conference/atc18/presentation/suresh
-            for (var ringNum = 0; ringNum < numProbedSilos; ++ringNum)
+            if (self.Status != SiloStatus.Joining)
             {
-                // Update hash values with the current ring number.
-                for (var i = 0; i < tmpList.Count; i++)
+                for (var ringNum = 0; ringNum < numProbedSilos; ++ringNum)
                 {
-                    var siloAddress = tmpList[i].SiloAddress;
-                    tmpList[i] = (siloAddress, siloAddress.GetConsistentHashCode(ringNum));
-                }
-
-                // Sort the candidates based on their updated hash values.
-                tmpList.Sort((x, y) => x.HashCode.CompareTo(y.HashCode));
-
-                var myIndex = tmpList.FindIndex(el => el.SiloAddress.Equals(self.SiloAddress));
-                if (myIndex < 0)
-                {
-                    LogErrorSiloNotInLocalList(log, self.SiloAddress, self.Status);
-                    throw new OrleansMissingMembershipEntryException(
-                        $"This silo {self.SiloAddress} status {self.Status} is not in its own local silo list! This is a bug!");
-                }
-
-                // Starting at the local silo's index, find the first non-monitored silo and add it to the list.
-                for (var i = 0; i < tmpList.Count - 1; i++)
-                {
-                    var candidate = tmpList[(myIndex + i + 1) % tmpList.Count].SiloAddress;
-                    if (!silosToWatch.Contains(candidate))
+                    // Update hash values with the current ring number.
+                    for (var i = 0; i < tmpList.Count; i++)
                     {
-                        Debug.Assert(!candidate.IsSameLogicalSilo(this.localSiloDetails.SiloAddress));
-                        silosToWatch.Add(candidate);
-                        break;
+                        var siloAddress = tmpList[i].SiloAddress;
+                        tmpList[i] = (siloAddress, siloAddress.GetConsistentHashCode(ringNum));
+                    }
+
+                    // Sort the candidates based on their updated hash values.
+                    tmpList.Sort((x, y) => x.HashCode.CompareTo(y.HashCode));
+
+                    var myIndex = tmpList.FindIndex(el => el.SiloAddress.Equals(self.SiloAddress));
+                    if (myIndex < 0)
+                    {
+                        LogErrorSiloNotInLocalList(log, self.SiloAddress, self.Status);
+                        throw new OrleansMissingMembershipEntryException(
+                            $"This silo {self.SiloAddress} status {self.Status} is not in its own local silo list! This is a bug!");
+                    }
+
+                    // Starting at the local silo's index, find the first non-monitored silo and add it to the list.
+                    for (var i = 0; i < tmpList.Count - 1; i++)
+                    {
+                        var candidate = tmpList[(myIndex + i + 1) % tmpList.Count].SiloAddress;
+                        if (!silosToWatch.Contains(candidate))
+                        {
+                            Debug.Assert(!candidate.IsSameLogicalSilo(this.localSiloDetails.SiloAddress));
+                            silosToWatch.Add(candidate);
+                            break;
+                        }
                     }
                 }
             }
@@ -246,8 +252,7 @@ namespace Orleans.Runtime.MembershipService
             var newProbedSilos = ImmutableDictionary.CreateBuilder<SiloAddress, SiloHealthMonitor>();
             foreach (var silo in silosToWatch.Union(additionalSilos))
             {
-                SiloHealthMonitor monitor;
-                if (!monitoredSilos.TryGetValue(silo, out monitor))
+                if (!monitoredSilos.TryGetValue(silo, out var monitor))
                 {
                     monitor = this.createMonitor(silo);
                     monitor.Start();
@@ -267,23 +272,27 @@ namespace Orleans.Runtime.MembershipService
             static bool AreTheSame<T>(ImmutableDictionary<SiloAddress, T> first, ImmutableDictionary<SiloAddress, T> second)
                 => first.Count == second.Count && first.Count == first.Keys.Intersect(second.Keys).Count();
 
-            static bool IsFunctionalForMembership(SiloStatus status)
-                => status is SiloStatus.Active or SiloStatus.ShuttingDown or SiloStatus.Stopping;
+            static bool CanEvictPeers(SiloStatus status)
+                => status is SiloStatus.Joining or SiloStatus.Active;
+
+            static bool CanBeEvictedByPeers(SiloStatus status)
+                => status is SiloStatus.Joining or SiloStatus.Active or SiloStatus.ShuttingDown or SiloStatus.Stopping;
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
             var tasks = new List<Task>();
 
-            lifecycle.Subscribe(nameof(ClusterHealthMonitor), ServiceLifecycleStage.Active, OnActiveStart, OnActiveStop);
+            lifecycle.Subscribe(nameof(ClusterHealthMonitor), ServiceLifecycleStage.ValidateInitialConnectivity, OnValidateInitialConnectivityStart, OnStop);
 
-            Task OnActiveStart(CancellationToken ct)
+            Task OnValidateInitialConnectivityStart(CancellationToken ct)
             {
+                this.monitoredSilos = this.UpdateMonitoredSilos(this.membershipManager.CurrentSnapshot, this.monitoredSilos, DateTime.UtcNow);
                 tasks.Add(Task.Run(() => this.ProcessMembershipUpdates()));
                 return Task.CompletedTask;
             }
 
-            async Task OnActiveStop(CancellationToken ct)
+            async Task OnStop(CancellationToken ct)
             {
                 this.shutdownCancellation.Cancel(throwOnFirstException: false);
 
@@ -315,16 +324,16 @@ namespace Orleans.Runtime.MembershipService
             {
                 if (probeResult.Status == ProbeResultStatus.Failed && probeResult.FailedProbeCount >= this.clusterMembershipOptions.CurrentValue.NumMissedProbesLimit)
                 {
-                    await this.membershipService.TryToSuspectOrKill(monitor.TargetSiloAddress).ConfigureAwait(false);
+                    await this.membershipManager.TrySuspectSilo(monitor.TargetSiloAddress, null, this.shutdownCancellation.Token).ConfigureAwait(false);
                 }
             }
             else if (probeResult.Status == ProbeResultStatus.Failed)
             {
-                await this.membershipService.TryToSuspectOrKill(monitor.TargetSiloAddress, probeResult.Intermediary).ConfigureAwait(false);
+                await this.membershipManager.TrySuspectSilo(monitor.TargetSiloAddress, probeResult.Intermediary, this.shutdownCancellation.Token).ConfigureAwait(false);
             }
         }
 
-        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, out string reason)
+        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, [MaybeNullWhen(true)] out string reason)
         {
             var ok = true;
             reason = default;

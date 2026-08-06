@@ -12,7 +12,7 @@ namespace Orleans.Providers
         private readonly IStreamPubSub grainBasedPubSub;
         private readonly IStreamPubSub implicitPubSub;
         private readonly IStreamPubSub combinedGrainBasedAndImplicitPubSub;
-        private StreamDirectory streamDirectory;
+        private StreamDirectory? streamDirectory;
         private readonly IInternalGrainFactory grainFactory;
         private readonly ImplicitStreamSubscriberTable implicitSubscriberTable;
         private readonly ClientGrainContext clientContext;
@@ -29,7 +29,7 @@ namespace Orleans.Providers
             this.ServiceProvider = serviceProvider;
             this.implicitSubscriberTable = implicitSubscriberTable;
             this.clientContext = clientContext;
-            this.runtimeClient = serviceProvider.GetService<IRuntimeClient>();
+            this.runtimeClient = serviceProvider.GetService<IRuntimeClient>()!; // Registered by DefaultClientServices.
             grainBasedPubSub = new GrainBasedPubSubRuntime(GrainFactory);
             var tmp = new ImplicitStreamPubSub(this.grainFactory, this.implicitSubscriberTable);
             implicitPubSub = tmp;
@@ -43,7 +43,7 @@ namespace Orleans.Providers
 
         public StreamDirectory GetStreamDirectory()
         {
-            return streamDirectory;
+            return streamDirectory!; // Reset only clears this during client shutdown.
         }
 
         public async Task Reset(bool cleanup = true)
@@ -71,7 +71,7 @@ namespace Orleans.Providers
             return this.clientContext.GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
         }
 
-        public IStreamPubSub PubSub(StreamPubSubType pubSubType)
+        public IStreamPubSub? PubSub(StreamPubSubType pubSubType)
         {
             switch (pubSubType)
             {

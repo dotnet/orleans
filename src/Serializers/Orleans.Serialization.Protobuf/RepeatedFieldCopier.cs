@@ -26,12 +26,12 @@ public sealed class RepeatedFieldCopier<T> : IDeepCopier<RepeatedField<T>>, IBas
     {
         if (context.TryGetCopy<RepeatedField<T>>(input, out var result))
         {
-            return result;
+            return result!;
         }
 
         if (input.GetType() != typeof(RepeatedField<T>))
         {
-            return context.DeepCopy(input);
+            return context.DeepCopy(input)!;
         }
 
         result = new RepeatedField<T> { Capacity = input.Count };

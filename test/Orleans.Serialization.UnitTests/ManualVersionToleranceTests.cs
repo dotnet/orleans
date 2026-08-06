@@ -163,7 +163,7 @@ namespace Orleans.Serialization.UnitTests
             _log.WriteLine("Header:");
             _log.WriteLine(initialHeader.ToString());
 
-            var actual = _serializer.ReadValue(ref reader, initialHeader);
+            var actual = _serializer.ReadValue(ref reader, initialHeader)!;
             pipe.Reader.AdvanceTo(readResult.Buffer.End);
             pipe.Reader.Complete();
 
@@ -274,7 +274,7 @@ namespace Orleans.Serialization.UnitTests
                 Assert.IsNotType<ConcreteTypeSerializer<ObjectWithNewField, ObjectWithNewFieldTypeSerializer>>(objectWithNewFieldSerializer);
 
                 // using Generated Deserializer, which is capable of deserializing NewField 
-                var value = objectWithNewFieldSerializer.ReadValue(ref reader, initialHeader);
+                var value = objectWithNewFieldSerializer.ReadValue(ref reader, initialHeader)!;
                 return (value, reader.Position, reader.Session.ReferencedObjects.CurrentReferenceId);
             }
 
@@ -340,7 +340,7 @@ namespace Orleans.Serialization.UnitTests
                 Assert.IsNotType<ConcreteTypeSerializer<ObjectWithoutNewField, ObjectWithoutNewFieldTypeSerializer>>(objectWithoutNewFieldSerializer);
 
                 // using Generated Deserializer, which is not able to deserialize the new field that was serialized
-                var value = objectWithoutNewFieldSerializer.ReadValue(ref reader, initialHeader);
+                var value = objectWithoutNewFieldSerializer.ReadValue(ref reader, initialHeader)!;
                 return (value, reader.Position, reader.Session.ReferencedObjects.CurrentReferenceId);
             }
 
@@ -439,14 +439,14 @@ namespace Orleans.Serialization.UnitTests
         /// </summary>
         public class BaseType : IEquatable<BaseType>
         {
-            public string BaseTypeString { get; set; }
-            public string AddedLaterString { get; set; }
+            public string? BaseTypeString { get; set; }
+            public string? AddedLaterString { get; set; }
 
-            public bool Equals(BaseType other) => other is not null
+            public bool Equals(BaseType? other) => other is not null
                     && string.Equals(BaseTypeString, other.BaseTypeString, StringComparison.Ordinal)
                     && string.Equals(AddedLaterString, other.AddedLaterString, StringComparison.Ordinal);
 
-            public override bool Equals(object obj) => obj is BaseType baseType && Equals(baseType);
+            public override bool Equals(object? obj) => obj is BaseType baseType && Equals(baseType);
 
             public override int GetHashCode() => HashCode.Combine(BaseTypeString, AddedLaterString);
 
@@ -459,15 +459,15 @@ namespace Orleans.Serialization.UnitTests
         public class SubType : BaseType, IEquatable<SubType>
         {
             // 0
-            public string String { get; set; }
+            public string? String { get; set; }
 
             // 1
             public int Int { get; set; }
 
             // 3
-            public object Ref { get; set; }
+            public object? Ref { get; set; }
 
-            public bool Equals(SubType other)
+            public bool Equals(SubType? other)
             {
                 if (other is null)
                 {
@@ -478,7 +478,8 @@ namespace Orleans.Serialization.UnitTests
                     base.Equals(other)
                     && string.Equals(String, other.String, StringComparison.Ordinal)
                     && Int == other.Int
-                    && (ReferenceEquals(Ref, other.Ref) || Ref.Equals(other.Ref));
+                    // Round-tripped equality inputs preserve whether Ref is present.
+                    && (ReferenceEquals(Ref, other.Ref) || Ref!.Equals(other.Ref));
             }
 
             public override string ToString()
@@ -487,7 +488,7 @@ namespace Orleans.Serialization.UnitTests
                 return $"{base.ToString()}, {nameof(String)}: {String}, {nameof(Int)}: {Int}, Ref: {refString}";
             }
 
-            public override bool Equals(object obj) => obj is SubType subType && Equals(subType);
+            public override bool Equals(object? obj) => obj is SubType subType && Equals(subType);
 
             public override int GetHashCode()
             {
@@ -521,9 +522,10 @@ namespace Orleans.Serialization.UnitTests
                 _baseTypeSerializer.Serialize(ref writer, obj);
                 writer.WriteEndBase(); // the base object is complete.
 
-                _stringCodec.WriteField(ref writer, 0, typeof(string), obj.String);
+                // The codec supports null payloads despite its legacy non-nullable signature.
+                _stringCodec.WriteField(ref writer, 0, typeof(string), obj.String!);
                 _intCodec.WriteField(ref writer, 1, typeof(int), obj.Int);
-                _objectCodec.WriteField(ref writer, 1, typeof(object), obj.Ref);
+                _objectCodec.WriteField(ref writer, 1, typeof(object), obj.Ref!);
                 _intCodec.WriteField(ref writer, 1, typeof(int), obj.Int);
                 _intCodec.WriteField(ref writer, 409, typeof(int), obj.Int);
                 /*writer.WriteFieldHeader(session, 1025, typeof(Guid), Guid.Empty.GetType(), WireType.Fixed128);
@@ -566,8 +568,9 @@ namespace Orleans.Serialization.UnitTests
         {
             public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, BaseType obj) where TBufferWriter : IBufferWriter<byte>
             {
-                StringCodec.WriteField(ref writer, 0, obj.BaseTypeString);
-                StringCodec.WriteField(ref writer, 234, obj.AddedLaterString);
+                // The codec supports null payloads despite its legacy non-nullable signature.
+                StringCodec.WriteField(ref writer, 0, obj.BaseTypeString!);
+                StringCodec.WriteField(ref writer, 234, obj.AddedLaterString!);
             }
 
             public void Deserialize<TInput>(ref Reader<TInput> reader, BaseType obj)

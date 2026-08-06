@@ -6,12 +6,12 @@ namespace Orleans.Serialization
     internal struct SerializationEntrySurrogate
     {
         [Id(0)]
-        public string Name;
+        public string? Name;
 
         [Id(1)]
-        public object Value;
+        public object? Value;
 
         [Id(2)]
-        public Type ObjectType;
+        public Type? ObjectType;
     }
 }

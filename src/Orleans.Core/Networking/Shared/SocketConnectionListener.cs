@@ -14,7 +14,7 @@ namespace Orleans.Networking.Shared
         private readonly MemoryPool<byte> _memoryPool;
         private readonly SocketSchedulers _schedulers;
         private readonly ISocketsTrace _trace;
-        private Socket _listenSocket;
+        private Socket? _listenSocket;
         private readonly SocketConnectionOptions _options;
 
         public EndPoint EndPoint { get; private set; }
@@ -61,7 +61,7 @@ namespace Orleans.Networking.Shared
             listenSocket.EnableFastPath();
 
             // Kestrel expects IPv6Any to bind to both IPv6 and IPv4
-            if (EndPoint is IPEndPoint ip && ip.Address == IPAddress.IPv6Any)
+            if (EndPoint is IPEndPoint ip && Equals(ip.Address, IPAddress.IPv6Any))
             {
                 listenSocket.DualMode = true;
             }
@@ -75,20 +75,20 @@ namespace Orleans.Networking.Shared
                 throw new AddressInUseException(e.Message, e);
             }
 
-            EndPoint = listenSocket.LocalEndPoint;
+            EndPoint = listenSocket.LocalEndPoint!;
 
             listenSocket.Listen(512);
 
             _listenSocket = listenSocket;
         }
 
-        public async ValueTask<ConnectionContext> AcceptAsync(CancellationToken cancellationToken = default)
+        public async ValueTask<ConnectionContext?> AcceptAsync(CancellationToken cancellationToken = default)
         {
             while (true)
             {
                 try
                 {
-                    var acceptSocket = await _listenSocket.AcceptAsync();
+                    var acceptSocket = await _listenSocket!.AcceptAsync();
                     acceptSocket.NoDelay = _options.NoDelay;
                     if (_options.KeepAlive)
                     {

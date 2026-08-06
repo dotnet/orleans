@@ -1,4 +1,5 @@
-﻿using Orleans.Streams;
+﻿using System.Diagnostics.CodeAnalysis;
+using Orleans.Streams;
 
 namespace TestGrains
 {
@@ -9,15 +10,16 @@ namespace TestGrains
         [Orleans.Id(0)]
         public Guid StreamGuid { get; set; }
         [Orleans.Id(1)]
-        public string StreamNamespace { get; set; }
+        public string? StreamNamespace { get; set; }
         [Orleans.Id(2)]
-        public StreamSequenceToken StartToken { get; set; }
+        public StreamSequenceToken? StartToken { get; set; }
         [Orleans.Id(3)]
-        public StreamSequenceToken LastProcessedToken { get; set; }
+        public StreamSequenceToken? LastProcessedToken { get; set; }
         [Orleans.Id(4)]
+        [MaybeNull]
         public TState Accumulator { get; set; }
 
-        public StreamSequenceToken RecoveryToken { get { return LastProcessedToken ?? StartToken; } }
+        public StreamSequenceToken? RecoveryToken { get { return LastProcessedToken ?? StartToken; } }
 
         public bool IsDuplicate(StreamSequenceToken sequenceToken)
         {

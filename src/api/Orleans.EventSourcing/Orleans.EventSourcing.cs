@@ -10,7 +10,7 @@ namespace Orleans.Configuration
 {
     public partial class CustomStorageLogConsistencyOptions
     {
-        public string PrimaryCluster { get { throw null; } set { } }
+        public string? PrimaryCluster { get { throw null; } set { } }
     }
 }
 
@@ -44,7 +44,7 @@ namespace Orleans.EventSourcing
     {
         void DisableStatsCollection();
         void EnableStatsCollection();
-        LogConsistencyStatistics GetStats();
+        LogConsistencyStatistics? GetStats();
     }
 
     public partial interface ILogConsistencyProtocolMessage
@@ -75,7 +75,7 @@ namespace Orleans.EventSourcing
     {
         bool UsesStorageProvider { get; }
 
-        ILogViewAdaptor<TLogView, TLogEntry> MakeLogViewAdaptor<TLogView, TLogEntry>(ILogViewAdaptorHost<TLogView, TLogEntry> hostGrain, TLogView initialState, string grainTypeName, Storage.IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
+        ILogViewAdaptor<TLogView, TLogEntry> MakeLogViewAdaptor<TLogView, TLogEntry>(ILogViewAdaptorHost<TLogView, TLogEntry> hostGrain, TLogView initialState, string grainTypeName, Storage.IGrainStorage? grainStorage, ILogConsistencyProtocolServices services)
             where TLogView : class, new()
             where TLogEntry : class;
     }
@@ -134,15 +134,17 @@ namespace Orleans.EventSourcing
 
         protected int Version { get { throw null; } }
 
+        protected System.Threading.Tasks.Task ClearLogAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         protected System.Threading.Tasks.Task ConfirmEvents() { throw null; }
 
         protected void DisableStatsCollection() { }
 
         protected void EnableStatsCollection() { }
 
-        protected LogConsistencyStatistics GetStats() { throw null; }
+        protected LogConsistencyStatistics? GetStats() { throw null; }
 
-        protected override void InstallAdaptor(ILogViewAdaptorFactory factory, object initialState, string graintypename, Storage.IGrainStorage grainStorage, ILogConsistencyProtocolServices services) { }
+        protected override void InstallAdaptor(ILogViewAdaptorFactory factory, object initialState, string graintypename, Storage.IGrainStorage? grainStorage, ILogConsistencyProtocolServices services) { }
 
         public override System.Threading.Tasks.Task OnActivateAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
@@ -195,9 +197,9 @@ namespace Orleans.EventSourcing
 
     public abstract partial class LogConsistentGrain<TView> : Grain, ILifecycleParticipant<Runtime.IGrainLifecycle>
     {
-        protected abstract ILogViewAdaptorFactory DefaultAdaptorFactory { get; }
+        protected abstract ILogViewAdaptorFactory? DefaultAdaptorFactory { get; }
 
-        protected abstract void InstallAdaptor(ILogViewAdaptorFactory factory, object state, string grainTypeName, Storage.IGrainStorage grainStorage, ILogConsistencyProtocolServices services);
+        protected abstract void InstallAdaptor(ILogViewAdaptorFactory factory, object state, string grainTypeName, Storage.IGrainStorage? grainStorage, ILogConsistencyProtocolServices services);
         public virtual void Participate(Runtime.IGrainLifecycle lifecycle) { }
     }
 
@@ -237,7 +239,7 @@ namespace Orleans.EventSourcing.Common
         where TLogEntry : class where TSubmissionEntry : SubmissionEntry<TLogEntry>
     {
         protected RecordedConnectionIssue LastPrimaryIssue;
-        protected LogConsistencyStatistics stats;
+        protected LogConsistencyStatistics? stats;
         protected PrimaryBasedLogViewAdaptor(ILogViewAdaptorHost<TLogView, TLogEntry> host, TLogView initialstate, ILogConsistencyProtocolServices services) { }
 
         public int ConfirmedVersion { get { throw null; } }
@@ -246,6 +248,8 @@ namespace Orleans.EventSourcing.Common
 
         protected ILogViewAdaptorHost<TLogView, TLogEntry> Host { get { throw null; } }
 
+        protected TLogView InitialState { get { throw null; } init { } }
+
         protected ILogConsistencyProtocolServices Services { get { throw null; } }
 
         protected virtual bool SupportSubmissions { get { throw null; } }
@@ -253,6 +257,10 @@ namespace Orleans.EventSourcing.Common
         public TLogView TentativeView { get { throw null; } }
 
         public System.Collections.Generic.IEnumerable<TLogEntry> UnconfirmedSuffix { get { throw null; } }
+
+        public virtual System.Threading.Tasks.Task ClearLogAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        protected virtual System.Threading.Tasks.Task ClearPrimaryLogAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task ConfirmSubmittedEntries() { throw null; }
 
@@ -269,7 +277,7 @@ namespace Orleans.EventSourcing.Common
 
         protected int GetNumberPendingUpdates() { throw null; }
 
-        public LogConsistencyStatistics GetStats() { throw null; }
+        public LogConsistencyStatistics? GetStats() { throw null; }
 
         protected abstract void InitializeConfirmedView(TLogView initialstate);
         protected bool IsMyClusterJoined() { throw null; }
@@ -284,7 +292,7 @@ namespace Orleans.EventSourcing.Common
 
         protected virtual void OnNotificationReceived(INotificationMessage payload) { }
 
-        public System.Threading.Tasks.Task<ILogConsistencyProtocolMessage> OnProtocolMessageReceived(ILogConsistencyProtocolMessage payLoad) { throw null; }
+        public System.Threading.Tasks.Task<ILogConsistencyProtocolMessage?> OnProtocolMessageReceived(ILogConsistencyProtocolMessage payLoad) { throw null; }
 
         public virtual System.Threading.Tasks.Task PostOnActivate() { throw null; }
 
@@ -325,7 +333,7 @@ namespace Orleans.EventSourcing.Common
     {
         private object _dummy;
         private int _dummyPrimitive;
-        public ConnectionIssue Issue { get { throw null; } }
+        public ConnectionIssue? Issue { get { throw null; } }
 
         public readonly System.Threading.Tasks.Task DelayBeforeRetry() { throw null; }
 
@@ -333,7 +341,7 @@ namespace Orleans.EventSourcing.Common
 
         public void Resolve(IConnectionIssueListener listener, ILogConsistencyProtocolServices services) { }
 
-        public override readonly string ToString() { throw null; }
+        public override readonly string? ToString() { throw null; }
     }
 
     public static partial class StringEncodedWriteVector
@@ -346,8 +354,9 @@ namespace Orleans.EventSourcing.Common
     public partial class SubmissionEntry<TLogEntry>
     {
         public int ConditionalPosition;
+        [System.Diagnostics.CodeAnalysis.MaybeNull]
         public TLogEntry Entry;
-        public System.Threading.Tasks.TaskCompletionSource<bool> ResultPromise;
+        public System.Threading.Tasks.TaskCompletionSource<bool>? ResultPromise;
         public System.DateTime SubmissionTime;
     }
 
@@ -364,6 +373,7 @@ namespace Orleans.EventSourcing.CustomStorage
     public partial interface ICustomStorageInterface<TState, TDelta>
     {
         System.Threading.Tasks.Task<bool> ApplyUpdatesToStorage(System.Collections.Generic.IReadOnlyList<TDelta> updates, int expectedVersion);
+        System.Threading.Tasks.Task ClearStoredState();
         System.Threading.Tasks.Task<System.Collections.Generic.KeyValuePair<int, TState>> ReadStateFromStorage();
     }
 
@@ -371,18 +381,18 @@ namespace Orleans.EventSourcing.CustomStorage
     {
         public LogConsistencyProvider(Configuration.CustomStorageLogConsistencyOptions options) { }
 
-        public string PrimaryCluster { get { throw null; } }
+        public string? PrimaryCluster { get { throw null; } }
 
         public bool UsesStorageProvider { get { throw null; } }
 
-        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, Storage.IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
+        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, Storage.IGrainStorage? grainStorage, ILogConsistencyProtocolServices services)
             where TView : class, new()
             where TEntry : class { throw null; }
     }
 
     public static partial class LogConsistencyProviderFactory
     {
-        public static ILogViewAdaptorFactory Create(System.IServiceProvider services, string name) { throw null; }
+        public static ILogViewAdaptorFactory Create(System.IServiceProvider services, string? name) { throw null; }
     }
 }
 
@@ -392,7 +402,7 @@ namespace Orleans.EventSourcing.LogStorage
     {
         public bool UsesStorageProvider { get { throw null; } }
 
-        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, Storage.IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
+        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, Storage.IGrainStorage? grainStorage, ILogConsistencyProtocolServices services)
             where TView : class, new()
             where TEntry : class { throw null; }
     }
@@ -401,7 +411,9 @@ namespace Orleans.EventSourcing.LogStorage
     public sealed partial class LogStateWithMetaDataAndETag<TEntry> : IGrainState<LogStateWithMetaData<TEntry>> where TEntry : class
     {
         [Id(1)]
-        public string ETag { get { throw null; } set { } }
+        public string? ETag { get { throw null; } set { } }
+
+        LogStateWithMetaData<TEntry>? IGrainState<LogStateWithMetaData<TEntry>>.State { get { throw null; } set { } }
 
         [Id(2)]
         public bool RecordExists { get { throw null; } set { } }
@@ -442,7 +454,9 @@ namespace Orleans.EventSourcing.StateStorage
         public GrainStateWithMetaDataAndETag(TView initialview) { }
 
         [Id(1)]
-        public string ETag { get { throw null; } set { } }
+        public string? ETag { get { throw null; } set { } }
+
+        GrainStateWithMetaData<TView>? IGrainState<GrainStateWithMetaData<TView>>.State { get { throw null; } set { } }
 
         [Id(2)]
         public bool RecordExists { get { throw null; } set { } }
@@ -481,7 +495,7 @@ namespace Orleans.EventSourcing.StateStorage
     {
         public bool UsesStorageProvider { get { throw null; } }
 
-        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, Storage.IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
+        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, Storage.IGrainStorage? grainStorage, ILogConsistencyProtocolServices services)
             where TView : class, new()
             where TEntry : class { throw null; }
     }
@@ -491,9 +505,9 @@ namespace Orleans.Hosting
 {
     public static partial class CustomStorageSiloBuilderExtensions
     {
-        public static ISiloBuilder AddCustomStorageBasedLogConsistencyProvider(this ISiloBuilder builder, string name = "LogStorage", string primaryCluster = null) { throw null; }
+        public static ISiloBuilder AddCustomStorageBasedLogConsistencyProvider(this ISiloBuilder builder, string name = "LogStorage", string? primaryCluster = null) { throw null; }
 
-        public static ISiloBuilder AddCustomStorageBasedLogConsistencyProviderAsDefault(this ISiloBuilder builder, string primaryCluster = null) { throw null; }
+        public static ISiloBuilder AddCustomStorageBasedLogConsistencyProviderAsDefault(this ISiloBuilder builder, string? primaryCluster = null) { throw null; }
     }
 
     public static partial class LogStorageSiloBuilderExtensions
@@ -513,7 +527,7 @@ namespace Orleans.Hosting
 
 namespace OrleansCodeGen.Orleans.EventSourcing
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ConnectionIssue : global::Orleans.Serialization.Serializers.AbstractTypeSerializer<global::Orleans.EventSourcing.ConnectionIssue>
@@ -523,7 +537,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing
         public override void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.EventSourcing.ConnectionIssue instance) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_ILogConsistencyProtocolParticipant_GrainReference_0DB087C8 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_ILogConsistencyProtocolParticipant_GrainReference_0DB087C8>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -539,7 +553,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_ILogConsistencyProtocolParticipant_GrainReference_22FD7D72 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_ILogConsistencyProtocolParticipant_GrainReference_22FD7D72>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -555,7 +569,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_ILogConsistencyProtocolParticipant_GrainReference_A36FC884 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_ILogConsistencyProtocolParticipant_GrainReference_A36FC884>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -571,7 +585,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ProtocolTransportException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.EventSourcing.ProtocolTransportException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -589,7 +603,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_ConnectionIssue : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.EventSourcing.ConnectionIssue>, global::Orleans.Serialization.Cloning.IDeepCopier, global::Orleans.Serialization.Cloning.IBaseCopier<global::Orleans.EventSourcing.ConnectionIssue>, global::Orleans.Serialization.Cloning.IBaseCopier
@@ -599,7 +613,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing
         public global::Orleans.EventSourcing.ConnectionIssue DeepCopy(global::Orleans.EventSourcing.ConnectionIssue original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_ILogConsistencyProtocolParticipant_GrainReference_0DB087C8 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_ILogConsistencyProtocolParticipant_GrainReference_0DB087C8>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -607,7 +621,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing
         public Invokable_ILogConsistencyProtocolParticipant_GrainReference_0DB087C8 DeepCopy(Invokable_ILogConsistencyProtocolParticipant_GrainReference_0DB087C8 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_ILogConsistencyProtocolParticipant_GrainReference_22FD7D72 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_ILogConsistencyProtocolParticipant_GrainReference_22FD7D72>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -615,7 +629,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing
         public Invokable_ILogConsistencyProtocolParticipant_GrainReference_22FD7D72 DeepCopy(Invokable_ILogConsistencyProtocolParticipant_GrainReference_22FD7D72 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_ILogConsistencyProtocolParticipant_GrainReference_A36FC884 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_ILogConsistencyProtocolParticipant_GrainReference_A36FC884>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -623,7 +637,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing
         public Invokable_ILogConsistencyProtocolParticipant_GrainReference_A36FC884 DeepCopy(Invokable_ILogConsistencyProtocolParticipant_GrainReference_A36FC884 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_ProtocolTransportException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.EventSourcing.ProtocolTransportException, global::Orleans.Runtime.OrleansException>
@@ -631,7 +645,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing
         public Copier_ProtocolTransportException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.EventSourcing.ILogConsistencyProtocolParticipant), "0DB087C8" })]
@@ -656,7 +670,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.EventSourcing.ILogConsistencyProtocolParticipant), "22FD7D72" })]
@@ -681,7 +695,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.EventSourcing.ILogConsistencyProtocolParticipant), "A36FC884" })]
@@ -709,7 +723,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing
 
 namespace OrleansCodeGen.Orleans.EventSourcing.Common
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_BatchedNotificationMessage : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.EventSourcing.Common.BatchedNotificationMessage>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -727,7 +741,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing.Common
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_PrimaryOperationFailed : global::Orleans.Serialization.Serializers.AbstractTypeSerializer<global::Orleans.EventSourcing.Common.PrimaryOperationFailed>
@@ -739,7 +753,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing.Common
         public override void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.EventSourcing.Common.PrimaryOperationFailed instance) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_VersionNotificationMessage : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.EventSourcing.Common.VersionNotificationMessage>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -755,7 +769,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing.Common
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_BatchedNotificationMessage : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.EventSourcing.Common.BatchedNotificationMessage>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -765,7 +779,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing.Common
         public global::Orleans.EventSourcing.Common.BatchedNotificationMessage DeepCopy(global::Orleans.EventSourcing.Common.BatchedNotificationMessage original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_PrimaryOperationFailed : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.EventSourcing.Common.PrimaryOperationFailed>, global::Orleans.Serialization.Cloning.IDeepCopier, global::Orleans.Serialization.Cloning.IBaseCopier<global::Orleans.EventSourcing.Common.PrimaryOperationFailed>, global::Orleans.Serialization.Cloning.IBaseCopier
@@ -777,7 +791,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing.Common
         public global::Orleans.EventSourcing.Common.PrimaryOperationFailed DeepCopy(global::Orleans.EventSourcing.Common.PrimaryOperationFailed original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_VersionNotificationMessage : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.EventSourcing.Common.VersionNotificationMessage>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -788,7 +802,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing.Common
 
 namespace OrleansCodeGen.Orleans.EventSourcing.LogStorage
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_LogStateWithMetaDataAndETag<TEntry> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.EventSourcing.LogStorage.LogStateWithMetaDataAndETag<TEntry>>, global::Orleans.Serialization.Codecs.IFieldCodec where TEntry : class
@@ -806,7 +820,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing.LogStorage
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_LogStateWithMetaData<TEntry> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.EventSourcing.LogStorage.LogStateWithMetaData<TEntry>>, global::Orleans.Serialization.Codecs.IFieldCodec where TEntry : class
@@ -824,7 +838,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing.LogStorage
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_LogStateWithMetaDataAndETag<TEntry> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.EventSourcing.LogStorage.LogStateWithMetaDataAndETag<TEntry>>, global::Orleans.Serialization.Cloning.IDeepCopier where TEntry : class
@@ -834,7 +848,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing.LogStorage
         public global::Orleans.EventSourcing.LogStorage.LogStateWithMetaDataAndETag<TEntry> DeepCopy(global::Orleans.EventSourcing.LogStorage.LogStateWithMetaDataAndETag<TEntry> original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_LogStateWithMetaData<TEntry> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.EventSourcing.LogStorage.LogStateWithMetaData<TEntry>>, global::Orleans.Serialization.Cloning.IDeepCopier where TEntry : class
@@ -847,7 +861,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing.LogStorage
 
 namespace OrleansCodeGen.Orleans.EventSourcing.StateStorage
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_GrainStateWithMetaDataAndETag<TView> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.EventSourcing.StateStorage.GrainStateWithMetaDataAndETag<TView>>, global::Orleans.Serialization.Codecs.IFieldCodec where TView : class, new()
@@ -865,7 +879,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing.StateStorage
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_GrainStateWithMetaData<TView> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.EventSourcing.StateStorage.GrainStateWithMetaData<TView>>, global::Orleans.Serialization.Codecs.IFieldCodec where TView : class, new()
@@ -883,7 +897,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing.StateStorage
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_GrainStateWithMetaDataAndETag<TView> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.EventSourcing.StateStorage.GrainStateWithMetaDataAndETag<TView>>, global::Orleans.Serialization.Cloning.IDeepCopier where TView : class, new()
@@ -893,7 +907,7 @@ namespace OrleansCodeGen.Orleans.EventSourcing.StateStorage
         public global::Orleans.EventSourcing.StateStorage.GrainStateWithMetaDataAndETag<TView> DeepCopy(global::Orleans.EventSourcing.StateStorage.GrainStateWithMetaDataAndETag<TView> original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_GrainStateWithMetaData<TView> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.EventSourcing.StateStorage.GrainStateWithMetaData<TView>>, global::Orleans.Serialization.Cloning.IDeepCopier where TView : class, new()

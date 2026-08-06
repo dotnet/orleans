@@ -10,7 +10,7 @@ namespace Orleans.Hosting
 {
     public static partial class FaultInjectionStorageServiceCollectionExtensions
     {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddFaultInjectionMemoryStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.MemoryGrainStorageOptions>> configureOptions = null, System.Action<Microsoft.Extensions.Options.OptionsBuilder<TestingHost.FaultInjectionGrainStorageOptions>> configureFaultInjectionOptions = null) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddFaultInjectionMemoryStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.MemoryGrainStorageOptions>>? configureOptions = null, System.Action<Microsoft.Extensions.Options.OptionsBuilder<TestingHost.FaultInjectionGrainStorageOptions>>? configureFaultInjectionOptions = null) { throw null; }
 
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddFaultInjectionMemoryStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Configuration.MemoryGrainStorageOptions> configureOptions, System.Action<TestingHost.FaultInjectionGrainStorageOptions> configureFaultInjectionOptions) { throw null; }
     }
@@ -67,7 +67,7 @@ namespace Orleans.TestingHost
 
         public Microsoft.Extensions.Hosting.IHost SiloHost { get { throw null; } init { } }
 
-        public static System.Threading.Tasks.Task<InProcessSiloHandle> CreateAsync(string siloName, Microsoft.Extensions.Configuration.IConfiguration configuration, System.Action<Microsoft.Extensions.Hosting.IHostBuilder> postConfigureHostBuilder = null) { throw null; }
+        public static System.Threading.Tasks.Task<InProcessSiloHandle> CreateAsync(string siloName, Microsoft.Extensions.Configuration.IConfiguration configuration, System.Action<Microsoft.Extensions.Hosting.IHostBuilder>? postConfigureHostBuilder = null) { throw null; }
 
         protected override void Dispose(bool disposing) { }
 
@@ -92,6 +92,10 @@ namespace Orleans.TestingHost
 
         public System.Threading.Tasks.Task<InProcessSiloHandle> CreateSiloAsync(InProcessTestSiloSpecificOptions siloOptions) { throw null; }
 
+        public System.Threading.Tasks.Task DeactivateAsync(Runtime.GrainId grainId) { throw null; }
+
+        public System.Threading.Tasks.Task DeactivateAsync(Runtime.IAddressable grain) { throw null; }
+
         public System.Threading.Tasks.Task DeployAsync() { throw null; }
 
         public void Dispose() { }
@@ -104,9 +108,9 @@ namespace Orleans.TestingHost
 
         public string GetLog() { throw null; }
 
-        public InProcessSiloHandle GetSiloForAddress(Runtime.SiloAddress siloAddress) { throw null; }
+        public InProcessSiloHandle? GetSiloForAddress(Runtime.SiloAddress siloAddress) { throw null; }
 
-        public System.IServiceProvider GetSiloServiceProvider(Runtime.SiloAddress silo = null) { throw null; }
+        public System.IServiceProvider GetSiloServiceProvider(Runtime.SiloAddress? silo = null) { throw null; }
 
         public System.Threading.Tasks.Task InitializeClientAsync() { throw null; }
 
@@ -114,7 +118,11 @@ namespace Orleans.TestingHost
 
         public System.Threading.Tasks.Task KillSiloAsync(InProcessSiloHandle instance) { throw null; }
 
-        public System.Threading.Tasks.Task<InProcessSiloHandle> RestartSiloAsync(InProcessSiloHandle instance) { throw null; }
+        public System.Threading.Tasks.Task MigrateAsync(Runtime.GrainId grainId, Runtime.SiloAddress? targetSilo = null) { throw null; }
+
+        public System.Threading.Tasks.Task MigrateAsync(Runtime.IAddressable grain, Runtime.SiloAddress? targetSilo = null) { throw null; }
+
+        public System.Threading.Tasks.Task<InProcessSiloHandle?> RestartSiloAsync(InProcessSiloHandle instance) { throw null; }
 
         public System.Threading.Tasks.Task<InProcessSiloHandle> RestartStoppedSecondarySiloAsync(string siloName) { throw null; }
 
@@ -151,6 +159,14 @@ namespace Orleans.TestingHost
         public System.Threading.Tasks.Task StopSiloAsync(InProcessSiloHandle instance) { throw null; }
 
         public System.Threading.Tasks.Task StopSilosAsync() { throw null; }
+
+        public bool TryGetGrainContext(Runtime.GrainId grainId, out Runtime.IGrainContext? grainContext) { throw null; }
+
+        public System.Threading.Tasks.Task WaitForClusterManifestToStabilizeAsync(bool didKill = false) { throw null; }
+
+        public System.Threading.Tasks.Task WaitForDeactivationAsync(Runtime.GrainId grainId) { throw null; }
+
+        public System.Threading.Tasks.Task WaitForDeactivationAsync(Runtime.IAddressable grain) { throw null; }
 
         public System.Threading.Tasks.Task WaitForLivenessToStabilizeAsync(bool didKill = false) { throw null; }
     }
@@ -246,14 +262,14 @@ namespace Orleans.TestingHost
 
     public static partial class SiloBuilderExtensions
     {
-        public static Hosting.ISiloBuilder AddFaultInjectionMemoryStorage(this Hosting.ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.MemoryGrainStorageOptions>> configureOptions = null, System.Action<Microsoft.Extensions.Options.OptionsBuilder<FaultInjectionGrainStorageOptions>> configureFaultInjectionOptions = null) { throw null; }
+        public static Hosting.ISiloBuilder AddFaultInjectionMemoryStorage(this Hosting.ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.MemoryGrainStorageOptions>>? configureOptions = null, System.Action<Microsoft.Extensions.Options.OptionsBuilder<FaultInjectionGrainStorageOptions>>? configureFaultInjectionOptions = null) { throw null; }
 
         public static Hosting.ISiloBuilder AddFaultInjectionMemoryStorage(this Hosting.ISiloBuilder builder, string name, System.Action<Configuration.MemoryGrainStorageOptions> configureOptions, System.Action<FaultInjectionGrainStorageOptions> configureFaultInjectionOptions) { throw null; }
     }
 
     public abstract partial class SiloHandle : System.IDisposable, System.IAsyncDisposable
     {
-        public TestClusterOptions ClusterOptions { get { throw null; } set { } }
+        public TestClusterOptions? ClusterOptions { get { throw null; } set { } }
 
         public Runtime.SiloAddress GatewayAddress { get { throw null; } set { } }
 
@@ -342,13 +358,17 @@ namespace Orleans.TestingHost
 
         public ITestClusterPortAllocator PortAllocator { get { throw null; } }
 
-        public SiloHandle Primary { get { throw null; } }
+        public SiloHandle? Primary { get { throw null; } }
 
         public System.Collections.Generic.IReadOnlyList<SiloHandle> SecondarySilos { get { throw null; } }
 
         public System.IServiceProvider ServiceProvider { get { throw null; } }
 
         public System.Collections.ObjectModel.ReadOnlyCollection<SiloHandle> Silos { get { throw null; } }
+
+        public System.Threading.Tasks.Task DeactivateAsync(Runtime.GrainId grainId) { throw null; }
+
+        public System.Threading.Tasks.Task DeactivateAsync(Runtime.IAddressable grain) { throw null; }
 
         public System.Threading.Tasks.Task<SiloHandle> DefaultCreateSiloAsync(string siloName, Microsoft.Extensions.Configuration.IConfiguration configuration) { throw null; }
 
@@ -366,9 +386,9 @@ namespace Orleans.TestingHost
 
         public string GetLog() { throw null; }
 
-        public SiloHandle GetSiloForAddress(Runtime.SiloAddress siloAddress) { throw null; }
+        public SiloHandle? GetSiloForAddress(Runtime.SiloAddress siloAddress) { throw null; }
 
-        public System.IServiceProvider GetSiloServiceProvider(Runtime.SiloAddress silo = null) { throw null; }
+        public System.IServiceProvider GetSiloServiceProvider(Runtime.SiloAddress? silo = null) { throw null; }
 
         public System.Threading.Tasks.Task InitializeClientAsync() { throw null; }
 
@@ -376,7 +396,11 @@ namespace Orleans.TestingHost
 
         public System.Threading.Tasks.Task KillSiloAsync(SiloHandle instance) { throw null; }
 
-        public System.Threading.Tasks.Task<SiloHandle> RestartSiloAsync(SiloHandle instance) { throw null; }
+        public System.Threading.Tasks.Task MigrateAsync(Runtime.GrainId grainId, Runtime.SiloAddress? targetSilo = null) { throw null; }
+
+        public System.Threading.Tasks.Task MigrateAsync(Runtime.IAddressable grain, Runtime.SiloAddress? targetSilo = null) { throw null; }
+
+        public System.Threading.Tasks.Task<SiloHandle?> RestartSiloAsync(SiloHandle instance) { throw null; }
 
         public System.Threading.Tasks.Task<SiloHandle> RestartStoppedSecondarySiloAsync(string siloName) { throw null; }
 
@@ -386,9 +410,9 @@ namespace Orleans.TestingHost
 
         public System.Threading.Tasks.Task<System.Collections.Generic.List<SiloHandle>> StartAdditionalSilosAsync(int silosToStart, bool startAdditionalSiloOnNewPort = false) { throw null; }
 
-        public static System.Threading.Tasks.Task<SiloHandle> StartSiloAsync(TestCluster cluster, int instanceNumber, TestClusterOptions clusterOptions, System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Configuration.IConfigurationSource> configurationOverrides = null, bool startSiloOnNewPort = false) { throw null; }
+        public static System.Threading.Tasks.Task<SiloHandle> StartSiloAsync(TestCluster cluster, int instanceNumber, TestClusterOptions clusterOptions, System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Configuration.IConfigurationSource>? configurationOverrides = null, bool startSiloOnNewPort = false) { throw null; }
 
-        public System.Threading.Tasks.Task<SiloHandle> StartSiloAsync(int instanceNumber, TestClusterOptions clusterOptions, System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Configuration.IConfigurationSource> configurationOverrides = null, bool startSiloOnNewPort = false) { throw null; }
+        public System.Threading.Tasks.Task<SiloHandle> StartSiloAsync(int instanceNumber, TestClusterOptions clusterOptions, System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Configuration.IConfigurationSource>? configurationOverrides = null, bool startSiloOnNewPort = false) { throw null; }
 
         public void StopAllSilos() { }
 
@@ -401,6 +425,14 @@ namespace Orleans.TestingHost
         public System.Threading.Tasks.Task StopSecondarySilosAsync() { throw null; }
 
         public System.Threading.Tasks.Task StopSiloAsync(SiloHandle instance) { throw null; }
+
+        public bool TryGetGrainContext(Runtime.GrainId grainId, out Runtime.IGrainContext? grainContext) { throw null; }
+
+        public System.Threading.Tasks.Task WaitForClusterManifestToStabilizeAsync(bool didKill = false) { throw null; }
+
+        public System.Threading.Tasks.Task WaitForDeactivationAsync(Runtime.GrainId grainId) { throw null; }
+
+        public System.Threading.Tasks.Task WaitForDeactivationAsync(Runtime.IAddressable grain) { throw null; }
 
         public System.Threading.Tasks.Task WaitForLivenessToStabilizeAsync(bool didKill = false) { throw null; }
     }
@@ -417,7 +449,7 @@ namespace Orleans.TestingHost
 
         public ITestClusterPortAllocator PortAllocator { get { throw null; } set { } }
 
-        public System.Collections.Generic.Dictionary<string, string> Properties { get { throw null; } }
+        public System.Collections.Generic.Dictionary<string, string?> Properties { get { throw null; } }
 
         public TestClusterBuilder AddClientBuilderConfigurator<T>()
             where T : new() { throw null; }
@@ -438,7 +470,7 @@ namespace Orleans.TestingHost
     {
         public static Microsoft.Extensions.Configuration.IConfiguration GetConfiguration(this Microsoft.Extensions.Hosting.IHostBuilder builder) { throw null; }
 
-        public static string GetConfigurationValue(this Microsoft.Extensions.Hosting.IHostBuilder hostBuilder, string key) { throw null; }
+        public static string? GetConfigurationValue(this Microsoft.Extensions.Hosting.IHostBuilder hostBuilder, string key) { throw null; }
 
         public static TestClusterOptions GetTestClusterOptions(this Microsoft.Extensions.Configuration.IConfiguration config) { throw null; }
 
@@ -447,9 +479,9 @@ namespace Orleans.TestingHost
 
     public partial class TestClusterHostFactory
     {
-        public static Microsoft.Extensions.Hosting.IHost CreateClusterClient(string hostName, Microsoft.Extensions.Configuration.IConfiguration configuration, System.Action<Microsoft.Extensions.Hosting.IHostBuilder> postConfigureHostBuilder = null) { throw null; }
+        public static Microsoft.Extensions.Hosting.IHost CreateClusterClient(string hostName, Microsoft.Extensions.Configuration.IConfiguration configuration, System.Action<Microsoft.Extensions.Hosting.IHostBuilder>? postConfigureHostBuilder = null) { throw null; }
 
-        public static Microsoft.Extensions.Hosting.IHost CreateSiloHost(string hostName, Microsoft.Extensions.Configuration.IConfiguration configuration, System.Action<Microsoft.Extensions.Hosting.IHostBuilder> postConfigureHostBuilder = null) { throw null; }
+        public static Microsoft.Extensions.Hosting.IHost CreateSiloHost(string hostName, Microsoft.Extensions.Configuration.IConfiguration configuration, System.Action<Microsoft.Extensions.Hosting.IHostBuilder>? postConfigureHostBuilder = null) { throw null; }
 
         public static Microsoft.Extensions.Configuration.IConfiguration DeserializeConfiguration(string serializedSources) { throw null; }
 
@@ -458,7 +490,7 @@ namespace Orleans.TestingHost
 
     public partial class TestClusterOptions
     {
-        public string ApplicationBaseDirectory { get { throw null; } set { } }
+        public string? ApplicationBaseDirectory { get { throw null; } set { } }
 
         public bool AssumeHomogenousSilosForTesting { get { throw null; } set { } }
 
@@ -466,7 +498,7 @@ namespace Orleans.TestingHost
 
         public int BaseSiloPort { get { throw null; } set { } }
 
-        public System.Collections.Generic.List<string> ClientBuilderConfiguratorTypes { get { throw null; } }
+        public System.Collections.Generic.List<string?> ClientBuilderConfiguratorTypes { get { throw null; } }
 
         public string ClusterId { get { throw null; } set { } }
 
@@ -482,13 +514,13 @@ namespace Orleans.TestingHost
 
         public string ServiceId { get { throw null; } set { } }
 
-        public System.Collections.Generic.List<string> SiloBuilderConfiguratorTypes { get { throw null; } }
+        public System.Collections.Generic.List<string?> SiloBuilderConfiguratorTypes { get { throw null; } }
 
         public bool UseRealEnvironmentStatistics { get { throw null; } set { } }
 
         public bool UseTestClusterMembership { get { throw null; } set { } }
 
-        public System.Collections.Generic.Dictionary<string, string> ToDictionary() { throw null; }
+        public System.Collections.Generic.Dictionary<string, string?> ToDictionary() { throw null; }
     }
 
     public partial class TestClusterPortAllocator : ITestClusterPortAllocator, System.IDisposable
@@ -507,7 +539,7 @@ namespace Orleans.TestingHost
     {
         public int GatewayPort { get { throw null; } set { } }
 
-        public System.Net.IPEndPoint PrimarySiloEndPoint { get { throw null; } set { } }
+        public System.Net.IPEndPoint? PrimarySiloEndPoint { get { throw null; } set { } }
 
         public string SiloName { get { throw null; } set { } }
 
@@ -515,7 +547,86 @@ namespace Orleans.TestingHost
 
         public static TestSiloSpecificOptions Create(TestCluster testCluster, TestClusterOptions testClusterOptions, int instanceNumber, bool assignNewPort = false) { throw null; }
 
-        public System.Collections.Generic.Dictionary<string, string> ToDictionary() { throw null; }
+        public System.Collections.Generic.Dictionary<string, string?> ToDictionary() { throw null; }
+    }
+
+    public static partial class TimeProviderTestingExtensions
+    {
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseTimeProviderForBackgroundAreas(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.TimeProvider timeProvider) { throw null; }
+    }
+}
+
+namespace Orleans.TestingHost.Diagnostics
+{
+    public readonly partial struct DiagnosticEvent : System.IEquatable<DiagnosticEvent>
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public DiagnosticEvent(string Name, object? Payload, System.DateTimeOffset Timestamp) { }
+
+        public string Name { get { throw null; } init { } }
+
+        public object? Payload { get { throw null; } init { } }
+
+        public System.DateTimeOffset Timestamp { get { throw null; } init { } }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly void Deconstruct(out string Name, out object? Payload, out System.DateTimeOffset Timestamp) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly bool Equals(DiagnosticEvent other) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly bool Equals(object obj) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly int GetHashCode() { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator ==(DiagnosticEvent left, DiagnosticEvent right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator !=(DiagnosticEvent left, DiagnosticEvent right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly string ToString() { throw null; }
+    }
+
+    public sealed partial class DiagnosticEventCollector : System.IDisposable, System.IObserver<System.Diagnostics.DiagnosticListener>, System.IObserver<System.Collections.Generic.KeyValuePair<string, object?>>
+    {
+        public DiagnosticEventCollector(System.Collections.Generic.IEnumerable<string>? listenerPrefixes = null) { }
+
+        public DiagnosticEventCollector(params string[] listenerPrefixes) { }
+
+        public System.Collections.Generic.IReadOnlyList<DiagnosticEvent> Events { get { throw null; } }
+
+        public void Clear() { }
+
+        public System.Threading.Tasks.TaskCompletionSource<DiagnosticEvent> CreateEventAwaiter(string eventName) { throw null; }
+
+        public void Dispose() { }
+
+        public int GetEventCount(string eventName) { throw null; }
+
+        public System.Collections.Generic.IEnumerable<DiagnosticEvent> GetEvents(string eventName) { throw null; }
+
+        void System.IObserver<System.Collections.Generic.KeyValuePair<string, object>>.OnCompleted() { }
+
+        void System.IObserver<System.Collections.Generic.KeyValuePair<string, object>>.OnError(System.Exception error) { }
+
+        void System.IObserver<System.Collections.Generic.KeyValuePair<string, object>>.OnNext(System.Collections.Generic.KeyValuePair<string, object?> kvp) { }
+
+        void System.IObserver<System.Diagnostics.DiagnosticListener>.OnCompleted() { }
+
+        void System.IObserver<System.Diagnostics.DiagnosticListener>.OnError(System.Exception error) { }
+
+        void System.IObserver<System.Diagnostics.DiagnosticListener>.OnNext(System.Diagnostics.DiagnosticListener listener) { }
+
+        public System.Threading.Tasks.Task<DiagnosticEvent> WaitForEventAsync(string eventName, System.Func<DiagnosticEvent, bool> predicate, System.TimeSpan timeout, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.Task<DiagnosticEvent> WaitForEventAsync(string eventName, System.TimeSpan timeout, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DiagnosticEvent>> WaitForEventCountAsync(string eventName, int expectedCount, System.TimeSpan timeout, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 }
 
@@ -529,7 +640,7 @@ namespace Orleans.TestingHost.Logging
 
         public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) { throw null; }
 
-        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, System.Exception exception, System.Func<TState, System.Exception, string> formatter) { }
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, System.Exception? exception, System.Func<TState, System.Exception?, string> formatter) { }
     }
 
     public partial class FileLoggerProvider : Microsoft.Extensions.Logging.ILoggerProvider, System.IDisposable
@@ -552,7 +663,98 @@ namespace Orleans.TestingHost.Logging
 
         public void Dispose() { }
 
-        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, System.Exception exception, System.Func<TState, System.Exception, string> formatter, string category) { }
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, System.Exception? exception, System.Func<TState, System.Exception?, string> formatter, string category) { }
+    }
+
+    public sealed partial class InMemoryLogBuffer
+    {
+        public System.Collections.Generic.IReadOnlyList<LogEntry> AllEntries { get { throw null; } }
+
+        public long ApproximateSizeBytes { get { throw null; } }
+
+        public bool HasWarningsOrErrors { get { throw null; } }
+
+        public void AssertNoWarningsOrErrors() { }
+
+        public void Clear() { }
+
+        public string FormatAllEntries() { throw null; }
+
+        public (string Content, long SizeBytes) FormatAllEntriesWithSize() { throw null; }
+
+        public string FormatEntries(Microsoft.Extensions.Logging.LogLevel minimumLevel) { throw null; }
+
+        public (string Content, long SizeBytes) FormatEntriesWithSize(Microsoft.Extensions.Logging.LogLevel minimumLevel) { throw null; }
+
+        public System.Collections.Generic.IEnumerable<LogEntry> GetEntries(Microsoft.Extensions.Logging.LogLevel minimumLevel) { throw null; }
+
+        public bool HasEntriesAtOrAbove(Microsoft.Extensions.Logging.LogLevel level) { throw null; }
+
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, System.Exception? exception, System.Func<TState, System.Exception?, string> formatter, string category) { }
+    }
+
+    public sealed partial class InMemoryLogger : Microsoft.Extensions.Logging.ILogger
+    {
+        public InMemoryLogger(string categoryName, InMemoryLogBuffer buffer) { }
+
+        public System.IDisposable? BeginScope<TState>(TState state) { throw null; }
+
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) { throw null; }
+
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, System.Exception? exception, System.Func<TState, System.Exception?, string> formatter) { }
+    }
+
+    public sealed partial class InMemoryLoggerProvider : Microsoft.Extensions.Logging.ILoggerProvider, System.IDisposable
+    {
+        public InMemoryLoggerProvider() { }
+
+        public InMemoryLoggerProvider(InMemoryLogBuffer sharedBuffer) { }
+
+        public InMemoryLogBuffer Buffer { get { throw null; } }
+
+        public Microsoft.Extensions.Logging.ILogger CreateLogger(string categoryName) { throw null; }
+
+        public void Dispose() { }
+    }
+
+    public readonly partial struct LogEntry : System.IEquatable<LogEntry>
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public LogEntry(System.DateTimeOffset Timestamp, Microsoft.Extensions.Logging.LogLevel LogLevel, string Category, Microsoft.Extensions.Logging.EventId EventId, string Message, System.Exception? Exception) { }
+
+        public string Category { get { throw null; } init { } }
+
+        public Microsoft.Extensions.Logging.EventId EventId { get { throw null; } init { } }
+
+        public System.Exception? Exception { get { throw null; } init { } }
+
+        public Microsoft.Extensions.Logging.LogLevel LogLevel { get { throw null; } init { } }
+
+        public string Message { get { throw null; } init { } }
+
+        public System.DateTimeOffset Timestamp { get { throw null; } init { } }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly void Deconstruct(out System.DateTimeOffset Timestamp, out Microsoft.Extensions.Logging.LogLevel LogLevel, out string Category, out Microsoft.Extensions.Logging.EventId EventId, out string Message, out System.Exception? Exception) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly bool Equals(LogEntry other) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly bool Equals(object obj) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly int GetHashCode() { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator ==(LogEntry left, LogEntry right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator !=(LogEntry left, LogEntry right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly string ToString() { throw null; }
     }
 }
 
@@ -579,9 +781,9 @@ namespace Orleans.TestingHost.Utils
 
         public bool Done { get { throw null; } set { } }
 
-        public System.Exception Exception { get { throw null; } set { } }
+        public System.Exception? Exception { get { throw null; } set { } }
 
-        public object Result { get { throw null; } set { } }
+        public object? Result { get { throw null; } set { } }
 
         public virtual void Reset() { }
 
@@ -611,8 +813,6 @@ namespace Orleans.TestingHost.Utils
     {
         public static void ConfigureDefaultLoggingBuilder(Microsoft.Extensions.Logging.ILoggingBuilder builder, string filePath) { }
 
-        public static void ConfigureThreadPoolSettingsForStorageTests(int numDotNetPoolThreads = 200) { }
-
         public static Microsoft.Extensions.Logging.ILoggerFactory CreateDefaultLoggerFactory(string filePath, Microsoft.Extensions.Logging.LoggerFilterOptions filters) { throw null; }
 
         public static Microsoft.Extensions.Logging.ILoggerFactory CreateDefaultLoggerFactory(string filePath) { throw null; }
@@ -627,7 +827,7 @@ namespace Orleans.TestingHost.Utils
 
 namespace OrleansCodeGen.Orleans.TestingHost
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IStorageFaultGrain_GrainReference_1150D526 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IStorageFaultGrain_GrainReference_1150D526>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -645,7 +845,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IStorageFaultGrain_GrainReference_1A607A31 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IStorageFaultGrain_GrainReference_1A607A31>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -663,7 +863,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IStorageFaultGrain_GrainReference_5D91E1AF : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IStorageFaultGrain_GrainReference_5D91E1AF>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -681,7 +881,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IStorageFaultGrain_GrainReference_B9852E6E : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IStorageFaultGrain_GrainReference_B9852E6E>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -699,7 +899,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IStorageFaultGrain_GrainReference_C94BA77C : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IStorageFaultGrain_GrainReference_C94BA77C>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -717,7 +917,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IStorageFaultGrain_GrainReference_E8594820 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IStorageFaultGrain_GrainReference_E8594820>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -735,7 +935,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_RandomlyInjectedInconsistentStateException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.TestingHost.RandomlyInjectedInconsistentStateException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -753,7 +953,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_RandomlyInjectedStorageException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.TestingHost.RandomlyInjectedStorageException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -771,7 +971,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IStorageFaultGrain_GrainReference_1150D526 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IStorageFaultGrain_GrainReference_1150D526>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -779,7 +979,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
         public Invokable_IStorageFaultGrain_GrainReference_1150D526 DeepCopy(Invokable_IStorageFaultGrain_GrainReference_1150D526 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IStorageFaultGrain_GrainReference_1A607A31 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IStorageFaultGrain_GrainReference_1A607A31>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -787,7 +987,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
         public Invokable_IStorageFaultGrain_GrainReference_1A607A31 DeepCopy(Invokable_IStorageFaultGrain_GrainReference_1A607A31 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IStorageFaultGrain_GrainReference_5D91E1AF : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IStorageFaultGrain_GrainReference_5D91E1AF>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -795,7 +995,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
         public Invokable_IStorageFaultGrain_GrainReference_5D91E1AF DeepCopy(Invokable_IStorageFaultGrain_GrainReference_5D91E1AF original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IStorageFaultGrain_GrainReference_B9852E6E : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IStorageFaultGrain_GrainReference_B9852E6E>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -803,7 +1003,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
         public Invokable_IStorageFaultGrain_GrainReference_B9852E6E DeepCopy(Invokable_IStorageFaultGrain_GrainReference_B9852E6E original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IStorageFaultGrain_GrainReference_C94BA77C : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IStorageFaultGrain_GrainReference_C94BA77C>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -811,7 +1011,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
         public Invokable_IStorageFaultGrain_GrainReference_C94BA77C DeepCopy(Invokable_IStorageFaultGrain_GrainReference_C94BA77C original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IStorageFaultGrain_GrainReference_E8594820 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IStorageFaultGrain_GrainReference_E8594820>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -819,7 +1019,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
         public Invokable_IStorageFaultGrain_GrainReference_E8594820 DeepCopy(Invokable_IStorageFaultGrain_GrainReference_E8594820 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_RandomlyInjectedInconsistentStateException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.TestingHost.RandomlyInjectedInconsistentStateException, global::Orleans.Storage.InconsistentStateException>
@@ -827,7 +1027,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
         public Copier_RandomlyInjectedInconsistentStateException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_RandomlyInjectedStorageException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.TestingHost.RandomlyInjectedStorageException, System.Exception>
@@ -835,7 +1035,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
         public Copier_RandomlyInjectedStorageException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.TestingHost.IStorageFaultGrain), "1150D526" })]
@@ -868,7 +1068,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.TestingHost.IStorageFaultGrain), "1A607A31" })]
@@ -901,7 +1101,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.TestingHost.IStorageFaultGrain), "5D91E1AF" })]
@@ -933,7 +1133,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.TestingHost.IStorageFaultGrain), "B9852E6E" })]
@@ -966,7 +1166,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.TestingHost.IStorageFaultGrain), "C94BA77C" })]
@@ -998,7 +1198,7 @@ namespace OrleansCodeGen.Orleans.TestingHost
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.TestingHost.IStorageFaultGrain), "E8594820" })]

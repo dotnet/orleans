@@ -26,6 +26,6 @@ namespace Orleans.Streams
         /// <param name="batch">The items to be passed.</param>
         /// <param name="token">The stream sequence token of this item.</param>
         /// <returns>A Task that is completed when the batch has been accepted.</returns>
-        Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken token = null);
+        Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken? token = null);
     }
 }

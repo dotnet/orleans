@@ -7,13 +7,13 @@ namespace TestExtensions
 {
     public abstract class TestClusterPerTest : OrleansTestingBase, Xunit.IAsyncLifetime
     {
-        private readonly ExceptionDispatchInfo preconditionsException;
+        private readonly ExceptionDispatchInfo? preconditionsException;
         static TestClusterPerTest()
         {
             TestDefaultConfiguration.InitializeDefaults();
         }
 
-        protected TestCluster HostedCluster { get; private set; }
+        protected TestCluster HostedCluster { get; private set; } = null!;
 
         internal IInternalClusterClient InternalClient => (IInternalClusterClient)this.Client;
 
@@ -22,7 +22,7 @@ namespace TestExtensions
         protected IGrainFactory GrainFactory => this.Client;
 
         protected ILogger Logger => this.logger;
-        protected ILogger logger;
+        protected ILogger logger = null!;
 
         protected TestClusterPerTest()
         {
@@ -50,6 +50,7 @@ namespace TestExtensions
 
         public virtual async Task InitializeAsync()
         {
+            EnsurePreconditionsMet();
             var builder = new TestClusterBuilder();
             TestDefaultConfiguration.ConfigureTestCluster(builder);
             this.ConfigureTestCluster(builder);

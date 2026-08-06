@@ -1,5 +1,7 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
@@ -32,14 +34,14 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] object? value) where TBufferWriter : IBufferWriter<byte>
         {
-            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
+            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value!))
             {
                 return;
             }
 
-            writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, value!.GetType(), WireType.TagDelimited);
 
             var array = (Array)value;
             var rank = array.Rank;
@@ -60,7 +62,7 @@ namespace Orleans.Serialization.Codecs
             while (remaining-- > 0)
             {
                 var element = array.GetValue(indices);
-                _elementCodec.WriteField(ref writer, innerFieldIdDelta, CodecElementType, (T)element);
+                _elementCodec.WriteField(ref writer, innerFieldIdDelta, CodecElementType, (T)element!);
                 innerFieldIdDelta = 0;
 
                 // Increment the indices array by 1.
@@ -84,7 +86,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
+        public object? ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
             {
@@ -94,10 +97,10 @@ namespace Orleans.Serialization.Codecs
             field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-            Array result = null;
+            Array? result = null;
             uint fieldId = 0;
-            int[] lengths = null;
-            int[] indices = null;
+            int[]? lengths = null;
+            int[]? indices = null;
             var rank = 0;
             while (true)
             {
@@ -112,8 +115,9 @@ namespace Orleans.Serialization.Codecs
                 {
                     case 0:
                         {
-                            lengths = _intArrayCodec.ReadValue(ref reader, header);
+                            lengths = _intArrayCodec.ReadValue(ref reader, header)!;
                             rank = lengths.Length;
+                            EnsureSufficientData(ref reader, lengths);
 
                             // Multi-dimensional arrays must be indexed using indexing arrays, so create one now.
                             indices = new int[rank];
@@ -129,11 +133,11 @@ namespace Orleans.Serialization.Codecs
                             }
 
                             var element = _elementCodec.ReadValue(ref reader, header);
-                            result.SetValue(element, indices);
+                            result!.SetValue(element, indices!);
 
                             // Increment the indices array by 1.
                             var idx = rank - 1;
-                            while (idx >= 0 && ++indices[idx] >= lengths[idx])
+                            while (idx >= 0 && ++indices![idx] >= lengths![idx])
                             {
                                 indices[idx] = 0;
                                 --idx;
@@ -156,6 +160,31 @@ namespace Orleans.Serialization.Codecs
         private void ThrowIndexOutOfRangeException(int[] lengths) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {CodecElementType} with declared lengths {string.Join(", ", lengths)}.");
 
+        private static void EnsureSufficientData<TInput>(ref Reader<TInput> reader, int[] lengths)
+        {
+            var remaining = (ulong)reader.Remaining;
+            ulong elementCount = 1;
+            foreach (var length in lengths)
+            {
+                if (length < 0)
+                {
+                    return;
+                }
+
+                if (length != 0 && elementCount > remaining / (uint)length)
+                {
+                    ThrowInvalidSizeException(lengths, reader.Remaining);
+                }
+
+                elementCount *= (uint)length;
+            }
+        }
+
+        [System.Diagnostics.CodeAnalysis.DoesNotReturn]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowInvalidSizeException(int[] lengths, long remaining) => throw new IndexOutOfRangeException(
+            $"Declared dimensions [{string.Join(", ", lengths)}] require more elements than the remaining length of the input, {remaining}.");
+
         private static void ThrowLengthsFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its lengths field.");
     }
 
@@ -166,17 +195,18 @@ namespace Orleans.Serialization.Codecs
     internal sealed class MultiDimensionalArrayCopier<T> : IGeneralizedCopier
     {
         /// <inheritdoc/>
-        public object DeepCopy(object original, CopyContext context)
+        [return: NotNullIfNotNull(nameof(original))]
+        public object? DeepCopy(object? original, CopyContext context)
         {
-            if (context.TryGetCopy<Array>(original, out var result))
+            if (context.TryGetCopy<Array>(original!, out var result))
             {
                 return result;
             }
 
-            var type = original.GetType();
+            var type = original!.GetType();
             var originalArray = (Array)original;
             var elementType = type.GetElementType();
-            if (ShallowCopyableTypes.Contains(elementType))
+            if (ShallowCopyableTypes.Contains(elementType!))
             {
                 return originalArray.Clone();
             }
@@ -189,7 +219,7 @@ namespace Orleans.Serialization.Codecs
                 lengths[i] = originalArray.GetLength(i);
             }
 
-            result = Array.CreateInstance(elementType, lengths);
+            result = Array.CreateInstance(elementType!, lengths);
             context.RecordCopy(original, result); 
 
             if (rank == 1)

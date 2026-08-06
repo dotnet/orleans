@@ -12,11 +12,11 @@ namespace Orleans.Configuration
     {
         public const string DEFAULT_CONTAINER_NAME = "grainstate";
         public const int DEFAULT_INIT_STAGE = 10000;
-        public Azure.Storage.Blobs.BlobServiceClient BlobServiceClient { get { throw null; } set { } }
+        public Azure.Storage.Blobs.BlobServiceClient? BlobServiceClient { get { throw null; } set { } }
 
         public System.Func<System.IServiceProvider, AzureBlobStorageOptions, Storage.IBlobContainerFactory> BuildContainerFactory { get { throw null; } set { } }
 
-        public Azure.Storage.Blobs.BlobClientOptions ClientOptions { get { throw null; } set { } }
+        public Azure.Storage.Blobs.BlobClientOptions? ClientOptions { get { throw null; } set { } }
 
         public string ContainerName { get { throw null; } set { } }
 
@@ -54,7 +54,7 @@ namespace Orleans.Configuration
 
     public partial class AzureTableGrainStorageOptionsValidator : Persistence.AzureStorage.AzureStorageOperationOptionsValidator<AzureTableStorageOptions>
     {
-        public AzureTableGrainStorageOptionsValidator(AzureTableStorageOptions options, string name) : base(default!, default!) { }
+        public AzureTableGrainStorageOptionsValidator(AzureTableStorageOptions options, string name) : base(default!, default) { }
     }
 
     public partial class AzureTableStorageOptions : Persistence.AzureStorage.AzureStorageOperationOptions, Storage.IStorageProviderSerializerOptions
@@ -77,33 +77,33 @@ namespace Orleans.Hosting
 {
     public static partial class AzureBlobGrainStorageServiceCollectionExtensions
     {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAzureBlobGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureBlobStorageOptions>> configureOptions = null) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAzureBlobGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureBlobStorageOptions>>? configureOptions = null) { throw null; }
 
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAzureBlobGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Configuration.AzureBlobStorageOptions> configureOptions) { throw null; }
 
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAzureBlobGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureBlobStorageOptions>> configureOptions = null) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAzureBlobGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureBlobStorageOptions>>? configureOptions = null) { throw null; }
 
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAzureBlobGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Configuration.AzureBlobStorageOptions> configureOptions) { throw null; }
     }
 
     public static partial class AzureBlobSiloBuilderExtensions
     {
-        public static ISiloBuilder AddAzureBlobGrainStorage(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureBlobStorageOptions>> configureOptions = null) { throw null; }
+        public static ISiloBuilder AddAzureBlobGrainStorage(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureBlobStorageOptions>>? configureOptions = null) { throw null; }
 
         public static ISiloBuilder AddAzureBlobGrainStorage(this ISiloBuilder builder, string name, System.Action<Configuration.AzureBlobStorageOptions> configureOptions) { throw null; }
 
-        public static ISiloBuilder AddAzureBlobGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureBlobStorageOptions>> configureOptions = null) { throw null; }
+        public static ISiloBuilder AddAzureBlobGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureBlobStorageOptions>>? configureOptions = null) { throw null; }
 
         public static ISiloBuilder AddAzureBlobGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Configuration.AzureBlobStorageOptions> configureOptions) { throw null; }
     }
 
     public static partial class AzureTableSiloBuilderExtensions
     {
-        public static ISiloBuilder AddAzureTableGrainStorage(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureTableStorageOptions>> configureOptions = null) { throw null; }
+        public static ISiloBuilder AddAzureTableGrainStorage(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureTableStorageOptions>>? configureOptions = null) { throw null; }
 
         public static ISiloBuilder AddAzureTableGrainStorage(this ISiloBuilder builder, string name, System.Action<Configuration.AzureTableStorageOptions> configureOptions) { throw null; }
 
-        public static ISiloBuilder AddAzureTableGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureTableStorageOptions>> configureOptions = null) { throw null; }
+        public static ISiloBuilder AddAzureTableGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureTableStorageOptions>>? configureOptions = null) { throw null; }
 
         public static ISiloBuilder AddAzureTableGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Configuration.AzureTableStorageOptions> configureOptions) { throw null; }
     }
@@ -113,13 +113,13 @@ namespace Orleans.Persistence.AzureStorage
 {
     public partial class AzureStorageOperationOptions
     {
-        public Azure.Data.Tables.TableClientOptions ClientOptions { get { throw null; } set { } }
+        public Azure.Data.Tables.TableClientOptions? ClientOptions { get { throw null; } set { } }
 
         public AzureStoragePolicyOptions StoragePolicyOptions { get { throw null; } }
 
         public virtual string TableName { get { throw null; } set { } }
 
-        public Azure.Data.Tables.TableServiceClient TableServiceClient { get { throw null; } set { } }
+        public Azure.Data.Tables.TableServiceClient? TableServiceClient { get { throw null; } set { } }
 
         [System.Obsolete("Set the TableServiceClient property directly.")]
         public void ConfigureTableServiceClient(System.Func<System.Threading.Tasks.Task<Azure.Data.Tables.TableServiceClient>> createClientCallback) { }
@@ -142,9 +142,9 @@ namespace Orleans.Persistence.AzureStorage
 
     public partial class AzureStorageOperationOptionsValidator<TOptions> : IConfigurationValidator where TOptions : AzureStorageOperationOptions
     {
-        public AzureStorageOperationOptionsValidator(TOptions options, string name = null) { }
+        public AzureStorageOperationOptionsValidator(TOptions options, string? name = null) { }
 
-        public string Name { get { throw null; } }
+        public string? Name { get { throw null; } }
 
         public TOptions Options { get { throw null; } }
 
@@ -160,6 +160,8 @@ namespace Orleans.Persistence.AzureStorage
         public int MaxCreationRetries { get { throw null; } set { } }
 
         public int MaxOperationRetries { get { throw null; } set { } }
+
+        public System.TimeSpan MaxPauseBetweenOperationRetries { get { throw null; } set { } }
 
         public System.TimeSpan OperationTimeout { get { throw null; } set { } }
 
@@ -225,20 +227,20 @@ namespace Orleans.Storage
 
         public TableStorageUpdateConditionNotSatisfiedException(string msg, System.Exception exc) { }
 
-        public TableStorageUpdateConditionNotSatisfiedException(string grainType, string grainId, string tableName, string storedEtag, string currentEtag, System.Exception storageException) { }
+        public TableStorageUpdateConditionNotSatisfiedException(string grainType, string grainId, string tableName, string storedEtag, string? currentEtag, System.Exception storageException) { }
 
-        public TableStorageUpdateConditionNotSatisfiedException(string errorMsg, string grainType, string grainId, string tableName, string storedEtag, string currentEtag, System.Exception storageException) { }
+        public TableStorageUpdateConditionNotSatisfiedException(string errorMsg, string grainType, string grainId, string tableName, string storedEtag, string? currentEtag, System.Exception storageException) { }
 
         public TableStorageUpdateConditionNotSatisfiedException(string msg) { }
 
         [Id(0)]
-        public string GrainId { get { throw null; } }
+        public string? GrainId { get { throw null; } }
 
         [Id(1)]
-        public string GrainType { get { throw null; } }
+        public string? GrainType { get { throw null; } }
 
         [Id(2)]
-        public string TableName { get { throw null; } }
+        public string? TableName { get { throw null; } }
 
         [System.Obsolete]
         public override void GetObjectData(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
@@ -247,7 +249,7 @@ namespace Orleans.Storage
 
 namespace OrleansCodeGen.Orleans.Storage
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_TableStorageUpdateConditionNotSatisfiedException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Storage.TableStorageUpdateConditionNotSatisfiedException>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Storage.TableStorageUpdateConditionNotSatisfiedException>, global::Orleans.Serialization.Serializers.IBaseCodec
@@ -265,7 +267,7 @@ namespace OrleansCodeGen.Orleans.Storage
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_TableStorageUpdateConditionNotSatisfiedException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Storage.TableStorageUpdateConditionNotSatisfiedException, global::Orleans.Storage.InconsistentStateException>

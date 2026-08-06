@@ -2,8 +2,6 @@ using System;
 using System.Data;
 using System.Linq.Expressions;
 
-#nullable disable
-
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
 #elif PERSISTENCE_ADONET
@@ -45,7 +43,7 @@ namespace Orleans.Tests.SqlUtils
         /// <returns>An action which takes a OracleCommand as IDbCommand </returns>
         private Action<IDbCommand> BuildSetBindByNameAction()
         {
-            var type = Type.GetType("Oracle.ManagedDataAccess.Client.OracleCommand, Oracle.ManagedDataAccess");
+            var type = Type.GetType("Oracle.ManagedDataAccess.Client.OracleCommand, Oracle.ManagedDataAccess")!;
 
             var parameterExpression = Expression.Parameter(typeof(IDbCommand), "command");
 
@@ -53,7 +51,7 @@ namespace Orleans.Tests.SqlUtils
 
             var booleanConstantExpression = Expression.Constant(true);
 
-            var setMethod = type.GetProperty("BindByName").GetSetMethod();
+            var setMethod = type.GetProperty("BindByName")!.GetSetMethod()!;
 
             var callExpression = Expression.Call(castExpression, setMethod, booleanConstantExpression);
 
@@ -67,19 +65,19 @@ namespace Orleans.Tests.SqlUtils
         /// <returns>An action which takes a OracleParameter as IDbDataParameter.</returns>
         private static Action<IDbDataParameter> BuildSetOracleDbTypeAction(string enumName)
         {
-            var type = Type.GetType("Oracle.ManagedDataAccess.Client.OracleParameter, Oracle.ManagedDataAccess");
+            var type = Type.GetType("Oracle.ManagedDataAccess.Client.OracleParameter, Oracle.ManagedDataAccess")!;
 
             var parameterExpression = Expression.Parameter(typeof(IDbDataParameter), "dbparameter");
 
             var castExpression = Expression.Convert(parameterExpression, type);
 
-            var enumType = Type.GetType("Oracle.ManagedDataAccess.Client.OracleDbType, Oracle.ManagedDataAccess");
+            var enumType = Type.GetType("Oracle.ManagedDataAccess.Client.OracleDbType, Oracle.ManagedDataAccess")!;
 
             var clob = Enum.Parse(enumType, enumName);
 
             var enumConstantExpression = Expression.Constant(clob, enumType);
 
-            var setMethod = type.GetProperty("OracleDbType").GetSetMethod();
+            var setMethod = type.GetProperty("OracleDbType")!.GetSetMethod()!;
 
             var callExpression = Expression.Call(castExpression, setMethod, enumConstantExpression);
 

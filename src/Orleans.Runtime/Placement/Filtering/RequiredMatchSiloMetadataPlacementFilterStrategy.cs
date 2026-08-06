@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using Orleans.Metadata;
 using Orleans.Placement;
 
-#nullable enable
 namespace Orleans.Runtime.Placement.Filtering;
 
 public class RequiredMatchSiloMetadataPlacementFilterStrategy(string[] metadataKeys, int order)

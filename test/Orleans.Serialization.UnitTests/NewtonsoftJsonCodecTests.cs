@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 using Orleans.Serialization.Cloning;
@@ -8,6 +8,7 @@ using Orleans.Serialization.TestKit;
 using Xunit;
 using Xunit.Abstractions;
 
+// TestKit's legacy TestValues contract cannot express intentionally nullable test values.
 namespace Orleans.Serialization.UnitTests
 {
     /// <summary>
@@ -28,9 +29,9 @@ namespace Orleans.Serialization.UnitTests
     /// to Orleans that already have complex Newtonsoft.Json configurations.
     /// </summary>
     [Trait("Category", "BVT")]
-    public class NewtonsoftJsonCodecTests : FieldCodecTester<MyNewtonsoftJsonClass, IFieldCodec<MyNewtonsoftJsonClass>>
+    public class NewtonsoftJsonCodecTests : FieldCodecTester<MyNewtonsoftJsonClass, IFieldCodec<MyNewtonsoftJsonClass>>, IClassFixture<SerializationTesterFixture>
     {
-        public NewtonsoftJsonCodecTests(ITestOutputHelper output) : base(output)
+        public NewtonsoftJsonCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
         {
         }
 
@@ -45,7 +46,7 @@ namespace Orleans.Serialization.UnitTests
 
         protected override MyNewtonsoftJsonClass[] TestValues => new MyNewtonsoftJsonClass[]
         {
-            null,
+            null!,
             new MyNewtonsoftJsonClass(),
             new MyNewtonsoftJsonClass() { IntProperty = 150, SubTypeProperty = new string('c', 20) },
             new MyNewtonsoftJsonClass() { IntProperty = -150_000, SubTypeProperty = new string('c', 4097) },
@@ -56,7 +57,7 @@ namespace Orleans.Serialization.UnitTests
         {
             var original = new MyNewtonsoftJsonClass { IntProperty = 30, SubTypeProperty = "hi" };
             var copier = ServiceProvider.GetRequiredService<DeepCopier<MyNewtonsoftJsonClass>>();
-            var result = copier.Copy(original);
+            var result = copier.Copy(original)!;
 
             Assert.Equal(original.IntProperty, result.IntProperty);
             Assert.Equal(original.SubTypeProperty, result.SubTypeProperty);
@@ -67,7 +68,7 @@ namespace Orleans.Serialization.UnitTests
         {
             var original = new MyNewtonsoftJsonClass { IntProperty = 30, SubTypeProperty = "hi" };
             var copier = ServiceProvider.GetRequiredService<DeepCopier>();
-            var result = (MyNewtonsoftJsonClass)copier.Copy((object)original);
+            var result = (MyNewtonsoftJsonClass)copier.Copy((object)original)!;
 
             Assert.Equal(original.IntProperty, result.IntProperty);
             Assert.Equal(original.SubTypeProperty, result.SubTypeProperty);
@@ -77,7 +78,7 @@ namespace Orleans.Serialization.UnitTests
         public void NewtonsoftJsonRoundTripThroughCodec()
         {
             var original = new MyNewtonsoftJsonClass { IntProperty = 30, SubTypeProperty = "hi" };
-            var result = RoundTripThroughCodec(original);
+            var result = RoundTripThroughCodec(original)!;
 
             Assert.Equal(original.IntProperty, result.IntProperty);
             Assert.Equal(original.SubTypeProperty, result.SubTypeProperty);
@@ -107,12 +108,20 @@ namespace Orleans.Serialization.UnitTests
             var deserializedObject = RoundTripThroughUntypedSerializer(jsonObject, out _);
             Assert.Equal(Newtonsoft.Json.JsonConvert.SerializeObject(jsonObject), Newtonsoft.Json.JsonConvert.SerializeObject(deserializedObject));
         }
-    }
 
+        [Fact]
+        public void CanSerializeNativeJsonBaseTypes()
+        {
+            JToken original = JToken.Parse("{\"foo\":\"bar\",\"items\":[1,true,\"three\"]}");
+            var result = RoundTripThroughCodec(original);
+
+            Assert.Equal(Newtonsoft.Json.JsonConvert.SerializeObject(original), Newtonsoft.Json.JsonConvert.SerializeObject(result));
+        }
+    }
     [Trait("Category", "BVT")]
-    public class NewtonsoftJsonCodecCopierTests : CopierTester<MyNewtonsoftJsonClass, IDeepCopier<MyNewtonsoftJsonClass>>
+    public class NewtonsoftJsonCodecCopierTests : CopierTester<MyNewtonsoftJsonClass, IDeepCopier<MyNewtonsoftJsonClass>>, IClassFixture<SerializationTesterFixture>
     {
-        public NewtonsoftJsonCodecCopierTests(ITestOutputHelper output) : base(output)
+        public NewtonsoftJsonCodecCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
         {
         }
 
@@ -127,7 +136,7 @@ namespace Orleans.Serialization.UnitTests
 
         protected override MyNewtonsoftJsonClass[] TestValues => new MyNewtonsoftJsonClass[]
         {
-            null,
+            null!,
             new MyNewtonsoftJsonClass(),
             new MyNewtonsoftJsonClass() { IntProperty = 150, SubTypeProperty = new string('c', 20) },
             new MyNewtonsoftJsonClass() { IntProperty = -150_000, SubTypeProperty = new string('c', 4097) },
@@ -145,6 +154,16 @@ namespace Orleans.Serialization.UnitTests
 
             var deserializedObject = copier.Copy(jsonObject);
             Assert.Equal(Newtonsoft.Json.JsonConvert.SerializeObject(jsonObject), Newtonsoft.Json.JsonConvert.SerializeObject(deserializedObject));
+        }
+
+        [Fact]
+        public void CanCopyNativeJsonBaseTypes()
+        {
+            JToken original = JToken.Parse("{\"foo\":\"bar\",\"items\":[1,true,\"three\"]}");
+            var copier = ServiceProvider.GetRequiredService<DeepCopier<JToken>>();
+            var result = copier.Copy(original);
+
+            Assert.Equal(Newtonsoft.Json.JsonConvert.SerializeObject(original), Newtonsoft.Json.JsonConvert.SerializeObject(result));
         }
     }
 }

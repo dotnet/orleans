@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -64,7 +63,11 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     private readonly IInternalGrainFactory _grainFactory;
     private readonly Catalog _catalog;
     private readonly IClusterMembershipService _clusterMembershipService;
+#if NET9_0_OR_GREATER
+    private readonly Lock _lock = new();
+#else
     private readonly object _lock = new();
+#endif
 
 #pragma warning disable IDE0052 // Remove unread private members. Justification: this field is only for diagnostic purposes.
     private readonly Task? _membershipUpdatesTask;
@@ -329,8 +332,11 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         lifecycle.Subscribe(
             nameof(ActivationMigrationManager),
             ServiceLifecycleStage.RuntimeGrainServices,
-                ct => this.RunOrQueueTask(() => StartAsync(ct)),
-                ct => this.RunOrQueueTask(() => StopAsync(ct)));
+            QueuedStart,
+            QueuedStop);
+
+        Task QueuedStart(CancellationToken ct) => this.RunOrQueueTask(() => StartAsync(ct));
+        Task QueuedStop(CancellationToken ct) => this.RunOrQueueTask(() => StopAsync(ct));
     }
 
     private class MigrationWorkItem : IValueTaskSource

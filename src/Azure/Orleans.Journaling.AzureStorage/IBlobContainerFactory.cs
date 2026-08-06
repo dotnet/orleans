@@ -1,19 +1,18 @@
-﻿using Azure.Storage.Blobs;
-using Orleans.Runtime;
+using Azure.Storage.Blobs;
 
 namespace Orleans.Journaling;
 
 /// <summary>
-/// A factory for building container clients for blob storage using GrainId
+/// A factory for building container clients for blob storage.
 /// </summary>
 public interface IBlobContainerFactory
 {
     /// <summary>
-    /// Gets the container which should be used for the specified grain.
+    /// Gets the container which should be used for the specified journal.
     /// </summary>
-    /// <param name="grainId">The grain id</param>
-    /// <returns>A configured blob client</returns>
-    public BlobContainerClient GetBlobContainerClient(GrainId grainId);
+    /// <param name="journalId">The journal id.</param>
+    /// <returns>A configured blob client.</returns>
+    public BlobContainerClient GetBlobContainerClient(JournalId journalId);
 
     /// <summary>
     /// Initialize any required dependencies using the provided client and options.

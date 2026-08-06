@@ -10,7 +10,7 @@ namespace Benchmarks.MapReduce;
 /// </summary>
 public class MapReduceBenchmark : IDisposable
 {
-    private static TestCluster _host;
+    private static TestCluster _host = null!;
     private readonly int _intermediateStagesCount = 15;
     private readonly int _pipelineParallelization = 4;
     private readonly int _repeats = 50000;
@@ -48,10 +48,10 @@ public class MapReduceBenchmark : IDisposable
     private async Task BenchCore()
     {
         List<Task> initializationTasks = new List<Task>();
-        var mapper = _host.GrainFactory.GetGrain<ITransformGrain<string, List<string>>>(Guid.NewGuid());
+        var mapper = _host.GrainFactory!.GetGrain<ITransformGrain<string, List<string>>>(Guid.NewGuid()); // Benchmark setup deploys the client.
         initializationTasks.Add(mapper.Initialize(new MapProcessor()));
         var reducer =
-            _host.GrainFactory.GetGrain<ITransformGrain<List<string>, Dictionary<string, int>>>(Guid.NewGuid());
+            _host.GrainFactory!.GetGrain<ITransformGrain<List<string>, Dictionary<string, int>>>(Guid.NewGuid()); // Benchmark setup deploys the client.
         initializationTasks.Add(reducer.Initialize(new ReduceProcessor()));
 
         // used for imitation of complex processing pipelines
@@ -70,7 +70,7 @@ public class MapReduceBenchmark : IDisposable
         var collector = _host.GrainFactory.GetGrain<IBufferGrain<Dictionary<string, int>>>(Guid.NewGuid());
         using (var e = intermediateGrains.GetEnumerator())
         {
-            ITransformGrain<Dictionary<string, int>, Dictionary<string, int>> previous = null;
+            ITransformGrain<Dictionary<string, int>, Dictionary<string, int>> previous = null!;
             if (e.MoveNext())
             {
                 initializationTasks.Add(reducer.LinkTo(e.Current));

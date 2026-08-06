@@ -23,7 +23,7 @@ namespace Orleans.EventSourcing.CustomStorage
         /// Initialize a new instance of CustomStorageAdaptor class
         /// </summary>
         public CustomStorageAdaptor(ILogViewAdaptorHost<TLogView, TLogEntry> host, TLogView initialState,
-            ILogConsistencyProtocolServices services, string primaryCluster)
+            ILogConsistencyProtocolServices services, string? primaryCluster)
             : base(host, initialState, services)
         {
             if (!(host is ICustomStorageInterface<TLogView, TLogEntry> customGrainStorage))
@@ -35,10 +35,10 @@ namespace Orleans.EventSourcing.CustomStorage
             this.primaryCluster = primaryCluster;
         }
 
-        private readonly string primaryCluster;
+        private readonly string? primaryCluster;
         private readonly ICustomStorageInterface<TLogView, TLogEntry> customGrainStorage;
 
-        private TLogView cached;
+        private TLogView cached = null!;
         private int version;
 
         /// <inheritdoc/>
@@ -100,7 +100,7 @@ namespace Orleans.EventSourcing.CustomStorage
             public int Version { get; set; }
 
             [Id(1)]
-            public ViewType Value { get; set; }
+            public ViewType? Value { get; set; }
         }
 
         /// <inheritdoc/>
@@ -141,7 +141,7 @@ namespace Orleans.EventSourcing.CustomStorage
                 {
                     // unwrap inner exception that was forwarded - helpful for debugging
                     if ((e as ProtocolTransportException)?.InnerException != null)
-                        e = ((ProtocolTransportException)e).InnerException;
+                        e = ((ProtocolTransportException)e).InnerException!;
 
                     LastPrimaryIssue.Record(new ReadFromPrimaryFailed() { Exception = e }, Host, Services);
                 }
@@ -159,7 +159,7 @@ namespace Orleans.EventSourcing.CustomStorage
         {
             enter_operation("WriteAsync");
 
-            var updates = GetCurrentBatchOfUpdates().Select(submissionentry => submissionentry.Entry).ToList();
+            var updates = GetCurrentBatchOfUpdates().Select(submissionentry => submissionentry.Entry!).ToList();
             bool writesuccessful = false;
             bool transitionssuccessful = false;
 
@@ -173,7 +173,7 @@ namespace Orleans.EventSourcing.CustomStorage
             {
                 // unwrap inner exception that was forwarded - helpful for debugging
                 if ((e as ProtocolTransportException)?.InnerException != null)
-                    e = ((ProtocolTransportException)e).InnerException;
+                    e = ((ProtocolTransportException)e).InnerException!;
 
                 LastPrimaryIssue.Record(new UpdatePrimaryFailed() { Exception = e }, Host, Services);
             }
@@ -224,7 +224,7 @@ namespace Orleans.EventSourcing.CustomStorage
                     {
                         // unwrap inner exception that was forwarded - helpful for debugging
                         if ((e as ProtocolTransportException)?.InnerException != null)
-                            e = ((ProtocolTransportException)e).InnerException;
+                            e = ((ProtocolTransportException)e).InnerException!;
 
                         LastPrimaryIssue.Record(new ReadFromPrimaryFailed() { Exception = e }, Host, Services);
                     }
@@ -282,7 +282,7 @@ namespace Orleans.EventSourcing.CustomStorage
 
             /// <summary> The list of updates that were applied. </summary>
             [Id(1)]
-            public List<TLogEntry> Updates { get; set; }
+            public List<TLogEntry> Updates { get; set; } = null!;
 
             /// <summary>
             /// A representation of this notification message suitable for tracing.

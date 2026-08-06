@@ -11,7 +11,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [RegisterSerializer]
-    public sealed class SortedDictionaryCodec<TKey, TValue> : GeneralizedReferenceTypeSurrogateCodec<SortedDictionary<TKey, TValue>, SortedDictionarySurrogate<TKey, TValue>>
+    public sealed class SortedDictionaryCodec<TKey, TValue> : GeneralizedReferenceTypeSurrogateCodec<SortedDictionary<TKey, TValue>, SortedDictionarySurrogate<TKey, TValue>> where TKey : notnull
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SortedDictionaryCodec{TKey, TValue}"/> class.
@@ -47,7 +47,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [GenerateSerializer]
-    public struct SortedDictionarySurrogate<TKey, TValue>
+    public struct SortedDictionarySurrogate<TKey, TValue> where TKey : notnull
     {
         /// <summary>
         /// Gets or sets the values.
@@ -61,7 +61,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The comparer.</value>
         [Id(1)]
-        public IComparer<TKey> Comparer;
+        public IComparer<TKey>? Comparer;
     }
 
     /// <summary>
@@ -70,7 +70,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [RegisterCopier]
-    public sealed class SortedDictionaryCopier<TKey, TValue> : IDeepCopier<SortedDictionary<TKey, TValue>>, IBaseCopier<SortedDictionary<TKey, TValue>>
+    public sealed class SortedDictionaryCopier<TKey, TValue> : IDeepCopier<SortedDictionary<TKey, TValue>>, IBaseCopier<SortedDictionary<TKey, TValue>> where TKey : notnull
     {
         private readonly Type _fieldType = typeof(SortedDictionary<TKey, TValue>);
         private readonly IDeepCopier<TKey> _keyCopier;
@@ -92,12 +92,12 @@ namespace Orleans.Serialization.Codecs
         {
             if (context.TryGetCopy<SortedDictionary<TKey, TValue>>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             if (input.GetType() as object != _fieldType as object)
             {
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
             }
 
             result = new SortedDictionary<TKey, TValue>(input.Comparer);

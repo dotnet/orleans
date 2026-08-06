@@ -9,7 +9,7 @@ namespace Orleans.BroadcastChannel
 
         public string ProviderName { get; }
 
-        Task Attach<T>(Func<T, Task> onPublished, Func<Exception, Task> onError = null);
+        Task Attach<T>(Func<T, Task> onPublished, Func<Exception, Task>? onError = null);
     }
 
     public interface IOnBroadcastChannelSubscribed
@@ -32,11 +32,10 @@ namespace Orleans.BroadcastChannel
             _streamId = streamId;
         }
 
-        public Task Attach<T>(Func<T, Task> onPublished, Func<Exception, Task> onError = null)
+        public Task Attach<T>(Func<T, Task> onPublished, Func<Exception, Task>? onError = null)
         {
             _consumerExtension.Attach(_streamId, onPublished, onError);
             return Task.CompletedTask;
         }
     }
 }
-

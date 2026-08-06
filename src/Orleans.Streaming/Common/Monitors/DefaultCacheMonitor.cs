@@ -12,7 +12,7 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     public class DefaultCacheMonitor : ICacheMonitor
     {
-        private readonly KeyValuePair<string, object>[] _dimensions;
+        private readonly KeyValuePair<string, object?>[] _dimensions;
         private readonly ObservableCounter<long> _queueCacheSizeCounter;
         private readonly ObservableCounter<long> _queueCacheMessagesAddedCounter;
         private readonly ObservableCounter<long> _queueCacheMessagesPurgedCounter;
@@ -34,23 +34,33 @@ namespace Orleans.Providers.Streams.Common
         private ValueStopwatch _oldestMessageDequeueAgo;
         private ValueStopwatch _oldestToNewestAge;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="DefaultCacheMonitor"/> class.
-        /// </summary>
-        protected DefaultCacheMonitor(KeyValuePair<string, object>[] dimensions)
+        public DefaultCacheMonitor(CacheMonitorDimensions dimensions, OrleansInstruments instruments)
+            : this(new KeyValuePair<string, object>[] { new("QueueId", dimensions.QueueId) }, instruments.Meter)
         {
-            _dimensions = dimensions;
-            _queueCacheSizeCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_QUEUE_CACHE_SIZE, () => new(_totalCacheSize, _dimensions), unit: "bytes");
-            _queueCacheMessageCountCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_QUEUE_CACHE_LENGTH, () => new(_messageCount, _dimensions), unit: "messages");
-            _queueCacheMessagesAddedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_QUEUE_CACHE_MESSAGES_ADDED, () => new(_messagesAdded, _dimensions));
-            _queueCacheMessagesPurgedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_QUEUE_CACHE_MESSAGES_PURGED, () => new(_messagesPurged, _dimensions));
-            _queueCacheMemoryAllocatedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_QUEUE_CACHE_MEMORY_ALLOCATED, () => new(_memoryAllocated, _dimensions));
-            _queueCacheMemoryReleasedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_QUEUE_CACHE_MEMORY_RELEASED, () => new(_memoryReleased, _dimensions));
-            _oldestMessageReadEnqueueTimeToNowCounter = Instruments.Meter.CreateObservableGauge<long>(InstrumentNames.STREAMS_QUEUE_CACHE_OLDEST_TO_NEWEST_DURATION, GetOldestToNewestAge);
-            _newestMessageReadEnqueueTimeToNowCounter = Instruments.Meter.CreateObservableGauge<long>(InstrumentNames.STREAMS_QUEUE_CACHE_OLDEST_AGE, GetOldestAge);
-            _currentPressureCounter = Instruments.Meter.CreateObservableGauge<double>(InstrumentNames.STREAMS_QUEUE_CACHE_PRESSURE, () => GetPressureMonitorMeasurement(monitor => monitor.CurrentPressure));
-            _underPressureCounter = Instruments.Meter.CreateObservableGauge<int>(InstrumentNames.STREAMS_QUEUE_CACHE_UNDER_PRESSURE, () => GetPressureMonitorMeasurement(monitor => monitor.UnderPressure));
-            _pressureContributionCounter = Instruments.Meter.CreateObservableGauge<double>(InstrumentNames.STREAMS_QUEUE_CACHE_PRESSURE_CONTRIBUTION_COUNT, () => GetPressureMonitorMeasurement(monitor => monitor.PressureContributionCount));
+        }
+
+        protected DefaultCacheMonitor(KeyValuePair<string, object>[] dimensions, OrleansInstruments instruments)
+            : this(dimensions, instruments.Meter)
+        {
+        }
+
+        private DefaultCacheMonitor(KeyValuePair<string, object>[] dimensions, Meter meter)
+        {
+            // The tag values are never actually null here; the cast only widens the nullability annotation of the array element
+            // type to satisfy the (nullable-annotated) System.Diagnostics.Metrics APIs below, which is safe since the underlying
+            // CLR array type is identical regardless of the element's nullable annotation.
+            _dimensions = (KeyValuePair<string, object?>[])(object)dimensions;
+            _queueCacheSizeCounter = meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_QUEUE_CACHE_SIZE, () => new(_totalCacheSize, _dimensions), unit: "bytes");
+            _queueCacheMessageCountCounter = meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_QUEUE_CACHE_LENGTH, () => new(_messageCount, _dimensions), unit: "messages");
+            _queueCacheMessagesAddedCounter = meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_QUEUE_CACHE_MESSAGES_ADDED, () => new(_messagesAdded, _dimensions));
+            _queueCacheMessagesPurgedCounter = meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_QUEUE_CACHE_MESSAGES_PURGED, () => new(_messagesPurged, _dimensions));
+            _queueCacheMemoryAllocatedCounter = meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_QUEUE_CACHE_MEMORY_ALLOCATED, () => new(_memoryAllocated, _dimensions));
+            _queueCacheMemoryReleasedCounter = meter.CreateObservableCounter<long>(InstrumentNames.STREAMS_QUEUE_CACHE_MEMORY_RELEASED, () => new(_memoryReleased, _dimensions));
+            _oldestMessageReadEnqueueTimeToNowCounter = meter.CreateObservableGauge<long>(InstrumentNames.STREAMS_QUEUE_CACHE_OLDEST_TO_NEWEST_DURATION, GetOldestToNewestAge);
+            _newestMessageReadEnqueueTimeToNowCounter = meter.CreateObservableGauge<long>(InstrumentNames.STREAMS_QUEUE_CACHE_OLDEST_AGE, GetOldestAge);
+            _currentPressureCounter = meter.CreateObservableGauge<double>(InstrumentNames.STREAMS_QUEUE_CACHE_PRESSURE, () => GetPressureMonitorMeasurement(monitor => monitor.CurrentPressure));
+            _underPressureCounter = meter.CreateObservableGauge<int>(InstrumentNames.STREAMS_QUEUE_CACHE_UNDER_PRESSURE, () => GetPressureMonitorMeasurement(monitor => monitor.UnderPressure));
+            _pressureContributionCounter = meter.CreateObservableGauge<double>(InstrumentNames.STREAMS_QUEUE_CACHE_PRESSURE_CONTRIBUTION_COUNT, () => GetPressureMonitorMeasurement(monitor => monitor.PressureContributionCount));
             IEnumerable<Measurement<T>> GetPressureMonitorMeasurement<T>(Func<PressureMonitorStatistics, T> selector) where T : struct
             {
                 foreach (var monitor in _pressureMonitors)
@@ -58,14 +68,6 @@ namespace Orleans.Providers.Streams.Common
                     yield return new Measurement<T>(selector(monitor.Value), monitor.Value.Dimensions);
                 }
             }
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="DefaultCacheMonitor"/> class.
-        /// </summary>
-        /// <param name="dimensions">The dimensions.</param>
-        public DefaultCacheMonitor(CacheMonitorDimensions dimensions) : this(new KeyValuePair<string, object>[] { new("QueueId", dimensions.QueueId) })
-        {
         }
 
         private Measurement<long> GetOldestToNewestAge() => new(_oldestToNewestAge.ElapsedTicks, _dimensions);
@@ -126,14 +128,14 @@ namespace Orleans.Providers.Streams.Common
 
         private sealed class PressureMonitorStatistics
         {
-            public PressureMonitorStatistics(string type, KeyValuePair<string, object>[] dimensions)
+            public PressureMonitorStatistics(string type, KeyValuePair<string, object?>[] dimensions)
             {
-                Dimensions = new KeyValuePair<string, object>[dimensions.Length + 1];
+                Dimensions = new KeyValuePair<string, object?>[dimensions.Length + 1];
                 dimensions.CopyTo(Dimensions, 0);
-                Dimensions[^1] = new KeyValuePair<string, object>("PressureMonitorType", type);
+                Dimensions[^1] = new KeyValuePair<string, object?>("PressureMonitorType", type);
             }
 
-            public KeyValuePair<string, object>[] Dimensions { get; }
+            public KeyValuePair<string, object?>[] Dimensions { get; }
             public double PressureContributionCount { get; set; }
             public double CurrentPressure { get; set; }
             public int UnderPressure { get; set; }

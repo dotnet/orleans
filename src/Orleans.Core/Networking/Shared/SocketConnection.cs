@@ -23,11 +23,15 @@ namespace Orleans.Networking.Shared
         private readonly SocketSender _sender;
         private readonly CancellationTokenSource _connectionClosedTokenSource = new CancellationTokenSource();
 
-        private readonly object _shutdownLock = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock _shutdownLock = new();
+#else
+        private readonly object _shutdownLock = new();
+#endif
         private volatile bool _socketDisposed;
-        private volatile Exception _shutdownReason;
-        private Task _processingTask;
-        private readonly TaskCompletionSource<object> _waitForConnectionClosedTcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+        private volatile Exception? _shutdownReason;
+        private Task? _processingTask;
+        private readonly TaskCompletionSource<object?> _waitForConnectionClosedTcs = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
         private bool _connectionClosed;
 
         internal SocketConnection(Socket socket,
@@ -128,7 +132,7 @@ namespace Orleans.Networking.Shared
 
         private async Task DoReceive()
         {
-            Exception error = null;
+            Exception? error = null;
 
             try
             {
@@ -225,8 +229,8 @@ namespace Orleans.Networking.Shared
 
         private async Task DoSend()
         {
-            Exception shutdownReason = null;
-            Exception unexpectedError = null;
+            Exception? shutdownReason = null;
+            Exception? unexpectedError = null;
 
             try
             {
@@ -305,14 +309,14 @@ namespace Orleans.Networking.Shared
 
             ThreadPool.UnsafeQueueUserWorkItem(state =>
             {
-                ((SocketConnection)state).CancelConnectionClosedToken();
+                ((SocketConnection)state!).CancelConnectionClosedToken();
 
-                ((SocketConnection)state)._waitForConnectionClosedTcs.TrySetResult(null);
+                ((SocketConnection)state!)._waitForConnectionClosedTcs.TrySetResult(null);
             },
             this);
         }
 
-        private void Shutdown(Exception shutdownReason)
+        private void Shutdown(Exception? shutdownReason)
         {
             lock (_shutdownLock)
             {

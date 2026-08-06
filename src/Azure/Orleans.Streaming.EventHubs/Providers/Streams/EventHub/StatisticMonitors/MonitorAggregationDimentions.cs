@@ -10,7 +10,7 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Eventhub path
         /// </summary>
-        public string EventHubPath { get; set; }
+        public string EventHubPath { get; set; } = null!;
 
         /// <summary>
         /// Constructor
@@ -46,7 +46,7 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Eventhub partition
         /// </summary>
-        public string EventHubPartition { get; set; }
+        public string EventHubPartition { get; set; } = null!;
 
         /// <summary>
         /// Constructor
@@ -75,7 +75,7 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Block pool this cache belongs to
         /// </summary>
-        public string BlockPoolId { get; set; }
+        public string BlockPoolId { get; set; } = null!;
 
         /// <summary>
         /// Constructor
@@ -105,7 +105,7 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Block pool Id
         /// </summary>
-        public string BlockPoolId { get; set; }
+        public string BlockPoolId { get; set; } = null!;
 
         /// <summary>
         /// Constructor

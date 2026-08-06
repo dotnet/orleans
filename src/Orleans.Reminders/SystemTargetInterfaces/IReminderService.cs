@@ -46,7 +46,7 @@ namespace Orleans
         /// <param name="grainId">A reference to the grain which the reminder is registered on.</param>
         /// <param name="reminderName">The name of the reminder.</param>
         /// <returns>The reminder.</returns>
-        Task<IGrainReminder> GetReminder(GrainId grainId, string reminderName);
+        Task<IGrainReminder?> GetReminder(GrainId grainId, string reminderName);
 
         /// <summary>
         /// Gets all reminders registered for the specified grain.

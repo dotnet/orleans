@@ -10,16 +10,16 @@ namespace Orleans.Networking.Shared
 {
     internal abstract partial class TransportConnection : ConnectionContext
     {
-        private IDictionary<object, object> _items;
-        private string _connectionId;
+        private IDictionary<object, object?>? _items;
+        private string? _connectionId;
 
         public TransportConnection()
         {
             FastReset();
         }
 
-        public override EndPoint LocalEndPoint { get; set; }
-        public override EndPoint RemoteEndPoint { get; set; }
+        public override EndPoint? LocalEndPoint { get; set; }
+        public override EndPoint? RemoteEndPoint { get; set; }
 
         public override string ConnectionId
         {
@@ -40,13 +40,13 @@ namespace Orleans.Networking.Shared
 
         public override IFeatureCollection Features => this;
 
-        public virtual MemoryPool<byte> MemoryPool { get; }
+        public virtual MemoryPool<byte> MemoryPool { get; } = null!;
 
-        public override IDuplexPipe Transport { get; set; }
+        public override IDuplexPipe Transport { get; set; } = null!;
 
-        public IDuplexPipe Application { get; set; }
+        public IDuplexPipe Application { get; set; } = null!;
 
-        public override IDictionary<object, object> Items
+        public override IDictionary<object, object?> Items
         {
             get
             {

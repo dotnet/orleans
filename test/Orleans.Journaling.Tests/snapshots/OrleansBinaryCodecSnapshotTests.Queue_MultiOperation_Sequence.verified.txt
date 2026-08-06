@@ -1,0 +1,10 @@
+﻿HEX: 01070000000800000001002901070000000800000001005101050000000800000003010A000000080000000705007900A1
+DISASSEMBLY:
+[entry 0] frame-version=1 length=7 streamId=8 payload-bytes=3
+0000  01 00 29                                           |..)|
+[entry 1] frame-version=1 length=7 streamId=8 payload-bytes=3
+0000  01 00 51                                           |..Q|
+[entry 2] frame-version=1 length=5 streamId=8 payload-bytes=1
+0000  03                                                 |.|
+[entry 3] frame-version=1 length=10 streamId=8 payload-bytes=6
+0000  07 05 00 79 00 A1                                  |...y..|

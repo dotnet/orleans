@@ -20,12 +20,12 @@ namespace Orleans.Runtime.Hosting
         public static IServiceCollection AddGrainStorage<T>(this IServiceCollection collection, string name, Func<IServiceProvider, string, T> implementationFactory)
             where T : IGrainStorage
         {
-            collection.AddKeyedSingleton<IGrainStorage>(name, (sp, key) => implementationFactory(sp, key as string));
+            collection.AddKeyedSingleton<IGrainStorage>(name, (sp, key) => implementationFactory(sp, (string)key!));
 
             // Check if it is the default implementation
             if (string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal))
             {
-                collection.TryAddSingleton(sp => sp.GetKeyedService<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+                collection.TryAddSingleton(sp => sp.GetKeyedService<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)!);
             }
 
             // Check if the grain storage implements ILifecycleParticipant<ISiloLifecycle>

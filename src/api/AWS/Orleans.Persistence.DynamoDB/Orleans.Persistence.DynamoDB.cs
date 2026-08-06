@@ -46,22 +46,22 @@ namespace Orleans.Hosting
 {
     public static partial class DynamoDBGrainStorageServiceCollectionExtensions
     {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddDynamoDBGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.DynamoDBStorageOptions>> configureOptions = null) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddDynamoDBGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.DynamoDBStorageOptions>>? configureOptions = null) { throw null; }
 
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddDynamoDBGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Configuration.DynamoDBStorageOptions> configureOptions) { throw null; }
 
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddDynamoDBGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.DynamoDBStorageOptions>> configureOptions = null) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddDynamoDBGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.DynamoDBStorageOptions>>? configureOptions = null) { throw null; }
 
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddDynamoDBGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Configuration.DynamoDBStorageOptions> configureOptions) { throw null; }
     }
 
     public static partial class DynamoDBGrainStorageSiloBuilderExtensions
     {
-        public static ISiloBuilder AddDynamoDBGrainStorage(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.DynamoDBStorageOptions>> configureOptions = null) { throw null; }
+        public static ISiloBuilder AddDynamoDBGrainStorage(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.DynamoDBStorageOptions>>? configureOptions = null) { throw null; }
 
         public static ISiloBuilder AddDynamoDBGrainStorage(this ISiloBuilder builder, string name, System.Action<Configuration.DynamoDBStorageOptions> configureOptions) { throw null; }
 
-        public static ISiloBuilder AddDynamoDBGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.DynamoDBStorageOptions>> configureOptions = null) { throw null; }
+        public static ISiloBuilder AddDynamoDBGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.DynamoDBStorageOptions>>? configureOptions = null) { throw null; }
 
         public static ISiloBuilder AddDynamoDBGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Configuration.DynamoDBStorageOptions> configureOptions) { throw null; }
     }
@@ -72,16 +72,16 @@ namespace Orleans.Persistence.DynamoDB
     public partial class DynamoDBClientOptions
     {
         [Redact]
-        public string AccessKey { get { throw null; } set { } }
+        public string? AccessKey { get { throw null; } set { } }
 
-        public string ProfileName { get { throw null; } set { } }
+        public string? ProfileName { get { throw null; } set { } }
 
         [Redact]
-        public string SecretKey { get { throw null; } set { } }
+        public string? SecretKey { get { throw null; } set { } }
 
         public string Service { get { throw null; } set { } }
 
-        public string Token { get { throw null; } set { } }
+        public string? Token { get { throw null; } set { } }
     }
 }
 

@@ -29,7 +29,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// <param name="clusterId"></param>
         /// <param name="azureStorageOptions"></param>
         /// <param name="createEntity"></param>
-        public AzureTableStorageStreamFailureHandler(Serializer<StreamSequenceToken> serializer, ILoggerFactory loggerFactory, bool faultOnFailure, string clusterId, AzureStorageOperationOptions azureStorageOptions, Func<TEntity> createEntity = null)
+        public AzureTableStorageStreamFailureHandler(Serializer<StreamSequenceToken> serializer, ILoggerFactory loggerFactory, bool faultOnFailure, string clusterId, AzureStorageOperationOptions azureStorageOptions, Func<TEntity>? createEntity = null)
         {
             if (string.IsNullOrEmpty(clusterId))
             {
@@ -72,7 +72,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
         public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, StreamId streamId,
-            StreamSequenceToken sequenceToken)
+            StreamSequenceToken? sequenceToken)
         {
             return OnFailure(subscriptionId, streamProviderName, streamId, sequenceToken);
         }
@@ -86,13 +86,13 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
         public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, StreamId streamId,
-            StreamSequenceToken sequenceToken)
+            StreamSequenceToken? sequenceToken)
         {
             return OnFailure(subscriptionId, streamProviderName, streamId, sequenceToken);
         }
 
         private async Task OnFailure(GuidId subscriptionId, string streamProviderName, StreamId streamId,
-                StreamSequenceToken sequenceToken)
+                StreamSequenceToken? sequenceToken)
         {
             if (subscriptionId == null)
             {

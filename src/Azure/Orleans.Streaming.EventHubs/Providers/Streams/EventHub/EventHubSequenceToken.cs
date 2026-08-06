@@ -40,7 +40,7 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         [Id(0)]
         [JsonProperty]
-        public string EventHubOffset { get; }
+        public string EventHubOffset { get; } = null!;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="EventHubSequenceToken" /> class.

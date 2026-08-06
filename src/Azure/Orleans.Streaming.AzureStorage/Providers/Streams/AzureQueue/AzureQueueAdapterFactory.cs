@@ -22,7 +22,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary>
         /// Application level failure handler override.
         /// </summary>
-        protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; }
+        protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; } = null!;
 
         public AzureQueueAdapterFactory(
             string name,
@@ -86,7 +86,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             var cacheOptions = services.GetOptionsByName<SimpleQueueCacheOptions>(name);
             var dataAdapter = services.GetKeyedService<IQueueDataAdapter<string, IBatchContainer>>(name)
                 ?? services.GetService<IQueueDataAdapter<string, IBatchContainer>>();
-            var factory = ActivatorUtilities.CreateInstance<AzureQueueAdapterFactory>(services, name, azureQueueOptions, cacheOptions, dataAdapter);
+            var factory = ActivatorUtilities.CreateInstance<AzureQueueAdapterFactory>(services, name, azureQueueOptions, cacheOptions, dataAdapter!);
             factory.Init();
             return factory;
         }

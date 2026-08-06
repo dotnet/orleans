@@ -27,6 +27,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public TField ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -42,24 +43,24 @@ namespace Orleans.Serialization.Codecs
                 TSurrogate surrogate = default;
                 _surrogateSerializer.Deserialize(ref reader, ref surrogate);
                 var result = ConvertFromSurrogate(ref surrogate);
-                ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
+                ReferenceCodec.RecordObject(reader.Session, result!, placeholderReferenceId);
                 return result;
             }
 
             // The type is a descendant, not an exact match, so get the specific serializer for it.
             var specificSerializer = reader.Session.CodecProvider.GetCodec(fieldType);
-            return (TField)specificSerializer.ReadValue(ref reader, field);
+            return (TField)specificSerializer.ReadValue(ref reader, field)!;
         }
 
         /// <inheritdoc/>
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] TField value) where TBufferWriter : IBufferWriter<byte>
         {
-            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
+            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value!))
             {
                 return;
             }
 
-            var fieldType = value.GetType();
+            var fieldType = value!.GetType();
             if (fieldType == CodecFieldType)
             {
                 writer.WriteStartObject(fieldIdDelta, expectedType, fieldType);

@@ -28,7 +28,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, T[] value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] T[] value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -52,6 +52,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public T[] ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -62,7 +63,7 @@ namespace Orleans.Serialization.Codecs
             field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-            T[] result = null;
+            T[]? result = null;
             uint fieldId = 0;
             var length = 0;
             var index = 0;
@@ -79,10 +80,7 @@ namespace Orleans.Serialization.Codecs
                 {
                     case 0:
                         length = (int)UInt32Codec.ReadValue(ref reader, header);
-                        if (length > 10240 && length > reader.Length)
-                        {
-                            ThrowInvalidSizeException(length);
-                        }
+                        reader.EnsureAvailable((uint)length);
 
                         result = new T[length];
                         ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
@@ -98,7 +96,7 @@ namespace Orleans.Serialization.Codecs
                             ThrowIndexOutOfRangeException(length);
                         }
 
-                        result[index] = _fieldCodec.ReadValue(ref reader, header);
+                        result![index] = _fieldCodec.ReadValue(ref reader, header)!;
                         ++index;
                         break;
                     default:
@@ -113,14 +111,11 @@ namespace Orleans.Serialization.Codecs
                 ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             }
 
-            return result;
+            return result!;
         }
 
         private static void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");
-
-        private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-            $"Declared length of {typeof(T[])}, {length}, is greater than total length of input.");
 
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
     }
@@ -148,7 +143,7 @@ namespace Orleans.Serialization.Codecs
         {
             if (context.TryGetCopy<T[]>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             result = new T[input.Length];
@@ -183,9 +178,9 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ReadOnlyMemory<T> value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] ReadOnlyMemory<T> value) where TBufferWriter : IBufferWriter<byte>
         {
-            if (!MemoryMarshal.TryGetArray(value, out var segment) || segment.Array.Length != value.Length)
+            if (!MemoryMarshal.TryGetArray(value, out var segment) || segment.Array!.Length != value.Length)
             {
                 ReferenceCodec.MarkValueField(writer.Session);
             }
@@ -208,6 +203,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public ReadOnlyMemory<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -218,7 +214,7 @@ namespace Orleans.Serialization.Codecs
             field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-            T[] result = null;
+            T[]? result = null;
             uint fieldId = 0;
             var length = 0;
             var index = 0;
@@ -235,10 +231,7 @@ namespace Orleans.Serialization.Codecs
                 {
                     case 0:
                         length = (int)UInt32Codec.ReadValue(ref reader, header);
-                        if (length > 10240 && length > reader.Length)
-                        {
-                            ThrowInvalidSizeException(length);
-                        }
+                        reader.EnsureAvailable((uint)length);
 
                         result = new T[length];
                         ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
@@ -254,7 +247,7 @@ namespace Orleans.Serialization.Codecs
                             ThrowIndexOutOfRangeException(length);
                         }
 
-                        result[index] = _fieldCodec.ReadValue(ref reader, header);
+                        result![index] = _fieldCodec.ReadValue(ref reader, header)!;
                         ++index;
                         break;
                     default:
@@ -263,7 +256,7 @@ namespace Orleans.Serialization.Codecs
                 }
             }
 
-            return result;
+            return result!;
         }
 
         private static void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
@@ -271,8 +264,6 @@ namespace Orleans.Serialization.Codecs
 
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 
-        private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-            $"Declared length of {typeof(ReadOnlyMemory<T>)}, {length}, is greater than total length of input.");
     }
 
     /// <summary>
@@ -307,12 +298,12 @@ namespace Orleans.Serialization.Codecs
             // Note that there is a possibility for unbounded recursion if the underlying object in the input is
             // able to take part in a cyclic reference. If we could get that object then we could prevent that cycle.
             // It is also possible that an IMemoryOwner<T> is the backing object, in which case this will not work.
-            if (MemoryMarshal.TryGetArray(input, out var segment) && segment.Array.Length == result.Length)
+            if (MemoryMarshal.TryGetArray(input, out var segment) && segment.Array!.Length == result.Length)
             {
-                if (context.TryGetCopy(segment.Array, out T[] existing))
-                    return existing;
+                if (context.TryGetCopy(segment.Array!, out T[]? existing))
+                    return existing!;
 
-                context.RecordCopy(segment.Array, result);
+                context.RecordCopy(segment.Array!, result);
             }
 
             for (var i = 0; i < inputSpan.Length; i++)
@@ -345,9 +336,9 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Memory<T> value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Memory<T> value) where TBufferWriter : IBufferWriter<byte>
         {
-            if (!MemoryMarshal.TryGetArray<T>(value, out var segment) || segment.Array.Length != value.Length)
+            if (!MemoryMarshal.TryGetArray<T>(value, out var segment) || segment.Array!.Length != value.Length)
             {
                 ReferenceCodec.MarkValueField(writer.Session);
             }
@@ -370,6 +361,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public Memory<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -380,7 +372,7 @@ namespace Orleans.Serialization.Codecs
             field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-            T[] result = null;
+            T[]? result = null;
             uint fieldId = 0;
             var length = 0;
             var index = 0;
@@ -397,10 +389,7 @@ namespace Orleans.Serialization.Codecs
                 {
                     case 0:
                         length = (int)UInt32Codec.ReadValue(ref reader, header);
-                        if (length > 10240 && length > reader.Length)
-                        {
-                            ThrowInvalidSizeException(length);
-                        }
+                        reader.EnsureAvailable((uint)length);
 
                         result = new T[length];
                         ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
@@ -416,7 +405,7 @@ namespace Orleans.Serialization.Codecs
                             ThrowIndexOutOfRangeException(length);
                         }
 
-                        result[index] = _fieldCodec.ReadValue(ref reader, header);
+                        result![index] = _fieldCodec.ReadValue(ref reader, header)!;
                         ++index;
                         break;
                     default:
@@ -425,7 +414,7 @@ namespace Orleans.Serialization.Codecs
                 }
             }
 
-            return result;
+            return result!;
         }
 
         private static void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
@@ -433,8 +422,6 @@ namespace Orleans.Serialization.Codecs
 
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 
-        private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-            $"Declared length of {typeof(Memory<T>)}, {length}, is greater than total length of input.");
     }
 
     /// <summary>
@@ -469,12 +456,12 @@ namespace Orleans.Serialization.Codecs
             // Note that there is a possibility for unbounded recursion if the underlying object in the input is
             // able to take part in a cyclic reference. If we could get that object then we could prevent that cycle.
             // It is also possible that an IMemoryOwner<T> is the backing object, in which case this will not work.
-            if (MemoryMarshal.TryGetArray<T>(input, out var segment) && segment.Array.Length == result.Length)
+            if (MemoryMarshal.TryGetArray<T>(input, out var segment) && segment.Array!.Length == result.Length)
             {
-                if (context.TryGetCopy(segment.Array, out T[] existing))
-                    return existing;
+                if (context.TryGetCopy(segment.Array!, out T[]? existing))
+                    return existing!;
 
-                context.RecordCopy(segment.Array, result);
+                context.RecordCopy(segment.Array!, result);
             }
 
             for (var i = 0; i < inputSpan.Length; i++)
@@ -507,7 +494,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ArraySegment<T> value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] ArraySegment<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (value.Array?.Length != value.Count)
             {
@@ -535,17 +522,18 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public ArraySegment<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
             {
-                return ReferenceCodec.ReadReference<T[], TInput>(ref reader, field);
+                return ReferenceCodec.ReadReference<T[], TInput>(ref reader, field)!;
             }
 
             field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-            T[] result = null;
+            T[]? result = null;
             uint fieldId = 0;
             var length = 0;
             var index = 0;
@@ -562,10 +550,7 @@ namespace Orleans.Serialization.Codecs
                 {
                     case 0:
                         length = (int)UInt32Codec.ReadValue(ref reader, header);
-                        if (length > 10240 && length > reader.Length)
-                        {
-                            ThrowInvalidSizeException(length);
-                        }
+                        reader.EnsureAvailable((uint)length);
 
                         result = new T[length];
                         ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
@@ -581,7 +566,7 @@ namespace Orleans.Serialization.Codecs
                             ThrowIndexOutOfRangeException(length);
                         }
 
-                        result[index] = _fieldCodec.ReadValue(ref reader, header);
+                        result![index] = _fieldCodec.ReadValue(ref reader, header)!;
                         ++index;
                         break;
                     default:
@@ -590,7 +575,7 @@ namespace Orleans.Serialization.Codecs
                 }
             }
 
-            return result;
+            return result!;
         }
 
         private static void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
@@ -598,8 +583,6 @@ namespace Orleans.Serialization.Codecs
 
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 
-        private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-            $"Declared length of {typeof(ArraySegment<T>)}, {length}, is greater than total length of input.");
     }
 
     /// <summary>

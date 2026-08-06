@@ -7,7 +7,7 @@ namespace Orleans.Serialization.Configuration
 {
     internal class DefaultTypeManifestProvider : TypeManifestProviderBase, IPostConfigureOptions<TypeManifestOptions>
     {
-        public void PostConfigure(string name, TypeManifestOptions options)
+        public void PostConfigure(string? name, TypeManifestOptions options)
         {
             // Clean up the options bookkeeping.
             options.TypeManifestProviders.Clear();

@@ -31,7 +31,7 @@ namespace Orleans.Configuration
         public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
 
         /// <inheritdoc/>
-        public IGrainStorageSerializer GrainStorageSerializer { get; set; }
+        public IGrainStorageSerializer GrainStorageSerializer { get; set; } = null!;
     }
 
     /// <summary>

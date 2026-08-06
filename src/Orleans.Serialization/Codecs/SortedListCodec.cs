@@ -11,7 +11,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [RegisterSerializer]
-    public sealed class SortedListCodec<TKey, TValue> : GeneralizedReferenceTypeSurrogateCodec<SortedList<TKey, TValue>, SortedListSurrogate<TKey, TValue>>
+    public sealed class SortedListCodec<TKey, TValue> : GeneralizedReferenceTypeSurrogateCodec<SortedList<TKey, TValue>, SortedListSurrogate<TKey, TValue>> where TKey : notnull
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SortedListCodec{TKey, TValue}"/> class.
@@ -22,7 +22,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public override SortedList<TKey, TValue> ConvertFromSurrogate(ref SortedListSurrogate<TKey, TValue> surrogate)
+        public override SortedList<TKey, TValue>? ConvertFromSurrogate(ref SortedListSurrogate<TKey, TValue> surrogate)
         {
             if (surrogate.Values is null)
             {
@@ -30,8 +30,9 @@ namespace Orleans.Serialization.Codecs
             }
             else
             {
-                var result = new SortedList<TKey, TValue>(surrogate.Values.Count, surrogate.Comparer);
-                foreach (var kvp in surrogate.Values)
+                var values = surrogate.Values!;
+                var result = new SortedList<TKey, TValue>(values.Count, surrogate.Comparer);
+                foreach (var kvp in values)
                 {
                     result.Add(kvp.Key, kvp.Value);
                 }
@@ -54,21 +55,21 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [GenerateSerializer]
-    public struct SortedListSurrogate<TKey, TValue>
+    public struct SortedListSurrogate<TKey, TValue> where TKey : notnull
     {
         /// <summary>
         /// Gets or sets the values.
         /// </summary>
         /// <value>The values.</value>
         [Id(0)]
-        public List<KeyValuePair<TKey, TValue>> Values;
+        public List<KeyValuePair<TKey, TValue>>? Values;
 
         /// <summary>
         /// Gets or sets the comparer.
         /// </summary>
         /// <value>The comparer.</value>
         [Id(1)]
-        public IComparer<TKey> Comparer;
+        public IComparer<TKey>? Comparer;
     }
 
     /// <summary>
@@ -77,7 +78,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [RegisterCopier]
-    public sealed class SortedListCopier<TKey, TValue> : IDeepCopier<SortedList<TKey, TValue>>, IBaseCopier<SortedList<TKey, TValue>>
+    public sealed class SortedListCopier<TKey, TValue> : IDeepCopier<SortedList<TKey, TValue>>, IBaseCopier<SortedList<TKey, TValue>> where TKey : notnull
     {
         private readonly Type _fieldType = typeof(SortedList<TKey, TValue>);
         private readonly IDeepCopier<TKey> _keyCopier;
@@ -99,12 +100,12 @@ namespace Orleans.Serialization.Codecs
         {
             if (context.TryGetCopy<SortedList<TKey, TValue>>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             if (input.GetType() as object != _fieldType as object)
             {
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
             }
 
             result = new SortedList<TKey, TValue>(input.Comparer);

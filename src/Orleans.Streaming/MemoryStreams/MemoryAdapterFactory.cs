@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO.Hashing;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -32,13 +33,14 @@ namespace Orleans.Providers
         private readonly ILoggerFactory loggerFactory;
         private readonly ILogger logger;
         private readonly TSerializer serializer;
+        private readonly OrleansInstruments orleansInstruments;
         private readonly ulong _nameHash;
-        private IStreamQueueMapper streamQueueMapper;
-        private ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain> queueGrains;
-        private IObjectPool<FixedSizeBuffer> bufferPool;
-        private BlockPoolMonitorDimensions blockPoolMonitorDimensions;
-        private IStreamFailureHandler streamFailureHandler;
-        private TimePurgePredicate purgePredicate;
+        private IStreamQueueMapper streamQueueMapper = null!; // Set during Init() before use.
+        private ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain> queueGrains = null!; // Set during Init() before use.
+        private IObjectPool<FixedSizeBuffer>? bufferPool;
+        private BlockPoolMonitorDimensions blockPoolMonitorDimensions = null!; // Set with bufferPool before use.
+        private IStreamFailureHandler? streamFailureHandler;
+        private TimePurgePredicate purgePredicate = null!; // Set during Init() before use.
 
         /// <inheritdoc />
         public string Name { get; }
@@ -52,25 +54,25 @@ namespace Orleans.Providers
         /// <summary>
         /// Creates a failure handler for a partition.
         /// </summary>
-        protected Func<string, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { get; set; }
+        protected Func<string, Task<IStreamFailureHandler>>? StreamFailureHandlerFactory { get; set; }
 
         /// <summary>
         /// Create a cache monitor to report cache related metrics
         /// Return a ICacheMonitor
         /// </summary>
-        protected Func<CacheMonitorDimensions, ICacheMonitor> CacheMonitorFactory;
+        protected Func<CacheMonitorDimensions, ICacheMonitor>? CacheMonitorFactory;
 
         /// <summary>
         /// Create a block pool monitor to monitor block pool related metrics
         /// Return a IBlockPoolMonitor
         /// </summary>
-        protected Func<BlockPoolMonitorDimensions, IBlockPoolMonitor> BlockPoolMonitorFactory;
+        protected Func<BlockPoolMonitorDimensions, IBlockPoolMonitor>? BlockPoolMonitorFactory;
 
         /// <summary>
         /// Create a monitor to monitor QueueAdapterReceiver related metrics
         /// Return a IQueueAdapterReceiverMonitor
         /// </summary>
-        protected Func<ReceiverMonitorDimensions, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
+        protected Func<ReceiverMonitorDimensions, IQueueAdapterReceiverMonitor>? ReceiverMonitorFactory;
 
         public MemoryAdapterFactory(
             string providerName,
@@ -89,6 +91,7 @@ namespace Orleans.Providers
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             this.logger = loggerFactory.CreateLogger<ILogger<MemoryAdapterFactory<TSerializer>>>();
             this.serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(serviceProvider);
+            this.orleansInstruments = serviceProvider.GetRequiredService<OrleansInstruments>();
 
             var nameBytes = BitConverter.IsLittleEndian ? MemoryMarshal.AsBytes(Name.AsSpan()) : Encoding.Unicode.GetBytes(Name);
             XxHash64.Hash(nameBytes, MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref _nameHash, 1)));
@@ -97,19 +100,21 @@ namespace Orleans.Providers
         /// <summary>
         /// Initializes this instance.
         /// </summary>
+        [MemberNotNull(nameof(CacheMonitorFactory), nameof(BlockPoolMonitorFactory), nameof(ReceiverMonitorFactory))]
         public void Init()
         {
             this.queueGrains = new ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain>();
             if (CacheMonitorFactory == null)
-                this.CacheMonitorFactory = (dimensions) => new DefaultCacheMonitor(dimensions);
+                this.CacheMonitorFactory = (dimensions) => new DefaultCacheMonitor(dimensions, this.orleansInstruments);
             if (this.BlockPoolMonitorFactory == null)
-                this.BlockPoolMonitorFactory = (dimensions) => new DefaultBlockPoolMonitor(dimensions);
+                this.BlockPoolMonitorFactory = (dimensions) => new DefaultBlockPoolMonitor(dimensions, this.orleansInstruments);
             if (this.ReceiverMonitorFactory == null)
-                this.ReceiverMonitorFactory = (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions);
+                this.ReceiverMonitorFactory = (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions, this.orleansInstruments);
             this.purgePredicate = new TimePurgePredicate(this.cacheOptions.DataMinTimeInCache, this.cacheOptions.DataMaxAgeInCache);
             this.streamQueueMapper = new HashRingBasedStreamQueueMapper(this.queueMapperOptions, this.Name);
         }
 
+        [MemberNotNull(nameof(bufferPool))]
         private void CreateBufferPoolIfNotCreatedYet()
         {
             if (this.bufferPool == null)
@@ -117,7 +122,8 @@ namespace Orleans.Providers
                 // 1 meg block size pool
                 this.blockPoolMonitorDimensions = new BlockPoolMonitorDimensions($"BlockPool-{Guid.NewGuid()}");
                 var oneMb = 1 << 20;
-                var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(blockPoolMonitorDimensions), oneMb);
+                var blockPoolMonitorFactory = this.BlockPoolMonitorFactory!; // Set during Init().
+                var objectPoolMonitor = new ObjectPoolMonitorBridge(blockPoolMonitorFactory(blockPoolMonitorDimensions), oneMb);
                 this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneMb), objectPoolMonitor, this.statisticOptions.StatisticMonitorWriteInterval);
             }
         }
@@ -145,13 +151,14 @@ namespace Orleans.Providers
         {
             var dimensions = new ReceiverMonitorDimensions(queueId.ToString());
             var receiverLogger = this.loggerFactory.CreateLogger($"{typeof(MemoryAdapterReceiver<TSerializer>).FullName}.{this.Name}.{queueId}");
-            var receiverMonitor = this.ReceiverMonitorFactory(dimensions);
+            var receiverMonitorFactory = this.ReceiverMonitorFactory!; // Set during Init().
+            var receiverMonitor = receiverMonitorFactory(dimensions);
             IQueueAdapterReceiver receiver = new MemoryAdapterReceiver<TSerializer>(GetQueueGrain(queueId), receiverLogger, this.serializer, receiverMonitor);
             return receiver;
         }
 
         /// <inheritdoc />
-        public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+        public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
         {
             try
             {
@@ -174,7 +181,8 @@ namespace Orleans.Providers
             //move block pool creation from init method to here, to avoid unnecessary block pool creation when stream provider is initialized in client side. 
             CreateBufferPoolIfNotCreatedYet();
             var logger = this.loggerFactory.CreateLogger($"{typeof(MemoryPooledCache<TSerializer>).FullName}.{this.Name}.{queueId}");
-            var monitor = this.CacheMonitorFactory(new CacheMonitorDimensions(queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId));
+            var cacheMonitorFactory = this.CacheMonitorFactory!; // Set during Init().
+            var monitor = cacheMonitorFactory(new CacheMonitorDimensions(queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId));
             return new MemoryPooledCache<TSerializer>(bufferPool, purgePredicate, logger, this.serializer, monitor, this.statisticOptions.StatisticMonitorWriteInterval, this.cacheOptions.MetadataMinTimeInCache);
         }
 

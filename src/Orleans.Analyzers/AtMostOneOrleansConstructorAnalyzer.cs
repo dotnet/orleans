@@ -22,7 +22,7 @@ namespace Orleans.Analyzers
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterCompilationStartAction(context =>
             {
-                var generateSerializerAttributeSymbol = context.Compilation.GetTypeByMetadataName("Orleans.GenerateSerializerAttribute");
+                var generateSerializerAttributeSymbol = context.Compilation.GetTypeByMetadataName(Constants.GenerateSerializerAttributeFullyQualifiedName);
                 if (generateSerializerAttributeSymbol is not null)
                 {
                     context.RegisterSymbolAction(context => AnalyzeNamedType(context, generateSerializerAttributeSymbol), SymbolKind.NamedType);
@@ -30,7 +30,7 @@ namespace Orleans.Analyzers
             });
         }
 
-        private void AnalyzeNamedType(SymbolAnalysisContext context, INamedTypeSymbol generateSerializerAttributeSymbol)
+        private static void AnalyzeNamedType(SymbolAnalysisContext context, INamedTypeSymbol generateSerializerAttributeSymbol)
         {
             var symbol = (INamedTypeSymbol)context.Symbol;
             if (SerializationAttributesHelper.ShouldGenerateSerializer(symbol, generateSerializerAttributeSymbol))

@@ -15,7 +15,7 @@ namespace Orleans.Connections.Security.Tests
 
         private const X509KeyUsageFlags KeyUsageFlags = X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.NonRepudiation | X509KeyUsageFlags.DataEncipherment | X509KeyUsageFlags.KeyEncipherment | X509KeyUsageFlags.KeyAgreement;
 
-        public static X509Certificate2 CreateSelfSignedCertificate(string subjectName, string[] extendedKeyUsageOids = null)
+        public static X509Certificate2 CreateSelfSignedCertificate(string subjectName, string[]? extendedKeyUsageOids = null)
         {
             using var rsa = RSA.Create(2048);
             var request = new CertificateRequest($"CN={subjectName}", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);

@@ -26,7 +26,7 @@ namespace OrleansAWSUtils.Streams
         /// <summary>
         /// Application level failure handler override.
         /// </summary>
-        protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; }
+        protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; } = null!;
 
         public SQSAdapterFactory(
             string name, 

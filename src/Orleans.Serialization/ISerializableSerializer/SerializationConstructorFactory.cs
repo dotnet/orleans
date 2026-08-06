@@ -36,7 +36,7 @@ namespace Orleans.Serialization
             => _constructors.GetOrAdd(owner, (t, d) => GetSerializationConstructorInvoker(t, t, d), delegateType);
 
         [SecurityCritical]
-        private static ConstructorInfo GetSerializationConstructor(Type type) => type.GetConstructor(
+        private static ConstructorInfo? GetSerializationConstructor(Type type) => type.GetConstructor(
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
                 null,
                 SerializationConstructorParameterTypes,

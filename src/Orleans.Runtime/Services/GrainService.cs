@@ -25,7 +25,7 @@ namespace Orleans.Runtime
         protected int RangeSerialNumber { get; private set; }
 
         /// <summary>Gets the range of the partitioning ring currently owned by the grain service instance</summary>
-        protected IRingRange RingRange { get; private set; }
+        protected IRingRange RingRange { get; private set; } = null!;
 
         /// <summary>Gets the status of the grain service instance</summary>
         protected GrainServiceStatus Status
@@ -50,7 +50,7 @@ namespace Orleans.Runtime
         internal GrainService(GrainId grainId, IConsistentRingProvider ringProvider, SystemTargetShared shared)
             : base(SystemTargetGrainId.Create(grainId.Type, shared.SiloAddress), shared)
         {
-            typeName = this.GetType().FullName;
+            typeName = this.GetType().FullName!;
             Logger = shared.LoggerFactory.CreateLogger(typeName);
 
             ring = ringProvider;

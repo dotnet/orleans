@@ -10,7 +10,7 @@ namespace Orleans.Runtime.Hosting.ProviderConfiguration;
 
 internal sealed class MemoryReminderTableBuilder : IProviderBuilder<ISiloBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseInMemoryReminderService();
     }

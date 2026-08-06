@@ -6,6 +6,15 @@
 //     the code is regenerated.
 // </auto-generated>
 //------------------------------------------------------------------------------
+namespace Orleans.Runtime
+{
+    public static partial class TargetHolderExtensions
+    {
+        public static TComponent? GetComponent<TComponent>(this Serialization.Invocation.ITargetHolder targetHolder)
+            where TComponent : class { throw null; }
+    }
+}
+
 namespace Orleans.Serialization
 {
     [GenerateSerializer]
@@ -40,10 +49,10 @@ namespace Orleans.Serialization
         public bool IsSupportedType(System.Type type) { throw null; }
 
         [System.Security.SecurityCritical]
-        public object ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+        public object? ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
         [System.Security.SecurityCritical]
-        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value)
+        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object? value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -52,7 +61,7 @@ namespace Orleans.Serialization
     [Alias("Exception")]
     public sealed partial class ExceptionCodec : Codecs.IFieldCodec<System.Exception>, Codecs.IFieldCodec, Serializers.IBaseCodec<System.Exception>, Serializers.IBaseCodec, Serializers.IGeneralizedCodec, Serializers.IGeneralizedBaseCodec, Serializers.IBaseCodec<object>, Cloning.IBaseCopier<System.Exception>, Cloning.IBaseCopier
     {
-        public ExceptionCodec(TypeSystem.TypeConverter typeConverter, Codecs.IFieldCodec<System.Collections.Generic.Dictionary<object, object>> dictionaryCodec, Cloning.IDeepCopier<System.Collections.Generic.Dictionary<object, object>> dictionaryCopier, Cloning.IDeepCopier<System.Exception> exceptionCopier, Microsoft.Extensions.Options.IOptions<ExceptionSerializationOptions> exceptionSerializationOptions) { }
+        public ExceptionCodec(TypeSystem.TypeConverter typeConverter, Codecs.IFieldCodec<System.Collections.Generic.Dictionary<object, object?>> dictionaryCodec, Cloning.IDeepCopier<System.Collections.Generic.Dictionary<object, object?>> dictionaryCopier, Cloning.IDeepCopier<System.Exception> exceptionCopier, Microsoft.Extensions.Options.IOptions<ExceptionSerializationOptions> exceptionSerializationOptions) { }
 
         public void DeepCopy(System.Exception input, System.Exception output, Cloning.CopyContext context) { }
 
@@ -62,13 +71,13 @@ namespace Orleans.Serialization
 
         public System.Exception DeserializeException<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
-        public System.Collections.Generic.Dictionary<object, object> GetDataProperty(System.Exception exception) { throw null; }
+        public System.Collections.Generic.Dictionary<object, object?>? GetDataProperty(System.Exception exception) { throw null; }
 
         public System.Runtime.Serialization.SerializationInfo GetObjectData(System.Exception value) { throw null; }
 
         public bool IsSupportedType(System.Type type) { throw null; }
 
-        object Codecs.IFieldCodec.ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+        object? Codecs.IFieldCodec.ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
         public System.Exception ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
@@ -81,12 +90,12 @@ namespace Orleans.Serialization
         public void SerializeException<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, System.Exception value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
-        public void SetBaseProperties(System.Exception value, string message, string stackTrace, System.Exception innerException, int hResult, System.Collections.Generic.Dictionary<object, object> data) { }
+        public void SetBaseProperties(System.Exception value, string? message, string? stackTrace, System.Exception? innerException, int hResult, System.Collections.Generic.Dictionary<object, object?>? data) { }
 
         public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, System.Exception value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
-        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value)
+        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object? value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -157,69 +166,69 @@ namespace Orleans.Serialization
 
         public bool CanSerialize(System.Type type) { throw null; }
 
-        public object Deserialize(System.ArraySegment<byte> source, Session.SerializerSession session, System.Type type) { throw null; }
+        public object? Deserialize(System.ArraySegment<byte> source, Session.SerializerSession session, System.Type type) { throw null; }
 
-        public object Deserialize(System.ArraySegment<byte> source, System.Type type) { throw null; }
+        public object? Deserialize(System.ArraySegment<byte> source, System.Type type) { throw null; }
 
-        public object Deserialize(System.Buffers.ReadOnlySequence<byte> source, Session.SerializerSession session, System.Type type) { throw null; }
+        public object? Deserialize(System.Buffers.ReadOnlySequence<byte> source, Session.SerializerSession session, System.Type type) { throw null; }
 
-        public object Deserialize(System.Buffers.ReadOnlySequence<byte> source, System.Type type) { throw null; }
+        public object? Deserialize(System.Buffers.ReadOnlySequence<byte> source, System.Type type) { throw null; }
 
-        public object Deserialize(byte[] source, Session.SerializerSession session, System.Type type) { throw null; }
+        public object? Deserialize(byte[] source, Session.SerializerSession session, System.Type type) { throw null; }
 
-        public object Deserialize(byte[] source, System.Type type) { throw null; }
+        public object? Deserialize(byte[] source, System.Type type) { throw null; }
 
-        public object Deserialize(System.IO.Stream source, Session.SerializerSession session, System.Type type) { throw null; }
+        public object? Deserialize(System.IO.Stream source, Session.SerializerSession session, System.Type type) { throw null; }
 
-        public object Deserialize(System.IO.Stream source, System.Type type) { throw null; }
+        public object? Deserialize(System.IO.Stream source, System.Type type) { throw null; }
 
-        public object Deserialize(System.ReadOnlyMemory<byte> source, Session.SerializerSession session, System.Type type) { throw null; }
+        public object? Deserialize(System.ReadOnlyMemory<byte> source, Session.SerializerSession session, System.Type type) { throw null; }
 
-        public object Deserialize(System.ReadOnlyMemory<byte> source, System.Type type) { throw null; }
+        public object? Deserialize(System.ReadOnlyMemory<byte> source, System.Type type) { throw null; }
 
-        public object Deserialize(System.ReadOnlySpan<byte> source, Session.SerializerSession session, System.Type type) { throw null; }
+        public object? Deserialize(System.ReadOnlySpan<byte> source, Session.SerializerSession session, System.Type type) { throw null; }
 
-        public object Deserialize(System.ReadOnlySpan<byte> source, System.Type type) { throw null; }
+        public object? Deserialize(System.ReadOnlySpan<byte> source, System.Type type) { throw null; }
 
-        public object Deserialize<TInput>(ref Buffers.Reader<TInput> source, System.Type type) { throw null; }
+        public object? Deserialize<TInput>(ref Buffers.Reader<TInput> source, System.Type type) { throw null; }
 
-        public int Serialize(object value, System.ArraySegment<byte> destination, Session.SerializerSession session, System.Type type) { throw null; }
+        public int Serialize(object? value, System.ArraySegment<byte> destination, Session.SerializerSession session, System.Type type) { throw null; }
 
-        public int Serialize(object value, System.ArraySegment<byte> destination, System.Type type) { throw null; }
+        public int Serialize(object? value, System.ArraySegment<byte> destination, System.Type type) { throw null; }
 
-        public int Serialize(object value, byte[] destination, Session.SerializerSession session, System.Type type) { throw null; }
+        public int Serialize(object? value, byte[] destination, Session.SerializerSession session, System.Type type) { throw null; }
 
-        public int Serialize(object value, byte[] destination, System.Type type) { throw null; }
+        public int Serialize(object? value, byte[] destination, System.Type type) { throw null; }
 
-        public void Serialize(object value, System.IO.Stream destination, Session.SerializerSession session, System.Type type, int sizeHint = 0) { }
+        public void Serialize(object? value, System.IO.Stream destination, Session.SerializerSession session, System.Type type, int sizeHint = 0) { }
 
-        public void Serialize(object value, System.IO.Stream destination, System.Type type, int sizeHint = 0) { }
+        public void Serialize(object? value, System.IO.Stream destination, System.Type type, int sizeHint = 0) { }
 
-        public void Serialize(object value, ref System.Memory<byte> destination, Session.SerializerSession session, System.Type type) { }
+        public void Serialize(object? value, ref System.Memory<byte> destination, Session.SerializerSession session, System.Type type) { }
 
-        public void Serialize(object value, ref System.Memory<byte> destination, System.Type type) { }
+        public void Serialize(object? value, ref System.Memory<byte> destination, System.Type type) { }
 
-        public void Serialize(object value, ref System.Span<byte> destination, Session.SerializerSession session, System.Type type) { }
+        public void Serialize(object? value, ref System.Span<byte> destination, Session.SerializerSession session, System.Type type) { }
 
-        public void Serialize(object value, ref System.Span<byte> destination, System.Type type) { }
+        public void Serialize(object? value, ref System.Span<byte> destination, System.Type type) { }
 
-        public void Serialize<TBufferWriter>(object value, TBufferWriter destination, Session.SerializerSession session, System.Type type)
+        public void Serialize<TBufferWriter>(object? value, TBufferWriter destination, Session.SerializerSession session, System.Type type)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
-        public void Serialize<TBufferWriter>(object value, TBufferWriter destination, System.Type type)
+        public void Serialize<TBufferWriter>(object? value, TBufferWriter destination, System.Type type)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
-        public void Serialize<TBufferWriter>(object value, ref Buffers.Writer<TBufferWriter> destination, System.Type type)
+        public void Serialize<TBufferWriter>(object? value, ref Buffers.Writer<TBufferWriter> destination, System.Type type)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
     [GenerateSerializer]
     public sealed partial class ReferenceFieldNotSupportedException : SerializerException
     {
-        public ReferenceFieldNotSupportedException(System.Type targetType) { }
+        public ReferenceFieldNotSupportedException(System.Type? targetType) { }
 
         [Id(0)]
-        public System.Type TargetReferenceType { get { throw null; } }
+        public System.Type? TargetReferenceType { get { throw null; } }
 
         [System.Obsolete]
         public override void GetObjectData(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
@@ -228,13 +237,13 @@ namespace Orleans.Serialization
     [GenerateSerializer]
     public sealed partial class ReferenceNotFoundException : SerializerException
     {
-        public ReferenceNotFoundException(System.Type targetType, uint targetId) { }
+        public ReferenceNotFoundException(System.Type? targetType, uint targetId) { }
 
         [Id(0)]
         public uint TargetReference { get { throw null; } }
 
         [Id(1)]
-        public System.Type TargetReferenceType { get { throw null; } }
+        public System.Type? TargetReferenceType { get { throw null; } }
 
         [System.Obsolete]
         public override void GetObjectData(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
@@ -270,6 +279,10 @@ namespace Orleans.Serialization
         public bool CanSerialize(System.Type type) { throw null; }
 
         public bool CanSerialize<T>() { throw null; }
+
+        public T Deserialize<T>(Buffers.ArcBuffer source, Session.SerializerSession session) { throw null; }
+
+        public T Deserialize<T>(Buffers.ArcBuffer source) { throw null; }
 
         public T Deserialize<T>(Buffers.PooledBuffer.BufferSlice source, Session.SerializerSession session) { throw null; }
 
@@ -379,6 +392,10 @@ namespace Orleans.Serialization
 
         public Serializer(Session.SerializerSessionPool sessionPool) { }
 
+        public T Deserialize(Buffers.ArcBuffer source, Session.SerializerSession session) { throw null; }
+
+        public T Deserialize(Buffers.ArcBuffer source) { throw null; }
+
         public T Deserialize(Buffers.PooledBuffer.BufferSlice source, Session.SerializerSession session) { throw null; }
 
         public T Deserialize(Buffers.PooledBuffer.BufferSlice source) { throw null; }
@@ -439,7 +456,7 @@ namespace Orleans.Serialization
 
     public static partial class ServiceCollectionExtensions
     {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddSerializer(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<ISerializerBuilder> configure = null) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddSerializer(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<ISerializerBuilder>? configure = null) { throw null; }
     }
 
     [GenerateSerializer]
@@ -457,9 +474,9 @@ namespace Orleans.Serialization
 
         public UnavailableExceptionFallbackException(string message, System.Exception innerException) { }
 
-        public string ExceptionType { get { throw null; } }
+        public string? ExceptionType { get { throw null; } }
 
-        public System.Collections.Generic.Dictionary<string, object> Properties { get { throw null; } }
+        public System.Collections.Generic.Dictionary<string, object?> Properties { get { throw null; } }
 
         public override string ToString() { throw null; }
     }
@@ -744,30 +761,38 @@ namespace Orleans.Serialization.Buffers
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
-        public ArcBufferReader(ArcBufferWriter writer) { }
-
         public int Length { get { throw null; } }
 
         public readonly void Consume(System.Span<byte> output) { }
 
         public readonly ArcBuffer ConsumeSlice(int count) { throw null; }
 
+        public readonly bool IsNext(System.ReadOnlySpan<byte> next, bool advancePast = false) { throw null; }
+
+        public readonly byte Peek(long offset) { throw null; }
+
         public readonly System.ReadOnlySpan<byte> Peek(scoped in System.Span<byte> destination) { throw null; }
 
         public readonly ArcBuffer PeekSlice(int count) { throw null; }
 
         public readonly void Skip(int count) { }
+
+        public readonly bool TryReadTo(out ArcBuffer slice, byte delimiter, bool advancePastDelimiter = true) { throw null; }
     }
 
     [Immutable]
     public sealed partial class ArcBufferWriter : System.Buffers.IBufferWriter<byte>, System.IDisposable
     {
-        public const int MinimumPageSize = 16384;
+        public const int MinimumPageSize = 1024;
         public int Length { get { throw null; } }
+
+        public ArcBufferReader Reader { get { throw null; } }
 
         public void AdvanceReader(int count) { }
 
         public void AdvanceWriter(int count) { }
+
+        public void AppendPinned(ArcBuffer input) { }
 
         public ArcBuffer ConsumeSlice(int count) { throw null; }
 
@@ -789,9 +814,26 @@ namespace Orleans.Serialization.Buffers
 
         void System.Buffers.IBufferWriter<byte>.Advance(int count) { }
 
+        public void Truncate(int length) { }
+
         public void Write(System.Buffers.ReadOnlySequence<byte> input) { }
 
         public void Write(System.ReadOnlySpan<byte> value) { }
+
+        public void WriteAt(int offset, System.ReadOnlySpan<byte> value) { }
+    }
+
+    public readonly partial struct ArcBufferWriterWrapper : System.Buffers.IBufferWriter<byte>
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public ArcBufferWriterWrapper(ArcBufferWriter bufferWriter) { }
+
+        public readonly void Advance(int count) { }
+
+        public readonly System.Memory<byte> GetMemory(int sizeHint = 0) { throw null; }
+
+        public readonly System.Span<byte> GetSpan(int sizeHint = 0) { throw null; }
     }
 
     public static partial class BufferWriterExtensions
@@ -932,6 +974,8 @@ namespace Orleans.Serialization.Buffers
 
     public static partial class Reader
     {
+        public static Reader<Adaptors.ArcBufferReaderInput> Create(ArcBuffer input, Session.SerializerSession session) { throw null; }
+
         public static Reader<Adaptors.BufferSliceReaderInput> Create(PooledBuffer input, Session.SerializerSession session) { throw null; }
 
         public static Reader<Adaptors.BufferSliceReaderInput> Create(PooledBuffer.BufferSlice input, Session.SerializerSession session) { throw null; }
@@ -945,6 +989,8 @@ namespace Orleans.Serialization.Buffers
         public static Reader<SpanReaderInput> Create(System.ReadOnlyMemory<byte> buffer, Session.SerializerSession session) { throw null; }
 
         public static Reader<SpanReaderInput> Create(System.ReadOnlySpan<byte> buffer, Session.SerializerSession session) { throw null; }
+
+        public static int GetVarIntByteCount(byte firstByte) { throw null; }
     }
 
     public abstract partial class ReaderInput
@@ -971,9 +1017,15 @@ namespace Orleans.Serialization.Buffers
 
         public long Position { get { throw null; } }
 
+        public long Remaining { get { throw null; } }
+
         public Session.SerializerSession Session { get { throw null; } }
 
+        public void EnsureAvailable(uint count) { }
+
         public void ForkFrom(long position, out Reader<TInput> forked) { throw null; }
+
+        public byte PeekByte() { throw null; }
 
         public byte ReadByte() { throw null; }
 
@@ -1045,6 +1097,8 @@ namespace Orleans.Serialization.Buffers
 
     public static partial class Writer
     {
+        public static Writer<ArcBufferWriterWrapper> Create(ArcBufferWriter destination, Session.SerializerSession session) { throw null; }
+
         public static Writer<Adaptors.SpanBufferWriter> Create(byte[] output, Session.SerializerSession session) { throw null; }
 
         public static Writer<Adaptors.MemoryStreamBufferWriter> Create(System.IO.MemoryStream destination, Session.SerializerSession session) { throw null; }
@@ -1093,7 +1147,7 @@ namespace Orleans.Serialization.Buffers
 
         public void WriteEndObject() { }
 
-        public void WriteFieldHeader(uint fieldId, System.Type expectedType, System.Type actualType, WireProtocol.WireType wireType) { }
+        public void WriteFieldHeader(uint fieldId, System.Type? expectedType, System.Type? actualType, WireProtocol.WireType wireType) { }
 
         public void WriteFieldHeaderExpected(uint fieldId, WireProtocol.WireType wireType) { }
 
@@ -1101,7 +1155,7 @@ namespace Orleans.Serialization.Buffers
 
         public void WriteInt64(long value) { }
 
-        public void WriteStartObject(uint fieldId, System.Type expectedType, System.Type actualType) { }
+        public void WriteStartObject(uint fieldId, System.Type? expectedType, System.Type actualType) { }
 
         public void WriteUInt32(uint value) { }
 
@@ -1127,6 +1181,13 @@ namespace Orleans.Serialization.Buffers
 
 namespace Orleans.Serialization.Buffers.Adaptors
 {
+    public partial struct ArcBufferReaderInput
+    {
+        private object _dummy;
+        private int _dummyPrimitive;
+        public ArcBufferReaderInput(in ArcBuffer slice) { }
+    }
+
     public partial struct ArrayStreamBufferWriter : System.Buffers.IBufferWriter<byte>
     {
         private object _dummy;
@@ -1234,7 +1295,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
         private int _dummyPrimitive;
         public void Advance(int count) { }
 
-        public readonly void Dispose() { }
+        public void Dispose() { }
 
         public System.Memory<byte> GetMemory(int sizeHint = 0) { throw null; }
 
@@ -1272,9 +1333,11 @@ namespace Orleans.Serialization.Cloning
             where T : class { throw null; }
     }
 
-    public sealed partial class CopyContextPool
+    public sealed partial class CopyContextPool : System.IDisposable
     {
         public CopyContextPool(Serializers.CodecProvider codecProvider) { }
+
+        public void Dispose() { }
 
         public CopyContext GetContext() { throw null; }
     }
@@ -1382,7 +1445,7 @@ namespace Orleans.Serialization.Codecs
     public partial struct ArrayListSurrogate
     {
         [Id(0)]
-        public object[] Values;
+        public object?[]? Values;
     }
 
     [RegisterSerializer]
@@ -1410,6 +1473,19 @@ namespace Orleans.Serialization.Codecs
         public static System.ArraySegment<byte> DeepCopy(System.ArraySegment<byte> input, Cloning.CopyContext copyContext) { throw null; }
 
         System.ArraySegment<byte> Cloning.IDeepCopier<System.ArraySegment<byte>>.DeepCopy(System.ArraySegment<byte> input, Cloning.CopyContext _) { throw null; }
+    }
+
+    [RegisterSerializer]
+    public sealed partial class BigIntegerCodec : IFieldCodec<System.Numerics.BigInteger>, IFieldCodec
+    {
+        System.Numerics.BigInteger IFieldCodec<System.Numerics.BigInteger>.ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+
+        void IFieldCodec<System.Numerics.BigInteger>.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, System.Numerics.BigInteger value) { }
+
+        public static System.Numerics.BigInteger ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+
+        public static void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Numerics.BigInteger value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
     [RegisterSerializer]
@@ -1752,6 +1828,64 @@ namespace Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
+    [RegisterSerializer]
+    public sealed partial class FrozenDictionaryCodec<TKey, TValue> : GeneralizedReferenceTypeSurrogateCodec<System.Collections.Frozen.FrozenDictionary<TKey, TValue>, FrozenDictionarySurrogate<TKey, TValue>>
+    {
+        public FrozenDictionaryCodec(Serializers.IValueSerializer<FrozenDictionarySurrogate<TKey, TValue>> surrogateSerializer) : base(default!) { }
+
+        public override System.Collections.Frozen.FrozenDictionary<TKey, TValue> ConvertFromSurrogate(ref FrozenDictionarySurrogate<TKey, TValue> surrogate) { throw null; }
+
+        public override void ConvertToSurrogate(System.Collections.Frozen.FrozenDictionary<TKey, TValue> value, ref FrozenDictionarySurrogate<TKey, TValue> surrogate) { }
+    }
+
+    [RegisterCopier]
+    public sealed partial class FrozenDictionaryCopier<TKey, TValue> : Cloning.IDeepCopier<System.Collections.Frozen.FrozenDictionary<TKey, TValue>>, Cloning.IDeepCopier, Cloning.IOptionalDeepCopier, Cloning.IDerivedTypeCopier
+    {
+        public FrozenDictionaryCopier(Cloning.IDeepCopier<TKey> keyCopier, Cloning.IDeepCopier<TValue> valueCopier) { }
+
+        public System.Collections.Frozen.FrozenDictionary<TKey, TValue> DeepCopy(System.Collections.Frozen.FrozenDictionary<TKey, TValue> input, Cloning.CopyContext context) { throw null; }
+
+        public bool IsShallowCopyable() { throw null; }
+    }
+
+    [GenerateSerializer]
+    public partial struct FrozenDictionarySurrogate<TKey, TValue>
+    {
+        [Id(1)]
+        public System.Collections.Generic.IEqualityComparer<TKey>? KeyComparer;
+        [Id(0)]
+        public System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<TKey, TValue>> Values;
+    }
+
+    [RegisterSerializer]
+    public sealed partial class FrozenSetCodec<T> : GeneralizedReferenceTypeSurrogateCodec<System.Collections.Frozen.FrozenSet<T>, FrozenSetSurrogate<T>>
+    {
+        public FrozenSetCodec(Serializers.IValueSerializer<FrozenSetSurrogate<T>> surrogateSerializer) : base(default!) { }
+
+        public override System.Collections.Frozen.FrozenSet<T> ConvertFromSurrogate(ref FrozenSetSurrogate<T> surrogate) { throw null; }
+
+        public override void ConvertToSurrogate(System.Collections.Frozen.FrozenSet<T> value, ref FrozenSetSurrogate<T> surrogate) { }
+    }
+
+    [RegisterCopier]
+    public sealed partial class FrozenSetCopier<T> : Cloning.IDeepCopier<System.Collections.Frozen.FrozenSet<T>>, Cloning.IDeepCopier, Cloning.IOptionalDeepCopier, Cloning.IDerivedTypeCopier
+    {
+        public FrozenSetCopier(Cloning.IDeepCopier<T> copier) { }
+
+        public System.Collections.Frozen.FrozenSet<T> DeepCopy(System.Collections.Frozen.FrozenSet<T> input, Cloning.CopyContext context) { throw null; }
+
+        public bool IsShallowCopyable() { throw null; }
+    }
+
+    [GenerateSerializer]
+    public partial struct FrozenSetSurrogate<T>
+    {
+        [Id(1)]
+        public System.Collections.Generic.IEqualityComparer<T>? KeyComparer;
+        [Id(0)]
+        public System.Collections.Generic.List<T> Values;
+    }
+
     public abstract partial class GeneralizedReferenceTypeSurrogateCodec<TField, TSurrogate> : IFieldCodec<TField>, IFieldCodec, IDerivedTypeCodec where TField : class where TSurrogate : struct
     {
         protected GeneralizedReferenceTypeSurrogateCodec(Serializers.IValueSerializer<TSurrogate> surrogateSerializer) { }
@@ -1839,15 +1973,15 @@ namespace Orleans.Serialization.Codecs
 
     public partial interface IFieldCodec
     {
-        object ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field);
-        void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value)
+        object? ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field);
+        void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object? value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte>;
     }
 
     public partial interface IFieldCodec<T> : IFieldCodec
     {
-        object IFieldCodec.ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field);
-        void IFieldCodec.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value);
+        object? IFieldCodec.ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field);
+        void IFieldCodec.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object? value);
         T ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field);
         void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, T value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte>;
@@ -1872,14 +2006,14 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [GenerateSerializer]
     public partial struct ImmutableArraySurrogate<T>
     {
         [Id(0)]
-        public T[] Values;
+        public T[]? Values;
     }
 
     [RegisterSerializer]
@@ -1905,6 +2039,8 @@ namespace Orleans.Serialization.Codecs
     [GenerateSerializer]
     public partial struct ImmutableDictionarySurrogate<TKey, TValue>
     {
+        [Id(1)]
+        public System.Collections.Generic.IEqualityComparer<TValue>? ValueComparer;
         [Id(0)]
         public System.Collections.Generic.Dictionary<TKey, TValue> Values;
     }
@@ -1933,7 +2069,7 @@ namespace Orleans.Serialization.Codecs
     public partial struct ImmutableHashSetSurrogate<T>
     {
         [Id(1)]
-        public System.Collections.Generic.IEqualityComparer<T> KeyComparer;
+        public System.Collections.Generic.IEqualityComparer<T>? KeyComparer;
         [Id(0)]
         public System.Collections.Generic.List<T> Values;
     }
@@ -2016,9 +2152,9 @@ namespace Orleans.Serialization.Codecs
     public partial struct ImmutableSortedDictionarySurrogate<TKey, TValue>
     {
         [Id(1)]
-        public System.Collections.Generic.IComparer<TKey> KeyComparer;
+        public System.Collections.Generic.IComparer<TKey>? KeyComparer;
         [Id(2)]
-        public System.Collections.Generic.IEqualityComparer<TValue> ValueComparer;
+        public System.Collections.Generic.IEqualityComparer<TValue>? ValueComparer;
         [Id(0)]
         public System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<TKey, TValue>> Values;
     }
@@ -2047,7 +2183,7 @@ namespace Orleans.Serialization.Codecs
     public partial struct ImmutableSortedSetSurrogate<T>
     {
         [Id(1)]
-        public System.Collections.Generic.IComparer<T> KeyComparer;
+        public System.Collections.Generic.IComparer<T>? KeyComparer;
         [Id(0)]
         public System.Collections.Generic.List<T> Values;
     }
@@ -2201,7 +2337,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterSerializer]
@@ -2289,8 +2425,12 @@ namespace Orleans.Serialization.Codecs
     [GenerateSerializer]
     public partial struct NameValueCollectionSurrogate
     {
+        [Id(1)]
+        public bool HasNullKey;
+        [Id(2)]
+        public string? NullKeyValue;
         [Id(0)]
-        public System.Collections.Generic.Dictionary<string, string> Values;
+        public System.Collections.Generic.Dictionary<string, string?>? Values;
     }
 
     [RegisterSerializer]
@@ -2313,7 +2453,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterSerializer]
@@ -2323,25 +2463,25 @@ namespace Orleans.Serialization.Codecs
 
         void IFieldCodec<object>.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value) { }
 
-        void IFieldCodec.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value) { }
+        void IFieldCodec.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object? value) { }
 
-        public static object ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+        public static object? ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
-        public static void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, object value)
+        public static void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, object? value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
-        public static void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value)
+        public static void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object? value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
     [RegisterCopier]
     public sealed partial class ObjectCopier : Cloning.IDeepCopier<object>, Cloning.IDeepCopier
     {
-        public static object DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        public static object? DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
 
         object Cloning.IDeepCopier<object>.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterSerializer]
@@ -2478,18 +2618,18 @@ namespace Orleans.Serialization.Codecs
 
         public static void MarkValueField(Session.SerializerSession session) { }
 
-        public static object ReadReference<TInput>(ref Buffers.Reader<TInput> reader, System.Type fieldType) { throw null; }
+        public static object? ReadReference<TInput>(ref Buffers.Reader<TInput> reader, System.Type? fieldType) { throw null; }
 
         public static T ReadReference<T, TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
-        public static void RecordObject(Session.SerializerSession session, object value, uint referenceId) { }
+        public static void RecordObject(Session.SerializerSession session, object? value, uint referenceId) { }
 
         public static void RecordObject(Session.SerializerSession session, object value) { }
 
-        public static bool TryWriteReferenceField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldId, System.Type expectedType, object value)
+        public static bool TryWriteReferenceField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldId, System.Type? expectedType, object? value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { throw null; }
 
-        public static bool TryWriteReferenceField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldId, System.Type expectedType, System.Type actualType, object value)
+        public static bool TryWriteReferenceField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldId, System.Type? expectedType, System.Type actualType, object? value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { throw null; }
 
         public static void WriteNullReference<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldId)
@@ -2526,9 +2666,9 @@ namespace Orleans.Serialization.Codecs
 
     public partial class SkipFieldCodec : IFieldCodec
     {
-        public object ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+        public object? ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
-        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value)
+        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object? value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -2561,7 +2701,7 @@ namespace Orleans.Serialization.Codecs
     public partial struct SortedDictionarySurrogate<TKey, TValue>
     {
         [Id(1)]
-        public System.Collections.Generic.IComparer<TKey> Comparer;
+        public System.Collections.Generic.IComparer<TKey>? Comparer;
         [Id(0)]
         public System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<TKey, TValue>> Values;
     }
@@ -2571,7 +2711,7 @@ namespace Orleans.Serialization.Codecs
     {
         public SortedListCodec(Serializers.IValueSerializer<SortedListSurrogate<TKey, TValue>> surrogateSerializer) : base(default!) { }
 
-        public override System.Collections.Generic.SortedList<TKey, TValue> ConvertFromSurrogate(ref SortedListSurrogate<TKey, TValue> surrogate) { throw null; }
+        public override System.Collections.Generic.SortedList<TKey, TValue>? ConvertFromSurrogate(ref SortedListSurrogate<TKey, TValue> surrogate) { throw null; }
 
         public override void ConvertToSurrogate(System.Collections.Generic.SortedList<TKey, TValue> value, ref SortedListSurrogate<TKey, TValue> surrogate) { }
     }
@@ -2590,9 +2730,9 @@ namespace Orleans.Serialization.Codecs
     public partial struct SortedListSurrogate<TKey, TValue>
     {
         [Id(1)]
-        public System.Collections.Generic.IComparer<TKey> Comparer;
+        public System.Collections.Generic.IComparer<TKey>? Comparer;
         [Id(0)]
-        public System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<TKey, TValue>> Values;
+        public System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<TKey, TValue>>? Values;
     }
 
     [RegisterSerializer]
@@ -2619,7 +2759,7 @@ namespace Orleans.Serialization.Codecs
     public partial struct SortedSetSurrogate<T>
     {
         [Id(1)]
-        public System.Collections.Generic.IComparer<T> Comparer;
+        public System.Collections.Generic.IComparer<T>? Comparer;
         [Id(0)]
         public System.Collections.Generic.List<T> Values;
     }
@@ -3059,7 +3199,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterCopier]
@@ -3071,7 +3211,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterCopier]
@@ -3083,7 +3223,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterCopier]
@@ -3095,7 +3235,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterCopier]
@@ -3107,7 +3247,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterCopier]
@@ -3119,7 +3259,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterCopier]
@@ -3131,7 +3271,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterCopier]
@@ -3143,7 +3283,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterCopier]
@@ -3155,7 +3295,7 @@ namespace Orleans.Serialization.Codecs
 
         public bool IsShallowCopyable() { throw null; }
 
-        object Cloning.IDeepCopier.DeepCopy(object input, Cloning.CopyContext context) { throw null; }
+        object? Cloning.IDeepCopier.DeepCopy(object? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterSerializer]
@@ -3186,9 +3326,9 @@ namespace Orleans.Serialization.Codecs
     {
         public bool IsSupportedType(System.Type type) { throw null; }
 
-        public object ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+        public object? ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
-        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value)
+        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object? value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 }
@@ -3201,9 +3341,15 @@ namespace Orleans.Serialization.Configuration
 
     public sealed partial class TypeManifestOptions
     {
+        public void AddAllowedAssembly(System.Reflection.Assembly assembly) { }
+
+        public void AddAllowedType(System.Type type) { }
+
         public System.Collections.Generic.HashSet<System.Type> Activators { get { throw null; } }
 
         public bool AllowAllTypes { get { throw null; } set { } }
+
+        public System.Collections.Generic.HashSet<string> AllowedAssemblies { get { throw null; } }
 
         public System.Collections.Generic.HashSet<string> AllowedTypes { get { throw null; } }
 
@@ -3258,9 +3404,9 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         public static TField DeserializeUnexpectedType<TInput, TField>(this ref Buffers.Reader<TInput> reader, scoped ref WireProtocol.Field field)
             where TField : class { throw null; }
 
-        public static System.Reflection.MethodInfo GetMethodInfoOrDefault(System.Type interfaceType, string methodName, System.Type[] methodTypeParameters, System.Type[] parameterTypes) { throw null; }
+        public static System.Reflection.MethodInfo? GetMethodInfoOrDefault(System.Type? interfaceType, string methodName, System.Type[]? methodTypeParameters, System.Type[]? parameterTypes) { throw null; }
 
-        public static Cloning.IDeepCopier<T> GetOptionalCopier<T>(Cloning.IDeepCopier<T> copier) { throw null; }
+        public static Cloning.IDeepCopier<T>? GetOptionalCopier<T>(Cloning.IDeepCopier<T> copier) { throw null; }
 
         public static TService GetService<TService>(object caller, Serializers.ICodecProvider codecProvider) { throw null; }
 
@@ -3277,7 +3423,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 
             public virtual void DeepCopy(T input, T output, Cloning.CopyContext context) { }
 
-            public T DeepCopy(T original, Cloning.CopyContext context) { throw null; }
+            public T? DeepCopy(T original, Cloning.CopyContext context) { throw null; }
         }
     }
 }
@@ -3288,11 +3434,11 @@ namespace Orleans.Serialization.Internal
     {
         public static void AddAssembly(System.Collections.Generic.HashSet<System.Reflection.Assembly> parts, System.Reflection.Assembly assembly) { }
 
-        public static void AddFromAssemblyLoadContext(System.Collections.Generic.HashSet<System.Reflection.Assembly> parts, System.Reflection.Assembly assembly = null) { }
+        public static void AddFromAssemblyLoadContext(System.Collections.Generic.HashSet<System.Reflection.Assembly> parts, System.Reflection.Assembly? assembly = null) { }
 
         public static void AddFromAssemblyLoadContext(System.Collections.Generic.HashSet<System.Reflection.Assembly> parts, System.Runtime.Loader.AssemblyLoadContext context) { }
 
-        public static void AddFromDependencyContext(System.Collections.Generic.HashSet<System.Reflection.Assembly> parts, System.Reflection.Assembly assembly = null) { }
+        public static void AddFromDependencyContext(System.Collections.Generic.HashSet<System.Reflection.Assembly> parts, System.Reflection.Assembly? assembly = null) { }
 
         public static System.Collections.Generic.IEnumerable<System.Reflection.Assembly> GetRelevantAssemblies() { throw null; }
     }
@@ -3337,6 +3483,8 @@ namespace Orleans.Serialization.Invocation
 
     public partial interface IInvokable : System.IDisposable
     {
+        bool IsCancellable { get; }
+
         string GetActivityName();
         object? GetArgument(int index);
         int GetArgumentCount();
@@ -3370,10 +3518,8 @@ namespace Orleans.Serialization.Invocation
 
     public partial interface ITargetHolder
     {
-        TComponent? GetComponent<TComponent>()
-            where TComponent : class;
-        TTarget? GetTarget<TTarget>()
-            where TTarget : class;
+        object? GetComponent(System.Type componentType);
+        object? GetTarget();
     }
 
     [SerializerTransparent]
@@ -3416,7 +3562,7 @@ namespace Orleans.Serialization.Invocation
 
         public System.Threading.Tasks.Sources.ValueTaskSourceStatus GetStatus(short token) { throw null; }
 
-        public void OnCompleted(System.Action<object> continuation, object state, short token, System.Threading.Tasks.Sources.ValueTaskSourceOnCompletedFlags flags) { }
+        public void OnCompleted(System.Action<object?> continuation, object? state, short token, System.Threading.Tasks.Sources.ValueTaskSourceOnCompletedFlags flags) { }
 
         public void Reset() { }
 
@@ -3438,9 +3584,9 @@ namespace Orleans.Serialization.Invocation
         public static void Return<T>(ResponseCompletionSource<T> obj) { }
     }
 
-    public sealed partial class ResponseCompletionSource<TResult> : IResponseCompletionSource, System.Threading.Tasks.Sources.IValueTaskSource<TResult>, System.Threading.Tasks.Sources.IValueTaskSource
+    public sealed partial class ResponseCompletionSource<TResult> : IResponseCompletionSource, System.Threading.Tasks.Sources.IValueTaskSource<TResult?>, System.Threading.Tasks.Sources.IValueTaskSource
     {
-        public System.Threading.Tasks.ValueTask<TResult> AsValueTask() { throw null; }
+        public System.Threading.Tasks.ValueTask<TResult?> AsValueTask() { throw null; }
 
         public System.Threading.Tasks.ValueTask AsVoidValueTask() { throw null; }
 
@@ -3450,17 +3596,17 @@ namespace Orleans.Serialization.Invocation
 
         public void Complete(Response<TResult> value) { }
 
-        public TResult GetResult(short token) { throw null; }
+        public TResult? GetResult(short token) { throw null; }
 
         public System.Threading.Tasks.Sources.ValueTaskSourceStatus GetStatus(short token) { throw null; }
 
-        public void OnCompleted(System.Action<object> continuation, object state, short token, System.Threading.Tasks.Sources.ValueTaskSourceOnCompletedFlags flags) { }
+        public void OnCompleted(System.Action<object?> continuation, object? state, short token, System.Threading.Tasks.Sources.ValueTaskSourceOnCompletedFlags flags) { }
 
         public void Reset() { }
 
         public void SetException(System.Exception exception) { }
 
-        public void SetResult(TResult result) { }
+        public void SetResult(TResult? result) { }
 
         void System.Threading.Tasks.Sources.IValueTaskSource.GetResult(short token) { }
     }
@@ -3503,9 +3649,9 @@ namespace Orleans.Serialization.Serializers
     {
         protected internal AbstractTypeSerializer(System.Type fieldType) { }
 
-        public object ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+        public object? ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
-        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value)
+        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object? value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -3549,13 +3695,13 @@ namespace Orleans.Serialization.Serializers
         public IValueSerializer<TField> GetValueSerializer<TField>()
             where TField : struct { throw null; }
 
-        public Codecs.IFieldCodec TryGetCodec(System.Type fieldType) { throw null; }
+        public Codecs.IFieldCodec? TryGetCodec(System.Type fieldType) { throw null; }
 
-        public Codecs.IFieldCodec<TField> TryGetCodec<TField>() { throw null; }
+        public Codecs.IFieldCodec<TField>? TryGetCodec<TField>() { throw null; }
 
-        public Cloning.IDeepCopier TryGetDeepCopier(System.Type fieldType) { throw null; }
+        public Cloning.IDeepCopier? TryGetDeepCopier(System.Type fieldType) { throw null; }
 
-        public Cloning.IDeepCopier<T> TryGetDeepCopier<T>() { throw null; }
+        public Cloning.IDeepCopier<T>? TryGetDeepCopier<T>() { throw null; }
     }
 
     public sealed partial class ConcreteTypeSerializer<TField, TBaseCodec> : Codecs.IFieldCodec<TField>, Codecs.IFieldCodec where TField : class where TBaseCodec : IBaseCodec<TField>
@@ -3633,8 +3779,8 @@ namespace Orleans.Serialization.Serializers
     {
         Codecs.IFieldCodec GetCodec(System.Type fieldType);
         Codecs.IFieldCodec<TField> GetCodec<TField>();
-        Codecs.IFieldCodec TryGetCodec(System.Type fieldType);
-        Codecs.IFieldCodec<TField> TryGetCodec<TField>();
+        Codecs.IFieldCodec? TryGetCodec(System.Type fieldType);
+        Codecs.IFieldCodec<TField>? TryGetCodec<TField>();
     }
 
     public partial interface IGeneralizedBaseCodec : IBaseCodec<object>, IBaseCodec
@@ -3733,32 +3879,32 @@ namespace Orleans.Serialization.Session
 
         public System.Collections.Generic.Dictionary<uint, object> CopyReferenceTable() { throw null; }
 
-        public bool GetOrAddReference(object value, out uint reference) { throw null; }
+        public bool GetOrAddReference(object? value, out uint reference) { throw null; }
 
-        public int GetReferenceIndex(object value) { throw null; }
+        public int GetReferenceIndex(object? value) { throw null; }
 
         public void MarkValueField() { }
 
-        public void RecordReferenceField(object value, uint referenceId) { }
+        public void RecordReferenceField(object? value, uint referenceId) { }
 
-        public void RecordReferenceField(object value) { }
+        public void RecordReferenceField(object? value) { }
 
         public void Reset() { }
 
-        public object TryGetReferencedObject(uint reference) { throw null; }
+        public object? TryGetReferencedObject(uint reference) { throw null; }
     }
 
     public sealed partial class ReferencedTypeCollection
     {
         public uint GetOrAddTypeReference(System.Type type) { throw null; }
 
-        public System.Type GetReferencedType(uint reference) { throw null; }
+        public System.Type? GetReferencedType(uint reference) { throw null; }
 
-        public void RecordReferencedType(System.Type type) { }
+        public void RecordReferencedType(System.Type? type) { }
 
         public void Reset() { }
 
-        public bool TryGetReferencedType(uint reference, out System.Type type) { throw null; }
+        public bool TryGetReferencedType(uint reference, out System.Type? type) { throw null; }
 
         public bool TryGetTypeReference(System.Type type, out uint reference) { throw null; }
     }
@@ -3784,11 +3930,13 @@ namespace Orleans.Serialization.Session
         public void Reset() { }
     }
 
-    public sealed partial class SerializerSessionPool
+    public sealed partial class SerializerSessionPool : System.IDisposable
     {
         public SerializerSessionPool(TypeSystem.TypeCodec typeCodec, WellKnownTypeCollection wellKnownTypes, Serializers.CodecProvider codecProvider) { }
 
         public Serializers.CodecProvider CodecProvider { get { throw null; } }
+
+        public void Dispose() { }
 
         public SerializerSession GetSession() { throw null; }
     }
@@ -3797,9 +3945,9 @@ namespace Orleans.Serialization.Session
     {
         public WellKnownTypeCollection(Microsoft.Extensions.Options.IOptions<Configuration.TypeManifestOptions> config) { }
 
-        public System.Type GetWellKnownType(uint typeId) { throw null; }
+        public System.Type? GetWellKnownType(uint typeId) { throw null; }
 
-        public bool TryGetWellKnownType(uint typeId, out System.Type type) { throw null; }
+        public bool TryGetWellKnownType(uint typeId, out System.Type? type) { throw null; }
 
         public bool TryGetWellKnownTypeId(System.Type type, out uint typeId) { throw null; }
     }
@@ -3992,9 +4140,9 @@ namespace Orleans.Serialization.TypeSystem
 
         public System.Type ReadLengthPrefixed<TInput>(ref Buffers.Reader<TInput> reader) { throw null; }
 
-        public System.Type TryRead<TInput>(ref Buffers.Reader<TInput> reader) { throw null; }
+        public System.Type? TryRead<TInput>(ref Buffers.Reader<TInput> reader) { throw null; }
 
-        public bool TryReadForAnalysis<TInput>(ref Buffers.Reader<TInput> reader, out System.Type type, out string typeString) { throw null; }
+        public bool TryReadForAnalysis<TInput>(ref Buffers.Reader<TInput> reader, out System.Type? type, out string typeString) { throw null; }
 
         public void WriteEncodedType<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, System.Type type)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
@@ -4088,7 +4236,7 @@ namespace Orleans.Serialization.WireProtocol
     public partial struct Field
     {
         public uint FieldIdDeltaRaw;
-        public System.Type FieldTypeRaw;
+        public System.Type? FieldTypeRaw;
         public Tag Tag;
         public Field(Tag tag, uint extendedFieldIdDelta, System.Type type) { }
 
@@ -4098,7 +4246,7 @@ namespace Orleans.Serialization.WireProtocol
 
         public uint FieldIdDelta { get { throw null; } set { } }
 
-        public System.Type FieldType { get { throw null; } set { } }
+        public System.Type? FieldType { get { throw null; } set { } }
 
         public bool HasExtendedFieldId { get { throw null; } }
 
@@ -4183,7 +4331,7 @@ namespace Orleans.Serialization.WireProtocol
 
 namespace OrleansCodeGen.Orleans.Serialization
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_CodecNotFoundException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.CodecNotFoundException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -4201,7 +4349,7 @@ namespace OrleansCodeGen.Orleans.Serialization
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ExtendedWireTypeInvalidException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.ExtendedWireTypeInvalidException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -4219,7 +4367,7 @@ namespace OrleansCodeGen.Orleans.Serialization
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_FieldIdNotPresentException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.FieldIdNotPresentException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -4237,7 +4385,7 @@ namespace OrleansCodeGen.Orleans.Serialization
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_FieldTypeInvalidException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.FieldTypeInvalidException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -4255,7 +4403,7 @@ namespace OrleansCodeGen.Orleans.Serialization
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_FieldTypeMissingException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.FieldTypeMissingException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -4273,7 +4421,7 @@ namespace OrleansCodeGen.Orleans.Serialization
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_IllegalTypeException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.IllegalTypeException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -4291,7 +4439,7 @@ namespace OrleansCodeGen.Orleans.Serialization
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ReferenceFieldNotSupportedException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.ReferenceFieldNotSupportedException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -4309,7 +4457,7 @@ namespace OrleansCodeGen.Orleans.Serialization
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ReferenceNotFoundException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.ReferenceNotFoundException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -4327,7 +4475,7 @@ namespace OrleansCodeGen.Orleans.Serialization
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_RequiredFieldMissingException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.RequiredFieldMissingException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -4345,7 +4493,7 @@ namespace OrleansCodeGen.Orleans.Serialization
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_SchemaTypeInvalidException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.SchemaTypeInvalidException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -4363,7 +4511,7 @@ namespace OrleansCodeGen.Orleans.Serialization
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_SerializerException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.SerializerException>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Serialization.SerializerException>, global::Orleans.Serialization.Serializers.IBaseCodec
@@ -4381,7 +4529,7 @@ namespace OrleansCodeGen.Orleans.Serialization
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_TypeMissingException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.TypeMissingException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -4399,7 +4547,7 @@ namespace OrleansCodeGen.Orleans.Serialization
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_UnexpectedLengthPrefixValueException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.UnexpectedLengthPrefixValueException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -4417,7 +4565,7 @@ namespace OrleansCodeGen.Orleans.Serialization
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_UnknownReferencedTypeException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.UnknownReferencedTypeException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -4435,7 +4583,7 @@ namespace OrleansCodeGen.Orleans.Serialization
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_UnknownWellKnownTypeException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.UnknownWellKnownTypeException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -4453,7 +4601,7 @@ namespace OrleansCodeGen.Orleans.Serialization
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_UnsupportedWireTypeException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.UnsupportedWireTypeException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -4471,7 +4619,7 @@ namespace OrleansCodeGen.Orleans.Serialization
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_CodecNotFoundException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.CodecNotFoundException, global::Orleans.Serialization.SerializerException>
@@ -4479,7 +4627,7 @@ namespace OrleansCodeGen.Orleans.Serialization
         public Copier_CodecNotFoundException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_ExtendedWireTypeInvalidException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.ExtendedWireTypeInvalidException, global::Orleans.Serialization.SerializerException>
@@ -4487,7 +4635,7 @@ namespace OrleansCodeGen.Orleans.Serialization
         public Copier_ExtendedWireTypeInvalidException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_FieldIdNotPresentException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.FieldIdNotPresentException, global::Orleans.Serialization.SerializerException>
@@ -4495,7 +4643,7 @@ namespace OrleansCodeGen.Orleans.Serialization
         public Copier_FieldIdNotPresentException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_FieldTypeInvalidException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.FieldTypeInvalidException, global::Orleans.Serialization.SerializerException>
@@ -4503,7 +4651,7 @@ namespace OrleansCodeGen.Orleans.Serialization
         public Copier_FieldTypeInvalidException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_FieldTypeMissingException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.FieldTypeMissingException, global::Orleans.Serialization.SerializerException>
@@ -4511,7 +4659,7 @@ namespace OrleansCodeGen.Orleans.Serialization
         public Copier_FieldTypeMissingException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_IllegalTypeException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.IllegalTypeException, global::Orleans.Serialization.SerializerException>
@@ -4521,7 +4669,7 @@ namespace OrleansCodeGen.Orleans.Serialization
         public override void DeepCopy(global::Orleans.Serialization.IllegalTypeException input, global::Orleans.Serialization.IllegalTypeException output, global::Orleans.Serialization.Cloning.CopyContext context) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_ReferenceFieldNotSupportedException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.ReferenceFieldNotSupportedException, global::Orleans.Serialization.SerializerException>
@@ -4531,7 +4679,7 @@ namespace OrleansCodeGen.Orleans.Serialization
         public override void DeepCopy(global::Orleans.Serialization.ReferenceFieldNotSupportedException input, global::Orleans.Serialization.ReferenceFieldNotSupportedException output, global::Orleans.Serialization.Cloning.CopyContext context) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_ReferenceNotFoundException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.ReferenceNotFoundException, global::Orleans.Serialization.SerializerException>
@@ -4541,7 +4689,7 @@ namespace OrleansCodeGen.Orleans.Serialization
         public override void DeepCopy(global::Orleans.Serialization.ReferenceNotFoundException input, global::Orleans.Serialization.ReferenceNotFoundException output, global::Orleans.Serialization.Cloning.CopyContext context) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_RequiredFieldMissingException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.RequiredFieldMissingException, global::Orleans.Serialization.SerializerException>
@@ -4549,7 +4697,7 @@ namespace OrleansCodeGen.Orleans.Serialization
         public Copier_RequiredFieldMissingException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_SchemaTypeInvalidException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.SchemaTypeInvalidException, global::Orleans.Serialization.SerializerException>
@@ -4557,7 +4705,7 @@ namespace OrleansCodeGen.Orleans.Serialization
         public Copier_SchemaTypeInvalidException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_SerializerException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.SerializerException, System.Exception>
@@ -4565,7 +4713,7 @@ namespace OrleansCodeGen.Orleans.Serialization
         public Copier_SerializerException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_TypeMissingException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.TypeMissingException, global::Orleans.Serialization.SerializerException>
@@ -4573,7 +4721,7 @@ namespace OrleansCodeGen.Orleans.Serialization
         public Copier_TypeMissingException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_UnexpectedLengthPrefixValueException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.UnexpectedLengthPrefixValueException, global::Orleans.Serialization.SerializerException>
@@ -4581,7 +4729,7 @@ namespace OrleansCodeGen.Orleans.Serialization
         public Copier_UnexpectedLengthPrefixValueException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_UnknownReferencedTypeException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.UnknownReferencedTypeException, global::Orleans.Serialization.SerializerException>
@@ -4591,7 +4739,7 @@ namespace OrleansCodeGen.Orleans.Serialization
         public override void DeepCopy(global::Orleans.Serialization.UnknownReferencedTypeException input, global::Orleans.Serialization.UnknownReferencedTypeException output, global::Orleans.Serialization.Cloning.CopyContext context) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_UnknownWellKnownTypeException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.UnknownWellKnownTypeException, global::Orleans.Serialization.SerializerException>
@@ -4601,7 +4749,7 @@ namespace OrleansCodeGen.Orleans.Serialization
         public override void DeepCopy(global::Orleans.Serialization.UnknownWellKnownTypeException input, global::Orleans.Serialization.UnknownWellKnownTypeException output, global::Orleans.Serialization.Cloning.CopyContext context) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_UnsupportedWireTypeException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.UnsupportedWireTypeException, global::Orleans.Serialization.SerializerException>
@@ -4612,7 +4760,7 @@ namespace OrleansCodeGen.Orleans.Serialization
 
 namespace OrleansCodeGen.Orleans.Serialization.Codecs
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ArrayListSurrogate : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ArrayListSurrogate>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ArrayListSurrogate>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -4630,7 +4778,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ConcurrentDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ConcurrentDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ConcurrentDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -4648,7 +4796,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ConcurrentQueueSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ConcurrentQueueSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ConcurrentQueueSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -4666,7 +4814,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_CultureInfoSurrogate : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.CultureInfoSurrogate>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.CultureInfoSurrogate>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -4682,7 +4830,43 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_FrozenDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Serializers.IValueSerializer
+    {
+        public Codec_FrozenDictionarySurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue> instance) { }
+
+        public global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue> ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue> instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue> value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_FrozenSetSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
+    {
+        public Codec_FrozenSetSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T> instance) { }
+
+        public global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T> ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T> instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T> value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ImmutableArraySurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ImmutableArraySurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ImmutableArraySurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -4700,7 +4884,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ImmutableDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ImmutableDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ImmutableDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -4718,7 +4902,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ImmutableHashSetSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ImmutableHashSetSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ImmutableHashSetSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -4736,7 +4920,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ImmutableListSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ImmutableListSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ImmutableListSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -4754,7 +4938,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ImmutableQueueSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ImmutableQueueSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ImmutableQueueSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -4772,7 +4956,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ImmutableSortedDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ImmutableSortedDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ImmutableSortedDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -4790,7 +4974,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ImmutableSortedSetSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ImmutableSortedSetSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ImmutableSortedSetSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -4808,7 +4992,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ImmutableStackSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ImmutableStackSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ImmutableStackSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -4826,7 +5010,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_NameValueCollectionSurrogate : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.NameValueCollectionSurrogate>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.NameValueCollectionSurrogate>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -4844,7 +5028,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ReadOnlyCollectionSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ReadOnlyCollectionSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ReadOnlyCollectionSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -4862,7 +5046,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ReadOnlyDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ReadOnlyDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ReadOnlyDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -4880,7 +5064,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_SortedDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.SortedDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.SortedDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -4898,7 +5082,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_SortedListSurrogate<TKey, TValue> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.SortedListSurrogate<TKey, TValue>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.SortedListSurrogate<TKey, TValue>>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -4916,7 +5100,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_SortedSetSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.SortedSetSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.SortedSetSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -4934,7 +5118,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_VersionSurrogate : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.VersionSurrogate>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.VersionSurrogate>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -4950,7 +5134,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_ArrayListSurrogate : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ArrayListSurrogate>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -4960,7 +5144,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
         public global::Orleans.Serialization.Codecs.ArrayListSurrogate DeepCopy(global::Orleans.Serialization.Codecs.ArrayListSurrogate result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_ConcurrentDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ConcurrentDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -4970,7 +5154,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
         public global::Orleans.Serialization.Codecs.ConcurrentDictionarySurrogate<TKey, TValue> DeepCopy(global::Orleans.Serialization.Codecs.ConcurrentDictionarySurrogate<TKey, TValue> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_ConcurrentQueueSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ConcurrentQueueSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -4980,7 +5164,27 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
         public global::Orleans.Serialization.Codecs.ConcurrentQueueSurrogate<T> DeepCopy(global::Orleans.Serialization.Codecs.ConcurrentQueueSurrogate<T> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_FrozenDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_FrozenDictionarySurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue> DeepCopy(global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_FrozenSetSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_FrozenSetSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T> DeepCopy(global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_ImmutableArraySurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ImmutableArraySurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -4990,7 +5194,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
         public global::Orleans.Serialization.Codecs.ImmutableArraySurrogate<T> DeepCopy(global::Orleans.Serialization.Codecs.ImmutableArraySurrogate<T> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_ImmutableDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ImmutableDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -5000,7 +5204,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
         public global::Orleans.Serialization.Codecs.ImmutableDictionarySurrogate<TKey, TValue> DeepCopy(global::Orleans.Serialization.Codecs.ImmutableDictionarySurrogate<TKey, TValue> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_ImmutableHashSetSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ImmutableHashSetSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -5010,7 +5214,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
         public global::Orleans.Serialization.Codecs.ImmutableHashSetSurrogate<T> DeepCopy(global::Orleans.Serialization.Codecs.ImmutableHashSetSurrogate<T> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_ImmutableListSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ImmutableListSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -5020,7 +5224,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
         public global::Orleans.Serialization.Codecs.ImmutableListSurrogate<T> DeepCopy(global::Orleans.Serialization.Codecs.ImmutableListSurrogate<T> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_ImmutableQueueSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ImmutableQueueSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -5030,7 +5234,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
         public global::Orleans.Serialization.Codecs.ImmutableQueueSurrogate<T> DeepCopy(global::Orleans.Serialization.Codecs.ImmutableQueueSurrogate<T> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_ImmutableSortedDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ImmutableSortedDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -5040,7 +5244,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
         public global::Orleans.Serialization.Codecs.ImmutableSortedDictionarySurrogate<TKey, TValue> DeepCopy(global::Orleans.Serialization.Codecs.ImmutableSortedDictionarySurrogate<TKey, TValue> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_ImmutableSortedSetSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ImmutableSortedSetSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -5050,7 +5254,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
         public global::Orleans.Serialization.Codecs.ImmutableSortedSetSurrogate<T> DeepCopy(global::Orleans.Serialization.Codecs.ImmutableSortedSetSurrogate<T> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_ImmutableStackSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ImmutableStackSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -5060,7 +5264,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
         public global::Orleans.Serialization.Codecs.ImmutableStackSurrogate<T> DeepCopy(global::Orleans.Serialization.Codecs.ImmutableStackSurrogate<T> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_NameValueCollectionSurrogate : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.NameValueCollectionSurrogate>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -5070,7 +5274,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
         public global::Orleans.Serialization.Codecs.NameValueCollectionSurrogate DeepCopy(global::Orleans.Serialization.Codecs.NameValueCollectionSurrogate result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_ReadOnlyCollectionSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ReadOnlyCollectionSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -5080,7 +5284,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
         public global::Orleans.Serialization.Codecs.ReadOnlyCollectionSurrogate<T> DeepCopy(global::Orleans.Serialization.Codecs.ReadOnlyCollectionSurrogate<T> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_ReadOnlyDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ReadOnlyDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -5090,7 +5294,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
         public global::Orleans.Serialization.Codecs.ReadOnlyDictionarySurrogate<TKey, TValue> DeepCopy(global::Orleans.Serialization.Codecs.ReadOnlyDictionarySurrogate<TKey, TValue> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_SortedDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.SortedDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -5100,7 +5304,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
         public global::Orleans.Serialization.Codecs.SortedDictionarySurrogate<TKey, TValue> DeepCopy(global::Orleans.Serialization.Codecs.SortedDictionarySurrogate<TKey, TValue> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_SortedListSurrogate<TKey, TValue> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.SortedListSurrogate<TKey, TValue>>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -5110,7 +5314,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
         public global::Orleans.Serialization.Codecs.SortedListSurrogate<TKey, TValue> DeepCopy(global::Orleans.Serialization.Codecs.SortedListSurrogate<TKey, TValue> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_SortedSetSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.SortedSetSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -5123,7 +5327,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
 
 namespace OrleansCodeGen.Orleans.Serialization.Invocation
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_CompletedResponse : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Invocation.CompletedResponse>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -5141,7 +5345,7 @@ namespace OrleansCodeGen.Orleans.Serialization.Invocation
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ExceptionResponse : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Invocation.ExceptionResponse>, global::Orleans.Serialization.Codecs.IFieldCodec

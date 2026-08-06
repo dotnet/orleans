@@ -1,9 +1,15 @@
 using System.Linq;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
 using Orleans.Runtime;
 using Orleans.DurableJobs;
+using Orleans.Journaling;
+using Orleans.Journaling.Json;
+using Orleans.Configuration;
 
 namespace Orleans.Hosting;
 
@@ -30,15 +36,25 @@ public static class DurableJobsExtensions
             return;
         }
 
+        services.TryAddSingleton<DurableJobsInstruments>();
         services.AddSingleton<IConfigurationValidator, DurableJobsOptionsValidator>();
+        services.AddSingleton<IConfigurationValidator, DurableJobsJournalingConfigurationValidator>();
         services.AddSingleton<ShardExecutor>();
         services.AddSingleton<LocalDurableJobManager>();
         services.AddFromExisting<ILocalDurableJobManager, LocalDurableJobManager>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalDurableJobManager>();
+        services.AddSingleton(sp => new DurableJobReceiverExtensionShared(
+            sp.GetRequiredService<ILogger<DurableJobReceiverExtension>>(),
+            sp.GetRequiredService<IOptions<DurableJobsOptions>>(),
+            sp.GetRequiredService<IOptions<SiloMessagingOptions>>(),
+            sp.GetKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs),
+            sp.GetRequiredService<DurableJobsInstruments>()));
         services.AddKeyedTransient<IGrainExtension>(typeof(IDurableJobReceiverExtension), (sp, _) =>
         {
             var grainContextAccessor = sp.GetRequiredService<IGrainContextAccessor>();
-            return new DurableJobReceiverExtension(grainContextAccessor.GrainContext, sp.GetRequiredService<ILogger<DurableJobReceiverExtension>>());
+            return new DurableJobReceiverExtension(
+                grainContextAccessor.GrainContext,
+                sp.GetRequiredService<DurableJobReceiverExtensionShared>());
         });
     }
 
@@ -53,8 +69,10 @@ public static class DurableJobsExtensions
     public static ISiloBuilder UseInMemoryDurableJobs(this ISiloBuilder builder)
     {
         builder.AddDurableJobs();
+        builder.AddJournalStorage();
+        builder.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
 
-        builder.ConfigureServices(services => services.UseInMemoryDurableJobs());
+        builder.ConfigureServices(services => services.UseVolatileJournaledDurableJobs());
         return builder;
     }
 
@@ -68,13 +86,32 @@ public static class DurableJobsExtensions
     /// <returns>The provided <see cref="IServiceCollection"/>, for chaining.</returns>
     internal static IServiceCollection UseInMemoryDurableJobs(this IServiceCollection services)
     {
-        services.AddSingleton<InMemoryJobShardManager>(sp =>
-        {
-            var siloDetails = sp.GetRequiredService<ILocalSiloDetails>();
-            var membershipService = sp.GetRequiredService<IClusterMembershipService>();
-            return new InMemoryJobShardManager(siloDetails.SiloAddress, membershipService);
-        });
-        services.AddFromExisting<JobShardManager, InMemoryJobShardManager>();
+        var builder = new ServiceCollectionSiloBuilder(services);
+        builder.AddJournalStorage();
+        builder.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
+        return services.UseVolatileJournaledDurableJobs();
+    }
+
+    private static IServiceCollection UseVolatileJournaledDurableJobs(this IServiceCollection services)
+    {
+        services.TryAddSingleton<VolatileJournalStorageProvider>();
+        services.AddFromExisting<IJournalStorageProvider, VolatileJournalStorageProvider>();
+        services.AddFromExisting<IJournalStorageCatalog, VolatileJournalStorageProvider>();
+        services.TryAddSingleton<JournaledJobShardManager>();
+        services.AddFromExisting<JobShardManager, JournaledJobShardManager>();
         return services;
+    }
+
+    private sealed class ServiceCollectionSiloBuilder : ISiloBuilder
+    {
+        public ServiceCollectionSiloBuilder(IServiceCollection services)
+        {
+            Services = services;
+            Configuration = new ConfigurationBuilder().Build();
+        }
+
+        public IServiceCollection Services { get; }
+
+        public IConfiguration Configuration { get; }
     }
 }

@@ -17,11 +17,15 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
         private readonly IServiceProvider serviceProvider;
         private readonly SiloConnectionOptions siloConnectionOptions;
-        private readonly object initializationLock = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock initializationLock = new();
+#else
+        private readonly object initializationLock = new();
+#endif
         private bool isInitialized;
-        private ConnectionManager connectionManager;
-        private MessageCenter messageCenter;
-        private ISiloStatusOracle siloStatusOracle;
+        private ConnectionManager connectionManager = null!;
+        private MessageCenter messageCenter = null!;
+        private ISiloStatusOracle siloStatusOracle = null!;
 
         public SiloConnectionFactory(
             IServiceProvider serviceProvider,

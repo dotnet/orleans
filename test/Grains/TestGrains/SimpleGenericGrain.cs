@@ -1,9 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
     public class SimpleGenericGrain<TType> : Grain, ISimpleGenericGrain<TType>
     {
+        [MaybeNull]
         protected TType Value { get; set; }
 
         public virtual Task Set(TType t)
@@ -19,7 +21,7 @@ namespace UnitTests.Grains
 
         public Task<TType> Get()
         {
-            return Task.FromResult(Value);
+            return Task.FromResult(Value!);
         }
 
         public Task CompareGrainReferences(ISimpleGenericGrain<TType> clientReference)

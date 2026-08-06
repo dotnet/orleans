@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Diagnostics;
 using System.Text;
@@ -90,7 +89,7 @@ namespace Orleans.Storage
         public virtual async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             var key = MakeKey(grainType, grainId);
-            LogTraceWrite(key, grainState.State!, grainState.ETag);
+            LogTraceWrite(key, grainState.State, grainState.ETag);
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try
             {
@@ -177,7 +176,7 @@ namespace Orleans.Storage
         /// http://msdn.microsoft.com/en-us/library/system.web.script.serialization.javascriptserializer.aspx
         /// for more on the JSON serializer.
         /// </remarks>
-        internal ReadOnlyMemory<byte> ConvertToStorageFormat<T>(T grainState)
+        internal ReadOnlyMemory<byte> ConvertToStorageFormat<T>(T? grainState)
         {
             // Convert to binary format
             return this.storageSerializer.Serialize<T>(grainState);
@@ -201,13 +200,13 @@ namespace Orleans.Storage
             Level = LogLevel.Trace,
             Message = "Write Keys={Keys} Data={Data} Etag={Etag}"
         )]
-        private partial void LogTraceWrite(string keys, object data, string etag);
+        private partial void LogTraceWrite(string keys, object? data, string? etag);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
             Message = "Delete Keys={Keys} Etag={Etag}"
         )]
-        private partial void LogTraceDelete(string keys, string etag);
+        private partial void LogTraceDelete(string keys, string? etag);
 
         [LoggerMessage(
             Level = LogLevel.Error,

@@ -11,7 +11,7 @@ namespace Orleans
         /// (which the standard constructor does not)
         /// </summary>
         /// <typeparam name="T">The element type</typeparam>
-        public static HashSet<T> ToSet<T>(this IEnumerable<T> values)
+        public static HashSet<T>? ToSet<T>(this IEnumerable<T>? values)
         {
             if (values == null)
                 return null;
@@ -26,7 +26,7 @@ namespace Orleans
         /// <param name="toString">Can supply null to use Object.ToString()</param>
         /// <param name="separator">Before each element, or space if unspecified</param>
         /// <returns></returns>
-        public static string ToStrings<T>(this IEnumerable<T> list, Func<T, object> toString = null, string separator = " ")
+        public static string ToStrings<T>(this IEnumerable<T>? list, Func<T, object?>? toString = null, string separator = " ")
         {
             if (list == null) return "";
             toString = toString ?? (x => x);
@@ -44,9 +44,9 @@ namespace Orleans
             return list.Aggregate("", (s, x) => s + separator + toString(x));
         }
 
-        public static T GetValueOrAddNew<T, TU>(this Dictionary<TU, T> dictionary, TU key) where T : new()
+        public static T GetValueOrAddNew<T, TU>(this Dictionary<TU, T> dictionary, TU key) where T : new() where TU : notnull
         {
-            T result;
+            T? result;
             if (dictionary.TryGetValue(key, out result))
                 return result;
 

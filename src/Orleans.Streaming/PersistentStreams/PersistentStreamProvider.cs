@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -72,10 +73,10 @@ namespace Orleans.Providers.Streams.Common
         private readonly DeepCopier deepCopier;
         private readonly IRuntimeClient runtimeClient;
         private readonly ProviderStateManager stateManager = new ProviderStateManager();
-        private IQueueAdapterFactory    adapterFactory;
-        private IQueueAdapter           queueAdapter;
-        private IPersistentStreamPullingManager pullingAgentManager;
-        private IStreamSubscriptionManager streamSubscriptionManager;
+        private IQueueAdapterFactory adapterFactory = null!;
+        private IQueueAdapter queueAdapter = null!;
+        private IPersistentStreamPullingManager? pullingAgentManager;
+        private IStreamSubscriptionManager? streamSubscriptionManager;
         private readonly StreamPubSubOptions pubsubOptions;
         private readonly StreamLifecycleOptions lifeCycleOptions;
         public string Name { get; private set; }
@@ -109,8 +110,8 @@ namespace Orleans.Providers.Streams.Common
             if (this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit
                 || this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
             {
-                this.streamSubscriptionManager = this.runtime.ServiceProvider
-                    .GetService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
+                var subscriptionManagerAdmin = this.runtime.ServiceProvider.GetService<IStreamSubscriptionManagerAdmin>()!;
+                this.streamSubscriptionManager = subscriptionManagerAdmin.GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
             }
             this.stateManager.CommitState();
         }
@@ -134,7 +135,7 @@ namespace Orleans.Providers.Streams.Common
             stateManager.CommitState();
         }
 
-        public IStreamSubscriptionManager GetStreamSubscriptionManager()
+        public IStreamSubscriptionManager? GetStreamSubscriptionManager()
         {
             return this.streamSubscriptionManager;
         }
@@ -146,7 +147,16 @@ namespace Orleans.Providers.Streams.Common
             var manager = this.pullingAgentManager;
             if (manager != null)
             {
-                await manager.Stop();
+                var stopTask = manager.Stop();
+                try
+                {
+                    await stopTask.WaitAsync(token);
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
+                {
+                    // The lifecycle deadline only bounds the observer; manager cleanup continues.
+                    stopTask.Ignore();
+                }
             }
 
             stateManager.CommitState();
@@ -175,10 +185,10 @@ namespace Orleans.Providers.Streams.Common
 
         private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream)
         {
-            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, this.runtime, this.runtime.PubSub(this.pubsubOptions.PubSubType), this.logger, IsRewindable);
+            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, this.runtime, this.runtime.PubSub(this.pubsubOptions.PubSubType)!, this.logger, IsRewindable); // Configured StreamPubSubType values always select a runtime.
         }
 
-        public Task<object> ExecuteCommand(int command, object arg)
+        public Task<object?> ExecuteCommand(int command, object? arg)
         {
             if (command >= (int)PersistentStreamProviderCommand.AdapterCommandStartRange &&
                 command <= (int)PersistentStreamProviderCommand.AdapterCommandEndRange &&
@@ -229,6 +239,6 @@ namespace Orleans.Providers.Streams.Common
             Level = LogLevel.Warning,
             Message = "Got command {Command} with arg {Argument}, but PullingAgentManager is not initialized yet. Ignoring the command."
         )]
-        private partial void LogWarningGotCommand(PersistentStreamProviderCommand command, object argument);
+        private partial void LogWarningGotCommand(PersistentStreamProviderCommand command, object? argument);
     }
 }

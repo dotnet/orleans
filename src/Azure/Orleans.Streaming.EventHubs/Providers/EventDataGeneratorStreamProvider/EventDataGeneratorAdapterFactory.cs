@@ -159,20 +159,21 @@ namespace Orleans.Streaming.EventHubs.Testing
         /// <param name="command"></param>
         /// <param name="arg"></param>
         /// <returns></returns>
-        public virtual Task<object> ExecuteCommand(int command, object arg)
+        public virtual Task<object?> ExecuteCommand(int command, object? arg)
         {
             switch (command)
             {
                 case (int)Commands.Randomly_Place_Stream_To_Queue:
-                    this.RandomlyPlaceStreamToQueue(arg as StreamRandomPlacementArg);
+                    this.RandomlyPlaceStreamToQueue((arg as StreamRandomPlacementArg)!);
                     break;
                 case (int)Commands.Stop_Producing_On_Stream:
-                    this.StopProducingOnStream((StreamId) arg);
+                    // This command is always issued with a StreamId argument.
+                    this.StopProducingOnStream((StreamId)arg!);
                     break;
                 default: break;
 
             }
-            return Task.FromResult((object)true);
+            return Task.FromResult<object?>(true);
         }
 
         public new static EventDataGeneratorAdapterFactory Create(IServiceProvider services, string name)

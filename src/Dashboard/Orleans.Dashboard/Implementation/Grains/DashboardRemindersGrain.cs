@@ -14,7 +14,7 @@ internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain
         Reminders = []
     }.AsImmutable();
 
-    private readonly IReminderTable _reminderTable;
+    private readonly IReminderTable? _reminderTable;
 
     public DashboardRemindersGrain(IServiceProvider serviceProvider)
     {

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using Newtonsoft.Json;
 using Orleans.Runtime;
 
@@ -7,7 +8,7 @@ namespace Orleans.Streams
     [Serializable]
     [JsonObject(MemberSerialization.OptIn)]
     [GenerateSerializer]
-    internal sealed class PubSubPublisherState : IEquatable<PubSubPublisherState>
+    internal sealed class PubSubPublisherState : IEquatable<PubSubPublisherState?>
     {
         // IMPORTANT!!!!!
         // These fields have to be public non-readonly for JsonSerialization to work!
@@ -28,16 +29,15 @@ namespace Orleans.Streams
             Producer = streamProducer;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals([NotNullWhen(true)] object? obj)
         {
             if (ReferenceEquals(null, obj)) return false;
-            // Note: Can't use the 'as' operator on PubSubPublisherState because it is a struct.
+            // Note: Can't use the 'as' operator on PubSubPublisherState because it is a class.
             return obj is PubSubPublisherState && Equals((PubSubPublisherState)obj);
         }
-        public bool Equals(PubSubPublisherState other)
+        public bool Equals(PubSubPublisherState? other)
         {
-            // Note: PubSubPublisherState is a struct, so 'other' can never be null.
-            return Equals(other.Stream, other.Producer);
+            return Equals(other!.Stream, other.Producer); // Preserve the legacy null dereference behavior.
         }
         public bool Equals(QualifiedStreamId streamId, GrainId streamProducer)
         {
@@ -45,13 +45,13 @@ namespace Orleans.Streams
             return Stream.Equals(streamId) && Producer.Equals(streamProducer);
         }
 
-        public static bool operator ==(PubSubPublisherState left, PubSubPublisherState right)
+        public static bool operator ==(PubSubPublisherState? left, PubSubPublisherState? right)
         {
-            return left.Equals(right);
+            return left!.Equals(right); // Preserve the legacy null dereference behavior.
         }
-        public static bool operator !=(PubSubPublisherState left, PubSubPublisherState right)
+        public static bool operator !=(PubSubPublisherState? left, PubSubPublisherState? right)
         {
-            return !left.Equals(right);
+            return !left!.Equals(right); // Preserve the legacy null dereference behavior.
         }
         public override int GetHashCode() => HashCode.Combine(Stream, Producer);
 

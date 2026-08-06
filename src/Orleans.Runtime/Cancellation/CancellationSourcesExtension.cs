@@ -30,7 +30,7 @@ namespace Orleans.Runtime
         {
             _logger = loggerFactory.CreateLogger<CancellationSourcesExtension>();
             _cancellationTokenRuntime = cancellationRuntime;
-            _cleanupTimer = new Timer(obj => ((CancellationSourcesExtension)obj).ExpireTokens(), this, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+            _cleanupTimer = new Timer(obj => ((CancellationSourcesExtension)obj!).ExpireTokens(), this, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
             _createToken = id => new Entry(new GrainCancellationToken(id, false, _cancellationTokenRuntime));
         }
 

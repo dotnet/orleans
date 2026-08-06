@@ -23,7 +23,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Adds Kubernetes hosting support.
         /// </summary>
-        public static ISiloBuilder UseKubernetesHosting(this ISiloBuilder siloBuilder, Action<OptionsBuilder<KubernetesHostingOptions>> configureOptions)
+        public static ISiloBuilder UseKubernetesHosting(this ISiloBuilder siloBuilder, Action<OptionsBuilder<KubernetesHostingOptions>>? configureOptions)
         {
             return siloBuilder.ConfigureServices(services => services.UseKubernetesHosting(configureOptions));
         }
@@ -36,7 +36,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Adds Kubernetes hosting support.
         /// </summary>
-        public static IServiceCollection UseKubernetesHosting(this IServiceCollection services, Action<OptionsBuilder<KubernetesHostingOptions>> configureOptions)
+        public static IServiceCollection UseKubernetesHosting(this IServiceCollection services, Action<OptionsBuilder<KubernetesHostingOptions>>? configureOptions)
         {
             configureOptions?.Invoke(services.AddOptions<KubernetesHostingOptions>());
 

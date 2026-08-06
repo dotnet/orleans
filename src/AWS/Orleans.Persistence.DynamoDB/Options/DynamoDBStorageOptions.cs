@@ -59,7 +59,7 @@ namespace Orleans.Configuration
         /// every StateWrite will increase the TTL of the grain
         /// </summary>
         public TimeSpan? TimeToLive { get; set; }
-        public IGrainStorageSerializer GrainStorageSerializer { get; set; }
+        public IGrainStorageSerializer GrainStorageSerializer { get; set; } = null!;
     }
 
     /// <summary>

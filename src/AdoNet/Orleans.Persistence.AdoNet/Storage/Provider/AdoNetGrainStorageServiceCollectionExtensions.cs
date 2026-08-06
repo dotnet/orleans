@@ -44,7 +44,7 @@ namespace Orleans.Hosting
         /// <remarks>
         /// Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
         /// </remarks>
-        public static IServiceCollection AddAdoNetGrainStorageAsDefault(this IServiceCollection services, Action<OptionsBuilder<AdoNetGrainStorageOptions>> configureOptions = null)
+        public static IServiceCollection AddAdoNetGrainStorageAsDefault(this IServiceCollection services, Action<OptionsBuilder<AdoNetGrainStorageOptions>>? configureOptions = null)
         {
             return services.AddAdoNetGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
         }
@@ -56,7 +56,7 @@ namespace Orleans.Hosting
         /// Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
         /// </remarks>
         public static IServiceCollection AddAdoNetGrainStorage(this IServiceCollection services, string name,
-            Action<OptionsBuilder<AdoNetGrainStorageOptions>> configureOptions = null)
+            Action<OptionsBuilder<AdoNetGrainStorageOptions>>? configureOptions = null)
         {
             configureOptions?.Invoke(services.AddOptions<AdoNetGrainStorageOptions>(name));
             services.ConfigureNamedOptionForLogging<AdoNetGrainStorageOptions>(name);

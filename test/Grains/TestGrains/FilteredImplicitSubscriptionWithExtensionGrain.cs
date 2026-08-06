@@ -18,10 +18,10 @@ namespace UnitTests.Grains
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger.LogInformation("OnActivateAsync");
-            var streamProvider = this.GetStreamProvider("SMSProvider");
+            var streamProvider = this.GetStreamProvider("MemoryStreamProvider");
 
             var streamIdentity = this.GetImplicitStreamIdentity();
-            var stream = streamProvider.GetStream<int>(streamIdentity.Namespace, streamIdentity.Guid);
+            var stream = streamProvider.GetStream<int>(streamIdentity.Namespace!, streamIdentity.Guid); // Implicit stream identities always include a namespace.
             await stream.SubscribeAsync(
                 (e, t) =>
                 {

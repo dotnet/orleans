@@ -109,6 +109,18 @@ internal partial class LocalDurableJobManager
     private static partial void LogErrorInPeriodicCheck(ILogger logger, Exception exception);
 
     [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Writable shard {ShardId} for key {ShardStartTime}/{ShardStripe} was disposed while scheduling. Removing stale entry and retrying."
+    )]
+    private static partial void LogWritableShardDisposedDuringScheduling(ILogger logger, Exception exception, string shardId, DateTimeOffset shardStartTime, int shardStripe);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Expired writable shard {ShardId} for key {ShardStartTime}/{ShardStripe} was already disposed while completing. Removing stale entry."
+    )]
+    private static partial void LogExpiredWritableShardAlreadyDisposed(ILogger logger, Exception exception, string shardId, DateTimeOffset shardStartTime, int shardStripe);
+
+    [LoggerMessage(
         Level = LogLevel.Information,
         Message = "Unregistered shard {ShardId}"
     )]
@@ -128,7 +140,25 @@ internal partial class LocalDurableJobManager
 
     [LoggerMessage(
         Level = LogLevel.Information,
-        Message = "Creating new shard for key {ShardKey}"
+        Message = "Creating new shard for key {ShardStartTime}/{ShardStripe}"
     )]
-    private static partial void LogCreatingNewShard(ILogger logger, DateTimeOffset shardKey);
+    private static partial void LogCreatingNewShard(ILogger logger, DateTimeOffset shardStartTime, int shardStripe);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Claimed {NewClaims} new orphaned shard(s) this cycle (total claimed: {TotalClaimed})"
+    )]
+    private static partial void LogOrphanedShardsClaimed(ILogger logger, int newClaims, int totalClaimed);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Shard claim budget: {Budget} (totalBudget={TotalBudget}, alreadyClaimed={AlreadyClaimed}, elapsed={Elapsed}, rampUpDuration={RampUpDuration})"
+    )]
+    private static partial void LogShardClaimBudget(ILogger logger, int budget, int totalBudget, int alreadyClaimed, TimeSpan elapsed, TimeSpan rampUpDuration);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Silo is overloaded, pausing all new shard claims"
+    )]
+    private static partial void LogOverloadPausingShardClaims(ILogger logger);
 }

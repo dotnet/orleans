@@ -7,10 +7,10 @@ namespace Orleans.Networking.Shared
 {
     internal sealed class IOQueue : PipeScheduler,  IThreadPoolWorkItem
     {
-        private readonly ConcurrentQueue<(Action<object> Callback, object State)> _workItems = new();
+        private readonly ConcurrentQueue<(Action<object?> Callback, object? State)> _workItems = new();
         private int _doingWork;
 
-        public override void Schedule(Action<object> action, object state)
+        public override void Schedule(Action<object?> action, object? state)
         {
             _workItems.Enqueue((action, state));
 

@@ -11,11 +11,12 @@ permissions:
 
 jobs:
   generate-and-pr:
+    if: github.repository == 'dotnet/orleans'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
         with:
           global-json-file: global.json
 
@@ -30,10 +31,35 @@ jobs:
         continue-on-error: true
 
       - name: Create or update pull request
-        uses: dotnet/actions-create-pull-request@e8d799aa1f8b17f324f9513832811b0a62f1e0b1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: update-api-diffs
-          base: main
-          title: "[Automated] Update API Surface Area"
-          body: "Auto-generated update to the API surface to compare current surface vs latest release. This should only be merged once this surface area ships in a new release."
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_BRANCH: update-api-diffs
+          PR_TITLE: "[Automated] Update API Surface Area"
+          PR_BODY: "Auto-generated update to the API surface to compare current surface vs latest release. This should only be merged once this surface area ships in a new release."
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No API surface changes detected."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          git commit -m "$PR_TITLE"
+
+          push_options=(--force-with-lease="refs/heads/$PR_BRANCH:")
+          if remote_ref=$(git ls-remote --exit-code --heads origin "$PR_BRANCH" | cut -f1); then
+            push_options=(--force-with-lease="refs/heads/$PR_BRANCH:$remote_ref")
+          fi
+          git push "${push_options[@]}" origin HEAD:"$PR_BRANCH"
+
+          repo_owner=${GITHUB_REPOSITORY%%/*}
+          pr_number=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$PR_BRANCH" --base main --state open --json number,headRepositoryOwner --jq "[.[] | select(.headRepositoryOwner.login == \"$repo_owner\")][0].number // empty")
+          if [[ -n "$pr_number" ]]; then
+            gh pr edit "$pr_number" --repo "$GITHUB_REPOSITORY" --title "$PR_TITLE" --body "$PR_BODY" --base main
+          else
+            gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$PR_BRANCH" --title "$PR_TITLE" --body "$PR_BODY"
+          fi

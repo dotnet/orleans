@@ -14,7 +14,7 @@ namespace Orleans.Hosting;
 
 internal sealed class AdoNetClusteringProviderBuilder : IProviderBuilder<ISiloBuilder>, IProviderBuilder<IClientBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseAdoNetClustering((OptionsBuilder<AdoNetClusteringSiloOptions> optionsBuilder) => optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {
@@ -38,7 +38,7 @@ internal sealed class AdoNetClusteringProviderBuilder : IProviderBuilder<ISiloBu
             }));
     }
 
-    public void Configure(IClientBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(IClientBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseAdoNetClustering((OptionsBuilder<AdoNetClusteringClientOptions> optionsBuilder) => optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {

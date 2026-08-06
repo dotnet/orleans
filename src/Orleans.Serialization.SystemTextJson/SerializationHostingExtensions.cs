@@ -23,8 +23,8 @@ public static class SerializationHostingExtensions
     /// <param name="jsonSerializerOptions">The JSON serializer options.</param>
     public static ISerializerBuilder AddJsonSerializer(
         this ISerializerBuilder serializerBuilder,
-        Func<Type, bool> isSupported,
-        JsonSerializerOptions jsonSerializerOptions = null)
+        Func<Type, bool>? isSupported,
+        JsonSerializerOptions? jsonSerializerOptions = null)
         => serializerBuilder.AddJsonSerializer(
             isSupported,
             isSupported,
@@ -45,9 +45,9 @@ public static class SerializationHostingExtensions
     /// <param name="configureOptions">A delegate used to configure the options for the JSON serializer.</param>
     public static ISerializerBuilder AddJsonSerializer(
         this ISerializerBuilder serializerBuilder,
-        Func<Type, bool> isSerializable,
-        Func<Type, bool> isCopyable,
-        Action<OptionsBuilder<JsonCodecOptions>> configureOptions = null)
+        Func<Type, bool>? isSerializable,
+        Func<Type, bool>? isCopyable,
+        Action<OptionsBuilder<JsonCodecOptions>>? configureOptions = null)
     {
         var services = serializerBuilder.Services;
         if (configureOptions != null)

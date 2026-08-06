@@ -12,7 +12,10 @@ namespace Tester
 
         public static void CheckForAzureStorage()
         {
-            AzuriteContainerManager.EnsureStarted();
+            if (!UseAadAuthentication && string.IsNullOrWhiteSpace(DataConnectionString))
+            {
+                AzuriteContainerManager.EnsureStarted();
+            }
         }
 
         public static void CheckForEventHub()

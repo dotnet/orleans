@@ -69,7 +69,7 @@ namespace Orleans
         /// The format string.
         /// </param>
         /// <returns>A formatted key-value pair.</returns>
-        public static string Format(object key, object value, string formatting = null)
+        public static string Format(object? key, object? value, string? formatting = null)
         {
             var valueFormat = formatting ?? DefaultFormatFormatting;
             return string.Format(valueFormat, key, value);
@@ -82,9 +82,9 @@ namespace Orleans
         /// <param name="name">The options name.</param>
         /// <param name="formatting">The format string.</param>
         /// <returns>The formatted options object name.</returns>
-        public static string Name<TOptions>(string name = null, string formatting = null)
+        public static string Name<TOptions>(string? name = null, string? formatting = null)
         {
-            return name is null && formatting is null ? typeof(TOptions).FullName
+            return name is null && formatting is null ? typeof(TOptions).FullName!
                 : string.Format(formatting ?? DefaultNamedFormatting, typeof(TOptions).FullName, name);
         }
     }

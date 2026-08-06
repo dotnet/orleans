@@ -27,7 +27,7 @@ namespace Orleans.Streams
         /// A Pub Sub runtime interface.
         /// </summary>
         /// <returns></returns>
-        IStreamPubSub PubSub(StreamPubSubType pubSubType);
+        IStreamPubSub? PubSub(StreamPubSubType pubSubType);
     }
 
     /// <summary>
@@ -69,7 +69,7 @@ namespace Orleans.Streams
 
         Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer);
 
-        Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string filterData);
+        Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string? filterData);
 
         Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId);
 

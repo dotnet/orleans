@@ -10,8 +10,8 @@ namespace Orleans.Runtime.Versions
     {
         Task<Dictionary<GrainInterfaceType, CompatibilityStrategy>> GetCompatibilityStrategies();
         Task<Dictionary<GrainInterfaceType, VersionSelectorStrategy>> GetSelectorStrategies();
-        Task<CompatibilityStrategy> GetCompatibilityStrategy();
-        Task<VersionSelectorStrategy> GetSelectorStrategy();
+        Task<CompatibilityStrategy?> GetCompatibilityStrategy();
+        Task<VersionSelectorStrategy?> GetSelectorStrategy();
         Task SetCompatibilityStrategy(CompatibilityStrategy strategy);
         Task SetSelectorStrategy(VersionSelectorStrategy strategy);
         Task SetCompatibilityStrategy(GrainInterfaceType interfaceType, CompatibilityStrategy strategy);
@@ -26,9 +26,9 @@ namespace Orleans.Runtime.Versions
         [Id(1)]
         public readonly Dictionary<GrainInterfaceType, VersionSelectorStrategy> VersionSelectorStrategies = new();
         [Id(2)]
-        public VersionSelectorStrategy SelectorOverride;
+        public VersionSelectorStrategy? SelectorOverride;
         [Id(3)]
-        public CompatibilityStrategy CompatibilityOverride;
+        public CompatibilityStrategy? CompatibilityOverride;
     }
 
     [StorageProvider(ProviderName = ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)]
@@ -36,25 +36,25 @@ namespace Orleans.Runtime.Versions
     {
         public async Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
         {
-            this.State.CompatibilityOverride = strategy;
+            this.State!.CompatibilityOverride = strategy; // Grain state is initialized before grain calls are dispatched.
             await this.WriteStateAsync();
         }
 
         public async Task SetSelectorStrategy(VersionSelectorStrategy strategy)
         {
-            this.State.SelectorOverride = strategy;
+            this.State!.SelectorOverride = strategy; // Grain state is initialized before grain calls are dispatched.
             await this.WriteStateAsync();
         }
 
         public async Task SetCompatibilityStrategy(GrainInterfaceType ifaceId, CompatibilityStrategy strategy)
         {
-            this.State.CompatibilityStrategies[ifaceId] = strategy;
+            this.State!.CompatibilityStrategies[ifaceId] = strategy; // Grain state is initialized before grain calls are dispatched.
             await this.WriteStateAsync();
         }
 
         public async Task SetSelectorStrategy(GrainInterfaceType ifaceId, VersionSelectorStrategy strategy)
         {
-            this.State.VersionSelectorStrategies[ifaceId] = strategy;
+            this.State!.VersionSelectorStrategies[ifaceId] = strategy; // Grain state is initialized before grain calls are dispatched.
             await this.WriteStateAsync();
         }
 
@@ -62,22 +62,22 @@ namespace Orleans.Runtime.Versions
 
         public Task<Dictionary<GrainInterfaceType, CompatibilityStrategy>> GetCompatibilityStrategies()
         {
-            return Task.FromResult(this.State.CompatibilityStrategies);
+            return Task.FromResult(this.State!.CompatibilityStrategies); // Grain state is initialized before grain calls are dispatched.
         }
 
         public Task<Dictionary<GrainInterfaceType, VersionSelectorStrategy>> GetSelectorStrategies()
         {
-            return Task.FromResult(this.State.VersionSelectorStrategies);
+            return Task.FromResult(this.State!.VersionSelectorStrategies); // Grain state is initialized before grain calls are dispatched.
         }
 
-        public Task<CompatibilityStrategy> GetCompatibilityStrategy()
+        public Task<CompatibilityStrategy?> GetCompatibilityStrategy()
         {
-            return Task.FromResult(this.State.CompatibilityOverride);
+            return Task.FromResult(this.State!.CompatibilityOverride); // Grain state is initialized before grain calls are dispatched.
         }
 
-        public Task<VersionSelectorStrategy> GetSelectorStrategy()
+        public Task<VersionSelectorStrategy?> GetSelectorStrategy()
         {
-            return Task.FromResult(this.State.SelectorOverride);
+            return Task.FromResult(this.State!.SelectorOverride); // Grain state is initialized before grain calls are dispatched.
         }
     }
 }

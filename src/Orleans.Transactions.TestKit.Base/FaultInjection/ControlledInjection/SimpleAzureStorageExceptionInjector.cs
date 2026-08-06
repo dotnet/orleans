@@ -6,12 +6,14 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Transactions.TestKit
 {
-    public class SimpleAzureStorageExceptionInjector : IControlledTransactionFaultInjector
+    public partial class SimpleAzureStorageExceptionInjector : IControlledTransactionFaultInjector
     {
         public bool InjectBeforeStore { get; set; }
         public bool InjectAfterStore { get; set; }
+        public bool InjectGenericAfterStore { get; set; }
         private int injectionBeforeStoreCounter = 0;
         private int injectionAfterStoreCounter = 0;
+        private int genericInjectionAfterStoreCounter = 0;
         private readonly ILogger logger;
         public SimpleAzureStorageExceptionInjector(ILogger<SimpleAzureStorageExceptionInjector> logger)
         {
@@ -25,8 +27,17 @@ namespace Orleans.Transactions.TestKit
                 InjectAfterStore = false;
                 this.injectionAfterStoreCounter++;
                 var message = $"Storage exception thrown after store, thrown total {injectionAfterStoreCounter}";
-                this.logger.LogInformation(message);
+                LogInformationMessage(this.logger, message);
                 throw new SimpleAzureStorageException(message);
+            }
+
+            if (InjectGenericAfterStore)
+            {
+                InjectGenericAfterStore = false;
+                this.genericInjectionAfterStoreCounter++;
+                var message = $"Generic storage exception thrown after store, thrown total {genericInjectionAfterStoreCounter}";
+                LogInformationMessage(this.logger, message);
+                throw new InvalidOperationException(message);
             }
         }
 
@@ -37,10 +48,16 @@ namespace Orleans.Transactions.TestKit
                 InjectBeforeStore = false;
                 this.injectionBeforeStoreCounter++;
                 var message = $"Storage exception thrown before store. Thrown total {injectionBeforeStoreCounter}";
-                this.logger.LogInformation(message);
+                LogInformationMessage(this.logger, message);
                 throw new SimpleAzureStorageException(message);
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "{Message}"
+        )]
+        private static partial void LogInformationMessage(ILogger logger, string message);
     }
 
     [GenerateSerializer]

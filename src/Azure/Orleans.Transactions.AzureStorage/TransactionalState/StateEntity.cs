@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using Azure;
@@ -41,7 +42,7 @@ namespace Orleans.Transactions.AzureStorage
         public const string RK_MIN = RK_PREFIX;
         public const string RK_MAX = RK_PREFIX + "~";
 
-        public string TransactionId
+        public string? TransactionId
         {
             get => this.GetPropertyOrDefault(nameof(this.TransactionId)) as string;
             set => this.Entity[nameof(this.TransactionId)] = value;
@@ -53,12 +54,13 @@ namespace Orleans.Transactions.AzureStorage
             set => this.Entity[nameof(this.TransactionTimestamp)] = new DateTimeOffset(value.ToUniversalTime());
         }
 
-        public string TransactionManager
+        public string? TransactionManager
         {
             get => this.GetPropertyOrDefault(nameof(this.TransactionManager)) as string;
             set => this.Entity[nameof(this.TransactionManager)] = value;
         }
 
+        [AllowNull]
         public string StateJson { get => this.GetStateInternal(); set => this.SetStateInternal(value); }
 
         public static StateEntity Create<T>(JsonSerializerSettings JsonSettings,
@@ -79,7 +81,7 @@ namespace Orleans.Transactions.AzureStorage
 
         public T GetState<T>(JsonSerializerSettings jsonSettings)
         {
-            return JsonConvert.DeserializeObject<T>(this.GetStateInternal(), jsonSettings);
+            return JsonConvert.DeserializeObject<T>(this.GetStateInternal(), jsonSettings)!;
         }
 
         public void SetState<T>(T state, JsonSerializerSettings jsonSettings)
@@ -87,7 +89,7 @@ namespace Orleans.Transactions.AzureStorage
             this.SetStateInternal(JsonConvert.SerializeObject(state, jsonSettings));
         }
 
-        private void SetStateInternal(string stringData)
+        private void SetStateInternal(string? stringData)
         {
             CheckMaxDataSize((stringData ?? string.Empty).Length * 2, MAX_DATA_CHUNK_SIZE * MAX_DATA_CHUNKS_COUNT);
 
@@ -101,7 +103,7 @@ namespace Orleans.Transactions.AzureStorage
                 this.Entity[entry.Key] = entry.Value;
             }
 
-            static IEnumerable<KeyValuePair<string, object>> SplitStringData(string stringData)
+            static IEnumerable<KeyValuePair<string, object>> SplitStringData(string? stringData)
             {
                 if (string.IsNullOrEmpty(stringData)) yield break;
 
@@ -140,7 +142,7 @@ namespace Orleans.Transactions.AzureStorage
             }
         }
 
-        private object GetPropertyOrDefault(string key)
+        private object? GetPropertyOrDefault(string key)
         {
             this.Entity.TryGetValue(key, out var result);
             return result;

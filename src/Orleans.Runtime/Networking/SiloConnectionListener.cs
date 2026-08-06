@@ -44,7 +44,7 @@ namespace Orleans.Runtime.Messaging
             this.endpointOptions = endpointOptions.Value;
         }
 
-        public override EndPoint Endpoint => this.endpointOptions.GetListeningSiloEndpoint();
+        public override EndPoint? Endpoint => this.endpointOptions.GetListeningSiloEndpoint();
 
         protected override Connection CreateConnection(ConnectionContext context)
         {

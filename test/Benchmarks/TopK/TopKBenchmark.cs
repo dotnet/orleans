@@ -10,14 +10,14 @@ namespace Benchmarks.TopK;
 [MemoryDiagnoser]
 public class TopKBenchmark
 {
-    private ZipfRejectionSampler _sampler;
-    private ulong[] ULongSamples;
-    private Edge[] EdgeSamples;
-    private EdgeClass[] EdgeClassSamples;
-    private UlongFrequentItemCollection _fss;
-    private EdgeClassFrequentItemCollection _fssClass;
-    private EdgeFrequentItemCollection _fssEdge;
-    private FrequencySink _sink;
+    private ZipfRejectionSampler _sampler = null!;
+    private ulong[] ULongSamples = null!;
+    private Edge[] EdgeSamples = null!;
+    private EdgeClass[] EdgeClassSamples = null!;
+    private UlongFrequentItemCollection _fss = null!;
+    private EdgeClassFrequentItemCollection _fssClass = null!;
+    private EdgeFrequentItemCollection _fssEdge = null!;
+    private FrequencySink _sink = null!;
 
     [Params(100_000, Priority = 3)]
     public int Pop { get; set; }

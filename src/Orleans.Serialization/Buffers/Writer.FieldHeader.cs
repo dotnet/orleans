@@ -16,7 +16,7 @@ namespace Orleans.Serialization.Buffers
         /// <param name="actualType">The actual type.</param>
         /// <param name="wireType">The wire type.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteFieldHeader(uint fieldId, Type expectedType, Type actualType, WireType wireType)
+        public void WriteFieldHeader(uint fieldId, Type? expectedType, Type? actualType, WireType wireType)
         {
             var embeddedFieldId = fieldId > Tag.MaxEmbeddedFieldIdDelta ? Tag.FieldIdCompleteMask : fieldId;
             var tag = (uint)wireType | embeddedFieldId;
@@ -169,7 +169,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static Type ReadType<TInput>(this ref Reader<TInput> reader, SchemaType schemaType)
+        private static Type? ReadType<TInput>(this ref Reader<TInput> reader, SchemaType schemaType)
         {
             switch (schemaType)
             {
@@ -189,7 +189,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static (Type type, string typeName) ReadTypeForAnalysis<TInput>(this ref Reader<TInput> reader, SchemaType schemaType)
+        private static (Type? type, string typeName) ReadTypeForAnalysis<TInput>(this ref Reader<TInput> reader, SchemaType schemaType)
         {
             switch (schemaType)
             {
@@ -201,7 +201,7 @@ namespace Orleans.Serialization.Codecs
                     }
                 case SchemaType.Encoded:
                     {
-                        var found = reader.Session.TypeCodec.TryReadForAnalysis(ref reader, out Type encoded, out var typeString);
+                        var found = reader.Session.TypeCodec.TryReadForAnalysis(ref reader, out var encoded, out var typeString);
                         reader.Session.ReferencedTypes.RecordReferencedType(encoded);
                         return (encoded, $"Encoded \"{typeString}\" ({(found ? encoded is null ? "null" : RuntimeTypeNameFormatter.Format(encoded) : "not found")})");
                     }
@@ -226,7 +226,7 @@ namespace Orleans.Serialization.Codecs
         public static (Field Field, string Type) ReadFieldHeaderForAnalysis<TInput>(ref this Reader<TInput> reader)
         {
             Unsafe.SkipInit(out Field field);
-            string type = default;
+            string type = default!;
             var tag = (uint)reader.ReadByte();
             field.Tag = new(tag);
             if (tag < (byte)WireType.Extended && ((tag & Tag.FieldIdCompleteMask) == Tag.FieldIdCompleteMask || (tag & Tag.SchemaTypeMask) != (byte)SchemaType.Expected))

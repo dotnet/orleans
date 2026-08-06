@@ -19,7 +19,7 @@ namespace UnitTests.Grains
             [Id(1)]
             public int ErrorCounter { get; set; }
             [Id(2)]
-            public StreamSequenceToken Token { get; set; }
+            public StreamSequenceToken? Token { get; set; }
         }
 
         public ImplicitSubscriptionCounterGrain(ILoggerFactory loggerFactory)
@@ -55,7 +55,7 @@ namespace UnitTests.Grains
 
             await handleFactory.Create<byte[]>().ResumeAsync(OnNext, OnError, OnCompleted, this.State.Token);
 
-            async Task OnNext(byte[] value, StreamSequenceToken token)
+            async Task OnNext(byte[] value, StreamSequenceToken? token)
             {
                 this.logger.LogInformation("Received: [{Value} {Token}]", value, token);
                 this.State.EventCounter++;

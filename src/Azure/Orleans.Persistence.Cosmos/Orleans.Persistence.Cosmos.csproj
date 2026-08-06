@@ -29,7 +29,7 @@
 
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
-      <_Parameter1>Tester.Cosmos</_Parameter1>
+      <_Parameter1>Orleans.Cosmos.Tests</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
 

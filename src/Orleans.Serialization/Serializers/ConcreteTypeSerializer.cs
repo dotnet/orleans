@@ -31,17 +31,17 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] TField value) where TBufferWriter : IBufferWriter<byte>
         {
             if (value is null || value.GetType() as object == CodecFieldType as object)
             {
-                if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
+                if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value!))
                 {
                     return;
                 }
 
                 writer.WriteStartObject(fieldIdDelta, expectedType, CodecFieldType);
-                _serializer.Serialize(ref writer, value);
+                _serializer.Serialize(ref writer, value!);
                 writer.WriteEndObject();
             }
             else
@@ -51,6 +51,7 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public TField ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -70,6 +71,7 @@ namespace Orleans.Serialization.Serializers
             return reader.DeserializeUnexpectedType<TInput, TField>(ref field);
         }
 
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public TField ReadValueSealed<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)

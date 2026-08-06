@@ -10,10 +10,12 @@ namespace Orleans.Configuration
 {
     public partial class AdoNetGrainStorageOptions : Storage.IStorageProviderSerializerOptions
     {
-        public const string DEFAULT_ADONET_INVARIANT = "System.Data.SqlClient";
+        public const string DEFAULT_ADONET_INVARIANT = "Microsoft.Data.SqlClient";
         public const int DEFAULT_INIT_STAGE = 10000;
         [Redact]
         public string ConnectionString { get { throw null; } set { } }
+
+        public bool DeleteStateOnClear { get { throw null; } set { } }
 
         public Storage.IGrainStorageSerializer GrainStorageSerializer { get { throw null; } set { } }
 
@@ -35,7 +37,7 @@ namespace Orleans.Configuration
 
     public partial class DefaultAdoNetGrainStorageOptionsHashPickerConfigurator : Microsoft.Extensions.Options.IPostConfigureOptions<AdoNetGrainStorageOptions>
     {
-        public void PostConfigure(string name, AdoNetGrainStorageOptions options) { }
+        public void PostConfigure(string? name, AdoNetGrainStorageOptions options) { }
     }
 }
 
@@ -45,20 +47,20 @@ namespace Orleans.Hosting
     {
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAdoNetGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Configuration.AdoNetGrainStorageOptions> configureOptions) { throw null; }
 
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAdoNetGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AdoNetGrainStorageOptions>> configureOptions = null) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAdoNetGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AdoNetGrainStorageOptions>>? configureOptions = null) { throw null; }
 
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAdoNetGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Configuration.AdoNetGrainStorageOptions> configureOptions) { throw null; }
 
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAdoNetGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AdoNetGrainStorageOptions>> configureOptions = null) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddAdoNetGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AdoNetGrainStorageOptions>>? configureOptions = null) { throw null; }
     }
 
     public static partial class AdoNetGrainStorageSiloBuilderExtensions
     {
-        public static ISiloBuilder AddAdoNetGrainStorage(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AdoNetGrainStorageOptions>> configureOptions = null) { throw null; }
+        public static ISiloBuilder AddAdoNetGrainStorage(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AdoNetGrainStorageOptions>>? configureOptions = null) { throw null; }
 
         public static ISiloBuilder AddAdoNetGrainStorage(this ISiloBuilder builder, string name, System.Action<Configuration.AdoNetGrainStorageOptions> configureOptions) { throw null; }
 
-        public static ISiloBuilder AddAdoNetGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AdoNetGrainStorageOptions>> configureOptions = null) { throw null; }
+        public static ISiloBuilder AddAdoNetGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AdoNetGrainStorageOptions>>? configureOptions = null) { throw null; }
 
         public static ISiloBuilder AddAdoNetGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Configuration.AdoNetGrainStorageOptions> configureOptions) { throw null; }
     }
@@ -70,7 +72,7 @@ namespace Orleans.Storage
     public partial class AdoNetGrainStorage : IGrainStorage, ILifecycleParticipant<Runtime.ISiloLifecycle>
     {
         public const string BinaryFormatSerializerTag = "BinaryFormatSerializer";
-        public const string DefaultInitializationQuery = "SELECT QueryKey, QueryText FROM OrleansQuery WHERE QueryKey = 'WriteToStorageKey' OR QueryKey = 'ReadFromStorageKey' OR QueryKey = 'ClearStorageKey'";
+        public const string DefaultInitializationQuery = "SELECT QueryKey, QueryText FROM OrleansQuery WHERE QueryKey = 'WriteToStorageKey' OR QueryKey = 'ReadFromStorageKey' OR QueryKey = 'ClearStorageKey' OR QueryKey = 'DeleteStorageKey'";
         public const string JsonFormatSerializerTag = "JsonFormatSerializer";
         public const string XmlFormatSerializerTag = "XmlFormatSerializer";
         public AdoNetGrainStorage(Serialization.Serializers.IActivatorProvider activatorProvider, Microsoft.Extensions.Logging.ILogger<AdoNetGrainStorage> logger, Microsoft.Extensions.Options.IOptions<Configuration.AdoNetGrainStorageOptions> options, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, string name) { }
@@ -106,14 +108,14 @@ namespace Orleans.Storage
     {
         System.Collections.Generic.ICollection<IHasher> HashProviders { get; }
 
-        IHasher PickHasher<T>(string serviceId, string storageProviderInstanceName, string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, string tag = null);
+        IHasher? PickHasher<T>(string serviceId, string storageProviderInstanceName, string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, string? tag = null);
     }
 
     public partial class Orleans3CompatibleStorageHashPicker : IStorageHasherPicker
     {
         public System.Collections.Generic.ICollection<IHasher> HashProviders { get { throw null; } }
 
-        public IHasher PickHasher<T>(string serviceId, string storageProviderInstanceName, string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, string tag = null) { throw null; }
+        public IHasher PickHasher<T>(string serviceId, string storageProviderInstanceName, string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, string? tag = null) { throw null; }
     }
 
     public sealed partial class OrleansDefaultHasher : IHasher
@@ -125,9 +127,11 @@ namespace Orleans.Storage
 
     public partial class RelationalStorageProviderQueries
     {
-        public RelationalStorageProviderQueries(string writeToStorage, string readFromStorage, string clearState) { }
+        public RelationalStorageProviderQueries(string writeToStorage, string readFromStorage, string clearState, string? deleteState) { }
 
         public string ClearState { get { throw null; } set { } }
+
+        public string? DeleteState { get { throw null; } set { } }
 
         public string ReadFromStorage { get { throw null; } set { } }
 
@@ -140,6 +144,6 @@ namespace Orleans.Storage
 
         public System.Collections.Generic.ICollection<IHasher> HashProviders { get { throw null; } }
 
-        public IHasher PickHasher<T>(string serviceId, string storageProviderInstanceName, string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, string tag = null) { throw null; }
+        public IHasher? PickHasher<T>(string serviceId, string storageProviderInstanceName, string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, string? tag = null) { throw null; }
     }
 }

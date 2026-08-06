@@ -1,0 +1,21 @@
+using System;
+namespace Orleans.Hosting;
+
+/// <summary>
+/// Extensions to <see cref="IClientBuilder"/> for configuring Redis streams.
+/// </summary>
+public static class ClientBuilderExtensions
+{
+    /// <summary>
+    /// Configure cluster client to use Redis streams.
+    /// </summary>
+    public static IClientBuilder AddRedisStreams(this IClientBuilder builder, string name, Action<ClusterClientRedisStreamConfigurator> configure)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        var configurator = new ClusterClientRedisStreamConfigurator(name, builder);
+        configure.Invoke(configurator);
+        return builder;
+    }
+}

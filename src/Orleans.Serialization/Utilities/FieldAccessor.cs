@@ -40,7 +40,7 @@ namespace Orleans.Serialization.Utilities
 
         private static Delegate GetGetter(Type declaringType, string fieldName, bool byref)
         {
-            var field = declaringType.GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            var field = declaringType.GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!;
             var parameterTypes = new[] { typeof(object), byref ? declaringType.MakeByRefType() : declaringType };
 
             var method = new DynamicMethod(fieldName + "Get", field.FieldType, parameterTypes, typeof(FieldAccessor).Module, true);
@@ -68,7 +68,7 @@ namespace Orleans.Serialization.Utilities
 
         private static Delegate GetSetter(Type declaringType, string fieldName, bool byref)
         {
-            var field = declaringType.GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            var field = declaringType.GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!;
             var parameterTypes = new[] { typeof(object), byref ? declaringType.MakeByRefType() : declaringType, field.FieldType };
 
             var method = new DynamicMethod(fieldName + "Set", null, parameterTypes, typeof(FieldAccessor).Module, true);

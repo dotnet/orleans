@@ -14,9 +14,9 @@ namespace Orleans.Hosting;
 
 internal sealed class AdoNetGrainStorageProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.AddAdoNetGrainStorage(name, (OptionsBuilder<AdoNetGrainStorageOptions> optionsBuilder) => optionsBuilder.Configure<IServiceProvider>((options, services) =>
+        builder.AddAdoNetGrainStorage(name!, (OptionsBuilder<AdoNetGrainStorageOptions> optionsBuilder) => optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {
                 var invariant = configurationSection[nameof(options.Invariant)];
                 if (!string.IsNullOrEmpty(invariant))

@@ -1,0 +1,7 @@
+﻿0x0031 [#1 TagDelimited Id: 0 SchemaType: Encoded RuntimeType: Orleans.Serialization.Codecs.DictionaryInterfaceCodec`2[System.String,System.Int32] (name: Encoded "TypeName "DictionaryInterfaceCodec`2[[string],[int]]" (hash 1D6FD9D8)" (Orleans.Serialization.Codecs.DictionaryInterfaceCodec`2[[System.String],[System.Int32]],Orleans.Serialization))] Value: {
+0x0032  [#2 VarInt Id: 1 SchemaType: Expected] Value: 2 (0x2)
+0x0034  [#3 LengthPrefixed Id: 2 SchemaType: Expected] Value: (length: 1b) ["a"]
+0x0037  [#4 VarInt Id: 2 SchemaType: Expected] Value: 2 (0x2)
+0x0039  [#5 LengthPrefixed Id: 2 SchemaType: Expected] Value: (length: 1b) ["b"]
+0x003C  [#6 VarInt Id: 2 SchemaType: Expected] Value: 4 (0x4)
+0x003E }

@@ -13,7 +13,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly GrainDirectoryResolver grainDirectoryResolver;
         private readonly CachedGrainLocator cachedGrainLocator;
         private readonly DhtGrainLocator dhtGrainLocator;
-        private ClientGrainLocator _clientGrainLocator;
+        private ClientGrainLocator? _clientGrainLocator;
 
         public GrainLocatorResolver(
             IServiceProvider servicesProvider,

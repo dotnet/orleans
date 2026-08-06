@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Utilities;
@@ -16,10 +17,14 @@ namespace Orleans
     /// </remarks>
     public class GrainInterfaceTypeToGrainTypeResolver
     {
-        private readonly object _lockObj = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock _lockObj = new();
+#else
+        private readonly object _lockObj = new();
+#endif
         private readonly ConcurrentDictionary<GrainInterfaceType, GrainType> _genericMapping = new ConcurrentDictionary<GrainInterfaceType, GrainType>();
         private readonly IClusterManifestProvider _clusterManifestProvider;
-        private Cache _cache;
+        private Cache? _cache;
 
         /// <summary>
         /// Creates a new instance of the <see cref="GrainInterfaceTypeToGrainTypeResolver"/> class.
@@ -178,7 +183,7 @@ namespace Orleans
             lock (_lockObj)
             {
                 var manifest = _clusterManifestProvider.Current;
-                cache = _cache;
+                cache = _cache!;
                 if (cache is not null && cache.Version == manifest.Version)
                 {
                     return cache;
@@ -208,7 +213,7 @@ namespace Orleans
                     {
                         if (!property.Key.StartsWith(WellKnownGrainTypeProperties.ImplementedInterfacePrefix, StringComparison.Ordinal)) continue;
                         var implemented = GrainInterfaceType.Create(property.Value);
-                        string interfaceTypeName;
+                        string? interfaceTypeName;
                         if (manifest.Interfaces.TryGetValue(implemented, out var interfaceProperties))
                         {
                             interfaceProperties.Properties.TryGetValue(WellKnownGrainInterfaceProperties.TypeName, out interfaceTypeName);
@@ -222,7 +227,7 @@ namespace Orleans
                         result.TryGetValue(implemented, out var entry);
 
                         var implementations = entry.Implementations ?? new List<(string Prefix, GrainType GrainType)>();
-                        if (!implementations.Contains((fullTypeName, id))) implementations.Add((fullTypeName, id));
+                        if (!implementations.Contains((fullTypeName!, id))) implementations.Add((fullTypeName!, id));
 
                         GrainType primaryImplementation;
                         if (!entry.PrimaryImplementation.IsDefault)

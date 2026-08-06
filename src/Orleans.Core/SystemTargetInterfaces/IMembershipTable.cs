@@ -132,16 +132,16 @@ namespace Orleans
         public TableVersion Next() => new (Version + 1, VersionEtag);
 
         public override string ToString() => $"<{Version}, {VersionEtag}>";
-        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
-        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
             => destination.TryWrite($"<{Version}, {VersionEtag}>", out charsWritten);
 
-        public override bool Equals(object obj) => Equals(obj as TableVersion);
+        public override bool Equals(object? obj) => Equals(obj as TableVersion);
         public override int GetHashCode() => HashCode.Combine(Version, VersionEtag);
-        public bool Equals(TableVersion other) => other is not null && Version == other.Version && VersionEtag == other.VersionEtag;
-        public static bool operator ==(TableVersion left, TableVersion right) => EqualityComparer<TableVersion>.Default.Equals(left, right);
-        public static bool operator !=(TableVersion left, TableVersion right) => !(left == right);
+        public bool Equals(TableVersion? other) => other is not null && Version == other.Version && VersionEtag == other.VersionEtag;
+        public static bool operator ==(TableVersion? left, TableVersion? right) => EqualityComparer<TableVersion>.Default.Equals(left, right);
+        public static bool operator !=(TableVersion? left, TableVersion? right) => !(left == right);
     }
 
     [Serializable]
@@ -180,7 +180,7 @@ namespace Orleans
             Version = version;
         }
 
-        public Tuple<MembershipEntry, string> TryGet(SiloAddress silo)
+        public Tuple<MembershipEntry, string>? TryGet(SiloAddress silo)
         {
             foreach (var item in Members)
                 if (item.Item1.SiloAddress.Equals(silo))
@@ -214,7 +214,7 @@ namespace Orleans
             foreach (var next in Members.Where(item => item.Item1.Status == SiloStatus.Dead))
             {
                 var ipEndPoint = next.Item1.SiloAddress.Endpoint;
-                Tuple<MembershipEntry, string> prev;
+                Tuple<MembershipEntry, string>? prev;
                 if (!dead.TryGetValue(ipEndPoint, out prev))
                 {
                     dead[ipEndPoint] = next;
@@ -248,13 +248,13 @@ namespace Orleans
 
     [GenerateSerializer]
     [Serializable]
-    public sealed class MembershipEntry
+    public sealed class MembershipEntry : ISpanFormattable
     {
         /// <summary>
         /// The silo unique identity (ip:port:epoch). Used mainly by the Membership Protocol.
         /// </summary>
         [Id(0)]
-        public SiloAddress SiloAddress { get; set; }
+        public SiloAddress SiloAddress { get; set; } = default!;
 
         /// <summary>
         /// The silo status. Managed by the Membership Protocol.
@@ -266,7 +266,7 @@ namespace Orleans
         /// The list of silos that suspect this silo. Managed by the Membership Protocol.
         /// </summary>
         [Id(2)]
-        public List<Tuple<SiloAddress, DateTime>> SuspectTimes { get; set; }
+        public List<Tuple<SiloAddress, DateTime>>? SuspectTimes { get; set; }
 
         /// <summary>
         /// Silo to clients TCP port. Set on silo startup.
@@ -278,17 +278,17 @@ namespace Orleans
         /// The DNS host name of the silo. Equals to Dns.GetHostName(). Set on silo startup.
         /// </summary>
         [Id(4)]
-        public string HostName { get; set; }
+        public string HostName { get; set; } = default!;
 
         /// <summary>
         /// the name of the specific silo instance within a cluster. 
         /// If running in Azure - the name of this role instance. Set on silo startup.
         /// </summary>
         [Id(5)]
-        public string SiloName { get; set; }
+        public string SiloName { get; set; } = default!;
 
         [Id(6)]
-        public string RoleName { get; set; } // Optional - only for Azure role  
+        public string? RoleName { get; set; } // Optional - only for Azure role
         [Id(7)]
         public int UpdateZone { get; set; }  // Optional - only for Azure role
         [Id(8)]
@@ -313,6 +313,35 @@ namespace Orleans
                 var startTimeUtc = DateTime.SpecifyKind(StartTime, DateTimeKind.Utc);
                 var iAmAliveTimeUtc = DateTime.SpecifyKind(IAmAliveTime, DateTimeKind.Utc);
                 return startTimeUtc > iAmAliveTimeUtc ? startTimeUtc : iAmAliveTimeUtc;
+            }
+        }
+
+        /// <summary>
+        /// Gets the most recent time at which this entry is known to have been updated. This is the later of
+        /// <see cref="EffectiveIAmAliveTime"/> and the most recent time at which a silo voted to suspect this
+        /// silo (see <see cref="SuspectTimes"/>). Declaring a silo dead records a suspect vote, so this value
+        /// reflects a recent death declaration even when the silo last reported itself alive long ago. It is
+        /// used to retain the most-recently-updated defunct entries when cleaning up the membership table, so
+        /// that recently-declared-dead silos remain visible in membership snapshots.
+        /// </summary>
+        internal DateTime EffectiveUpdateTime
+        {
+            get
+            {
+                var result = EffectiveIAmAliveTime;
+                if (SuspectTimes is { } suspectTimes)
+                {
+                    foreach (var vote in suspectTimes)
+                    {
+                        var voteTimeUtc = DateTime.SpecifyKind(vote.Item2, DateTimeKind.Utc);
+                        if (voteTimeUtc > result)
+                        {
+                            result = voteTimeUtc;
+                        }
+                    }
+                }
+
+                return result;
             }
         }
 
@@ -426,6 +455,11 @@ namespace Orleans
         }
 
         public override string ToString() => $"SiloAddress={SiloAddress} SiloName={SiloName} Status={Status}";
+
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
+            => destination.TryWrite($"SiloAddress={SiloAddress} SiloName={SiloName} Status={Status}", out charsWritten);
 
         public string ToFullString()
         {

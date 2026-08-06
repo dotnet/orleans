@@ -26,7 +26,7 @@ namespace Orleans.Runtime
                 var publicProxyEndpoint = endpointOptions.GetPublicProxyEndpoint();
                 return publicProxyEndpoint != null
                         ? SiloAddress.New(publicProxyEndpoint, 0)
-                        : null;
+                        : null!;
             });
         }
 

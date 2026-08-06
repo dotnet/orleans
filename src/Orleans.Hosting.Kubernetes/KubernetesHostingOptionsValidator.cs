@@ -8,9 +8,9 @@ namespace Orleans.Hosting.Kubernetes
     /// </summary>
     internal class KubernetesHostingOptionsValidator : IValidateOptions<KubernetesHostingOptions>
     {
-        public ValidateOptionsResult Validate(string name, KubernetesHostingOptions options)
+        public ValidateOptionsResult Validate(string? name, KubernetesHostingOptions options)
         {
-            List<string> failures = default;
+            List<string>? failures = default;
             if (string.IsNullOrWhiteSpace(options.Namespace))
             {
                 failures ??= new List<string>();

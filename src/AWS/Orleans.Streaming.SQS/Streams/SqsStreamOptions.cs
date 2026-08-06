@@ -1,9 +1,9 @@
-﻿
+
 namespace Orleans.Configuration
 {
     public class SqsOptions
     {
         [Redact]
-        public string ConnectionString { get; set; }
+        public string ConnectionString { get; set; } = null!;
     }
 }

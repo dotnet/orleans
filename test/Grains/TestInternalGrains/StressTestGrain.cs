@@ -10,7 +10,7 @@ namespace UnitTests.Grains
 {
     internal class StressTestGrain : Grain, IStressTestGrain
     {
-        private string label;
+        private string label = null!;
 
         private readonly ILogger logger;
 
@@ -108,7 +108,7 @@ namespace UnitTests.Grains
     [Reentrant]
     internal class ReentrantStressTestGrain : Grain, IReentrantStressTestGrain
     {
-        private string label;
+        private string label = null!;
         private readonly ILogger logger;
 
         public ReentrantStressTestGrain(ILoggerFactory loggerFactory)
@@ -246,7 +246,7 @@ namespace UnitTests.Grains
             List<string> results = new List<string>(fileMetadatas.Count);
             for (int i = 0; i < numItems; i++)
             {
-                string metadata;
+                string? metadata;
                 if (fileMetadatas.TryGetValue(i, out metadata))
                 {
                     results.Add(metadata);
@@ -265,7 +265,7 @@ namespace UnitTests.Grains
     [StatelessWorker]
     public class ReentrantLocalStressTestGrain : Grain, IReentrantLocalStressTestGrain
     {
-        private string label;
+        private string label = null!;
         private readonly ILogger logger;
 
         public ReentrantLocalStressTestGrain(ILoggerFactory loggerFactory)

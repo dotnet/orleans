@@ -1,4 +1,3 @@
-#nullable enable
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -70,7 +69,7 @@ namespace Orleans.Hosting.Kubernetes
                 }
                 else
                 {
-                    var hostAddresses = Dns.GetHostAddresses(hostingOptions.PodName);
+                    var hostAddresses = Dns.GetHostAddresses(hostingOptions.PodName!);
                     if (hostAddresses != null)
                     {
                         podIp = IPAddressSelector.PickIPAddress(hostAddresses);

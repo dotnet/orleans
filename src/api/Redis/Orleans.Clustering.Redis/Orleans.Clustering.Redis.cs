@@ -39,15 +39,15 @@ namespace Orleans.Clustering.Redis
 
     public partial class RedisClusteringOptions
     {
-        public StackExchange.Redis.ConfigurationOptions ConfigurationOptions { get { throw null; } set { } }
+        public StackExchange.Redis.ConfigurationOptions? ConfigurationOptions { get { throw null; } set { } }
 
-        public System.Func<RedisClusteringOptions, System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer>> CreateMultiplexer { get { throw null; } set { } }
+        public System.Func<RedisClusteringOptions, System.Threading.Tasks.Task<(StackExchange.Redis.IConnectionMultiplexer Multiplexer, bool IsShared)>> CreateMultiplexer { get { throw null; } set { } }
 
         public System.Func<Configuration.ClusterOptions, StackExchange.Redis.RedisKey> CreateRedisKey { get { throw null; } set { } }
 
         public System.TimeSpan? EntryExpiry { get { throw null; } set { } }
 
-        public static System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer> DefaultCreateMultiplexer(RedisClusteringOptions options) { throw null; }
+        public static System.Threading.Tasks.Task<(StackExchange.Redis.IConnectionMultiplexer Multiplexer, bool IsShared)> DefaultCreateMultiplexer(RedisClusteringOptions options) { throw null; }
 
         public static StackExchange.Redis.RedisKey DefaultCreateRedisKey(Configuration.ClusterOptions clusterOptions) { throw null; }
     }

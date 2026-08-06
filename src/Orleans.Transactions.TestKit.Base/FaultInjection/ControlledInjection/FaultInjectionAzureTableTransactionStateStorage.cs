@@ -29,11 +29,11 @@ namespace Orleans.Transactions.TestKit
 
         public async Task<string> Store(
 
-            string expectedETag,
+            string? expectedETag,
             TransactionalStateMetaData metadata,
 
             // a list of transactions to prepare.
-            List<PendingTransactionState<TState>> statesToPrepare,
+            List<PendingTransactionState<TState>>? statesToPrepare,
 
             // if non-null, commit all pending transaction up to and including this sequence number.
             long? commitUpTo,

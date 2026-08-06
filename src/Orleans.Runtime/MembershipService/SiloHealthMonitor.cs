@@ -1,10 +1,11 @@
-#nullable enable
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -23,10 +24,15 @@ namespace Orleans.Runtime.MembershipService
         private readonly IOptionsMonitor<ClusterMembershipOptions> _clusterMembershipOptions;
         private readonly IRemoteSiloProber _prober;
         private readonly ILocalSiloHealthMonitor _localSiloHealthMonitor;
-        private readonly MembershipTableManager _membershipService;
+        private readonly IMembershipManager _membershipService;
+        private readonly MessagingInstruments? _messagingInstruments;
         private readonly ILocalSiloDetails _localSiloDetails;
         private readonly CancellationTokenSource _stoppingCancellation = new();
+#if NET9_0_OR_GREATER
+        private readonly Lock _lockObj = new();
+#else
         private readonly object _lockObj = new();
+#endif
         private readonly IAsyncTimer _pingTimer;
         private ValueStopwatch _elapsedSinceLastSuccessfulResponse;
         private readonly Func<SiloHealthMonitor, ProbeResult, Task> _onProbeResult;
@@ -60,19 +66,23 @@ namespace Orleans.Runtime.MembershipService
             IRemoteSiloProber remoteSiloProber,
             IAsyncTimerFactory asyncTimerFactory,
             ILocalSiloHealthMonitor localSiloHealthMonitor,
-            MembershipTableManager membershipService,
-            ILocalSiloDetails localSiloDetails)
+            IMembershipManager membershipService,
+            ILocalSiloDetails localSiloDetails,
+            [FromKeyedServices(TimeProviderNames.Membership)] TimeProvider timeProvider,
+            MessagingInstruments? messagingInstruments = null)
         {
             TargetSiloAddress = siloAddress;
             _clusterMembershipOptions = clusterMembershipOptions;
             _prober = remoteSiloProber;
             _localSiloHealthMonitor = localSiloHealthMonitor;
             _membershipService = membershipService;
+            _messagingInstruments = messagingInstruments;
             _localSiloDetails = localSiloDetails;
             _log = loggerFactory.CreateLogger<SiloHealthMonitor>();
             _pingTimer = asyncTimerFactory.Create(
                 _clusterMembershipOptions.CurrentValue.ProbeTimeout,
-                nameof(SiloHealthMonitor));
+                nameof(SiloHealthMonitor),
+                timeProvider);
             _onProbeResult = onProbeResult;
             _elapsedSinceLastSuccessfulResponse = ValueStopwatch.StartNew();
         }
@@ -167,7 +177,7 @@ namespace Orleans.Runtime.MembershipService
                 try
                 {
                     // Discover the other active nodes in the cluster, if there are any.
-                    var membershipSnapshot = _membershipService.MembershipTableSnapshot;
+                    var membershipSnapshot = _membershipService.CurrentSnapshot;
                     if (otherNodes is null || !ReferenceEquals(activeMembersSnapshot, membershipSnapshot))
                     {
                         activeMembersSnapshot = membershipSnapshot;
@@ -281,7 +291,7 @@ namespace Orleans.Runtime.MembershipService
 
             if (failureException is null)
             {
-                MessagingInstruments.OnPingReplyReceived(TargetSiloAddress);
+                _messagingInstruments?.OnPingReplyReceived(TargetSiloAddress);
 
                 LogTraceGotSuccessfulPingResponse(_log, id, TargetSiloAddress, roundTripTimer.Elapsed);
 
@@ -292,7 +302,7 @@ namespace Orleans.Runtime.MembershipService
             }
             else
             {
-                MessagingInstruments.OnPingReplyMissed(TargetSiloAddress);
+                _messagingInstruments?.OnPingReplyMissed(TargetSiloAddress);
 
                 var failedProbes = ++_failedProbes;
                 LogWarningDidNotGetResponseForProbe(_log, failureException, id, TargetSiloAddress, roundTripTimer.Elapsed, failedProbes);
@@ -332,14 +342,14 @@ namespace Orleans.Runtime.MembershipService
                 {
                     LogInformationIndirectProbeSucceeded(_log, id, TargetSiloAddress, intermediary, roundTripTimer.Elapsed, indirectResult.ProbeResponseTime);
 
-                    MessagingInstruments.OnPingReplyReceived(TargetSiloAddress);
+                    _messagingInstruments?.OnPingReplyReceived(TargetSiloAddress);
 
                     _failedProbes = 0;
                     probeResult = ProbeResult.CreateIndirect(0, ProbeResultStatus.Succeeded, indirectResult, intermediary);
                 }
                 else
                 {
-                    MessagingInstruments.OnPingReplyMissed(TargetSiloAddress);
+                    _messagingInstruments?.OnPingReplyMissed(TargetSiloAddress);
 
                     if (indirectResult.IntermediaryHealthScore > 0)
                     {
@@ -357,7 +367,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exception)
             {
-                MessagingInstruments.OnPingReplyMissed(TargetSiloAddress);
+                _messagingInstruments?.OnPingReplyMissed(TargetSiloAddress);
                 LogWarningIndirectProbeRequestFailed(_log, exception);
                 probeResult = ProbeResult.CreateIndirect(_failedProbes, ProbeResultStatus.Unknown, default, intermediary);
             }
@@ -366,7 +376,7 @@ namespace Orleans.Runtime.MembershipService
         }
 
         /// <inheritdoc />
-        public bool CheckHealth(DateTime lastCheckTime, out string reason) => _pingTimer.CheckHealth(lastCheckTime, out reason);
+        public bool CheckHealth(DateTime lastCheckTime, [MaybeNullWhen(true)] out string reason) => _pingTimer.CheckHealth(lastCheckTime, out reason);
 
         /// <summary>
         /// Represents the result of probing a silo.
@@ -448,7 +458,7 @@ namespace Orleans.Runtime.MembershipService
             Level = LogLevel.Warning,
             Message = "Indirect probe request #{Id} to silo {SiloAddress} via silo {IntermediarySiloAddress} failed after {RoundTripTime} with a direct probe response time of {ProbeResponseTime}. Failure message: {FailureMessage}. Intermediary health score: {IntermediaryHealthScore}."
         )]
-        private static partial void LogWarningIndirectProbeFailed(ILogger logger, int id, SiloAddress siloAddress, SiloAddress intermediarySiloAddress, TimeSpan roundTripTime, TimeSpan probeResponseTime, string failureMessage, int intermediaryHealthScore);
+        private static partial void LogWarningIndirectProbeFailed(ILogger logger, int id, SiloAddress siloAddress, SiloAddress intermediarySiloAddress, TimeSpan roundTripTime, TimeSpan probeResponseTime, string? failureMessage, int intermediaryHealthScore);
 
         [LoggerMessage(
             Level = LogLevel.Warning,

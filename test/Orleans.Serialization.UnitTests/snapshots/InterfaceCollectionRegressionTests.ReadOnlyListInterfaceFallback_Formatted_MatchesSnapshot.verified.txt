@@ -1,0 +1,6 @@
+﻿0x002A [#1 TagDelimited Id: 0 SchemaType: Encoded RuntimeType: Orleans.Serialization.Codecs.ReadOnlyListInterfaceCodec`1[System.Int32] (name: Encoded "TypeName "ReadOnlyListInterfaceCodec`1[[int]]" (hash EFB8BAFD)" (Orleans.Serialization.Codecs.ReadOnlyListInterfaceCodec`1[[System.Int32]],Orleans.Serialization))] Value: {
+0x002B  [#2 VarInt Id: 0 SchemaType: Expected] Value: 3 (0x3)
+0x002D  [#3 VarInt Id: 1 SchemaType: Expected] Value: 2 (0x2)
+0x002F  [#4 VarInt Id: 1 SchemaType: Expected] Value: 4 (0x4)
+0x0031  [#5 VarInt Id: 1 SchemaType: Expected] Value: 6 (0x6)
+0x0033 }

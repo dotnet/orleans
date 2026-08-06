@@ -17,9 +17,9 @@ namespace Orleans.Hosting;
 
 internal sealed class RedisGrainStorageProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.AddRedisGrainStorage(name, (OptionsBuilder<RedisStorageOptions> optionsBuilder) =>
+        builder.AddRedisGrainStorage(name!, (OptionsBuilder<RedisStorageOptions> optionsBuilder) =>
         {
             optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {
@@ -28,7 +28,7 @@ internal sealed class RedisGrainStorageProviderBuilder : IProviderBuilder<ISiloB
                 {
                     // Get a connection multiplexer instance by name.
                     var multiplexer = services.GetRequiredKeyedService<IConnectionMultiplexer>(serviceKey);
-                    options.CreateMultiplexer = _ => Task.FromResult(multiplexer);
+                    options.CreateMultiplexer = _ => Task.FromResult((Multiplexer: multiplexer, IsShared: true));
                     options.ConfigurationOptions = new ConfigurationOptions();
                 }
                 else

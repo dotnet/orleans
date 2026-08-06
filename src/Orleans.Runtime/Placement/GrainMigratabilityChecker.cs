@@ -4,15 +4,15 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.DependencyInjection;
 
-#nullable enable
 
 namespace Orleans.Runtime.Placement;
 
 internal sealed class GrainMigratabilityChecker(
     PlacementStrategyResolver strategyResolver,
     IClusterManifestProvider clusterManifestProvider,
-    TimeProvider timeProvider)
+    [FromKeyedServices(TimeProviderNames.ActivationManagement)] TimeProvider timeProvider)
 {
     // We override equality and hashcode as this type is used as the dictionary key,
     // and record structs use default equality comparer, which for an enum is not that great for performance.

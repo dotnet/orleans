@@ -54,7 +54,7 @@ namespace Orleans.Hosting
         /// <returns></returns>
         public static ISiloBuilder ConfigureEndpoints(
             this ISiloBuilder builder,
-            string hostname,
+            string? hostname,
             int siloPort,
             int gatewayPort,
             AddressFamily addressFamily = AddressFamily.InterNetwork,

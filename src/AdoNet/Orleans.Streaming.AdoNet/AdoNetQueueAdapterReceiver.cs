@@ -15,7 +15,7 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
     /// <summary>
     /// Helps shutdown wait for any outstanding storage operation.
     /// </summary>
-    private Task _outstandingTask;
+    private Task? _outstandingTask;
 
     /// <summary>
     /// This receiver does not require initialization.

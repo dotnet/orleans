@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Threading;
 using Orleans.Runtime.Scheduler;
+using Microsoft.Extensions.DependencyInjection;
 
 #nullable enable
 
@@ -28,7 +29,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
     private readonly static TimeSpan TimerPeriod = 2 * IActivationRebalancerMonitor.WorkerReportPeriod;
 
     public ActivationRebalancerMonitor(
-        TimeProvider timeProvider,
+        [FromKeyedServices(TimeProviderNames.ActivationManagement)] TimeProvider timeProvider,
         ActivationDirectory activationDirectory,
         ILoggerFactory loggerFactory,
         IGrainFactory grainFactory,
@@ -74,12 +75,24 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
             _monitorTimer = RegisterGrainTimer(async ct =>
             {
                 var elapsedSinceHeartbeat = _timeProvider.GetElapsedTime(_lastHeartbeatTimestamp);
-                var shouldFetchReport = _latestReport.Host == SiloAddress.Zero
-                    || elapsedSinceHeartbeat >= IActivationRebalancerMonitor.WorkerReportPeriod;
+                var shouldFetchReport = SiloAddress.Zero.Equals(_latestReport.Host) ||
+                    elapsedSinceHeartbeat >= IActivationRebalancerMonitor.WorkerReportPeriod;
+
                 if (shouldFetchReport)
                 {
                     LogStartingRebalancer(elapsedSinceHeartbeat, IActivationRebalancerMonitor.WorkerReportPeriod);
-                    _latestReport = await _rebalancerGrain.GetReport().AsTask().WaitAsync(ct);
+
+                    try
+                    {
+                        _latestReport = await _rebalancerGrain.GetReport().AsTask().WaitAsync(ct);
+                    }
+                    catch (OperationCanceledException oce) when (oce.CancellationToken == ct) { }
+                    catch (Exception ex)
+                    {
+                        // This is to avoid crashing the silo due to issues like membership being
+                        // full with dead silos after an ungraceful shutdown.
+                        LogRebalancerReportFailed(ex);
+                    }
                 }
 
             }, TimeSpan.Zero, TimerPeriod);
@@ -113,7 +126,14 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
     {
         if (force)
         {
-            _latestReport = await _rebalancerGrain.GetReport();
+            try
+            {
+                _latestReport = await _rebalancerGrain.GetReport();
+            }
+            catch (Exception ex)
+            {
+                LogRebalancerReportFailed(ex);
+            }
         }
 
         return _latestReport;
@@ -169,4 +189,10 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
         Message = "An unexpected error occurred while notifying rebalancer listener."
     )]
     private partial void LogErrorWhileNotifyingListener(Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "An unexpected error occurred while trying to a grab report from the rebalancer."
+    )]
+    private partial void LogRebalancerReportFailed(Exception exception);
 }

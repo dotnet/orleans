@@ -50,7 +50,7 @@ namespace TestGrains
         public class UpdatedEvent
         {
             [Id(0)]
-            public string Key { get; set; }
+            public string Key { get; set; } = null!;
             [Id(1)]
             public int Amount { get; set; }
         }

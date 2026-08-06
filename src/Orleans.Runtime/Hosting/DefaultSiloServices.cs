@@ -1,49 +1,48 @@
-#nullable enable
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using Microsoft.AspNetCore.Connections;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Configuration.Internal;
 using Orleans.Configuration.Validators;
+using Orleans.Core;
+using Orleans.GrainReferences;
+using Orleans.Metadata;
+using Orleans.Networking.Shared;
+using Orleans.Placement.Repartitioning;
+using Orleans.Providers;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.MembershipService;
-using Orleans.Metadata;
 using Orleans.Runtime.Messaging;
+using Orleans.Runtime.Metadata;
 using Orleans.Runtime.Placement;
+using Orleans.Runtime.Placement.Filtering;
 using Orleans.Runtime.Providers;
+using Orleans.Runtime.Utilities;
 using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Runtime.Versions.Selector;
 using Orleans.Serialization;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Internal;
+using Orleans.Serialization.Serializers;
+using Orleans.Serialization.TypeSystem;
 using Orleans.Statistics;
+using Orleans.Storage;
 using Orleans.Timers;
+using Orleans.Timers.Internal;
 using Orleans.Versions;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
-using Orleans.Providers;
-using Orleans.Runtime;
-using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Utilities;
-using System;
-using System.Reflection;
-using System.Linq;
-using Microsoft.Extensions.Options;
-using Orleans.Timers.Internal;
-using Microsoft.AspNetCore.Connections;
-using Orleans.Networking.Shared;
-using Orleans.Configuration.Internal;
-using Orleans.Runtime.Metadata;
-using Orleans.GrainReferences;
-using Orleans.Storage;
-using Orleans.Serialization.TypeSystem;
-using Orleans.Serialization.Serializers;
-using Orleans.Serialization.Cloning;
-using System.Collections.Generic;
-using Microsoft.Extensions.Configuration;
-using Orleans.Serialization.Internal;
-using Orleans.Core;
-using Orleans.Placement.Repartitioning;
-using Orleans.Runtime.Placement.Filtering;
 
 namespace Orleans.Hosting
 {
@@ -66,7 +65,19 @@ namespace Orleans.Hosting
             services.AddOptions();
             services.AddMetrics();
             services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+
+            // Catch-all keyed TimeProvider: consumers resolve their area's clock via [FromKeyedServices(TimeProviderNames.X)];
+            // unless an area has been explicitly overridden, this fallback supplies the unkeyed default provider.
+            services.TryAddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (sp, _) => sp.GetRequiredService<TimeProvider>());
             services.TryAddSingleton<OrleansInstruments>();
+            services.TryAddSingleton<SchedulerInstruments>();
+            services.TryAddSingleton<ConsistentRingInstruments>();
+            services.TryAddSingleton<StorageInstruments>();
+            services.TryAddSingleton<CatalogInstruments>();
+            services.TryAddSingleton<DirectoryInstruments>();
+            services.TryAddSingleton<GrainInstruments>();
+            services.TryAddSingleton<MessagingInstruments>();
+            services.TryAddSingleton<MessagingProcessingInstruments>();
 
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
@@ -83,6 +94,11 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloOptionsLogger>();
             services.AddSingleton<SiloControl>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloControl>();
+
+            // Lifecycle
+            services.AddSingleton<ServiceLifecycle<ISiloLifecycle>>();
+            services.TryAddFromExisting<IServiceLifecycle, ServiceLifecycle<ISiloLifecycle>>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ServiceLifecycle<ISiloLifecycle>>();
 
             // Statistics
             services.AddSingleton<IEnvironmentStatisticsProvider, EnvironmentStatisticsProvider>();
@@ -135,7 +151,7 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalGrainDirectory>();
             services.AddSingleton<GrainLocator>();
             services.AddSingleton<GrainLocatorResolver>();
-            services.AddSingleton<DhtGrainLocator>(sp => DhtGrainLocator.FromLocalGrainDirectory(sp.GetService<LocalGrainDirectory>()));
+            services.AddSingleton<DhtGrainLocator>(sp => DhtGrainLocator.FromLocalGrainDirectory(sp.GetService<LocalGrainDirectory>()!));
             services.AddSingleton<GrainDirectoryResolver>();
             services.AddSingleton<IGrainDirectoryResolver, GenericGrainDirectoryResolver>();
             services.AddSingleton<CachedGrainLocator>();
@@ -158,9 +174,10 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, DeploymentLoadPublisher>();
 
             services.AddSingleton<IAsyncTimerFactory, AsyncTimerFactory>();
-            services.AddSingleton<MembershipTableManager>();
-            services.AddFromExisting<IHealthCheckParticipant, MembershipTableManager>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableManager>();
+
+            services.TryAddSingleton<IMembershipManager, MembershipTableManager>();
+            services.AddFromExisting<IHealthCheckParticipant, IMembershipManager>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IMembershipManager>();
             services.AddSingleton<MembershipSystemTarget>();
             services.AddFromExisting<IMembershipService, MembershipSystemTarget>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipSystemTarget>();
@@ -168,10 +185,11 @@ namespace Orleans.Hosting
             services.AddSingleton<IRemoteSiloProber, RemoteSiloProber>();
             services.AddSingleton<SiloStatusOracle>();
             services.TryAddFromExisting<ISiloStatusOracle, SiloStatusOracle>();
-            services.AddSingleton<ClusterHealthMonitor>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor>();
-            services.AddFromExisting<IHealthCheckParticipant, ClusterHealthMonitor>();
+            services.TryAddSingleton<IClusterHealthMonitor, ClusterHealthMonitor>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IClusterHealthMonitor>();
+            services.AddFromExisting<IHealthCheckParticipant, IClusterHealthMonitor>();
             services.AddSingleton<ProbeRequestMonitor>();
+            services.TryAddSingleton<IProbeHealthMonitor, ProbingSiloHealthMonitor>();
             services.AddSingleton<LocalSiloHealthMonitor>();
             services.AddFromExisting<ILocalSiloHealthMonitor, LocalSiloHealthMonitor>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalSiloHealthMonitor>();
@@ -180,7 +198,6 @@ namespace Orleans.Hosting
             services.AddFromExisting<IHealthCheckParticipant, MembershipAgent>();
             services.AddSingleton<MembershipTableCleanupAgent>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableCleanupAgent>();
-            services.AddFromExisting<IHealthCheckParticipant, MembershipTableCleanupAgent>();
             services.AddSingleton<SiloStatusListenerManager>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloStatusListenerManager>();
             services.AddSingleton<ClusterMembershipService>();
@@ -256,6 +273,7 @@ namespace Orleans.Hosting
 
             // Grain activation
             services.AddSingleton<PlacementService>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, PlacementService>();
             services.AddSingleton<Catalog>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, Catalog>();
             services.AddSingleton<GrainContextActivator>();
@@ -265,7 +283,6 @@ namespace Orleans.Hosting
             services.AddSingleton<IGrainContextAccessor, GrainContextAccessor>();
             services.AddSingleton<IncomingRequestMonitor>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IncomingRequestMonitor>();
-            services.AddFromExisting<IActivationWorkingSetObserver, IncomingRequestMonitor>();
             services.AddSingleton<ILocalActivationStatusChecker, Runtime.LocalActivationStatusChecker>();
 
             // Scoped to a grain activation
@@ -279,9 +296,10 @@ namespace Orleans.Hosting
                     var siloDetails = sp.GetRequiredService<ILocalSiloDetails>();
                     var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
                     var siloStatusOracle = sp.GetRequiredService<ISiloStatusOracle>();
+                    var consistentRingInstruments = sp.GetRequiredService<ConsistentRingInstruments>();
                     if (consistentRingOptions.UseVirtualBucketsConsistentRing)
                     {
-                        return new VirtualBucketsRingProvider(siloDetails.SiloAddress, loggerFactory, consistentRingOptions.NumVirtualBucketsConsistentRing, siloStatusOracle);
+                        return new VirtualBucketsRingProvider(siloDetails.SiloAddress, loggerFactory, consistentRingOptions.NumVirtualBucketsConsistentRing, siloStatusOracle, consistentRingInstruments);
                     }
 
                     return new ConsistentRingProvider(siloDetails.SiloAddress, loggerFactory, siloStatusOracle);
@@ -407,7 +425,6 @@ namespace Orleans.Hosting
                 sp,
                 sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value));
             services.TryAddSingleton<ConnectionFactory, SiloConnectionFactory>();
-            services.AddSingleton<NetworkingTrace>();
             services.AddSingleton<RuntimeMessagingTrace>();
             services.AddFromExisting<MessagingTrace, RuntimeMessagingTrace>();
 
@@ -477,7 +494,17 @@ namespace Orleans.Hosting
                         ?? throw new InvalidOperationException($"{kind} provider, '{name}', of type {type}, does not implement {typeof(IProviderBuilder<ISiloBuilder>)}.");
                 }
 
-                throw new InvalidOperationException($"Could not find {kind} provider named '{name}'. This can indicate that either the 'Microsoft.Orleans.Sdk' or the provider's package are not referenced by your application.");
+                var knownProvidersOfKind = knownProviderTypes
+                    .Where(kvp => string.Equals(kvp.Key.Kind, kind, StringComparison.OrdinalIgnoreCase))
+                    .Select(kvp => kvp.Key.Name)
+                    .OrderBy(n => n)
+                    .ToList();
+
+                var knownProvidersMessage = knownProvidersOfKind.Count > 0
+                    ? $" Known {kind} providers: {string.Join(", ", knownProvidersOfKind)}."
+                    : string.Empty;
+
+                throw new InvalidOperationException($"Could not find {kind} provider named '{name}'. This can indicate that either the 'Microsoft.Orleans.Sdk' or the provider's package are not referenced by your application.{knownProvidersMessage}");
             }
 
             static Dictionary<(string Kind, string Name), Type> GetRegisteredProviders()
@@ -521,7 +548,7 @@ namespace Orleans.Hosting
         {
             public bool? IsTypeNameAllowed(string typeName, string assemblyName)
             {
-                if (assemblyName is { Length: > 0} && assemblyName.Contains("Orleans"))
+                if (assemblyName is { Length: > 0 } && assemblyName.Contains("Orleans"))
                 {
                     return true;
                 }

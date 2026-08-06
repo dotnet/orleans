@@ -10,7 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.Placement.Repartitioning;
 
-#nullable enable
 
 /// <summary>
 /// Tolerance rule which is aware of the cluster size, and if rebalancer is enabled, it scales with the clusters imbalance.
@@ -20,7 +19,11 @@ internal class RebalancerCompatibleRule(IServiceProvider provider) :
     IImbalanceToleranceRule, ILifecycleParticipant<ISiloLifecycle>,
     ILifecycleObserver, ISiloStatusListener, IActivationRebalancerReportListener
 {
+#if NET9_0_OR_GREATER
+    private readonly Lock _lock = new();
+#else
     private readonly object _lock = new();
+#endif
     private readonly Dictionary<SiloAddress, SiloStatus> _silos = [];
 
     private uint _pairwiseImbalance;

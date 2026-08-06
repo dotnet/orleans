@@ -33,7 +33,7 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
 
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Collection<T> value) where TBufferWriter : IBufferWriter<byte>
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Collection<T> value) where TBufferWriter : IBufferWriter<byte>
     {
         if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
         {
@@ -48,6 +48,7 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
     }
 
     /// <inheritdoc/>
+    [return: System.Diagnostics.CodeAnalysis.MaybeNull]
     public Collection<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         if (field.WireType == WireType.Reference)
@@ -58,7 +59,7 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
         field.EnsureWireTypeTagDelimited();
 
         var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-        Collection<T> result = null;
+        Collection<T>? result = null;
         uint fieldId = 0;
         while (true)
         {
@@ -73,10 +74,7 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
             {
                 case 0:
                     var length = (int)UInt32Codec.ReadValue(ref reader, header);
-                    if (length > 10240 && length > reader.Length)
-                    {
-                        ThrowInvalidSizeException(length);
-                    }
+                    reader.EnsureAvailable((uint)length);
 
                     result = new Collection<T>(new List<T>(length));
                     ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
@@ -87,7 +85,7 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
                         ThrowLengthFieldMissing();
                     }
 
-                    result.Add(_fieldCodec.ReadValue(ref reader, header));
+                    result!.Add(_fieldCodec.ReadValue(ref reader, header)!);
                     break;
                 default:
                     reader.ConsumeUnknownField(header);
@@ -101,11 +99,8 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
         }
 
-        return result;
+        return result!;
     }
-
-    private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-        $"Declared length of {typeof(Collection<T>)}, {length}, is greater than total length of input.");
 
     private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 
@@ -143,14 +138,11 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
             {
                 case 0:
                     var length = (int)UInt32Codec.ReadValue(ref reader, header);
-                    if (length > 10240 && length > reader.Length)
-                    {
-                        ThrowInvalidSizeException(length);
-                    }
+                    reader.EnsureAvailable((uint)length);
 
                     break;
                 case 1:
-                    value.Add(_fieldCodec.ReadValue(ref reader, header));
+                    value.Add(_fieldCodec.ReadValue(ref reader, header)!);
                     break;
                 default:
                     reader.ConsumeUnknownField(header);
@@ -183,12 +175,12 @@ public sealed class CollectionCopier<T> : IDeepCopier<Collection<T>>, IBaseCopie
     {
         if (context.TryGetCopy<Collection<T>>(input, out var result))
         {
-            return result;
+            return result!;
         }
 
         if (input.GetType() != typeof(Collection<T>))
         {
-            return context.DeepCopy(input);
+            return context.DeepCopy(input)!;
         }
 
         result = new Collection<T>(new List<T>(input.Count));

@@ -27,19 +27,19 @@ namespace Orleans.Runtime.MembershipService
         internal const string TABLE_VERSION_ROW = "VersionRow"; // Range key for version row.
         public const string MEMBERSHIP_VERSION_PROPERTY_NAME = "MembershipVersion";
 
-        public string DeploymentId { get; set; }
-        public string SiloIdentity { get; set; }
-        public string Address { get; set; }
+        public string DeploymentId { get; set; } = null!;
+        public string SiloIdentity { get; set; } = null!;
+        public string? Address { get; set; }
         public int Port { get; set; }
         public int Generation { get; set; }
-        public string HostName { get; set; }
+        public string? HostName { get; set; }
         public int Status { get; set; }
         public int ProxyPort { get; set; }
-        public string SiloName { get; set; }
-        public string SuspectingSilos { get; set; }
-        public string SuspectingTimes { get; set; }
-        public string StartTime { get; set; }
-        public string IAmAliveTime { get; set; }
+        public string? SiloName { get; set; }
+        public string? SuspectingSilos { get; set; }
+        public string? SuspectingTimes { get; set; }
+        public string? StartTime { get; set; }
+        public string? IAmAliveTime { get; set; }
         public int ETag { get; set; }
 
         public int MembershipVersion { get; set; }

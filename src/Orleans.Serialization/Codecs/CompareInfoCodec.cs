@@ -13,6 +13,7 @@ namespace Orleans.Serialization.Codecs
     public sealed class CompareInfoCodec : IFieldCodec<CompareInfo>
     {
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public CompareInfo ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -24,7 +25,7 @@ namespace Orleans.Serialization.Codecs
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
             uint fieldId = 0;
-            string name = null;
+            string? name = null;
             while (true)
             {
                 var header = reader.ReadFieldHeader();
@@ -45,13 +46,13 @@ namespace Orleans.Serialization.Codecs
                 }
             }
 
-            var result = CompareInfo.GetCompareInfo(name);
+            var result = CompareInfo.GetCompareInfo(name!);
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
 
         /// <inheritdoc/>
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, CompareInfo value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] CompareInfo value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {

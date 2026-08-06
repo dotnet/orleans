@@ -16,7 +16,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="stateName">Name of the state.</param>
         /// <param name="storageName">Name of the storage provider.</param>
-        public PersistentStateAttribute(string stateName, string storageName = null)
+        public PersistentStateAttribute(string stateName, string? storageName = null)
         {
             ArgumentNullException.ThrowIfNull(stateName);
             this.StateName = stateName;
@@ -33,6 +33,6 @@ namespace Orleans.Runtime
         /// Gets the name of the storage provider.
         /// </summary>
         /// <value>The name of the storage provider.</value>
-        public string StorageName { get; }
+        public string? StorageName { get; }
     }
 }

@@ -1,0 +1,8 @@
+0x0016 [#1 TagDelimited Id: 0 SchemaType: Encoded RuntimeType: Orleans.Serialization.UnitTests.BaselinePerson (name: Encoded "TypeName "baseline.person" (hash 9DA03D10)" (Orleans.Serialization.UnitTests.BaselinePerson,Orleans.Serialization.UnitTests))] Value: {
+
+0x0017  - End of base type fields -
+0x0018  [#2 VarInt Id: 0 SchemaType: Expected] Value: 4 (0x4)
+0x001A  [#3 LengthPrefixed Id: 1 SchemaType: Expected] Value: (length: 5b) ["harry"]
+0x0021  [#4 LengthPrefixed Id: 2 SchemaType: Expected] Value: (length: 9b) ["redborine"]
+0x002C  [#5 LengthPrefixed Id: 3 SchemaType: Expected] Value: (length: 10b) ["Aquaricorn"]
+0x0038 }

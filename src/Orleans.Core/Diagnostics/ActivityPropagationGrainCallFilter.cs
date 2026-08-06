@@ -39,7 +39,7 @@ namespace Orleans.Runtime
             }
         }
 
-        protected static void GetRequestContextValue(object carrier, string fieldName, out string fieldValue, out IEnumerable<string> fieldValues)
+        protected static void GetRequestContextValue(object? carrier, string fieldName, out string? fieldValue, out IEnumerable<string>? fieldValues)
         {
             fieldValues = default;
             fieldValue = RequestContext.Get(fieldName) as string;
@@ -146,7 +146,7 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public Task Invoke(IIncomingGrainCallContext context)
         {
-            Activity activity = default;
+            Activity? activity = default;
             _propagator.ExtractTraceIdAndState(null, GetRequestContextValue, out var traceParent, out var traceState);
 
             var source = GetActivitySource(context);

@@ -7,9 +7,9 @@ namespace Orleans.SqlUtils.StorageProvider.GrainClasses
     public class DeviceState
     {
         [Id(0)]
-        public ICustomerGrain Owner { get; set; }
+        public ICustomerGrain? Owner { get; set; }
         [Id(1)]
-        public string SerialNumber { get; set; }
+        public string SerialNumber { get; set; } = null!;
         [Id(2)]
         public long EventId { get; set; }
         [Id(3)]
@@ -113,7 +113,7 @@ namespace Orleans.SqlUtils.StorageProvider.GrainClasses
         [Id(52)]
         public Guid TransactionId { get; set; }
         [Id(53)]
-        public string MessageId { get; set; }
+        public string? MessageId { get; set; }
         [Id(54)]
         public short LampId { get; set; }
         [Id(55)]

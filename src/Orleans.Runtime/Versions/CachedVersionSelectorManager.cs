@@ -25,6 +25,8 @@ namespace Orleans.Runtime.Versions
 
         public CompatibilityDirectorManager CompatibilityDirectorManager { get; }
 
+        public event Action? CacheInvalidated;
+
         public CachedEntry GetSuitableSilos(GrainType grainType, GrainInterfaceType interfaceId, ushort requestedVersion)
         {
             var key = ValueTuple.Create(grainType, interfaceId, requestedVersion);
@@ -39,6 +41,7 @@ namespace Orleans.Runtime.Versions
         public void ResetCache()
         {
             this.suitableSilosCache.Clear();
+            CacheInvalidated?.Invoke();
         }
 
         private CachedEntry GetSuitableSilosImpl((GrainType Type, GrainInterfaceType Interface, ushort Version) key)

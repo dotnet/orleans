@@ -14,9 +14,9 @@ namespace Orleans.LeaseProviders
 {
     public class AzureBlobLeaseProvider : ILeaseProvider
     {
-        private BlobContainerClient container;
+        private BlobContainerClient? container;
         private readonly AzureBlobLeaseProviderOptions options;
-        private BlobServiceClient blobClient;
+        private BlobServiceClient? blobClient;
         public AzureBlobLeaseProvider(IOptions<AzureBlobLeaseProviderOptions> options)
             : this(options.Value)
         {
@@ -31,14 +31,14 @@ namespace Orleans.LeaseProviders
         {
             if (this.container == null)
             {
-                this.blobClient = await options.CreateClient();
+                this.blobClient = await options.CreateClient!();
                 var tmpContainer = blobClient.GetBlobContainerClient(this.options.BlobContainerName);
                 await tmpContainer.CreateIfNotExistsAsync().ConfigureAwait(false);
                 this.container = tmpContainer;
             }
         }
 
-        private BlobClient GetBlobClient(string category, string resourceKey) => this.container.GetBlobClient($"{category.ToLowerInvariant()}-{resourceKey.ToLowerInvariant()}.json");
+        private BlobClient GetBlobClient(string category, string resourceKey) => this.container!.GetBlobClient($"{category.ToLowerInvariant()}-{resourceKey.ToLowerInvariant()}.json");
 
         public async Task<AcquireLeaseResult[]> Acquire(string category, LeaseRequest[] leaseRequests)
         {

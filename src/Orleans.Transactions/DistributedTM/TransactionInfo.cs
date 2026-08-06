@@ -34,6 +34,7 @@ namespace Orleans.Transactions
             this.TransactionId = other.TransactionId;
             this.TryToCommit = other.TryToCommit;
             this.IsReadOnly = other.IsReadOnly;
+            this.UseExclusiveLock = other.UseExclusiveLock;
             this.TimeStamp = other.TimeStamp;
             this.Priority = other.Priority;
         }
@@ -53,7 +54,7 @@ namespace Orleans.Transactions
         public bool IsReadOnly { get; }
 
         [Id(4)]
-        public byte[] OriginalException { get; set; }
+        public byte[]? OriginalException { get; set; }
 
         // counts how many writes were done per each accessed resource
         // zero means the resource was only read
@@ -62,6 +63,9 @@ namespace Orleans.Transactions
 
         [Id(6)]
         public bool TryToCommit { get; internal set; } = true;
+
+        [Id(7)]
+        public bool UseExclusiveLock { get; set; } = false;
 
         [NonSerialized]
         public int PendingCalls;
@@ -80,7 +84,7 @@ namespace Orleans.Transactions
             joined.Enqueue(x);
         }
 
-        public OrleansTransactionAbortedException MustAbort(Serializer<OrleansTransactionAbortedException> serializer)
+        public OrleansTransactionAbortedException? MustAbort(Serializer<OrleansTransactionAbortedException> serializer)
         {
             if (OriginalException != null)
             {
@@ -113,7 +117,7 @@ namespace Orleans.Transactions
         /// <returns>true if there are no orphans, false otherwise</returns>
         public void ReconcilePending()
         {
-            TransactionInfo transactionInfo;
+            TransactionInfo? transactionInfo;
             while (this.joined.TryDequeue(out transactionInfo))
             {
                 Union(transactionInfo);

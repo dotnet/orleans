@@ -16,7 +16,7 @@ namespace Orleans.Hosting;
 
 internal sealed class AzureTableStorageRemindersProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseAzureTableReminderService((OptionsBuilder<AzureTableReminderStorageOptions> optionsBuilder) =>
             optionsBuilder.Configure<IServiceProvider>((options, services) =>

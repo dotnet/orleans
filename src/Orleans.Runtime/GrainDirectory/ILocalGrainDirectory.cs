@@ -3,7 +3,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 
-#nullable enable
 namespace Orleans.Runtime.GrainDirectory
 {
     internal interface ILocalGrainDirectory : IDhtGrainDirectory
@@ -35,16 +34,6 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="address">The address of the activation to remove.</param>
         /// <param name="origin"> the silo from which the message to the non-existing activation was sent</param>
         Task UnregisterAfterNonexistingActivation(GrainAddress address, SiloAddress origin);
-
-        /// <summary>
-        /// Fetches locally known directory information for a grain.
-        /// If there is no local information, either in the cache or in this node's directory partition,
-        /// then this method will return false and leave the list empty.
-        /// </summary>
-        /// <param name="grain">The ID of the grain to look up.</param>
-        /// <param name="addresses">An output parameter that receives the list of locally-known activations of the grain.</param>
-        /// <returns>True if remote addresses are complete within freshness constraint</returns>
-        bool LocalLookup(GrainId grain, out AddressAndTag addresses);
 
         /// <summary>
         /// Invalidates cache entry for the given activation address.
@@ -84,6 +73,14 @@ namespace Orleans.Runtime.GrainDirectory
         AddressAndTag GetLocalDirectoryData(GrainId grain);
 
         /// <summary>
+        /// Attempts to find the grain address in this silo's local cache or authoritative local directory partition.
+        /// </summary>
+        /// <param name="grainId">The grain id to find.</param>
+        /// <param name="address">The resulting grain address, if found, or <see langword="null"/> if not found.</param>
+        /// <returns>A value indicating whether a valid entry was found.</returns>
+        bool TryLocalLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address);
+
+        /// <summary>
         /// For testing and troubleshooting purposes only.
         /// Returns the directory information held in a local directory cache for the provided grain ID.
         /// The result will be null if no information is held.
@@ -96,12 +93,5 @@ namespace Orleans.Runtime.GrainDirectory
         /// Attempts to find the specified grain in the directory cache.
         /// </summary>
         bool TryCachedLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address);
-
-        /// <summary>
-        /// For determining message forwarding logic, we sometimes check if a silo is part of this cluster or not
-        /// </summary>
-        /// <param name="silo">the address of the silo</param>
-        /// <returns>true if the silo is known to be part of this cluster</returns>
-        bool IsSiloInCluster(SiloAddress silo);
     }
 }

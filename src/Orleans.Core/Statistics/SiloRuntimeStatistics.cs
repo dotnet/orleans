@@ -124,13 +124,13 @@ namespace Orleans.Runtime
         /// The type of the grain for this SimpleGrainStatistic.
         /// </summary>
         [Id(0)]
-        public string GrainType { get; init; }
+        public string GrainType { get; init; } = default!;
 
         /// <summary>
         /// The silo address for this SimpleGrainStatistic.
         /// </summary>
         [Id(1)]
-        public SiloAddress SiloAddress { get; init; }
+        public SiloAddress SiloAddress { get; init; } = default!;
 
         /// <summary>
         /// The number of activations of this grain type on this given silo.
@@ -151,13 +151,13 @@ namespace Orleans.Runtime
         /// The type of the grain for this DetailedGrainStatistic.
         /// </summary>
         [Id(0)]
-        public string GrainType { get; init; }
+        public string GrainType { get; init; } = default!;
 
         /// <summary>
         /// The silo address for this DetailedGrainStatistic.
         /// </summary>
         [Id(1)]
-        public SiloAddress SiloAddress { get; init; }
+        public SiloAddress SiloAddress { get; init; } = default!;
 
         /// <summary>
         /// Unique Id for the grain.
@@ -165,6 +165,7 @@ namespace Orleans.Runtime
         [Id(2)]
         public GrainId GrainId { get; init; }
     }
+
 
     [Serializable, GenerateSerializer, Immutable]
     internal sealed class DetailedGrainReport
@@ -174,31 +175,31 @@ namespace Orleans.Runtime
 
         /// <summary>silo on which these statistics come from</summary>
         [Id(1)]
-        public SiloAddress SiloAddress { get; init; }
+        public SiloAddress SiloAddress { get; init; } = default!;
 
         /// <summary>silo on which these statistics come from</summary>
         [Id(2)]
-        public string SiloName { get; init; }
+        public string SiloName { get; init; } = default!;
 
         /// <summary>activation addresses in the local directory cache</summary>
         [Id(3)]
-        public GrainAddress LocalCacheActivationAddress { get; init; }
+        public GrainAddress? LocalCacheActivationAddress { get; init; }
 
         /// <summary>activation addresses in the local directory.</summary>
         [Id(4)]
-        public GrainAddress LocalDirectoryActivationAddress { get; init; }
+        public GrainAddress? LocalDirectoryActivationAddress { get; init; }
 
         /// <summary>primary silo for this grain</summary>
         [Id(5)]
-        public SiloAddress PrimaryForGrain { get; init; }
+        public SiloAddress? PrimaryForGrain { get; init; }
 
         /// <summary>the name of the class that implements this grain.</summary>
         [Id(6)]
-        public string GrainClassTypeName { get; init; }
+        public string? GrainClassTypeName { get; init; }
 
         /// <summary>activation on this silo</summary>
         [Id(7)]
-        public string LocalActivation { get; init; }
+        public string? LocalActivation { get; init; }
 
         public override string ToString() => @$"{Environment.NewLine
             }**DetailedGrainReport for grain {Grain} from silo {SiloName} SiloAddress={SiloAddress}{Environment.NewLine

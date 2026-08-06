@@ -15,7 +15,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class BoolCodec : IFieldCodec<bool>
     {
-        void IFieldCodec<bool>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, bool value)
+        void IFieldCodec<bool>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] bool value)
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(bool), WireType.VarInt);
@@ -38,6 +38,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         bool IFieldCodec<bool>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
@@ -48,6 +49,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static bool ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);
@@ -61,7 +63,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class CharCodec : IFieldCodec<char>
     {
-        void IFieldCodec<char>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, char value)
+        void IFieldCodec<char>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] char value)
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(char), WireType.VarInt);
@@ -84,6 +86,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         char IFieldCodec<char>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
@@ -94,6 +97,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static char ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);
@@ -107,7 +111,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class ByteCodec : IFieldCodec<byte>
     {
-        void IFieldCodec<byte>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, byte value)
+        void IFieldCodec<byte>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] byte value)
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(byte), WireType.VarInt);
@@ -138,10 +142,11 @@ namespace Orleans.Serialization.Codecs
         /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
         /// <param name="actualType">The actual type.</param>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, byte value, Type actualType) where TBufferWriter : IBufferWriter<byte>
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] byte value, Type actualType) where TBufferWriter : IBufferWriter<byte>
             => UInt16Codec.WriteField(ref writer, fieldIdDelta, expectedType, value, actualType);
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         byte IFieldCodec<byte>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
@@ -152,6 +157,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static byte ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);
@@ -165,7 +171,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class SByteCodec : IFieldCodec<sbyte>
     {
-        void IFieldCodec<sbyte>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, sbyte value)
+        void IFieldCodec<sbyte>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] sbyte value)
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(sbyte), WireType.VarInt);
@@ -196,10 +202,11 @@ namespace Orleans.Serialization.Codecs
         /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
         /// <param name="actualType">The actual type.</param>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, sbyte value, Type actualType) where TBufferWriter : IBufferWriter<byte>
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] sbyte value, Type actualType) where TBufferWriter : IBufferWriter<byte>
             => Int16Codec.WriteField(ref writer, fieldIdDelta, expectedType, value, actualType);
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         sbyte IFieldCodec<sbyte>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
@@ -210,6 +217,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static sbyte ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);
@@ -224,6 +232,7 @@ namespace Orleans.Serialization.Codecs
     public sealed class UInt16Codec : IFieldCodec<ushort>
     {
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         ushort IFieldCodec<ushort>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
@@ -234,13 +243,14 @@ namespace Orleans.Serialization.Codecs
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static ushort ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);
             return reader.ReadUInt16(field.WireType);
         }
 
-        void IFieldCodec<ushort>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ushort value)
+        void IFieldCodec<ushort>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] ushort value)
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(ushort), WireType.VarInt);
@@ -271,7 +281,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
         /// <param name="actualType">The actual type.</param>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ushort value, Type actualType) where TBufferWriter : IBufferWriter<byte>
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] ushort value, Type actualType) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.VarInt);
@@ -285,7 +295,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class Int16Codec : IFieldCodec<short>
     {
-        void IFieldCodec<short>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, short value)
+        void IFieldCodec<short>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] short value)
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(short), WireType.VarInt);
@@ -316,7 +326,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
         /// <param name="actualType">The actual type.</param>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, short value, Type actualType) where TBufferWriter : IBufferWriter<byte>
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] short value, Type actualType) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.VarInt);
@@ -324,6 +334,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         short IFieldCodec<short>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
@@ -334,6 +345,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static short ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);
@@ -347,7 +359,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class UInt32Codec : IFieldCodec<uint>
     {
-        void IFieldCodec<uint>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, uint value)
+        void IFieldCodec<uint>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] uint value)
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(uint), value < 1 << 21 ? WireType.VarInt : WireType.Fixed32);
@@ -382,7 +394,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
         /// <param name="actualType">The actual type.</param>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, uint value, Type actualType) where TBufferWriter : IBufferWriter<byte>
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] uint value, Type actualType) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, value < 1 << 21 ? WireType.VarInt : WireType.Fixed32);
@@ -392,6 +404,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         uint IFieldCodec<uint>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
@@ -402,6 +415,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static uint ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);
@@ -415,7 +429,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class Int32Codec : IFieldCodec<int>
     {
-        void IFieldCodec<int>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, int value)
+        void IFieldCodec<int>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] int value)
         {
             ReferenceCodec.MarkValueField(writer.Session);
             var wireType = value < 1 << 20 && value > -1 << 20 ? WireType.VarInt : WireType.Fixed32;
@@ -452,7 +466,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
         /// <param name="actualType">The actual type.</param>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, int value, Type actualType) where TBufferWriter : IBufferWriter<byte>
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] int value, Type actualType) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
             var wireType = value < 1 << 20 && value > -1 << 20 ? WireType.VarInt : WireType.Fixed32;
@@ -463,6 +477,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         int IFieldCodec<int>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
@@ -473,6 +488,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static int ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);
@@ -486,7 +502,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class Int64Codec : IFieldCodec<long>
     {
-        void IFieldCodec<long>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, long value)
+        void IFieldCodec<long>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] long value)
         {
             ReferenceCodec.MarkValueField(writer.Session);
             var wireType = value switch
@@ -537,7 +553,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
         /// <param name="actualType">The actual type.</param>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, long value, Type actualType) where TBufferWriter : IBufferWriter<byte>
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] long value, Type actualType) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
             var wireType = value switch
@@ -555,6 +571,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         long IFieldCodec<long>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
@@ -565,6 +582,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static long ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);
@@ -578,7 +596,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class UInt64Codec : IFieldCodec<ulong>
     {
-        void IFieldCodec<ulong>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ulong value)
+        void IFieldCodec<ulong>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] ulong value)
         {
             ReferenceCodec.MarkValueField(writer.Session);
             var wireType = value switch
@@ -629,7 +647,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
         /// <param name="actualType">The actual type.</param>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ulong value, Type actualType) where TBufferWriter : IBufferWriter<byte>
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] ulong value, Type actualType) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
             var wireType = value switch
@@ -647,6 +665,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         ulong IFieldCodec<ulong>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
@@ -657,6 +676,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static ulong ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);
@@ -672,7 +692,7 @@ namespace Orleans.Serialization.Codecs
     public sealed class Int128Codec : IFieldCodec<Int128>
     {
         /// <inheritdoc/>
-        void IFieldCodec<Int128>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Int128 value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
+        void IFieldCodec<Int128>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Int128 value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
 
         /// <summary>
         /// Writes a field without type info (expected type is statically known).
@@ -685,7 +705,7 @@ namespace Orleans.Serialization.Codecs
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Int128 value) where TBufferWriter : IBufferWriter<byte>
             => WriteField(ref writer, fieldIdDelta, typeof(Int128), value);
 
-        private static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Int128 value) where TBufferWriter : IBufferWriter<byte>
+        private static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Int128 value) where TBufferWriter : IBufferWriter<byte>
         {
             if (value <= (Int128)long.MaxValue && value >= (Int128)long.MinValue)
             {
@@ -712,6 +732,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         Int128 IFieldCodec<Int128>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
@@ -722,6 +743,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static Int128 ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType != WireType.LengthPrefixed)
@@ -766,7 +788,7 @@ namespace Orleans.Serialization.Codecs
     public sealed class UInt128Codec : IFieldCodec<UInt128>
     {
         /// <inheritdoc/>
-        void IFieldCodec<UInt128>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, UInt128 value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
+        void IFieldCodec<UInt128>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] UInt128 value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
 
         /// <summary>
         /// Writes a field without type info (expected type is statically known).
@@ -779,7 +801,7 @@ namespace Orleans.Serialization.Codecs
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, UInt128 value) where TBufferWriter : IBufferWriter<byte>
             => WriteField(ref writer, fieldIdDelta, typeof(UInt128), value);
 
-        private static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, UInt128 value) where TBufferWriter : IBufferWriter<byte>
+        private static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] UInt128 value) where TBufferWriter : IBufferWriter<byte>
         {
             if (value <= (UInt128)ulong.MaxValue)
             {
@@ -806,6 +828,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         UInt128 IFieldCodec<UInt128>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
@@ -816,6 +839,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static UInt128 ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType != WireType.LengthPrefixed)

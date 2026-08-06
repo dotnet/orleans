@@ -7,10 +7,10 @@ namespace Orleans.Dashboard.Metrics;
 
 internal static class GrainProfilerExtensions
 {
-    public static void Track<T>(this IGrainProfiler profiler, double elapsedMs, [CallerMemberName] string methodName = null, bool failed = false)
+    public static void Track<T>(this IGrainProfiler profiler, double elapsedMs, [CallerMemberName] string? methodName = null, bool failed = false)
         => profiler.Track(elapsedMs, typeof(T), methodName, failed);
 
-    public static async Task TrackAsync<T>(this IGrainProfiler profiler, Func<Task> handler, [CallerMemberName] string methodName = null)
+    public static async Task TrackAsync<T>(this IGrainProfiler profiler, Func<Task> handler, [CallerMemberName] string? methodName = null)
     {
         if (!profiler.IsEnabled)
         {

@@ -60,7 +60,8 @@ namespace Orleans.Serialization.Codecs
             || !type.IsAbstract && typeof(IEqualityComparer<string>).IsAssignableFrom(type) && type.Assembly.Equals(typeof(IEqualityComparer<string>).Assembly);
 
         /// <inheritdoc />
-        public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
+        public object? ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             field.EnsureWireTypeTagDelimited();
             ReferenceCodec.MarkValueField(reader.Session);
@@ -135,11 +136,11 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] object? value) where TBufferWriter : IBufferWriter<byte>
         {
             uint type;
             CompareOptions compareOptions = default;
-            CompareInfo compareInfo = default;
+            CompareInfo? compareInfo = default;
             if (value is null)
             {
                 type = 0;
@@ -147,7 +148,7 @@ namespace Orleans.Serialization.Codecs
             else
             {
 #if NET6_0_OR_GREATER
-                var comparer = (IEqualityComparer<string>)value;
+                var comparer = (IEqualityComparer<string?>)value;
                 if (StringComparer.IsWellKnownOrdinalComparer(comparer, out var ignoreCase))
                 {
                     // Ordinal. This also handles EqualityComparer<string>.Default.
@@ -209,7 +210,7 @@ namespace Orleans.Serialization.Codecs
         }
 
 #if !NET6_0_OR_GREATER
-        private bool TryGetWellKnownCultureAwareComparerInfo(object value, out CompareInfo compareInfo, out CompareOptions compareOptions, out bool ignoreCase)
+        private bool TryGetWellKnownCultureAwareComparerInfo(object value, out CompareInfo? compareInfo, out CompareOptions compareOptions, out bool ignoreCase)
         {
             compareInfo = default;
             compareOptions = default;

@@ -5,7 +5,7 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace Orleans.Connections.Security
 {
-    public delegate X509Certificate ClientCertificateSelectionCallback(object sender, string targetHost, X509CertificateCollection localCertificates, X509Certificate remoteCertificate, string[] acceptableIssuers);
+    public delegate X509Certificate? ClientCertificateSelectionCallback(object sender, string targetHost, X509CertificateCollection localCertificates, X509Certificate? remoteCertificate, string[] acceptableIssuers);
 
     public class TlsClientAuthenticationOptions
     {
@@ -17,13 +17,23 @@ namespace Orleans.Connections.Security
             }
         };
 
-        public ClientCertificateSelectionCallback LocalCertificateSelectionCallback
+        public ClientCertificateSelectionCallback? LocalCertificateSelectionCallback
         {
             get => Value.LocalCertificateSelectionCallback is null ? null : new ClientCertificateSelectionCallback(Value.LocalCertificateSelectionCallback);
-            set => Value.LocalCertificateSelectionCallback = value is null ? null : new System.Net.Security.LocalCertificateSelectionCallback(value);
+            set
+            {
+#if NET10_0_OR_GREATER
+                Value.LocalCertificateSelectionCallback = value is null ? null : new System.Net.Security.LocalCertificateSelectionCallback(value);
+#else
+                Value.LocalCertificateSelectionCallback = value is null
+                    ? null
+                    : (sender, targetHost, localCertificates, remoteCertificate, acceptableIssuers) =>
+                        value(sender, targetHost, localCertificates, remoteCertificate, acceptableIssuers)!;
+#endif
+            }
         }
 
-        public X509CertificateCollection ClientCertificates
+        public X509CertificateCollection? ClientCertificates
         {
             get => this.Value.ClientCertificates;
             set => this.Value.ClientCertificates = value;
@@ -41,7 +51,7 @@ namespace Orleans.Connections.Security
             set => this.Value.CertificateRevocationCheckMode = value;
         }
 
-        public string TargetHost
+        public string? TargetHost
         {
             get => this.Value.TargetHost;
             set => this.Value.TargetHost = value;

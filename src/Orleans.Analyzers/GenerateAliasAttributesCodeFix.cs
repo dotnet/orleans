@@ -19,7 +19,7 @@ public class GenerateAliasAttributesCodeFix : CodeFixProvider
 
     public override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
-        var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
+        var root = (await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false))!;
 
         foreach (var diagnostic in context.Diagnostics)
         {
@@ -63,7 +63,7 @@ public class GenerateAliasAttributesCodeFix : CodeFixProvider
 
         var aliasAttribute =
             Attribute(
-                ParseName(Constants.AliasAttributeFullyQualifiedName))
+                ParseName(Constants.AliasAttributeSourceName))
                     .WithArgumentList(
                         ParseAttributeArgumentList($"(\"{ns}{typeName}{arityString}\")"))
                             .WithAdditionalAnnotations(Simplifier.Annotation);

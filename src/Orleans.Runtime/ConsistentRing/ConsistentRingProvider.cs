@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Text;
 using Microsoft.Extensions.Logging;
 
-
 namespace Orleans.Runtime.ConsistentRing
 {
     /// <summary>
@@ -50,7 +49,7 @@ namespace Orleans.Runtime.ConsistentRing
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        public SiloAddress GetPrimaryTargetSilo(uint key)
+        public SiloAddress? GetPrimaryTargetSilo(uint key)
         {
             return CalculateTargetSilo(key);
         }
@@ -241,9 +240,9 @@ namespace Orleans.Runtime.ConsistentRing
         /// <param name="hash"></param>
         /// <param name="excludeThisSiloIfStopping"></param>
         /// <returns></returns>
-        private SiloAddress CalculateTargetSilo(uint hash, bool excludeThisSiloIfStopping = true)
+        private SiloAddress? CalculateTargetSilo(uint hash, bool excludeThisSiloIfStopping = true)
         {
-            SiloAddress siloAddress = null;
+            SiloAddress? siloAddress = null;
 
             lock (membershipRingList)
             {
@@ -303,9 +302,9 @@ namespace Orleans.Runtime.ConsistentRing
             public override string ToString() => siloAddress.ToStringWithHashCode();
         }
 
-        private readonly struct ConsistentHashCodeLogRecord(SiloAddress siloAddress)
+        private readonly struct ConsistentHashCodeLogRecord(SiloAddress? siloAddress)
         {
-            public override string ToString() => siloAddress?.GetConsistentHashCode().ToString();
+            public override string ToString() => siloAddress?.GetConsistentHashCode().ToString()!;
         }
 
         [LoggerMessage(
@@ -337,12 +336,12 @@ namespace Orleans.Runtime.ConsistentRing
             Level = LogLevel.Warning,
             Message = "Error notifying listener '{ListenerType}' of ring range {AdjustmentKind} from '{OldRange}' to '{NewRange}'."
         )]
-        private static partial void LogWarningErrorNotifyingListener(ILogger logger, Exception exception, string listenerType, string adjustmentKind, IRingRange oldRange, IRingRange newRange);
+        private static partial void LogWarningErrorNotifyingListener(ILogger logger, Exception exception, string? listenerType, string adjustmentKind, IRingRange oldRange, IRingRange newRange);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
             Message = "Silo {SiloAddress} calculated ring partition owner silo {OwnerAddress} for key {Key}: {Key} --> {OwnerHash}"
         )]
-        private static partial void LogTraceCalculatedRingPartitionOwner(ILogger logger, SiloAddress siloAddress, SiloAddress ownerAddress, uint key, ConsistentHashCodeLogRecord ownerHash);
+        private static partial void LogTraceCalculatedRingPartitionOwner(ILogger logger, SiloAddress siloAddress, SiloAddress? ownerAddress, uint key, ConsistentHashCodeLogRecord ownerHash);
     }
 }

@@ -27,7 +27,7 @@ public static class InternalServiceCollectionExtensions
     /// <param name="implementation">The implementation of <paramref name="service"/>.</param>
     public static void AddFromExisting(this IServiceCollection services, Type service, Type implementation)
     {
-        ServiceDescriptor registration = null;
+        ServiceDescriptor? registration = null;
         foreach (var descriptor in services)
         {
             if (descriptor.ServiceType == implementation)

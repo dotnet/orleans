@@ -57,7 +57,7 @@ public static class RuntimeTypeNameParser
         char c;
         var arity = 0;
 
-        TypeSpec coreType = null;
+        TypeSpec coreType = null!;
 
         // Read tuple
         if (input.TryPeek(out c) && c == CompoundAliasStartIndicator)
@@ -114,11 +114,11 @@ public static class RuntimeTypeNameParser
         else
         {
             // Read namespace and class name, including generic arity, which is a part of the class name.
-            NamedTypeSpec named = null;
+            NamedTypeSpec? named = null;
             while (true)
             {
                 var typeName = ParseTypeName(ref input);
-                named = new NamedTypeSpec(named, typeName.ToString(), input.TotalGenericArity);
+                named = new NamedTypeSpec(named!, typeName.ToString(), input.TotalGenericArity);
                 arity = named.Arity;
 
                 if (input.TryPeek(out c) && c == NestedTypeIndicator)
@@ -131,7 +131,7 @@ public static class RuntimeTypeNameParser
                 break;
             }
 
-            coreType = named;
+            coreType = named!;
         }
 
         // Parse generic type parameters

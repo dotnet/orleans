@@ -14,9 +14,9 @@ namespace Orleans.Transactions.TestKit
     public class FaultInjectionTransactionalStateAttribute : Attribute, IFacetMetadata, IFaultInjectionTransactionalStateConfiguration
     {
         public string StateName { get; }
-        public string StorageName { get; }
+        public string? StorageName { get; }
 
-        public FaultInjectionTransactionalStateAttribute(string stateName, string storageName = null)
+        public FaultInjectionTransactionalStateAttribute(string stateName, string? storageName = null)
         {
             this.StateName = stateName;
             this.StorageName = storageName;
@@ -49,7 +49,7 @@ namespace Orleans.Transactions.TestKit
     public class FaultInjectionTransactionalStateAttributeMapper : IAttributeToFactoryMapper<FaultInjectionTransactionalStateAttribute>
     {
         private static readonly MethodInfo create =
-            typeof(IFaultInjectionTransactionalStateFactory).GetMethod("Create");
+            typeof(IFaultInjectionTransactionalStateFactory).GetMethod("Create")!;
         public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, FaultInjectionTransactionalStateAttribute attribute)
         {
             IFaultInjectionTransactionalStateConfiguration config = attribute;
@@ -62,7 +62,7 @@ namespace Orleans.Transactions.TestKit
         private static object Create(IGrainContext context, MethodInfo genericCreate, object[] args)
         {
             IFaultInjectionTransactionalStateFactory factory = context.ActivationServices.GetRequiredService<IFaultInjectionTransactionalStateFactory>();
-            return genericCreate.Invoke(factory, args);
+            return genericCreate.Invoke(factory, args)!;
         }
     }
 }

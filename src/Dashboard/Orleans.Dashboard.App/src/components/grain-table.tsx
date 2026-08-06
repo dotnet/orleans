@@ -1,4 +1,5 @@
 import React from 'react';
+import { getName } from '../lib/typeName';
 
 interface GrainStat {
   grainType: string;
@@ -83,8 +84,8 @@ export default class GrainTable extends React.Component<GrainTableProps, GrainTa
   }
 
   renderStat = (stat: AggregatedGrainStat) => {
-    const parts = stat.grainType.split('.');
-    const grainClassName = parts[parts.length - 1];
+    // shorten fully-qualified type names, including generics
+    const grainClassName = getName(stat.grainType);
     const systemGrain = stat.grainType.startsWith('Orleans.');
     const dashboardGrain = stat.grainType.startsWith('OrleansDashboard.');
     return (

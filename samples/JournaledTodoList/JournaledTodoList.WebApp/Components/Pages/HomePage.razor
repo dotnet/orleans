@@ -1,0 +1,24 @@
+﻿@page "/"
+<PageTitle>Todo Lists</PageTitle>
+
+<div class="container">
+    <h1>My Todo Lists</h1>
+
+    <div class="mb-4">
+        <form @onsubmit="() => CreateNewList(newListName)">
+            <div class="input-group">
+                <input type="text" class="form-control" placeholder="New list name..." @bind="newListName" />
+                <button type="submit" class="btn btn-primary">Create List</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="list-group">
+        @foreach (var list in TodoLists)
+        {
+            <a href="/todolist/@(list.Id)" class="list-group-item list-group-item-action">
+                @list.Name
+            </a>
+        }
+    </div>
+</div>

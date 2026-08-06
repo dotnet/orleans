@@ -19,6 +19,6 @@ namespace Orleans.Runtime.Messaging
     internal class UnderlyingConnectionTransportFeature : IUnderlyingTransportFeature
     {
         /// <inheritdoc />
-        public IDuplexPipe Transport { get; set; }
+        public IDuplexPipe Transport { get; set; } = null!;
     }
 }

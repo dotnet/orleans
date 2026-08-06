@@ -1,8 +1,10 @@
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Internal;
 
 namespace Orleans.Runtime
 {
@@ -17,14 +19,16 @@ namespace Orleans.Runtime
         private readonly TimeSpan period;
         private readonly string name;
         private readonly ILogger log;
+        private readonly TimeProvider _timeProvider;
         private DateTime lastFired = DateTime.MinValue;
         private DateTime expected;
 
-        public AsyncTimer(TimeSpan period, string name, ILogger log)
+        public AsyncTimer(TimeSpan period, string name, ILogger log, TimeProvider timeProvider)
         {
             this.log = log;
             this.period = period;
             this.name = name;
+            _timeProvider = timeProvider;
         }
 
         /// <summary>
@@ -36,36 +40,36 @@ namespace Orleans.Runtime
         {
             if (cancellation.IsCancellationRequested) return false;
 
-            var start = DateTime.UtcNow;
+            var start = _timeProvider.GetUtcNow().UtcDateTime;
             var delay = overrideDelay switch
             {
                 { } value => value,
                 _ when lastFired == DateTime.MinValue => period,
-                _ => lastFired.Add(period).Subtract(start)
+                _ when period == Timeout.InfiniteTimeSpan => period,
+                _ when start - lastFired < period => period - (start - lastFired),
+                _ => TimeSpan.Zero,
             };
 
-            if (delay < TimeSpan.Zero) delay = TimeSpan.Zero;
+            var isInfinite = delay == Timeout.InfiniteTimeSpan;
+            if (delay < TimeSpan.Zero && !isInfinite) delay = TimeSpan.Zero;
 
-            var dueTime = start.Add(delay);
+            var hasAbsoluteDueTime = !isInfinite && delay <= DateTime.MaxValue - start;
+            var dueTime = hasAbsoluteDueTime ? start.Add(delay) : DateTime.MaxValue;
             this.expected = dueTime;
-            if (delay > TimeSpan.Zero)
+            if (delay > TimeSpan.Zero || isInfinite)
             {
-                // for backwards compatibility, support timers with periods up to ReminderRegistry.MaxSupportedTimeout
-                var maxDelay = TimeSpan.FromMilliseconds(int.MaxValue);
-                while (delay > maxDelay)
+                try
                 {
-                    delay -= maxDelay;
-                    var task2 = await Task.WhenAny(Task.Delay(maxDelay, cancellation.Token)).ConfigureAwait(false);
-                    if (task2.IsCanceled)
+                    if (hasAbsoluteDueTime)
                     {
-                        await Task.Yield();
-                        expected = default;
-                        return false;
+                        await _timeProvider.DelayUntilAsync(new DateTimeOffset(dueTime), cancellation.Token).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        await _timeProvider.DelayAsync(delay, cancellation.Token).ConfigureAwait(false);
                     }
                 }
-
-                var task = await Task.WhenAny(Task.Delay(delay, cancellation.Token)).ConfigureAwait(false);
-                if (task.IsCanceled)
+                catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
                 {
                     await Task.Yield();
                     expected = default;
@@ -73,7 +77,7 @@ namespace Orleans.Runtime
                 }
             }
 
-            var now = this.lastFired = DateTime.UtcNow;
+            var now = this.lastFired = _timeProvider.GetUtcNow().UtcDateTime;
             var overshoot = GetOvershootDelay(now, dueTime);
             if (overshoot > TimeSpan.Zero)
             {
@@ -98,9 +102,9 @@ namespace Orleans.Runtime
             return TimeSpan.Zero;
         }
 
-        public bool CheckHealth(DateTime lastCheckTime, out string reason)
+        public bool CheckHealth(DateTime lastCheckTime, [MaybeNullWhen(true)] out string reason)
         {
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             var due = this.expected;
             var overshoot = GetOvershootDelay(now, due);
             if (overshoot > TimeSpan.Zero && !Debugger.IsAttached)

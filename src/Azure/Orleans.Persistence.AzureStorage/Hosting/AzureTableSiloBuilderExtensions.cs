@@ -31,7 +31,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use azure table storage as the default grain storage.
         /// </summary>
-        public static ISiloBuilder AddAzureTableGrainStorageAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<AzureTableStorageOptions>> configureOptions = null)
+        public static ISiloBuilder AddAzureTableGrainStorageAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<AzureTableStorageOptions>>? configureOptions = null)
         {
             return builder.AddAzureTableGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
         }
@@ -39,7 +39,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use azure table storage for grain storage.
         /// </summary>
-        public static ISiloBuilder AddAzureTableGrainStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<AzureTableStorageOptions>> configureOptions = null)
+        public static ISiloBuilder AddAzureTableGrainStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<AzureTableStorageOptions>>? configureOptions = null)
         {
             return builder.ConfigureServices(services => services.AddAzureTableGrainStorage(name, configureOptions));
         }
@@ -47,7 +47,7 @@ namespace Orleans.Hosting
         internal static IServiceCollection AddAzureTableGrainStorage(
             this IServiceCollection services,
             string name,
-            Action<OptionsBuilder<AzureTableStorageOptions>> configureOptions = null)
+            Action<OptionsBuilder<AzureTableStorageOptions>>? configureOptions = null)
         {
             configureOptions?.Invoke(services.AddOptions<AzureTableStorageOptions>(name));
             services.AddTransient<IConfigurationValidator>(sp => new AzureTableGrainStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureTableStorageOptions>>().Get(name), name));

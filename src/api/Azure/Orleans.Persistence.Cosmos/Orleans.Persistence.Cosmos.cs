@@ -22,11 +22,11 @@ namespace Orleans.Hosting
 
         public static ISiloBuilder AddCosmosGrainStorage(this ISiloBuilder builder, string name, System.Type customPartitionKeyProviderType, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.Cosmos.CosmosGrainStorageOptions>>? configureOptions = null) { throw null; }
 
-        public static ISiloBuilder AddCosmosGrainStorage<TPartitionKeyProvider>(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.Cosmos.CosmosGrainStorageOptions>>? configureOptions = null)
-            where TPartitionKeyProvider : class, Persistence.Cosmos.IPartitionKeyProvider { throw null; }
+        public static ISiloBuilder AddCosmosGrainStorage<TProvider>(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.Cosmos.CosmosGrainStorageOptions>>? configureOptions = null)
+            where TProvider : class { throw null; }
 
-        public static ISiloBuilder AddCosmosGrainStorage<TPartitionKeyProvider>(this ISiloBuilder builder, string name, System.Action<Persistence.Cosmos.CosmosGrainStorageOptions> configureOptions)
-            where TPartitionKeyProvider : class, Persistence.Cosmos.IPartitionKeyProvider { throw null; }
+        public static ISiloBuilder AddCosmosGrainStorage<TProvider>(this ISiloBuilder builder, string name, System.Action<Persistence.Cosmos.CosmosGrainStorageOptions> configureOptions)
+            where TProvider : class { throw null; }
 
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddCosmosGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.Cosmos.CosmosGrainStorageOptions>>? configureOptions = null) { throw null; }
 
@@ -40,11 +40,11 @@ namespace Orleans.Hosting
 
         public static ISiloBuilder AddCosmosGrainStorageAsDefault(this ISiloBuilder builder, System.Type customPartitionKeyProviderType, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.Cosmos.CosmosGrainStorageOptions>>? configureOptions = null) { throw null; }
 
-        public static ISiloBuilder AddCosmosGrainStorageAsDefault<TPartitionKeyProvider>(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.Cosmos.CosmosGrainStorageOptions>>? configureOptions = null)
-            where TPartitionKeyProvider : class, Persistence.Cosmos.IPartitionKeyProvider { throw null; }
+        public static ISiloBuilder AddCosmosGrainStorageAsDefault<TProvider>(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.Cosmos.CosmosGrainStorageOptions>>? configureOptions = null)
+            where TProvider : class { throw null; }
 
-        public static ISiloBuilder AddCosmosGrainStorageAsDefault<TPartitionKeyProvider>(this ISiloBuilder builder, System.Action<Persistence.Cosmos.CosmosGrainStorageOptions> configureOptions)
-            where TPartitionKeyProvider : class, Persistence.Cosmos.IPartitionKeyProvider { throw null; }
+        public static ISiloBuilder AddCosmosGrainStorageAsDefault<TProvider>(this ISiloBuilder builder, System.Action<Persistence.Cosmos.CosmosGrainStorageOptions> configureOptions)
+            where TProvider : class { throw null; }
     }
 }
 
@@ -58,11 +58,11 @@ namespace Orleans.Persistence.Cosmos
         [System.Obsolete]
         protected CosmosConditionNotSatisfiedException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
 
-        public CosmosConditionNotSatisfiedException(string grainType, Runtime.GrainId grainId, string collection, string storedEtag, string currentEtag) { }
+        public CosmosConditionNotSatisfiedException(string grainType, Runtime.GrainId grainId, string collection, string storedEtag, string? currentEtag) { }
 
         public CosmosConditionNotSatisfiedException(string msg, System.Exception exc) { }
 
-        public CosmosConditionNotSatisfiedException(string errorMsg, string grainType, Runtime.GrainId grainId, string collection, string storedEtag, string currentEtag) { }
+        public CosmosConditionNotSatisfiedException(string errorMsg, string grainType, Runtime.GrainId grainId, string collection, string storedEtag, string? currentEtag) { }
 
         public CosmosConditionNotSatisfiedException(string msg) { }
 
@@ -81,7 +81,7 @@ namespace Orleans.Persistence.Cosmos
 
     public sealed partial class CosmosGrainStorage : Storage.IGrainStorage, ILifecycleParticipant<Runtime.ISiloLifecycle>
     {
-        public CosmosGrainStorage(string name, CosmosGrainStorageOptions options, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, System.IServiceProvider serviceProvider, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, IPartitionKeyProvider partitionKeyProvider, Serialization.Serializers.IActivatorProvider activatorProvider) { }
+        public CosmosGrainStorage(string name, CosmosGrainStorageOptions options, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, System.IServiceProvider serviceProvider, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, IDocumentIdProvider documentIdProvider, Serialization.Serializers.IActivatorProvider activatorProvider) { }
 
         public System.Threading.Tasks.Task ClearStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
 
@@ -145,11 +145,28 @@ namespace Orleans.Persistence.Cosmos
         public static CosmosGrainStorage Create(System.IServiceProvider services, string name) { throw null; }
     }
 
+    public sealed partial class DefaultDocumentIdProvider : IDocumentIdProvider
+    {
+        public DefaultDocumentIdProvider(Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> options) { }
+
+        public System.Threading.Tasks.ValueTask<(string DocumentId, string PartitionKey)> GetDocumentIdentifiers(string grainType, Runtime.GrainId grainId) { throw null; }
+
+        public string GetId(string grainType, Runtime.GrainId grainId) { throw null; }
+
+        public string GetPartitionKey(string grainType, Runtime.GrainId grainId) { throw null; }
+    }
+
     public partial interface ICosmosOperationExecutor
     {
         System.Threading.Tasks.Task<TResult> ExecuteOperation<TArg, TResult>(System.Func<TArg, System.Threading.Tasks.Task<TResult>> func, TArg arg);
     }
 
+    public partial interface IDocumentIdProvider
+    {
+        System.Threading.Tasks.ValueTask<(string DocumentId, string PartitionKey)> GetDocumentIdentifiers(string grainType, Runtime.GrainId grainId);
+    }
+
+    [System.Obsolete("Use IDocumentIdProvider instead.")]
     public partial interface IPartitionKeyProvider
     {
         System.Threading.Tasks.ValueTask<string> GetPartitionKey(string grainType, Runtime.GrainId grainId);
@@ -158,7 +175,7 @@ namespace Orleans.Persistence.Cosmos
 
 namespace OrleansCodeGen.Orleans.Persistence.Cosmos
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_CosmosConditionNotSatisfiedException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Persistence.Cosmos.CosmosConditionNotSatisfiedException>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Persistence.Cosmos.CosmosConditionNotSatisfiedException>, global::Orleans.Serialization.Serializers.IBaseCodec
@@ -176,7 +193,7 @@ namespace OrleansCodeGen.Orleans.Persistence.Cosmos
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_CosmosConditionNotSatisfiedException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Persistence.Cosmos.CosmosConditionNotSatisfiedException, global::Orleans.Storage.InconsistentStateException>

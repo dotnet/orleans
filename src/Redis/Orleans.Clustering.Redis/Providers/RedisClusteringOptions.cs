@@ -17,12 +17,15 @@ namespace Orleans.Clustering.Redis
         /// Gets or sets the Redis client configuration.
         /// </summary>
         [RedactRedisConfigurationOptions]
-        public ConfigurationOptions ConfigurationOptions { get; set; }
+        public ConfigurationOptions? ConfigurationOptions { get; set; }
 
         /// <summary>
-        /// The delegate used to create a Redis connection multiplexer.
+        /// The delegate used to create a Redis connection multiplexer and indicate whether it is shared.
         /// </summary>
-        public Func<RedisClusteringOptions, Task<IConnectionMultiplexer>> CreateMultiplexer { get; set; } = DefaultCreateMultiplexer;
+        /// <remarks>
+        /// When <c>IsShared</c> is <see langword="true"/>, the provider will not dispose the returned multiplexer.
+        /// </remarks>
+        public Func<RedisClusteringOptions, Task<(IConnectionMultiplexer Multiplexer, bool IsShared)>> CreateMultiplexer { get; set; } = DefaultCreateMultiplexer;
 
         /// <summary>
         /// The delegate used to create redis key for RedisMembershipTable.
@@ -38,9 +41,9 @@ namespace Orleans.Clustering.Redis
         /// <summary>
         /// The default multiplexer creation delegate.
         /// </summary>
-        public static async Task<IConnectionMultiplexer> DefaultCreateMultiplexer(RedisClusteringOptions options)
+        public static async Task<(IConnectionMultiplexer Multiplexer, bool IsShared)> DefaultCreateMultiplexer(RedisClusteringOptions options)
         {
-            return await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions);
+            return (await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions!), false);
         }
 
         /// <summary>
@@ -55,7 +58,7 @@ namespace Orleans.Clustering.Redis
 
     internal class RedactRedisConfigurationOptions : RedactAttribute
     {
-        public override string Redact(object value) => value is ConfigurationOptions cfg ? cfg.ToString(includePassword: false) : base.Redact(value);
+        public override string Redact(object? value) => value is ConfigurationOptions cfg ? cfg.ToString(includePassword: false) : base.Redact(value);
     }
 
     /// <summary>

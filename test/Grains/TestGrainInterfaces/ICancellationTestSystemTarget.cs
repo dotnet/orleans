@@ -1,4 +1,3 @@
-#nullable enable
 namespace UnitTests.GrainInterfaces;
 
 /// <summary>

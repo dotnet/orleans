@@ -1,4 +1,3 @@
-#nullable enable
 using Orleans.Serialization.Codecs;
 using System;
 
@@ -21,7 +20,7 @@ namespace Orleans.Serialization.Serializers
         /// </summary>
         /// <typeparam name="TField">The field type.</typeparam>
         /// <returns>A codec.</returns>
-        IFieldCodec<TField> TryGetCodec<TField>();
+        IFieldCodec<TField>? TryGetCodec<TField>();
 
         /// <summary>
         /// Gets a codec for the specific type.
@@ -39,6 +38,6 @@ namespace Orleans.Serialization.Serializers
         /// The field type.
         /// </param>
         /// <returns>A codec.</returns>
-        IFieldCodec TryGetCodec(Type fieldType);
+        IFieldCodec? TryGetCodec(Type fieldType);
     }
 }

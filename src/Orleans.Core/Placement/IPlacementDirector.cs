@@ -29,8 +29,8 @@ namespace Orleans.Runtime.Placement
         /// </summary>
         /// <param name="requestContextData">The request context data.</param>
         /// <param name="compatibleSilos">The compatible silos.</param>
-        /// <returns>The placement hint, if present and valid, or <see landword="null"/> otherwise.</returns>
-        public static SiloAddress GetPlacementHint(Dictionary<string, object> requestContextData, SiloAddress[] compatibleSilos)
+        /// <returns>The placement hint, if present and valid, or <see langword="null"/> otherwise.</returns>
+        public static SiloAddress? GetPlacementHint(Dictionary<string, object> requestContextData, SiloAddress[] compatibleSilos)
         {
             if (requestContextData is { Count: > 0 } data
                 && data.TryGetValue(PlacementHintKey, out var value)

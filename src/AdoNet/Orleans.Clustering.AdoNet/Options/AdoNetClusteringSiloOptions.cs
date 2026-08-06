@@ -1,4 +1,4 @@
-﻿namespace Orleans.Configuration
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Options for ADO.NET clustering
@@ -9,11 +9,11 @@
         /// Connection string for AdoNet Storage
         /// </summary>
         [Redact]
-        public string ConnectionString { get; set; }
+        public string ConnectionString { get; set; } = null!;
 
         /// <summary>
         /// The invariant name of the connector for membership's database.
         /// </summary>
-        public string Invariant { get; set; }
+        public string Invariant { get; set; } = null!;
     }
 }

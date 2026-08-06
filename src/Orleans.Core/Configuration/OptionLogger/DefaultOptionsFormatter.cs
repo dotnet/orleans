@@ -70,7 +70,7 @@ namespace Orleans
             return true;
         }
 
-        private static bool IsAccessibleMethod(MethodInfo accessor)
+        private static bool IsAccessibleMethod(MethodInfo? accessor)
         {
             if (accessor is null) return false;
             if (!accessor.IsPublic) return false;

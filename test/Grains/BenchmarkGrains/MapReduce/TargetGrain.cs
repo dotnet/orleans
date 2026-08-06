@@ -4,7 +4,7 @@ namespace BenchmarkGrains.MapReduce
 {
     public class TargetGrain<TInput> : DataflowGrain, ITargetGrain<TInput>
     {
-        private ITargetProcessor<TInput> _processor;
+        private ITargetProcessor<TInput> _processor = null!;
 
         public Task Init(ITargetProcessor<TInput> processor)
         {

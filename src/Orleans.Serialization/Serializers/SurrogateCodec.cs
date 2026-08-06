@@ -1,4 +1,3 @@
-﻿#nullable enable
 using System;
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
@@ -62,6 +61,7 @@ public sealed class SurrogateCodec<TField, TSurrogate, TConverter>
     }
 
     /// <inheritdoc/>
+    [return: System.Diagnostics.CodeAnalysis.MaybeNull]
     public TField ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         if (field.WireType == WireType.Reference)
@@ -95,14 +95,14 @@ public sealed class SurrogateCodec<TField, TSurrogate, TConverter>
     }
 
     /// <inheritdoc/>
-    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value) where TBufferWriter : IBufferWriter<byte>
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] TField value) where TBufferWriter : IBufferWriter<byte>
     {
         if (IsReferenceTrackingSupported && ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
         {
             return;
         }
 
-        if (value.GetType() as object == _fieldType as object)
+        if (value!.GetType() as object == _fieldType as object)
         {
             writer.WriteStartObject(fieldIdDelta, expectedType, _fieldType);
             var surrogate = _converter.ConvertToSurrogate(in value);

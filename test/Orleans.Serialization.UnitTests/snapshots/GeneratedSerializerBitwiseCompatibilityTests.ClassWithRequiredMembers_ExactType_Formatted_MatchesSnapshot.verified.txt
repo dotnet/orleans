@@ -1,0 +1,4 @@
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0002  [#2 VarInt Id: 0 SchemaType: Expected] Value: 2 (0x2)
+0x0004  [#3 LengthPrefixed Id: 1 SchemaType: Expected] Value: (length: 3b) ["foo"]
+0x0009 }

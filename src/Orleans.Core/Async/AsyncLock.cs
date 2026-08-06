@@ -82,7 +82,7 @@ namespace Orleans
 
         private class LockReleaser : IDisposable
         {
-            private AsyncLock target;
+            private AsyncLock? target;
 
             internal LockReleaser(AsyncLock target)
             {

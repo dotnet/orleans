@@ -3,7 +3,7 @@ namespace Orleans.Transactions.Abstractions
     public class TransactionalStateConfiguration : ITransactionalStateConfiguration
     {
         private readonly string name;
-        private readonly string storage;
+        private readonly string? storage;
         public TransactionalStateConfiguration(ITransactionalStateConfiguration config, ParticipantId.Role supportedRoles = ParticipantId.Role.Resource | ParticipantId.Role.Manager)
         {
             this.name = config.StateName;
@@ -12,7 +12,7 @@ namespace Orleans.Transactions.Abstractions
         }
         public string StateName => this.name;
 
-        public string StorageName => this.storage;
+        public string? StorageName => this.storage;
 
         public ParticipantId.Role SupportedRoles { get; }
     }

@@ -19,7 +19,7 @@ namespace Orleans.Streams
         private readonly IAsyncEnumerable<ClusterMembershipSnapshot> clusterMembershipUpdates;
         private readonly List<IStreamQueueBalanceListener> queueBalanceListeners;
         private readonly CancellationTokenSource cts;
-        private Task _listenForClusterChangesTask;
+        private Task _listenForClusterChangesTask = null!; // Initialized in Initialize.
 
         protected CancellationToken Cancellation => this.cts.Token;
 

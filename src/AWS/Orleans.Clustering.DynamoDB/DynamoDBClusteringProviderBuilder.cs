@@ -11,7 +11,7 @@ namespace Orleans.Hosting;
 
 internal sealed class DynamoDBClusteringProviderBuilder : IProviderBuilder<ISiloBuilder>, IProviderBuilder<IClientBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseDynamoDBClustering(options =>
             {
@@ -78,7 +78,7 @@ internal sealed class DynamoDBClusteringProviderBuilder : IProviderBuilder<ISilo
             });
     }
 
-    public void Configure(IClientBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(IClientBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseDynamoDBClustering(options =>
             {

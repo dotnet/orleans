@@ -32,12 +32,12 @@ namespace Orleans.Versions
         /// Gets the default grain interface version compatibility strategy.
         /// </summary>
         /// <returns>The default grain interface version compatibility strategy.</returns>
-        Task<CompatibilityStrategy> GetCompatibilityStrategy();
+        Task<CompatibilityStrategy?> GetCompatibilityStrategy();
 
         /// <summary>
         /// Gets the default grain interface version selector strategy.
         /// </summary>
         /// <returns>The default grain interface version selector strategy.</returns>
-        Task<VersionSelectorStrategy> GetSelectorStrategy();
+        Task<VersionSelectorStrategy?> GetSelectorStrategy();
     }
 }

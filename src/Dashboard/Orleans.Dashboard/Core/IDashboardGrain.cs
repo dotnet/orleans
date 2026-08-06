@@ -18,7 +18,7 @@ internal interface IDashboardGrain : IGrainWithIntegerKey
     Task SubmitTracing(string siloAddress, Immutable<SiloGrainTraceEntry[]> grainCallTime);
 
     [Alias("GetCounters")]
-    Task<Immutable<DashboardCounters>> GetCounters(string[] exclusions = null);
+    Task<Immutable<DashboardCounters>> GetCounters(string[]? exclusions = null);
 
     [Alias("GetGrainTracing")]
     Task<Immutable<Dictionary<string, Dictionary<string, GrainTraceEntry>>>> GetGrainTracing(string grain);
@@ -30,11 +30,11 @@ internal interface IDashboardGrain : IGrainWithIntegerKey
     Task<Immutable<Dictionary<string, GrainTraceEntry>>> GetSiloTracing(string address);
 
     [Alias("TopGrainMethods")]
-    Task<Immutable<Dictionary<string, GrainMethodAggregate[]>>> TopGrainMethods(int take, string[] exclusions = null);
+    Task<Immutable<Dictionary<string, GrainMethodAggregate[]>>> TopGrainMethods(int take, string[]? exclusions = null);
 
     [Alias("GetGrainState")]
-    Task<Immutable<string>> GetGrainState(string id, string grainType);
+    Task<Immutable<string>> GetGrainState(string? id, string? grainType);
 
     [Alias("GetGrainTypes")]
-    Task<Immutable<string[]>> GetGrainTypes(string[] exclusions = null);
+    Task<Immutable<string[]>> GetGrainTypes(string[]? exclusions = null);
 }

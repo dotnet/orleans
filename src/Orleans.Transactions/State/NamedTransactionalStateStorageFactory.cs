@@ -20,19 +20,19 @@ namespace Orleans.Transactions
             this.contextAccessor = contextAccessor;
         }
 
-        public ITransactionalStateStorage<TState> Create<TState>(string storageName, string stateName)
+        public ITransactionalStateStorage<TState> Create<TState>(string? storageName, string stateName)
             where TState : class, new()
         {
             var currentContext = this.contextAccessor.GrainContext;
 
             // Try to get ITransactionalStateStorage from factory
-            ITransactionalStateStorageFactory factory = string.IsNullOrEmpty(storageName)
+            ITransactionalStateStorageFactory? factory = string.IsNullOrEmpty(storageName)
                 ? currentContext.ActivationServices.GetService<ITransactionalStateStorageFactory>()
                 : currentContext.ActivationServices.GetKeyedService<ITransactionalStateStorageFactory>(storageName);
             if (factory != null) return factory.Create<TState>(stateName, currentContext);
 
             // Else try to get storage provider and wrap it
-            IGrainStorage grainStorage = string.IsNullOrEmpty(storageName)
+            IGrainStorage? grainStorage = string.IsNullOrEmpty(storageName)
                 ? currentContext.ActivationServices.GetService<IGrainStorage>()
                 : currentContext.ActivationServices.GetKeyedService<IGrainStorage>(storageName);
 

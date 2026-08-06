@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -9,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Core.Diagnostics;
 using Orleans.Internal;
 using Orleans.Messaging;
 using Orleans.Metadata;
@@ -171,6 +171,7 @@ namespace Orleans.Runtime
                             continue;
                         }
 
+                        ManifestEvents.EmitClusterManifestUpdated(this, updatedManifest);
                         _initialized.TrySetResult(true);
 
                         LogRefreshedClusterManifest(_logger);

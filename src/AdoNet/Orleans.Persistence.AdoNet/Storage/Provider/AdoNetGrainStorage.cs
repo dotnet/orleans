@@ -96,7 +96,7 @@ namespace Orleans.Storage
         /// <summary>
         /// The storage used for back-end operations.
         /// </summary>
-        private IRelationalStorage Storage { get; set; }
+        private IRelationalStorage Storage { get; set; } = null!;
 
         /// <summary>
         /// These chars are delimiters when used to extract a class base type from a class
@@ -113,7 +113,7 @@ namespace Orleans.Storage
         /// <summary>
         /// The queries currently used. When this is updated, the new queries will take effect immediately.
         /// </summary>
-        public RelationalStorageProviderQueries CurrentOperationalQueries { get; set; }
+        public RelationalStorageProviderQueries CurrentOperationalQueries { get; set; } = null!;
 
         /// <summary>
         /// The hash generator used to hash natural keys, grain ID and grain type to a more narrow index.
@@ -163,11 +163,11 @@ namespace Orleans.Storage
                 }
             }
 
-            string storageVersion = null;
+            string? storageVersion = null;
             try
             {
-                var grainIdHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes());
-                var grainTypeHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
+                var grainIdHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState)!.Hash(grainId.GetHashBytes()); // Storage configuration always supplies a matching hasher.
+                var grainTypeHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState)!.Hash(Encoding.UTF8.GetBytes(baseGrainType)); // Storage configuration always supplies a matching hasher.
 
                 var queryText = options.DeleteStateOnClear ? CurrentOperationalQueries.DeleteState : CurrentOperationalQueries.ClearState;
 
@@ -225,8 +225,8 @@ namespace Orleans.Storage
             try
             {
                 var commandBehavior = CommandBehavior.Default;
-                var grainIdHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes());
-                var grainTypeHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
+                var grainIdHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState)!.Hash(grainId.GetHashBytes()); // Storage configuration always supplies a matching hasher.
+                var grainTypeHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState)!.Hash(Encoding.UTF8.GetBytes(baseGrainType)); // Storage configuration always supplies a matching hasher.
                 var readRecords = (await Storage.ReadAsync(
                     CurrentOperationalQueries.ReadFromStorage,
                     command =>
@@ -241,9 +241,9 @@ namespace Orleans.Storage
                     },
                     (selector, resultSetCount, token) =>
                     {
-                        object storageState = null;
+                        object? storageState = null;
                         int? version;
-                        byte[] payload;
+                        byte[]? payload;
                         payload = selector.GetValueOrDefault<byte[]>("PayloadBinary");
                         if (payload != null)
                         {
@@ -255,8 +255,8 @@ namespace Orleans.Storage
                     },
                     commandBehavior, CancellationToken.None).ConfigureAwait(false)).SingleOrDefault();
 
-                T state = readRecords != null ? (T)readRecords.Item1 : default;
-                string etag = readRecords != null ? readRecords.Item2 : null;
+                T? state = readRecords != null ? (T)readRecords.Item1! : default;
+                string? etag = readRecords != null ? readRecords.Item2 : null;
                 bool recordExists = readRecords != null;
                 if (state == null)
                 {
@@ -288,11 +288,11 @@ namespace Orleans.Storage
             var baseGrainType = ExtractBaseClass(grainType);
             LogTraceWritingGrainState(serviceId, name, baseGrainType, grainId, grainState.ETag);
 
-            string storageVersion = null;
+            string? storageVersion = null;
             try
             {
-                var grainIdHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes());
-                var grainTypeHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
+                var grainIdHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState)!.Hash(grainId.GetHashBytes()); // Storage configuration always supplies a matching hasher.
+                var grainTypeHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState)!.Hash(Encoding.UTF8.GetBytes(baseGrainType)); // Storage configuration always supplies a matching hasher.
                 var writeRecord = await Storage.ReadAsync(CurrentOperationalQueries.WriteToStorage, command =>
                 {
                     var serialized = this.Serializer.Serialize<T>(grainState.State);
@@ -381,7 +381,7 @@ namespace Orleans.Storage
         /// <returns>An exception for throwing or <em>null</em> if no violation was detected.</returns>
         /// <remarks>This means that the version was not updated in the database or the version storage version was something else than null
         /// when the grain version was null, meaning effectively a double activation and save.</remarks>
-        private static InconsistentStateException CheckVersionInconsistency(string operation, string serviceId, string providerName, string storageVersion, string grainVersion, string normalizedGrainType, string grainId)
+        private static InconsistentStateException? CheckVersionInconsistency(string operation, string serviceId, string providerName, string? storageVersion, string? grainVersion, string normalizedGrainType, string grainId)
         {
             //If these are the same, it means no row was inserted or updated in the storage.
             //Effectively it means the UPDATE or INSERT conditions failed due to ETag violation.
@@ -405,7 +405,7 @@ namespace Orleans.Storage
         /// <remarks>This likely should exist in Orleans core in more optimized form.</remarks>
         private static AdoGrainKey GrainIdAndExtensionAsString(GrainId grainId)
         {
-            string keyExt;
+            string? keyExt;
             if (grainId.TryGetGuidKey(out var guid, out keyExt))
             {
                 return new AdoGrainKey(guid, keyExt);
@@ -487,70 +487,70 @@ namespace Orleans.Storage
             Level = LogLevel.Trace,
             Message = "Clearing grain state: ServiceId={ServiceId} ProviderName={Name} GrainType={BaseGrainType} GrainId={GrainId} ETag={ETag}."
         )]
-        private partial void LogTraceClearingGrainState(string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string etag);
+        private partial void LogTraceClearingGrainState(string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string? etag);
 
         [LoggerMessage(
             EventId = (int)RelationalStorageProviderCodes.RelationalProviderDeleteError,
             Level = LogLevel.Error,
             Message = "Error clearing grain state: ServiceId={ServiceId} ProviderName={Name} GrainType={BaseGrainType} GrainId={GrainId} ETag={ETag}."
         )]
-        private partial void LogErrorClearingGrainState(Exception exception, string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string etag);
+        private partial void LogErrorClearingGrainState(Exception exception, string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string? etag);
 
         [LoggerMessage(
             EventId = (int)RelationalStorageProviderCodes.RelationalProviderCleared,
             Level = LogLevel.Trace,
             Message = "Cleared grain state: ServiceId={ServiceId} ProviderName={Name} GrainType={BaseGrainType} GrainId={GrainId} ETag={ETag}."
         )]
-        private partial void LogTraceClearedGrainState(string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string etag);
+        private partial void LogTraceClearedGrainState(string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string? etag);
 
         [LoggerMessage(
             EventId = (int)RelationalStorageProviderCodes.RelationalProviderReading,
             Level = LogLevel.Trace,
             Message = "Reading grain state: ServiceId={ServiceId} ProviderName={Name} GrainType={BaseGrainType} GrainId={GrainId} ETag={ETag}."
         )]
-        private partial void LogTraceReadingGrainState(string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string etag);
+        private partial void LogTraceReadingGrainState(string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string? etag);
 
         [LoggerMessage(
             EventId = (int)RelationalStorageProviderCodes.RelationalProviderNoStateFound,
             Level = LogLevel.Trace,
             Message = "Null grain state read (default will be instantiated): ServiceId={ServiceId} ProviderName={Name} GrainType={BaseGrainType} GrainId={GrainId} ETag={ETag}."
         )]
-        private partial void LogTraceNullGrainStateRead(string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string etag);
+        private partial void LogTraceNullGrainStateRead(string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string? etag);
 
         [LoggerMessage(
             EventId = (int)RelationalStorageProviderCodes.RelationalProviderRead,
             Level = LogLevel.Trace,
             Message = "Read grain state: ServiceId={ServiceId} ProviderName={Name} GrainType={BaseGrainType} GrainId={GrainId} ETag={ETag}."
         )]
-        private partial void LogTraceReadGrainState(string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string etag);
+        private partial void LogTraceReadGrainState(string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string? etag);
 
         [LoggerMessage(
             EventId = (int)RelationalStorageProviderCodes.RelationalProviderReadError,
             Level = LogLevel.Error,
             Message = "Error reading grain state: ServiceId={ServiceId} ProviderName={Name} GrainType={BaseGrainType} GrainId={GrainId} ETag={ETag}."
         )]
-        private partial void LogErrorReadingGrainState(Exception exception, string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string etag);
+        private partial void LogErrorReadingGrainState(Exception exception, string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string? etag);
 
         [LoggerMessage(
             EventId = (int)RelationalStorageProviderCodes.RelationalProviderWriting,
             Level = LogLevel.Trace,
             Message = "Writing grain state: ServiceId={ServiceId} ProviderName={Name} GrainType={BaseGrainType} GrainId={GrainId} ETag={ETag}."
         )]
-        private partial void LogTraceWritingGrainState(string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string etag);
+        private partial void LogTraceWritingGrainState(string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string? etag);
 
         [LoggerMessage(
             EventId = (int)RelationalStorageProviderCodes.RelationalProviderWriteError,
             Level = LogLevel.Error,
             Message = "Error writing grain state: ServiceId={ServiceId} ProviderName={Name} GrainType={BaseGrainType} GrainId={GrainId} ETag={ETag}."
         )]
-        private partial void LogErrorWritingGrainState(Exception exception, string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string etag);
+        private partial void LogErrorWritingGrainState(Exception exception, string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string? etag);
 
         [LoggerMessage(
             EventId = (int)RelationalStorageProviderCodes.RelationalProviderWrote,
             Level = LogLevel.Trace,
             Message = "Wrote grain state: ServiceId={ServiceId} ProviderName={Name} GrainType={BaseGrainType} GrainId={GrainId} ETag={ETag}."
         )]
-        private partial void LogTraceWroteGrainState(string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string etag);
+        private partial void LogTraceWroteGrainState(string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string? etag);
 
         private readonly struct ConnectionStringLogRecord(string connectionString)
         {

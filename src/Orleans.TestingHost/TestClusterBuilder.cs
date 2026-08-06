@@ -17,7 +17,7 @@ namespace Orleans.TestingHost
     {
         private readonly List<Action<IConfigurationBuilder>> configureHostConfigActions = new List<Action<IConfigurationBuilder>>();
         private readonly List<Action> configureBuilderActions = new List<Action>();
-        private Func<string, IConfiguration, Task<SiloHandle>> _createSiloAsync;
+        private Func<string, IConfiguration, Task<SiloHandle>>? _createSiloAsync;
 
         /// <summary>
         /// Initializes a new instance of <see cref="TestClusterBuilder"/> using the default options.
@@ -57,7 +57,7 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Configuration values which will be provided to the silos and clients created by this builder.
         /// </summary>
-        public Dictionary<string, string> Properties { get; } = new Dictionary<string, string>();
+        public Dictionary<string, string?> Properties { get; } = new Dictionary<string, string?>();
 
         /// <summary>
         /// Gets the options.
@@ -70,7 +70,7 @@ namespace Orleans.TestingHost
         /// </summary>
         public Func<string, IConfiguration, Task<SiloHandle>> CreateSiloAsync
         {
-            private get => _createSiloAsync;
+            private get => _createSiloAsync!;
             set
             {
                 _createSiloAsync = value;
@@ -197,7 +197,7 @@ namespace Orleans.TestingHost
             {
                 hostBuilder.ConfigureServices((context, services) =>
                 {
-                    var initialSilos = int.Parse(context.Configuration[nameof(TestClusterOptions.InitialSilosCount)]);
+                    var initialSilos = int.Parse(context.Configuration[nameof(TestClusterOptions.InitialSilosCount)]!);
                     var siloNames = Enumerable.Range(0, initialSilos).Select(GetSiloName).ToList();
                     services.Configure<StaticClusterDeploymentOptions>(options => options.SiloNames = siloNames);
                 });

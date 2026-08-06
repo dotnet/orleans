@@ -32,7 +32,7 @@ namespace Orleans.TestingHost
         /// <param name="configuration">The configuration.</param>
         /// <param name="postConfigureHostBuilder">An optional delegate which can be used to configure the host builder just prior to a host being built.</param>
         /// <returns>A new silo.</returns>
-        public static IHost CreateSiloHost(string hostName, IConfiguration configuration, Action<IHostBuilder> postConfigureHostBuilder = null)
+        public static IHost CreateSiloHost(string hostName, IConfiguration configuration, Action<IHostBuilder>? postConfigureHostBuilder = null)
         {
             string siloName = configuration["Name"] ?? hostName;
 
@@ -77,7 +77,7 @@ namespace Orleans.TestingHost
         /// <param name="configuration">The configuration.</param>
         /// <param name="postConfigureHostBuilder">An optional delegate which can be used to configure the host builder just prior to a host being built.</param>
         /// <returns>The cluster client host.</returns>
-        public static IHost CreateClusterClient(string hostName, IConfiguration configuration, Action<IHostBuilder> postConfigureHostBuilder = null)
+        public static IHost CreateClusterClient(string hostName, IConfiguration configuration, Action<IHostBuilder>? postConfigureHostBuilder = null)
         {
             var hostBuilder = new HostBuilder();
             hostBuilder.UseEnvironment(Environments.Development);
@@ -110,7 +110,7 @@ namespace Orleans.TestingHost
         {
             var settings = new JsonSerializerSettings();
 
-            KeyValuePair<string, string>[] enumerated = configuration.AsEnumerable().ToArray();
+            KeyValuePair<string, string?>[] enumerated = configuration.AsEnumerable().ToArray();
             return JsonConvert.SerializeObject(enumerated, settings);
         }
 
@@ -124,7 +124,7 @@ namespace Orleans.TestingHost
             var settings = new JsonSerializerSettings();
 
             var builder = new ConfigurationBuilder();
-            var enumerated = JsonConvert.DeserializeObject<KeyValuePair<string, string>[]>(serializedSources, settings);
+            var enumerated = JsonConvert.DeserializeObject<KeyValuePair<string, string?>[]>(serializedSources, settings);
             builder.AddInMemoryCollection(enumerated);
             return builder.Build();
         }
@@ -138,7 +138,7 @@ namespace Orleans.TestingHost
             {
                 if (!string.IsNullOrWhiteSpace(builderConfiguratorType))
                 {
-                    var configurator = Activator.CreateInstance(Type.GetType(builderConfiguratorType, true));
+                    var configurator = Activator.CreateInstance(Type.GetType(builderConfiguratorType, true)!);
 
                     (configurator as IHostConfigurator)?.Configure(hostBuilder);
                     hostBuilder.UseOrleans((ctx, siloBuilder) => (configurator as ISiloConfigurator)?.Configure(siloBuilder));
@@ -155,7 +155,7 @@ namespace Orleans.TestingHost
             {
                 if (!string.IsNullOrWhiteSpace(builderConfiguratorType))
                 {
-                    var builderConfigurator = Activator.CreateInstance(Type.GetType(builderConfiguratorType, true));
+                    var builderConfigurator = Activator.CreateInstance(Type.GetType(builderConfiguratorType, true)!);
 
                     (builderConfigurator as IHostConfigurator)?.Configure(hostBuilder);
 
@@ -172,7 +172,7 @@ namespace Orleans.TestingHost
             bool.TryParse(configuration[nameof(TestClusterOptions.ConfigureFileLogging)], out bool configureFileLogging);
             if (configureFileLogging)
             {
-                var fileName = TestingUtils.CreateTraceFileName(name, configuration["Orleans:ClusterId"]);
+                var fileName = TestingUtils.CreateTraceFileName(name, configuration["Orleans:ClusterId"]!);
                 services.AddLogging(loggingBuilder => loggingBuilder.AddFile(fileName));
             }
         }

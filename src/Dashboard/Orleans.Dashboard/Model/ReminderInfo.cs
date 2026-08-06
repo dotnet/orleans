@@ -7,10 +7,10 @@ namespace Orleans.Dashboard.Model;
 internal sealed class ReminderInfo
 {
     [Id(0)]
-    public string GrainReference { get; set; }
+    public string GrainReference { get; set; } = null!;
 
     [Id(1)]
-    public string Name { get; set; }
+    public string Name { get; set; } = null!;
 
     [Id(2)]
     public DateTime StartAt { get; set; }
@@ -19,5 +19,5 @@ internal sealed class ReminderInfo
     public TimeSpan Period { get; set; }
 
     [Id(4)]
-    public string PrimaryKey { get; set; }
+    public string PrimaryKey { get; set; } = null!;
 }

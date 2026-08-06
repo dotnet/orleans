@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO.Pipelines;
 using System.Runtime.CompilerServices;
 
@@ -31,7 +32,7 @@ namespace Orleans.Runtime.Messaging
         /// <summary>
         /// The underlying buffer writer.
         /// </summary>
-        private PipeWriter innerWriter;
+        private PipeWriter? innerWriter;
 
         /// <summary>
         /// The memory reserved for the header from the <see cref="innerWriter"/>.
@@ -54,7 +55,7 @@ namespace Orleans.Runtime.Messaging
         /// The fallback writer to use when the caller writes more than we allowed for given the <see cref="payloadSizeHint"/>
         /// in anything but the initial call to <see cref="GetSpan(int)"/>.
         /// </summary>
-        private Sequence privateWriter;
+        private Sequence? privateWriter;
 
         private int _committedBytes;
 
@@ -97,7 +98,7 @@ namespace Orleans.Runtime.Messaging
         [MethodImpl(MethodImplOptions.NoInlining)]
         private void AdvancePrivateWriter(int count)
         {
-            privateWriter.Advance(count);
+            privateWriter!.Advance(count);
             _committedBytes += count;
         }
 
@@ -125,7 +126,7 @@ namespace Orleans.Runtime.Messaging
             if (privateWriter == null)
             {
                 var res = realMemory.Span[advanced..];
-                if ((uint)sizeHint < (uint)res.Length)
+                if (!res.IsEmpty && (uint)sizeHint <= (uint)res.Length)
                     return res;
             }
 
@@ -147,13 +148,13 @@ namespace Orleans.Runtime.Messaging
             if (this.prefixMemory.Length == 0)
             {
                 // No payload was actually written, and we never requested memory, so just write it out.
-                this.innerWriter.Write(prefix);
+                this.innerWriter!.Write(prefix);
             }
             else
             {
                 // Payload has been written, so write in the prefix then commit the payload.
                 prefix.CopyTo(this.prefixMemory.Span);
-                this.innerWriter.Advance(prefix.Length + this.advanced);
+                this.innerWriter!.Advance(prefix.Length + this.advanced);
                 if (this.privateWriter != null)
                     CompletePrivateWriter();
             }
@@ -161,10 +162,10 @@ namespace Orleans.Runtime.Messaging
 
         private void CompletePrivateWriter()
         {
-            var sequence = privateWriter.AsReadOnlySequence;
+            var sequence = privateWriter!.AsReadOnlySequence;
             var sequenceLength = checked((int)sequence.Length);
-            sequence.CopyTo(innerWriter.GetSpan(sequenceLength));
-            innerWriter.Advance(sequenceLength);
+            sequence.CopyTo(innerWriter!.GetSpan(sequenceLength));
+            innerWriter!.Advance(sequenceLength);
         }
 
         /// <summary>
@@ -199,7 +200,7 @@ namespace Orleans.Runtime.Messaging
         private void Initialize(int sizeHint)
         {
             int sizeToRequest = this.expectedPrefixSize + Math.Max(sizeHint, this.payloadSizeHint);
-            var memory = this.innerWriter.GetMemory(sizeToRequest);
+            var memory = this.innerWriter!.GetMemory(sizeToRequest);
             this.prefixMemory = memory[..this.expectedPrefixSize];
             this.realMemory = memory[this.expectedPrefixSize..];
         }
@@ -219,9 +220,9 @@ namespace Orleans.Runtime.Messaging
 
             private readonly MemoryPool<byte> memoryPool;
 
-            private SequenceSegment first;
+            private SequenceSegment? first;
 
-            private SequenceSegment last;
+            private SequenceSegment? last;
 
             /// <summary>
             /// Initializes a new instance of the <see cref="Sequence"/> class.
@@ -232,6 +233,7 @@ namespace Orleans.Runtime.Messaging
                 if (memoryPool is null) ThrowNull();
                 this.memoryPool = memoryPool;
 
+                [DoesNotReturn]
                 static void ThrowNull() => throw new ArgumentNullException(nameof(memoryPool));
             }
 
@@ -239,7 +241,7 @@ namespace Orleans.Runtime.Messaging
             /// Gets this sequence expressed as a <see cref="ReadOnlySequence{T}"/>.
             /// </summary>
             /// <returns>A read only sequence representing the data in this object.</returns>
-            public ReadOnlySequence<byte> AsReadOnlySequence => first != null ? new(first, first.Start, last, last.End) : default;
+            public ReadOnlySequence<byte> AsReadOnlySequence => first != null ? new(first, first.Start, last!, last!.End) : default;
 
             /// <summary>
             /// Gets the value to display in a debugger datatip.
@@ -251,7 +253,7 @@ namespace Orleans.Runtime.Messaging
             /// returned by a prior call to <see cref="GetMemory(int)"/>.
             /// </summary>
             /// <param name="count">The number of elements written into memory.</param>
-            public void Advance(int count) => last.Advance(count);
+            public void Advance(int count) => last!.Advance(count);
 
             /// <summary>
             /// Gets writable memory that can be initialized and added to the sequence via a subsequent call to <see cref="Advance(int)"/>.
@@ -268,7 +270,7 @@ namespace Orleans.Runtime.Messaging
             /// </summary>
             public void Dispose()
             {
-                var current = this.first;
+                SequenceSegment? current = this.first;
                 while (current != null)
                 {
                     current = this.RecycleAndGetNext(current);
@@ -298,12 +300,12 @@ namespace Orleans.Runtime.Messaging
                     else
                     {
                         // The last block is completely unused. Replace it instead of appending to it.
-                        var current = this.first;
+                        var current = this.first!;
                         if (this.first != this.last)
                         {
                             while (current.Next != this.last)
                             {
-                                current = current.Next;
+                                current = current.Next!;
                             }
                         }
                         else
@@ -321,10 +323,10 @@ namespace Orleans.Runtime.Messaging
                 return segment.AvailableMemory;
             }
 
-            private SequenceSegment RecycleAndGetNext(SequenceSegment segment)
+            private SequenceSegment? RecycleAndGetNext(SequenceSegment segment)
             {
                 var recycledSegment = segment;
-                segment = segment.Next;
+                segment = segment.Next!;
                 recycledSegment.ResetMemory();
                 this.segmentPool.Push(recycledSegment);
                 return segment;
@@ -354,15 +356,15 @@ namespace Orleans.Runtime.Messaging
 
                 internal Memory<byte> TrailingSlack => this.AvailableMemory[this.End..];
 
-                private IMemoryOwner<byte> MemoryOwner;
+                private IMemoryOwner<byte>? MemoryOwner;
 
                 internal Memory<byte> AvailableMemory;
 
                 internal int Length => this.End - this.Start;
 
-                internal new SequenceSegment Next
+                internal new SequenceSegment? Next
                 {
-                    get => (SequenceSegment)base.Next;
+                    get => (SequenceSegment?)base.Next;
                     set => base.Next = value;
                 }
 
@@ -374,7 +376,7 @@ namespace Orleans.Runtime.Messaging
 
                 internal void ResetMemory()
                 {
-                    this.MemoryOwner.Dispose();
+                    this.MemoryOwner!.Dispose();
                     this.MemoryOwner = null;
                     this.AvailableMemory = default;
 

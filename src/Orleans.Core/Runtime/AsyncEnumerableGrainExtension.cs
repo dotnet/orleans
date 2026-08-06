@@ -42,7 +42,7 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
         _messagingOptions = messagingOptions.Value;
         var registry = GrainContext.GetComponent<ITimerRegistry>();
         var cleanupPeriod = messagingOptions.Value.ResponseTimeout;
-        Timer = registry.RegisterGrainTimer(
+        Timer = registry!.RegisterGrainTimer(
             GrainContext,
             static async (state, cancellationToken) => await state.RemoveExpiredAsync(cancellationToken),
             this,
@@ -61,7 +61,7 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
 
     private async ValueTask RemoveExpiredAsync(CancellationToken cancellationToken)
     {
-        List<Guid> toRemove = default;
+        List<Guid>? toRemove = default;
         foreach (var (requestId, state) in _enumerators)
         {
             if (MarkAndCheck(requestId))
@@ -83,7 +83,7 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
             }
         }
 
-        List<Task> tasks = default;
+        List<Task>? tasks = default;
         if (toRemove is not null)
         {
             foreach (var requestId in toRemove)
@@ -106,7 +106,7 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
     }
 
     /// <inheritdoc/>
-    public ValueTask<(EnumerationResult Status, object Value)> StartEnumeration<T>(Guid requestId, [Immutable] IAsyncEnumerableRequest<T> request, CancellationToken cancellationToken)
+    public ValueTask<(EnumerationResult Status, object? Value)> StartEnumeration<T>(Guid requestId, [Immutable] IAsyncEnumerableRequest<T> request, CancellationToken cancellationToken)
     {
         ref var entry = ref CollectionsMarshal.GetValueRefOrAddDefault(_enumerators, requestId, out bool exists);
         if (exists)
@@ -124,16 +124,16 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
         Debug.Assert(entry.MaxBatchSize > 0, "Max batch size must be positive.");
         return MoveNextCore(ref entry, requestId, enumerator, cancellationToken);
 
-        static ValueTask<(EnumerationResult Status, object Value)> ThrowAlreadyExists() => ValueTask.FromException<(EnumerationResult Status, object Value)>(new InvalidOperationException("An enumerator with the same id already exists."));
+        static ValueTask<(EnumerationResult Status, object? Value)> ThrowAlreadyExists() => ValueTask.FromException<(EnumerationResult Status, object? Value)>(new InvalidOperationException("An enumerator with the same id already exists."));
     }
 
     /// <inheritdoc/>
-    public ValueTask<(EnumerationResult Status, object Value)> MoveNext<T>(Guid requestId, CancellationToken cancellationToken)
+    public ValueTask<(EnumerationResult Status, object? Value)> MoveNext<T>(Guid requestId, CancellationToken cancellationToken)
     {
         ref var entry = ref CollectionsMarshal.GetValueRefOrNullRef(_enumerators, requestId);
         if (Unsafe.IsNullRef(ref entry))
         {
-            return new((EnumerationResult.MissingEnumeratorError, default));
+            return new((EnumerationResult.MissingEnumeratorError, default!));
         }
 
         if (entry.Enumerator is not IAsyncEnumerator<T> typedEnumerator)
@@ -144,7 +144,7 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
         return MoveNextCore(ref entry, requestId, typedEnumerator, cancellationToken);
     }
 
-    private ValueTask<(EnumerationResult Status, object Value)> MoveNextCore<T>(
+    private ValueTask<(EnumerationResult Status, object? Value)> MoveNextCore<T>(
         ref EnumeratorState entry,
         Guid requestId,
         IAsyncEnumerator<T> typedEnumerator,
@@ -159,7 +159,7 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
             if (entry.MoveNextTask is null)
             {
                 ValueTask<bool> moveNextValueTask;
-                object result = null;
+                object? result = null;
                 do
                 {
                     // Check if the enumerator has a result ready synchronously.
@@ -179,11 +179,11 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
                             else if (currentBatchSize == 2)
                             {
                                 // Grow from a single element to a list.
-                                result = new List<T> { (T)result, value };
+                                result = new List<T> { (T)result!, value };
                             }
                             else
                             {
-                                ((List<T>)result).Add(value);
+                                ((List<T>)result!).Add(value);
                             }
                         }
                         else
@@ -212,11 +212,11 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
                 // If there are elements, return them now instead of waiting for the pending operation to complete.
                 if (currentBatchSize == 1)
                 {
-                    return new((EnumerationResult.Element, result));
+                    return new((EnumerationResult.Element, result!));
                 }
                 else if (currentBatchSize > 1)
                 {
-                    return new((EnumerationResult.Batch, result));
+                    return new((EnumerationResult.Batch, result!));
                 }
 
                 // There are no elements, so wait for the pending operation to complete.
@@ -224,7 +224,7 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
 
             // Prevent the enumerator from being collected while we are enumerating it.
             entry.SetBusy();
-            return AwaitMoveNextAsync(requestId, typedEnumerator, entry.MoveNextTask, cancellationToken);
+            return AwaitMoveNextAsync(requestId, typedEnumerator, entry.MoveNextTask!, cancellationToken);
         }
         catch (Exception exception)
         {
@@ -232,7 +232,7 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
         }
     }
 
-    private async ValueTask<(EnumerationResult Status, object Value)> AwaitMoveNextAsync<T>(
+    private async ValueTask<(EnumerationResult Status, object? Value)> AwaitMoveNextAsync<T>(
         Guid requestId,
         IAsyncEnumerator<T> typedEnumerator,
         Task<bool> moveNextTask,
@@ -275,23 +275,23 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
                 else
                 {
                     await RemoveEnumeratorAsync(requestId);
-                    return (EnumerationResult.Completed, default);
+                    return (EnumerationResult.Completed, default!);
                 }
             }
             else if (moveNextTask.IsCanceled || cancellationToken.IsCancellationRequested)
             {
                 await RemoveEnumeratorAsync(requestId);
-                return (EnumerationResult.Canceled, default);
+                return (EnumerationResult.Canceled, default!);
             }
             else if (moveNextTask.Exception is { } moveNextException)
             {
                 // Completed, but not successfully.
-                var exception = moveNextException.InnerExceptions.Count == 1 ? moveNextException.InnerException : moveNextException;
+                var exception = moveNextException.InnerExceptions.Count == 1 ? moveNextException.InnerException! : moveNextException;
                 await RemoveEnumeratorAsync(requestId);
                 return (EnumerationResult.Error, exception);
             }
 
-            return (EnumerationResult.Heartbeat, default);
+            return (EnumerationResult.Heartbeat, default!);
         }
         catch (Exception exception)
         {
@@ -308,7 +308,7 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
         }
     }
 
-    private async ValueTask<(EnumerationResult Status, object Value)> OnTerminateAsync(Guid requestId, EnumerationResult status, object value)
+    private async ValueTask<(EnumerationResult Status, object? Value)> OnTerminateAsync(Guid requestId, EnumerationResult status, object? value)
     {
         await RemoveEnumeratorAsync(requestId);
         return (status, value);
@@ -335,7 +335,7 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
     {
         try
         {
-            enumerator.CancellationTokenSource.Cancel();
+            enumerator.CancellationTokenSource!.Cancel();
         }
         catch (Exception exception)
         {
@@ -388,10 +388,10 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
         private const int SeenFlag = 0x01;
         private const int BusyFlag = 0x10;
         private int _flags;
-        public IAsyncDisposable Enumerator;
-        public Task<bool> MoveNextTask;
+        public IAsyncDisposable? Enumerator;
+        public Task<bool>? MoveNextTask;
         public int MaxBatchSize;
-        internal CancellationTokenSource CancellationTokenSource;
+        internal CancellationTokenSource? CancellationTokenSource;
         public void SetSeen() => _flags |= SeenFlag;
         public void SetBusy() => _flags |= BusyFlag | SeenFlag;
         public void ClearBusy() => _flags = SeenFlag; // Clear the 'Busy' flag, but set the 'Seen' flag.

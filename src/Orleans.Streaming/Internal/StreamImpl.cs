@@ -1,4 +1,3 @@
-#nullable enable
 
 using System;
 using System.Collections.Generic;
@@ -30,8 +29,13 @@ namespace Orleans.Streams
         [NonSerialized]
         private volatile IInternalAsyncObservable<T>?            consumerInterface;
 
+#if NET9_0_OR_GREATER
         [NonSerialized]
-        private readonly object initLock = new object();
+        private readonly Lock initLock = new();
+#else
+        [NonSerialized]
+        private readonly object initLock = new();
+#endif
 
         [NonSerialized]
         private IRuntimeClient?                                  runtimeClient;
@@ -99,7 +103,7 @@ namespace Orleans.Streams
             return GetProducerInterface().OnNextAsync(item, token);
         }
 
-        public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken token)
+        public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken? token)
         {
             return GetProducerInterface().OnNextBatchAsync(batch, token);
         }
@@ -119,7 +123,7 @@ namespace Orleans.Streams
         internal Task<StreamSubscriptionHandle<T>> ResumeAsync(
             StreamSubscriptionHandle<T> handle,
             IAsyncObserver<T> observer,
-            StreamSequenceToken token)
+            StreamSequenceToken? token)
         {
             return GetConsumerInterface().ResumeAsync(handle, observer, token);
         }
@@ -127,7 +131,7 @@ namespace Orleans.Streams
         internal Task<StreamSubscriptionHandle<T>> ResumeAsync(
             StreamSubscriptionHandle<T> handle,
             IAsyncBatchObserver<T> observer,
-            StreamSequenceToken token)
+            StreamSequenceToken? token)
         {
             return GetConsumerInterface().ResumeAsync(handle, observer, token);
         }

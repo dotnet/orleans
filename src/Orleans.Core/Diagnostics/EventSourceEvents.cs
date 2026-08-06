@@ -8,7 +8,7 @@ namespace Orleans.Runtime
     [EventSource(Name = "Microsoft-Orleans-CallBackData")]
     internal sealed class OrleansCallBackDataEvent : EventSource
     {
-        public static readonly OrleansCallBackDataEvent Log = new OrleansCallBackDataEvent();
+        public static readonly OrleansCallBackDataEvent Instance = new OrleansCallBackDataEvent();
 
         /// <summary>
         /// Indicates that a request timeout occurred.
@@ -88,7 +88,7 @@ namespace Orleans.Runtime
     [EventSource(Name = "Microsoft-Orleans-OutsideRuntimeClient")]
     internal sealed class OrleansOutsideRuntimeClientEvent : EventSource
     {
-        public static readonly OrleansOutsideRuntimeClientEvent Log = new OrleansOutsideRuntimeClientEvent();
+        public static readonly OrleansOutsideRuntimeClientEvent Instance = new OrleansOutsideRuntimeClientEvent();
 
         [NonEvent]
         public void SendRequest(Message message)
@@ -130,7 +130,7 @@ namespace Orleans.Runtime
     [EventSource(Name = "Microsoft-Orleans-Dispatcher")]
     internal sealed class OrleansDispatcherEvent : EventSource
     {
-        public static readonly OrleansDispatcherEvent Log = new OrleansDispatcherEvent();
+        public static readonly OrleansDispatcherEvent Instance = new OrleansDispatcherEvent();
 
         [NonEvent]
         public void ReceiveMessage(Message message)
@@ -148,7 +148,7 @@ namespace Orleans.Runtime
     [EventSource(Name = "Microsoft-Orleans-InsideRuntimeClient")]
     internal sealed class OrleansInsideRuntimeClientEvent : EventSource
     {
-        public static readonly OrleansInsideRuntimeClientEvent Log = new OrleansInsideRuntimeClientEvent();
+        public static readonly OrleansInsideRuntimeClientEvent Instance = new OrleansInsideRuntimeClientEvent();
 
         [NonEvent]
         public void SendRequest(Message message)

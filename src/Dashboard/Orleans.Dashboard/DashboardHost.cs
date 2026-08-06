@@ -12,14 +12,14 @@ using Orleans.Dashboard.Core;
 
 namespace Orleans.Dashboard;
 
-internal sealed class DashboardHost(
+internal sealed partial class DashboardHost(
     ILogger<DashboardHost> logger,
     ILocalSiloDetails localSiloDetails,
     IGrainFactory grainFactory,
     DashboardTelemetryExporter dashboardTelemetryExporter,
     ISiloGrainClient siloGrainClient) : IHostedService, IAsyncDisposable, IDisposable
 {
-    private MeterProvider _meterProvider;
+    private MeterProvider? _meterProvider;
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -40,7 +40,7 @@ internal sealed class DashboardHost(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Unable to activate silo grain service during startup. The service will be activated on first use.");
+            LogWarningActivateSiloGrainServiceStartupFailed(logger, ex);
         }
     }
 
@@ -53,7 +53,7 @@ internal sealed class DashboardHost(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Unable to activate dashboard grain during startup. The grain will be activated on first use.");
+            LogWarningActivateDashboardGrainStartupFailed(logger, ex);
         }
     }
 
@@ -70,7 +70,7 @@ internal sealed class DashboardHost(
     {
         await DisposeAsync(_meterProvider).ConfigureAwait(false);
 
-        static async ValueTask DisposeAsync(object obj)
+        static async ValueTask DisposeAsync(object? obj)
         {
             try
             {
@@ -117,7 +117,7 @@ internal sealed class DashboardHost(
 
             if (assembly != null)
             {
-                return assembly.GetName().Version.ToString();
+                return assembly.GetName().Version!.ToString();
             }
         }
         catch
@@ -127,4 +127,16 @@ internal sealed class DashboardHost(
 
         return "1.0.0.0";
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Unable to activate silo grain service during startup. The service will be activated on first use."
+    )]
+    private static partial void LogWarningActivateSiloGrainServiceStartupFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Unable to activate dashboard grain during startup. The grain will be activated on first use."
+    )]
+    private static partial void LogWarningActivateDashboardGrainStartupFailed(ILogger logger, Exception exception);
 }

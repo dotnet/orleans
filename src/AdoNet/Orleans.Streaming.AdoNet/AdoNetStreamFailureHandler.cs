@@ -15,17 +15,17 @@ internal partial class AdoNetStreamFailureHandler(bool faultOnFailure, AdoNetStr
     /// <summary>
     /// Attempts to move the message to dead letters on delivery failure.
     /// </summary>
-    public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, StreamId streamIdentity, StreamSequenceToken sequenceToken) => OnFailureAsync(streamProviderName, streamIdentity, sequenceToken);
+    public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, StreamId streamIdentity, StreamSequenceToken? sequenceToken) => OnFailureAsync(streamProviderName, streamIdentity, sequenceToken);
 
     /// <summary>
     /// Attempts to move the message to dead letters on delivery failure.
     /// </summary>
-    public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, StreamId streamIdentity, StreamSequenceToken sequenceToken) => OnFailureAsync(streamProviderName, streamIdentity, sequenceToken);
+    public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, StreamId streamIdentity, StreamSequenceToken? sequenceToken) => OnFailureAsync(streamProviderName, streamIdentity, sequenceToken);
 
     /// <summary>
     /// Attempts to move the message to dead letters on delivery failure.
     /// </summary>
-    private async Task OnFailureAsync(string streamProviderName, StreamId streamIdentity, StreamSequenceToken sequenceToken)
+    private async Task OnFailureAsync(string streamProviderName, StreamId streamIdentity, StreamSequenceToken? sequenceToken)
     {
         ArgumentNullException.ThrowIfNull(streamProviderName);
         ArgumentNullException.ThrowIfNull(sequenceToken);

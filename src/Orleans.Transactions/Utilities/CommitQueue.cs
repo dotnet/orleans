@@ -70,7 +70,7 @@ namespace Orleans.Transactions
         public void Clear()
         {
             for (int i = 0; i < Count; i++)
-                _buffer[(_pos + i) % _buffer.Length] = null;
+                _buffer[(_pos + i) % _buffer.Length] = null!;
             Count = 0;
             _pos = 0;
         }
@@ -89,7 +89,7 @@ namespace Orleans.Transactions
 
             // clear entries so they can ge GCd
             for (int i = 0; i < howMany; i++)
-                _buffer[(_pos + i) % _buffer.Length] = null;
+                _buffer[(_pos + i) % _buffer.Length] = null!;
 
             _pos = (_pos + howMany) % _buffer.Length;
 
@@ -103,7 +103,7 @@ namespace Orleans.Transactions
 
             // clear entries so they can ge GCd
             for (int i = 0; i < howMany; i++)
-                _buffer[(_pos + Count - i - 1) % _buffer.Length] = null;
+                _buffer[(_pos + Count - i - 1) % _buffer.Length] = null!;
 
             Count -= howMany;
         }

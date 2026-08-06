@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -11,7 +11,7 @@ namespace Orleans.Transactions.TestKit
 
         [Transaction(TransactionOption.Create)]
         Task MultiGrainAddAndFaultInjection(List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd, 
-            FaultInjectionControl faultInjection = null);
+            FaultInjectionControl? faultInjection = null);
     }
     public class FaultInjectionTransactionCoordinatorGrain : Grain, IFaultInjectionTransactionCoordinatorGrain
     {
@@ -21,7 +21,7 @@ namespace Orleans.Transactions.TestKit
         }
 
         public Task MultiGrainAddAndFaultInjection(List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd,
-            FaultInjectionControl faultInjection = null)
+            FaultInjectionControl? faultInjection = null)
         {
             return Task.WhenAll(grains.Select(g => g.Add(numberToAdd, faultInjection)));
         }

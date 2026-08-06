@@ -25,7 +25,7 @@ namespace Orleans.EventSourcing
             ILogViewAdaptorHost<TLogView, TLogEntry> hostGrain,
             TLogView initialState,
             string grainTypeName,
-            IGrainStorage grainStorage,
+            IGrainStorage? grainStorage,
             ILogConsistencyProtocolServices services)
 
             where TLogView : class, new()

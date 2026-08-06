@@ -9,9 +9,9 @@ namespace Orleans.Connections.Security
 {
     internal class TlsConnectionFeature : ITlsConnectionFeature, ITlsApplicationProtocolFeature, ITlsHandshakeFeature
     {
-        public X509Certificate2 LocalCertificate { get; set; }
+        public X509Certificate2? LocalCertificate { get; set; }
 
-        public X509Certificate2 RemoteCertificate { get; set; }
+        public X509Certificate2? RemoteCertificate { get; set; }
 
         public ReadOnlyMemory<byte> ApplicationProtocol { get; set; }
 
@@ -39,7 +39,7 @@ namespace Orleans.Connections.Security
 #pragma warning restore SYSLIB0058
 #endif
 
-        public Task<X509Certificate2> GetRemoteCertificateAsync(CancellationToken cancellationToken)
+        public Task<X509Certificate2?> GetRemoteCertificateAsync(CancellationToken cancellationToken)
         {
             return Task.FromResult(RemoteCertificate);
         }

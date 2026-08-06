@@ -1,10 +1,10 @@
-#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -39,7 +39,11 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
     private readonly IClusterMembershipService _clusterMembershipService;
     private readonly SiloMessagingOptions _messagingOptions;
     private readonly CancellationTokenSource _shutdownCts = new();
+#if NET9_0_OR_GREATER
+    private readonly Lock _lockObj = new();
+#else
     private readonly object _lockObj = new();
+#endif
     private readonly GrainId _localHostedClientId;
     private readonly IConnectedClientCollection _connectedClients;
     private Action _schedulePublishUpdate;
@@ -65,6 +69,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         IClusterMembershipService clusterMembershipService,
         IAsyncTimerFactory timerFactory,
         IConnectedClientCollection connectedClients,
+        [FromKeyedServices(TimeProviderNames.SystemTimers)] TimeProvider timeProvider,
         SystemTargetShared shared)
         : base(Constants.ClientDirectoryType, shared)
     {
@@ -74,7 +79,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         _clusterMembershipService = clusterMembershipService;
         _messagingOptions = messagingOptions.Value;
         _logger = loggerFactory.CreateLogger<ClientDirectory>();
-        _refreshTimer = timerFactory.Create(_messagingOptions.ClientRegistrationRefresh, "ClientDirectory.RefreshTimer");
+        _refreshTimer = timerFactory.Create(_messagingOptions.ClientRegistrationRefresh, "ClientDirectory.RefreshTimer", timeProvider);
         _connectedClients = connectedClients;
         _localHostedClientId = HostedClient.CreateHostedClientGrainId(_localSilo).GrainId;
         _schedulePublishUpdate = SchedulePublishUpdates;
@@ -520,26 +525,30 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         lifecycle.Subscribe(
             nameof(ClientDirectory),
             ServiceLifecycleStage.RuntimeGrainServices,
-            ct =>
-            {
-                this.RunOrQueueTask(() => _runTask = this.Run()).Ignore();
-                return Task.CompletedTask;
-            },
-            async ct =>
-            {
-                _shutdownCts.Cancel();
-                _refreshTimer?.Dispose();
+            StartPublishingRoutingTable,
+            StopPublishingRoutingTable);
 
-                if (_runTask is Task task)
-                {
-                    await task.WaitAsync(ct).SuppressThrowing();
-                }
+        Task StartPublishingRoutingTable(CancellationToken ct)
+        {
+            this.RunOrQueueTask(() => _runTask = this.Run()).Ignore();
+            return Task.CompletedTask;
+        }
 
-                if (_nextPublishTask is Task publishTask)
-                {
-                    await publishTask.WaitAsync(ct).SuppressThrowing();
-                }
-            });
+        async Task StopPublishingRoutingTable(CancellationToken ct)
+        {
+            _shutdownCts.Cancel();
+            _refreshTimer?.Dispose();
+
+            if (_runTask is Task task)
+            {
+                await task.WaitAsync(ct).SuppressThrowing();
+            }
+
+            if (_nextPublishTask is Task publishTask)
+            {
+                await publishTask.WaitAsync(ct).SuppressThrowing();
+            }
+        }
     }
 
     internal class TestAccessor(ClientDirectory instance)

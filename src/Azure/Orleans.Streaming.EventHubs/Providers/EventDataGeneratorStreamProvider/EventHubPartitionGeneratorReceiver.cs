@@ -24,7 +24,7 @@ namespace Orleans.Streaming.EventHubs.Testing
         /// <inheritdoc />
         public async Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
         {
-            IEnumerable<EventData> events;
+            IEnumerable<EventData>? events;
             //mimic real life response time
             await Task.Delay(TimeSpan.FromMilliseconds(30));
             if (generator.TryReadEvents(maxCount, out events))

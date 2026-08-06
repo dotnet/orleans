@@ -15,14 +15,14 @@ namespace Orleans.TestingHost
         /// </summary>
         /// <seealso cref="ClusterOptions.ClusterId"/>
         /// <value>The cluster identifier.</value>
-        public string ClusterId { get; set; }
+        public string ClusterId { get; set; } = null!;
 
         /// <summary>
         /// Gets or sets the service identifier.
         /// </summary>
         /// <seealso cref="ClusterOptions.ServiceId"/>
         /// <value>The service identifier.</value>
-        public string ServiceId { get; set; }
+        public string ServiceId { get; set; } = null!;
 
         /// <summary>
         /// Gets or sets the base silo port, which is the port for the first silo. Other silos will use subsequent ports.
@@ -63,7 +63,7 @@ namespace Orleans.TestingHost
         /// Gets or sets the application base directory.
         /// </summary>
         /// <value>The application base directory.</value>
-        public string ApplicationBaseDirectory { get; set; }
+        public string? ApplicationBaseDirectory { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether to configure file logging.
@@ -87,13 +87,13 @@ namespace Orleans.TestingHost
         /// Gets the silo builder configurator types.
         /// </summary>
         /// <value>The silo builder configurator types.</value>
-        public List<string> SiloBuilderConfiguratorTypes { get; } = new List<string>();
+        public List<string?> SiloBuilderConfiguratorTypes { get; } = new List<string?>();
 
         /// <summary>
         /// Gets the client builder configurator types.
         /// </summary>
         /// <value>The client builder configurator types.</value>
-        public List<string> ClientBuilderConfiguratorTypes { get; } = new List<string>();
+        public List<string?> ClientBuilderConfiguratorTypes { get; } = new List<string?>();
 
         /// <summary>
         /// Gets or sets a value indicating what transport to use for connecting silos and clients.
@@ -107,9 +107,9 @@ namespace Orleans.TestingHost
         /// Converts these options into a dictionary.
         /// </summary>
         /// <returns>The options dictionary.</returns>
-        public Dictionary<string, string> ToDictionary()
+        public Dictionary<string, string?> ToDictionary()
         {
-            var result = new Dictionary<string, string>
+            var result = new Dictionary<string, string?>
             {
                 [$"Orleans:{nameof(ClusterId)}"] = this.ClusterId,
                 [$"Orleans:{nameof(ServiceId)}"] = this.ServiceId,
@@ -174,13 +174,13 @@ namespace Orleans.TestingHost
         /// Gets or sets the name of the silo.
         /// </summary>
         /// <value>The name of the silo.</value>
-        public string SiloName { get; set; }
+        public string SiloName { get; set; } = null!;
 
         /// <summary>
         /// Gets or sets the primary silo port.
         /// </summary>
         /// <value>The primary silo port.</value>
-        public IPEndPoint PrimarySiloEndPoint { get; set; }
+        public IPEndPoint? PrimarySiloEndPoint { get; set; }
 
         /// <summary>
         /// Creates an instance of the <see cref="TestSiloSpecificOptions"/> class.
@@ -217,9 +217,9 @@ namespace Orleans.TestingHost
         /// Converts these options into a dictionary.
         /// </summary>
         /// <returns>The options dictionary.</returns>
-        public Dictionary<string, string> ToDictionary()
+        public Dictionary<string, string?> ToDictionary()
         {
-            var result = new Dictionary<string, string>
+            var result = new Dictionary<string, string?>
             {
                 [$"Orleans:Endpoints:AdvertisedIPAddress"] = IPAddress.Loopback.ToString(),
                 [$"Orleans:Endpoints:{nameof(SiloPort)}"] = this.SiloPort.ToString(),

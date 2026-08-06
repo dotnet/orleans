@@ -14,7 +14,7 @@ public sealed class ByteStringCopier : IDeepCopier<ByteString>
     {
         if (context.TryGetCopy<ByteString>(input, out var result))
         {
-            return result;
+            return result!;
         }
 
         result = ByteString.CopyFrom(input.Span);

@@ -17,7 +17,7 @@ public class IncorrectAttributeUseCodeFix : CodeFixProvider
 
     public sealed override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
-        var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
+        var root = (await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false))!;
         var diagnostic = context.Diagnostics.First();
 
         if (root.FindNode(diagnostic.Location.SourceSpan) is not AttributeSyntax node)
@@ -30,8 +30,8 @@ public class IncorrectAttributeUseCodeFix : CodeFixProvider
                 title: Resources.IncorrectAttributeUseTitle,
                 createChangedDocument: token =>
                 {
-                    var newRoot = root.RemoveNode(node.Parent, SyntaxRemoveOptions.KeepEndOfLine);
-                    return Task.FromResult(context.Document.WithSyntaxRoot(newRoot));
+                    var newRoot = root.RemoveNode(node.Parent!, SyntaxRemoveOptions.KeepEndOfLine);
+                    return Task.FromResult(context.Document.WithSyntaxRoot(newRoot!));
 
                 },
                 equivalenceKey: IncorrectAttributeUseAnalyzer.RuleId),

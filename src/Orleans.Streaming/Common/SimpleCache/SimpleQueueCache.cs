@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -29,10 +30,10 @@ namespace Orleans.Providers.Streams.Common
 
     internal class SimpleQueueCacheItem
     {
-        internal IBatchContainer Batch;
+        internal IBatchContainer Batch = null!; // Always set via object initializer immediately after construction.
         internal bool DeliveryFailure;
-        internal StreamSequenceToken SequenceToken;
-        internal CacheBucket CacheBucket;
+        internal StreamSequenceToken SequenceToken = null!; // Always set via object initializer immediately after construction.
+        internal CacheBucket CacheBucket = null!; // Always set via object initializer immediately after construction.
     }
 
     /// <summary>
@@ -81,7 +82,7 @@ namespace Orleans.Providers.Streams.Common
 
 
         /// <inheritdoc />
-        public virtual bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
+        public virtual bool TryPurgeFromCache([MaybeNullWhen(false)] out IList<IBatchContainer> purgedItems)
         {
             purgedItems = null;
             if (cachedMessages.Count == 0) return false; // empty cache
@@ -109,7 +110,7 @@ namespace Orleans.Providers.Streams.Common
             // and remove from the cache the oness that reside in the given bucket until we jump to a next bucket
             while (bucket.NumCurrentItems > 0)
             {
-                SimpleQueueCacheItem item = cachedMessages.Last.Value;
+                SimpleQueueCacheItem item = cachedMessages.Last!.Value; // bucket.NumCurrentItems > 0 implies the list is non-empty.
                 if (item.CacheBucket.Equals(bucket))
                 {
                     if (!item.DeliveryFailure)
@@ -141,14 +142,14 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public virtual IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token)
+        public virtual IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
         {
             var cursor = new SimpleQueueCacheCursor(this, streamId, logger);
             InitializeCursor(cursor, token);
             return cursor;
         }
 
-        internal void InitializeCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken sequenceToken)
+        internal void InitializeCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken? sequenceToken)
         {
             LogDebugInitializeCursor(cursor, sequenceToken);
 
@@ -160,27 +161,27 @@ namespace Orleans.Providers.Streams.Common
             }
 
             // if no token is provided, set token to item at end of cache
-            sequenceToken = sequenceToken ?? cachedMessages.First?.Value?.SequenceToken;
+            sequenceToken = sequenceToken ?? cachedMessages.First?.Value?.SequenceToken!; // cachedMessages.Count > 0 here (checked above), so First/Value/SequenceToken are guaranteed non-null.
 
             // If sequenceToken is too new to be in cache, unset token, and wait for more data.
-            if (sequenceToken.Newer(cachedMessages.First.Value.SequenceToken))
+            if (sequenceToken.Newer(cachedMessages.First!.Value.SequenceToken)) // cachedMessages.Count > 0 here (checked above), so First is guaranteed non-null.
             {
                 UnsetCursor(cursor, sequenceToken);
                 return;
             }
 
-            LinkedListNode<SimpleQueueCacheItem> lastMessage = cachedMessages.Last;
+            LinkedListNode<SimpleQueueCacheItem> lastMessage = cachedMessages.Last!; // cachedMessages.Count > 0 here (checked above), so Last is guaranteed non-null.
             // Check to see if offset is too old to be in cache
             if (sequenceToken.Older(lastMessage.Value.SequenceToken))
             {
-                throw new QueueCacheMissException(sequenceToken, cachedMessages.Last.Value.SequenceToken, cachedMessages.First.Value.SequenceToken);
+                throw new QueueCacheMissException(sequenceToken, cachedMessages.Last!.Value.SequenceToken, cachedMessages.First.Value.SequenceToken);
             }
 
             // Now the requested sequenceToken is set and is also within the limits of the cache.
 
             // Find first message at or below offset
             // Events are ordered from newest to oldest, so iterate from start of list until we hit a node at a previous offset, or the end.
-            LinkedListNode<SimpleQueueCacheItem> node = cachedMessages.First;
+            LinkedListNode<SimpleQueueCacheItem>? node = cachedMessages.First;
             while (node != null && node.Value.SequenceToken.Newer(sequenceToken))
             {
                 // did we get to the end?
@@ -195,10 +196,10 @@ namespace Orleans.Providers.Streams.Common
             }
 
             // return cursor from start.
-            SetCursor(cursor, node);
+            SetCursor(cursor, node!); // Guaranteed non-null: node starts as First (non-null since Count > 0) and is only ever reassigned to node.Next after a non-null check.
         }
 
-        internal void RefreshCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken sequenceToken)
+        internal void RefreshCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken? sequenceToken)
         {
             LogDebugRefreshCursor(cursor, sequenceToken);
 
@@ -215,7 +216,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="cursor"></param>
         /// <param name="batch"></param>
         /// <returns></returns>
-        internal bool TryGetNextMessage(SimpleQueueCacheCursor cursor, out IBatchContainer batch)
+        internal bool TryGetNextMessage(SimpleQueueCacheCursor cursor, out IBatchContainer? batch)
         {
             LogDebugTryGetNextMessage(cursor);
 
@@ -229,7 +230,7 @@ namespace Orleans.Providers.Streams.Common
             }
             else // Advance to next:
             {
-                AdvanceCursor(cursor, cursor.Element.Previous);
+                AdvanceCursor(cursor, cursor.Element!.Previous!); // cursor.IsSet is true, so Element is non-null; Element != First, so it has a Previous node.
             }
 
             batch = cursor.Element?.Value.Batch;
@@ -240,9 +241,9 @@ namespace Orleans.Providers.Streams.Common
         {
             LogDebugUpdateCursor(cursor, item.Value.Batch);
 
-            cursor.Element.Value.CacheBucket.UpdateNumCursors(-1); // remove from prev bucket
+            cursor.Element!.Value.CacheBucket.UpdateNumCursors(-1); // remove from prev bucket; cursor.Element is non-null here (see caller).
             cursor.Set(item);
-            cursor.Element.Value.CacheBucket.UpdateNumCursors(1);  // add to next bucket
+            cursor.Element!.Value.CacheBucket.UpdateNumCursors(1);  // add to next bucket
         }
 
         internal void SetCursor(SimpleQueueCacheCursor cursor, LinkedListNode<SimpleQueueCacheItem> item)
@@ -250,16 +251,16 @@ namespace Orleans.Providers.Streams.Common
             LogDebugSetCursor(cursor, item.Value.Batch);
 
             cursor.Set(item);
-            cursor.Element.Value.CacheBucket.UpdateNumCursors(1);  // add to next bucket
+            cursor.Element!.Value.CacheBucket.UpdateNumCursors(1);  // add to next bucket; cursor.Set(item) above guarantees Element is non-null.
         }
 
-        internal void UnsetCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken token)
+        internal void UnsetCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken? token)
         {
             LogDebugUnsetCursor(cursor);
 
             if (cursor.IsSet)
             {
-                cursor.Element.Value.CacheBucket.UpdateNumCursors(-1);
+                cursor.Element!.Value.CacheBucket.UpdateNumCursors(-1); // cursor.IsSet is true, so Element is non-null.
             }
             cursor.UnSet(token);
         }
@@ -315,13 +316,13 @@ namespace Orleans.Providers.Streams.Common
             Level = LogLevel.Debug,
             Message = "InitializeCursor: {Cursor} to sequenceToken {SequenceToken}"
         )]
-        private partial void LogDebugInitializeCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken sequenceToken);
+        private partial void LogDebugInitializeCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken? sequenceToken);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
             Message = "RefreshCursor: {RefreshCursor} to sequenceToken {SequenceToken}"
         )]
-        private partial void LogDebugRefreshCursor(SimpleQueueCacheCursor refreshCursor, StreamSequenceToken sequenceToken);
+        private partial void LogDebugRefreshCursor(SimpleQueueCacheCursor refreshCursor, StreamSequenceToken? sequenceToken);
 
         [LoggerMessage(
             Level = LogLevel.Debug,

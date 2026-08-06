@@ -13,7 +13,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="success">True if read succeeded, false if read failed.</param>
         /// <param name="callTime">Init operation time.</param>
         /// <param name="exception">Exception caught if initialize fail.</param>
-        void TrackInitialization(bool success, TimeSpan callTime, Exception exception);
+        void TrackInitialization(bool success, TimeSpan callTime, Exception? exception);
 
         /// <summary>
         /// Track attempts to read from the partition.    Tracked per partition read operation.
@@ -21,7 +21,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="success">True if read succeeded, false if read failed.</param>
         /// <param name="callTime">Time spent in read operation.</param>
         /// <param name="exception">The exception caught if read failed.</param>
-        void TrackRead(bool success, TimeSpan callTime, Exception exception);
+        void TrackRead(bool success, TimeSpan callTime, Exception? exception);
         
         /// <summary>
         /// Tracks messages read and time taken per successful read.  Tracked per successful partition read operation.
@@ -37,6 +37,6 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="success">True if read succeeded, false if read failed.</param>
         /// <param name="callTime">Shutdown operation time.</param>
         /// <param name="exception">Exception caught if shutdown fail.</param>
-        void TrackShutdown(bool success, TimeSpan callTime, Exception exception);
+        void TrackShutdown(bool success, TimeSpan callTime, Exception? exception);
     }
 }

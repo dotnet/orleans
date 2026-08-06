@@ -45,12 +45,12 @@ namespace Orleans.Runtime.Messaging
 
         protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes)
         {
-            MessagingInstruments.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
+            MessagingInstrumentation.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
         }
 
         protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes)
         {
-            MessagingInstruments.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
+            MessagingInstrumentation.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
         }
 
         protected override void OnReceivedMessage(Message message)
@@ -60,7 +60,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override async Task RunInternal()
         {
-            Exception error = default;
+            Exception? error = default;
             try
             {
                 this.messageCenter.OnGatewayConnectionOpen();
@@ -115,7 +115,7 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        protected override void RetryMessage(Message msg, Exception ex = null)
+        protected override void RetryMessage(Message msg, Exception? ex = null)
         {
             if (msg == null) return;
 
@@ -138,7 +138,7 @@ namespace Orleans.Runtime.Messaging
 
         internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason)
         {
-            MessagingInstruments.OnRejectedMessage(msg);
+            MessagingInstrumentation.OnRejectedMessage(msg);
             if (string.IsNullOrEmpty(reason)) reason = "Rejection from silo - Unknown reason.";
             var error = this.MessageFactory.CreateRejectionResponse(msg, rejectionType, reason);
 
@@ -148,7 +148,7 @@ namespace Orleans.Runtime.Messaging
 
         public void FailMessage(Message msg, string reason)
         {
-            MessagingInstruments.OnFailedSentMessage(msg);
+            MessagingInstrumentation.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {
                 LogDebugClientIsRejectingMessage(this.Log, msg, reason);
@@ -158,7 +158,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 LogInformationClientIsDroppingMessage(this.Log, msg, reason);
-                MessagingInstruments.OnDroppedSentMessage(msg);
+                MessagingInstrumentation.OnDroppedSentMessage(msg);
             }
         }
 
@@ -172,7 +172,7 @@ namespace Orleans.Runtime.Messaging
             Level = LogLevel.Information,
             Message = "Established connection to {Silo} with protocol version {ProtocolVersion}"
         )]
-        private static partial void LogInformationEstablishedConnection(ILogger logger, SiloAddress silo, string protocolVersion);
+        private static partial void LogInformationEstablishedConnection(ILogger logger, SiloAddress? silo, string protocolVersion);
 
         [LoggerMessage(
             Level = LogLevel.Debug,

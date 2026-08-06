@@ -2,12 +2,15 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.Internal;
 using Orleans.Statistics;
 
@@ -30,12 +33,13 @@ namespace Orleans.Runtime
         internal int _activationCount;
 
         private readonly PeriodicTimer _collectionTimer;
-        private Task _collectionLoopTask;
+        private Task? _collectionLoopTask;
 
         private readonly IEnvironmentStatisticsProvider _environmentStatisticsProvider;
         private readonly GrainCollectionOptions _grainCollectionOptions;
-        private readonly PeriodicTimer _memBasedDeactivationTimer;
-        private Task _memBasedDeactivationLoopTask;
+        private readonly CatalogInstruments _catalogInstruments;
+        private readonly PeriodicTimer? _memBasedDeactivationTimer;
+        private Task? _memBasedDeactivationLoopTask;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ActivationCollector"/> class.
@@ -44,12 +48,14 @@ namespace Orleans.Runtime
         /// <param name="options">The options.</param>
         /// <param name="logger">The logger.</param>
         public ActivationCollector(
-            TimeProvider timeProvider,
+            [FromKeyedServices(TimeProviderNames.ActivationManagement)] TimeProvider timeProvider,
             IOptions<GrainCollectionOptions> options,
             ILogger<ActivationCollector> logger,
-            IEnvironmentStatisticsProvider environmentStatisticsProvider)
+            IEnvironmentStatisticsProvider environmentStatisticsProvider,
+            CatalogInstruments catalogInstruments)
         {
             _grainCollectionOptions = options.Value;
+            _catalogInstruments = catalogInstruments;
 
             shortestAgeLimit = new(_grainCollectionOptions.ClassSpecificCollectionAge.Values.Aggregate(_grainCollectionOptions.CollectionAge.Ticks, (a, v) => Math.Min(a, v.Ticks)));
             nextTicket = MakeTicketFromDateTime(timeProvider.GetUtcNow().UtcDateTime);
@@ -91,6 +97,8 @@ namespace Orleans.Runtime
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         public Task CollectActivations(TimeSpan ageLimit, CancellationToken cancellationToken) => CollectActivationsImpl(false, ageLimit, cancellationToken);
 
+        internal Task CollectStaleActivations(CancellationToken cancellationToken) => CollectActivationsImpl(scanStale: true, ageLimit: default, cancellationToken: cancellationToken);
+
         /// <summary>
         /// Schedules the provided grain context for collection if it becomes idle for the specified duration.
         /// </summary>
@@ -125,7 +133,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="item">The grain context.</param>
         /// <returns><see langword="true"/> if collection was canceled, <see langword="false"/> otherwise.</returns>
-        public bool TryCancelCollection(ICollectibleGrainContext item)
+        public bool TryCancelCollection(ICollectibleGrainContext? item)
         {
             if (item is null) return false;
             if (item.IsExemptFromCollection) return false;
@@ -137,7 +145,7 @@ namespace Orleans.Runtime
                 if (IsExpired(ticket)) return false;
 
                 // first, we attempt to remove the ticket.
-                Bucket bucket;
+                Bucket? bucket;
                 if (!buckets.TryGetValue(ticket, out bucket) || !bucket.TryRemove(item)) return false;
             }
 
@@ -174,7 +182,7 @@ namespace Orleans.Runtime
             // if the ticket value doesn't change, then the source and destination bucket are the same and there's nothing to do.
             if (newTicket.Equals(oldTicket)) return true;
 
-            Bucket bucket;
+            Bucket? bucket;
             if (!buckets.TryGetValue(oldTicket, out bucket) || !bucket.TryRemove(item))
             {
                 // fail: item is not associated with currentKey.
@@ -186,7 +194,7 @@ namespace Orleans.Runtime
             return true;
         }
 
-        private bool DequeueQuantum(out List<ICollectibleGrainContext> items, DateTime now)
+        private bool DequeueQuantum([NotNullWhen(true)] out List<ICollectibleGrainContext>? items, DateTime now)
         {
             DateTime key;
             lock (buckets)
@@ -201,7 +209,7 @@ namespace Orleans.Runtime
                 nextTicket += _grainCollectionOptions.CollectionQuantum;
             }
 
-            Bucket bucket;
+            Bucket? bucket;
             if (!buckets.TryRemove(key, out bucket))
             {
                 items = nothing;
@@ -228,7 +236,7 @@ namespace Orleans.Runtime
         public List<ICollectibleGrainContext> ScanStale()
         {
             var now = DateTime.UtcNow;
-            List<ICollectibleGrainContext> condemned = null;
+            List<ICollectibleGrainContext>? condemned = null;
             while (DequeueQuantum(out var activations, now))
             {
                 // At this point, all tickets associated with activations are cancelled and any attempts to reschedule will fail silently.
@@ -274,7 +282,7 @@ namespace Orleans.Runtime
         /// <returns>The grain activations which have been idle for at least the specified age limit.</returns>
         public List<ICollectibleGrainContext> ScanAll(TimeSpan ageLimit)
         {
-            List<ICollectibleGrainContext> condemned = null;
+            List<ICollectibleGrainContext>? condemned = null;
             var now = DateTime.UtcNow;
             foreach (var kv in buckets)
             {
@@ -323,6 +331,13 @@ namespace Orleans.Runtime
         // Internal for testing. It's expected that when this returns true, activation shedding will occur.
         internal bool IsMemoryOverloaded(out int surplusActivationCount)
         {
+            var activationCount = _activationCount;
+            if (activationCount == 0)
+            {
+                surplusActivationCount = 0;
+                return false;
+            }
+
             var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
             var limit = _grainCollectionOptions.MemoryUsageLimitPercentage / 100f;
 
@@ -335,7 +350,6 @@ namespace Orleans.Runtime
             }
 
             // Calculate the surplus activations based the memory usage target.
-            var activationCount = _activationCount;
             var target = _grainCollectionOptions.MemoryUsageTargetPercentage / 100f;
             surplusActivationCount = (int)Math.Max(0, activationCount - Math.Floor(activationCount * target / usage));
             if (surplusActivationCount <= 0)
@@ -364,7 +378,8 @@ namespace Orleans.Runtime
 
             // snapshot to avoid concurrency collection modification issues
             var bucketSnapshot = buckets.ToArray();
-            foreach (var bucket in bucketSnapshot.OrderBy(b => b.Key))
+            Array.Sort(bucketSnapshot, static (left, right) => left.Key.CompareTo(right.Key));
+            foreach (var bucket in bucketSnapshot)
             {
                 foreach (var item in bucket.Value.Items)
                 {
@@ -374,6 +389,13 @@ namespace Orleans.Runtime
                     }
 
                     var activation = item.Value;
+                    lock (activation)
+                    {
+                        if (!activation.IsValid || !activation.IsInactive)
+                        {
+                            continue;
+                        }
+                    }
 
                     candidates.Add(activation);
                 }
@@ -384,7 +406,7 @@ namespace Orleans.Runtime
                 }
             }
 
-            CatalogInstruments.ActivationCollections.Add(1);
+            _catalogInstruments.OnActivationCollected();
             if (candidates.Count > 0) 
             {
                 LogCollectActivations(new(candidates));
@@ -393,7 +415,12 @@ namespace Orleans.Runtime
                     DeactivationReasonCode.HighMemoryPressure,
                     $"Process memory utilization exceeded the configured limit of '{_grainCollectionOptions.MemoryUsageLimitPercentage}'. Detected memory usage is {memBefore} MB.");
 
-                await DeactivateActivationsFromCollector(candidates, cancellationToken, reason);
+                await DeactivateActivationsFromCollector(
+                    candidates,
+                    cancellationToken,
+                    reason,
+                    ActivationCollectionEvents.CollectionSource.MemoryPressure,
+                    ageLimit: default);
             }
 
             long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
@@ -411,6 +438,11 @@ namespace Orleans.Runtime
         private void ThrowIfTicketIsInvalid(DateTime ticket)
         {
             if (ticket.Ticks == 0) throw new ArgumentException("Empty ticket is not allowed in this context.");
+            // DateTime.MaxValue is a sentinel produced by MakeTicketFromDateTime when the
+            // rounded-up tick overflows (e.g., ScanStale rescheduling an activation whose
+            // KeepAliveUntil is DateTime.MaxValue). Its ticks aren't quantum-aligned, but
+            // it is a valid ticket and must not be rejected here.
+            if (ticket == DateTime.MaxValue) return;
             if (0 != ticket.Ticks % _grainCollectionOptions.CollectionQuantum.Ticks)
             {
                 throw new ArgumentException(string.Format("invalid ticket ({0})", ticket));
@@ -572,7 +604,7 @@ namespace Orleans.Runtime
 
             try
             {
-                while (await _memBasedDeactivationTimer.WaitForNextTickAsync(cancellationToken))
+                while (await _memBasedDeactivationTimer!.WaitForNextTickAsync(cancellationToken))
                 {
                     try
                     {
@@ -629,11 +661,16 @@ namespace Orleans.Runtime
             LogBeforeCollection(number, memBefore, _activationCount, this);
 
             List<ICollectibleGrainContext> list = scanStale ? ScanStale() : ScanAll(ageLimit);
-            CatalogInstruments.ActivationCollections.Add(1);
+            _catalogInstruments.OnActivationCollected();
             if (list is { Count: > 0 })
             {
                 LogCollectActivations(new(list));
-                await DeactivateActivationsFromCollector(list, cancellationToken);
+                await DeactivateActivationsFromCollector(
+                    list,
+                    cancellationToken,
+                    deactivationReason: null,
+                    collectionSource: scanStale ? ActivationCollectionEvents.CollectionSource.Stale : ActivationCollectionEvents.CollectionSource.AgeLimit,
+                    ageLimit: ageLimit);
             }
 
             long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
@@ -642,10 +679,15 @@ namespace Orleans.Runtime
             LogAfterCollection(number, memAfter, _activationCount, list?.Count ?? 0, this, watch.Elapsed);
         }
 
-        private async Task DeactivateActivationsFromCollector(List<ICollectibleGrainContext> list, CancellationToken cancellationToken, DeactivationReason? deactivationReason = null)
+        private async Task DeactivateActivationsFromCollector(
+            List<ICollectibleGrainContext> list,
+            CancellationToken cancellationToken,
+            DeactivationReason? deactivationReason,
+            ActivationCollectionEvents.CollectionSource collectionSource,
+            TimeSpan ageLimit)
         {
             LogDeactivateActivationsFromCollector(list.Count);
-            CatalogInstruments.ActivationShutdownViaCollection();
+            _catalogInstruments.ActivationShutdownViaCollection();
 
             deactivationReason ??= GetDeactivationReason();
 
@@ -662,6 +704,8 @@ namespace Orleans.Runtime
                 activationData.Deactivate(deactivationReason.Value, cancellationToken);
                 await activationData.Deactivated.ConfigureAwait(false);
             }).WaitAsync(cancellationToken);
+
+            ActivationCollectionEvents.EmitCollectionCompleted(collectionSource, ageLimit, deactivationReason.Value, list);
         }
 
         public void Dispose()
@@ -700,7 +744,7 @@ namespace Orleans.Runtime
 
             public List<ICollectibleGrainContext> CancelAll()
             {
-                List<ICollectibleGrainContext> result = null;
+                List<ICollectibleGrainContext>? result = null;
                 foreach (var pair in Items)
                 {
                     // Attempt to cancel the item. if we succeed, it wasn't already cancelled and we can return it. otherwise, we silently ignore it.

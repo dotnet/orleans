@@ -16,17 +16,17 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets the delegate used to create connections to Azure Event Hub.
         /// </summary>
-        internal CreateConnectionDelegate CreateConnection { get; private set; }
+        internal CreateConnectionDelegate CreateConnection { get; private set; } = null!;
 
         /// <summary>
         /// Event Hub consumer group.
         /// </summary>
-        internal string ConsumerGroup { get; private set; }
+        internal string ConsumerGroup { get; private set; } = null!;
 
         /// <summary>
         /// Event Hub name.
         /// </summary>
-        internal string EventHubName { get; private set; }
+        internal string EventHubName { get; private set; } = null!;
 
         /// <summary>
         /// Connection options used when creating a connection to an Azure Event Hub.

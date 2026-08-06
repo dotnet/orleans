@@ -23,8 +23,8 @@ public static class SerializationHostingExtensions
     /// <param name="jsonSerializerSettings">The JSON serializer settings.</param>
     public static ISerializerBuilder AddNewtonsoftJsonSerializer(
         this ISerializerBuilder serializerBuilder,
-        Func<Type, bool> isSupported,
-        JsonSerializerSettings jsonSerializerSettings = null)
+        Func<Type, bool>? isSupported,
+        JsonSerializerSettings? jsonSerializerSettings = null)
         => serializerBuilder.AddNewtonsoftJsonSerializer(
             isSupported,
             optionsBuilder => optionsBuilder.Configure(options =>
@@ -43,8 +43,8 @@ public static class SerializationHostingExtensions
     /// <param name="configureOptions">A delegate used to configure the options for the JSON serializer.</param>
     public static ISerializerBuilder AddNewtonsoftJsonSerializer(
         this ISerializerBuilder serializerBuilder,
-        Func<Type, bool> isSupported,
-        Action<OptionsBuilder<NewtonsoftJsonCodecOptions>> configureOptions)
+        Func<Type, bool>? isSupported,
+        Action<OptionsBuilder<NewtonsoftJsonCodecOptions>>? configureOptions)
         => serializerBuilder.AddNewtonsoftJsonSerializer(
             isSupported,
             isSupported,
@@ -59,9 +59,9 @@ public static class SerializationHostingExtensions
     /// <param name="configureOptions">A delegate used to configure the options for the JSON serializer.</param>
     public static ISerializerBuilder AddNewtonsoftJsonSerializer(
         this ISerializerBuilder serializerBuilder,
-        Func<Type, bool> isSerializable,
-        Func<Type, bool> isCopyable,
-        Action<OptionsBuilder<NewtonsoftJsonCodecOptions>> configureOptions)
+        Func<Type, bool>? isSerializable,
+        Func<Type, bool>? isCopyable,
+        Action<OptionsBuilder<NewtonsoftJsonCodecOptions>>? configureOptions)
     {
         var services = serializerBuilder.Services;
         if (configureOptions != null)

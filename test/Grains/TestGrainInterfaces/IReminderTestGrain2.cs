@@ -14,6 +14,7 @@ namespace UnitTests.GrainInterfaces
     public interface IReminderTestGrain2 : IGrainWithGuidKey
     {
         Task<IGrainReminder> StartReminder(string reminderName, TimeSpan? period = null, bool validate = false);
+        Task<IGrainReminder> StartReminder(string reminderName, TimeSpan dueTime, TimeSpan period);
 
         Task StopReminder(string reminderName);
         Task StopReminder(IGrainReminder reminder);
@@ -21,7 +22,7 @@ namespace UnitTests.GrainInterfaces
         Task<TimeSpan> GetReminderPeriod(string reminderName);
         Task<(TimeSpan DueTime, TimeSpan Period)> GetReminderDueTimeAndPeriod(string reminderName);
         Task<long> GetCounter(string name);
-        Task<IGrainReminder> GetReminderObject(string reminderName);
+        Task<IGrainReminder?> GetReminderObject(string reminderName);
         Task<List<IGrainReminder>> GetRemindersList();
 
         Task EraseReminderTable();
@@ -46,4 +47,3 @@ namespace UnitTests.GrainInterfaces
         Task<bool> StartReminder(string reminderName);
     }
 }
-

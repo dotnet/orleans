@@ -16,7 +16,7 @@ namespace Orleans.Configuration
             this.logger = logger;
         }
 
-        public void PostConfigure(string name, EndpointOptions options)
+        public void PostConfigure(string? name, EndpointOptions options)
         {
             if (options.AdvertisedIPAddress is null)
             {

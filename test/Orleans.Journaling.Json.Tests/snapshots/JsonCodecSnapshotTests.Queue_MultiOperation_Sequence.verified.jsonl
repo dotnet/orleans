@@ -1,0 +1,4 @@
+﻿[8,["enqueue",10]]
+[8,["enqueue",20]]
+[8,["dequeue"]]
+[8,["snapshot",[30,40]]]

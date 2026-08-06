@@ -7,7 +7,11 @@ namespace Orleans.Runtime
     {
         private readonly SiloAddress _localSilo;
         private readonly IClusterMembershipService _clusterMembershipService;
-        private readonly object _lockObj = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock _lockObj = new();
+#else
+        private readonly object _lockObj = new();
+#endif
         private VersionedSuccessor _successor = new VersionedSuccessor(MembershipVersion.MinValue, null);
 
         public SimpleConsistentRingProvider(ILocalSiloDetails localSiloDetails, IClusterMembershipService clusterMembershipService)
@@ -22,7 +26,7 @@ namespace Orleans.Runtime
         /// than this silo's, or if no such silo exists, then the active silo with the absolute smallest consistent hash code,
         /// or <see langword="null"/> if there are no other active silos in the cluster.
         /// </summary>
-        public SiloAddress Successor
+        public SiloAddress? Successor
         {
             get
             {
@@ -42,7 +46,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private SiloAddress FindSuccessor(ClusterMembershipSnapshot snapshot)
+        private SiloAddress? FindSuccessor(ClusterMembershipSnapshot snapshot)
         {
             var (successorVersion, successor) = _successor;
             if (successorVersion >= snapshot.Version)
@@ -51,8 +55,8 @@ namespace Orleans.Runtime
             }
 
             // Find the silo with the smallest hashcode which is larger than this silo's.
-            (SiloAddress Silo, int HashCode) firstInRing = (default(SiloAddress), int.MaxValue);
-            (SiloAddress Silo, int HashCode) candidate = (default(SiloAddress), int.MaxValue);
+            (SiloAddress? Silo, int HashCode) firstInRing = (default, int.MaxValue);
+            (SiloAddress? Silo, int HashCode) candidate = (default, int.MaxValue);
             var localSiloHashCode = _localSilo.GetConsistentHashCode();
             foreach (var member in snapshot.Members.Values)
             {
@@ -97,20 +101,20 @@ namespace Orleans.Runtime
 
         private sealed class VersionedSuccessor
         {
-            public VersionedSuccessor(MembershipVersion membershipVersion, SiloAddress siloAddress)
+            public VersionedSuccessor(MembershipVersion membershipVersion, SiloAddress? siloAddress)
             {
                 MembershipVersion = membershipVersion;
                 SiloAddress = siloAddress;
             }
 
-            public void Deconstruct(out MembershipVersion version, out SiloAddress siloAddress)
+            public void Deconstruct(out MembershipVersion version, out SiloAddress? siloAddress)
             {
                 version = MembershipVersion;
                 siloAddress = SiloAddress;
             }
 
             public MembershipVersion MembershipVersion { get; }
-            public SiloAddress SiloAddress { get; }
+            public SiloAddress? SiloAddress { get; }
         }
     }
 }

@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -14,13 +13,18 @@ namespace Orleans.Runtime
     /// <summary>
     /// Monitors runtime and component health periodically, reporting complaints.
     /// </summary>
-    internal partial class Watchdog(IOptions<ClusterMembershipOptions> clusterMembershipOptions, IEnumerable<IHealthCheckParticipant> participants, ILogger<Watchdog> logger) : IDisposable
+    internal partial class Watchdog(
+        IOptions<ClusterMembershipOptions> clusterMembershipOptions,
+        IEnumerable<IHealthCheckParticipant> participants,
+        ILogger<Watchdog> logger,
+        OrleansInstruments orleansInstruments) : IDisposable
     {
         private static readonly TimeSpan PlatformWatchdogHeartbeatPeriod = TimeSpan.FromMilliseconds(1000);
         private readonly CancellationTokenSource _cancellation = new();
         private readonly TimeSpan _componentHealthCheckPeriod = clusterMembershipOptions.Value.LocalHealthDegradationMonitoringPeriod;
         private readonly List<IHealthCheckParticipant> _participants = participants.ToList();
         private readonly ILogger _logger = logger;
+        private readonly WatchdogInstruments _watchdogInstruments = new(orleansInstruments);
         private ValueStopwatch _platformWatchdogStopwatch;
         private ValueStopwatch _componentWatchdogStopwatch;
 
@@ -131,7 +135,7 @@ namespace Orleans.Runtime
 
         private void CheckComponentHealth()
         {
-            WatchdogInstruments.HealthChecks.Add(1);
+            _watchdogInstruments.OnHealthCheck();
             var numFailedChecks = 0;
             StringBuilder? complaints = null;
 
@@ -162,7 +166,7 @@ namespace Orleans.Runtime
 
             if (complaints != null)
             {
-                WatchdogInstruments.FailedHealthChecks.Add(1);
+                _watchdogInstruments.OnFailedHealthCheck();
                 LogWarningHealthCheckFailure(_logger, numFailedChecks, _participants.Count, complaints);
             }
 

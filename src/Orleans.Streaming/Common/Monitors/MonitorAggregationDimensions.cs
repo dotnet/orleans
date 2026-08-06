@@ -24,7 +24,7 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Gets the queue identifier.
         /// </summary>
-        public string QueueId { get; set; }
+        public string QueueId { get; set; } = null!; // Set by constructor or object initializer.
     }
 
     /// <summary>

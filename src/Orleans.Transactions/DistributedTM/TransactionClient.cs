@@ -18,7 +18,13 @@ internal class TransactionClient : ITransactionClient
         _serializer = serializer;
     }
 
-    public async Task RunTransaction(TransactionOption transactionOption, Func<Task> transactionDelegate)
+    public Task RunTransaction(TransactionOption transactionOption, Func<Task> transactionDelegate)
+        => RunTransaction(transactionOption, transactionDelegate, useExclusiveLock: false);
+
+    public Task RunTransaction(TransactionOption transactionOption, Func<Task<bool>> transactionDelegate)
+        => RunTransaction(transactionOption, transactionDelegate, useExclusiveLock: false);
+
+    public async Task RunTransaction(TransactionOption transactionOption, Func<Task> transactionDelegate, bool useExclusiveLock)
     {
         if (transactionDelegate is null)
         {
@@ -29,10 +35,10 @@ internal class TransactionClient : ITransactionClient
         {
             await transactionDelegate();
             return true;
-        });
+        }, useExclusiveLock);
     }
 
-    public async Task RunTransaction(TransactionOption transactionOption, Func<Task<bool>> transactionDelegate)
+    public async Task RunTransaction(TransactionOption transactionOption, Func<Task<bool>> transactionDelegate, bool useExclusiveLock)
     {
         if (transactionDelegate is null)
         {
@@ -57,13 +63,13 @@ internal class TransactionClient : ITransactionClient
             switch (transactionOption)
             {
                 case TransactionOption.Create:
-                    await RunDelegateWithTransaction(null, transactionDelegate);
+                    await RunDelegateWithTransaction(null, transactionDelegate, useExclusiveLock);
                     break;
                 case TransactionOption.Join:
-                    await RunDelegateWithTransaction(ambientTransactionInfo, transactionDelegate);
+                    await RunDelegateWithTransaction(ambientTransactionInfo, transactionDelegate, useExclusiveLock);
                     break;
                 case TransactionOption.CreateOrJoin:
-                    await RunDelegateWithTransaction(ambientTransactionInfo, transactionDelegate);
+                    await RunDelegateWithTransaction(ambientTransactionInfo, transactionDelegate, useExclusiveLock);
                     break;
                 case TransactionOption.Suppress:
                     await RunDelegateWithSupressedTransaction(ambientTransactionInfo, transactionDelegate);
@@ -85,7 +91,7 @@ internal class TransactionClient : ITransactionClient
         }
     }
 
-    private static async Task RunDelegateWithDisallowedTransaction(TransactionInfo ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
+    private static async Task RunDelegateWithDisallowedTransaction(TransactionInfo? ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
     {
         if (ambientTransactionInfo is not null)
         {
@@ -97,7 +103,7 @@ internal class TransactionClient : ITransactionClient
         _ = await transactionDelegate();
     }
 
-    private static async Task RunDelegateWithSupportedTransaction(TransactionInfo ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
+    private static async Task RunDelegateWithSupportedTransaction(TransactionInfo? ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
     {
         if (ambientTransactionInfo is null)
         {
@@ -111,7 +117,7 @@ internal class TransactionClient : ITransactionClient
         }
     }
 
-    private static async Task RunDelegateWithSupressedTransaction(TransactionInfo ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
+    private static async Task RunDelegateWithSupressedTransaction(TransactionInfo? ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
     {
         // Clear transaction context
         TransactionContext.Clear();
@@ -128,7 +134,7 @@ internal class TransactionClient : ITransactionClient
         }
     }
 
-    private async Task RunDelegateWithTransaction(TransactionInfo ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
+    private async Task RunDelegateWithTransaction(TransactionInfo? ambientTransactionInfo, Func<Task<bool>> transactionDelegate, bool useExclusiveLock)
     {
         TransactionInfo transactionInfo;
 
@@ -144,6 +150,12 @@ internal class TransactionClient : ITransactionClient
         {
             // Fork ambient transaction
             transactionInfo = ambientTransactionInfo.Fork();
+        }
+
+        // Apply exclusive lock flag if requested
+        if (useExclusiveLock)
+        {
+            transactionInfo.UseExclusiveLock = true;
         }
 
         // Set transaction context
@@ -177,7 +189,7 @@ internal class TransactionClient : ITransactionClient
     private async Task FinalizeTransaction(TransactionInfo transactionInfo)
     {
         // Prepare for exception, if any
-        OrleansTransactionException transactionException;
+        OrleansTransactionException? transactionException;
 
         // Check if transaction is pending for abort
         transactionException = transactionInfo.MustAbort(_serializer);

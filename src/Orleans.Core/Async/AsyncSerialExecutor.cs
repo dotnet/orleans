@@ -80,7 +80,7 @@ namespace Orleans
 
                     while (!actions.IsEmpty)
                     {
-                        Tuple<TaskCompletionSource<TResult>, Func<Task<TResult>>> actionTuple;
+                        Tuple<TaskCompletionSource<TResult>, Func<Task<TResult>>>? actionTuple;
                         if (actions.TryDequeue(out actionTuple))
                         {
                             try

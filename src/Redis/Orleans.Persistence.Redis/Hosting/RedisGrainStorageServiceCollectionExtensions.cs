@@ -36,7 +36,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configures Redis as the default grain storage provider.
         /// </summary>
-        public static IServiceCollection AddRedisGrainStorageAsDefault(this IServiceCollection services, Action<OptionsBuilder<RedisStorageOptions>> configureOptions = null)
+        public static IServiceCollection AddRedisGrainStorageAsDefault(this IServiceCollection services, Action<OptionsBuilder<RedisStorageOptions>>? configureOptions = null)
         {
             return services.AddRedisGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
         }
@@ -45,7 +45,7 @@ namespace Orleans.Hosting
         /// Configures Redis as a grain storage provider.
         /// </summary>
         public static IServiceCollection AddRedisGrainStorage(this IServiceCollection services, string name,
-            Action<OptionsBuilder<RedisStorageOptions>> configureOptions = null)
+            Action<OptionsBuilder<RedisStorageOptions>>? configureOptions = null)
         {
             configureOptions?.Invoke(services.AddOptions<RedisStorageOptions>(name));
             services.AddTransient<IConfigurationValidator>(sp => new RedisStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<RedisStorageOptions>>().Get(name), name));

@@ -30,12 +30,12 @@ namespace Orleans.Runtime.Messaging
             _lastGarbageCollectionTimestamp = Environment.TickCount64;
         }
 
-        public SiloAddress ReadRaw<TInput>(ref Reader<TInput> reader)
+        public SiloAddress? ReadRaw<TInput>(ref Reader<TInput> reader)
         {
             var currentTimestamp = Environment.TickCount64;
 
-            SiloAddress result = null;
-            byte[] payloadArray = default;
+            SiloAddress? result = null;
+            byte[]? payloadArray = default;
             var length = (int)reader.ReadVarUInt32();
             if (length == 0)
             {
@@ -47,7 +47,8 @@ namespace Orleans.Runtime.Messaging
                 payloadSpan = payloadArray = reader.ReadBytes((uint)length);
             }
 
-            var innerReader = Reader.Create(payloadSpan, null);
+            // This payload only contains primitive values, so no serializer session is required.
+            var innerReader = Reader.Create(payloadSpan, null!);
             var hashCode = innerReader.ReadInt32();
 
             ref var cacheEntry = ref CollectionsMarshal.GetValueRefOrAddDefault(_cache, hashCode, out var exists);
@@ -103,7 +104,7 @@ namespace Orleans.Runtime.Messaging
             return SiloAddress.New(ip, port, generation);
         }
 
-        public void WriteRaw<TBufferWriter>(ref Writer<TBufferWriter> writer, SiloAddress value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteRaw<TBufferWriter>(ref Writer<TBufferWriter> writer, SiloAddress? value) where TBufferWriter : IBufferWriter<byte>
         {
             var currentTimestamp = Environment.TickCount64;
             if (value is null)
@@ -131,7 +132,7 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            var innerWriter = Writer.Create(new PooledBuffer(), null);
+            var innerWriter = Writer.Create(new PooledBuffer(), null!);
             innerWriter.WriteInt32(value.GetConsistentHashCode());
             WriteSiloAddressInner(ref innerWriter, value);
             innerWriter.Commit();

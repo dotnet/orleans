@@ -1,0 +1,3 @@
+@echo off
+echo Building and running FSharpHelloWorld sample...
+dotnet run --project "%~dp0HelloWorld\HelloWorld.csproj"

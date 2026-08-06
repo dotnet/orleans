@@ -19,7 +19,7 @@ namespace Orleans.Clustering.Redis.Hosting;
 
 internal sealed class RedisClusteringProviderBuilder : IProviderBuilder<ISiloBuilder>, IProviderBuilder<IClientBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseRedisClustering(_ => { });
         builder.Services.AddOptions<RedisClusteringOptions>()
@@ -30,7 +30,7 @@ internal sealed class RedisClusteringProviderBuilder : IProviderBuilder<ISiloBui
                 {
                     // Get a connection multiplexer instance by name.
                     var multiplexer = services.GetRequiredKeyedService<IConnectionMultiplexer>(serviceKey);
-                    options.CreateMultiplexer = _ => Task.FromResult(multiplexer);
+                    options.CreateMultiplexer = _ => Task.FromResult((Multiplexer: multiplexer, IsShared: true));
                     options.ConfigurationOptions = new ConfigurationOptions();
                 }
                 else
@@ -52,7 +52,7 @@ internal sealed class RedisClusteringProviderBuilder : IProviderBuilder<ISiloBui
             });
     }
 
-    public void Configure(IClientBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(IClientBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseRedisClustering(_ => { });
         builder.Services.AddOptions<RedisClusteringOptions>()
@@ -63,7 +63,7 @@ internal sealed class RedisClusteringProviderBuilder : IProviderBuilder<ISiloBui
                 {
                     // Get a connection multiplexer instance by name.
                     var multiplexer = services.GetRequiredKeyedService<IConnectionMultiplexer>(serviceKey);
-                    options.CreateMultiplexer = _ => Task.FromResult(multiplexer);
+                    options.CreateMultiplexer = _ => Task.FromResult((Multiplexer: multiplexer, IsShared: true));
                     options.ConfigurationOptions = new ConfigurationOptions();
                 }
                 else

@@ -17,9 +17,8 @@ namespace Orleans.Providers.Streams.Common
         /// Protected for test purposes
         /// </summary>
         protected readonly Queue<FixedSizeBuffer> inUseBuffers;
-        private FixedSizeBuffer currentBuffer;
-        private readonly ICacheMonitor cacheMonitor;
-        private readonly PeriodicAction periodicMonitoring;
+        private readonly ICacheMonitor? cacheMonitor;
+        private readonly PeriodicAction? periodicMonitoring;
         private long cacheSizeInByte;
 
         /// <summary>
@@ -29,7 +28,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="timePurage">The time-based purge predicate.</param>
         /// <param name="cacheMonitor">The cache monitor.</param>
         /// <param name="monitorWriteInterval">"Interval to write periodic statistics. Only triggered for active caches.</param>
-        public ChronologicalEvictionStrategy(ILogger logger, TimePurgePredicate timePurage, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
+        public ChronologicalEvictionStrategy(ILogger logger, TimePurgePredicate timePurage, ICacheMonitor? cacheMonitor, TimeSpan? monitorWriteInterval)
         {
             if (logger == null) throw new ArgumentException(nameof(logger));
             if (timePurage == null) throw new ArgumentException(nameof(timePurage));
@@ -49,25 +48,19 @@ namespace Orleans.Providers.Streams.Common
 
         private void ReportCacheSize()
         {
-            this.cacheMonitor.ReportCacheSize(this.cacheSizeInByte);
+            this.cacheMonitor!.ReportCacheSize(this.cacheSizeInByte); // Only invoked via periodicMonitoring, which is only created when cacheMonitor is non-null.
         }
 
         /// <inheritdoc />
-        public IPurgeObservable PurgeObservable { private get; set; }
+        public IPurgeObservable PurgeObservable { private get; set; } = null!; // Set once by the owning cache immediately after construction.
 
         /// <inheritdoc />
-        public Action<CachedMessage?, CachedMessage?> OnPurged { get; set; }
+        public Action<CachedMessage?, CachedMessage?>? OnPurged { get; set; }
 
         /// <inheritdoc />
         public void OnBlockAllocated(FixedSizeBuffer newBlock)
         {
-            if (this.PurgeObservable.IsEmpty && this.currentBuffer != null
-                && this.inUseBuffers.Contains(this.currentBuffer) && this.inUseBuffers.Count == 1)
-            {
-                this.inUseBuffers.Dequeue().Dispose();
-            }
             this.inUseBuffers.Enqueue(newBlock);
-            this.currentBuffer = newBlock;
             //report metrics
             this.cacheSizeInByte += newBlock.SizeInByte;
             this.cacheMonitor?.TrackMemoryAllocated(newBlock.SizeInByte);
@@ -102,11 +95,11 @@ namespace Orleans.Providers.Streams.Common
             if (this.PurgeObservable.IsEmpty)
                 return;
             int itemsPurged = 0;
-            CachedMessage neweswtMessageInCache = this.PurgeObservable.Newest.Value;
+            CachedMessage neweswtMessageInCache = this.PurgeObservable.Newest!.Value; // Not empty (checked above), so Newest is non-null.
             CachedMessage? lastMessagePurged = null;
             while (!this.PurgeObservable.IsEmpty)
             {
-                var oldestMessageInCache = this.PurgeObservable.Oldest.Value;
+                var oldestMessageInCache = this.PurgeObservable.Oldest!.Value; // Not empty (checked in the while condition), so Oldest is non-null.
                 if (!ShouldPurge(ref oldestMessageInCache, ref neweswtMessageInCache, nowUtc))
                 {
                     break;
@@ -131,9 +124,9 @@ namespace Orleans.Providers.Streams.Common
             if (this.inUseBuffers.Count <= 0 || !lastMessagePurged.HasValue)
                 return;
             int memoryReleasedInByte = 0;
-            object IdOfLastPurgedBufferId = lastMessagePurged?.Segment.Array;
+            object? IdOfLastPurgedBufferId = lastMessagePurged?.Segment.Array;
             // IdOfLastBufferInCache will be null if cache is empty after purge
-            object IdOfLastBufferInCacheId = oldestMessageInCache?.Segment.Array;
+            object? IdOfLastBufferInCacheId = oldestMessageInCache?.Segment.Array;
             //all buffers older than LastPurgedBuffer should be purged
             while (this.inUseBuffers.Peek().Id != IdOfLastPurgedBufferId)
             {

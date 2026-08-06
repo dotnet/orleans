@@ -64,8 +64,8 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
             if (edge.TargetGrain.IsSystemTarget() || edge.SourceGrain.IsSystemTarget()) continue;
             lock (this)
             {
-                var sourceHostId = GetHostVertex(edge.SourceHost);
-                var targetHostId = GetHostVertex(edge.TargetHost);
+                var sourceHostId = GetHostVertex(edge.SourceHost!); // Non-system grain call edges always include both hosts.
+                var targetHostId = GetHostVertex(edge.TargetHost!); // Non-system grain call edges always include both hosts.
                 var sourceVertex = GetGrainVertex(edge.SourceGrain, sourceHostId);
                 var targetVertex = GetGrainVertex(edge.TargetGrain, targetHostId);
                 maxEdgeValue = Math.Max(maxEdgeValue, (int)edge.CallCount);

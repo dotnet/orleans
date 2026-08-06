@@ -4,7 +4,7 @@ namespace TestInternalGrains
 {
     public class ProxyGrain : Grain, IProxyGrain
     {
-        private ITestGrain proxy;
+        private ITestGrain proxy = null!;
 
         public Task CreateProxy(long key)
         {

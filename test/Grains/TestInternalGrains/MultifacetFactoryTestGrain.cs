@@ -7,9 +7,9 @@ namespace UnitTests.Grains
     public class MultifacetFactoryTestGrainState
     {
         [Id(0)]
-        public IMultifacetReader Reader { get; set; }
+        public IMultifacetReader Reader { get; set; } = null!;
         [Id(1)]
-        public IMultifacetWriter Writer { get; set; }
+        public IMultifacetWriter Writer { get; set; } = null!;
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]

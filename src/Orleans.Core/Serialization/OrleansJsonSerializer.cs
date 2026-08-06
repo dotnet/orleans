@@ -1,10 +1,9 @@
-using System;
 using System.Net;
+using System.Text;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Orleans.Runtime;
 using Orleans.GrainReferences;
-using Microsoft.Extensions.Options;
 
 namespace Orleans.Serialization
 {
@@ -33,7 +32,7 @@ namespace Orleans.Serialization
         /// <param name="expectedType">The expected type.</param>
         /// <param name="input">The input.</param>
         /// <returns>The deserialized object.</returns>
-        public object Deserialize(Type expectedType, string input)
+        public object? Deserialize(Type expectedType, string? input)
         {
             if (string.IsNullOrWhiteSpace(input))
             {
@@ -44,11 +43,39 @@ namespace Orleans.Serialization
         }
 
         /// <summary>
+        /// Deserializes an object of the specified expected type from the provided stream.
+        /// </summary>
+        /// <param name="expectedType">The expected type.</param>
+        /// <param name="input">The input stream.</param>
+        /// <returns>The deserialized object.</returns>
+        public object? Deserialize(Type expectedType, Stream input)
+        {
+            using var reader = new StreamReader(input, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: 1024, leaveOpen: true);
+            using var jsonReader = new JsonTextReader(reader);
+            var serializer = JsonSerializer.Create(this.settings);
+            return serializer.Deserialize(jsonReader, expectedType);
+        }
+
+        /// <summary>
         /// Serializes an object to a JSON string.
         /// </summary>
         /// <param name="item">The object to serialize.</param>
         /// <param name="expectedType">The type the deserializer should expect.</param>
-        public string Serialize(object item, Type expectedType) => JsonConvert.SerializeObject(item, expectedType, this.settings);
+        public string Serialize(object? item, Type expectedType) => JsonConvert.SerializeObject(item, expectedType, this.settings);
+
+        /// <summary>
+        /// Serializes an object to a stream.
+        /// </summary>
+        /// <param name="item">The object to serialize.</param>
+        /// <param name="expectedType">The type the deserializer should expect.</param>
+        /// <param name="destination">The destination stream.</param>
+        public void Serialize(object? item, Type expectedType, Stream destination)
+        {
+            using var writer = new StreamWriter(destination, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), 1024, leaveOpen: true);
+            using var jsonWriter = new JsonTextWriter(writer);
+            var serializer = JsonSerializer.Create(this.settings);
+            serializer.Serialize(jsonWriter, item, expectedType);
+        }
     }
 
     /// <summary>
@@ -64,17 +91,17 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
-            IPAddress ip = (IPAddress)value;
+            IPAddress ip = (IPAddress)value!;
             writer.WriteValue(ip.ToString());
         }
 
         /// <inheritdoc/>
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        public override object ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
         {
             JToken token = JToken.Load(reader);
-            return IPAddress.Parse(token.Value<string>());
+            return IPAddress.Parse(token.Value<string>()!);
         }
     }
 
@@ -88,9 +115,9 @@ namespace Orleans.Serialization
         public override bool CanConvert(Type objectType) => objectType == typeof(GrainId);
 
         /// <inheritdoc/>
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
-            GrainId id = (GrainId)value;
+            GrainId id = (GrainId)value!;
             writer.WriteStartObject();
             writer.WritePropertyName("Type");
             writer.WriteValue(id.Type.ToString());
@@ -100,10 +127,10 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        public override object ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
         {
             JObject jo = JObject.Load(reader);
-            GrainId grainId = GrainId.Create(jo["Type"].ToObject<string>(), jo["Key"].ToObject<string>());
+            GrainId grainId = GrainId.Create(jo["Type"]!.ToObject<string>()!, jo["Key"]!.ToObject<string>()!);
             return grainId;
         }
     }
@@ -118,14 +145,14 @@ namespace Orleans.Serialization
         public override bool CanConvert(Type objectType) => objectType == typeof(ActivationId);
 
         /// <inheritdoc/>
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
-            ActivationId id = (ActivationId)value;
+            ActivationId id = (ActivationId)value!;
             writer.WriteValue(id.ToParsableString());
         }
 
         /// <inheritdoc/>
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        public override object ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
         {
             return reader.Value switch
             {
@@ -148,22 +175,22 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
-            SiloAddress addr = (SiloAddress)value;
+            SiloAddress addr = (SiloAddress)value!;
             writer.WriteValue(addr.ToParsableString());
         }
 
         /// <inheritdoc/>
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        public override object? ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
         {
             switch (reader.TokenType)
             {
                 case JsonToken.StartObject:
                     var jo = JObject.Load(reader);
-                    return SiloAddress.FromParsableString(jo["SiloAddress"].ToObject<string>());
+                    return SiloAddress.FromParsableString(jo["SiloAddress"]!.ToObject<string>()!);
                 case JsonToken.String:
-                    return SiloAddress.FromParsableString(reader.Value as string);
+                    return SiloAddress.FromParsableString((reader.Value as string)!);
             }
 
             return null;
@@ -180,14 +207,14 @@ namespace Orleans.Serialization
         public override bool CanConvert(Type objectType) => objectType == typeof(MembershipVersion);
 
         /// <inheritdoc/>
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
-            MembershipVersion typedValue = (MembershipVersion)value;
+            MembershipVersion typedValue = (MembershipVersion)value!;
             writer.WriteValue(typedValue.Value);
         }
 
         /// <inheritdoc/>
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        public override object ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
         {
             return reader.Value switch
             {
@@ -210,9 +237,9 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
-            UniqueKey key = (UniqueKey)value;
+            UniqueKey key = (UniqueKey)value!;
             writer.WriteStartObject();
             writer.WritePropertyName("UniqueKey");
             writer.WriteValue(key.ToHexString());
@@ -220,10 +247,10 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        public override object ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
         {
             JObject jo = JObject.Load(reader);
-            UniqueKey addr = UniqueKey.Parse(jo["UniqueKey"].ToObject<string>().AsSpan());
+            UniqueKey addr = UniqueKey.Parse(jo["UniqueKey"]!.ToObject<string>()!.AsSpan());
             return addr;
         }
     }
@@ -241,9 +268,9 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
-            IPEndPoint ep = (IPEndPoint)value;
+            IPEndPoint ep = (IPEndPoint)value!;
             writer.WriteStartObject();
             writer.WritePropertyName("Address");
             serializer.Serialize(writer, ep.Address);
@@ -253,11 +280,11 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        public override object ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
         {
             JObject jo = JObject.Load(reader);
-            IPAddress address = jo["Address"].ToObject<IPAddress>(serializer);
-            int port = jo["Port"].Value<int>();
+            IPAddress address = jo["Address"]!.ToObject<IPAddress>(serializer)!;
+            int port = jo["Port"]!.Value<int>();
             return new IPEndPoint(address, port);
         }
     }
@@ -287,9 +314,9 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
-            var val = ((IAddressable)value).AsReference();  
+            var val = ((IAddressable)value!).AsReference();
             writer.WriteStartObject();
             writer.WritePropertyName("Id");
             writer.WriteStartObject();
@@ -304,12 +331,12 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        public override object ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
         {
             JObject jo = JObject.Load(reader);
             var id = jo["Id"];
-            GrainId grainId = GrainId.Create(id["Type"].ToObject<string>(), id["Key"].ToObject<string>());
-            var encodedInterface = jo["Interface"].ToString();
+            GrainId grainId = GrainId.Create(id!["Type"]!.ToObject<string>()!, id["Key"]!.ToObject<string>()!);
+            var encodedInterface = jo["Interface"]!.ToString();
             var iface = string.IsNullOrWhiteSpace(encodedInterface) ? default : GrainInterfaceType.Create(encodedInterface);
             return this.referenceActivator.CreateReference(grainId, iface);
         }

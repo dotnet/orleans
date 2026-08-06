@@ -7,12 +7,40 @@ internal static class JournalingAzureStorageTestConfiguration
 {
     public static void CheckPreconditionsOrThrow()
     {
-        Skip.If(string.IsNullOrEmpty(AzuriteContainerManager.ConnectionString), "DataConnectionString is not set. Skipping test.");
+        if (TestDefaultConfiguration.UseAadAuthentication)
+        {
+            Skip.If(!TestDefaultConfiguration.GetValue(nameof(TestDefaultConfiguration.DataBlobUri), out _), "DataBlobUri is not set. Skipping test.");
+        }
+        else
+        {
+            _ = TestDefaultConfiguration.AzureStorageConnectionString;
+        }
     }
 
-    public static AzureAppendBlobStateMachineStorageOptions ConfigureTestDefaults(this AzureAppendBlobStateMachineStorageOptions options)
+    public static AzureBlobJournalStorageOptions ConfigureTestDefaults(this AzureBlobJournalStorageOptions options)
     {
-        options.ConfigureBlobServiceClient(AzuriteContainerManager.ConnectionString);
+        if (TestDefaultConfiguration.UseAadAuthentication)
+        {
+            options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataBlobUri, TestDefaultConfiguration.TokenCredential);
+        }
+        else
+        {
+            options.ConfigureBlobServiceClient(TestDefaultConfiguration.AzureStorageConnectionString);
+        }
+
+        return options;
+    }
+
+    public static AzureTableJournalStorageOptions ConfigureTestDefaults(this AzureTableJournalStorageOptions options)
+    {
+        if (TestDefaultConfiguration.UseAadAuthentication)
+        {
+            options.ConfigureTableServiceClient(TestDefaultConfiguration.TableEndpoint, TestDefaultConfiguration.TokenCredential);
+        }
+        else
+        {
+            options.ConfigureTableServiceClient(TestDefaultConfiguration.AzureStorageConnectionString);
+        }
 
         return options;
     }

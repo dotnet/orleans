@@ -30,9 +30,9 @@ namespace Orleans.Serialization.UnitTests;
 /// - Needing better performance than JSON but more portability than Orleans' native format
 /// </summary>
 [Trait("Category", "BVT")]
-public class MessagePackCodecTests : FieldCodecTester<MyMessagePackClass?, IFieldCodec<MyMessagePackClass?>>
+public class MessagePackCodecTests : FieldCodecTester<MyMessagePackClass?, IFieldCodec<MyMessagePackClass?>>, IClassFixture<SerializationTesterFixture>
 {
-    public MessagePackCodecTests(ITestOutputHelper output) : base(output)
+    public MessagePackCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
     {
     }
 
@@ -58,11 +58,12 @@ public class MessagePackCodecTests : FieldCodecTester<MyMessagePackClass?, IFiel
     {
         var original = new MyMessagePackClass { IntProperty = 30, StringProperty = "hi", SubClass = new() { Id = Guid.NewGuid() } };
         var copier = ServiceProvider.GetRequiredService<DeepCopier<MyMessagePackClass>>();
-        var result = copier.Copy(original);
+        var result = copier.Copy(original)!;
 
         Assert.Equal(original.IntProperty, result.IntProperty);
         Assert.Equal(original.StringProperty, result.StringProperty);
-        Assert.Equal(original.SubClass.Id, result.SubClass.Id);
+        // Both values are initialized above and copying preserves the nested object.
+        Assert.Equal(original.SubClass!.Id, result.SubClass!.Id);
     }
 
     [Fact]
@@ -70,18 +71,19 @@ public class MessagePackCodecTests : FieldCodecTester<MyMessagePackClass?, IFiel
     {
         var original = new MyMessagePackClass { IntProperty = 30, StringProperty = "hi", SubClass = new() { Id = Guid.NewGuid() } };
         var copier = ServiceProvider.GetRequiredService<DeepCopier>();
-        var result = (MyMessagePackClass)copier.Copy((object)original);
+        var result = (MyMessagePackClass)copier.Copy((object)original)!;
 
         Assert.Equal(original.IntProperty, result.IntProperty);
         Assert.Equal(original.StringProperty, result.StringProperty);
-        Assert.Equal(original.SubClass.Id, result.SubClass.Id);
+        // Both values are initialized above and copying preserves the nested object.
+        Assert.Equal(original.SubClass!.Id, result.SubClass!.Id);
     }
 
     [Fact]
     public void MessagePackSerializerRoundTripThroughCodec()
     {
         var original = new MyMessagePackClass { IntProperty = 30, StringProperty = "hi", SubClass = new() { Id = Guid.NewGuid() } };
-        var result = RoundTripThroughCodec(original);
+        var result = RoundTripThroughCodec(original)!;
 
         Assert.Equal(original.IntProperty, result.IntProperty);
         Assert.Equal(original.StringProperty, result.StringProperty);
@@ -101,9 +103,9 @@ public class MessagePackCodecTests : FieldCodecTester<MyMessagePackClass?, IFiel
 
 
 [Trait("Category", "BVT")]
-public class MessagePackUnionCodecTests : FieldCodecTester<IMyMessagePackUnion?, IFieldCodec<IMyMessagePackUnion?>>
+public class MessagePackUnionCodecTests : FieldCodecTester<IMyMessagePackUnion?, IFieldCodec<IMyMessagePackUnion?>>, IClassFixture<SerializationTesterFixture>
 {
-    public MessagePackUnionCodecTests(ITestOutputHelper output) : base(output)
+    public MessagePackUnionCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
     {
     }
 
@@ -124,9 +126,9 @@ public class MessagePackUnionCodecTests : FieldCodecTester<IMyMessagePackUnion?,
 
 
 [Trait("Category", "BVT")]
-public class MessagePackCodecCopierTests : CopierTester<MyMessagePackClass?, IDeepCopier<MyMessagePackClass?>>
+public class MessagePackCodecCopierTests : CopierTester<MyMessagePackClass?, IDeepCopier<MyMessagePackClass?>>, IClassFixture<SerializationTesterFixture>
 {
-    public MessagePackCodecCopierTests(ITestOutputHelper output) : base(output)
+    public MessagePackCodecCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
     {
     }
 

@@ -25,14 +25,39 @@ namespace Orleans.GrainDirectory.AzureStorage
     {
         private TimeSpan? creationTimeout;
         private TimeSpan? operationTimeout;
+        private TimeSpan? maxPauseBetweenOperationRetries;
 
         public int MaxBulkUpdateRows { get; set; } = 100;
         public int MaxCreationRetries { get; set; } = 60;
+
+        // Defaults match Azure Storage SDK retry settings.
+        /// <summary>
+        /// The maximum number of operation retry attempts.
+        /// </summary>
         public int MaxOperationRetries { get; set; } = 5;
 
         public TimeSpan PauseBetweenCreationRetries { get; set; } = TimeSpan.FromSeconds(1);
 
-        public TimeSpan PauseBetweenOperationRetries { get; set; } = TimeSpan.FromMilliseconds(100);
+        /// <summary>
+        /// The base delay used by the Azure SDK exponential retry policy.
+        /// </summary>
+        public TimeSpan PauseBetweenOperationRetries { get; set; } = TimeSpan.FromSeconds(0.8);
+
+        /// <summary>
+        /// The maximum delay used by the Azure SDK exponential retry policy.
+        /// </summary>
+        public TimeSpan MaxPauseBetweenOperationRetries
+        {
+            get => this.maxPauseBetweenOperationRetries ?? TimeSpan.FromMinutes(1);
+            set
+            {
+                if (value <= TimeSpan.Zero && !value.Equals(Timeout.InfiniteTimeSpan))
+                {
+                    throw new ArgumentOutOfRangeException(nameof(MaxPauseBetweenOperationRetries), value, "Value must be positive or Timeout.InfiniteTimeSpan.");
+                }
+                this.maxPauseBetweenOperationRetries = value;
+            }
+        }
 
         public TimeSpan CreationTimeout
         {
@@ -42,7 +67,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         public TimeSpan OperationTimeout
         {
-            get => this.operationTimeout ?? TimeSpan.FromMilliseconds(this.PauseBetweenOperationRetries.TotalMilliseconds * this.MaxOperationRetries * 6);
+            get => this.operationTimeout ?? TimeSpan.FromSeconds(100);
             set => SetIfValidTimeout(ref this.operationTimeout, value, nameof(OperationTimeout));
         }
 

@@ -36,7 +36,7 @@ namespace DistributedTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task OnNextAsync(object item, StreamSequenceToken token = null)
+        public Task OnNextAsync(object item, StreamSequenceToken? token = null)
         {
             if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("OnNextAsync {Item}", item);
 

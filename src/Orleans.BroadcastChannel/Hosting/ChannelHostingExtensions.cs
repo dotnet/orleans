@@ -29,7 +29,7 @@ namespace Orleans.Hosting
         /// <param name="this">The builder.</param>
         /// <param name="name">The name of the provider</param>
         /// <param name="configureOptions">The configuration delegate.</param>
-        public static ISiloBuilder AddBroadcastChannel(this ISiloBuilder @this, string name, Action<OptionsBuilder<BroadcastChannelOptions>> configureOptions = null)
+        public static ISiloBuilder AddBroadcastChannel(this ISiloBuilder @this, string name, Action<OptionsBuilder<BroadcastChannelOptions>>? configureOptions = null)
         {
             @this.Services.AddBroadcastChannel(name, configureOptions);
             @this.AddGrainExtension<IBroadcastChannelConsumerExtension, BroadcastChannelConsumerExtension>();
@@ -54,7 +54,7 @@ namespace Orleans.Hosting
         /// <param name="this">The builder.</param>
         /// <param name="name">The name of the provider</param>
         /// <param name="configureOptions">The configuration delegate.</param>
-        public static IClientBuilder AddBroadcastChannel(this IClientBuilder @this, string name, Action<OptionsBuilder<BroadcastChannelOptions>> configureOptions = null)
+        public static IClientBuilder AddBroadcastChannel(this IClientBuilder @this, string name, Action<OptionsBuilder<BroadcastChannelOptions>>? configureOptions = null)
         {
             @this.Services.AddBroadcastChannel(name, configureOptions);
             return @this;
@@ -68,7 +68,7 @@ namespace Orleans.Hosting
         public static IBroadcastChannelProvider GetBroadcastChannelProvider(this IClusterClient @this, string name)
             => @this.ServiceProvider.GetRequiredKeyedService<IBroadcastChannelProvider>(name);
 
-        private static void AddBroadcastChannel(this IServiceCollection services, string name, Action<OptionsBuilder<BroadcastChannelOptions>> configureOptions)
+        private static void AddBroadcastChannel(this IServiceCollection services, string name, Action<OptionsBuilder<BroadcastChannelOptions>>? configureOptions)
         {
             configureOptions?.Invoke(services.AddOptions<BroadcastChannelOptions>(name));
             services.ConfigureNamedOptionForLogging<BroadcastChannelOptions>(name);
@@ -77,8 +77,7 @@ namespace Orleans.Hosting
                 .AddSingleton<IChannelNamespacePredicateProvider, DefaultChannelNamespacePredicateProvider>()
                 .AddSingleton<IChannelNamespacePredicateProvider, ConstructorChannelNamespacePredicateProvider>()
                 .AddKeyedSingleton<IChannelIdMapper, DefaultChannelIdMapper>(DefaultChannelIdMapper.Name)
-                .AddKeyedSingleton(name, (sp, key) => BroadcastChannelProvider.Create(sp, key as string));
+                .AddKeyedSingleton(name, (sp, key) => BroadcastChannelProvider.Create(sp, (key as string)!));
         }
     }
 }
-

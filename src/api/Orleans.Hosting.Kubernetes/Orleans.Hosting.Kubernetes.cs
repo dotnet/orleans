@@ -10,11 +10,11 @@ namespace Orleans.Hosting
 {
     public static partial class KubernetesHostingExtensions
     {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseKubernetesHosting(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Kubernetes.KubernetesHostingOptions>> configureOptions) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseKubernetesHosting(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Kubernetes.KubernetesHostingOptions>>? configureOptions) { throw null; }
 
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseKubernetesHosting(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) { throw null; }
 
-        public static ISiloBuilder UseKubernetesHosting(this ISiloBuilder siloBuilder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Kubernetes.KubernetesHostingOptions>> configureOptions) { throw null; }
+        public static ISiloBuilder UseKubernetesHosting(this ISiloBuilder siloBuilder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Kubernetes.KubernetesHostingOptions>>? configureOptions) { throw null; }
 
         public static ISiloBuilder UseKubernetesHosting(this ISiloBuilder siloBuilder) { throw null; }
     }

@@ -1,0 +1,17 @@
+<div class="collapse navbar-collapse" id="navbarContent">
+    <ul class="navbar-nav">
+        <li class="nav-item">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <i class="bi bi-house-door me-2"></i> Home
+            </NavLink>
+        </li>
+        @foreach (var list in TodoLists)
+        {
+            <li class="nav-item">
+                <NavLink class="nav-link" href="@($"todolist/{list.Id}")">
+                    <i class="bi bi-list-task me-1"></i> @list.Name
+                </NavLink>
+            </li>
+        }
+    </ul>
+</div>

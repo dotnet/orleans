@@ -53,8 +53,8 @@ namespace Orleans.Serialization.TestKit
         {
             public static ReadOnlySequence<byte> Create(IEnumerable<Memory<byte>> buffers)
             {
-                ReadOnlyBufferSegment segment = null;
-                ReadOnlyBufferSegment first = null;
+                ReadOnlyBufferSegment? segment = null;
+                ReadOnlyBufferSegment? first = null;
                 foreach (var buffer in buffers)
                 {
                     var newSegment = new ReadOnlyBufferSegment
@@ -80,7 +80,7 @@ namespace Orleans.Serialization.TestKit
                     first = segment = new ReadOnlyBufferSegment();
                 }
 
-                return new ReadOnlySequence<byte>(first, 0, segment, segment.Memory.Length);
+                return new ReadOnlySequence<byte>(first, 0, segment!, segment!.Memory.Length);
             }
         }
     }

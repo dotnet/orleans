@@ -10,7 +10,7 @@ namespace UnitTests.Grains
     public class MultipleImplicitSubscriptionGrain : Grain, IMultipleImplicitSubscriptionGrain
     {
         private readonly ILogger logger;
-        private IAsyncStream<int> redStream, blueStream;
+        private IAsyncStream<int> redStream = null!, blueStream = null!;
         private int redCounter, blueCounter;
 
         public MultipleImplicitSubscriptionGrain(ILoggerFactory loggerFactory)
@@ -22,7 +22,7 @@ namespace UnitTests.Grains
         {
             logger.LogInformation("OnActivateAsync");
 
-            var streamProvider = this.GetStreamProvider("SMSProvider");
+            var streamProvider = this.GetStreamProvider("MemoryStreamProvider");
             redStream = streamProvider.GetStream<int>("red", this.GetPrimaryKey());
             blueStream = streamProvider.GetStream<int>("blue", this.GetPrimaryKey());
 

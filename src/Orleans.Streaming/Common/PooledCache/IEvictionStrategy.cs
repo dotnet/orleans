@@ -15,7 +15,7 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Gets or sets the method which will be called when purge is finished.
         /// </summary>
-        Action<CachedMessage?, CachedMessage?> OnPurged { get; set; }
+        Action<CachedMessage?, CachedMessage?>? OnPurged { get; set; }
 
         /// <summary>
         /// Method which should be called when pulling agent try to do a purge on the cache

@@ -124,7 +124,8 @@ public class NumericsWideningAndNarrowingTests
         var values = new List<N>
         {
             N.MinValue,
-            default,
+            // All numeric types exercised by this suite are value types, so default is non-null.
+            default!,
             N.MaxValue / two,
             N.MaxValue,
         };
@@ -143,7 +144,8 @@ public class NumericsWideningAndNarrowingTests
         var values = (new N[]
         {
             N.MinValue,
-            default,
+            // All numeric types exercised by this suite are value types, so default is non-null.
+            default!,
             N.MaxValue / two,
             N.MaxValue,
         }).Select(W.CreateTruncating).ToList();
@@ -181,7 +183,8 @@ public class NumericsWideningAndNarrowingTests
         {
             N.MinValue + buffer,
             N.MinValue / two,
-            default,
+            // All numeric types exercised by this suite are value types, so default is non-null.
+            default!,
             N.MaxValue / two,
             N.MaxValue - buffer,
         };
@@ -202,7 +205,8 @@ public class NumericsWideningAndNarrowingTests
         {
             N.MinValue + buffer,
             N.MinValue / two,
-            default,
+            // All numeric types exercised by this suite are value types, so default is non-null.
+            default!,
             N.MaxValue / two,
             N.MaxValue - buffer,
         }.Select(W.CreateTruncating).ToList();
@@ -227,7 +231,7 @@ public class NumericsWideningAndNarrowingTests
     {
         // Round-trip the value, converting it along the way.
         var payload = _serializer.SerializeToArray(leftValue);
-        var result = _serializer.Deserialize<TRight>(payload);
+        var result = _serializer.Deserialize<TRight>(payload)!;
 
         var asRight = TRight.CreateTruncating(leftValue);
         Assert.Equal(asRight, result);
@@ -243,7 +247,7 @@ public class NumericsWideningAndNarrowingTests
     {
         // Wrap the value and round-trip the wrapped value, converting it along the way.
         var payload = _serializer.SerializeToArray(new ValueHolder<TLeft> { Value = leftValue });
-        var result = _serializer.Deserialize<ValueHolder<TRight>>(payload).Value;
+        var result = _serializer.Deserialize<ValueHolder<TRight>>(payload)!.Value;
 
         var asRight = TRight.CreateTruncating(leftValue);
         Assert.Equal(asRight, result);
@@ -257,7 +261,8 @@ public class NumericsWideningAndNarrowingTests
     public sealed class ValueHolder<T>
     {
         [Id(0)]
-        public T Value;
+        // Tests initialize this member directly or through deserialization before reading it.
+        public T Value = default!;
     }
 }
 #else
@@ -370,7 +375,7 @@ public class NumericsWideningAndNarrowingTests
         var values = new List<N>
         {
             n.MinValue,
-            default,
+            default!,
             n.Divide(n.MaxValue, two),
             n.MaxValue,
         };
@@ -387,7 +392,7 @@ public class NumericsWideningAndNarrowingTests
         var values = (new N[]
         {
             n.MinValue,
-            default,
+            default!,
             n.Divide(n.MaxValue, two),
             n.MaxValue,
         }).Select(w.CreateTruncating).ToList();
@@ -421,7 +426,7 @@ public class NumericsWideningAndNarrowingTests
         {
             n.Add(n.MinValue, buffer),
             n.Divide(n.MinValue, two),
-            default,
+            default!,
             n.Divide(n.MaxValue, two),
             n.Subtract(n.MaxValue, buffer),
         };
@@ -440,7 +445,7 @@ public class NumericsWideningAndNarrowingTests
         {
             n.Add(n.MinValue, buffer),
             n.Divide(n.MinValue, two),
-            default,
+            default!,
             n.Divide(n.MaxValue, two),
             n.Subtract(n.MaxValue, buffer),
         }.Select(w.CreateTruncating).ToList();
@@ -475,7 +480,7 @@ public class NumericsWideningAndNarrowingTests
     {
         // Wrap the value and round-trip the wrapped value, converting it along the way.
         var payload = _serializer.SerializeToArray(new ValueHolder<TLeft> { Value = leftValue });
-        var result = _serializer.Deserialize<ValueHolder<TRight>>(payload).Value;
+        var result = _serializer.Deserialize<ValueHolder<TRight>>(payload)!.Value; // The payload was serialized from a ValueHolder above.
 
         var asRight = right.CreateTruncating(leftValue);
         Assert.Equal(asRight, result);
@@ -489,7 +494,7 @@ public class NumericsWideningAndNarrowingTests
     public sealed class ValueHolder<T>
     {
         [Id(0)]
-        public T Value;
+        public T Value = default!;
     }
 
     public interface INumber<T>
@@ -517,7 +522,7 @@ public class NumericsWideningAndNarrowingTests
 
         public byte Divide(byte x, byte y) => (byte)(x / y);
 
-        public byte CreateTruncating<TFrom>(TFrom from) => (byte)Convert.ChangeType(from, typeof(byte));
+        public byte CreateTruncating<TFrom>(TFrom from) => (byte)Convert.ChangeType(from, typeof(byte))!;
     }
 
     public sealed class UShortNumber : INumber<ushort>
@@ -533,7 +538,7 @@ public class NumericsWideningAndNarrowingTests
 
         public ushort Divide(ushort x, ushort y) => (ushort)(x / y);
 
-        public ushort CreateTruncating<TFrom>(TFrom from) => (ushort)Convert.ChangeType(from, typeof(ushort));
+        public ushort CreateTruncating<TFrom>(TFrom from) => (ushort)Convert.ChangeType(from, typeof(ushort))!;
     }
 
     public sealed class UIntNumber : INumber<uint>
@@ -549,7 +554,7 @@ public class NumericsWideningAndNarrowingTests
 
         public uint Divide(uint x, uint y) => x / y;
 
-        public uint CreateTruncating<TFrom>(TFrom from) => (uint)Convert.ChangeType(from, typeof(uint));
+        public uint CreateTruncating<TFrom>(TFrom from) => (uint)Convert.ChangeType(from, typeof(uint))!;
     }
 
     public sealed class ULongNumber : INumber<ulong>
@@ -565,7 +570,7 @@ public class NumericsWideningAndNarrowingTests
 
         public ulong Divide(ulong x, ulong y) => x / y;
 
-        public ulong CreateTruncating<TFrom>(TFrom from) => (ulong)Convert.ChangeType(from, typeof(ulong));
+        public ulong CreateTruncating<TFrom>(TFrom from) => (ulong)Convert.ChangeType(from, typeof(ulong))!;
     }
 
     public sealed class SByteNumber : INumber<sbyte>
@@ -581,7 +586,7 @@ public class NumericsWideningAndNarrowingTests
 
         public sbyte Divide(sbyte x, sbyte y) => (sbyte)(x / y);
 
-        public sbyte CreateTruncating<TFrom>(TFrom from) => (sbyte)Convert.ChangeType(from, typeof(sbyte));
+        public sbyte CreateTruncating<TFrom>(TFrom from) => (sbyte)Convert.ChangeType(from, typeof(sbyte))!;
     }
 
     public sealed class ShortNumber : INumber<short>
@@ -597,7 +602,7 @@ public class NumericsWideningAndNarrowingTests
 
         public short Divide(short x, short y) => (short)(x / y);
 
-        public short CreateTruncating<TFrom>(TFrom from) => (short)Convert.ChangeType(from, typeof(short));
+        public short CreateTruncating<TFrom>(TFrom from) => (short)Convert.ChangeType(from, typeof(short))!;
     }
 
     public sealed class IntNumber : INumber<int>
@@ -613,7 +618,7 @@ public class NumericsWideningAndNarrowingTests
 
         public int Divide(int x, int y) => x / y;
 
-        public int CreateTruncating<TFrom>(TFrom from) => (int)Convert.ChangeType(from, typeof(int));
+        public int CreateTruncating<TFrom>(TFrom from) => (int)Convert.ChangeType(from, typeof(int))!;
     }
 
     public sealed class LongNumber : INumber<long>
@@ -629,7 +634,7 @@ public class NumericsWideningAndNarrowingTests
 
         public long Divide(long x, long y) => x / y;
 
-        public long CreateTruncating<TFrom>(TFrom from) => (long)Convert.ChangeType(from, typeof(long));
+        public long CreateTruncating<TFrom>(TFrom from) => (long)Convert.ChangeType(from, typeof(long))!;
     }
 
     public sealed class FloatNumber : INumber<float>
@@ -645,7 +650,7 @@ public class NumericsWideningAndNarrowingTests
 
         public float Divide(float x, float y) => x / y;
 
-        public float CreateTruncating<TFrom>(TFrom from) => (float)Convert.ChangeType(from, typeof(float));
+        public float CreateTruncating<TFrom>(TFrom from) => (float)Convert.ChangeType(from, typeof(float))!;
     }
 
     public sealed class DoubleNumber : INumber<double>
@@ -661,7 +666,7 @@ public class NumericsWideningAndNarrowingTests
 
         public double Divide(double x, double y) => x / y;
 
-        public double CreateTruncating<TFrom>(TFrom from) => (double)Convert.ChangeType(from, typeof(double));
+        public double CreateTruncating<TFrom>(TFrom from) => (double)Convert.ChangeType(from, typeof(double))!;
     }
 
     public sealed class DecimalNumber : INumber<decimal>
@@ -677,7 +682,7 @@ public class NumericsWideningAndNarrowingTests
 
         public decimal Divide(decimal x, decimal y) => x / y;
 
-        public decimal CreateTruncating<TFrom>(TFrom from) => (decimal)Convert.ChangeType(from, typeof(decimal));
+        public decimal CreateTruncating<TFrom>(TFrom from) => (decimal)Convert.ChangeType(from, typeof(decimal))!;
     }
 
 #if NET5_0_OR_GREATER
@@ -694,7 +699,7 @@ public class NumericsWideningAndNarrowingTests
 
         public Half Divide(Half x, Half y) => x / y;
 
-        public Half CreateTruncating<TFrom>(TFrom from) => (Half)Convert.ChangeType(from, typeof(Half));
+        public Half CreateTruncating<TFrom>(TFrom from) => (Half)Convert.ChangeType(from, typeof(Half))!;
     }
 #endif
 }

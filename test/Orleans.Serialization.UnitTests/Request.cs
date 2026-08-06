@@ -34,7 +34,7 @@ namespace Orleans.Serialization.Invocation
                 if (resultTask.IsCompleted)
                 {
                     resultTask.GetAwaiter().GetResult();
-                    return new ValueTask<Response>(Response.FromResult<object>(null));
+                    return new ValueTask<Response>(Response.FromResult<object?>(null));
                 }
 
                 return CompleteInvokeAsync(resultTask);
@@ -50,7 +50,7 @@ namespace Orleans.Serialization.Invocation
             try
             {
                 await resultTask;
-                return Response.FromResult<object>(null);
+                return Response.FromResult<object?>(null);
             }
             catch (Exception exception)
             {
@@ -151,7 +151,7 @@ namespace Orleans.Serialization.Invocation
                 if (resultTask.IsCompleted)
                 {
                     resultTask.GetAwaiter().GetResult();
-                    return new ValueTask<Response>(Response.FromResult<object>(null));
+                    return new ValueTask<Response>(Response.FromResult<object?>(null));
                 }
 
                 return CompleteInvokeAsync(resultTask);
@@ -167,7 +167,7 @@ namespace Orleans.Serialization.Invocation
             try
             {
                 await resultTask;
-                return Response.FromResult<object>(null);
+                return Response.FromResult<object?>(null);
             }
             catch (Exception exception)
             {
@@ -187,7 +187,7 @@ namespace Orleans.Serialization.Invocation
             try
             {
                 InvokeInner();
-                return new ValueTask<Response>(Response.FromResult<object>(null));
+                return new ValueTask<Response>(Response.FromResult<object?>(null));
             }
             catch (Exception exception)
             {

@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
@@ -80,8 +79,8 @@ public static class RuntimeTypeNameFormatter
     {
         if (allowAliases && GetCompoundTypeAlias(type) is { } compoundAlias)
         {
-            AddCompoundTypeAlias(builder, type, compoundAlias.Components);
-            AddGenericParameters(builder, type);
+            AddCompoundTypeAlias(builder, type, compoundAlias.Components, allowAliases);
+            AddGenericParameters(builder, type, allowAliases);
             return;
         }
 
@@ -89,7 +88,7 @@ public static class RuntimeTypeNameFormatter
         if (type.HasElementType)
         {
             // Format the element type.
-            Format(builder, type.GetElementType()!, isElementType: true);
+            Format(builder, type.GetElementType()!, isElementType: true, allowAliases: allowAliases);
 
             // Format this type's adornments to the element type.
             AddArrayRank(builder, type);
@@ -100,7 +99,7 @@ public static class RuntimeTypeNameFormatter
         {
             AddNamespace(builder, type);
             AddClassName(builder, type);
-            AddGenericParameters(builder, type);
+            AddGenericParameters(builder, type, allowAliases);
         }
 
         // Types which are used as elements are not formatted with their assembly name, since that is added after the
@@ -111,7 +110,7 @@ public static class RuntimeTypeNameFormatter
         }
     }
 
-    private static void AddCompoundTypeAlias(StringBuilder builder, Type type, object[] components)
+    private static void AddCompoundTypeAlias(StringBuilder builder, Type type, object[] components, bool allowAliases)
     {
         // Start
         builder.Append('(');
@@ -136,7 +135,7 @@ public static class RuntimeTypeNameFormatter
                 }
 
                 builder.Append('[');
-                Format(builder, t, isElementType: false);
+                Format(builder, t, isElementType: false, allowAliases: allowAliases);
                 builder.Append(']');
             }
             else
@@ -187,7 +186,7 @@ public static class RuntimeTypeNameFormatter
         AddGenericArity(builder, type);
     }
 
-    private static void AddGenericParameters(StringBuilder builder, Type type)
+    private static void AddGenericParameters(StringBuilder builder, Type type, bool allowAliases = true)
     {
         // Generic type definitions (eg, List<> without parameters) and non-generic types do not include any
         // parameters in their formatting.
@@ -201,7 +200,7 @@ public static class RuntimeTypeNameFormatter
         for (var i = 0; i < args.Length; i++)
         {
             _ = builder.Append('[');
-            Format(builder, args[i], isElementType: false);
+            Format(builder, args[i], isElementType: false, allowAliases: allowAliases);
             _ = builder.Append(']');
             if (i + 1 < args.Length)
             {

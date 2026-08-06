@@ -109,7 +109,7 @@ internal sealed class EmbeddedAssetProvider
         }
 
         // Only use compression if it actually reduces size
-        byte[] compressedArray = compressedContent.Length < decompressedArray.Length
+        byte[]? compressedArray = compressedContent.Length < decompressedArray.Length
             ? compressedContent.ToArray()
             : null;
 
@@ -125,9 +125,9 @@ internal sealed class EmbeddedAssetProvider
         return new ResourceEntry(decompressedArray, compressedArray, eTag, contentType);
     }
 
-    private sealed class ResourceEntry(byte[] decompressedContent, byte[] compressedContent, string eTag, string contentType)
+    private sealed class ResourceEntry(byte[] decompressedContent, byte[]? compressedContent, string eTag, string contentType)
     {
-        public byte[] CompressedContent { get; } = compressedContent;
+        public byte[]? CompressedContent { get; } = compressedContent;
         public string ContentType { get; } = contentType;
         public byte[] DecompressedContent { get; } = decompressedContent;
         public string ETag { get; } = eTag;

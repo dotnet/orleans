@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -54,15 +54,18 @@ namespace Orleans.Transactions
 
         public TransactionalStateMetaData MetaData { get; private set; }
 
-        public string ETag { get; set; }
+        public string? ETag { get; set; }
 
         public int BatchSize => total;
+
+        public int CommitCount => commit;
+
         public override string ToString()
         {
             return $"batchsize={total} [{read}r {prepare}p {commit}c {confirm}cf {collect}cl {cancel}cc]";
         }
 
-        public StorageBatch(TransactionalStateMetaData metaData, string etag, long confirmUpTo, long cancelAbove)
+        public StorageBatch(TransactionalStateMetaData metaData, string? etag, long confirmUpTo, long cancelAbove)
         {
             this.MetaData = metaData ?? throw new ArgumentNullException(nameof(metaData));
             this.ETag = etag;
@@ -201,7 +204,7 @@ namespace Orleans.Transactions
             this.storeConditions.Add(action);
         }
 
-        public async Task<bool> CheckStorePreConditions()
+        public async ValueTask<bool> CheckStorePreConditions()
         {
             if (this.storeConditions.Count == 0)
                 return true;

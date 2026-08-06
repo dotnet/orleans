@@ -33,7 +33,7 @@ namespace Orleans.Storage
             string grainType,
             GrainId grainId,
             IGrainState<T> grainState,
-            string tag = null)
+            string? tag = null)
         {
             // string-only grain keys had special behaviour in Orleans v3
             if (grainId.TryGetIntegerKey(out _, out _) || grainId.TryGetGuidKey(out _, out _))

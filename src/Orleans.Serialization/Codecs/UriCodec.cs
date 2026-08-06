@@ -13,11 +13,13 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class UriCodec : IFieldCodec<Uri>, IDerivedTypeCodec
     {
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         Uri IFieldCodec<Uri>.ReadValue<TInput>(ref Buffers.Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
         /// Reads a value.
         /// </summary>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static Uri ReadValue<TInput>(ref Buffers.Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -32,12 +34,12 @@ namespace Orleans.Serialization.Codecs
             reader.ReadFieldHeader(ref field);
             reader.ConsumeEndBaseOrEndObject(ref field);
 
-            var result = new Uri(uriString, UriKind.RelativeOrAbsolute);
+            var result = new Uri(uriString!, UriKind.RelativeOrAbsolute);
             ReferenceCodec.RecordObject(reader.Session, result, referencePlaceholder);
             return result;
         }
 
-        void IFieldCodec<Uri>.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Uri value)
+        void IFieldCodec<Uri>.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Uri value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, typeof(Uri), value))
                 return;

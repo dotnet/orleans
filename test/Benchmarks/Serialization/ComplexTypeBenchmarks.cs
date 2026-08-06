@@ -120,7 +120,7 @@ public class ComplexTypeBenchmarks
         var reader = Reader.Create(writer.Output.GetReadOnlySpan(), _session);
         var result = _structSerializer.Deserialize(ref reader);
         Buffer.Reset();
-        return result;
+        return result!; // The payload was serialized from _value above.
     }
 
 /*
@@ -149,7 +149,7 @@ public class ComplexTypeBenchmarks
         var reader = Reader.Create(writer.Output.GetReadOnlySpan(), _session);
         var result = _serializer.Deserialize(ref reader);
         Buffer.Reset();
-        return result;
+        return result!; // The payload was serialized from _value above.
     }
 
     /*
@@ -186,7 +186,7 @@ public class ComplexTypeBenchmarks
     {
         _session.Reset();
         var reader = Reader.Create(_serializedPayload, _session);
-        return _serializer.Deserialize(ref reader);
+        return _serializer.Deserialize(ref reader)!; // The benchmark payload is initialized from a non-null value.
     }
 
     //[Benchmark]

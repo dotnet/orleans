@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Azure;
 using Azure.Core;
@@ -15,7 +16,7 @@ namespace Orleans.Configuration
     /// </summary>
     public class AzureQueueOptions
     {
-        private QueueServiceClient _queueServiceClient;
+        private QueueServiceClient? _queueServiceClient;
 
         /// <summary>
         /// Options to be used when configuring the queue storage client, or <see langword="null"/> to use the default options.
@@ -35,21 +36,23 @@ namespace Orleans.Configuration
         /// <summary>
         /// The optional delegate used to create a <see cref="QueueServiceClient"/> instance.
         /// </summary>
-        internal Func<Task<QueueServiceClient>> CreateClient { get; private set; }
+        internal Func<Task<QueueServiceClient>>? CreateClient { get; private set; }
 
         public TimeSpan? MessageVisibilityTimeout { get; set; }
 
-        public List<string> QueueNames { get; set; }
+        public List<string> QueueNames { get; set; } = null!;
 
         /// <summary>
         /// Gets or sets the <see cref="QueueServiceClient"/> used to access the Azure Queue Service.
         /// </summary>
-        public QueueServiceClient QueueServiceClient
+        [DisallowNull]
+        public QueueServiceClient? QueueServiceClient
         {
             get => _queueServiceClient;
 
             set
             {
+                ArgumentNullException.ThrowIfNull(value);
                 _queueServiceClient = value;
                 CreateClient = () => Task.FromResult(value);
             }

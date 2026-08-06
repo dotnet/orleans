@@ -98,6 +98,32 @@ public sealed class ActivationRepartitionerOptions
     /// The default value of <see cref="ProbabilisticFilteringMaxAllowedErrorRate"/>.
     /// </summary>
     public const double DEFAULT_PROBABILISTIC_FILTERING_MAX_ALLOWED_ERROR = 0.01d;
+
+    /// <summary>
+    /// <para>
+    /// Determines how long anchoring history is retained. A lower generation count keeps the filter fresher, but might forget anchored grains too quickly.
+    /// A higher generation count retains history longer, but increases the memory usage and the risk of saturation.
+    /// </para>
+    /// <para>
+    /// Because the filter decays exactly once per repartitioning round, the actual time a "cold" grain remains anchored is directly tied to 
+    /// <see cref="MinRoundPeriod"/> and <see cref="MaxRoundPeriod"/>. 
+    /// For example with the default of 3 generations and round periods randomly firing between 1-2 mins, a grain that goes completely 
+    /// "cold" will be retained in the filter for 4.5 mins (on average) before being dropped.
+    /// </para>
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Setting this value to 1 effectively disables retention. The filter will be compltely cleared at the start of every 
+    /// repartitioning round, meaning a grain must be continuusly active in the exact current cycle to remain anchored.
+    /// This makes the filter highly reactive to current traffic, but prone to forgetting anchored grains during brief idle periods.
+    /// </para>
+    /// </remarks>
+    public int AnchoringFilterGenerations { get; set; } = DEFAULT_ANCHORING_FILTER_GENERATIONS;
+
+    /// <summary>
+    /// The default value of <see cref="AnchoringFilterGenerations"/>.
+    /// </summary>
+    public const int DEFAULT_ANCHORING_FILTER_GENERATIONS = 3;
 }
 
 internal sealed class ActivationRepartitionerOptionsValidator(IOptions<ActivationRepartitionerOptions> options) : IConfigurationValidator
@@ -144,6 +170,11 @@ internal sealed class ActivationRepartitionerOptionsValidator(IOptions<Activatio
         if (_options.ProbabilisticFilteringMaxAllowedErrorRate < 0.001d || _options.ProbabilisticFilteringMaxAllowedErrorRate > 0.01d)
         {
             throw new OrleansConfigurationException($"{nameof(ActivationRepartitionerOptions.ProbabilisticFilteringMaxAllowedErrorRate)} must be inclusive between [0.001 - 0.01](0.1% - 1%)");
+        }
+
+        if (_options.AnchoringFilterGenerations <= 0)
+        {
+            ThrowMustBeGreaterThanZero(nameof(ActivationRepartitionerOptions.AnchoringFilterGenerations));
         }
     }
 

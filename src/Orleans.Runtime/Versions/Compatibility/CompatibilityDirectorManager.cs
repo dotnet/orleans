@@ -26,18 +26,17 @@ namespace Orleans.Runtime.Versions.Compatibility
 
         public ICompatibilityDirector GetDirector(GrainInterfaceType interfaceType)
         {
-            ICompatibilityDirector director;
-            return compatibilityDirectors.TryGetValue(interfaceType, out director) 
-                ? director 
+            return compatibilityDirectors.TryGetValue(interfaceType, out var director)
+                ? director
                 : Default;
         }
-        public void SetStrategy(CompatibilityStrategy strategy)
+        public void SetStrategy(CompatibilityStrategy? strategy)
         {
             var director = ResolveVersionDirector(this.serviceProvider, strategy ?? this.strategyFromConfig);
             Default = director;
         }
 
-        public void SetStrategy(GrainInterfaceType interfaceType, CompatibilityStrategy strategy)
+        public void SetStrategy(GrainInterfaceType interfaceType, CompatibilityStrategy? strategy)
         {
             if (strategy == null)
             {

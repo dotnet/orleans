@@ -103,7 +103,25 @@ internal partial class CosmosMembershipTable : IMembershipTable
     {
         try
         {
-            var silos = (await ReadSilos(SiloStatus.Dead).ConfigureAwait(false)).Where(s => s.IAmAliveTime < beforeDate).ToList();
+            // Filter by status server-side (Status is indexed); apply the date check in C#
+            // so that the Math.Max(IAmAliveTime, StartTime) semantics are preserved correctly.
+            var activeStatus = (int)SiloStatus.Active;
+            var query = _container
+                .GetItemLinqQueryable<SiloEntity>(requestOptions: _queryRequestOptions)
+                .Where(g => g.EntityType == nameof(SiloEntity) && g.Status != activeStatus);
+
+            var iterator = query.ToFeedIterator();
+            var nonActiveSilos = new List<SiloEntity>();
+            do
+            {
+                var items = await iterator.ReadNextAsync().ConfigureAwait(false);
+                nonActiveSilos.AddRange(items);
+            } while (iterator.HasMoreResults);
+
+            var silos = nonActiveSilos
+                .Where(s => Math.Max(s.IAmAliveTime.Ticks, s.StartTime.Ticks) < beforeDate.Ticks)
+                .ToList();
+
             if (silos.Count == 0)
             {
                 return;
@@ -142,7 +160,8 @@ internal partial class CosmosMembershipTable : IMembershipTable
             TableVersion? version = null;
             if (clusterVersion is not null)
             {
-                version = new TableVersion(clusterVersion.ClusterVersion, clusterVersion.ETag);
+                // Cosmos populates ETag on resources returned from reads.
+                version = new TableVersion(clusterVersion.ClusterVersion, clusterVersion.ETag!);
             }
             else
             {
@@ -151,10 +170,12 @@ internal partial class CosmosMembershipTable : IMembershipTable
 
             var memEntries = new List<Tuple<MembershipEntry, string>>
             {
-                Tuple.Create(ParseEntity(silo.Resource), silo.Resource.ETag)
+                // Cosmos populates ETag on resources returned from reads.
+                Tuple.Create(ParseEntity(silo.Resource), silo.Resource.ETag!)
             };
 
-            return new MembershipTableData(memEntries, version);
+            // A cluster version record is created during provider initialization.
+            return new MembershipTableData(memEntries, version!);
         }
         catch (Exception exc)
         {
@@ -179,7 +200,8 @@ internal partial class CosmosMembershipTable : IMembershipTable
             TableVersion? version = null;
             if (clusterVersion is not null)
             {
-                version = new TableVersion(clusterVersion.ClusterVersion, clusterVersion.ETag);
+                // Cosmos populates ETag on resources returned from reads.
+                version = new TableVersion(clusterVersion.ClusterVersion, clusterVersion.ETag!);
             }
             else
             {
@@ -192,7 +214,8 @@ internal partial class CosmosMembershipTable : IMembershipTable
                 try
                 {
                     var membershipEntry = ParseEntity(entity);
-                    memEntries.Add(new Tuple<MembershipEntry, string>(membershipEntry, entity.ETag));
+                    // Cosmos populates ETag on resources returned from reads.
+                    memEntries.Add(new Tuple<MembershipEntry, string>(membershipEntry, entity.ETag!));
                 }
                 catch (Exception exc)
                 {
@@ -202,7 +225,8 @@ internal partial class CosmosMembershipTable : IMembershipTable
                 }
             }
 
-            return new MembershipTableData(memEntries, version);
+            // A cluster version record is created during provider initialization.
+            return new MembershipTableData(memEntries, version!);
         }
         catch (Exception exc)
         {
@@ -334,15 +358,15 @@ internal partial class CosmosMembershipTable : IMembershipTable
         var containerProperties = new ContainerProperties(_options.ContainerName, PARTITION_KEY);
         containerProperties.IndexingPolicy.IndexingMode = IndexingMode.Consistent;
         containerProperties.IndexingPolicy.IncludedPaths.Add(new IncludedPath { Path = "/*" });
-        containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/Address/*" });
-        containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/Port/*" });
-        containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/Generation/*" });
-        containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/Hostname/*" });
-        containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/SiloName/*" });
-        containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/\"SuspectingSilos\"/*" });
-        containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/\"SuspectingTimes\"/*" });
-        containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/StartTime/*" });
-        containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/IAmAliveTime/*" });
+        containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/Address/?" });
+        containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/Port/?" });
+        containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/Generation/?" });
+        containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/Hostname/?" });
+        containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/SiloName/?" });
+        containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/\"SuspectingSilos\"/[]/?" });
+        containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/\"SuspectingTimes\"/[]/?" });
+        containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/StartTime/?" });
+        containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/IAmAliveTime/?" });
 
         const int maxRetries = 3;
         for (var retry = 0; retry <= maxRetries; ++retry)

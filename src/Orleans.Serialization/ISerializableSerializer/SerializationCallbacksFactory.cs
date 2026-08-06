@@ -126,10 +126,10 @@ namespace Orleans.Serialization
             /// <param name="onSerializing">The callback invoked during serialization.</param>
             /// <param name="onSerialized">The callback invoked once a value is serialized.</param>
             public SerializationCallbacks(
-                TDelegate onDeserializing,
-                TDelegate onDeserialized,
-                TDelegate onSerializing,
-                TDelegate onSerialized)
+                TDelegate? onDeserializing,
+                TDelegate? onDeserialized,
+                TDelegate? onSerializing,
+                TDelegate? onSerialized)
             {
                 OnDeserializing = onDeserializing;
                 OnDeserialized = onDeserialized;
@@ -140,23 +140,23 @@ namespace Orleans.Serialization
             /// <summary>
             /// Gets the callback invoked while deserializing.
             /// </summary>
-            public readonly TDelegate OnDeserializing;
+            public readonly TDelegate? OnDeserializing;
 
             /// <summary>
             /// Gets the callback invoked once a value has been deserialized.
             /// </summary>
-            public readonly TDelegate OnDeserialized;
+            public readonly TDelegate? OnDeserialized;
 
             /// <summary>
             /// Gets the callback invoked during serialization.
             /// </summary>
             /// <value>The on serializing.</value>
-            public readonly TDelegate OnSerializing;
+            public readonly TDelegate? OnSerializing;
 
             /// <summary>
             /// Gets the callback invoked once a value has been serialized.
             /// </summary>
-            public readonly TDelegate OnSerialized;
+            public readonly TDelegate? OnSerialized;
         }
     }
 }

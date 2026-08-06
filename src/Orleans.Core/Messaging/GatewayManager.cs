@@ -1,13 +1,14 @@
-#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Core.Diagnostics;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 using static Orleans.Internal.StandardExtensions;
@@ -22,7 +23,11 @@ namespace Orleans.Messaging
     /// </summary>
     internal partial class GatewayManager : IDisposable
     {
-        private readonly object lockable = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock lockable = new();
+#else
+        private readonly object lockable = new();
+#endif
         private readonly Dictionary<SiloAddress, DateTime> knownDead = new Dictionary<SiloAddress, DateTime>();
         private readonly Dictionary<SiloAddress, DateTime> knownMasked = new Dictionary<SiloAddress, DateTime>();
         private readonly IGatewayListProvider gatewayListProvider;
@@ -44,7 +49,7 @@ namespace Orleans.Messaging
             IGatewayListProvider gatewayListProvider,
             ILoggerFactory loggerFactory,
             ConnectionManager connectionManager,
-            TimeProvider timeProvider)
+            [FromKeyedServices(TimeProviderNames.Messaging)] TimeProvider timeProvider)
         {
             this.gatewayOptions = gatewayOptions.Value;
             this.logger = loggerFactory.CreateLogger<GatewayManager>();
@@ -89,6 +94,7 @@ namespace Orleans.Messaging
             this.cachedLiveGatewaysSet = new HashSet<SiloAddress>(cachedLiveGateways);
             this.lastRefreshTime = DateTime.UtcNow;
             this.gatewayRefreshTimerTask ??= PeriodicallyRefreshGatewaySnapshot();
+            EmitGatewayListUpdatedIfEnabled(this.knownGateways, this.cachedLiveGateways);
         }
 
         public async Task StopAsync(CancellationToken cancellationToken)
@@ -156,9 +162,7 @@ namespace Orleans.Messaging
         /// is in the same order every time.
         /// </summary>
         /// <returns></returns>
-        #nullable enable
         public SiloAddress? GetLiveGateway()
-        #nullable disable
         {
             List<SiloAddress> live = GetLiveGateways();
             int count = live.Count;
@@ -257,7 +261,7 @@ namespace Orleans.Messaging
 
                 // the listProvider.GetGateways() is not under lock.
                 var allGateways = await gatewayListProvider.GetGateways();
-                var refreshedGateways = allGateways.Select(gw => gw.ToGatewayAddress()).ToList();
+                var refreshedGateways = allGateways.Select(gw => gw.ToGatewayAddress()!).ToList();
 
                 await UpdateLiveGatewaysSnapshot(refreshedGateways, gatewayListProvider.MaxStaleness);
             }
@@ -271,6 +275,8 @@ namespace Orleans.Messaging
         private async Task UpdateLiveGatewaysSnapshot(IEnumerable<SiloAddress> refreshedGateways, TimeSpan maxStaleness)
         {
             List<SiloAddress> connectionsToKeepAlive;
+            List<SiloAddress> knownGatewaysSnapshotSource;
+            List<SiloAddress> liveGatewaysSnapshotSource;
 
             // This is a short lock, protecting the access to knownDead, knownMasked and cachedLiveGateways.
             lock (lockable)
@@ -330,6 +336,8 @@ namespace Orleans.Messaging
                 // swap cachedLiveGateways pointer in one atomic operation
                 cachedLiveGateways = live;
                 cachedLiveGatewaysSet = new HashSet<SiloAddress>(live);
+                knownGatewaysSnapshotSource = knownGateways;
+                liveGatewaysSnapshotSource = live;
 
                 DateTime prevRefresh = lastRefreshTime;
                 lastRefreshTime = now;
@@ -342,7 +350,16 @@ namespace Orleans.Messaging
                 connectionsToKeepAlive.AddRange(knownMasked.Select(e => e.Key));
             }
 
+            EmitGatewayListUpdatedIfEnabled(knownGatewaysSnapshotSource, liveGatewaysSnapshotSource);
             await this.CloseEvictedGatewayConnections(connectionsToKeepAlive);
+        }
+
+        private void EmitGatewayListUpdatedIfEnabled(List<SiloAddress> knownGatewaysSnapshotSource, List<SiloAddress> liveGatewaysSnapshotSource)
+        {
+            if (GatewayEvents.IsGatewayListUpdatedEnabled())
+            {
+                GatewayEvents.EmitGatewayListUpdated(this, knownGatewaysSnapshotSource.ToArray(), liveGatewaysSnapshotSource.ToArray());
+            }
         }
 
         private async Task CloseEvictedGatewayConnections(List<SiloAddress> liveGateways)
@@ -381,7 +398,7 @@ namespace Orleans.Messaging
             Level = LogLevel.Warning,
             Message = "Could not find any gateway in '{GatewayListProviderName}'. Orleans client cannot initialize until at least one gateway becomes available."
         )]
-        private static partial void LogNoGatewayDuringInitialization(ILogger logger, string gatewayListProviderName);
+        private static partial void LogNoGatewayDuringInitialization(ILogger logger, string? gatewayListProviderName);
 
         private readonly struct UrisLogValue(IList<Uri> uris)
         {

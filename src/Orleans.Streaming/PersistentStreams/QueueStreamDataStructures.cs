@@ -2,7 +2,6 @@ using System;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
-#nullable enable
 namespace Orleans.Streams
 {
     [Serializable]
@@ -29,12 +28,21 @@ namespace Orleans.Streams
         [Id(5)]
         public StreamHandshakeToken? LastToken;
         [Id(6)]
-        public string FilterData;
+        public string? FilterData;
 
         [NonSerialized]
         public bool IsRegistered = false;
+        [NonSerialized]
+        public StreamSequenceToken? PendingStartToken;
 
-        public StreamConsumerData(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
+        /// <summary>
+        /// The sequence token of the last batch processed (delivered or filtered) by this subscription.
+        /// Used by the pulling agent's periodic scan to compute the delivery-based checkpoint watermark.
+        /// </summary>
+        [NonSerialized]
+        public StreamSequenceToken? LastProcessedToken;
+
+        public StreamConsumerData(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string? filterData)
         {
             SubscriptionId = subscriptionId;
             StreamId = streamId;

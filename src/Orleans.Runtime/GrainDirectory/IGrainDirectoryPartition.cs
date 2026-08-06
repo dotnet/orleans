@@ -1,37 +1,64 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 
-#nullable enable
 namespace Orleans.Runtime.GrainDirectory;
 
 [Alias("IGrainDirectoryPartition")]
 internal interface IGrainDirectoryPartition : ISystemTarget
 {
     [Alias("RegisterAsync")]
-    ValueTask<DirectoryResult<GrainAddress>> RegisterAsync(MembershipVersion version, GrainAddress address, GrainAddress? currentRegistration);
+    ValueTask<DirectoryResult<GrainAddress>> RegisterAsync(
+        MembershipVersion version,
+        GrainAddress address,
+        GrainAddress? currentRegistration,
+        CancellationToken cancellationToken = default);
 
     [Alias("LookupAsync")]
-    ValueTask<DirectoryResult<GrainAddress?>> LookupAsync(MembershipVersion version, GrainId grainId);
+    ValueTask<DirectoryResult<GrainAddress?>> LookupAsync(
+        MembershipVersion version,
+        GrainId grainId,
+        CancellationToken cancellationToken = default);
 
     [Alias("DeregisterAsync")]
-    ValueTask<DirectoryResult<bool>> DeregisterAsync(MembershipVersion version, GrainAddress address);
+    ValueTask<DirectoryResult<bool>> DeregisterAsync(
+        MembershipVersion version,
+        GrainAddress address,
+        CancellationToken cancellationToken = default);
 
     [Alias("GetSnapshotAsync")]
-    ValueTask<GrainDirectoryPartitionSnapshot?> GetSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRange range);
+    ValueTask<GrainDirectoryPartitionSnapshot?> GetSnapshotAsync(
+        MembershipVersion version,
+        MembershipVersion rangeVersion,
+        RingRange range,
+        CancellationToken cancellationToken = default);
 
     [Alias("AcknowledgeSnapshotTransferAsync")]
-    ValueTask<bool> AcknowledgeSnapshotTransferAsync(SiloAddress silo, int partitionIndex, MembershipVersion version);
+    ValueTask<bool> AcknowledgeSnapshotTransferAsync(
+        SiloAddress silo,
+        int partitionIndex,
+        MembershipVersion version,
+        CancellationToken cancellationToken = default);
 }
 
 [Alias("IGrainDirectoryClient")]
 internal interface IGrainDirectoryClient : ISystemTarget
 {
     [Alias("GetRegisteredActivations")]
-    ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRange range, bool isValidation);
+    ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(
+        MembershipVersion membershipVersion,
+        RingRange range,
+        bool isValidation,
+        CancellationToken cancellationToken = default);
 
     [Alias("RecoverRegisteredActivations")]
-    ValueTask<Immutable<List<GrainAddress>>> RecoverRegisteredActivations(MembershipVersion membershipVersion, RingRange range, SiloAddress siloAddress, int partitionId);
+    ValueTask<Immutable<List<GrainAddress>>> RecoverRegisteredActivations(
+        MembershipVersion membershipVersion,
+        RingRange range,
+        SiloAddress siloAddress,
+        int partitionId,
+        CancellationToken cancellationToken = default);
 }
 
 [Alias("IGrainDirectoryTestHooks")]
@@ -39,4 +66,13 @@ internal interface IGrainDirectoryTestHooks : ISystemTarget
 {
     [Alias("CheckIntegrityAsync")]
     ValueTask CheckIntegrityAsync();
+
+    [Alias("RecoverAndCheckIntegrityAsync")]
+    ValueTask RecoverAndCheckIntegrityAsync();
+
+    [Alias("WaitForMembershipVersionAsync")]
+    ValueTask WaitForMembershipVersionAsync(MembershipVersion version);
+
+    [Alias("CheckActivationsAsync")]
+    ValueTask<Immutable<List<GrainId>>> CheckActivationsAsync(Immutable<List<GrainAddress>> activations);
 }

@@ -44,7 +44,7 @@ namespace Orleans.Storage
             var extendedLength = data.Length + 8;
 
             const int maxOnStack = 256;
-            byte[] rentedBuffer = null;
+            byte[]? rentedBuffer = null;
 
             // assuming code below never throws, so calling ArrayPool.Return without try/finally block for JIT optimization
 
@@ -77,7 +77,7 @@ namespace Orleans.Storage
                 return false;
 
             const int maxOnStack = 256;
-            byte[] rentedBuffer = null;
+            byte[]? rentedBuffer = null;
 
             // assuming code below never throws, so calling ArrayPool.Return without try/finally block for JIT optimization
 

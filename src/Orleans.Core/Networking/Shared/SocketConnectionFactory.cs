@@ -52,7 +52,7 @@ namespace Orleans.Networking.Shared
 
             if (socket.ConnectAsync(completion))
             {
-                using (cancellationToken.Register(s => Socket.CancelConnectAsync((SingleUseSocketAsyncEventArgs)s), completion))
+                using (cancellationToken.Register(s => Socket.CancelConnectAsync((SingleUseSocketAsyncEventArgs)s!), completion))
                 {
                     await completion.Task;
                 }
@@ -73,7 +73,7 @@ namespace Orleans.Networking.Shared
 
         private sealed class SingleUseSocketAsyncEventArgs : SocketAsyncEventArgs
         {
-            private readonly TaskCompletionSource<object> completion = new();
+            private readonly TaskCompletionSource<object?> completion = new();
 
             public Task Task => completion.Task;
 

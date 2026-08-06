@@ -1,12 +1,8 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using System.Globalization;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Orleans.Analyzers;
 
@@ -39,14 +35,14 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
         context.RegisterCompilationStartAction(context =>
         {
             var aliasMap = new ConcurrentDictionary<string, ConcurrentBag<TypeAliasInfo>>();
-            var aliasAttributeSymbol = context.Compilation.GetTypeByMetadataName("Orleans.AliasAttribute");
+            var aliasAttributeSymbol = context.Compilation.GetTypeByMetadataName(Constants.AliasAttributeFullyQualifiedName);
             context.RegisterSymbolAction(
-                context => CollectTypeAliases(context, aliasMap, aliasAttributeSymbol),
+                context => CollectTypeAliases(context, aliasMap, aliasAttributeSymbol!),
                 SymbolKind.NamedType);
 
             // We can immediately check duplicate method‐aliases in grain interfaces.
             context.RegisterSymbolAction(
-                context => CheckMethodAliases(context, aliasMap, aliasAttributeSymbol),
+                context => CheckMethodAliases(context, aliasMap, aliasAttributeSymbol!),
                 SymbolKind.NamedType);
 
             // Only at the very end, we do one single‐threaded scan for type‐alias clashes only.
@@ -83,7 +79,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
         INamedTypeSymbol aliasAttributeSymbol)
     {
         var typeSymbol = (INamedTypeSymbol)context.Symbol;
-        
+
         if (typeSymbol.TypeKind == TypeKind.Interface && !typeSymbol.ExtendsGrainInterface())
         {
             return; // Skip interfaces that dont extend IAddressable
@@ -98,10 +94,10 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
             if (string.IsNullOrEmpty(alias))
                 continue;
 
-            var info = new TypeAliasInfo(typeSymbol.ToDisplayString(), attr.ApplicationSyntaxReference.GetSyntax().GetLocation());
+            var info = new TypeAliasInfo(typeSymbol.ToDisplayString(), attr.ApplicationSyntaxReference!.GetSyntax().GetLocation());
 
             aliasMap.AddOrUpdate(
-                key: alias,
+                key: alias!,
                 addValueFactory: _ => new ConcurrentBag<TypeAliasInfo>([info]),
                 updateValueFactory: (_, bag) =>
                 {
@@ -135,7 +131,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
                 var alias = attr.ConstructorArguments.FirstOrDefault().Value as string;
                 if (!string.IsNullOrEmpty(alias))
                 {
-                    methodBags.Add((alias, attr.ApplicationSyntaxReference.GetSyntax().GetLocation()));
+                    methodBags.Add((alias!, attr.ApplicationSyntaxReference!.GetSyntax().GetLocation()));
                 }
             }
         }
@@ -160,7 +156,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
                 }
                 while (aliasMap.ContainsKey(newAlias) || methodBags.Any(b => b.Alias == newAlias));
 
-                var properties = ImmutableDictionary.CreateBuilder<string, string>();
+                var properties = ImmutableDictionary.CreateBuilder<string, string?>();
 
                 properties.Add("AliasName", prefix);
                 properties.Add("AliasSuffix", suffix.ToString(CultureInfo.InvariantCulture));

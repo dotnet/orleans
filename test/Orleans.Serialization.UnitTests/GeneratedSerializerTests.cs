@@ -517,9 +517,10 @@ public class GeneratedSerializerTests : IDisposable
         Assert.Equal(original.concurrentQueueField, result.concurrentQueueField);
         Assert.Equal(original.ConcurrentQueueProperty, result.ConcurrentQueueProperty);
 
-        // Order of the key-value pairs in the return value may not match the order of the key-value pairs in the surrogate
-        Assert.Equal(original.concurrentDictField["nine"], result.concurrentDictField["nine"]);
-        Assert.Equal(original.ConcurrentDictProperty["ten"], result.ConcurrentDictProperty["ten"]);
+        // These collections are initialized above and serialization preserves their presence.
+        // Order of the key-value pairs in the return value may not match the order of the key-value pairs in the surrogate.
+        Assert.Equal(original.concurrentDictField!["nine"], result.concurrentDictField!["nine"]);
+        Assert.Equal(original.ConcurrentDictProperty!["ten"], result.ConcurrentDictProperty!["ten"]);
         Assert.Equal(original.ConcurrentDictProperty["eleven"], result.ConcurrentDictProperty["eleven"]);
     }
 
@@ -754,7 +755,7 @@ public class GeneratedSerializerTests : IDisposable
             var initialHeader = reader.ReadFieldHeader();
             Assert.True(reader.Position > previousPos);
 
-            result = codec.ReadValue(ref reader, initialHeader);
+            result = codec.ReadValue(ref reader, initialHeader)!;
             pipe.Reader.AdvanceTo(readResult.Buffer.End);
             pipe.Reader.Complete();
         }
@@ -765,7 +766,7 @@ public class GeneratedSerializerTests : IDisposable
     private T Copy<T>(T original)
     {
         var copier = _serviceProvider.GetRequiredService<DeepCopier<T>>();
-        return copier.Copy(original);
+        return copier.Copy(original)!;
     }
 
     private object RoundTripThroughUntypedSerializer(object original, out string formattedBitStream)
@@ -776,7 +777,8 @@ public class GeneratedSerializerTests : IDisposable
         using (var writeSession = _sessionPool.GetSession())
         {
             var writer = Writer.Create(pipe.Writer, writeSession);
-            var serializer = _serviceProvider.GetService<Serializer<object>>();
+            // AddSerializer registers the closed serializer used by this test.
+            var serializer = _serviceProvider.GetService<Serializer<object>>()!;
             serializer.Serialize(original, ref writer);
 
             _ = pipe.Writer.FlushAsync().AsTask().GetAwaiter().GetResult();
@@ -789,7 +791,7 @@ public class GeneratedSerializerTests : IDisposable
 
             var reader = Reader.Create(readResult.Buffer, readerSession);
 
-            result = serializer.Deserialize(ref reader);
+            result = serializer.Deserialize(ref reader)!;
             pipe.Reader.AdvanceTo(readResult.Buffer.End);
             pipe.Reader.Complete();
         }

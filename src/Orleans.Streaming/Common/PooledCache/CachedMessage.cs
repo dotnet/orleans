@@ -56,7 +56,7 @@ namespace Orleans.Providers.Streams.Common
         public static int Compare(this ref CachedMessage cachedMessage, StreamSequenceToken token)
         {
             return cachedMessage.SequenceNumber != token.SequenceNumber
-                ? (int)(cachedMessage.SequenceNumber - token.SequenceNumber)
+                ? cachedMessage.SequenceNumber.CompareTo(token.SequenceNumber)
                 : cachedMessage.EventIndex - token.EventIndex;
         }
 

@@ -5,14 +5,14 @@ namespace BenchmarkGrains.MapReduce
 {
     public class TransformGrain<TInput, TOutput> : DataflowGrain, ITransformGrain<TInput, TOutput>
     {
-        private ITransformProcessor<TInput, TOutput> _processor;
+        private ITransformProcessor<TInput, TOutput> _processor = null!;
         private bool _processingStarted ;
         private bool _proccessingStopped;
 
         private const bool ProcessOnThreadPool = true;
 
         // it should be list
-        private ITargetGrain<TOutput> _target;
+        private ITargetGrain<TOutput> _target = null!;
 
         // BlockingCollection has shown worse perf results for this workload types
         private readonly ConcurrentQueue<TInput> _input = new ConcurrentQueue<TInput>();
@@ -65,7 +65,7 @@ namespace BenchmarkGrains.MapReduce
                 {
                     while (!this._proccessingStopped)
                     {
-                        TInput itemToProcess;
+                        TInput? itemToProcess;
                         if (!this._input.TryDequeue(out itemToProcess))
                         {
                             await Task.Delay(7);

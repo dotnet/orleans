@@ -83,6 +83,7 @@ namespace Orleans.Configuration
     public sealed partial class ActivationRepartitionerOptions
     {
         public const bool DEFAULT_ANCHORING_FILTER_ENABLED = true;
+        public const int DEFAULT_ANCHORING_FILTER_GENERATIONS = 3;
         public const int DEFAULT_MAX_EDGE_COUNT = 10000;
         public const int DEFAULT_MAX_UNPROCESSED_EDGES = 100000;
         public static readonly System.TimeSpan DEFAULT_MAXIMUM_ROUND_PERIOD;
@@ -90,6 +91,8 @@ namespace Orleans.Configuration
         public const double DEFAULT_PROBABILISTIC_FILTERING_MAX_ALLOWED_ERROR = 0.01D;
         public static readonly System.TimeSpan DEFAULT_RECOVERY_PERIOD;
         public bool AnchoringFilterEnabled { get { throw null; } set { } }
+
+        public int AnchoringFilterGenerations { get { throw null; } set { } }
 
         public int MaxEdgeCount { get { throw null; } set { } }
 
@@ -121,7 +124,7 @@ namespace Orleans.Configuration
 
     public partial class DevelopmentClusterMembershipOptions
     {
-        public System.Net.IPEndPoint PrimarySiloEndpoint { get { throw null; } set { } }
+        public System.Net.IPEndPoint? PrimarySiloEndpoint { get { throw null; } set { } }
     }
 
     public partial class EndpointOptions
@@ -130,11 +133,11 @@ namespace Orleans.Configuration
         public const int DEFAULT_SILO_PORT = 11111;
         public System.Net.IPAddress AdvertisedIPAddress { get { throw null; } set { } }
 
-        public System.Net.IPEndPoint GatewayListeningEndpoint { get { throw null; } set { } }
+        public System.Net.IPEndPoint? GatewayListeningEndpoint { get { throw null; } set { } }
 
         public int GatewayPort { get { throw null; } set { } }
 
-        public System.Net.IPEndPoint SiloListeningEndpoint { get { throw null; } set { } }
+        public System.Net.IPEndPoint? SiloListeningEndpoint { get { throw null; } set { } }
 
         public int SiloPort { get { throw null; } set { } }
     }
@@ -169,8 +172,8 @@ namespace Orleans.Configuration
         public const CachingStrategyType DEFAULT_CACHING_STRATEGY = 1;
         [System.Obsolete("DEFAULT_INITIAL_CACHE_TTL is deprecated and will be removed in a future version.")]
         public static readonly System.TimeSpan DEFAULT_INITIAL_CACHE_TTL;
-        [System.Obsolete("DEFAULT_MAXIMUM_CACHE_TTL is deprecated and will be removed in a future version.")]
         public static readonly System.TimeSpan DEFAULT_MAXIMUM_CACHE_TTL;
+        public const int DEFAULT_PARTITIONS_PER_SILO = 1;
         [System.Obsolete("DEFAULT_TTL_EXTENSION_FACTOR is deprecated and will be removed in a future version.")]
         public const double DEFAULT_TTL_EXTENSION_FACTOR = 2D;
         public static readonly System.TimeSpan DEFAULT_UNREGISTER_RACE_DELAY;
@@ -186,8 +189,9 @@ namespace Orleans.Configuration
 
         public System.TimeSpan LazyDeregistrationDelay { get { throw null; } set { } }
 
-        [System.Obsolete("MaximumCacheTTL is deprecated and will be removed in a future version.")]
         public System.TimeSpan MaximumCacheTTL { get { throw null; } set { } }
+
+        public int PartitionsPerSilo { get { throw null; } set { } }
 
         public enum CachingStrategyType
         {
@@ -316,7 +320,7 @@ namespace Orleans.Configuration
     public partial class StatelessWorkerOptions
     {
         public static readonly System.TimeSpan DEFAULT_IDLE_WORKERS_INSPECTION_PERIOD;
-        public const int DEFAULT_MIN_IDLE_CYCLES_BEFORE_REMOVAL = 3;
+        public const int DEFAULT_MIN_IDLE_CYCLES_BEFORE_REMOVAL = 1;
         public const bool DEFAULT_REMOVE_IDLE_WORKERS = true;
         public System.TimeSpan IdleWorkersInspectionPeriod { get { throw null; } set { } }
 
@@ -386,7 +390,7 @@ namespace Orleans.Hosting
 
         public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, System.Action<Configuration.DevelopmentClusterMembershipOptions> configureOptions) { throw null; }
 
-        public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, System.Net.IPEndPoint primarySiloEndpoint) { throw null; }
+        public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, System.Net.IPEndPoint? primarySiloEndpoint) { throw null; }
 
         public static ISiloBuilder UseLocalhostClustering(this ISiloBuilder builder, int siloPort = 11111, int gatewayPort = 30000, System.Net.IPEndPoint? primarySiloEndpoint = null, string serviceId = "dev", string clusterId = "dev") { throw null; }
     }
@@ -397,7 +401,7 @@ namespace Orleans.Hosting
 
         public static ISiloBuilder ConfigureEndpoints(this ISiloBuilder builder, System.Net.IPAddress advertisedIP, int siloPort, int gatewayPort, bool listenOnAnyHostAddress = false) { throw null; }
 
-        public static ISiloBuilder ConfigureEndpoints(this ISiloBuilder builder, string hostname, int siloPort, int gatewayPort, System.Net.Sockets.AddressFamily addressFamily = System.Net.Sockets.AddressFamily.InterNetwork, bool listenOnAnyHostAddress = false) { throw null; }
+        public static ISiloBuilder ConfigureEndpoints(this ISiloBuilder builder, string? hostname, int siloPort, int gatewayPort, System.Net.Sockets.AddressFamily addressFamily = System.Net.Sockets.AddressFamily.InterNetwork, bool listenOnAnyHostAddress = false) { throw null; }
     }
 
     public static partial class GrainCallFilterSiloBuilderExtensions
@@ -494,7 +498,7 @@ namespace Orleans.Metadata
     {
         public GrainClassMap(Serialization.TypeSystem.TypeConverter typeConverter, System.Collections.Immutable.ImmutableDictionary<Runtime.GrainType, System.Type> classes) { }
 
-        public bool TryGetGrainClass(Runtime.GrainType grainType, out System.Type grainClass) { throw null; }
+        public bool TryGetGrainClass(Runtime.GrainType grainType, out System.Type? grainClass) { throw null; }
     }
 }
 
@@ -502,7 +506,7 @@ namespace Orleans.Runtime
 {
     [GenerateSerializer]
     [Immutable]
-    public sealed partial class ClusterMember : System.IEquatable<ClusterMember>
+    public sealed partial class ClusterMember : System.IEquatable<ClusterMember>, System.ISpanFormattable, System.IFormattable
     {
         public ClusterMember(SiloAddress siloAddress, SiloStatus status, string name) { }
 
@@ -515,18 +519,22 @@ namespace Orleans.Runtime
         [Id(1)]
         public SiloStatus Status { get { throw null; } }
 
-        public bool Equals(ClusterMember other) { throw null; }
+        public bool Equals(ClusterMember? other) { throw null; }
 
-        public override bool Equals(object obj) { throw null; }
+        public override bool Equals(object? obj) { throw null; }
 
         public override int GetHashCode() { throw null; }
+
+        string System.IFormattable.ToString(string? format, System.IFormatProvider? formatProvider) { throw null; }
+
+        bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
 
         public override string ToString() { throw null; }
     }
 
     [GenerateSerializer]
     [Immutable]
-    public sealed partial class ClusterMembershipSnapshot
+    public sealed partial class ClusterMembershipSnapshot : System.ISpanFormattable, System.IFormattable
     {
         public ClusterMembershipSnapshot(System.Collections.Immutable.ImmutableDictionary<SiloAddress, ClusterMember> members, MembershipVersion version) { }
 
@@ -540,7 +548,13 @@ namespace Orleans.Runtime
 
         public ClusterMembershipUpdate CreateUpdate(ClusterMembershipSnapshot previous) { throw null; }
 
+        public SiloStatus GetSiloStatus(SiloAddress silo, MembershipVersion seenAtVersion) { throw null; }
+
         public SiloStatus GetSiloStatus(SiloAddress silo) { throw null; }
+
+        string System.IFormattable.ToString(string? format, System.IFormatProvider? formatProvider) { throw null; }
+
+        bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
 
         public override string ToString() { throw null; }
     }
@@ -621,7 +635,7 @@ namespace Orleans.Runtime
 
     public sealed partial class GrainTypeSharedContext
     {
-        public GrainTypeSharedContext(GrainType grainType, IClusterManifestProvider clusterManifestProvider, Orleans.Metadata.GrainClassMap grainClassMap, Placement.PlacementStrategyResolver placementStrategyResolver, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.SiloMessagingOptions> messagingOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.GrainCollectionOptions> collectionOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.SchedulingOptions> schedulingOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.StatelessWorkerOptions> statelessWorkerOptions, IGrainRuntime grainRuntime, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, GrainReferences.GrainReferenceActivator grainReferenceActivator, System.IServiceProvider serviceProvider, Orleans.Serialization.Session.SerializerSessionPool serializerSessionPool) { }
+        public GrainTypeSharedContext(GrainType grainType, IClusterManifestProvider clusterManifestProvider, Orleans.Metadata.GrainClassMap grainClassMap, Placement.PlacementStrategyResolver placementStrategyResolver, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.SiloMessagingOptions> messagingOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.GrainCollectionOptions> collectionOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.SchedulingOptions> schedulingOptions, IGrainRuntime grainRuntime, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, GrainReferences.GrainReferenceActivator grainReferenceActivator, System.IServiceProvider serviceProvider, Orleans.Serialization.Session.SerializerSessionPool serializerSessionPool) { }
 
         public System.TimeSpan CollectionAgeLimit { get { throw null; } }
 
@@ -629,7 +643,7 @@ namespace Orleans.Runtime
 
         public GrainReferences.GrainReferenceActivator GrainReferenceActivator { get { throw null; } }
 
-        public string? GrainTypeName { get { throw null; } }
+        public string GrainTypeName { get { throw null; } }
 
         public Microsoft.Extensions.Logging.ILogger Logger { get { throw null; } }
 
@@ -647,7 +661,7 @@ namespace Orleans.Runtime
 
         public Orleans.Serialization.Session.SerializerSessionPool SerializerSessionPool { get { throw null; } }
 
-        public Orleans.Configuration.StatelessWorkerOptions StatelessWorkerOptions { get { throw null; } }
+        public object? GetComponent(System.Type componentType) { throw null; }
 
         public TComponent? GetComponent<TComponent>() { throw null; }
 
@@ -702,7 +716,7 @@ namespace Orleans.Runtime
 
         System.Collections.Generic.IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates { get; }
 
-        System.Threading.Tasks.ValueTask Refresh(MembershipVersion minimumVersion = default);
+        System.Threading.Tasks.ValueTask Refresh(MembershipVersion minimumVersion = default, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task<bool> TryKill(SiloAddress siloAddress);
     }
 
@@ -713,7 +727,7 @@ namespace Orleans.Runtime
 
     public partial interface IConfigureGrainContextProvider
     {
-        bool TryGetConfigurator(GrainType grainType, Orleans.Metadata.GrainProperties properties, out IConfigureGrainContext configurator);
+        bool TryGetConfigurator(GrainType grainType, Orleans.Metadata.GrainProperties properties, out IConfigureGrainContext? configurator);
     }
 
     public partial interface IConfigureGrainTypeComponents
@@ -724,7 +738,7 @@ namespace Orleans.Runtime
     public partial interface IFatalErrorHandler
     {
         bool IsUnexpected(System.Exception exception);
-        void OnFatalException(object sender = null, string context = null, System.Exception exception = null);
+        void OnFatalException(object? sender = null, string? context = null, System.Exception? exception = null);
     }
 
     public partial interface IGrainActivator
@@ -740,7 +754,7 @@ namespace Orleans.Runtime
 
     public partial interface IGrainContextActivatorProvider
     {
-        bool TryGet(GrainType grainType, out IGrainContextActivator activator);
+        bool TryGet(GrainType grainType, out IGrainContextActivator? activator);
     }
 
     public partial interface IGrainServiceFactory
@@ -757,7 +771,7 @@ namespace Orleans.Runtime
     {
         string StateName { get; }
 
-        string StorageName { get; }
+        string? StorageName { get; }
     }
 
     public partial interface IPersistentStateFactory
@@ -793,13 +807,13 @@ namespace Orleans.Runtime
 
         string SiloName { get; }
 
-        System.Collections.Immutable.ImmutableArray<SiloAddress> GetActiveSilos();
+        SiloAddress[] GetActiveSilos();
         SiloStatus GetApproximateSiloStatus(SiloAddress siloAddress);
         System.Collections.Generic.Dictionary<SiloAddress, SiloStatus> GetApproximateSiloStatuses(bool onlyActive = false);
         bool IsDeadSilo(SiloAddress silo);
         bool IsFunctionalDirectory(SiloAddress siloAddress);
         bool SubscribeToSiloStatusEvents(ISiloStatusListener observer);
-        bool TryGetSiloName(SiloAddress siloAddress, out string siloName);
+        bool TryGetSiloName(SiloAddress siloAddress, out string? siloName);
         bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener observer);
     }
 
@@ -811,11 +825,11 @@ namespace Orleans.Runtime
     [System.AttributeUsage(System.AttributeTargets.Parameter)]
     public partial class PersistentStateAttribute : System.Attribute, IFacetMetadata, IPersistentStateConfiguration
     {
-        public PersistentStateAttribute(string stateName, string storageName = null) { }
+        public PersistentStateAttribute(string stateName, string? storageName = null) { }
 
         public string StateName { get { throw null; } }
 
-        public string StorageName { get { throw null; } }
+        public string? StorageName { get { throw null; } }
     }
 
     public partial class PersistentStateFactory : IPersistentStateFactory
@@ -850,6 +864,8 @@ namespace Orleans.Runtime
 
     public partial class SiloLifecycleSubject : LifecycleSubject, ISiloLifecycleSubject, ISiloLifecycle, ILifecycleObservable, ILifecycleObserver
     {
+        public SiloLifecycleSubject(Microsoft.Extensions.Logging.ILogger<SiloLifecycleSubject> logger, ILocalSiloDetails? localSiloDetails) : base(default!) { }
+
         public SiloLifecycleSubject(Microsoft.Extensions.Logging.ILogger<SiloLifecycleSubject> logger) : base(default!) { }
 
         public int HighestCompletedStage { get { throw null; } }
@@ -871,7 +887,7 @@ namespace Orleans.Runtime
         public override System.IDisposable Subscribe(string observerName, int stage, ILifecycleObserver observer) { throw null; }
     }
 
-    public abstract partial class SystemTarget : ISystemTarget, IAddressable, IGrainContext, Orleans.Serialization.Invocation.ITargetHolder, System.IEquatable<IGrainContext>, IGrainExtensionBinder, System.ISpanFormattable, System.IFormattable, System.IDisposable
+    public abstract partial class SystemTarget : ISystemTarget, IAddressable, IGrainContext, Orleans.Serialization.Invocation.ITargetHolder, System.IEquatable<IGrainContext>, IGrainExtensionBinder, System.ISpanFormattable, System.IFormattable, System.IDisposable, IGrainExtension
     {
         public System.IServiceProvider ActivationServices { get { throw null; } }
 
@@ -893,13 +909,13 @@ namespace Orleans.Runtime
 
         public SiloAddress Silo { get { throw null; } }
 
-        public void Activate(System.Collections.Generic.Dictionary<string, object> requestContext, System.Threading.CancellationToken cancellationToken) { }
+        public void Activate(System.Collections.Generic.Dictionary<string, object>? requestContext, System.Threading.CancellationToken cancellationToken) { }
 
         public void Deactivate(DeactivationReason deactivationReason, System.Threading.CancellationToken cancellationToken) { }
 
         public void Dispose() { }
 
-        public TComponent GetComponent<TComponent>() { throw null; }
+        public TComponent? GetComponent<TComponent>() { throw null; }
 
         public TExtensionInterface GetExtension<TExtensionInterface>()
             where TExtensionInterface : class, IGrainExtension { throw null; }
@@ -907,12 +923,11 @@ namespace Orleans.Runtime
         public (TExtension, TExtensionInterface) GetOrSetExtension<TExtension, TExtensionInterface>(System.Func<TExtension> newExtensionFunc)
             where TExtension : class, TExtensionInterface where TExtensionInterface : class, IGrainExtension { throw null; }
 
-        public TTarget GetTarget<TTarget>()
-            where TTarget : class { throw null; }
+        public object? GetTarget() { throw null; }
 
-        public void Migrate(System.Collections.Generic.Dictionary<string, object> requestContext, System.Threading.CancellationToken cancellationToken) { }
+        public void Migrate(System.Collections.Generic.Dictionary<string, object>? requestContext, System.Threading.CancellationToken cancellationToken) { }
 
-        TComponent Orleans.Serialization.Invocation.ITargetHolder.GetComponent<TComponent>() { throw null; }
+        object? Orleans.Serialization.Invocation.ITargetHolder.GetComponent(System.Type componentType) { throw null; }
 
         public void ReceiveMessage(object message) { }
 
@@ -920,18 +935,18 @@ namespace Orleans.Runtime
 
         public IGrainTimer RegisterGrainTimer<TState>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, TState state, System.TimeSpan dueTime, System.TimeSpan period) { throw null; }
 
-        public IGrainTimer RegisterTimer(System.Func<object, System.Threading.Tasks.Task> callback, object state, System.TimeSpan dueTime, System.TimeSpan period) { throw null; }
+        public IGrainTimer RegisterTimer(System.Func<object?, System.Threading.Tasks.Task> callback, object? state, System.TimeSpan dueTime, System.TimeSpan period) { throw null; }
 
         public void Rehydrate(IRehydrationContext context) { }
 
-        public void SetComponent<TComponent>(TComponent instance)
+        public void SetComponent<TComponent>(TComponent? instance)
             where TComponent : class { }
 
-        bool System.IEquatable<IGrainContext>.Equals(IGrainContext other) { throw null; }
+        bool System.IEquatable<IGrainContext>.Equals(IGrainContext? other) { throw null; }
 
-        string System.IFormattable.ToString(string format, System.IFormatProvider formatProvider) { throw null; }
+        string System.IFormattable.ToString(string? format, System.IFormatProvider? formatProvider) { throw null; }
 
-        bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider provider) { throw null; }
+        bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
 
         public sealed override string ToString() { throw null; }
     }
@@ -956,6 +971,245 @@ namespace Orleans.Runtime.Development
     }
 }
 
+namespace Orleans.Runtime.Diagnostics
+{
+    public static partial class ActivationRebalancerEvents
+    {
+        public const string ListenerName = "Orleans.ActivationRebalancer";
+        public static System.IObservable<RebalancerEvent> AllEvents { get { throw null; } }
+
+        public sealed partial class CycleStart : RebalancerEvent
+        {
+            public readonly int CycleNumber;
+            public CycleStart(SiloAddress siloAddress, int cycleNumber) : base(default!) { }
+        }
+
+        public sealed partial class CycleStop : RebalancerEvent
+        {
+            public readonly int ActivationsMigrated;
+            public readonly int CycleNumber;
+            public readonly System.TimeSpan Elapsed;
+            public readonly double EntropyDeviation;
+            public readonly bool SessionCompleted;
+            public CycleStop(SiloAddress siloAddress, int cycleNumber, int activationsMigrated, double entropyDeviation, System.TimeSpan elapsed, bool sessionCompleted) : base(default!) { }
+        }
+
+        public abstract partial class RebalancerEvent
+        {
+            public readonly SiloAddress SiloAddress;
+            protected RebalancerEvent(SiloAddress siloAddress) { }
+        }
+
+        public sealed partial class SessionStart : RebalancerEvent
+        {
+            public SessionStart(SiloAddress siloAddress) : base(default!) { }
+        }
+
+        public sealed partial class SessionStop : RebalancerEvent
+        {
+            public readonly string Reason;
+            public readonly int TotalCycles;
+            public SessionStop(SiloAddress siloAddress, string reason, int totalCycles) : base(default!) { }
+        }
+    }
+
+    public static partial class DeploymentLoadPublisherEvents
+    {
+        public const string ListenerName = "Orleans.DeploymentLoadPublisher";
+        public static System.IObservable<DeploymentLoadPublisherEvent> AllEvents { get { throw null; } }
+
+        public sealed partial class ClusterRefreshed : DeploymentLoadPublisherEvent
+        {
+            public readonly SiloAddress SiloAddress;
+            public readonly System.Collections.Generic.IReadOnlyDictionary<SiloAddress, SiloRuntimeStatistics> Statistics;
+            public ClusterRefreshed(SiloAddress siloAddress, System.Collections.Generic.IReadOnlyDictionary<SiloAddress, SiloRuntimeStatistics> statistics) { }
+        }
+
+        public abstract partial class DeploymentLoadPublisherEvent
+        {
+        }
+
+        public sealed partial class Published : DeploymentLoadPublisherEvent
+        {
+            public readonly SiloAddress SiloAddress;
+            public readonly SiloRuntimeStatistics Statistics;
+            public Published(SiloAddress siloAddress, SiloRuntimeStatistics statistics) { }
+        }
+
+        public sealed partial class Received : DeploymentLoadPublisherEvent
+        {
+            public readonly SiloAddress FromSilo;
+            public readonly SiloAddress ReceiverSilo;
+            public readonly SiloRuntimeStatistics Statistics;
+            public Received(SiloAddress fromSilo, SiloAddress receiverSilo, SiloRuntimeStatistics statistics) { }
+        }
+
+        public sealed partial class Removed : DeploymentLoadPublisherEvent
+        {
+            public readonly SiloAddress ObserverSilo;
+            public readonly SiloAddress RemovedSilo;
+            public Removed(SiloAddress removedSilo, SiloAddress observerSilo) { }
+        }
+    }
+
+    public static partial class GrainLifecycleEvents
+    {
+        public const string ListenerName = "Orleans.GrainLifecycle";
+        public static System.IObservable<LifecycleEvent> AllEvents { get { throw null; } }
+
+        public sealed partial class Activated : LifecycleEvent
+        {
+            public Activated(IGrainContext grainContext) : base(default!) { }
+        }
+
+        public sealed partial class Created : LifecycleEvent
+        {
+            public Created(IGrainContext grainContext) : base(default!) { }
+        }
+
+        public sealed partial class Deactivated : LifecycleEvent
+        {
+            public readonly DeactivationReason Reason;
+            public Deactivated(IGrainContext grainContext, DeactivationReason reason) : base(default!) { }
+        }
+
+        public sealed partial class Deactivating : LifecycleEvent
+        {
+            public readonly DeactivationReason Reason;
+            public Deactivating(IGrainContext grainContext, DeactivationReason reason) : base(default!) { }
+        }
+
+        public abstract partial class LifecycleEvent
+        {
+            public readonly IGrainContext GrainContext;
+            protected LifecycleEvent(IGrainContext grainContext) { }
+        }
+    }
+
+    public static partial class GrainTimerEvents
+    {
+        public const string ListenerName = "Orleans.GrainTimers";
+        public static System.IObservable<TimerEvent> AllEvents { get { throw null; } }
+
+        public sealed partial class Created : TimerEvent
+        {
+            public readonly System.TimeSpan DueTime;
+            public readonly System.TimeSpan Period;
+            public Created(IGrainContext grainContext, IGrainTimer timer, System.TimeSpan dueTime, System.TimeSpan period) : base(default!, default!) { }
+        }
+
+        public sealed partial class Disposed : TimerEvent
+        {
+            public Disposed(IGrainContext grainContext, IGrainTimer timer) : base(default!, default!) { }
+        }
+
+        public sealed partial class TickStart : TimerEvent
+        {
+            public TickStart(IGrainContext grainContext, IGrainTimer timer) : base(default!, default!) { }
+        }
+
+        public sealed partial class TickStop : TimerEvent
+        {
+            public readonly System.Exception? Exception;
+            public TickStop(IGrainContext grainContext, IGrainTimer timer, System.Exception? exception) : base(default!, default!) { }
+        }
+
+        public abstract partial class TimerEvent
+        {
+            public readonly IGrainContext GrainContext;
+            public readonly IGrainTimer Timer;
+            protected TimerEvent(IGrainContext grainContext, IGrainTimer timer) { }
+        }
+    }
+
+    public static partial class SiloLifecycleEvents
+    {
+        public const string ListenerName = "Orleans.SiloLifecycle";
+        public static System.IObservable<LifecycleEvent> AllEvents { get { throw null; } }
+
+        public abstract partial class LifecycleEvent
+        {
+            public readonly SiloAddress? SiloAddress;
+            public readonly int Stage;
+            public readonly string StageName;
+            protected LifecycleEvent(int stage, string stageName, SiloAddress? siloAddress) { }
+        }
+
+        public sealed partial class ObserverCompleted : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly ILifecycleObserver Observer;
+            public readonly string ObserverName;
+            public ObserverCompleted(string observerName, int stage, string stageName, SiloAddress? siloAddress, System.TimeSpan elapsed, ILifecycleObserver observer) : base(default, default!, default) { }
+        }
+
+        public sealed partial class ObserverFailed : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly System.Exception Exception;
+            public readonly ILifecycleObserver Observer;
+            public readonly string ObserverName;
+            public ObserverFailed(string observerName, int stage, string stageName, SiloAddress? siloAddress, System.Exception exception, System.TimeSpan elapsed, ILifecycleObserver observer) : base(default, default!, default) { }
+        }
+
+        public sealed partial class ObserverStarting : LifecycleEvent
+        {
+            public readonly ILifecycleObserver Observer;
+            public readonly string ObserverName;
+            public ObserverStarting(string observerName, int stage, string stageName, SiloAddress? siloAddress, ILifecycleObserver observer) : base(default, default!, default) { }
+        }
+
+        public sealed partial class ObserverStopped : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly ILifecycleObserver Observer;
+            public readonly string ObserverName;
+            public ObserverStopped(string observerName, int stage, string stageName, SiloAddress? siloAddress, System.TimeSpan elapsed, ILifecycleObserver observer) : base(default, default!, default) { }
+        }
+
+        public sealed partial class ObserverStopping : LifecycleEvent
+        {
+            public readonly ILifecycleObserver Observer;
+            public readonly string ObserverName;
+            public ObserverStopping(string observerName, int stage, string stageName, SiloAddress? siloAddress, ILifecycleObserver observer) : base(default, default!, default) { }
+        }
+
+        public sealed partial class StageCompleted : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly ILifecycleObservable Lifecycle;
+            public StageCompleted(int stage, string stageName, SiloAddress? siloAddress, System.TimeSpan elapsed, ILifecycleObservable lifecycle) : base(default, default!, default) { }
+        }
+
+        public sealed partial class StageFailed : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly System.Exception Exception;
+            public readonly ILifecycleObservable Lifecycle;
+            public StageFailed(int stage, string stageName, SiloAddress? siloAddress, System.Exception exception, System.TimeSpan elapsed, ILifecycleObservable lifecycle) : base(default, default!, default) { }
+        }
+
+        public sealed partial class StageStarting : LifecycleEvent
+        {
+            public readonly ILifecycleObservable Lifecycle;
+            public StageStarting(int stage, string stageName, SiloAddress? siloAddress, ILifecycleObservable lifecycle) : base(default, default!, default) { }
+        }
+
+        public sealed partial class StageStopped : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly ILifecycleObservable Lifecycle;
+            public StageStopped(int stage, string stageName, SiloAddress? siloAddress, System.TimeSpan elapsed, ILifecycleObservable lifecycle) : base(default, default!, default) { }
+        }
+
+        public sealed partial class StageStopping : LifecycleEvent
+        {
+            public readonly ILifecycleObservable Lifecycle;
+            public StageStopping(int stage, string stageName, SiloAddress? siloAddress, ILifecycleObservable lifecycle) : base(default, default!, default) { }
+        }
+    }
+}
+
 namespace Orleans.Runtime.GrainDirectory
 {
     public static partial class GrainDirectoryCacheFactory
@@ -969,14 +1223,14 @@ namespace Orleans.Runtime.GrainDirectory
 
         void AddOrUpdate(GrainAddress value, int version);
         void Clear();
-        bool LookUp(GrainId key, out GrainAddress result, out int version);
+        bool LookUp(GrainId key, out GrainAddress? result, out int version);
         bool Remove(GrainAddress key);
         bool Remove(GrainId key);
     }
 
     public partial interface IGrainDirectoryResolver
     {
-        bool TryResolveGrainDirectory(GrainType grainType, Orleans.Metadata.GrainProperties properties, out Orleans.GrainDirectory.IGrainDirectory grainDirectory);
+        bool TryResolveGrainDirectory(GrainType grainType, Orleans.Metadata.GrainProperties? properties, out Orleans.GrainDirectory.IGrainDirectory? grainDirectory);
     }
 }
 
@@ -1050,11 +1304,19 @@ namespace Orleans.Runtime.MembershipService.SiloMetadata
     }
 }
 
+namespace Orleans.Runtime.Messaging
+{
+    public partial interface IOverloadDetector
+    {
+        bool IsOverloaded { get; }
+    }
+}
+
 namespace Orleans.Runtime.Placement
 {
     public partial interface IPlacementStrategyResolver
     {
-        bool TryResolvePlacementStrategy(GrainType grainType, Orleans.Metadata.GrainProperties properties, out PlacementStrategy result);
+        bool TryResolvePlacementStrategy(GrainType grainType, Orleans.Metadata.GrainProperties? properties, out PlacementStrategy result);
     }
 
     public sealed partial class PlacementDirectorResolver
@@ -1151,13 +1413,13 @@ namespace Orleans.Runtime.Utilities
 {
     public static partial class OrleansDebuggerHelper
     {
-        public static object GetGrainInstance(object grainReference) { throw null; }
+        public static object? GetGrainInstance(object? grainReference) { throw null; }
     }
 }
 
 namespace OrleansCodeGen.Orleans.LeaseProviders
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_ILeaseProvider_GrainReference_5C7B2877 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_ILeaseProvider_GrainReference_5C7B2877>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -1175,7 +1437,7 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_ILeaseProvider_GrainReference_ACF8E0DD : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_ILeaseProvider_GrainReference_ACF8E0DD>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -1193,7 +1455,7 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_ILeaseProvider_GrainReference_F2BF11D0 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_ILeaseProvider_GrainReference_F2BF11D0>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -1211,7 +1473,7 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_ILeaseProvider_GrainReference_5C7B2877 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_ILeaseProvider_GrainReference_5C7B2877>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -1221,7 +1483,7 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
         public Invokable_ILeaseProvider_GrainReference_5C7B2877 DeepCopy(Invokable_ILeaseProvider_GrainReference_5C7B2877 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_ILeaseProvider_GrainReference_ACF8E0DD : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_ILeaseProvider_GrainReference_ACF8E0DD>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -1231,7 +1493,7 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
         public Invokable_ILeaseProvider_GrainReference_ACF8E0DD DeepCopy(Invokable_ILeaseProvider_GrainReference_ACF8E0DD original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_ILeaseProvider_GrainReference_F2BF11D0 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_ILeaseProvider_GrainReference_F2BF11D0>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -1241,7 +1503,7 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
         public Invokable_ILeaseProvider_GrainReference_F2BF11D0 DeepCopy(Invokable_ILeaseProvider_GrainReference_F2BF11D0 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.LeaseProviders.ILeaseProvider), "5C7B2877" })]
@@ -1274,7 +1536,7 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.LeaseProviders.ILeaseProvider), "ACF8E0DD" })]
@@ -1307,7 +1569,7 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.LeaseProviders.ILeaseProvider), "F2BF11D0" })]
@@ -1343,7 +1605,7 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
 
 namespace OrleansCodeGen.Orleans.Runtime
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ClusterMember : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.ClusterMember>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -1361,7 +1623,7 @@ namespace OrleansCodeGen.Orleans.Runtime
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ClusterMembershipSnapshot : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.ClusterMembershipSnapshot>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -1379,7 +1641,7 @@ namespace OrleansCodeGen.Orleans.Runtime
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ClusterMembershipUpdate : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.ClusterMembershipUpdate>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -1400,7 +1662,7 @@ namespace OrleansCodeGen.Orleans.Runtime
 
 namespace OrleansCodeGen.Orleans.Runtime.MembershipService
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_OrleansClusterConnectivityCheckFailedException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.MembershipService.OrleansClusterConnectivityCheckFailedException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -1418,7 +1680,7 @@ namespace OrleansCodeGen.Orleans.Runtime.MembershipService
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_OrleansMissingMembershipEntryException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.MembershipService.OrleansMissingMembershipEntryException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -1436,7 +1698,7 @@ namespace OrleansCodeGen.Orleans.Runtime.MembershipService
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_OrleansClusterConnectivityCheckFailedException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Runtime.MembershipService.OrleansClusterConnectivityCheckFailedException, global::Orleans.Runtime.OrleansException>
@@ -1444,7 +1706,7 @@ namespace OrleansCodeGen.Orleans.Runtime.MembershipService
         public Copier_OrleansClusterConnectivityCheckFailedException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_OrleansMissingMembershipEntryException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Runtime.MembershipService.OrleansMissingMembershipEntryException, global::Orleans.Runtime.OrleansException>
@@ -1455,7 +1717,7 @@ namespace OrleansCodeGen.Orleans.Runtime.MembershipService
 
 namespace OrleansCodeGen.Orleans.Runtime.MembershipService.SiloMetadata
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_SiloMetadata : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadata>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadata>, global::Orleans.Serialization.Serializers.IBaseCodec
@@ -1473,7 +1735,7 @@ namespace OrleansCodeGen.Orleans.Runtime.MembershipService.SiloMetadata
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_SiloMetadata : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadata>, global::Orleans.Serialization.Cloning.IDeepCopier, global::Orleans.Serialization.Cloning.IBaseCopier<global::Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadata>, global::Orleans.Serialization.Cloning.IBaseCopier

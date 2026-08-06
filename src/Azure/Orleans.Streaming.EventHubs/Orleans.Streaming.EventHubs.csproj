@@ -30,4 +30,8 @@
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Streaming.EventHubs.Tests" />
+  </ItemGroup>
 </Project>

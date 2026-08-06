@@ -11,13 +11,12 @@ using Orleans.Serialization;
 
 namespace Orleans.Streaming.NATS;
 
-internal sealed class NatsQueueAdapterReceiver : IQueueAdapterReceiver
+internal sealed partial class NatsQueueAdapterReceiver : IQueueAdapterReceiver
 {
     private readonly ILogger _logger;
     private readonly uint _partition;
     private readonly string _providerName;
     private readonly Serializer _serializer;
-    private long lastReadMessage;
     private NatsConnectionManager? _nats;
     private NatsStreamConsumer? _consumer;
     private Task? _outstandingTask;
@@ -57,7 +56,7 @@ internal sealed class NatsQueueAdapterReceiver : IQueueAdapterReceiver
         this._consumer = this._nats.CreateConsumer(this._partition);
         if (this._consumer is null)
         {
-            this._logger.LogError("Unable to create consumer for partition {Partition}", this._partition);
+            this.LogUnableToCreateConsumer(this._partition);
             return;
         }
 
@@ -86,9 +85,7 @@ internal sealed class NatsQueueAdapterReceiver : IQueueAdapterReceiver
         {
             if (this._nats is null || this._consumer is null)
             {
-                this._logger.LogWarning(
-                    "NATS provider is not initialized. Unable to get messages. If we are shutting down it is fine. Otherwise, we have a problem with initialization of the NATS stream provider {Provider} for partition {Partition}.",
-                    this._providerName, this._partition);
+                this.LogProviderNotInitializedForReceiving(this._providerName, this._partition);
                 return [];
             }
 
@@ -96,13 +93,14 @@ internal sealed class NatsQueueAdapterReceiver : IQueueAdapterReceiver
             this._outstandingTask = task;
             var (messages, messageCount) = await task;
 
-            var containers = new List<IBatchContainer>();
+            var containers = new List<IBatchContainer>(messageCount);
 
             for (var i = 0; i < messageCount; i++)
             {
                 var natsMessage = messages[i];
-                var container = this._serializer.Deserialize<NatsBatchContainer>(natsMessage.Payload);
-                container.SequenceToken = new EventSequenceTokenV2(lastReadMessage++);
+                // NATS stream messages handled by this receiver always contain a serialized batch container.
+                var container = this._serializer.Deserialize<NatsBatchContainer>(natsMessage.Payload)!;
+                container.SequenceToken = new EventSequenceTokenV2((long)natsMessage.Sequence);
                 container.ReplyTo = natsMessage.ReplyTo;
 
                 containers.Add(container);
@@ -122,9 +120,7 @@ internal sealed class NatsQueueAdapterReceiver : IQueueAdapterReceiver
     {
         if (this._nats is null || this._consumer is null)
         {
-            this._logger.LogWarning(
-                "NATS provider is not initialized. Unable to deliver messages. If we are shutting down it is fine. Otherwise, we have a problem with initialization of the NATS stream provider {Provider} for partition {Partition}.",
-                this._providerName, this._partition);
+            this.LogProviderNotInitializedForDelivery(this._providerName, this._partition);
             return;
         }
 
@@ -142,4 +138,17 @@ internal sealed class NatsQueueAdapterReceiver : IQueueAdapterReceiver
 
         await Task.WhenAll(tasks);
     }
+
+    #region Logging
+
+    [LoggerMessage(1, LogLevel.Error, "Unable to create a consumer for partition '{Partition}'.")]
+    private partial void LogUnableToCreateConsumer(uint partition);
+
+    [LoggerMessage(2, LogLevel.Warning, "NATS provider '{Provider}' is not initialized for partition '{Partition}', so messages cannot be received. This is expected during shutdown; otherwise, provider initialization failed.")]
+    private partial void LogProviderNotInitializedForReceiving(string provider, uint partition);
+
+    [LoggerMessage(3, LogLevel.Warning, "NATS provider '{Provider}' is not initialized for partition '{Partition}', so delivered messages cannot be acknowledged. This is expected during shutdown; otherwise, provider initialization failed.")]
+    private partial void LogProviderNotInitializedForDelivery(string provider, uint partition);
+
+    #endregion Logging
 }

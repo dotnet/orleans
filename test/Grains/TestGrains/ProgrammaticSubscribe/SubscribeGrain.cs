@@ -14,7 +14,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
     {
         public Task<bool> CanGetSubscriptionManager(string providerName)
         {
-            return Task.FromResult(this.ServiceProvider.GetKeyedService<IStreamProvider>(providerName).TryGetStreamSubscriptionManager(out _));
+            return Task.FromResult(this.ServiceProvider.GetKeyedService<IStreamProvider>(providerName)!.TryGetStreamSubscriptionManager(out _)); // The test configures the named provider before invoking this grain.
         }
     }
 

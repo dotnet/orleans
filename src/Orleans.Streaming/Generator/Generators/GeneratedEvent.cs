@@ -35,6 +35,6 @@ namespace Orleans.Providers.Streams.Generator
         /// Gets or sets the payload.
         /// </summary>
         [Id(1)]
-        public int[] Payload { get; set; }
+        public int[]? Payload { get; set; }
     }
 }

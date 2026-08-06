@@ -31,7 +31,7 @@ namespace Orleans.Runtime.ConsistentRing
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        SiloAddress GetPrimaryTargetSilo(uint key);
+        SiloAddress? GetPrimaryTargetSilo(uint key);
     }
 
     // similar to ISiloStatusListener

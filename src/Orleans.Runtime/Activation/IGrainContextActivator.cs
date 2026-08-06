@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -23,7 +24,11 @@ namespace Orleans.Runtime
     /// </summary>
     public sealed class GrainContextActivator
     {
-        private readonly object _lockObj = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock _lockObj = new();
+#else
+        private readonly object _lockObj = new();
+#endif
         private readonly IGrainContextActivatorProvider[] _activatorProviders;
         private readonly IConfigureGrainContextProvider[] _configuratorProviders;
         private readonly GrainPropertiesResolver _resolver;
@@ -74,7 +79,7 @@ namespace Orleans.Runtime
             {
                 if (!_activators.TryGetValue(grainType, out var configuredActivator))
                 {
-                    IGrainContextActivator unconfiguredActivator = null;
+                    IGrainContextActivator? unconfiguredActivator = null;
                     foreach (var provider in this._activatorProviders)
                     {
                         if (provider.TryGet(grainType, out unconfiguredActivator))
@@ -118,7 +123,7 @@ namespace Orleans.Runtime
         /// <param name="grainType">Type of the grain.</param>
         /// <param name="activator">The grain context activator.</param>
         /// <returns><see langword="true"/> if an appropriate activator was found, otherwise <see langword="false"/>.</returns>
-        bool TryGet(GrainType grainType, [NotNullWhen(true)] out IGrainContextActivator activator);
+        bool TryGet(GrainType grainType, [NotNullWhen(true)] out IGrainContextActivator? activator);
     }
 
     /// <summary>
@@ -146,7 +151,7 @@ namespace Orleans.Runtime
         /// <param name="properties">The grain properties.</param>
         /// <param name="configurator">The configuration provider.</param>
         /// <returns><see langword="true"/> if a configuration provider was found, <see langword="false"/> otherwise.</returns>
-        bool TryGetConfigurator(GrainType grainType, GrainProperties properties, [NotNullWhen(true)] out IConfigureGrainContext configurator);
+        bool TryGetConfigurator(GrainType grainType, GrainProperties properties, [NotNullWhen(true)] out IConfigureGrainContext? configurator);
     }
 
     /// <summary>
@@ -250,7 +255,7 @@ namespace Orleans.Runtime
             _grainClassMap = grainClassMap;
         }
 
-        public bool TryGetConfigurator(GrainType grainType, GrainProperties properties, out IConfigureGrainContext configurator)
+        public bool TryGetConfigurator(GrainType grainType, GrainProperties properties, [NotNullWhen(true)] out IConfigureGrainContext? configurator)
         {
             if (properties.Properties.TryGetValue(WellKnownGrainTypeProperties.MayInterleavePredicate, out _)
                 && _grainClassMap.TryGetGrainClass(grainType, out var grainClass))
@@ -268,7 +273,7 @@ namespace Orleans.Runtime
         /// Returns interleave predicate depending on whether class is marked with <see cref="MayInterleaveAttribute"/> or not.
         /// </summary>
         /// <param name="grainType">Grain class.</param>
-        private static IMayInterleavePredicate GetMayInterleavePredicate(Type grainType)
+        private static IMayInterleavePredicate? GetMayInterleavePredicate(Type grainType)
         {
             var attribute = grainType.GetCustomAttribute<MayInterleaveAttribute>();
             if (attribute is null)
@@ -302,7 +307,7 @@ namespace Orleans.Runtime
             }
 
             var predicateType = typeof(MayInterleaveInstancedPredicate<>).MakeGenericType(grainType);
-            return (IMayInterleavePredicate)Activator.CreateInstance(predicateType, method);
+            return (IMayInterleavePredicate?)Activator.CreateInstance(predicateType, method);
         }
     }
 
@@ -343,14 +348,14 @@ namespace Orleans.Runtime
             _mayInterleavePredicate = mayInterleavePredicateInfo.CreateDelegate<Func<T, IInvokable, bool>>();
         }
 
-        public bool Invoke(object instance, IInvokable bodyObject) => _mayInterleavePredicate(instance as T, bodyObject);
+        public bool Invoke(object instance, IInvokable bodyObject) => _mayInterleavePredicate((T)instance, bodyObject);
     }
 
     internal class MayInterleaveConfigurator : IConfigureGrainContext
     {
-        private readonly IMayInterleavePredicate _mayInterleavePredicate;
+        private readonly IMayInterleavePredicate? _mayInterleavePredicate;
 
-        public MayInterleaveConfigurator(IMayInterleavePredicate mayInterleavePredicate)
+        public MayInterleaveConfigurator(IMayInterleavePredicate? mayInterleavePredicate)
         {
             _mayInterleavePredicate = mayInterleavePredicate;
         }
@@ -370,12 +375,12 @@ namespace Orleans.Runtime
 
     internal class GrainCanInterleave
     {
-        public List<IMayInterleavePredicate> MayInterleavePredicates { get; } = new List<IMayInterleavePredicate>();
-        public bool MayInterleave(object instance, Message message)
+        public List<IMayInterleavePredicate?> MayInterleavePredicates { get; } = new List<IMayInterleavePredicate?>();
+        public bool MayInterleave(object? instance, Message message)
         {
             foreach (var predicate in this.MayInterleavePredicates)
             {
-                if (predicate.Invoke(instance, message.BodyObject as IInvokable)) return true;
+                if (predicate!.Invoke(instance!, (IInvokable)message.BodyObject!)) return true;
             }
 
             return false;

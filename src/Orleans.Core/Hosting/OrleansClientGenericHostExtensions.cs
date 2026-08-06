@@ -176,7 +176,7 @@ namespace Microsoft.Extensions.Hosting
         /// Note that this method should not be used in conjunction with UseOrleans, since UseOrleans includes a client automatically.
         /// </remarks>
         /// <exception cref="ArgumentNullException"><paramref name="services"/> was null or <paramref name="configureDelegate"/> was null.</exception>
-        public static IServiceCollection AddOrleansClient(this IServiceCollection services, IConfiguration configuration, Action<IClientBuilder> configureDelegate)
+        public static IServiceCollection AddOrleansClient(this IServiceCollection services, IConfiguration? configuration, Action<IClientBuilder> configureDelegate)
         {
             ArgumentNullException.ThrowIfNull(configureDelegate);
 
@@ -185,13 +185,13 @@ namespace Microsoft.Extensions.Hosting
             return services;
         }
 
-        private static IClientBuilder AddOrleansClient(IServiceCollection services, IConfiguration configuration)
+        private static IClientBuilder AddOrleansClient(IServiceCollection services, IConfiguration? configuration)
         {
             configuration ??= new ConfigurationBuilder().Build();
-            IClientBuilder clientBuilder = default;
+            IClientBuilder? clientBuilder = default;
             foreach (var descriptor in services.Where(d => d.ServiceType.Equals(MarkerType)))
             {
-                var instance = (OrleansBuilderMarker)descriptor.ImplementationInstance;
+                var instance = (OrleansBuilderMarker)descriptor.ImplementationInstance!;
                 clientBuilder = instance.BuilderInstance switch
                 {
                     IClientBuilder existingBuilder => existingBuilder,

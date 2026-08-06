@@ -9,7 +9,7 @@ namespace Orleans.Transactions.TestKit
     {
         protected ITransactionCommitter<IRemoteCommitService> committer;
         private readonly ILoggerFactory loggerFactory;
-        protected ILogger logger;
+        protected ILogger logger = null!;
 
         public TransactionCommitterTestGrain(
             [TransactionCommitter(TransactionTestConstants.RemoteCommitService, TransactionTestConstants.TransactionStore)] ITransactionCommitter<IRemoteCommitService> committer,

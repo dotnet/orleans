@@ -17,7 +17,7 @@ namespace Orleans.Streams
         /// <param name="token">The token.</param>
         /// <param name="requestContext">The request context.</param>
         /// <returns>A new queue message.</returns>
-        TQueueMessage ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext);
+        TQueueMessage ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext);
     }
 
     /// <summary>

@@ -1,4 +1,4 @@
-﻿namespace Orleans.Streams
+namespace Orleans.Streams
 {
     /// <summary>
     /// Extension methods for grains implicitly subscribed to streams.
@@ -12,7 +12,7 @@
         /// <returns>The stream identity (key + namespace).</returns>
         public static StreamIdentity GetImplicitStreamIdentity(this IGrainWithGuidCompoundKey grain)
         {
-            string keyExtension;
+            string? keyExtension;
             var key = grain.GetPrimaryKey(out keyExtension);
             return new StreamIdentity(key, keyExtension);
         }

@@ -1,3 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
+using Azure.Core;
+using Azure.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Primitives;
@@ -8,7 +11,7 @@ namespace TestExtensions
     public class TestDefaultConfiguration
     {
         private static readonly object LockObject = new object();
-        private static IConfiguration defaultConfiguration;
+        private static IConfiguration defaultConfiguration = null!;
 
         static TestDefaultConfiguration()
         {
@@ -23,21 +26,62 @@ namespace TestExtensions
             }
         }
 
-        public static string CosmosDBAccountEndpoint => defaultConfiguration[nameof(CosmosDBAccountEndpoint)];
-        public static string CosmosDBAccountKey => defaultConfiguration[nameof(CosmosDBAccountKey)];
-        public static string EventHubConnectionString => defaultConfiguration[nameof(EventHubConnectionString)];
-        public static string ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)];
-        public static string ConsulConnectionString => defaultConfiguration[nameof(ConsulConnectionString)];
-        public static string RedisConnectionString => defaultConfiguration[nameof(RedisConnectionString)];
-        public static string PostgresConnectionString => defaultConfiguration[nameof(PostgresConnectionString)];
-        public static string MySqlConnectionString => defaultConfiguration[nameof(MySqlConnectionString)];
-        public static string MsSqlConnectionString => defaultConfiguration[nameof(MsSqlConnectionString)];
-        public static string DynamoDbService => defaultConfiguration[nameof(DynamoDbService)];
-        public static string DynamoDbAccessKey => defaultConfiguration[nameof(DynamoDbAccessKey)];
-        public static string DynamoDbSecretKey => defaultConfiguration[nameof(DynamoDbSecretKey)];
-        public static string SqsConnectionString => defaultConfiguration[nameof(SqsConnectionString)];
+        public static bool UseAadAuthentication
+        {
+            get
+            {
+                bool.TryParse(defaultConfiguration[nameof(UseAadAuthentication)], out var value);
+                return value;
+            }
+        }
 
-        public static bool GetValue(string key, out string value)
+        public static string? CosmosDBAccountEndpoint => defaultConfiguration[nameof(CosmosDBAccountEndpoint)];
+        public static string? CosmosDBAccountKey => defaultConfiguration[nameof(CosmosDBAccountKey)];
+        public static Uri TableEndpoint => new Uri(defaultConfiguration[nameof(TableEndpoint)]!);
+        public static Uri DataBlobUri => new Uri(defaultConfiguration[nameof(DataBlobUri)]!);
+        public static Uri DataQueueUri => new Uri(defaultConfiguration[nameof(DataQueueUri)]!);
+        public static string? DataConnectionString => defaultConfiguration[nameof(DataConnectionString)];
+        public static string AzureStorageConnectionString
+        {
+            get
+            {
+                var connectionString = DataConnectionString;
+                return string.IsNullOrWhiteSpace(connectionString)
+                    ? AzuriteContainerManager.ConnectionString
+                    : connectionString;
+            }
+        }
+
+        public static string? EventHubConnectionString => defaultConfiguration[nameof(EventHubConnectionString)];
+        public static string? EventHubFullyQualifiedNamespace => defaultConfiguration[nameof(EventHubFullyQualifiedNamespace)];
+        public static string? ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)];
+        public static string? ConsulConnectionString => defaultConfiguration[nameof(ConsulConnectionString)];
+        public static string? RedisConnectionString => defaultConfiguration[nameof(RedisConnectionString)];
+        public static string? PostgresConnectionString => defaultConfiguration[nameof(PostgresConnectionString)];
+        public static string? MySqlConnectionString => defaultConfiguration[nameof(MySqlConnectionString)];
+        public static string? MsSqlConnectionString => defaultConfiguration[nameof(MsSqlConnectionString)];
+        public static string? DynamoDbService => defaultConfiguration[nameof(DynamoDbService)];
+        public static string? DynamoDbAccessKey => defaultConfiguration[nameof(DynamoDbAccessKey)];
+        public static string? DynamoDbSecretKey => defaultConfiguration[nameof(DynamoDbSecretKey)];
+        public static string? SqsConnectionString => defaultConfiguration[nameof(SqsConnectionString)];
+        public static TokenCredential TokenCredential
+        {
+            get
+            {
+                var systemAccessToken = Environment.GetEnvironmentVariable("SYSTEM_ACCESSTOKEN");
+                if (!string.IsNullOrEmpty(systemAccessToken))
+                {
+                    // If running in an AzDo pipeline with a SYSTEM_ACCESSTOKEN available, let's try to use AzurePipelinesCredential
+                    var tenantId = Environment.GetEnvironmentVariable("AZURE_TENANT_ID");
+                    var clientId = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID");
+                    var serviceConnectionId = Environment.GetEnvironmentVariable("SERVICE_CONNECTION_ID");
+                    return new AzurePipelinesCredential(tenantId, clientId, serviceConnectionId, systemAccessToken);
+                }
+                return new DefaultAzureCredential();
+            }
+        }
+
+        public static bool GetValue(string key, [NotNullWhen(true)] out string? value)
         {
             value = defaultConfiguration.GetValue(key, default(string));
 
@@ -55,7 +99,7 @@ namespace TestExtensions
 
         public static void ConfigureHostConfiguration(IConfigurationBuilder builder)
         {
-            builder.AddInMemoryCollection(new Dictionary<string, string>
+            builder.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 { nameof(ZooKeeperConnectionString), "127.0.0.1:2181" }
             });
@@ -72,9 +116,9 @@ namespace TestExtensions
         private class SerializablePhysicalFileProvider : IFileProvider
         {
             [NonSerialized]
-            private PhysicalFileProvider fileProvider;
+            private PhysicalFileProvider? fileProvider;
 
-            public string Root { get; set; }
+            public string? Root { get; set; }
 
             public IDirectoryContents GetDirectoryContents(string subpath)
             {
@@ -93,7 +137,7 @@ namespace TestExtensions
 
             private PhysicalFileProvider FileProvider()
             {
-                return this.fileProvider ?? (this.fileProvider = new PhysicalFileProvider(this.Root));
+                return this.fileProvider ?? (this.fileProvider = new PhysicalFileProvider(this.Root!));
             }
         }
 

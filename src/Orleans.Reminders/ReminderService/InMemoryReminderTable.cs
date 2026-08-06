@@ -17,7 +17,7 @@ namespace Orleans.Runtime.ReminderService
 
         public Task Init() => Task.CompletedTask;
 
-        public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+        public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
         {
             this.ThrowIfNotAvailable();
             return this.reminderTableGrain.ReadRow(grainId, reminderName);
@@ -46,7 +46,7 @@ namespace Orleans.Runtime.ReminderService
             return this.reminderTableGrain.TestOnlyClearTable();
         }
 
-        public Task<string> UpsertRow(ReminderEntry entry)
+        public Task<string?> UpsertRow(ReminderEntry entry)
         {
             this.ThrowIfNotAvailable();
             return this.reminderTableGrain.UpsertRow(entry);

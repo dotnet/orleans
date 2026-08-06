@@ -39,7 +39,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, HashSet<T> value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] HashSet<T> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
             {
@@ -54,6 +54,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public HashSet<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)
@@ -64,8 +65,8 @@ namespace Orleans.Serialization.Codecs
             field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-            HashSet<T> result = null;
-            IEqualityComparer<T> comparer = null;
+            HashSet<T>? result = null;
+            IEqualityComparer<T>? comparer = null;
             uint fieldId = 0;
             while (true)
             {
@@ -83,10 +84,7 @@ namespace Orleans.Serialization.Codecs
                         break;
                     case 1:
                         var length = (int)UInt32Codec.ReadValue(ref reader, header);
-                        if (length > 10240 && length > reader.Length)
-                        {
-                            ThrowInvalidSizeException(length);
-                        }
+                        reader.EnsureAvailable((uint)length);
 
                         result = CreateInstance(length, comparer, reader.Session, placeholderReferenceId);
                         break;
@@ -94,7 +92,7 @@ namespace Orleans.Serialization.Codecs
                         if (result is null)
                             ThrowLengthFieldMissing();
 
-                        result.Add(_fieldCodec.ReadValue(ref reader, header));
+                        result!.Add(_fieldCodec.ReadValue(ref reader, header)!);
                         break;
                     default:
                         reader.ConsumeUnknownField(header);
@@ -106,15 +104,12 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        private static HashSet<T> CreateInstance(int length, IEqualityComparer<T> comparer, SerializerSession session, uint placeholderReferenceId)
+        private static HashSet<T> CreateInstance(int length, IEqualityComparer<T>? comparer, SerializerSession session, uint placeholderReferenceId)
         {
             var result = new HashSet<T>(length, comparer);
             ReferenceCodec.RecordObject(session, result, placeholderReferenceId);
             return result;
         }
-
-        private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-            $"Declared length of {typeof(HashSet<T>)}, {length}, is greater than total length of input.");
 
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized set is missing its length field.");
 
@@ -143,7 +138,7 @@ namespace Orleans.Serialization.Codecs
             // If those values are in the serialized payload, they will be added below.
             value.Clear();
 
-            IEqualityComparer<T> comparer = null;
+            IEqualityComparer<T>? comparer = null;
             uint fieldId = 0;
             while (true)
             {
@@ -161,10 +156,7 @@ namespace Orleans.Serialization.Codecs
                         break;
                     case 1:
                         var length = (int)UInt32Codec.ReadValue(ref reader, header);
-                        if (length > 10240 && length > reader.Length)
-                        {
-                            ThrowInvalidSizeException(length);
-                        }
+                        reader.EnsureAvailable((uint)length);
 
                         // Re-initialize the class by calling the constructor.
                         if (comparer is not null)
@@ -178,7 +170,7 @@ namespace Orleans.Serialization.Codecs
 
                         break;
                     case 2:
-                        value.Add(_fieldCodec.ReadValue(ref reader, header));
+                        value.Add(_fieldCodec.ReadValue(ref reader, header)!);
                         break;
                     default:
                         reader.ConsumeUnknownField(header);
@@ -209,12 +201,12 @@ namespace Orleans.Serialization.Codecs
         {
             if (context.TryGetCopy<HashSet<T>>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             if (input.GetType() as object != _fieldType as object)
             {
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
             }
 
             result = new(input.Count, input.Comparer);

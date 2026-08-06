@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -10,6 +9,7 @@ using Orleans.GrainDirectory;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Placement;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;
@@ -22,8 +22,7 @@ namespace Orleans.Runtime;
 public sealed class GrainTypeSharedContext
 {
     private readonly IServiceProvider _serviceProvider;
-    private readonly Dictionary<Type, object> _components = new();
-    private InternalGrainRuntime? _internalGrainRuntime;
+    private readonly Dictionary<Type, object> _components = [];
 
     public GrainTypeSharedContext(
         GrainType grainType,
@@ -33,7 +32,6 @@ public sealed class GrainTypeSharedContext
         IOptions<SiloMessagingOptions> messagingOptions,
         IOptions<GrainCollectionOptions> collectionOptions,
         IOptions<SchedulingOptions> schedulingOptions,
-        IOptions<StatelessWorkerOptions> statelessWorkerOptions,
         IGrainRuntime grainRuntime,
         ILoggerFactory loggerFactory,
         GrainReferenceActivator grainReferenceActivator,
@@ -48,6 +46,7 @@ public sealed class GrainTypeSharedContext
         SerializerSessionPool = serializerSessionPool;
         GrainTypeName = RuntimeTypeNameFormatter.Format(grainClass);
         Logger = loggerFactory.CreateLogger("Orleans.Grain");
+        SchedulerLogger = loggerFactory.CreateLogger<WorkItemGroup>();
         MessagingOptions = messagingOptions.Value;
         GrainReferenceActivator = grainReferenceActivator;
         _serviceProvider = serviceProvider;
@@ -57,9 +56,11 @@ public sealed class GrainTypeSharedContext
         var grainDirectoryResolver = serviceProvider.GetRequiredService<GrainDirectoryResolver>();
         GrainDirectory = PlacementStrategy.IsUsingGrainDirectory ? grainDirectoryResolver.Resolve(grainType) : null;
         SchedulingOptions = schedulingOptions.Value;
-        StatelessWorkerOptions = statelessWorkerOptions.Value;
         Runtime = grainRuntime;
         MigrationManager = _serviceProvider.GetService<IActivationMigrationManager>();
+        CatalogInstruments = serviceProvider.GetRequiredService<CatalogInstruments>();
+        GrainInstruments = serviceProvider.GetRequiredService<GrainInstruments>();
+        MessagingProcessingInstruments = serviceProvider.GetRequiredService<MessagingProcessingInstruments>();
 
         CollectionAgeLimit = GetCollectionAgeLimit(
             grainType,
@@ -71,7 +72,11 @@ public sealed class GrainTypeSharedContext
     /// <summary>
     /// Gets the grain instance type name, if available.
     /// </summary>
-    public string? GrainTypeName { get; }
+    public string GrainTypeName { get; }
+
+    internal CatalogInstruments CatalogInstruments { get; }
+    internal GrainInstruments GrainInstruments { get; }
+    internal MessagingProcessingInstruments MessagingProcessingInstruments { get; }
 
     private static TimeSpan GetCollectionAgeLimit(GrainType grainType, Type grainClass, GrainManifest siloManifest, GrainCollectionOptions collectionOptions)
     {
@@ -165,6 +170,8 @@ public sealed class GrainTypeSharedContext
     /// </summary>
     public ILogger Logger { get; }
 
+    internal ILogger SchedulerLogger { get; }
+
     /// <summary>
     /// Gets the serializer session pool.
     /// </summary>
@@ -206,11 +213,6 @@ public sealed class GrainTypeSharedContext
     public SchedulingOptions SchedulingOptions { get; }
 
     /// <summary>
-    /// Gets the stateless worker options.
-    /// </summary>
-    public StatelessWorkerOptions StatelessWorkerOptions { get; }
-
-    /// <summary>
     /// Gets the grain runtime.
     /// </summary>
     public IGrainRuntime Runtime { get; }
@@ -223,7 +225,7 @@ public sealed class GrainTypeSharedContext
     /// <summary>
     /// Gets the internal grain runtime.
     /// </summary>
-    internal InternalGrainRuntime InternalRuntime => _internalGrainRuntime ??= _serviceProvider.GetRequiredService<InternalGrainRuntime>();
+    internal InternalGrainRuntime InternalRuntime => field ??= _serviceProvider.GetRequiredService<InternalGrainRuntime>();
 
     /// <summary>
     /// Called on creation of an activation.

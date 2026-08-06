@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -16,26 +15,29 @@ internal sealed class SystemTargetShared(
     IOptions<SchedulingOptions> schedulingOptions,
     GrainReferenceActivator grainReferenceActivator,
     ITimerRegistry timerRegistry,
-    ActivationDirectory activations)
+    ActivationDirectory activations,
+    SchedulerInstruments schedulerInstruments,
+    GrainInstruments grainInstruments,
+    MessagingInstruments messagingInstruments,
+    MessagingProcessingInstruments messagingProcessingInstruments)
 {
-    private readonly ILogger<WorkItemGroup> _workItemGroupLogger = loggerFactory.CreateLogger<WorkItemGroup>();
-    private readonly ILogger<ActivationTaskScheduler> _activationTaskSchedulerLogger = loggerFactory.CreateLogger<ActivationTaskScheduler>();
     public SiloAddress SiloAddress => localSiloDetails.SiloAddress;
 
     public ILoggerFactory LoggerFactory => loggerFactory;
+    internal ILogger SchedulerLogger { get; } = loggerFactory.CreateLogger<WorkItemGroup>();
     public GrainReferenceActivator GrainReferenceActivator => grainReferenceActivator;
     public ITimerRegistry TimerRegistry => timerRegistry;
 
-    public RuntimeMessagingTrace MessagingTrace { get; } = new(loggerFactory);
+    public RuntimeMessagingTrace MessagingTrace { get; } = new(loggerFactory, messagingInstruments, messagingProcessingInstruments);
     public InsideRuntimeClient RuntimeClient => runtimeClient;
     public ActivationDirectory ActivationDirectory => activations;
+    public GrainInstruments GrainInstruments => grainInstruments;
     public WorkItemGroup CreateWorkItemGroup(SystemTarget systemTarget)
     {
         ArgumentNullException.ThrowIfNull(systemTarget);
         return new WorkItemGroup(
             systemTarget,
-            _workItemGroupLogger,
-            _activationTaskSchedulerLogger,
-            schedulingOptions);
+            schedulingOptions,
+            schedulerInstruments);
     }
 }

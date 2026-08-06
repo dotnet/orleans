@@ -24,7 +24,7 @@ public class RelationalStorageProviderQueries
     /// <summary>
     /// The clause to delete the row from storage when clearing state.
     /// </summary>
-    public string DeleteState { get; set; }
+    public string? DeleteState { get; set; }
 
     /// <summary>
     /// Constructor.
@@ -33,7 +33,7 @@ public class RelationalStorageProviderQueries
     /// <param name="readFromStorage">The clause to read from a storage.</param>
     /// <param name="clearState">The clause to clear the storage.</param>
     /// <param name="deleteState">The clause to delete the row from storage. May be <see langword="null"/> for backward compatibility.</param>
-    public RelationalStorageProviderQueries(string writeToStorage, string readFromStorage, string clearState, string deleteState)
+    public RelationalStorageProviderQueries(string writeToStorage, string readFromStorage, string clearState, string? deleteState)
     {
         ArgumentNullException.ThrowIfNull(writeToStorage);
         ArgumentNullException.ThrowIfNull(readFromStorage);

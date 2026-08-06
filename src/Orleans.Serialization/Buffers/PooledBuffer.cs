@@ -20,9 +20,9 @@ namespace Orleans.Serialization.Buffers;
 [Immutable]
 public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 {
-    internal SequenceSegment First;
-    internal SequenceSegment Last;
-    internal SequenceSegment WriteHead;
+    internal SequenceSegment? First;
+    internal SequenceSegment? Last;
+    internal SequenceSegment? WriteHead;
     internal int TotalLength;
     internal int CurrentPosition;
 
@@ -59,7 +59,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 
         if (CurrentPosition > 0)
         {
-            WriteHead.Array.AsSpan(0, CurrentPosition).CopyTo(resultSpan);
+            WriteHead!.Array.AsSpan(0, CurrentPosition).CopyTo(resultSpan);
         }
 
         return result;
@@ -141,7 +141,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 
         if (output.Length > 0 && CurrentPosition > 0)
         {
-            var span = WriteHead.Array.AsSpan(0, Math.Min(output.Length, CurrentPosition));
+            var span = WriteHead!.Array.AsSpan(0, Math.Min(output.Length, CurrentPosition));
             span.CopyTo(output);
         }
     }
@@ -159,7 +159,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 
         if (CurrentPosition > 0)
         {
-            writer.Write(WriteHead.Array.AsSpan(0, CurrentPosition));
+            writer.Write(WriteHead!.Array.AsSpan(0, CurrentPosition));
         }
     }
 
@@ -176,7 +176,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 
         if (CurrentPosition > 0)
         {
-            Adaptors.BufferWriterExtensions.Write(ref writer, WriteHead.Array.AsSpan(0, CurrentPosition));
+            Adaptors.BufferWriterExtensions.Write(ref writer, WriteHead!.Array.AsSpan(0, CurrentPosition));
         }
     }
 
@@ -306,19 +306,20 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             return;
         }
 
-        WriteHead.Commit(TotalLength, CurrentPosition);
+        var writeHead = WriteHead;
+        writeHead.Commit(TotalLength, CurrentPosition);
         TotalLength += CurrentPosition;
         if (First is null)
         {
-            First = WriteHead;
+            First = writeHead;
         }
         else
         {
             Debug.Assert(Last is not null);
-            Last.SetNext(WriteHead);
+            Last!.SetNext(writeHead);
         }
 
-        Last = WriteHead;
+        Last = writeHead;
         WriteHead = null;
         CurrentPosition = 0;
     }
@@ -332,7 +333,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         private static readonly SequenceSegment FinalSegmentSentinel = new();
         private readonly PooledBuffer _buffer;
         private int _position;
-        private SequenceSegment _segment;
+        private SequenceSegment? _segment;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MemoryEnumerator"/> type.
@@ -425,7 +426,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 #endif
             PooledBuffer _buffer;
         private int _position;
-        private SequenceSegment _segment;
+        private SequenceSegment? _segment;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SpanEnumerator"/> type.
@@ -627,7 +628,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             private static readonly SequenceSegment FinalSegmentSentinel = new();
             private readonly BufferSlice _slice;
             private int _position;
-            private SequenceSegment _segment;
+            private SequenceSegment? _segment;
 
             /// <summary>
             /// Initializes a new instance of the <see cref="SpanEnumerator"/> type.
@@ -741,7 +742,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             private static readonly SequenceSegment FinalSegmentSentinel = new();
             private readonly BufferSlice _slice;
             private int _position;
-            private SequenceSegment _segment;
+            private SequenceSegment? _segment;
 
             /// <summary>
             /// Initializes a new instance of the <see cref="MemoryEnumerator"/> type.
@@ -858,17 +859,17 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 
         public SequenceSegment Rent(int size = -1)
         {
-            SequenceSegment block;
+            SequenceSegment? block;
             if (size <= MinimumBlockSize)
             {
-                return _blocks.TryDequeue(out block) ? block : new(large: false);
+                return _blocks.TryDequeue(out block) ? block! : new(large: false);
             }
 
             if (!_largeBlocks.TryDequeue(out block))
             {
                 block = new(large: true);
             }
-            block.ResizeLargeSegment(size);
+            block!.ResizeLargeSegment(size);
             return block;
         }
 
@@ -913,14 +914,14 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
                 }
 
                 // The segment is being resized.
-                Array = null;
+                Array = null!;
                 ArrayPool<byte>.Shared.Return(array);
             }
 
             Array = ArrayPool<byte>.Shared.Rent(length);
         }
 
-        public byte[] Array { get; private set; }
+        public byte[] Array { get; private set; } = System.Array.Empty<byte>();
 
         public ReadOnlyMemory<byte> CommittedMemory => Memory;
 

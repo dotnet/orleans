@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -273,6 +272,19 @@ public static class ServiceCollectionExtensions
             }
         });
 
+        group.MapGet("/LifecycleStages", async ([FromServices] IDashboardClient client) =>
+        {
+            try
+            {
+                var result = await client.GetLifecycleStages();
+                return Results.Json(result.Value, jsonOptions);
+            }
+            catch (SiloUnavailableException)
+            {
+                return CreateUnavailableResult(true);
+            }
+        });
+
         group.MapGet("/GrainTypes", async (string[] exclude, [FromServices] IDashboardClient client) =>
         {
             try
@@ -290,7 +302,8 @@ public static class ServiceCollectionExtensions
         {
             if (opts.Value.HideTrace)
             {
-                return Results.StatusCode(StatusCodes.Status403Forbidden);
+                return Results.Problem("The trace endpoint is disabled in the dashboard options.",
+                    title: "Trace Endpoint Disabled", statusCode: StatusCodes.Status403Forbidden);
             }
 
             await StreamTraceAsync(context, logger);

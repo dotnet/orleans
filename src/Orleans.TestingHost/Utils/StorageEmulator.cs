@@ -66,7 +66,7 @@ namespace Orleans.TestingHost.Utils
             try
             {
                 //This process handle returns immediately.
-                using(var process = Process.Start(CreateProcessArguments("help")))
+                using(var process = Process.Start(CreateProcessArguments("help"))!)
                 {
                     process.WaitForExit();
                     StringBuilder help = new();
@@ -131,7 +131,7 @@ namespace Orleans.TestingHost.Utils
             try
             {
                 //This process handle returns immediately.
-                using(var process = Process.Start(CreateProcessArguments("stop")))
+                using(var process = Process.Start(CreateProcessArguments("stop"))!)
                 {
                     process.WaitForExit();
                     return process.ExitCode == 0;
@@ -152,7 +152,7 @@ namespace Orleans.TestingHost.Utils
         private static ProcessStartInfo CreateProcessArguments(string arguments)
         {
 #pragma warning disable CA1416 // Validate platform compatibility
-            return new ProcessStartInfo(GetStorageEmulatorPath())
+            return new ProcessStartInfo(GetStorageEmulatorPath()!)
             {
                 WindowStyle = ProcessWindowStyle.Hidden,
                 ErrorDialog = true,
@@ -189,7 +189,7 @@ namespace Orleans.TestingHost.Utils
         /// Returns a full path to the storage emulator executable, including the executable name and file extension.
         /// </summary>
         /// <returns>A full path to the storage emulator executable, or null if not found.</returns>
-        private static string GetStorageEmulatorPath()
+        private static string? GetStorageEmulatorPath()
         {
             //Try to take the newest known emulator path. If it does not exist, try an older one.
             string exeBasePath = Path.Combine(GetProgramFilesBasePath(), @"Microsoft SDKs\Azure\Storage Emulator\");

@@ -62,7 +62,7 @@ namespace UnitTests.Grains
 
         public Task<T> CheckExtension_1()
         {
-            return Task.FromResult(grain.ExtensionProperty);
+            return Task.FromResult(grain.ExtensionProperty!);
         }
 
         // check that one can send messages from within extensions.

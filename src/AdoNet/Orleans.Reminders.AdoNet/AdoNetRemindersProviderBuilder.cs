@@ -13,7 +13,7 @@ namespace Orleans.Hosting;
 
 internal sealed class AdoNetRemindersProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseAdoNetReminderService((OptionsBuilder<AdoNetReminderTableOptions> optionsBuilder) => optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {

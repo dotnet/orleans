@@ -41,22 +41,21 @@ namespace Orleans.Transactions.Tests
                     })
             };
 
-            List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
-            for(int i=0; i<results.Length; i++)
-            {
-                this.output.WriteLine($"{i} => {string.Join(",", results[i])}");
-            }
+            List<string?>?[] results = await top.GetNestedTransactionIds(0, tiers);
+            this.WriteResults(results);
 
             // make sure there are 2 tiers
             Assert.Equal(2, results.Length);
 
             // make sure top level call has no transactionId
-            List<string> topTransactionIds = results[0];
+            List<string?>? topTransactionIds = results[0];
+            Assert.NotNull(topTransactionIds);
             Assert.Single(topTransactionIds);
             Assert.Null(topTransactionIds.First());
 
             // check sub call transactionIds, should be null, null, guid1, guid2, null, null
-            List<string> subcallTransactionIds = results[1];
+            List<string?>? subcallTransactionIds = results[1];
+            Assert.NotNull(subcallTransactionIds);
             Assert.Equal(6, subcallTransactionIds.Count);
 
             Assert.Null(subcallTransactionIds[0]); // no attribute
@@ -100,22 +99,21 @@ namespace Orleans.Transactions.Tests
                     })
             };
 
-            List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
-            for (int i = 0; i < results.Length; i++)
-            {
-                this.output.WriteLine($"{i} => {string.Join(",", results[i])}");
-            }
+            List<string?>?[] results = await top.GetNestedTransactionIds(0, tiers);
+            this.WriteResults(results);
 
             // make sure there are 2 tiers
             Assert.Equal(2, results.Length);
 
             // make sure top level call has transactionId
-            List<string> topTransactionIds = results[0];
-            Assert.Single(topTransactionIds);
-            Assert.NotNull(topTransactionIds.First());
+            List<string?>? topTransactionIds = results[0];
+            Assert.NotNull(topTransactionIds);
+            string? topTransactionId = Assert.Single(topTransactionIds);
+            Assert.NotNull(topTransactionId);
 
             // check sub call transactionIds, should be null, null, guid1, guid2, where guid1 should match Id from top
-            List<string> subcallTransactionIds = results[1];
+            List<string?>? subcallTransactionIds = results[1];
+            Assert.NotNull(subcallTransactionIds);
             Assert.Equal(6, subcallTransactionIds.Count);
 
             Assert.Null(subcallTransactionIds[0]); // no attribute
@@ -124,7 +122,7 @@ namespace Orleans.Transactions.Tests
 
             Assert.NotNull(subcallTransactionIds[2]); // CreateOrJoin attribute
             // make sure required attributed transactionId matches top
-            Assert.Equal(subcallTransactionIds[2], topTransactionIds.First());
+            Assert.Equal(subcallTransactionIds[2], topTransactionId);
 
             Assert.NotNull(subcallTransactionIds[3]); // Create attribute
             // make sure the transaction id's differ
@@ -132,11 +130,11 @@ namespace Orleans.Transactions.Tests
 
             Assert.NotNull(subcallTransactionIds[4]); // Join attribute
             // make sure Join attributed transactionId matches top
-            Assert.Equal(subcallTransactionIds[4], topTransactionIds.First());
+            Assert.Equal(subcallTransactionIds[4], topTransactionId);
 
             Assert.NotNull(subcallTransactionIds[5]); // Supported attribute
             // make sure Supported attributed transactionId matches top
-            Assert.Equal(subcallTransactionIds[5], topTransactionIds.First());
+            Assert.Equal(subcallTransactionIds[5], topTransactionId);
         }
 
         [Fact]
@@ -151,27 +149,28 @@ namespace Orleans.Transactions.Tests
                     })
             };
 
-            List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
-            for (int i = 0; i < results.Length; i++)
-            {
-                this.output.WriteLine($"{i} => {string.Join(",", results[i])}");
-            }
+            List<string?>?[] results = await top.GetNestedTransactionIds(0, tiers);
+            this.WriteResults(results);
 
             // make sure there are 2 tiers
             Assert.Equal(2, results.Length);
 
             // make sure top level call has transactionId
-            List<string> topTransactionIds = results[0];
-            Assert.Single(topTransactionIds);
-            Assert.NotNull(topTransactionIds.First());
+            List<string?>? topTransactionIds = results[0];
+            Assert.NotNull(topTransactionIds);
+            string? topTransactionId = Assert.Single(topTransactionIds);
+            Assert.NotNull(topTransactionId);
 
             // check sub call transactionIds, should be null, null, guid1, guid1, where guid1 should match Id from top
-            List<string> subcallTransactionIds = results[1];
+            List<string?>? subcallTransactionIds = results[1];
+            Assert.NotNull(subcallTransactionIds);
             Assert.Equal(2, subcallTransactionIds.Count);
+            Assert.NotNull(subcallTransactionIds[0]);
+            Assert.NotNull(subcallTransactionIds[1]);
             // make sure required attributed transactionId matches parent
-            Assert.Equal(subcallTransactionIds[0], topTransactionIds.First());
+            Assert.Equal(subcallTransactionIds[0], topTransactionId);
             // make sure required attributed transactionId matches parent
-            Assert.Equal(subcallTransactionIds[1], topTransactionIds.First());
+            Assert.Equal(subcallTransactionIds[1], topTransactionId);
         }
 
         [Fact]
@@ -186,27 +185,28 @@ namespace Orleans.Transactions.Tests
                     })
             };
 
-            List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
-            for (int i = 0; i < results.Length; i++)
-            {
-                this.output.WriteLine($"{i} => {string.Join(",", results[i])}");
-            }
+            List<string?>?[] results = await top.GetNestedTransactionIds(0, tiers);
+            this.WriteResults(results);
 
             // make sure there are 2 tiers
             Assert.Equal(2, results.Length);
 
             // make sure top level call has transactionId
-            List<string> topTransactionIds = results[0];
-            Assert.Single(topTransactionIds);
-            Assert.NotNull(topTransactionIds.First());
+            List<string?>? topTransactionIds = results[0];
+            Assert.NotNull(topTransactionIds);
+            string? topTransactionId = Assert.Single(topTransactionIds);
+            Assert.NotNull(topTransactionId);
 
             // check sub call transactionIds, should be null, null, guid1, guid2, where guid1 and guid2 should be different and not match top level transactionId
-            List<string> subcallTransactionIds = results[1];
+            List<string?>? subcallTransactionIds = results[1];
+            Assert.NotNull(subcallTransactionIds);
             Assert.Equal(2, subcallTransactionIds.Count);
+            Assert.NotNull(subcallTransactionIds[0]);
+            Assert.NotNull(subcallTransactionIds[1]);
             // make sure RequiresNew attributed transactionId does not match parents
-            Assert.NotEqual(subcallTransactionIds[0], topTransactionIds.First());
+            Assert.NotEqual(subcallTransactionIds[0], topTransactionId);
             // make sure RequiresNew attributed transactionId does not match parents
-            Assert.NotEqual(subcallTransactionIds[1], topTransactionIds.First());
+            Assert.NotEqual(subcallTransactionIds[1], topTransactionId);
             // make sure the transaction id's differ
             Assert.NotEqual(subcallTransactionIds[0], subcallTransactionIds[1]);
         }
@@ -229,31 +229,33 @@ namespace Orleans.Transactions.Tests
                     })
             };
 
-            List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
-            for (int i = 0; i < results.Length; i++)
-            {
-                this.output.WriteLine($"{i} => {string.Join(",", results[i])}");
-            }
+            List<string?>?[] results = await top.GetNestedTransactionIds(0, tiers);
+            this.WriteResults(results);
 
             // make sure there are 3 tiers
             Assert.Equal(3, results.Length);
 
             // make sure top level call has transactionId
-            List<string> topTransactionIds = results[0];
-            Assert.Single(topTransactionIds);
-            Assert.NotNull(topTransactionIds.First());
+            List<string?>? topTransactionIds = results[0];
+            Assert.NotNull(topTransactionIds);
+            string? topTransactionId = Assert.Single(topTransactionIds);
+            Assert.NotNull(topTransactionId);
 
             // check first tier call transactionIds, should be a guid which matches the parent
-            List<string> tier1callTransactionIds = results[1];
-            Assert.Single(tier1callTransactionIds);
+            List<string?>? tier1callTransactionIds = results[1];
+            Assert.NotNull(tier1callTransactionIds);
+            string? tier1callTransactionId = Assert.Single(tier1callTransactionIds);
+            Assert.NotNull(tier1callTransactionId);
             // make sure Supported attributed transactionId matchs parents
-            Assert.Equal(tier1callTransactionIds[0], topTransactionIds.First());
+            Assert.Equal(tier1callTransactionId, topTransactionId);
 
             // check second tier call transactionIds, should be a guid which matches the parent
-            List<string> tier2callTransactionIds = results[2];
-            Assert.Single(tier2callTransactionIds);
+            List<string?>? tier2callTransactionIds = results[2];
+            Assert.NotNull(tier2callTransactionIds);
+            string? tier2callTransactionId = Assert.Single(tier2callTransactionIds);
+            Assert.NotNull(tier2callTransactionId);
             // make sure CreateOrJoin attributed transactionId matchs parents
-            Assert.Equal(tier2callTransactionIds[0], topTransactionIds.First());
+            Assert.Equal(tier2callTransactionId, topTransactionId);
         }
 
         [Fact]
@@ -283,6 +285,17 @@ namespace Orleans.Transactions.Tests
 
             OrleansTransactionAbortedException exception = await Assert.ThrowsAsync<OrleansTransactionAbortedException>(() => fail.GetNestedTransactionIds(0, tiers));
             Assert.IsType<NotSupportedException>(exception.InnerException);
+        }
+
+        private void WriteResults(List<string?>?[] results)
+        {
+            for (var i = 0; i < results.Length; i++)
+            {
+                var formattedIds = results[i] is { } transactionIds
+                    ? string.Join(",", transactionIds.Select(transactionId => transactionId ?? "<null id>"))
+                    : "<null tier>";
+                this.output.WriteLine($"{i} => {formattedIds}");
+            }
         }
     }
 }

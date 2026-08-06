@@ -1,10 +1,10 @@
-﻿using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Configuration
 {
     internal class SiloMessagingOptionsValidator : IValidateOptions<SiloMessagingOptions>
     {
-        public ValidateOptionsResult Validate(string name, SiloMessagingOptions options)
+        public ValidateOptionsResult Validate(string? name, SiloMessagingOptions options)
         {
             if (options.MaxForwardCount > 255)
             {

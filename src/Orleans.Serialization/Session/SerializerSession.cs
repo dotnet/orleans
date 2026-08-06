@@ -52,7 +52,7 @@ namespace Orleans.Serialization.Session
         /// <value>The codec provider.</value>
         public CodecProvider CodecProvider { get; }
 
-        internal Action<SerializerSession> OnDisposed { get; set; }
+        internal Action<SerializerSession>? OnDisposed { get; set; }
 
         /// <summary>
         /// Resets the referenced objects collection.

@@ -1,0 +1,492 @@
+using System.Collections.Immutable;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Channels;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using NSubstitute;
+using Orleans.Configuration;
+using Orleans.Metadata;
+using Orleans.Placement;
+using Orleans.Runtime;
+using Orleans.Runtime.Diagnostics;
+using Orleans.Runtime.Placement;
+using Orleans.Runtime.Placement.Filtering;
+using Orleans.Runtime.Versions;
+using Orleans.TestingHost.Diagnostics;
+using TestExtensions;
+using Xunit;
+
+namespace UnitTests.Runtime
+{
+    [TestCategory("BVT"), TestCategory("Placement")]
+    public class PlacementServiceTests
+    {
+        private static readonly GrainType TestGrainType = GrainType.Create("test");
+        private static readonly GrainInterfaceType TestInterfaceType = GrainInterfaceType.Create("test.interface");
+        private static int _siloGeneration;
+
+        [Fact]
+        public async Task LifecycleStop_CompletesWorkerTasks()
+        {
+            var target = CreateTarget();
+            var testAccessor = GetTestAccessor(target);
+            using var collector = new DiagnosticEventCollector(PlacementServiceEvents.ListenerName);
+
+            await StopAsync(target);
+
+            Assert.All(testAccessor.WorkerTasks, task => Assert.True(task.IsCompleted));
+            await AssertWorkerStopEventsAsync(target, collector);
+        }
+
+        [Fact]
+        public async Task LifecycleStop_WithCanceledToken_CompletesWorkerTasks()
+        {
+            var target = CreateTarget();
+            var testAccessor = GetTestAccessor(target);
+            using var collector = new DiagnosticEventCollector(PlacementServiceEvents.ListenerName);
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            await StopAsync(target, cts.Token);
+
+            Assert.All(testAccessor.WorkerTasks, task => Assert.True(task.IsCompleted));
+            await AssertWorkerStopEventsAsync(target, collector);
+        }
+
+        [Fact]
+        public async Task AddressMessage_AfterLifecycleStop_ThrowsSiloUnavailableException()
+        {
+            var target = CreateTarget();
+            var message = new Message
+            {
+                TargetGrain = GrainId.Create("test", "grain-1"),
+            };
+
+            await StopAsync(target);
+
+            await Assert.ThrowsAsync<SiloUnavailableException>(() => target.AddressMessage(message));
+        }
+
+        [Fact]
+        public async Task GetOrPlaceActivationAsync_AfterLifecycleStop_ThrowsSiloUnavailableException()
+        {
+            var target = CreateTarget();
+            var message = new Message
+            {
+                TargetGrain = GrainId.Create("test", "grain-1"),
+                InterfaceType = GrainInterfaceType.Create("test.interface"),
+                InterfaceVersion = 1,
+            };
+
+            await StopAsync(target);
+
+            await Assert.ThrowsAsync<SiloUnavailableException>(() => GetTestAccessor(target).GetOrPlaceActivationAsync(message));
+        }
+
+        [Fact]
+        public async Task GetCompatibleSilos_AfterLifecycleStop_ThrowsSiloUnavailableException()
+        {
+            var target = CreateTarget();
+            var placementTarget = new PlacementTarget(GrainId.Create("test", "grain-1"), new Dictionary<string, object>(), default, 0);
+
+            await StopAsync(target);
+
+            Assert.Throws<SiloUnavailableException>(() => target.GetCompatibleSilos(placementTarget));
+        }
+
+        [Fact]
+        public async Task GetCompatibleSilosWithVersions_AfterLifecycleStop_ThrowsSiloUnavailableException()
+        {
+            var target = CreateTarget();
+            var placementTarget = new PlacementTarget(
+                GrainId.Create("test", "grain-1"),
+                new Dictionary<string, object>(),
+                GrainInterfaceType.Create("test.interface"),
+                1);
+
+            await StopAsync(target);
+
+            Assert.Throws<SiloUnavailableException>(() => target.GetCompatibleSilosWithVersions(placementTarget));
+        }
+
+        [Fact]
+        public async Task GetCompatibleSilos_WithoutFilters_UsesCachedResult()
+        {
+            var silos = CreateSilos(2);
+            var fixture = new PlacementServiceFixture(activeSilos: silos, manifestSilos: silos);
+            var placementTarget = CreatePlacementTarget();
+
+            var first = fixture.Target.GetCompatibleSilos(placementTarget);
+            var second = fixture.Target.GetCompatibleSilos(placementTarget);
+
+            Assert.Same(first, second);
+            Assert.True(silos.ToHashSet().SetEquals(first));
+
+            await StopAsync(fixture.Target);
+        }
+
+        [Fact]
+        public async Task GetCompatibleSilos_WithoutInterfaceVersion_ReusesCacheAcrossInterfaces()
+        {
+            var silos = CreateSilos(2);
+            var fixture = new PlacementServiceFixture(activeSilos: silos, manifestSilos: silos);
+            var firstTarget = CreatePlacementTarget(interfaceType: GrainInterfaceType.Create("test.interface.one"));
+            var secondTarget = CreatePlacementTarget(interfaceType: GrainInterfaceType.Create("test.interface.two"));
+
+            var first = fixture.Target.GetCompatibleSilos(firstTarget);
+            var second = fixture.Target.GetCompatibleSilos(secondTarget);
+
+            Assert.Same(first, second);
+            Assert.Equal(1, GetTestAccessor(fixture.Target).CompatibleSilosCacheCount);
+
+            await StopAsync(fixture.Target);
+        }
+
+        [Fact]
+        public async Task GetCompatibleSilos_MembershipChange_InvalidatesCachedResult()
+        {
+            var silos = CreateSilos(2);
+            var fixture = new PlacementServiceFixture(activeSilos: silos, manifestSilos: silos);
+            var placementTarget = CreatePlacementTarget();
+
+            var first = fixture.Target.GetCompatibleSilos(placementTarget);
+
+            fixture.ClusterManifestProvider.SetCurrent(CreateClusterManifest(new[] { silos[1] }, version: new MajorMinorVersion(1, 0)));
+            fixture.NotifyMembershipChanged(silos[1]);
+            var second = fixture.Target.GetCompatibleSilos(placementTarget);
+
+            Assert.NotSame(first, second);
+            Assert.Equal(new[] { silos[1] }, second);
+
+            await StopAsync(fixture.Target);
+        }
+
+        [Fact]
+        public async Task GetCompatibleSilos_VersionSelectorCacheReset_InvalidatesCachedResult()
+        {
+            var silos = CreateSilos(2);
+            var fixture = new PlacementServiceFixture(activeSilos: silos, manifestSilos: silos);
+            var placementTarget = CreatePlacementTarget();
+
+            fixture.Target.GetCompatibleSilos(placementTarget);
+            Assert.Equal(1, GetTestAccessor(fixture.Target).CompatibleSilosCacheCount);
+
+            fixture.VersionSelectorManager.ResetCache();
+
+            Assert.Equal(0, GetTestAccessor(fixture.Target).CompatibleSilosCacheCount);
+            fixture.Target.GetCompatibleSilos(placementTarget);
+            Assert.Equal(1, GetTestAccessor(fixture.Target).CompatibleSilosCacheCount);
+
+            await StopAsync(fixture.Target);
+        }
+
+        [Fact]
+        public async Task GetCompatibleSilos_ManifestUpdate_InvalidatesCachedResult()
+        {
+            var silos = CreateSilos(2);
+            var manifestProvider = new TestClusterManifestProvider(CreateClusterManifest(new[] { silos[0] }));
+            var fixture = new PlacementServiceFixture(activeSilos: silos, manifestSilos: new[] { silos[0] }, manifestProvider: manifestProvider);
+            var placementTarget = CreatePlacementTarget();
+            var lifecycle = await StartAsync(fixture.Target);
+
+            var first = fixture.Target.GetCompatibleSilos(placementTarget);
+            Assert.Equal(new[] { silos[0] }, first);
+
+            manifestProvider.Publish(CreateClusterManifest(new[] { silos[1] }, version: new MajorMinorVersion(1, 0)));
+
+            await Until(() => fixture.Target.GetCompatibleSilos(placementTarget).SequenceEqual(new[] { silos[1] }));
+            var second = fixture.Target.GetCompatibleSilos(placementTarget);
+
+            Assert.NotSame(first, second);
+            Assert.Equal(new[] { silos[1] }, second);
+
+            await lifecycle.OnStop();
+        }
+
+        [Fact]
+        public async Task GetCompatibleSilos_WithFilters_RunsFiltersPerRequest()
+        {
+            var silos = CreateSilos(2);
+            var fixture = new PlacementServiceFixture(activeSilos: silos, manifestSilos: silos, useFilter: true);
+
+            var first = fixture.Target.GetCompatibleSilos(CreatePlacementTarget(new Dictionary<string, object> { ["target-silo"] = silos[0] }));
+            var second = fixture.Target.GetCompatibleSilos(CreatePlacementTarget(new Dictionary<string, object> { ["target-silo"] = silos[1] }));
+
+            Assert.Equal(new[] { silos[0] }, first);
+            Assert.Equal(new[] { silos[1] }, second);
+            Assert.Equal(2, fixture.FilterDirector!.CallCount);
+
+            await StopAsync(fixture.Target);
+        }
+
+        private static PlacementService CreateTarget()
+        {
+            return new PlacementServiceFixture().Target;
+        }
+
+        private static PlacementTarget CreatePlacementTarget(
+            Dictionary<string, object>? requestContextData = null,
+            GrainInterfaceType? interfaceType = null) =>
+            new(
+                GrainId.Create(TestGrainType, "grain-1"),
+                requestContextData ?? new Dictionary<string, object>(),
+                interfaceType ?? TestInterfaceType,
+                0);
+
+        private static PlacementService CreateTarget(
+            IOptionsMonitor<SiloMessagingOptions> optionsMonitor,
+            ILocalSiloDetails localSiloDetails,
+            ISiloStatusOracle siloStatusOracle,
+            TestClusterManifestProvider clusterManifestProvider,
+            IServiceProvider serviceProvider,
+            CachedVersionSelectorManager versionSelectorManager)
+        {
+            var grainVersionManifest = new GrainVersionManifest(clusterManifestProvider);
+            var filterStrategyResolver = new PlacementFilterStrategyResolver(serviceProvider, new GrainPropertiesResolver(clusterManifestProvider));
+            var placementFilterDirectorResolver = new PlacementFilterDirectorResolver(serviceProvider);
+
+            return new PlacementService(
+                optionsMonitor,
+                localSiloDetails,
+                siloStatusOracle,
+                NullLoggerFactory.Instance.CreateLogger<PlacementService>(),
+                grainLocator: null!,
+                grainInterfaceVersions: grainVersionManifest,
+                versionSelectorManager,
+                clusterManifestProvider,
+                directorResolver: null!,
+                strategyResolver: null!,
+                filterStrategyResolver,
+                placementFilterDirectorResolver);
+        }
+
+        private static SiloAddress[] CreateSilos(int count)
+        {
+            var result = new SiloAddress[count];
+            for (var i = 0; i < count; i++)
+            {
+                result[i] = SiloAddress.New(IPAddress.Loopback, 11111, Interlocked.Increment(ref _siloGeneration));
+            }
+
+            return result;
+        }
+
+        private static ClusterManifest CreateClusterManifest(SiloAddress[] silos, bool useFilter = false, MajorMinorVersion? version = null)
+        {
+            var manifest = CreateGrainManifest(useFilter);
+            var manifests = silos.ToImmutableDictionary(silo => silo, _ => manifest);
+            return new ClusterManifest(version ?? MajorMinorVersion.Zero, manifests);
+        }
+
+        private static GrainManifest CreateGrainManifest(bool useFilter)
+        {
+            var grainProperties = ImmutableDictionary.Create<string, string>(StringComparer.Ordinal);
+            if (useFilter)
+            {
+                var filterName = typeof(TestPlacementFilterStrategy).Name;
+                grainProperties = grainProperties
+                    .Add(WellKnownGrainTypeProperties.PlacementFilter, filterName)
+                    .Add($"{WellKnownGrainTypeProperties.PlacementFilter}.{filterName}.order", "0");
+            }
+
+            return new GrainManifest(
+                ImmutableDictionary.CreateRange(new[] { new KeyValuePair<GrainType, GrainProperties>(TestGrainType, new GrainProperties(grainProperties)) }),
+                ImmutableDictionary.CreateRange(new[]
+                {
+                    new KeyValuePair<GrainInterfaceType, GrainInterfaceProperties>(
+                        TestInterfaceType,
+                        new GrainInterfaceProperties(
+                            ImmutableDictionary.Create<string, string>(StringComparer.Ordinal)
+                                .Add(WellKnownGrainInterfaceProperties.Version, "0")))
+                }));
+        }
+
+        private static ServiceProvider CreateServiceProvider(TestPlacementFilterDirector? filterDirector = null)
+        {
+            IServiceCollection services = new ServiceCollection();
+            if (filterDirector is not null)
+            {
+                services.Add(ServiceDescriptor.DescribeKeyed(
+                    typeof(PlacementFilterStrategy),
+                    typeof(TestPlacementFilterStrategy).Name,
+                    typeof(TestPlacementFilterStrategy),
+                    ServiceLifetime.Transient));
+                services.AddKeyedSingleton<IPlacementFilterDirector>(typeof(TestPlacementFilterStrategy), filterDirector);
+            }
+
+            return services.BuildServiceProvider();
+        }
+
+        private static async Task<SiloLifecycleSubject> StartAsync(PlacementService target)
+        {
+            var lifecycle = new SiloLifecycleSubject(NullLoggerFactory.Instance.CreateLogger<SiloLifecycleSubject>());
+            ((ILifecycleParticipant<ISiloLifecycle>)target).Participate(lifecycle);
+            await lifecycle.OnStart();
+            return lifecycle;
+        }
+
+        private static async Task StopAsync(PlacementService target, CancellationToken cancellationToken = default)
+        {
+            var lifecycle = await StartAsync(target);
+            await lifecycle.OnStop(cancellationToken);
+        }
+
+        private static PlacementService.ITestAccessor GetTestAccessor(PlacementService target) => target;
+
+        private static async Task AssertWorkerStopEventsAsync(PlacementService target, DiagnosticEventCollector collector)
+        {
+            var workerCount = GetTestAccessor(target).WorkerTasks.Length;
+            var stoppedEvents = new List<PlacementServiceEvents.WorkerStopped>(workerCount);
+
+            while (stoppedEvents.Count < workerCount)
+            {
+                var diagnosticEvent = await collector.WaitForEventAsync(
+                    nameof(PlacementServiceEvents.WorkerStopped),
+                    evt => evt.Payload is PlacementServiceEvents.WorkerStopped stopped
+                        && stopped.SiloAddress == target.LocalSilo
+                        && stoppedEvents.All(existing => existing.WorkerIndex != stopped.WorkerIndex),
+                    TimeSpan.FromSeconds(10));
+
+                stoppedEvents.Add(Assert.IsType<PlacementServiceEvents.WorkerStopped>(diagnosticEvent.Payload));
+            }
+
+            Assert.Equal(workerCount, stoppedEvents.Count);
+        }
+
+        private static async Task Until(Func<bool> condition)
+        {
+            var maxTimeout = 10_000;
+            while (!condition() && (maxTimeout -= 10) > 0)
+            {
+                await Task.Delay(10);
+            }
+
+            Assert.True(maxTimeout > 0);
+        }
+
+        private sealed class PlacementServiceFixture
+        {
+            private Dictionary<SiloAddress, SiloStatus> _siloStatuses = new();
+
+            public PlacementServiceFixture(
+                SiloAddress[]? activeSilos = null,
+                SiloAddress[]? manifestSilos = null,
+                TestClusterManifestProvider? manifestProvider = null,
+                bool useFilter = false)
+            {
+                activeSilos ??= CreateSilos(1);
+                manifestSilos ??= activeSilos;
+                SetActiveSilos(activeSilos);
+
+                ClusterManifestProvider = manifestProvider ?? new TestClusterManifestProvider(CreateClusterManifest(manifestSilos, useFilter));
+                VersionSelectorManager = new CachedVersionSelectorManager(new GrainVersionManifest(ClusterManifestProvider), null!, null!);
+                FilterDirector = useFilter ? new TestPlacementFilterDirector() : null;
+                ServiceProvider = CreateServiceProvider(FilterDirector);
+
+                var optionsMonitor = Substitute.For<IOptionsMonitor<SiloMessagingOptions>>();
+                optionsMonitor.CurrentValue.Returns(new SiloMessagingOptions());
+
+                var localSiloDetails = Substitute.For<ILocalSiloDetails>();
+                localSiloDetails.SiloAddress.Returns(activeSilos[0]);
+
+                SiloStatusOracle = Substitute.For<ISiloStatusOracle>();
+                SiloStatusOracle.CurrentStatus.Returns(SiloStatus.Active);
+                SiloStatusOracle.GetActiveSilos().Returns(_ => _siloStatuses.Keys.ToArray());
+                SiloStatusOracle.SubscribeToSiloStatusEvents(Arg.Do<ISiloStatusListener>(listener => StatusListener = listener)).Returns(true);
+                SiloStatusOracle.UnSubscribeFromSiloStatusEvents(Arg.Any<ISiloStatusListener>()).Returns(true);
+
+                Target = CreateTarget(optionsMonitor, localSiloDetails, SiloStatusOracle, ClusterManifestProvider, ServiceProvider, VersionSelectorManager);
+            }
+
+            public PlacementService Target { get; }
+
+            public ISiloStatusOracle SiloStatusOracle { get; }
+
+            public TestClusterManifestProvider ClusterManifestProvider { get; }
+
+            public ServiceProvider ServiceProvider { get; }
+
+            public CachedVersionSelectorManager VersionSelectorManager { get; }
+
+            public TestPlacementFilterDirector? FilterDirector { get; }
+
+            private ISiloStatusListener StatusListener { get; set; } = null!;
+
+            public void SetActiveSilos(params SiloAddress[] silos)
+            {
+                _siloStatuses = silos.ToDictionary(silo => silo, _ => SiloStatus.Active);
+            }
+
+            public void NotifyMembershipChanged(SiloAddress silo)
+            {
+                StatusListener.SiloStatusChangeNotification(silo, SiloStatus.Active);
+            }
+        }
+
+        private sealed class TestClusterManifestProvider : IClusterManifestProvider
+        {
+            private readonly Channel<ClusterManifest> _updates = Channel.CreateUnbounded<ClusterManifest>();
+            private ClusterManifest _current;
+
+            public TestClusterManifestProvider(ClusterManifest current)
+            {
+                _current = current;
+                LocalGrainManifest = current.AllGrainManifests.FirstOrDefault() ?? CreateGrainManifest(useFilter: false);
+            }
+
+            public ClusterManifest Current => Volatile.Read(ref _current);
+
+            public IAsyncEnumerable<ClusterManifest> Updates => ReadUpdates();
+
+            public GrainManifest LocalGrainManifest { get; }
+
+            public void Publish(ClusterManifest manifest)
+            {
+                SetCurrent(manifest);
+                Assert.True(_updates.Writer.TryWrite(manifest));
+            }
+
+            public void SetCurrent(ClusterManifest manifest) => Volatile.Write(ref _current, manifest);
+
+            private async IAsyncEnumerable<ClusterManifest> ReadUpdates([EnumeratorCancellation] CancellationToken cancellationToken = default)
+            {
+                yield return Current;
+
+                await foreach (var manifest in _updates.Reader.ReadAllAsync(cancellationToken))
+                {
+                    yield return manifest;
+                }
+            }
+        }
+
+        private sealed class TestPlacementFilterStrategy : PlacementFilterStrategy
+        {
+            public TestPlacementFilterStrategy()
+                : base(0)
+            {
+            }
+        }
+
+        private sealed class TestPlacementFilterDirector : IPlacementFilterDirector
+        {
+            public int CallCount { get; private set; }
+
+            public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, IEnumerable<SiloAddress> silos)
+            {
+                CallCount++;
+                if (target.RequestContextData.TryGetValue("target-silo", out var value) && value is SiloAddress requestedSilo)
+                {
+                    return silos.Where(silo => silo.Equals(requestedSilo));
+                }
+
+                return silos;
+            }
+        }
+    }
+}

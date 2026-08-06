@@ -40,7 +40,7 @@ namespace Orleans.Transactions
             return Task.FromResult<TransactionInfo>(new TransactionInfo(guid, ts, ts, readOnly));
         }
 
-        public async Task<(TransactionalStatus, Exception)> Resolve(TransactionInfo transactionInfo)
+        public async Task<(TransactionalStatus, Exception?)> Resolve(TransactionInfo transactionInfo)
         {
             transactionInfo.TimeStamp = this.clock.MergeUtcNow(transactionInfo.TimeStamp);
 
@@ -53,14 +53,14 @@ namespace Orleans.Transactions
 
             KeyValuePair<ParticipantId, AccessCounter>? manager;
 
-            List<ParticipantId> writeParticipants;
-            List<KeyValuePair<ParticipantId, AccessCounter>> resources;
+            List<ParticipantId>? writeParticipants;
+            List<KeyValuePair<ParticipantId, AccessCounter>>? resources;
             CollateParticipants(transactionInfo.Participants, out writeParticipants, out resources, out manager);
             try
             {
                 var (status, exception) = (writeParticipants == null)
-                    ? await CommitReadOnlyTransaction(transactionInfo, resources)
-                    : await CommitReadWriteTransaction(transactionInfo, writeParticipants, resources, manager.Value);
+                    ? await CommitReadOnlyTransaction(transactionInfo, resources!)
+                    : await CommitReadWriteTransaction(transactionInfo, writeParticipants, resources!, manager!.Value);
                 if (status == TransactionalStatus.Ok)
                     this.statistics.TrackTransactionSucceeded();
                 else
@@ -74,10 +74,10 @@ namespace Orleans.Transactions
             }
         }
 
-        private async Task<(TransactionalStatus, Exception)> CommitReadOnlyTransaction(TransactionInfo transactionInfo, List<KeyValuePair<ParticipantId, AccessCounter>> resources)
+        private async Task<(TransactionalStatus, Exception?)> CommitReadOnlyTransaction(TransactionInfo transactionInfo, List<KeyValuePair<ParticipantId, AccessCounter>> resources)
         {
             TransactionalStatus status = TransactionalStatus.Ok;
-            Exception exception;
+            Exception? exception;
 
             var tasks = new List<Task<TransactionalStatus>>();
             try
@@ -136,10 +136,10 @@ namespace Orleans.Transactions
             return (status, exception);
         }
 
-        private async Task<(TransactionalStatus, Exception)> CommitReadWriteTransaction(TransactionInfo transactionInfo, List<ParticipantId> writeResources, List<KeyValuePair<ParticipantId, AccessCounter>> resources, KeyValuePair<ParticipantId, AccessCounter> manager)
+        private async Task<(TransactionalStatus, Exception?)> CommitReadWriteTransaction(TransactionInfo transactionInfo, List<ParticipantId> writeResources, List<KeyValuePair<ParticipantId, AccessCounter>> resources, KeyValuePair<ParticipantId, AccessCounter> manager)
         {
             TransactionalStatus status = TransactionalStatus.Ok;
-            Exception exception;
+            Exception? exception;
 
             try
             {
@@ -210,7 +210,7 @@ namespace Orleans.Transactions
                  .Abort(p.Name, transactionInfo.TransactionId)));
         }
 
-        private void CollateParticipants(Dictionary<ParticipantId, AccessCounter> participants, out List<ParticipantId> writers, out List<KeyValuePair<ParticipantId, AccessCounter>> resources, out KeyValuePair<ParticipantId, AccessCounter>? manager)
+        private void CollateParticipants(Dictionary<ParticipantId, AccessCounter> participants, out List<ParticipantId>? writers, out List<KeyValuePair<ParticipantId, AccessCounter>>? resources, out KeyValuePair<ParticipantId, AccessCounter>? manager)
         {
             writers = null;
             resources = null;

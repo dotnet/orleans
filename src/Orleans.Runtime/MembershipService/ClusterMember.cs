@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Runtime
 {
@@ -6,7 +7,7 @@ namespace Orleans.Runtime
     /// Represents a cluster member.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
-    public sealed class ClusterMember : IEquatable<ClusterMember>
+    public sealed class ClusterMember : IEquatable<ClusterMember>, ISpanFormattable
     {                
         /// <summary>
         /// Initializes a new instance of the <see cref="ClusterMember"/> class.
@@ -21,10 +22,16 @@ namespace Orleans.Runtime
         /// The silo name.
         /// </param>
         public ClusterMember(SiloAddress siloAddress, SiloStatus status, string name)
+            : this(siloAddress, status, name, wasDeclaredDead: false)
+        {
+        }
+
+        internal ClusterMember(SiloAddress siloAddress, SiloStatus status, string name, bool wasDeclaredDead)
         {
             this.SiloAddress = siloAddress ?? throw new ArgumentNullException(nameof(siloAddress));
             this.Status = status;
             this.Name = name;
+            this.WasDeclaredDead = wasDeclaredDead;
         }
 
         /// <summary>
@@ -48,11 +55,14 @@ namespace Orleans.Runtime
         [Id(2)]
         public string Name { get; }
 
-        /// <inheritdoc/>
-        public override bool Equals(object obj) => this.Equals(obj as ClusterMember);
+        [Id(3)]
+        internal bool WasDeclaredDead { get; }
 
         /// <inheritdoc/>
-        public bool Equals(ClusterMember other) => other != null
+        public override bool Equals([NotNullWhen(true)] object? obj) => this.Equals(obj as ClusterMember);
+
+        /// <inheritdoc/>
+        public bool Equals(ClusterMember? other) => other != null
             && this.SiloAddress.Equals(other.SiloAddress)
             && this.Status == other.Status
             && string.Equals(this.Name, other.Name, StringComparison.Ordinal);
@@ -62,5 +72,10 @@ namespace Orleans.Runtime
 
         /// <inheritdoc/>
         public override string ToString() => $"{this.SiloAddress}/{this.Name}/{this.Status}";
+
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
+            => destination.TryWrite($"{this.SiloAddress}/{this.Name}/{this.Status}", out charsWritten);
     }
 }

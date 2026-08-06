@@ -11,7 +11,7 @@ namespace Orleans
     /// </summary>
     internal class GrainFactory : IInternalGrainFactory
     {
-        private GrainReferenceRuntime grainReferenceRuntime;
+        private GrainReferenceRuntime? grainReferenceRuntime;
 
         /// <summary>
         /// The cache of typed system target references.
@@ -38,21 +38,21 @@ namespace Orleans
         private GrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime ??= (GrainReferenceRuntime)this.runtimeClient.GrainReferenceRuntime;
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidKey
+        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string? grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidKey
         {
             var grainKey = GrainIdKeyExtensions.CreateGuidKey(primaryKey);
             return (TGrainInterface)GetGrain(typeof(TGrainInterface), grainKey, grainClassNamePrefix: grainClassNamePrefix);
         }
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithIntegerKey
+        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string? grainClassNamePrefix = null) where TGrainInterface : IGrainWithIntegerKey
         {
             var grainKey = GrainIdKeyExtensions.CreateIntegerKey(primaryKey);
             return (TGrainInterface)GetGrain(typeof(TGrainInterface), grainKey, grainClassNamePrefix: grainClassNamePrefix);
         }
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string grainClassNamePrefix = null)
+        public TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithStringKey
         {
             ArgumentNullException.ThrowIfNullOrWhiteSpace(primaryKey);
@@ -61,7 +61,7 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string grainClassNamePrefix = null)
+        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithGuidCompoundKey
         {
             ValidateGrainKeyExtension(keyExtension);
@@ -71,7 +71,7 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string grainClassNamePrefix = null)
+        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithIntegerCompoundKey
         {
             ValidateGrainKeyExtension(keyExtension);
@@ -123,7 +123,7 @@ namespace Orleans
         public TGrainInterface GetSystemTarget<TGrainInterface>(GrainId grainId)
             where TGrainInterface : ISystemTarget
         {
-            ISystemTarget reference;
+            ISystemTarget? reference;
             ValueTuple<GrainId, Type> key = ValueTuple.Create(grainId, typeof(TGrainInterface));
 
             lock (this.typedSystemTargetReferenceCache)
@@ -204,7 +204,7 @@ namespace Orleans
         /// <param name="grainKey">The <see cref="GrainId.Key"/> portion of the grain id.</param>
         /// <param name="grainClassNamePrefix">An optional grain class name prefix.</param>
         /// <returns>A grain reference which implements the provided interface.</returns>
-        public IAddressable GetGrain(Type interfaceType, IdSpan grainKey, string grainClassNamePrefix = null)
+        public IAddressable GetGrain(Type interfaceType, IdSpan grainKey, string? grainClassNamePrefix = null)
         {
             ArgumentNullException.ThrowIfNull(interfaceType);
 

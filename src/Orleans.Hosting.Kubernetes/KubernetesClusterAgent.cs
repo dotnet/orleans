@@ -7,6 +7,7 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Net;
 using System.Threading;
@@ -57,7 +58,7 @@ namespace Orleans.Hosting.Kubernetes
         private readonly CancellationTokenSource _shutdownToken;
         private readonly SemaphoreSlim _pauseMonitoringSemaphore = new SemaphoreSlim(0);
         private volatile bool _enableMonitoring;
-        private Task _runTask;
+        private Task _runTask = null!;
 
         public KubernetesClusterAgent(
             IClusterMembershipService clusterMembershipService,
@@ -75,8 +76,8 @@ namespace Orleans.Hosting.Kubernetes
             _config = _options.CurrentValue.GetClientConfiguration?.Invoke() ?? throw new ArgumentNullException(nameof(KubernetesHostingOptions) + "." + nameof(KubernetesHostingOptions.GetClientConfiguration));
             _client = new k8s.Kubernetes(_config);
             _podLabelSelector = $"{KubernetesHostingOptions.ServiceIdLabel}={_clusterOptions.ServiceId},{KubernetesHostingOptions.ClusterIdLabel}={_clusterOptions.ClusterId}";
-            _podNamespace = _options.CurrentValue.Namespace;
-            _podName = _options.CurrentValue.PodName;
+            _podNamespace = _options.CurrentValue.Namespace!;
+            _podName = _options.CurrentValue.PodName!;
         }
 
         public void Participate(ISiloLifecycle lifecycle)
@@ -353,7 +354,7 @@ namespace Orleans.Hosting.Kubernetes
             }
         }
 
-        private bool TryMatchSilo(V1Pod pod, out ClusterMember server)
+        private bool TryMatchSilo(V1Pod pod, [NotNullWhen(true)] out ClusterMember? server)
         {
             var snapshot = _clusterMembershipService.CurrentSnapshot;
             foreach (var member in snapshot.Members)

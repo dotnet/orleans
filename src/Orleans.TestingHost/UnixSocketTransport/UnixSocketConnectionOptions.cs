@@ -22,5 +22,5 @@ public partial class UnixSocketConnectionOptions
     [GeneratedRegex("[^a-zA-Z0-9]")]
     private static partial Regex ConvertEndpointRegex();
 
-    private static string DefaultConvertEndpointToPath(EndPoint endPoint) => Path.Combine(Path.GetTempPath(), ConvertEndpointRegex().Replace(endPoint.ToString(), "_"));
+    private static string DefaultConvertEndpointToPath(EndPoint endPoint) => Path.Combine(Path.GetTempPath(), ConvertEndpointRegex().Replace(endPoint.ToString()!, "_"));
 }

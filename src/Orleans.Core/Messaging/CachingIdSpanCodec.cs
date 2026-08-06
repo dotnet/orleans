@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Messaging
             var hashCode = reader.ReadInt32();
 
             IdSpan result = default;
-            byte[] payloadArray = default;
+            byte[]? payloadArray = default;
             if (!reader.TryReadBytes((int)length, out var payloadSpan))
             {
                 payloadSpan = payloadArray = reader.ReadBytes(length);
@@ -56,10 +56,10 @@ namespace Orleans.Runtime.Messaging
                 result = IdSpan.UnsafeCreate(payloadArray ?? payloadSpan.ToArray(), hashCode);
 
                 // Before adding this value to the private cache and returning it, intern it via the shared cache to hopefully reduce duplicates.
-                result = SharedCache.GetOrAdd(result, static (key, _) => key, (object)null);
+                result = SharedCache.GetOrAdd(result, static (key, _) => key, (object?)null);
 
                 // Update the cache. If there is a hash collision, the last entry wins.
-                cacheEntry.Value = IdSpan.UnsafeGetArray(result);
+                cacheEntry.Value = IdSpan.UnsafeGetArray(result)!;
             }
             cacheEntry.LastSeen = currentTimestamp;
 
@@ -89,7 +89,7 @@ namespace Orleans.Runtime.Messaging
         public void WriteRaw<TBufferWriter>(ref Writer<TBufferWriter> writer, IdSpan value) where TBufferWriter : IBufferWriter<byte>
         {
             IdSpanCodec.WriteRaw(ref writer, value);
-            SharedCache.GetOrAdd(value, static (key, _) => key, (object)null);
+            SharedCache.GetOrAdd(value, static (key, _) => key, (object?)null);
         }
     }
 }

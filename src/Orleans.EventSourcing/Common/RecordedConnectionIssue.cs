@@ -12,7 +12,7 @@ namespace Orleans.EventSourcing.Common
         /// <summary>
         /// The recorded connection issue, or null if none
         /// </summary>
-        public ConnectionIssue Issue { get; private set; }
+        public ConnectionIssue? Issue { get; private set; }
 
         /// <summary>
         /// record a connection issue, filling in timestamps etc.
@@ -83,7 +83,7 @@ namespace Orleans.EventSourcing.Common
         }
 
         /// <inheritdoc/>
-        public override readonly string ToString()
+        public override readonly string? ToString()
         {
             if (Issue == null)
                 return "";

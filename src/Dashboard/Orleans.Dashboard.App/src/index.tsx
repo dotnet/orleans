@@ -49,6 +49,7 @@ import SiloCounters from './silos/silo-counters';
 import Reminders from './reminders/reminders';
 import Preferences from './components/preferences';
 import storage from './lib/storage';
+import Lifecycle, { LifecycleStageInfo } from './lifecycle/lifecycle';
 
 interface Settings {
   dashboardGrainsHidden: boolean;
@@ -477,6 +478,33 @@ function renderPage(jsx: JSX.Element, path: string) {
   renderPage(<LogStream xhr={xhr} />, '#/trace');
 });
 
+(routie as any)('/lifecycle', function () {
+  const thisRouteIndex = ++routeIndex;
+  events.clearAll();
+  scroll();
+  renderLoading();
+
+  let stages: LifecycleStageInfo[] | null = null;
+
+  render = function () {
+    if (routeIndex != thisRouteIndex) return;
+    renderPage(
+      <Page title="Lifecycle">
+        <Lifecycle stages={stages} />
+      </Page>,
+      '#/lifecycle'
+    );
+  };
+
+  http.get('LifecycleStages', function (err, data) {
+    if (routeIndex != thisRouteIndex) return;
+    stages = (data as LifecycleStageInfo[]) || [];
+    render();
+  });
+
+  render();
+});
+
 (routie as any)('/preferences', function () {
   const thisRouteIndex = ++routeIndex;
   events.clearAll();
@@ -553,6 +581,11 @@ function getMenu(): MenuItem[] {
       name: 'Silos',
       path: '#/silos',
       icon: 'fa fa-database'
+    },
+    {
+      name: 'Lifecycle',
+      path: '#/lifecycle',
+      icon: 'fa fa-sitemap'
     },
     {
       name: 'Reminders',

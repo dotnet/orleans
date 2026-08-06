@@ -8,6 +8,6 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the seed node to find the membership system grain.
         /// </summary>
-        public IPEndPoint PrimarySiloEndpoint { get; set; }
+        public IPEndPoint? PrimarySiloEndpoint { get; set; }
     }
 }

@@ -21,6 +21,6 @@ namespace Orleans.Streams
         /// Gets the namespace.
         /// </summary>
         /// <value>The namespace.</value>
-        string Namespace { get; }
+        string? Namespace { get; }
     }
 }

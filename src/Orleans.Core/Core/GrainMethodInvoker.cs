@@ -49,13 +49,13 @@ namespace Orleans.Runtime
 
         public IInvokable Request => request;
 
-        public object Grain => grainContext.GrainInstance;
+        public object Grain => grainContext.GrainInstance!;
 
         public MethodInfo InterfaceMethod => request.GetMethod();
 
         public MethodInfo ImplementationMethod => GetMethodEntry().ImplementationMethod;
 
-        public object Result
+        public object? Result
         {
             get => Response switch
             {
@@ -65,7 +65,7 @@ namespace Orleans.Runtime
             set => Response = Response.FromResult(value);
         }
 
-        public Response Response { get; set; }
+        public Response? Response { get; set; }
 
         public GrainId? SourceId => message.SendingGrain is { IsDefault: false } source ? source : null;
 
@@ -161,7 +161,7 @@ namespace Orleans.Runtime
         private (MethodInfo ImplementationMethod, MethodInfo InterfaceMethod) GetMethodEntry()
         {
             var interfaceType = this.request.GetInterfaceType();
-            var implementationType = this.request.GetTarget().GetType();
+            var implementationType = this.request.GetTarget()!.GetType();
 
             // Get or create the implementation map for this object.
             var implementationMap = interfaceToImplementationMapping.GetOrCreate(

@@ -24,7 +24,7 @@ namespace Benchmarks.Dashboard
         public int HistorySize { get; set; }
 
         [ParamsSource(nameof(Histories))]
-        public ITraceHistory History { get; set; }
+        public ITraceHistory History { get; set; } = null!;
 
         public IEnumerable<ITraceHistory> Histories
         {
@@ -44,7 +44,7 @@ namespace Benchmarks.Dashboard
             testTraces = Helper.CreateTraces(startTime.AddSeconds(HistorySize), SiloCount, GrainTypeCount, GrainMethodCount).ToList();
         }
 
-        private List<TestTraces> testTraces;
+        private List<TestTraces> testTraces = null!;
 
         [Benchmark]
         public void Test_Add_TraceHistory()

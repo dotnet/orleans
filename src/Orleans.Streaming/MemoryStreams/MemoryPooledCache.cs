@@ -21,7 +21,7 @@ namespace Orleans.Providers
         private readonly IEvictionStrategy evictionStrategy;
         private readonly PooledQueueCache cache;
 
-        private FixedSizeBuffer currentBuffer;
+        private FixedSizeBuffer? currentBuffer;
 
         /// <summary>
         /// Pooled cache for memory stream provider.
@@ -37,7 +37,7 @@ namespace Orleans.Providers
             TimePurgePredicate purgePredicate,
             ILogger logger,
             TSerializer serializer,
-            ICacheMonitor cacheMonitor,
+            ICacheMonitor? cacheMonitor,
             TimeSpan? monitorWriteInterval,
             TimeSpan? purgeMetadataInterval)
         {
@@ -71,16 +71,19 @@ namespace Orleans.Providers
             if (currentBuffer == null || !currentBuffer.TryGetSegment(size, out segment))
             {
                 // no block or block full, get new block and try again
-                currentBuffer = bufferPool.Allocate();
-                //call EvictionStrategy's OnBlockAllocated method
-                this.evictionStrategy.OnBlockAllocated(currentBuffer);
-                // if this fails with clean block, then requested size is too big
-                if (!currentBuffer.TryGetSegment(size, out segment))
+                var newBuffer = bufferPool.Allocate();
+                // if this fails with a clean block, then requested size is too big; return the
+                // unused block to the pool and fail rather than leaking a block that is never committed.
+                if (!newBuffer.TryGetSegment(size, out segment))
                 {
+                    newBuffer.Dispose();
                     string errmsg = string.Format(CultureInfo.InvariantCulture,
                         "Message size is too big. MessageSize: {0}", size);
                     throw new ArgumentOutOfRangeException(nameof(queueMessage), errmsg);
                 }
+                currentBuffer = newBuffer;
+                //call EvictionStrategy's OnBlockAllocated method
+                this.evictionStrategy.OnBlockAllocated(currentBuffer);
             }
             // encode namespace, offset, partitionkey, properties and payload into segment
             int writeOffset = 0;
@@ -98,10 +101,10 @@ namespace Orleans.Providers
         {
             private readonly PooledQueueCache cache;
             private readonly object cursor;
-            private IBatchContainer current;
+            private IBatchContainer? current;
 
             public Cursor(PooledQueueCache cache, StreamId streamId,
-                StreamSequenceToken token)
+                StreamSequenceToken? token)
             {
                 this.cache = cache;
                 cursor = cache.GetCursor(streamId, token);
@@ -111,7 +114,7 @@ namespace Orleans.Providers
             {
             }
 
-            public IBatchContainer GetCurrent(out Exception exception)
+            public IBatchContainer? GetCurrent(out Exception? exception)
             {
                 exception = null;
                 return current;
@@ -119,7 +122,7 @@ namespace Orleans.Providers
 
             public bool MoveNext()
             {
-                IBatchContainer next;
+                IBatchContainer? next;
                 if (!cache.TryGetNextMessage(cursor, out next))
                 {
                     return false;
@@ -159,13 +162,13 @@ namespace Orleans.Providers
         /// <inheritdoc/>
         public bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
         {
-            purgedItems = null;
+            purgedItems = null!; // Return value is always false, per [MaybeNullWhen(false)] on the interface.
             this.evictionStrategy.PerformPurge(DateTime.UtcNow);
             return false;
         }
 
         /// <inheritdoc/>
-        public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token)
+        public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
         {
             return new Cursor(cache, streamId, token);
         }

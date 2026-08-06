@@ -19,7 +19,7 @@ namespace Orleans.Transactions.AzureStorage
         private readonly ClusterOptions clusterOptions;
         private readonly JsonSerializerSettings jsonSettings;
         private readonly ILoggerFactory loggerFactory;
-        private TableClient table;
+        private TableClient table = null!;
 
         public static ITransactionalStateStorageFactory Create(IServiceProvider services, string name)
         {

@@ -3,6 +3,7 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Azure.Messaging.EventHubs;
 
@@ -31,7 +32,7 @@ namespace Orleans.Streaming.EventHubs
         private readonly ILogger logger;
         private readonly AggregatedCachePressureMonitor cachePressureMonitor;
         private readonly ICacheMonitor cacheMonitor;
-        private FixedSizeBuffer currentBuffer;
+        private FixedSizeBuffer currentBuffer = null!;
 
         /// <summary>
         /// EventHub queue cache.
@@ -131,9 +132,15 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="streamId"></param>
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
-        public object GetCursor(StreamId streamId, StreamSequenceToken sequenceToken)
+        public object GetCursor(StreamId streamId, StreamSequenceToken? sequenceToken)
         {
             return cache.GetCursor(streamId, sequenceToken);
+        }
+
+        /// <inheritdoc />
+        public void Refresh(object cursor, StreamSequenceToken? sequenceToken)
+        {
+            cache.Refresh(cursor, sequenceToken);
         }
 
         /// <summary>
@@ -142,7 +149,7 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="cursorObj"></param>
         /// <param name="message"></param>
         /// <returns></returns>
-        public bool TryGetNextMessage(object cursorObj, out IBatchContainer message)
+        public bool TryGetNextMessage(object cursorObj, [NotNullWhen(true)] out IBatchContainer? message)
         {
             if (!cache.TryGetNextMessage(cursorObj, out message))
                 return false;
@@ -208,14 +215,19 @@ namespace Orleans.Streaming.EventHubs
             if (currentBuffer == null || !currentBuffer.TryGetSegment(size, out segment))
             {
                 // no block or block full, get new block and try again
-                currentBuffer = bufferPool.Allocate();
+                var newBuffer = bufferPool.Allocate();
+                // if this fails with a clean block, then requested size is too big; return the
+                // unused block to the pool and fail. Registering it with the eviction strategy
+                // before confirming the segment fits would leak it, because a batch that never
+                // commits is never reclaimed by the purge-time logic.
+                if (!newBuffer.TryGetSegment(size, out segment))
+                {
+                    newBuffer.Dispose();
+                    throw new ArgumentOutOfRangeException(nameof(size), $"Message size is too big. MessageSize: {size}");
+                }
+                currentBuffer = newBuffer;
                 //call EvictionStrategy's OnBlockAllocated method
                 this.evictionStrategy.OnBlockAllocated(currentBuffer);
-                // if this fails with clean block, then requested size is too big
-                if (!currentBuffer.TryGetSegment(size, out segment))
-                {
-                    throw new ArgumentOutOfRangeException(nameof(size), $"Message size is to big. MessageSize: {size}");
-                }
             }
             return segment;
         }

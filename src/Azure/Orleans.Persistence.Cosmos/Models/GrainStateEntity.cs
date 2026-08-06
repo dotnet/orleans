@@ -10,7 +10,7 @@ internal class GrainStateEntity<TState> : BaseEntity
 
     [JsonProperty(nameof(State))]
     [JsonPropertyName(nameof(State))]
-    public TState State { get; set; } = default!;
+    public TState? State { get; set; }
 
     [JsonProperty(nameof(PartitionKey))]
     [JsonPropertyName(nameof(PartitionKey))]

@@ -12,7 +12,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly string clusterId;
         private readonly IServiceProvider serviceProvider;
         private readonly ILogger logger;
-        private RelationalOrleansQueries orleansQueries;
+        private RelationalOrleansQueries orleansQueries = null!;
         private readonly AdoNetClusteringSiloOptions clusteringTableOptions;
 
         public AdoNetClusteringTable(

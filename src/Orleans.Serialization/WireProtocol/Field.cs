@@ -22,7 +22,7 @@ namespace Orleans.Serialization.WireProtocol
         /// <summary>
         /// The raw field type.
         /// </summary>
-        public Type FieldTypeRaw;
+        public Type? FieldTypeRaw;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Field"/> struct.
@@ -85,7 +85,7 @@ namespace Orleans.Serialization.WireProtocol
         /// Gets or sets the type of the field.
         /// </summary>
         /// <value>The type of the field.</value>
-        public Type FieldType
+        public Type? FieldType
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             readonly get

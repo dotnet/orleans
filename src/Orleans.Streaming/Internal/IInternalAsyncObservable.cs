@@ -8,12 +8,12 @@ namespace Orleans.Streams
         Task<StreamSubscriptionHandle<T>> ResumeAsync(
             StreamSubscriptionHandle<T> handle,
             IAsyncObserver<T> observer,
-            StreamSequenceToken token = null);
+            StreamSequenceToken? token = null);
 
         Task<StreamSubscriptionHandle<T>> ResumeAsync(
             StreamSubscriptionHandle<T> handle,
             IAsyncBatchObserver<T> observer,
-            StreamSequenceToken token = null);
+            StreamSequenceToken? token = null);
 
         Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle);
 

@@ -25,7 +25,7 @@ public class ConfigureAwaitCodeFix : CodeFixProvider
 
     public sealed override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
-        var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
+        var root = (await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false))!;
         var diagnostic = context.Diagnostics.First();
         var diagnosticSpan = diagnostic.Location.SourceSpan;
 
@@ -39,7 +39,7 @@ public class ConfigureAwaitCodeFix : CodeFixProvider
         }
 
         // Get semantic model to determine which fix to apply
-        var semanticModel = await context.Document.GetSemanticModelAsync(context.CancellationToken).ConfigureAwait(false);
+        var semanticModel = (await context.Document.GetSemanticModelAsync(context.CancellationToken).ConfigureAwait(false))!;
         var symbolInfo = semanticModel.GetSymbolInfo(invocation, context.CancellationToken);
 
         if (symbolInfo.Symbol is not IMethodSymbol methodSymbol)
@@ -80,7 +80,7 @@ public class ConfigureAwaitCodeFix : CodeFixProvider
         InvocationExpressionSyntax invocation,
         CancellationToken cancellationToken)
     {
-        var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+        var root = (await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
 
         // Create new argument with 'true' instead of 'false'
         var newArgument = Argument(LiteralExpression(SyntaxKind.TrueLiteralExpression));
@@ -99,7 +99,7 @@ public class ConfigureAwaitCodeFix : CodeFixProvider
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+        var root = (await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
 
         var arguments = invocation.ArgumentList?.Arguments;
         if (arguments is null || arguments.Value.Count == 0)

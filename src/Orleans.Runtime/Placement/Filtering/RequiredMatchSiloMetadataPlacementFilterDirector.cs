@@ -3,7 +3,6 @@ using System.Linq;
 using Orleans.Placement;
 using Orleans.Runtime.MembershipService.SiloMetadata;
 
-#nullable enable
 namespace Orleans.Runtime.Placement.Filtering;
 
 internal class RequiredMatchSiloMetadataPlacementFilterDirector(ILocalSiloDetails localSiloDetails, ISiloMetadataCache siloMetadataCache)

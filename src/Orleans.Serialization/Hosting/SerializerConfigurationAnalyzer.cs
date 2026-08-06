@@ -74,9 +74,9 @@ namespace Orleans.Serialization
                         };
                     }
 
-                    if (!complaint.Methods.TryGetValue(methodInfo.DeclaringType, out var methodList))
+                    if (!complaint.Methods.TryGetValue(methodInfo.DeclaringType!, out var methodList))
                     {
-                        methodList = complaint.Methods[methodInfo.DeclaringType] = new HashSet<MethodInfo>();
+                        methodList = complaint.Methods[methodInfo.DeclaringType!] = new HashSet<MethodInfo>();
                     }
 
                     methodList.Add(methodInfo);

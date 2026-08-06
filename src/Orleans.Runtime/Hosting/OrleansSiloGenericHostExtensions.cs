@@ -146,13 +146,13 @@ namespace Microsoft.Extensions.Hosting
             return services;
         }
 
-        private static ISiloBuilder AddOrleansCore(IServiceCollection services, IConfiguration configuration)
+        private static ISiloBuilder AddOrleansCore(IServiceCollection services, IConfiguration? configuration)
         {
-            ISiloBuilder builder = default;
+            ISiloBuilder? builder = default;
             configuration ??= new ConfigurationBuilder().Build();
             foreach (var descriptor in services.Where(d => d.ServiceType.Equals(MarkerType)))
             {
-                var marker = (OrleansBuilderMarker)descriptor.ImplementationInstance;
+                var marker = (OrleansBuilderMarker)descriptor.ImplementationInstance!;
                 builder = marker.BuilderInstance switch
                 {
                     ISiloBuilder existingBuilder => existingBuilder,

@@ -29,7 +29,7 @@ namespace Orleans.Runtime
             _seed = unchecked((ulong)Random.Shared.NextInt64());
         }
 
-        public Message CreateMessage(object body, InvokeMethodOptions options)
+        public Message CreateMessage(object? body, InvokeMethodOptions options)
         {
             var message = new Message
             {
@@ -74,7 +74,7 @@ namespace Orleans.Runtime
             return response;
         }
 
-        public Message CreateRejectionResponse(Message request, Message.RejectionTypes type, string info, Exception ex = null)
+        public Message CreateRejectionResponse(Message request, Message.RejectionTypes type, string info, Exception? ex = null)
         {
             var response = CreateResponseMessage(request);
             response.Result = Message.ResponseTypes.Rejection;
@@ -102,7 +102,7 @@ namespace Orleans.Runtime
             Level = LogLevel.Debug,
             Message = "Creating '{RejectionType}' rejection with info '{Information}'."
         )]
-        private static partial void LogCreatingRejectionResponse(ILogger logger, Exception exception, Message.RejectionTypes rejectionType, string information);
+        private static partial void LogCreatingRejectionResponse(ILogger logger, Exception? exception, Message.RejectionTypes rejectionType, string information);
 
         private readonly struct DiagnosticsLogValue(List<string> diagnostics)
         {

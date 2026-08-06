@@ -1,8 +1,6 @@
 using System;
 using System.Globalization;
 
-#nullable disable
-
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
 #elif PERSISTENCE_ADONET
@@ -31,7 +29,7 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="formatType">Requested format type</param>
         /// <returns></returns>
-        public object GetFormat(Type formatType)
+        public object? GetFormat(Type? formatType)
         {
             return formatType == typeof(ICustomFormatter) ? formatter : null;
         }
@@ -39,7 +37,7 @@ namespace Orleans.Tests.SqlUtils
 
         private class AdoNetFormatter: ICustomFormatter
         {
-            public string Format(string format, object arg, IFormatProvider formatProvider)
+            public string Format(string? format, object? arg, IFormatProvider? formatProvider)
             {
                 //This null check applies also to Nullable<T> when T does not have value defined.
                 if(arg == null)
@@ -67,7 +65,7 @@ namespace Orleans.Tests.SqlUtils
                     return ((IFormattable)arg).ToString(format, CultureInfo.InvariantCulture);
                 }
 
-                return arg.ToString();
+                return arg.ToString()!;
             }
         }
     }

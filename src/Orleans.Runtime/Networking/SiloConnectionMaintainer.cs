@@ -9,15 +9,18 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly ConnectionManager connectionManager;
         private readonly ISiloStatusOracle siloStatusOracle;
+        private readonly IRuntimeClient runtimeClient;
         private readonly ILogger<SiloConnectionMaintainer> log;
 
         public SiloConnectionMaintainer(
             ConnectionManager connectionManager,
             ISiloStatusOracle siloStatusOracle,
+            IRuntimeClient runtimeClient,
             ILogger<SiloConnectionMaintainer> log)
         {
             this.connectionManager = connectionManager;
             this.siloStatusOracle = siloStatusOracle;
+            this.runtimeClient = runtimeClient;
             this.log = log;
         }
 
@@ -40,8 +43,9 @@ namespace Orleans.Runtime.Messaging
 
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
-            if (status == SiloStatus.Dead && updatedSilo != siloStatusOracle.SiloAddress)
+            if (status == SiloStatus.Dead && !updatedSilo.Equals(siloStatusOracle.SiloAddress))
             {
+                this.runtimeClient.BreakOutstandingMessagesToSilo(updatedSilo);
                 _ = Task.Run(() => this.CloseConnectionAsync(updatedSilo));
             }
         }

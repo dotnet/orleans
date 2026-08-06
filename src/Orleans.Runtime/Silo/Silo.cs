@@ -33,7 +33,11 @@ namespace Orleans.Runtime
         private readonly Watchdog platformWatchdog;
         private readonly TimeSpan waitForMessageToBeQueuedForOutbound;
         private readonly TimeSpan initTimeout;
-        private readonly object lockable = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock lockable = new();
+#else
+        private readonly object lockable = new();
+#endif
         private readonly GrainFactory grainFactory;
         private readonly ISiloLifecycleSubject siloLifecycle;
         private readonly List<GrainService> grainServices = new List<GrainService>();
@@ -250,7 +254,7 @@ namespace Orleans.Runtime
                 throw;
             }
 
-            LogInfoGrainServiceRegistered(logger, service.GetType().FullName);
+            LogInfoGrainServiceRegistered(logger, service.GetType().FullName!);
         }
 
         private async Task StartGrainService(IGrainService service)
@@ -267,7 +271,7 @@ namespace Orleans.Runtime
                 throw;
             }
 
-            LogInfoGrainServiceStarted(logger, service.GetType().FullName);
+            LogInfoGrainServiceStarted(logger, service.GetType().FullName!);
         }
 
         /// <summary>
@@ -451,7 +455,7 @@ namespace Orleans.Runtime
                     }
                 }
 
-                LogDebugGrainServiceStopped(logger, grainService.GetType().FullName, grainService.GetGrainId());
+                LogDebugGrainServiceStopped(logger, grainService.GetType().FullName!, grainService.GetGrainId());
             }
         }
 
@@ -460,11 +464,25 @@ namespace Orleans.Runtime
 
         private void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeInitialize, (ct) => Task.Run(() => OnRuntimeInitializeStart(ct)), (ct) => Task.Run(() => OnRuntimeInitializeStop(ct)));
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeServices, (ct) => Task.Run(() => OnRuntimeServicesStart(ct)), (ct) => Task.Run(() => OnRuntimeServicesStop(ct)));
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeGrainServices, (ct) => Task.Run(() => OnRuntimeGrainServicesStart(ct)));
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.BecomeActive, (ct) => Task.Run(() => OnBecomeActiveStart(ct)), (ct) => Task.Run(() => OnBecomeActiveStop(ct)));
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.Active, (ct) => Task.Run(() => OnActiveStart(ct)), (ct) => Task.Run(() => OnActiveStop(ct)));
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeInitialize, RunOnRuntimeInitializeStart, RunOnRuntimeInitializeStop);
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeServices, RunOnRuntimeServicesStart, RunOnRuntimeServicesStop);
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeGrainServices, RunOnRuntimeGrainServicesStart);
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.BecomeActive, RunOnBecomeActiveStart);
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.GrainDeactivation, NoOpStart, RunOnBecomeActiveStop);
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.Active, RunOnActiveStart, RunOnActiveStop);
+
+            // Stage callbacks are dispatched onto the thread pool so that any blocking
+            // work in the silo start/stop paths does not stall the lifecycle scheduler.
+            static Task NoOpStart(CancellationToken ct) => Task.CompletedTask;
+            Task RunOnRuntimeInitializeStart(CancellationToken ct) => Task.Run(() => OnRuntimeInitializeStart(ct));
+            Task RunOnRuntimeInitializeStop(CancellationToken ct) => Task.Run(() => OnRuntimeInitializeStop(ct));
+            Task RunOnRuntimeServicesStart(CancellationToken ct) => Task.Run(() => OnRuntimeServicesStart(ct));
+            Task RunOnRuntimeServicesStop(CancellationToken ct) => Task.Run(() => OnRuntimeServicesStop(ct));
+            Task RunOnRuntimeGrainServicesStart(CancellationToken ct) => Task.Run(() => OnRuntimeGrainServicesStart(ct));
+            Task RunOnBecomeActiveStart(CancellationToken ct) => Task.Run(() => OnBecomeActiveStart(ct));
+            Task RunOnBecomeActiveStop(CancellationToken ct) => Task.Run(() => OnBecomeActiveStop(ct));
+            Task RunOnActiveStart(CancellationToken ct) => Task.Run(() => OnActiveStart(ct));
+            Task RunOnActiveStop(CancellationToken ct) => Task.Run(() => OnActiveStop(ct));
         }
 
         public async ValueTask DisposeAsync()

@@ -1,5 +1,3 @@
-#nullable enable
-
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
@@ -25,6 +23,7 @@ namespace Orleans.Runtime.Messaging
     {
         private const int FramingLength = Message.LENGTH_HEADER_SIZE;
         private const int MessageSizeHint = 4096;
+        private const int MaxRequestContextInitialCapacity = 1024;
         private readonly Dictionary<Type, ResponseCodec> _rawResponseCodecs = [];
         private readonly CodecProvider _codecProvider;
         private readonly IFieldCodec<GrainAddressCacheUpdate> _grainAddressCacheUpdateCodec;
@@ -128,17 +127,19 @@ namespace Orleans.Runtime.Messaging
         private void ReadBodyObject<TInput>(Message message, ref Reader<TInput> reader)
         {
             var field = reader.ReadFieldHeader();
+            // A non-empty message body always carries its concrete field type.
+            var fieldType = field.FieldType!;
 
             if (message.Result == ResponseTypes.Success)
             {
                 message.Result = ResponseTypes.None; // reset raw response indicator
-                if (!_rawResponseCodecs.TryGetValue(field.FieldType, out var rawCodec))
-                    rawCodec = GetRawCodec(field.FieldType);
+                if (!_rawResponseCodecs.TryGetValue(fieldType, out var rawCodec))
+                    rawCodec = GetRawCodec(fieldType);
                 message.BodyObject = rawCodec.ReadRaw(ref reader, ref field);
             }
             else
             {
-                var bodyCodec = _codecProvider.GetCodec(field.FieldType);
+                var bodyCodec = _codecProvider.GetCodec(fieldType);
                 message.BodyObject = bodyCodec.ReadValue(ref reader, field);
             }
         }
@@ -302,13 +303,19 @@ namespace Orleans.Runtime.Messaging
 
         internal List<GrainAddressCacheUpdate> ReadCacheInvalidationHeaders<TInput>(ref Reader<TInput> reader)
         {
-            var n = (int)reader.ReadVarUInt32();
+            var n = reader.ReadVarUInt32();
             if (n > 0)
             {
-                var list = new List<GrainAddressCacheUpdate>(n);
-                for (int i = 0; i < n; i++)
+                var count = Math.Min(n, (uint)Message.MaxCacheInvalidationHeaderEntries);
+                var list = new List<GrainAddressCacheUpdate>((int)count);
+                for (uint i = 0; i < n; i++)
                 {
-                    list.Add(_grainAddressCacheUpdateCodec.ReadValue(ref reader, reader.ReadFieldHeader()));
+                    // Cache invalidation headers only contain non-null update records.
+                    var update = _grainAddressCacheUpdateCodec.ReadValue(ref reader, reader.ReadFieldHeader())!;
+                    if (i < count)
+                    {
+                        list.Add(update);
+                    }
                 }
 
                 return list;
@@ -383,11 +390,12 @@ namespace Orleans.Runtime.Messaging
         private static Dictionary<string, object> ReadRequestContext<TInput>(ref Reader<TInput> reader)
         {
             var size = (int)reader.ReadVarUInt32();
-            var result = new Dictionary<string, object>(size);
+            var result = new Dictionary<string, object>(GetRequestContextInitialCapacity(size));
             for (var i = 0; i < size; i++)
             {
                 var key = ReadString(ref reader);
-                var value = ObjectCodec.ReadValue(ref reader, reader.ReadFieldHeader());
+                // Request context dictionaries do not contain null values.
+                var value = ObjectCodec.ReadValue(ref reader, reader.ReadFieldHeader())!;
 
                 Debug.Assert(key is not null);
                 result.Add(key, value);
@@ -395,6 +403,8 @@ namespace Orleans.Runtime.Messaging
 
             return result;
         }
+
+        internal static int GetRequestContextInitialCapacity(int size) => size > MaxRequestContextInitialCapacity ? MaxRequestContextInitialCapacity : size;
 
         private GrainId ReadGrainId<TInput>(ref Reader<TInput> reader)
         {

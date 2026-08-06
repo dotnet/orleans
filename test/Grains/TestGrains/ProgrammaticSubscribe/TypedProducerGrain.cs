@@ -7,9 +7,9 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
 {
     public class TypedProducerGrain<T> : Grain, ITypedProducerGrain
     {
-        private IAsyncStream<T> producer;
+        private IAsyncStream<T> producer = null!;
         protected int numProducedItems;
-        private IDisposable producerTimer;
+        private IDisposable? producerTimer;
         internal ILogger logger;
         private static readonly TimeSpan defaultFirePeriod = TimeSpan.FromMilliseconds(10);
         private readonly List<Exception> producerExceptions = new();
@@ -45,7 +45,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         public Task StopPeriodicProducing()
         {
             logger.LogInformation("StopPeriodicProducing");
-            producerTimer.Dispose();
+            producerTimer!.Dispose();
             producerTimer = null;
             if (producerExceptions is { Count: > 0 } exceptions)
             {
@@ -90,7 +90,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
             }
         }
 
-        private async Task Fire([CallerMemberName] string caller = null)
+        private async Task Fire([CallerMemberName] string? caller = null)
         {
             numProducedItems++;
             await ProducerOnNextAsync(this.producer);

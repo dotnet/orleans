@@ -6,30 +6,30 @@ public abstract class DurableGrain : Grain, IGrainBase
 {
     protected DurableGrain()
     {
-        StateMachineManager = ServiceProvider.GetRequiredService<IStateMachineManager>();
-        if (StateMachineManager is ILifecycleParticipant<IGrainLifecycle> participant)
+        StateManager = ServiceProvider.GetRequiredService<IJournaledStateManager>();
+        if (StateManager is ILifecycleParticipant<IGrainLifecycle> participant)
         {
             participant.Participate(((IGrainBase)this).GrainContext.ObservableLifecycle);
         }
     }
 
-    protected IStateMachineManager StateMachineManager { get; }
+    protected IJournaledStateManager StateManager { get; }
 
-    protected TStateMachine GetOrCreateStateMachine<TStateMachine>(string name) where TStateMachine : class, IDurableStateMachine
-        => GetOrCreateStateMachine(name, static sp => sp.GetRequiredService<TStateMachine>(), ServiceProvider);
+    protected TState GetOrCreateState<TState>(string name) where TState : class, IJournaledState
+        => GetOrCreateState(name, static sp => sp.GetRequiredService<TState>(), ServiceProvider);
 
-    protected TStateMachine GetOrCreateStateMachine<TState, TStateMachine>(string name, Func<TState, TStateMachine> createStateMachine, TState state) where TStateMachine : class, IDurableStateMachine
+    protected TState GetOrCreateState<TArg, TState>(string name, Func<TArg, TState> createState, TArg arg) where TState : class, IJournaledState
     {
-        if (StateMachineManager.TryGetStateMachine(name, out var stateMachine))
+        if (StateManager.TryGetState(name, out var state))
         {
-            return stateMachine as TStateMachine
-                ?? throw new InvalidOperationException($"A state machine named '{name}' already exists with an incompatible type {stateMachine.GetType()} versus {typeof(TStateMachine)}");
+            return state as TState
+                ?? throw new InvalidOperationException($"A state named '{name}' already exists with an incompatible type {state.GetType()} versus {typeof(TState)}");
         }
 
-        var result = createStateMachine(state);
-        StateMachineManager.RegisterStateMachine(name, result);
+        var result = createState(arg);
+        StateManager.RegisterState(name, result);
         return result;
     }
 
-    protected ValueTask WriteStateAsync(CancellationToken cancellationToken = default) => StateMachineManager.WriteStateAsync(cancellationToken);
+    protected ValueTask WriteStateAsync(CancellationToken cancellationToken = default) => StateManager.WriteStateAsync(cancellationToken);
 }

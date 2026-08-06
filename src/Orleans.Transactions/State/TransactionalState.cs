@@ -27,7 +27,7 @@ namespace Orleans.Transactions
         private readonly ILogger logger;
         private readonly ActivationLifetime activationLifetime;
         private ParticipantId participantId;
-        private TransactionQueue<TState> queue;
+        private TransactionQueue<TState> queue = null!;
 
         public string CurrentTransactionId => TransactionContext.GetRequiredTransactionInfo().Id;
 
@@ -66,11 +66,11 @@ namespace Orleans.Transactions
             info.Participants.TryGetValue(this.participantId, out var recordedaccesses);
 
             // schedule read access to happen under the lock
-            return this.queue.RWLock.EnterLock<TResult>(info.TransactionId, info.Priority, recordedaccesses, true,
+            return this.queue.RWLock.EnterLock<TResult>(info.TransactionId, info.Priority, recordedaccesses, true, info.UseExclusiveLock,
                 () =>
                 {
                     // check if our record is gone because we expired while waiting
-                    if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<TState> record))
+                    if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<TState>? record))
                     {
                         throw new OrleansCascadingAbortException(info.TransactionId.ToString());
                     }
@@ -89,7 +89,7 @@ namespace Orleans.Transactions
                     info.RecordRead(this.participantId, record.Timestamp);
 
                     // perform the read
-                    TResult result = default;
+                    TResult result = default!;
                     try
                     {
                         detectReentrancy = true;
@@ -126,11 +126,11 @@ namespace Orleans.Transactions
 
             info.Participants.TryGetValue(this.participantId, out var recordedaccesses);
 
-            return this.queue.RWLock.EnterLock<TResult>(info.TransactionId, info.Priority, recordedaccesses, false,
+            return this.queue.RWLock.EnterLock<TResult>(info.TransactionId, info.Priority, recordedaccesses, false, info.UseExclusiveLock,
                 () =>
                 {
                     // check if we expired while waiting
-                    if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<TState> record))
+                    if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<TState>? record))
                     {
                         throw new OrleansCascadingAbortException(info.TransactionId.ToString());
                     }
@@ -212,7 +212,7 @@ namespace Orleans.Transactions
         private TResult CopyResult<TResult>(TResult result)
         {
             ITransactionDataCopier<TResult> resultCopier;
-            if (!this.copiers.TryGetValue(typeof(TResult), out object cp))
+            if (!this.copiers.TryGetValue(typeof(TResult), out object? cp))
             {
                 resultCopier = this.context.ActivationServices.GetRequiredService<ITransactionDataCopier<TResult>>();
                 this.copiers.Add(typeof(TResult), resultCopier);
@@ -245,7 +245,7 @@ namespace Orleans.Transactions
             Level = LogLevel.Trace,
             Message = "EndRead {Info} {Result} {State}"
         )]
-        private partial void LogTraceEndRead(TransactionInfo info, object result, TState state);
+        private partial void LogTraceEndRead(TransactionInfo info, object? result, TState state);
 
         [LoggerMessage(
             Level = LogLevel.Trace,

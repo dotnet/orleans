@@ -38,4 +38,10 @@ namespace UnitTests.GrainInterfaces
         Task Delay(TimeSpan dt);
         Task<string> IdentifyActivation();
     }
+
+    public interface IKeepAliveActivationGcTestGrain : IGrainWithGuidKey
+    {
+        Task SetKeepAlive(TimeSpan keepAlive);
+        Task CancelKeepAlive();
+    }
 }

@@ -8,6 +8,6 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the silo name.
         /// </summary>
-        public string SiloName { get; set; }
+        public string SiloName { get; set; } = null!;
     }
 }

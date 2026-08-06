@@ -14,11 +14,11 @@ namespace Orleans.Streams.Filtering
         /// <param name="item">The stream item.</param>
         /// <param name="filterData">The filter data.</param>
         /// <returns><see langword="true" /> if the stream item should be delivered, <see langword="false" /> otherwise.</returns>
-        bool ShouldDeliver(StreamId streamId, object item, string filterData);
+        bool ShouldDeliver(StreamId streamId, object item, string? filterData);
     }
 
     internal sealed class NoOpStreamFilter : IStreamFilter
     {
-        public bool ShouldDeliver(StreamId streamId, object item, string filterData) => true;
+        public bool ShouldDeliver(StreamId streamId, object item, string? filterData) => true;
     }
 }

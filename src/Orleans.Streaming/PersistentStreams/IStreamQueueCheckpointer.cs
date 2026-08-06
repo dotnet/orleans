@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Streams
@@ -40,5 +41,13 @@ namespace Orleans.Streams
         /// <param name="offset">The offset.</param>
         /// <param name="utcNow">The current UTC time.</param>
         void Update(TCheckpoint offset, DateTime utcNow);
+
+        /// <summary>
+        /// Flushes any pending checkpoint to persistent storage, ensuring the latest offset is durably saved.
+        /// Called during shutdown or rebalancing to prevent message replay on restart.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>A <see cref="Task"/> representing the flush operation.</returns>
+        Task FlushAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

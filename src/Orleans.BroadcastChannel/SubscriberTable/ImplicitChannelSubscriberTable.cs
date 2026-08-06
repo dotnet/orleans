@@ -3,8 +3,10 @@ using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Metadata;
 using Orleans.Runtime;
@@ -13,7 +15,11 @@ namespace Orleans.BroadcastChannel.SubscriberTable
 {
     internal class ImplicitChannelSubscriberTable
     {
-        private readonly object _lockObj = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock _lockObj = new();
+#else
+        private readonly object _lockObj = new();
+#endif
         private readonly GrainBindingsResolver _bindings;
         private readonly IChannelNamespacePredicateProvider[] _providers;
         private readonly IServiceProvider _serviceProvider;
@@ -72,7 +78,7 @@ namespace Orleans.BroadcastChannel.SubscriberTable
                            $"Channel binding for grain type {binding.GrainType} is missing a \"{WellKnownGrainTypeProperties.BroadcastChannelBindingPatternKey}\" value");
                     }
 
-                    IChannelNamespacePredicate predicate = null;
+                    IChannelNamespacePredicate? predicate = null;
                     foreach (var provider in _providers)
                     {
                         if (provider.TryGetPredicate(pattern, out predicate)) break;
@@ -92,7 +98,7 @@ namespace Orleans.BroadcastChannel.SubscriberTable
                     }
 
                     var channelIdMapper = _serviceProvider.GetKeyedService<IChannelIdMapper>(string.IsNullOrWhiteSpace(mapperName) ? DefaultChannelIdMapper.Name : mapperName);
-                    var subscriber = new BroadcastChannelSubscriber(binding, channelIdMapper);
+                    var subscriber = new BroadcastChannelSubscriber(binding, channelIdMapper!);
                     newPredicates.Add(new BroadcastChannelSubscriberPredicate(subscriber, predicate));
                 }
             }
@@ -203,7 +209,7 @@ namespace Orleans.BroadcastChannel.SubscriberTable
             public IChannelNamespacePredicate Predicate { get; }
         }
 
-        private sealed class BroadcastChannelSubscriber : IEquatable<BroadcastChannelSubscriber>
+        private sealed class BroadcastChannelSubscriber : IEquatable<BroadcastChannelSubscriber?>
         {
             public BroadcastChannelSubscriber(GrainBindings grainBindings, IChannelIdMapper channelIdMapper)
             {
@@ -217,9 +223,9 @@ namespace Orleans.BroadcastChannel.SubscriberTable
 
             private IChannelIdMapper channelIdMapper { get; }
 
-            public override bool Equals(object obj) => Equals(obj as BroadcastChannelSubscriber);
+            public override bool Equals([NotNullWhen(true)] object? obj) => Equals(obj as BroadcastChannelSubscriber);
 
-            public bool Equals(BroadcastChannelSubscriber other) => other != null && GrainType.Equals(other.GrainType);
+            public bool Equals([NotNullWhen(true)] BroadcastChannelSubscriber? other) => other != null && GrainType.Equals(other.GrainType);
 
             public override int GetHashCode() => GrainType.GetHashCode();
 

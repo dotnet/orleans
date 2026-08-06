@@ -7,14 +7,14 @@ namespace Orleans
     /// </summary>
     /// <param name="sender">The sender.</param>
     /// <param name="e">The event arguments.</param>
-    public delegate void ConnectionToClusterLostHandler(object sender, EventArgs e);
+    public delegate void ConnectionToClusterLostHandler(object? sender, EventArgs e);
 
     /// <summary>
     /// Handler for the number of gateways.
     /// </summary>
     /// <param name="sender">The sender.</param>
     /// <param name="e">The event arguments.</param>
-    public delegate void GatewayCountChangedHandler(object sender, GatewayCountChangedEventArgs e);
+    public delegate void GatewayCountChangedHandler(object? sender, GatewayCountChangedEventArgs e);
 
     /// <summary>
     /// Event arguments for gateway connectivity events.

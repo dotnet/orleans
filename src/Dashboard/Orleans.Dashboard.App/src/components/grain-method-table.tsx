@@ -1,4 +1,5 @@
 import React from 'react';
+import { getName } from '../lib/typeName';
 
 interface GrainMethodValue {
   grain: string;
@@ -27,7 +28,7 @@ export default class GrainMethodTable extends React.Component<GrainMethodTablePr
           {value.method}
           <br />
           <small>
-            <a href={`#/grain/${value.grain}`}>{value.grain}</a>
+            <a href={`#/grain/${value.grain}`} title={value.grain}>{getName(value.grain)}</a>
           </small>
         </td>
       </tr>

@@ -16,6 +16,184 @@ using System.Runtime.InteropServices;
 
 namespace Orleans.Serialization.UnitTests
 {
+    [Trait("Category", "BVT")]
+    public sealed class ReaderTests
+    {
+        [Theory]
+        [InlineData(0x01, 1)]
+        [InlineData(0x02, 2)]
+        [InlineData(0x04, 3)]
+        [InlineData(0x08, 4)]
+        [InlineData(0x10, 5)]
+        [InlineData(0x20, 6)]
+        [InlineData(0x00, 9)]
+        public void GetVarIntByteCount_ReturnsEncodedByteCount(byte firstByte, int expected)
+        {
+            Assert.Equal(expected, Reader.GetVarIntByteCount(firstByte));
+        }
+
+        [Fact]
+        public void PeekByte_DoesNotAdvanceReader()
+        {
+            var reader = Reader.Create(new byte[] { 0x12, 0x34 }, session: null!);
+
+            Assert.Equal(0, reader.Position);
+            Assert.Equal(2, reader.Remaining);
+            Assert.Equal(0x12, reader.PeekByte());
+            Assert.Equal(0, reader.Position);
+            Assert.Equal(2, reader.Remaining);
+            Assert.Equal(0x12, reader.ReadByte());
+            Assert.Equal(1, reader.Position);
+            Assert.Equal(1, reader.Remaining);
+        }
+
+        [Fact]
+        public void Remaining_IsRelativeToForkedInput()
+        {
+            var reader = Reader.Create(new byte[10], session: null!);
+            reader.ForkFrom(4, out var forked);
+
+            Assert.Equal(6, forked.Remaining);
+            forked.ReadByte();
+            Assert.Equal(5, forked.Remaining);
+        }
+
+        [Fact]
+        public void ReadBytes_RejectsLengthGreaterThanRemainingInput()
+        {
+            var exception = Assert.Throws<IndexOutOfRangeException>(() => ReadBytes(new byte[4], 5));
+            Assert.Contains("remaining length of the input, 4", exception.Message);
+        }
+
+        [Fact]
+        public void StringCodec_RejectsLengthGreaterThanRemainingInput()
+        {
+            var exception = Assert.Throws<IndexOutOfRangeException>(() => ReadString(new byte[4], 5));
+            Assert.Contains("remaining length of the input, 4", exception.Message);
+        }
+
+        [Fact]
+        public void StringCodec_ReadsFromNonSeekableStream()
+        {
+            using var stream = new NonSeekableStream([0x74, 0x65, 0x73, 0x74]);
+            var reader = Reader.Create(stream, session: null!);
+
+            Assert.Equal("test", StringCodec.ReadRaw(ref reader, 4));
+        }
+
+        [Fact]
+        public void ReadVarUInt32_RejectsOverflowBits()
+        {
+            var bytes = WriteVarUInt32(uint.MaxValue);
+            bytes[^1] |= 0xE0;
+
+            Assert.Throws<OverflowException>(() => ReadVarUInt32(bytes));
+        }
+
+        [Fact]
+        public void ReadVarUInt64_IgnoresFollowingByteAfterNineByteValue()
+        {
+            var bytes = WriteVarUInt64(1UL << 62);
+            Array.Resize(ref bytes, bytes.Length + 1);
+            bytes[^1] = 0x01;
+
+            var reader = Reader.Create(bytes, session: null!);
+
+            Assert.Equal(1UL << 62, reader.ReadVarUInt64());
+            Assert.Equal(0x01, reader.ReadByte());
+        }
+
+        [Fact]
+        public void ReadVarUInt64_RejectsOverflowBits()
+        {
+            var bytes = WriteVarUInt64(ulong.MaxValue);
+            bytes[^1] |= 0xFC;
+
+            Assert.Throws<OverflowException>(() => ReadVarUInt64(bytes));
+            Assert.Throws<OverflowException>(() => ReadVarUInt64FromStream(bytes));
+        }
+
+        private static uint ReadVarUInt32(byte[] bytes)
+        {
+            var reader = Reader.Create(bytes, session: null!);
+            return reader.ReadVarUInt32();
+        }
+
+        private static ulong ReadVarUInt64(byte[] bytes)
+        {
+            var reader = Reader.Create(bytes, session: null!);
+            return reader.ReadVarUInt64();
+        }
+
+        private static ulong ReadVarUInt64FromStream(byte[] bytes)
+        {
+            using var stream = new MemoryStream(bytes);
+            var reader = Reader.Create(stream, session: null!);
+            return reader.ReadVarUInt64();
+        }
+
+        private static byte[] ReadBytes(byte[] bytes, uint count)
+        {
+            var reader = Reader.Create(bytes, session: null!);
+            return reader.ReadBytes(count);
+        }
+
+        private static string ReadString(byte[] bytes, uint count)
+        {
+            var reader = Reader.Create(bytes, session: null!);
+            return StringCodec.ReadRaw(ref reader, count);
+        }
+
+        private static byte[] WriteVarUInt32(uint value)
+        {
+            var output = new ArrayBufferWriter<byte>();
+            var writer = Writer.Create(output, session: null!);
+            writer.WriteVarUInt32(value);
+            writer.Commit();
+            return output.WrittenSpan.ToArray();
+        }
+
+        private static byte[] WriteVarUInt64(ulong value)
+        {
+            var output = new ArrayBufferWriter<byte>();
+            var writer = Writer.Create(output, session: null!);
+            writer.WriteVarUInt64(value);
+            writer.Commit();
+            return output.WrittenSpan.ToArray();
+        }
+
+        private sealed class NonSeekableStream(byte[] buffer) : Stream
+        {
+            private readonly MemoryStream _inner = new(buffer);
+
+            public override bool CanRead => true;
+            public override bool CanSeek => false;
+            public override bool CanWrite => false;
+            public override long Length => throw new NotSupportedException();
+            public override long Position
+            {
+                get => throw new NotSupportedException();
+                set => throw new NotSupportedException();
+            }
+
+            public override void Flush() { }
+            public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
+            public override int Read(Span<byte> buffer) => _inner.Read(buffer);
+            public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+            public override void SetLength(long value) => throw new NotSupportedException();
+            public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+            protected override void Dispose(bool disposing)
+            {
+                if (disposing)
+                {
+                    _inner.Dispose();
+                }
+
+                base.Dispose(disposing);
+            }
+        }
+    }
+
     /// <summary>
     /// Tests for Orleans' low-level Reader and Writer implementations.
     /// 
@@ -257,7 +435,8 @@ namespace Orleans.Serialization.UnitTests
             // implementation details.
             var buf = buffer.GetMemory(1);
             Assert.True(MemoryMarshal.TryGetArray<byte>(buf, out var seg));
-            var offset = seg.Array.Length - b.Length;
+            // A successful TryGetArray call guarantees that the returned segment is array-backed.
+            var offset = seg.Array!.Length - b.Length;
             buffer.Write(new byte[offset]);
             buffer.Write(b);
             buffer.Write(b2);
@@ -304,7 +483,8 @@ namespace Orleans.Serialization.UnitTests
             var services = new ServiceCollection();
             _ = services.AddSerializer();
             _serviceProvider = services.BuildServiceProvider();
-            _sessionPool = _serviceProvider.GetService<SerializerSessionPool>();
+            // AddSerializer guarantees that the session pool is registered.
+            _sessionPool = _serviceProvider.GetService<SerializerSessionPool>()!;
             _testOutputHelper = testOutputHelper;
         }
 

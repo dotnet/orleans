@@ -51,7 +51,7 @@ public class MegaGraphBenchmark
     {
         Session.Reset();
         var instance = Serializer.Deserialize(Input, Session);
-        return instance;
+        return instance!; // Input is initialized from a serialized graph during setup.
     }
 
     [Benchmark]

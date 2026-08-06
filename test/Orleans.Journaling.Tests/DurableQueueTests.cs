@@ -12,7 +12,7 @@ namespace Orleans.Journaling.Tests;
 /// reliable message processing patterns in Orleans grains.
 /// </summary>
 [TestCategory("BVT")]
-public class DurableQueueTests : StateMachineTestBase
+public class DurableQueueTests : JournalingTestBase
 {
     /// <summary>
     /// Tests basic queue operations: Enqueue, Dequeue, Peek, and Count.
@@ -25,7 +25,7 @@ public class DurableQueueTests : StateMachineTestBase
         var sut = CreateTestSystem();
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
-        var queue = new DurableQueue<string>("testQueue", manager, codec, SessionPool);
+        var queue = new DurableQueue<string>("testQueue", manager, new OrleansBinaryDurableQueueCommandCodec<string>(codec, SessionPool));
         await sut.Lifecycle.OnStart();
         
         // Act - Enqueue items
@@ -80,7 +80,7 @@ public class DurableQueueTests : StateMachineTestBase
         // Arrange
         var sut = CreateTestSystem();
         var codec = CodecProvider.GetCodec<string>();
-        var queue1 = new DurableQueue<string>("testQueue", sut.Manager, codec, SessionPool);
+        var queue1 = new DurableQueue<string>("testQueue", sut.Manager, new OrleansBinaryDurableQueueCommandCodec<string>(codec, SessionPool));
         await sut.Lifecycle.OnStart();
         
         // Act - Enqueue items and persist
@@ -91,7 +91,7 @@ public class DurableQueueTests : StateMachineTestBase
         
         // Create a new manager with the same storage
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var queue2 = new DurableQueue<string>("testQueue", sut2.Manager, codec, SessionPool);
+        var queue2 = new DurableQueue<string>("testQueue", sut2.Manager, new OrleansBinaryDurableQueueCommandCodec<string>(codec, SessionPool));
         await sut2.Lifecycle.OnStart();
 
         // Assert - Queue should be recovered
@@ -119,7 +119,7 @@ public class DurableQueueTests : StateMachineTestBase
         var sut = CreateTestSystem();
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<TestPerson>();
-        var queue = new DurableQueue<TestPerson>("personQueue", manager, codec, SessionPool);
+        var queue = new DurableQueue<TestPerson>("personQueue", manager, new OrleansBinaryDurableQueueCommandCodec<TestPerson>(codec, SessionPool));
         await sut.Lifecycle.OnStart();
         
         // Act
@@ -156,7 +156,7 @@ public class DurableQueueTests : StateMachineTestBase
         var sut = CreateTestSystem();
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
-        var queue = new DurableQueue<string>("clearQueue", manager, codec, SessionPool);
+        var queue = new DurableQueue<string>("clearQueue", manager, new OrleansBinaryDurableQueueCommandCodec<string>(codec, SessionPool));
         await sut.Lifecycle.OnStart();
         
         // Add items
@@ -186,7 +186,7 @@ public class DurableQueueTests : StateMachineTestBase
         var sut = CreateTestSystem();
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
-        var queue = new DurableQueue<string>("emptyQueue", manager, codec, SessionPool);
+        var queue = new DurableQueue<string>("emptyQueue", manager, new OrleansBinaryDurableQueueCommandCodec<string>(codec, SessionPool));
         await sut.Lifecycle.OnStart();
         await manager.WriteStateAsync(CancellationToken.None);
         
@@ -210,7 +210,7 @@ public class DurableQueueTests : StateMachineTestBase
         var sut = CreateTestSystem();
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
-        var queue = new DurableQueue<string>("enumQueue", manager, codec, SessionPool);
+        var queue = new DurableQueue<string>("enumQueue", manager, new OrleansBinaryDurableQueueCommandCodec<string>(codec, SessionPool));
         await sut.Lifecycle.OnStart();
         
         // Add items
@@ -242,7 +242,7 @@ public class DurableQueueTests : StateMachineTestBase
         var sut = CreateTestSystem();
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<int>();
-        var queue = new DurableQueue<int>("largeQueue", manager, codec, SessionPool);
+        var queue = new DurableQueue<int>("largeQueue", manager, new OrleansBinaryDurableQueueCommandCodec<int>(codec, SessionPool));
         await sut.Lifecycle.OnStart();
         
         // Act - Enqueue many items
@@ -260,7 +260,7 @@ public class DurableQueueTests : StateMachineTestBase
         
         // Create a new manager with the same storage to test recovery
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var queue2 = new DurableQueue<int>("largeQueue", sut2.Manager, codec, SessionPool);
+        var queue2 = new DurableQueue<int>("largeQueue", sut2.Manager, new OrleansBinaryDurableQueueCommandCodec<int>(codec, SessionPool));
         await sut2.Lifecycle.OnStart();
         
         // Assert - Large queue is correctly recovered
@@ -289,7 +289,7 @@ public class DurableQueueTests : StateMachineTestBase
         var sut = CreateTestSystem();
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<int>();
-        var queue = new DurableQueue<int>("concurrentQueue", manager, codec, SessionPool);
+        var queue = new DurableQueue<int>("concurrentQueue", manager, new OrleansBinaryDurableQueueCommandCodec<int>(codec, SessionPool));
         await sut.Lifecycle.OnStart();
         
         // Act - Simulate a queue with concurrent operations
@@ -321,7 +321,7 @@ public class DurableQueueTests : StateMachineTestBase
         
         // Create a new manager with the same storage to test recovery
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var queue2 = new DurableQueue<int>("concurrentQueue", sut2.Manager, codec, SessionPool);
+        var queue2 = new DurableQueue<int>("concurrentQueue", sut2.Manager, new OrleansBinaryDurableQueueCommandCodec<int>(codec, SessionPool));
         await sut2.Lifecycle.OnStart();
         
         // Assert - Queue should be recovered with correct state and ordering

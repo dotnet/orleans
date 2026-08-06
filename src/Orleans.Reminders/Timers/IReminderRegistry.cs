@@ -35,7 +35,7 @@ namespace Orleans.Timers
         /// <param name="callingGrainId">The ID of the the currently executing grain</param>
         /// <param name="reminderName">The reminder name.</param>
         /// <returns>The reminder.</returns>
-        Task<IGrainReminder> GetReminder(GrainId callingGrainId, string reminderName);
+        Task<IGrainReminder?> GetReminder(GrainId callingGrainId, string reminderName);
 
         /// <summary>
         /// Gets all reminders which are currently registered to the active grain.

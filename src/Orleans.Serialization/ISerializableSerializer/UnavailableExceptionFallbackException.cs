@@ -36,12 +36,12 @@ namespace Orleans.Serialization
         /// <summary>
         /// Gets the serialized properties of the exception.
         /// </summary>
-        public Dictionary<string, object> Properties { get; } = new();
+        public Dictionary<string, object?> Properties { get; } = new();
 
         /// <summary>
         /// Gets the exception type name.
         /// </summary>
-        public string ExceptionType { get; internal set; }
+        public string? ExceptionType { get; internal set; }
 
         /// <inheritdoc />
         public override string ToString() => string.IsNullOrWhiteSpace(ExceptionType) ? $"Unknown exception: {base.ToString()}" : $"Unknown exception of type {ExceptionType}: {base.ToString()}";

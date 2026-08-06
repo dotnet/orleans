@@ -43,7 +43,7 @@ namespace TestExtensions.Runners
             //acquire
             var results = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
             //release
-            await this.leaseProvider.Release(LeaseCategory, results.Select(result => result.AcquiredLease).ToArray());
+            await this.leaseProvider.Release(LeaseCategory, results.Select(result => result.AcquiredLease!).ToArray()); // This golden path expects every acquisition to succeed.
         }
 
         [SkippableFact]
@@ -55,7 +55,7 @@ namespace TestExtensions.Runners
             //acquire
             var acquireResults = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
             //renew
-            var renewResults = await this.leaseProvider.Renew(LeaseCategory, acquireResults.Select(result => result.AcquiredLease).ToArray());
+            var renewResults = await this.leaseProvider.Renew(LeaseCategory, acquireResults.Select(result => result.AcquiredLease!).ToArray()); // This golden path expects every acquisition to succeed.
             for (int i = 0; i < renewResults.Count(); i++)
             {
                 var result = renewResults[i];
@@ -87,7 +87,7 @@ namespace TestExtensions.Runners
             };
             //acquire
             var results = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
-            var acquiredLeaseWithWrongToken = results.Select(result => new AcquiredLease(result.AcquiredLease.ResourceKey, result.AcquiredLease.Duration, Guid.NewGuid().ToString(), result.AcquiredLease.StartTimeUtc));
+            var acquiredLeaseWithWrongToken = results.Select(result => new AcquiredLease(result.AcquiredLease!.ResourceKey, result.AcquiredLease.Duration, Guid.NewGuid().ToString(), result.AcquiredLease.StartTimeUtc)); // One lease is acquired for each distinct resource.
             //renew with wrong token
             var renewResults = await this.leaseProvider.Renew(LeaseCategory, acquiredLeaseWithWrongToken.ToArray());
             for (int i = 0; i < renewResults.Count(); i++)
@@ -95,7 +95,7 @@ namespace TestExtensions.Runners
                 LeaseRequest request = leaseRequests[i];
                 AcquireLeaseResult result = renewResults[i];
                 Assert.Equal(ResponseCode.InvalidToken, result.StatusCode);
-                Assert.Equal(request.ResourceKey, result.AcquiredLease.ResourceKey);
+                Assert.Equal(request.ResourceKey, result.AcquiredLease!.ResourceKey); // Invalid-token responses retain the acquired lease.
             }
         }
 
@@ -110,7 +110,7 @@ namespace TestExtensions.Runners
             //acquire first time
             var acquireResults1 = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
             //renew
-            var renewResults = await this.leaseProvider.Renew(LeaseCategory, acquireResults1.Select(result => result.AcquiredLease).ToArray());
+            var renewResults = await this.leaseProvider.Renew(LeaseCategory, acquireResults1.Select(result => result.AcquiredLease!).ToArray()); // This golden path expects acquisition to succeed.
             for (int i = 0; i < renewResults.Count(); i++)
             {
                 var result = renewResults[i];
@@ -119,7 +119,7 @@ namespace TestExtensions.Runners
                 Assert.Equal(leaseRequests[i].ResourceKey, result.AcquiredLease.ResourceKey);
             }
             //release
-            await this.leaseProvider.Release(LeaseCategory, renewResults.Select(result => result.AcquiredLease).ToArray());
+            await this.leaseProvider.Release(LeaseCategory, renewResults.Select(result => result.AcquiredLease!).ToArray()); // Successful renewals retain their leases.
 
             //acquire second time, acquire lease on the same resource after their leases got released
             var acquireResults2 = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
@@ -130,7 +130,7 @@ namespace TestExtensions.Runners
                 Assert.NotNull(result.AcquiredLease);
                 Assert.Equal(leaseRequests[i].ResourceKey, result.AcquiredLease.ResourceKey);
                 //token in two leases should be different
-                Assert.NotEqual(acquireResults1[i].AcquiredLease.Token, result.AcquiredLease.Token);
+                Assert.NotEqual(acquireResults1[i].AcquiredLease!.Token, result.AcquiredLease!.Token); // Both successful acquisitions have leases.
             }
         }
 

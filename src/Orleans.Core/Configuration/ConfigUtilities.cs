@@ -52,7 +52,7 @@ namespace Orleans.Runtime.Configuration
             return TimeSpan.FromTicks((long)(rawTimeSpan * unitSize));
         }
 
-        internal static IPAddress ResolveIPAddressOrDefault(byte[] subnet, AddressFamily family)
+        internal static IPAddress? ResolveIPAddressOrDefault(byte[]? subnet, AddressFamily family)
         {
             IList<IPAddress> nodeIps = NetworkInterface.GetAllNetworkInterfaces()
                             .Where(iface => iface.OperationalStatus == OperationalStatus.Up)
@@ -65,7 +65,7 @@ namespace Orleans.Runtime.Configuration
             return ipAddress;
         }
 
-        internal static IPAddress ResolveIPAddressOrDefault(string addrOrHost, byte[] subnet, AddressFamily family)
+        internal static IPAddress? ResolveIPAddressOrDefault(string? addrOrHost, byte[]? subnet, AddressFamily family)
         {
             var loopback = family == AddressFamily.InterNetwork ? IPAddress.Loopback : IPAddress.IPv6Loopback;
 
@@ -96,7 +96,7 @@ namespace Orleans.Runtime.Configuration
             }
         }
 
-        private static IPAddress PickIPAddress(IList<IPAddress> nodeIps, byte[] subnet, AddressFamily family)
+        private static IPAddress? PickIPAddress(IList<IPAddress> nodeIps, byte[]? subnet, AddressFamily family)
         {
             var candidates = new List<IPAddress>();
             foreach (var nodeIp in nodeIps.Where(x => x.AddressFamily == family))
@@ -120,9 +120,9 @@ namespace Orleans.Runtime.Configuration
             return candidates.Count > 0 ? PickIPAddress(candidates) : null;
         }
 
-        private static IPAddress PickIPAddress(IReadOnlyList<IPAddress> candidates)
+        private static IPAddress? PickIPAddress(IReadOnlyList<IPAddress> candidates)
         {
-            IPAddress chosen = null;
+            IPAddress? chosen = null;
             foreach (IPAddress addr in candidates)
             {
                 if (chosen == null)
@@ -164,7 +164,7 @@ namespace Orleans.Runtime.Configuration
         /// If there are multiple addresses in the correct family in the server's DNS record, the first will be returned.
         /// </summary>
         /// <returns>The server's IPv4 address.</returns>
-        internal static IPAddress GetLocalIPAddress(AddressFamily family = AddressFamily.InterNetwork, string interfaceName = null)
+        internal static IPAddress GetLocalIPAddress(AddressFamily family = AddressFamily.InterNetwork, string? interfaceName = null)
         {
             var loopback = (family == AddressFamily.InterNetwork) ? IPAddress.Loopback : IPAddress.IPv6Loopback;
             // get list of all network interfaces
@@ -201,7 +201,26 @@ namespace Orleans.Runtime.Configuration
                     }
                 }
             }
-            if (candidates.Count > 0) return PickIPAddress(candidates);
+            return ResolveLocalIPAddress(candidates, family, interfaceName);
+        }
+
+        internal static IPAddress ResolveLocalIPAddress(IReadOnlyList<IPAddress> candidates, AddressFamily family, string? interfaceName)
+        {
+            if (candidates.Count > 0)
+            {
+                return PickIPAddress(candidates)!;
+            }
+
+            if (string.IsNullOrWhiteSpace(interfaceName))
+            {
+                return family switch
+                {
+                    AddressFamily.InterNetwork => IPAddress.Loopback,
+                    AddressFamily.InterNetworkV6 => IPAddress.IPv6Loopback,
+                    _ => throw new OrleansException("Failed to get a local IP address."),
+                };
+            }
+
             throw new OrleansException("Failed to get a local IP address.");
         }
 
@@ -212,7 +231,7 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         /// <param name="connectionString">The connection string to print.</param>
         /// <returns>The string representation of the DataConnectionString with account credential info redacted.</returns>
-        public static string RedactConnectionStringInfo(string connectionString)
+        public static string RedactConnectionStringInfo(string? connectionString)
         {
             string[] secretKeys =
             {

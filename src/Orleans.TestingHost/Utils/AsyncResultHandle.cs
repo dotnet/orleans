@@ -35,10 +35,10 @@ namespace Orleans.TestingHost.Utils
         }
 
         /// <summary> Get or set the exception of the result handle </summary>
-        public Exception Exception { get; set; }
+        public Exception? Exception { get; set; }
 
         /// <summary> Get or set the value of the result handle </summary>
-        public object Result { get; set; }
+        public object? Result { get; set; }
 
         /// <summary>
         /// </summary>

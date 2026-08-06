@@ -8,7 +8,7 @@ namespace UnitTests.Grains
     public class FilteredImplicitSubscriptionGrain : Grain, IFilteredImplicitSubscriptionGrain
     {
         private readonly ILogger logger;
-        private Dictionary<string, int> counters;
+        private Dictionary<string, int> counters = null!;
 
         public FilteredImplicitSubscriptionGrain(ILoggerFactory loggerFactory)
         {
@@ -18,7 +18,7 @@ namespace UnitTests.Grains
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger.LogInformation("OnActivateAsync");
-            var streamProvider = this.GetStreamProvider("SMSProvider");
+            var streamProvider = this.GetStreamProvider("MemoryStreamProvider");
             var streamNamespaces = new[] { "red1", "red2", "blue3", "blue4" };
             counters = new Dictionary<string, int>();
             foreach (var streamNamespace in streamNamespaces)

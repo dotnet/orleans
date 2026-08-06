@@ -21,7 +21,7 @@ namespace Orleans.Runtime.Scheduler
         {
             using var suppressExecutionContext = new ExecutionContextSuppressor();
 
-            var task = new Task(action, state);
+            var task = new Task((Action<object?>)action, state);
             task.Start(taskScheduler);
         }
 

@@ -25,5 +25,5 @@ internal abstract class BaseEntity
 
     [JsonProperty(ETAG_FIELD)]
     [JsonPropertyName(ETAG_FIELD)]
-    public string ETag { get; set; } = default!;
+    public string? ETag { get; set; }
 }

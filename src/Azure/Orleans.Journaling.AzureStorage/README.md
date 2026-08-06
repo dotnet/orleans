@@ -1,7 +1,35 @@
 # Microsoft Orleans Journaling for Azure Storage
 
 ## Introduction
-Microsoft Orleans Journaling for Azure Storage provides an Azure Storage implementation of the Orleans Journaling provider. This allows logging and tracking of grain operations using Azure Storage as a backing store.
+Microsoft Orleans Journaling for Azure Storage provides an Azure Storage implementation of the Orleans Journaling provider. This allows journaling and tracking of grain operations using Azure Storage as a backing store.
+
+Blob names are derived from the configured journal storage identity and do not use journal format file extensions. Azure append blobs store the journal format key in blob metadata and, when the selected journal format provides a MIME type, are created with that content type. The WAL blob name and checkpoint blob name can be customized using `AzureBlobJournalStorageOptions.GetWalBlobName` and `GetCheckpointBlobName`.
+
+## Using an alternative blob layout
+
+By default, WAL blobs are named `<journalId>/wal` and checkpoint blobs are named `<journalId>/chk.<snapshotId>`. Configure the blob name delegates to use an alternative layout, such as a shared prefix, file extensions, tenant-specific paths, or names which match an existing storage convention. Each delegate returns a container-relative blob name, and checkpoint names should include the supplied snapshot id to avoid collisions.
+
+```csharp
+siloBuilder.AddAzureBlobJournalStorage(options =>
+{
+    options.GetWalBlobName = static journalId => $"journals/{journalId.Value}.wal";
+    options.GetCheckpointBlobName = static (journalId, snapshotId) => $"journals/{journalId.Value}.{snapshotId}.chk";
+});
+```
+
+## Azure Table journal storage
+
+The package also provides an Azure Table implementation, `AddAzureTableJournalStorage`. Each journal is stored as one table partition: a header row carries the journal manifest and is the optimistic concurrency fence, and journal bytes are stored in data rows whose keys order the current generation by sequence. Every append commits its rows together with the header update in a single entity group transaction, and recovery replays the whole journal with a single partition range query, avoiding the per-block pacing which append blob replay is subject to. Because an append is limited by entity group transaction limits, a single journal batch must not exceed 2 MiB; replace operations may be any size.
+
+```csharp
+siloBuilder.AddAzureTableJournalStorage(options =>
+{
+    options.TableName = "journal";
+    options.TableServiceClient = tableServiceClient;
+});
+```
+
+`AzureTableJournalStorageOptions.GetPartitionKey` can be used to apply a custom partition layout. The returned key must be unique per journal, satisfy Azure Table partition-key restrictions, and contain at most 1,024 characters. The canonical journal id is stored in the header so catalog listing remains accurate with custom mappings.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -11,14 +39,47 @@ dotnet add package Microsoft.Orleans.Journaling.AzureStorage
 ```
 
 ## Example - Configuring Azure Storage Journaling
+
+The journaling provider resolves a registered `BlobServiceClient` from DI. How you obtain that client depends on your hosting model.
+
+### Authentication options
+
+For production workloads, prefer Microsoft Entra (Azure AD) credentials with `DefaultAzureCredential` rather than long-lived connection strings:
+
+```csharp
+using Azure.Identity;
+using Azure.Storage.Blobs;
+using Microsoft.Extensions.DependencyInjection;
+
+builder.Services.AddSingleton(_ =>
+    new BlobServiceClient(
+        new Uri("https://<your-account>.blob.core.windows.net"),
+        new DefaultAzureCredential()));
+```
+
+If you are integrating with .NET Aspire (as the bundled `JournalingAzureBlobJson` sample does), the AppHost emits a connection string that the consuming project resolves via `AddAzureBlobServiceClient`. Aspire wires up local emulator credentials in development and Entra-backed credentials in production.
+
+For ad-hoc local development you may register a `BlobServiceClient` from a connection string (such as the Azurite UseDevelopmentStorage shortcut). Do not embed production connection strings in source.
+
+### Wiring it into the silo
+
 ```csharp
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.Configuration;
+using Orleans.Journaling.Json;
+using System.Text.Json.Serialization;
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using MyGrainNamespace;
+
+[JsonSerializable(typeof(DateTime))]
+[JsonSerializable(typeof(int))]
+[JsonSerializable(typeof(long))]
+[JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(ulong))]
+internal partial class JournalJsonContext : JsonSerializerContext;
 
 var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
@@ -26,10 +87,12 @@ var builder = Host.CreateApplicationBuilder(args)
         siloBuilder
             .UseLocalhostClustering()
             // Configure Azure Storage as a journaling provider
-            .AddAzureAppendBlobStateMachineStorage(optionsBuilder =>
+            .AddAzureBlobJournalStorage(optionsBuilder =>
             {
                 optionsBuilder.Configure((options, serviceProvider) => options.BlobServiceClient = serviceProvider.GetRequiredService<BlobServiceClient>());
-            });
+            })
+            // JSON Lines is the default journaling format. Register metadata for all journaled payload types.
+            .UseJsonJournalFormat(JournalJsonContext.Default);
     });
 
 var host = await builder.StartAsync();

@@ -13,7 +13,7 @@ namespace Orleans.Serialization.Codecs;
 [RegisterSerializer]
 public sealed class TimeOnlyCodec : IFieldCodec<TimeOnly>
 {
-    void IFieldCodec<TimeOnly>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TimeOnly value)
+    void IFieldCodec<TimeOnly>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] TimeOnly value)
     {
         ReferenceCodec.MarkValueField(writer.Session);
         writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(TimeOnly), WireType.Fixed64);
@@ -32,6 +32,7 @@ public sealed class TimeOnlyCodec : IFieldCodec<TimeOnly>
     }
 
     /// <inheritdoc/>
+    [return: System.Diagnostics.CodeAnalysis.MaybeNull]
     TimeOnly IFieldCodec<TimeOnly>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
     /// <summary>
@@ -41,6 +42,7 @@ public sealed class TimeOnlyCodec : IFieldCodec<TimeOnly>
     /// <param name="reader">The reader.</param>
     /// <param name="field">The field.</param>
     /// <returns>The <see cref="TimeOnly"/> value.</returns>
+    [return: System.Diagnostics.CodeAnalysis.MaybeNull]
     public static TimeOnly ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         ReferenceCodec.MarkValueField(reader.Session);

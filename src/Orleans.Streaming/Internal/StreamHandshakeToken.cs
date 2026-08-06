@@ -4,24 +4,24 @@ namespace Orleans.Streams
 {
     [Serializable]
     [GenerateSerializer]
-    internal abstract class StreamHandshakeToken : IEquatable<StreamHandshakeToken>
+    internal abstract class StreamHandshakeToken : IEquatable<StreamHandshakeToken?>
     {
         [Id(0)]
-        public StreamSequenceToken Token { get; private set; }
+        public StreamSequenceToken Token { get; private set; } = null!;
         
-        public static StreamHandshakeToken CreateStartToken(StreamSequenceToken token)
+        public static StreamHandshakeToken? CreateStartToken(StreamSequenceToken? token)
         {
             if (token == null) return default;
             return new StartToken {Token = token};
         }
 
-        public static StreamHandshakeToken CreateDeliveyToken(StreamSequenceToken token)
+        public static StreamHandshakeToken? CreateDeliveyToken(StreamSequenceToken? token)
         {
             if (token == null) return default;
             return new DeliveryToken {Token = token};
         }
 
-        public bool Equals(StreamHandshakeToken other)
+        public bool Equals(StreamHandshakeToken? other)
         {
             if (ReferenceEquals(null, other)) return false;
             if (ReferenceEquals(this, other)) return true;
@@ -29,7 +29,7 @@ namespace Orleans.Streams
             return Equals(Token, other.Token);
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (ReferenceEquals(null, obj)) return false;
             if (ReferenceEquals(this, obj)) return true;

@@ -13,6 +13,6 @@ namespace Orleans.Providers
         /// <param name="command">A serial number of the command.</param>
         /// <param name="arg">An opaque command argument.</param>
         /// <returns>The value returned from the command handler.</returns>
-        Task<object> ExecuteCommand(int command, object arg);
+        Task<object?> ExecuteCommand(int command, object? arg);
     }
 }

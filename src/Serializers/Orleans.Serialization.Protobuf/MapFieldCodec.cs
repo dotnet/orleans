@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using Google.Protobuf.Collections;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
@@ -37,7 +38,7 @@ public sealed class MapFieldCodec<TKey, TValue> : IFieldCodec<MapField<TKey, TVa
     }
 
     /// <inheritdoc/>
-    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, MapField<TKey, TValue> value) where TBufferWriter : IBufferWriter<byte>
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] MapField<TKey, TValue> value) where TBufferWriter : IBufferWriter<byte>
     {
         if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
         {
@@ -62,6 +63,7 @@ public sealed class MapFieldCodec<TKey, TValue> : IFieldCodec<MapField<TKey, TVa
     }
 
     /// <inheritdoc/>
+    [return: MaybeNull]
     public MapField<TKey, TValue> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         if (field.WireType == WireType.Reference)
@@ -72,9 +74,9 @@ public sealed class MapFieldCodec<TKey, TValue> : IFieldCodec<MapField<TKey, TVa
         field.EnsureWireTypeTagDelimited();
 
         var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-        TKey key = default;
+        TKey? key = default;
         var valueExpected = false;
-        MapField<TKey, TValue> result = null;
+        MapField<TKey, TValue>? result = null;
         uint fieldId = 0;
         while (true)
         {
@@ -89,10 +91,7 @@ public sealed class MapFieldCodec<TKey, TValue> : IFieldCodec<MapField<TKey, TVa
             {
                 case 0:
                     var length = (int)UInt32Codec.ReadValue(ref reader, header);
-                    if (length > 10240 && length > reader.Length)
-                    {
-                        ThrowInvalidSizeException(length);
-                    }
+                    reader.EnsureAvailable((uint)length);
 
                     result = CreateInstance(reader.Session, placeholderReferenceId);
                     break;
@@ -107,7 +106,7 @@ public sealed class MapFieldCodec<TKey, TValue> : IFieldCodec<MapField<TKey, TVa
                     }
                     else
                     {
-                        result.Add(key, _valueCodec.ReadValue(ref reader, header));
+                        result!.Add(key!, _valueCodec.ReadValue(ref reader, header)!);
                         valueExpected = false;
                     }
                     break;
@@ -127,9 +126,6 @@ public sealed class MapFieldCodec<TKey, TValue> : IFieldCodec<MapField<TKey, TVa
         ReferenceCodec.RecordObject(session, result, placeholderReferenceId);
         return result;
     }
-
-    private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-        $"Declared length of {typeof(MapField<TKey, TValue>)}, {length}, is greater than total length of input.");
 
     private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized MapField is missing its length field.");
 }

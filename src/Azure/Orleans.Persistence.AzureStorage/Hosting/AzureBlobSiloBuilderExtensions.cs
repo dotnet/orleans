@@ -26,7 +26,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use azure blob storage as the default grain storage.
         /// </summary>
-        public static ISiloBuilder AddAzureBlobGrainStorageAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<AzureBlobStorageOptions>> configureOptions = null)
+        public static ISiloBuilder AddAzureBlobGrainStorageAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<AzureBlobStorageOptions>>? configureOptions = null)
         {
             return builder.AddAzureBlobGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
         }
@@ -34,7 +34,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use azure blob storage for grain storage.
         /// </summary>
-        public static ISiloBuilder AddAzureBlobGrainStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<AzureBlobStorageOptions>> configureOptions = null)
+        public static ISiloBuilder AddAzureBlobGrainStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<AzureBlobStorageOptions>>? configureOptions = null)
         {
             return builder.ConfigureServices(services => services.AddAzureBlobGrainStorage(name, configureOptions));
         }

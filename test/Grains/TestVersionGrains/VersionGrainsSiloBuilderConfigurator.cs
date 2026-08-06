@@ -14,14 +14,14 @@ namespace TestVersionGrains
         public void Configure(IHostBuilder hostBuilder)
         {
             var cfg = hostBuilder.GetConfiguration();
-            var siloCount = int.Parse(cfg["SiloCount"]);
+            var siloCount = int.Parse(cfg["SiloCount"]!);
             hostBuilder.UseOrleans((ctx, siloBuilder) =>
             {
                 siloBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = false);
                 siloBuilder.Configure<GrainVersioningOptions>(options =>
                 {
-                    options.DefaultCompatibilityStrategy = cfg["CompatibilityStrategy"];
-                    options.DefaultVersionSelectorStrategy = cfg["VersionSelectorStrategy"];
+                    options.DefaultCompatibilityStrategy = cfg["CompatibilityStrategy"]!;
+                    options.DefaultVersionSelectorStrategy = cfg["VersionSelectorStrategy"]!;
                 });
 
                 siloBuilder.ConfigureServices(ConfigureServices)

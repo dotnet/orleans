@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -42,7 +43,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="result">value if the key is found, undefined otherwise</param>
         /// <param name="version">version of cached value if the key is found, undefined otherwise</param>
         /// <returns>true if the given key is in the cache</returns>
-        bool LookUp(GrainId key, out GrainAddress result, out int version);
+        bool LookUp(GrainId key, [NotNullWhen(true)] out GrainAddress? result, out int version);
 
         /// <summary>
         /// Returns list of key-value-version tuples stored currently in the cache.
@@ -59,7 +60,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="key">key for the lookup</param>
         /// <param name="result">value if the key is found, undefined otherwise</param>
         /// <returns>true if the given key is in the cache</returns>
-        public static bool LookUp(this IGrainDirectoryCache cache, GrainId key, out GrainAddress result)
+        public static bool LookUp(this IGrainDirectoryCache cache, GrainId key, [NotNullWhen(true)] out GrainAddress? result)
         {
             return cache.LookUp(key, out result, out _);
         }

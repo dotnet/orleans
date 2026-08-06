@@ -11,7 +11,7 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly IConnectionFactory connectionFactory;
         private readonly IServiceProvider serviceProvider;
-        private ConnectionDelegate connectionDelegate;
+        private ConnectionDelegate? connectionDelegate;
 
         protected ConnectionFactory(
             IConnectionFactory connectionFactory,

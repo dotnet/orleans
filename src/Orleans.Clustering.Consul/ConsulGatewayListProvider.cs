@@ -12,12 +12,12 @@ namespace Orleans.Runtime.Membership
 {
     public class ConsulGatewayListProvider : IGatewayListProvider
     {
-        private IConsulClient consulClient;
+        private IConsulClient consulClient = null!;
         private readonly string clusterId;
         private readonly ILogger logger;
         private readonly ConsulClusteringOptions options;
         private readonly TimeSpan maxStaleness;
-        private readonly string kvRootFolder;
+        private readonly string? kvRootFolder;
 
         public ConsulGatewayListProvider(
             ILogger<ConsulGatewayListProvider> logger, 

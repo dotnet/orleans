@@ -207,7 +207,7 @@ namespace UnitTests.Grains
     {
         public Task<string> SayHello() => Task.FromResult("Hello");
 
-        public Task<string> GetInputAsString(T input) => Task.FromResult(input.ToString());
+        public Task<string> GetInputAsString(T input) => Task.FromResult(input!.ToString()!);
         public async Task Invoke(IIncomingGrainCallContext context)
         {
             if (context.ImplementationMethod.Name == nameof(GetInputAsString))
@@ -245,7 +245,7 @@ namespace UnitTests.Grains
     {
         public Task<string> SayHello() => Task.FromResult("Hello");
 
-        public Task<string> GetInputAsString(T input) => Task.FromResult(input.ToString());
+        public Task<string> GetInputAsString(T input) => Task.FromResult(input!.ToString()!);
         public async Task Invoke(IIncomingGrainCallContext context)
         {
             if (context.ImplementationMethod.Name == nameof(GetInputAsString))
@@ -293,7 +293,7 @@ namespace UnitTests.Grains
             return Task.FromResult("Thanks for nothing");
         }
 
-        public Task<string> GetRequestContext() => Task.FromResult((string)RequestContext.Get(Key) + "4");
+        public Task<string> GetRequestContext() => Task.FromResult((string)RequestContext.Get(Key)! + "4");
 
         public async Task Invoke(IIncomingGrainCallContext ctx)
         {
@@ -353,7 +353,7 @@ namespace UnitTests.Grains
             return Task.FromResult("Thanks for nothing");
         }
 
-        public Task<string> GetRequestContext() => Task.FromResult((string)RequestContext.Get(Key) + "4");
+        public Task<string> GetRequestContext() => Task.FromResult((string)RequestContext.Get(Key)! + "4");
 
         public async Task Invoke(IIncomingGrainCallContext ctx)
         {
@@ -404,10 +404,10 @@ namespace UnitTests.Grains
         Task IIncomingGrainCallFilter.Invoke(IIncomingGrainCallContext ctx)
         {
             if (ctx.InterfaceMethod is null) throw new Exception("InterfaceMethod is null");
-            if (!ctx.InterfaceMethod.DeclaringType.IsInterface) throw new Exception("InterfaceMethod is not an interface method");
+            if (!ctx.InterfaceMethod.DeclaringType!.IsInterface) throw new Exception("InterfaceMethod is not an interface method");
 
             if (ctx.ImplementationMethod is null) throw new Exception("ImplementationMethod is null");
-            if (ctx.ImplementationMethod.DeclaringType.IsInterface) throw new Exception("ImplementationMethod is an interface method");
+            if (ctx.ImplementationMethod.DeclaringType!.IsInterface) throw new Exception("ImplementationMethod is an interface method");
 
             if (RequestContext.Get("tag") is string tag)
             {

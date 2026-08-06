@@ -71,9 +71,9 @@ namespace UnitTests.PersistentState.Grains
 
         public Task<string> GetExtendedKeyValue()
         {
-            string extKey;
+            string? extKey;
             _ = this.GetPrimaryKey(out extKey);
-            return Task.FromResult(extKey);
+            return Task.FromResult(extKey!);
         }
 
         public Task DoWrite(int val)
@@ -97,6 +97,7 @@ namespace UnitTests.PersistentState.Grains
     [GrainType("new-test-storage-generic-grain`1")]
     public class GrainStorageGenericGrain<T> : Grain,
         IGrainStorageGenericGrain<T>
+        where T : notnull
     {
         private readonly IPersistentState<PersistenceGenericGrainState<T>> persistentState;
 
@@ -109,7 +110,7 @@ namespace UnitTests.PersistentState.Grains
 
         public Task<T> GetValue()
         {
-            return Task.FromResult(this.persistentState.State.Field1);
+            return Task.FromResult(this.persistentState.State.Field1!);
         }
 
         public Task DoWrite(T val)
@@ -121,7 +122,7 @@ namespace UnitTests.PersistentState.Grains
         public async Task<T> DoRead()
         {
             await this.persistentState.ReadStateAsync(); // Re-read state from store
-            return this.persistentState.State.Field1;
+            return this.persistentState.State.Field1!;
         }
 
         public Task DoDelete()

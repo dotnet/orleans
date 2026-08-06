@@ -14,7 +14,7 @@ namespace Orleans.Runtime.Membership
         private readonly ILogger _logger;
         private readonly string _clusterId;
         private readonly AdoNetClusteringClientOptions _options;
-        private RelationalOrleansQueries _orleansQueries;
+        private RelationalOrleansQueries _orleansQueries = null!;
         private readonly IServiceProvider _serviceProvider;
         private readonly TimeSpan _maxStaleness;
 

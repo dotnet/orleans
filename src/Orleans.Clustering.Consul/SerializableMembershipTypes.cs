@@ -17,13 +17,13 @@ namespace Orleans.Runtime.Host
         /// Persisted as part of the KV Key therefore not serialised.
         /// </summary>
         [JsonIgnore]
-        internal string DeploymentId { get; set; }
+        internal string DeploymentId { get; set; } = null!;
 
         /// <summary>
         /// Persisted as part of the KV Key therefore not serialised.
         /// </summary>
         [JsonIgnore]
-        internal SiloAddress Address { get; set; }
+        internal SiloAddress Address { get; set; } = null!;
 
         /// <summary>
         /// Persisted in a separate KV Subkey, therefore not serialised but held here to enable cleaner assembly to MembershipEntry.
@@ -43,7 +43,7 @@ namespace Orleans.Runtime.Host
 
         //Public properties are serialized to the KV.Value
         [JsonProperty]
-        public string Hostname { get; set; }
+        public string Hostname { get; set; } = null!;
 
         [JsonProperty]
         public int ProxyPort { get; set; }
@@ -55,10 +55,10 @@ namespace Orleans.Runtime.Host
         public SiloStatus Status { get; set; }
 
         [JsonProperty]
-        public string SiloName { get; set; }
+        public string SiloName { get; set; } = null!;
 
         [JsonProperty]
-        public List<SuspectingSilo> SuspectingSilos { get; set; }
+        public List<SuspectingSilo>? SuspectingSilos { get; set; }
 
         [JsonConstructor]
         internal ConsulSiloRegistration()
@@ -74,7 +74,7 @@ namespace Orleans.Runtime.Host
     public class SuspectingSilo
     {
         [JsonProperty]
-        public string Id { get; set; }
+        public string Id { get; set; } = null!;
 
         [JsonProperty]
         public DateTime Time { get; set; }
@@ -91,9 +91,9 @@ namespace Orleans.Runtime.Host
         internal const string SiloIAmAliveSuffix = "iamalive";
         internal const string VersionSuffix = "version";
 
-        internal static string FormatVersionKey(string deploymentId, string rootKvFolder) => $"{FormatDeploymentKVPrefix(deploymentId, rootKvFolder)}{KeySeparator}{VersionSuffix}";
+        internal static string FormatVersionKey(string deploymentId, string? rootKvFolder) => $"{FormatDeploymentKVPrefix(deploymentId, rootKvFolder)}{KeySeparator}{VersionSuffix}";
 
-        internal static string FormatDeploymentKVPrefix(string deploymentId, string rootKvFolder)
+        internal static string FormatDeploymentKVPrefix(string deploymentId, string? rootKvFolder)
         {
             //Backward compatible
             if (string.IsNullOrEmpty(rootKvFolder))
@@ -106,7 +106,7 @@ namespace Orleans.Runtime.Host
             }
         }
 
-        internal static string FormatDeploymentSiloKey(string deploymentId, string rootKvFolder, SiloAddress siloAddress)
+        internal static string FormatDeploymentSiloKey(string deploymentId, string? rootKvFolder, SiloAddress siloAddress)
         {
             return $"{FormatDeploymentKVPrefix(deploymentId, rootKvFolder)}{KeySeparator}{siloAddress.ToParsableString()}";
         }
@@ -116,14 +116,14 @@ namespace Orleans.Runtime.Host
             return $"{siloKey}{KeySeparator}{SiloIAmAliveSuffix}";
         }
 
-        internal static string FormatSiloIAmAliveKey(string deploymentId, string rootKvFolder, SiloAddress siloAddress)
+        internal static string FormatSiloIAmAliveKey(string deploymentId, string? rootKvFolder, SiloAddress siloAddress)
         {
             return FormatSiloIAmAliveKey(FormatDeploymentSiloKey(deploymentId, rootKvFolder, siloAddress));
         }
 
-        internal static ConsulSiloRegistration FromKVPairs(string deploymentId, KVPair siloKV, KVPair iAmAliveKV)
+        internal static ConsulSiloRegistration FromKVPairs(string deploymentId, KVPair siloKV, KVPair? iAmAliveKV)
         {
-            var ret = JsonConvert.DeserializeObject<ConsulSiloRegistration>(Encoding.UTF8.GetString(siloKV.Value));
+            var ret = JsonConvert.DeserializeObject<ConsulSiloRegistration>(Encoding.UTF8.GetString(siloKV.Value))!;
 
             var keyParts = siloKV.Key.Split(KeySeparator);
             ret.Address = SiloAddress.FromParsableString(keyParts[^1]);
@@ -157,7 +157,7 @@ namespace Orleans.Runtime.Host
             return ret;
         }
 
-        internal static KVPair ToKVPair(ConsulSiloRegistration siloRegistration, string rootKvFolder)
+        internal static KVPair ToKVPair(ConsulSiloRegistration siloRegistration, string? rootKvFolder)
         {
             var ret = new KVPair(ConsulSiloRegistrationAssembler.FormatDeploymentSiloKey(siloRegistration.DeploymentId, rootKvFolder, siloRegistration.Address));
             ret.ModifyIndex = siloRegistration.LastIndex;
@@ -165,7 +165,7 @@ namespace Orleans.Runtime.Host
             return ret;
         }
 
-        internal static KVPair ToIAmAliveKVPair(string deploymentId, string rootKvFolder, SiloAddress siloAddress, DateTime iAmAliveTime)
+        internal static KVPair ToIAmAliveKVPair(string deploymentId, string? rootKvFolder, SiloAddress siloAddress, DateTime iAmAliveTime)
         {
             var ret = new KVPair(ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(deploymentId, rootKvFolder, siloAddress));
             ret.Value = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(iAmAliveTime));

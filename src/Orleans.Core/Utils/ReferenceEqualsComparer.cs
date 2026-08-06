@@ -17,7 +17,7 @@ namespace Orleans
         /// true if the specified objects are equal; otherwise, false.
         /// </returns>
         /// <param name="x">The first object to compare.</param><param name="y">The second object to compare.</param>
-        public new bool Equals(object x, object y) => object.ReferenceEquals(x, y);
+        public new bool Equals(object? x, object? y) => object.ReferenceEquals(x, y);
 
         public int GetHashCode(object obj) => obj == null ? 0 : RuntimeHelpers.GetHashCode(obj);
     }
@@ -36,7 +36,7 @@ namespace Orleans
         /// true if the specified objects are equal; otherwise, false.
         /// </returns>
         /// <param name="x">The first object to compare.</param><param name="y">The second object to compare.</param>
-        public bool Equals(T x, T y) => object.ReferenceEquals(x, y);
+        public bool Equals(T? x, T? y) => object.ReferenceEquals(x, y);
 
         public int GetHashCode(T obj) => obj == null ? 0 : RuntimeHelpers.GetHashCode(obj);
     }

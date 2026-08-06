@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 namespace Orleans.Serialization.TypeSystem
@@ -16,7 +17,7 @@ namespace Orleans.Serialization.TypeSystem
         /// <summary>
         /// Gets the cached assembly name.
         /// </summary>
-        public static string GetName(Assembly assembly) => _assemblyNameCache.GetOrAdd(assembly, a => a.GetName().Name);
+        public static string GetName(Assembly assembly) => _assemblyNameCache.GetOrAdd(assembly, static a => a.GetName().Name!);
 
         /// <inheritdoc />
         public override Type ResolveType(string name)
@@ -37,21 +38,24 @@ namespace Orleans.Serialization.TypeSystem
                 throw new ArgumentException("A FullName must not be null nor consist of only whitespace.", nameof(name));
             }
 
-            if (TryGetCachedType(name, out type))
+            if (TryGetCachedType(name, out var cachedType))
             {
+                type = cachedType;
                 return true;
             }
 
-            if (!TryPerformUncachedTypeResolution(name, out type))
+            if (!TryPerformUncachedTypeResolution(name, out var resolvedType))
             {
+                type = default!;
                 return false;
             }
 
-            AddTypeToCache(name, type);
+            AddTypeToCache(name, resolvedType);
+            type = resolvedType;
             return true;
         }
 
-        private bool TryPerformUncachedTypeResolution(string name, out Type type)
+        private bool TryPerformUncachedTypeResolution(string name, [NotNullWhen(true)] out Type? type)
         {
             var assemblies = AppDomain.CurrentDomain.GetAssemblies();
             if (!TryPerformUncachedTypeResolution(name, out type, assemblies))
@@ -67,7 +71,7 @@ namespace Orleans.Serialization.TypeSystem
             return true;
         }
 
-        private bool TryGetCachedType(string name, out Type result)
+        private bool TryGetCachedType(string name, [NotNullWhen(true)] out Type? result)
         {
             if (string.IsNullOrWhiteSpace(name))
             {
@@ -86,7 +90,7 @@ namespace Orleans.Serialization.TypeSystem
             }
         }
 
-        private bool TryPerformUncachedTypeResolution(string fullName, out Type type, Assembly[] assemblies)
+        private bool TryPerformUncachedTypeResolution(string fullName, [NotNullWhen(true)] out Type? type, Assembly[] assemblies)
         {
             if (null == assemblies)
             {
@@ -129,7 +133,7 @@ namespace Orleans.Serialization.TypeSystem
 
                 foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
                 {
-                    _assemblyCache[assembly.FullName] = assembly;
+                    _assemblyCache[assembly.FullName!] = assembly;
                     _assemblyCache[GetName(assembly)] = assembly;
                 }
 
@@ -148,12 +152,12 @@ namespace Orleans.Serialization.TypeSystem
                 }
                 
                 _assemblyCache[GetName(result)] = result;
-                _assemblyCache[result.FullName] = result;
+                _assemblyCache[result.FullName!] = result;
 
                 return result;
             }
 
-            static Type ResolveType(Assembly asm, string name, bool ignoreCase)
+            static Type? ResolveType(Assembly? asm, string name, bool ignoreCase)
             {
                 return asm?.GetType(name, throwOnError: false, ignoreCase: ignoreCase) ?? Type.GetType(name, throwOnError: false, ignoreCase: ignoreCase);
             }

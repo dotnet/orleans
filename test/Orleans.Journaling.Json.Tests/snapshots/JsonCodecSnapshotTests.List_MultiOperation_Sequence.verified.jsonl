@@ -1,0 +1,6 @@
+﻿[8,["add","one"]]
+[8,["add","two"]]
+[8,["set",1,"updated"]]
+[8,["insert",0,"head"]]
+[8,["removeAt",2]]
+[8,["snapshot",["alpha","beta"]]]

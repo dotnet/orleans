@@ -5,7 +5,6 @@ using System;
 using System.Buffers;
 using System.Net;
 
-#nullable enable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -14,6 +13,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class IPEndPointCodec : IFieldCodec<IPEndPoint>, IDerivedTypeCodec
     {
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         IPEndPoint IFieldCodec<IPEndPoint>.ReadValue<TInput>(ref Buffers.Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
         /// <summary>
@@ -23,6 +23,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static IPEndPoint ReadValue<TInput>(ref Buffers.Reader<TInput> reader, Field field)
         {
             if (field.IsReference)
@@ -49,12 +50,12 @@ namespace Orleans.Serialization.Codecs
 
             reader.ConsumeEndBaseOrEndObject(ref header);
 
-            var result = new IPEndPoint(address, port);
+            var result = new IPEndPoint(address!, port);
             ReferenceCodec.RecordObject(reader.Session, result, referencePlaceholder);
             return result;
         }
 
-        void IFieldCodec<IPEndPoint>.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, IPEndPoint value)
+        void IFieldCodec<IPEndPoint>.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] IPEndPoint value)
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, typeof(IPEndPoint), value))
             {

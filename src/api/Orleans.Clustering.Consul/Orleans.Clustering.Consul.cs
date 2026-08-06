@@ -12,18 +12,18 @@ namespace Orleans.Configuration
     {
         public System.Func<Consul.IConsulClient> CreateClient { get { throw null; } }
 
-        public string KvRootFolder { get { throw null; } set { } }
+        public string? KvRootFolder { get { throw null; } set { } }
 
         public void ConfigureConsulClient(System.Func<Consul.IConsulClient> createClientCallback) { }
 
-        public void ConfigureConsulClient(System.Uri address, string aclClientToken = null) { }
+        public void ConfigureConsulClient(System.Uri address, string? aclClientToken = null) { }
     }
 
     public partial class ConsulClusteringOptionsValidator<TOptions> : IConfigurationValidator where TOptions : ConsulClusteringOptions
     {
-        public ConsulClusteringOptionsValidator(TOptions options, string name = null) { }
+        public ConsulClusteringOptionsValidator(TOptions options, string? name = null) { }
 
-        public string Name { get { throw null; } }
+        public string? Name { get { throw null; } }
 
         public TOptions Options { get { throw null; } }
 
@@ -68,7 +68,7 @@ namespace Orleans.Runtime.Host
         public SiloStatus Status { get { throw null; } set { } }
 
         [Newtonsoft.Json.JsonProperty]
-        public System.Collections.Generic.List<SuspectingSilo> SuspectingSilos { get { throw null; } set { } }
+        public System.Collections.Generic.List<SuspectingSilo>? SuspectingSilos { get { throw null; } set { } }
     }
 
     [Newtonsoft.Json.JsonObject]
@@ -98,7 +98,7 @@ namespace Orleans.Runtime.Membership
 
         public System.Threading.Tasks.Task<MembershipTableData> ReadAll() { throw null; }
 
-        public static System.Threading.Tasks.Task<MembershipTableData> ReadAll(Consul.IConsulClient consulClient, string clusterId, string kvRootFolder, Microsoft.Extensions.Logging.ILogger logger, string versionKey) { throw null; }
+        public static System.Threading.Tasks.Task<MembershipTableData> ReadAll(Consul.IConsulClient consulClient, string clusterId, string? kvRootFolder, Microsoft.Extensions.Logging.ILogger logger, string? versionKey) { throw null; }
 
         public System.Threading.Tasks.Task<MembershipTableData> ReadRow(SiloAddress siloAddress) { throw null; }
 

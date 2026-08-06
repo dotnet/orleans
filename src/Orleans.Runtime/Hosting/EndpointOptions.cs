@@ -9,7 +9,7 @@ namespace Orleans.Configuration
     /// </summary>
     public class EndpointOptions
     {
-        private IPAddress advertisedIPAddress;
+        private IPAddress advertisedIPAddress = null!;
         private int siloPort = DEFAULT_SILO_PORT;
 
         /// <summary>
@@ -27,10 +27,10 @@ namespace Orleans.Configuration
                         + $"to configure endpoints and ensure that {nameof(AdvertisedIPAddress)} is set.");
                 }
 
-                if (value == IPAddress.Any
-                    || value == IPAddress.IPv6Any
-                    || value == IPAddress.None
-                    || value == IPAddress.IPv6None)
+                if (Equals(value, IPAddress.Any)
+                    || Equals(value, IPAddress.IPv6Any)
+                    || Equals(value, IPAddress.None)
+                    || Equals(value, IPAddress.IPv6None))
                 {
                     throw new OrleansConfigurationException(
                         $"Invalid value specified for {nameof(AdvertisedIPAddress)}. The value was {value}");
@@ -75,20 +75,20 @@ namespace Orleans.Configuration
         public const int DEFAULT_GATEWAY_PORT = 30000;
 
         /// <summary>
-        /// Gets or sets the endpoint used to listen for silo to silo communication. 
+        /// Gets or sets the endpoint used to listen for silo to silo communication.
         /// If not set will default to <see cref="AdvertisedIPAddress"/> + <see cref="SiloPort"/>
         /// </summary>
-        public IPEndPoint SiloListeningEndpoint { get; set; }
+        public IPEndPoint? SiloListeningEndpoint { get; set; }
 
         /// <summary>
-        /// Gets or sets the endpoint used to listen for client to silo communication. 
+        /// Gets or sets the endpoint used to listen for client to silo communication.
         /// If not set will default to <see cref="AdvertisedIPAddress"/> + <see cref="GatewayPort"/>
         /// </summary>
-        public IPEndPoint GatewayListeningEndpoint { get; set; }
+        public IPEndPoint? GatewayListeningEndpoint { get; set; }
 
         internal IPEndPoint GetPublicSiloEndpoint() => new(AdvertisedIPAddress, SiloPort);
 
-        internal IPEndPoint GetPublicProxyEndpoint()
+        internal IPEndPoint? GetPublicProxyEndpoint()
         {
             var gatewayPort = GatewayPort != 0 ? GatewayPort : GatewayListeningEndpoint?.Port ?? 0;
             return gatewayPort != 0 ? new(AdvertisedIPAddress, gatewayPort) : null;
@@ -96,7 +96,7 @@ namespace Orleans.Configuration
 
         internal IPEndPoint GetListeningSiloEndpoint() => SiloListeningEndpoint ?? GetPublicSiloEndpoint();
 
-        internal IPEndPoint GetListeningProxyEndpoint() => GatewayListeningEndpoint ?? GetPublicProxyEndpoint();
+        internal IPEndPoint? GetListeningProxyEndpoint() => GatewayListeningEndpoint ?? GetPublicProxyEndpoint();
 
         internal void Bind(IConfiguration cfg)
         {
@@ -115,12 +115,12 @@ namespace Orleans.Configuration
                 AdvertisedIPAddress = aip;
             }
 
-            if (IPEndPoint.TryParse(cfg[nameof(SiloListeningEndpoint)], out var sle))
+            if (IPEndPoint.TryParse(cfg[nameof(SiloListeningEndpoint)]!, out var sle))
             {
                 SiloListeningEndpoint = sle;
             }
 
-            if (IPEndPoint.TryParse(cfg[nameof(GatewayListeningEndpoint)], out var gle))
+            if (IPEndPoint.TryParse(cfg[nameof(GatewayListeningEndpoint)]!, out var gle))
             {
                 GatewayListeningEndpoint = gle;
             }

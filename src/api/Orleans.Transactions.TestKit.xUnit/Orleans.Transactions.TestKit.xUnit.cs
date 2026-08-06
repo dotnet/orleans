@@ -138,6 +138,19 @@ namespace Orleans.Transactions.TestKit.xUnit
         public override void TransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName) { }
     }
 
+    public abstract partial class ExclusiveLockTransactionTestRunnerxUnit : ExclusiveLockTransactionTestRunner
+    {
+        protected ExclusiveLockTransactionTestRunnerxUnit(IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) : base(default!, default!) { }
+
+        [SkippableTheory(new[] { })]
+        [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
+        public override System.Threading.Tasks.Task ConcurrentReadThenWriteWithExclusiveLock_NoLockException(string grainStates) { throw null; }
+
+        [SkippableTheory(new[] { })]
+        [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
+        public override System.Threading.Tasks.Task ConcurrentReadThenWriteWithoutExclusiveLock_ThrowsLockException(string grainStates) { throw null; }
+    }
+
     public abstract partial class GoldenPathTransactionTestRunnerxUnit : GoldenPathTransactionTestRunner
     {
         protected GoldenPathTransactionTestRunnerxUnit(IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) : base(default!, default!) { }
@@ -284,7 +297,7 @@ namespace Orleans.Transactions.TestKit.xUnit
 
     public abstract partial class TransactionalStateStorageTestRunnerxUnit<TState> : TransactionalStateStorageTestRunner<TState> where TState : class, new()
     {
-        public TransactionalStateStorageTestRunnerxUnit(System.Func<System.Threading.Tasks.Task<Abstractions.ITransactionalStateStorage<TState>>> stateStorageFactory, System.Func<int, TState> stateFactory, IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper testOutput, System.Func<FluentAssertions.Equivalency.EquivalencyOptions<TState>, FluentAssertions.Equivalency.EquivalencyOptions<TState>> assertConfig = null) : base(default!, default!, default!, default!, default!) { }
+        public TransactionalStateStorageTestRunnerxUnit(System.Func<System.Threading.Tasks.Task<Abstractions.ITransactionalStateStorage<TState>>> stateStorageFactory, System.Func<int, TState> stateFactory, IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper testOutput, System.Func<AwesomeAssertions.Equivalency.EquivalencyOptions<TState>, AwesomeAssertions.Equivalency.EquivalencyOptions<TState>>? assertConfig = null) : base(default!, default!, default!, default!, default) { }
 
         [Xunit.Theory]
         [Xunit.InlineData(new[] { 99 })]

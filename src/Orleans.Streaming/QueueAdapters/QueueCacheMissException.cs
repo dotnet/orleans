@@ -18,19 +18,19 @@ namespace Orleans.Streams
         /// </summary>
         /// <value>The requested sequence token.</value>
         [Id(0)]
-        public string Requested { get; private set; }
+        public string? Requested { get; private set; }
 
         /// <summary>
         /// Gets the earliest available sequence token.
         /// </summary>
         [Id(1)]
-        public string Low { get; private set; }
+        public string? Low { get; private set; }
 
         /// <summary>
         /// Gets the latest available sequence token.
         /// </summary>
         [Id(2)]
-        public string High { get; private set; }
+        public string? High { get; private set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="QueueCacheMissException"/> class.
@@ -67,7 +67,7 @@ namespace Orleans.Streams
         /// <param name="requested">The requested sequence token.</param>
         /// <param name="low">The earliest available sequence token.</param>
         /// <param name="high">The latest available sequence token.</param>
-        public QueueCacheMissException(string requested, string low, string high)
+        public QueueCacheMissException(string? requested, string? low, string? high)
             : this(string.Format(CultureInfo.InvariantCulture, MESSAGE_FORMAT, requested, low, high))
         {
             Requested = requested;

@@ -8,13 +8,13 @@ public class AdoNetStreamOptions
     /// <summary>
     /// Gets or sets the ADO.NET invariant.
     /// </summary>
-    public string Invariant { get; set; }
+    public string Invariant { get; set; } = default!;
 
     /// <summary>
     /// Gets or sets the connection string.
     /// </summary>
     [Redact]
-    public string ConnectionString { get; set; }
+    public string ConnectionString { get; set; } = default!;
 
     /// <summary>
     /// The maximum number of attempts to deliver a message.

@@ -24,7 +24,7 @@ namespace Orleans.Hosting
         public static IClientBuilder AddMemoryStreams(
             this IClientBuilder builder,
             string name,
-            Action<IClusterClientMemoryStreamConfigurator> configure = null)
+            Action<IClusterClientMemoryStreamConfigurator>? configure = null)
         {
             return AddMemoryStreams<DefaultMemoryMessageBodySerializer>(builder, name, configure);
         }
@@ -40,7 +40,7 @@ namespace Orleans.Hosting
         public static IClientBuilder AddMemoryStreams<TSerializer>(
             this IClientBuilder builder,
             string name,
-            Action<IClusterClientMemoryStreamConfigurator> configure = null)
+            Action<IClusterClientMemoryStreamConfigurator>? configure = null)
             where TSerializer : class, IMemoryMessageBodySerializer
         {
             //the constructor wire up DI with all default components of the streams , so need to be called regardless of configureStream null or not
@@ -61,7 +61,7 @@ namespace Orleans.Hosting
             this IClientBuilder builder,
             string name,
             Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory,
-            Action<IClusterClientPersistentStreamConfigurator> configureStream)
+            Action<IClusterClientPersistentStreamConfigurator>? configureStream)
         {
             //the constructor wire up DI with all default components of the streams , so need to be called regardless of configureStream null or not
             var streamConfigurator = new ClusterClientPersistentStreamConfigurator(name, builder, adapterFactory);

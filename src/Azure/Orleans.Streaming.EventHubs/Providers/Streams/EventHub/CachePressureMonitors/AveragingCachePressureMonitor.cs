@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Common;
 using Orleans.Configuration;
@@ -14,7 +14,7 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Cache monitor which is used to report cache related metrics
         /// </summary>
-        public ICacheMonitor CacheMonitor { set; private get; }
+        public ICacheMonitor? CacheMonitor { set; private get; }
         private static readonly TimeSpan checkPeriod = TimeSpan.FromSeconds(2);
         private readonly ILogger logger;
 
@@ -29,7 +29,7 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         /// <param name="logger"></param>
         /// <param name="monitor"></param>
-        public AveragingCachePressureMonitor(ILogger logger, ICacheMonitor monitor=null)
+        public AveragingCachePressureMonitor(ILogger logger, ICacheMonitor? monitor=null)
             :this(EventHubStreamCachePressureOptions.DEFAULT_AVERAGING_CACHE_PRESSURE_MONITORING_THRESHOLD, logger, monitor)
         { }
 
@@ -39,7 +39,7 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="flowControlThreshold"></param>
         /// <param name="logger"></param>
         /// <param name="monitor"></param>
-        public AveragingCachePressureMonitor(double flowControlThreshold, ILogger logger, ICacheMonitor monitor=null)
+        public AveragingCachePressureMonitor(double flowControlThreshold, ILogger logger, ICacheMonitor? monitor=null)
         {
             this.flowControlThreshold = flowControlThreshold;
             this.logger = logger;

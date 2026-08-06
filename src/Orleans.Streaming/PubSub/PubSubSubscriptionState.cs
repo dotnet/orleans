@@ -7,7 +7,7 @@ namespace Orleans.Streams
     [Serializable]
     [JsonObject(MemberSerialization.OptIn)]
     [GenerateSerializer]
-    public sealed class PubSubSubscriptionState : IEquatable<PubSubSubscriptionState>
+    public sealed class PubSubSubscriptionState : IEquatable<PubSubSubscriptionState?>
     {
         public enum SubscriptionStates
         {
@@ -32,7 +32,7 @@ namespace Orleans.Streams
 
         [JsonProperty]
         [Id(3)]
-        public string FilterData; // Serialized func info
+        public string? FilterData; // Serialized func info
 
         [JsonProperty]
         [Id(4)]
@@ -54,27 +54,27 @@ namespace Orleans.Streams
             state = SubscriptionStates.Active;
         }
 
-        public void AddFilter(string filterData)
+        public void AddFilter(string? filterData)
         {
             this.FilterData = filterData;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (ReferenceEquals(null, obj)) return false;
             // Note: Can't use the 'as' operator on PubSubSubscriptionState because it is a struct.
             return obj is PubSubSubscriptionState && Equals((PubSubSubscriptionState) obj);
         }
 
-        public bool Equals(PubSubSubscriptionState other)
+        public bool Equals(PubSubSubscriptionState? other)
         {
-            if ((object)other == null)
+            if ((object?)other == null)
                 return false;
             // Note: PubSubSubscriptionState is a struct, so 'other' can never be null.
             return Equals(other.SubscriptionId);
         }
 
-        public bool Equals(GuidId subscriptionId)
+        public bool Equals(GuidId? subscriptionId)
         {
             if (ReferenceEquals(null, subscriptionId)) return false;
             return SubscriptionId.Equals(subscriptionId);
@@ -85,18 +85,18 @@ namespace Orleans.Streams
             return SubscriptionId.GetHashCode();
         }
 
-        public static bool operator ==(PubSubSubscriptionState left, PubSubSubscriptionState right)
+        public static bool operator ==(PubSubSubscriptionState? left, PubSubSubscriptionState? right)
         {
-            if ((object)left == null && (object)right == null)
+            if ((object?)left == null && (object?)right == null)
                 return true;
-            if ((object)left != null)
+            if ((object?)left != null)
             {
                 return left.Equals(right);
             }
             return false;
         }
 
-        public static bool operator !=(PubSubSubscriptionState left, PubSubSubscriptionState right)
+        public static bool operator !=(PubSubSubscriptionState? left, PubSubSubscriptionState? right)
         {
             return !(left == right);
         }

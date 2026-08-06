@@ -19,7 +19,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public override ArrayList ConvertFromSurrogate(ref ArrayListSurrogate surrogate) => new(surrogate.Values);
+        public override ArrayList ConvertFromSurrogate(ref ArrayListSurrogate surrogate)
+            => surrogate.Values is { } values ? new(values) : [];
 
         /// <inheritdoc/>
         public override void ConvertToSurrogate(ArrayList value, ref ArrayListSurrogate surrogate) => surrogate.Values = value.ToArray();
@@ -36,7 +37,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(0)]
-        public object[] Values;
+        public object?[]? Values;
     }
 
     /// <summary>
@@ -50,12 +51,12 @@ namespace Orleans.Serialization.Codecs
         {
             if (context.TryGetCopy<ArrayList>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             if (input.GetType() != typeof(ArrayList))
             {
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
             }
 
             result = new ArrayList(input.Count);

@@ -20,6 +20,6 @@ namespace Orleans.Runtime
         /// <param name="sender">The sender.</param>
         /// <param name="context">The context.</param>
         /// <param name="exception">The exception.</param>
-        void OnFatalException(object sender = null, string context = null, Exception exception = null);
+        void OnFatalException(object? sender = null, string? context = null, Exception? exception = null);
     }
 }

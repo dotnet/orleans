@@ -40,8 +40,8 @@ namespace Orleans.TestingHost
         public static ISiloBuilder AddFaultInjectionMemoryStorage(
             this ISiloBuilder builder,
             string name,
-            Action<OptionsBuilder<MemoryGrainStorageOptions>> configureOptions = null,
-            Action<OptionsBuilder<FaultInjectionGrainStorageOptions>> configureFaultInjectionOptions = null)
+            Action<OptionsBuilder<MemoryGrainStorageOptions>>? configureOptions = null,
+            Action<OptionsBuilder<FaultInjectionGrainStorageOptions>>? configureFaultInjectionOptions = null)
         {
             return builder.ConfigureServices(services => services.AddFaultInjectionMemoryStorage(name,
                configureOptions, configureFaultInjectionOptions));

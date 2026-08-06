@@ -9,7 +9,7 @@ namespace Orleans.Configuration
     internal class DevelopmentClusterMembershipOptionsValidator : IConfigurationValidator
     {
         private readonly DevelopmentClusterMembershipOptions options;
-        private readonly IMembershipTable membershipTable;
+        private readonly IMembershipTable? membershipTable;
 
         public DevelopmentClusterMembershipOptionsValidator(IOptions<DevelopmentClusterMembershipOptions> options, IServiceProvider serviceProvider)
         {

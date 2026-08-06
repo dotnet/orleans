@@ -23,7 +23,7 @@ namespace Orleans.Streams
         /// <param name="token">The token.</param>
         /// <param name="requestContext">The request context.</param>
         /// <returns>Task.</returns>
-        Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext);
+        Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext);
 
         /// <summary>
         /// Creates a queue receiver for the specified queueId
@@ -60,7 +60,7 @@ namespace Orleans.Streams
         /// <param name="token">The token.</param>
         /// <param name="requestContext">The request context.</param>
         /// <returns>A <see cref="Task"/> representing the operation.</returns>
-        public static Task QueueMessageAsync<T>(this IQueueAdapter adapter, StreamId streamId, T evt, StreamSequenceToken token, Dictionary<string, object> requestContext)
+        public static Task QueueMessageAsync<T>(this IQueueAdapter adapter, StreamId streamId, T evt, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
         {
             return adapter.QueueMessageBatchAsync(streamId, new[] { evt }, token, requestContext);
         }

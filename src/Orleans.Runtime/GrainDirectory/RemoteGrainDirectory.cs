@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 
-#nullable enable
 namespace Orleans.Runtime.GrainDirectory
 {
     internal sealed partial class RemoteGrainDirectory : SystemTarget, IRemoteGrainDirectory
@@ -14,18 +13,21 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly LocalGrainDirectoryPartition partition;
         private readonly ILogger logger;
 
-        internal RemoteGrainDirectory(LocalGrainDirectory localGrainDirectory, GrainType grainType, SystemTargetShared shared)
+        internal RemoteGrainDirectory(LocalGrainDirectory localGrainDirectory, GrainType grainType, SystemTargetShared shared, bool registerAsSystemTarget = true)
             : base(grainType, shared)
         {
             router = localGrainDirectory;
             partition = localGrainDirectory.DirectoryPartition;
             logger = shared.LoggerFactory.CreateLogger($"{typeof(RemoteGrainDirectory).FullName}.CacheValidator");
-            shared.ActivationDirectory.RecordNewTarget(this);
+            if (registerAsSystemTarget)
+            {
+                shared.ActivationDirectory.RecordNewTarget(this);
+            }
         }
 
         public Task<AddressAndTag> RegisterAsync(GrainAddress address, GrainAddress? previousAddress, int hopCount)
         {
-            DirectoryInstruments.RegistrationsSingleActRemoteReceived.Add(1);
+            router.DirectoryInstruments.RegistrationsSingleActRemoteReceived.Add(1);
 
             return router.RegisterAsync(address, previousAddress, hopCount);
         }
@@ -67,7 +69,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public Task<List<AddressAndTag>> LookUpMany(List<(GrainId GrainId, int Version)> grainAndETagList)
         {
-            DirectoryInstruments.ValidationsCacheReceived.Add(1);
+            router.DirectoryInstruments.ValidationsCacheReceived.Add(1);
             LogLookUpMany(grainAndETagList.Count);
 
             var result = new List<AddressAndTag>();

@@ -7,7 +7,7 @@ namespace Orleans.Providers.Streams.Common
     internal class CachedMessagePool
     {
         private readonly IObjectPool<CachedMessageBlock> messagePool;
-        private CachedMessageBlock currentMessageBlock;
+        private CachedMessageBlock? currentMessageBlock;
 
         /// <summary>
         /// Allocates a pool of cached message blocks.

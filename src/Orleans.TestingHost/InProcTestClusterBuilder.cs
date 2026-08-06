@@ -31,6 +31,7 @@ public sealed class InProcessTestClusterBuilder
             ClusterId = CreateClusterId(),
             ServiceId = Guid.NewGuid().ToString("N"),
             UseTestClusterMembership = true,
+            UseTestClusterGrainDirectory = true,
             InitializeClientOnDeploy = true,
             ConfigureFileLogging = true,
             AssumeHomogenousSilosForTesting = true
@@ -139,7 +140,7 @@ public sealed class InProcessTestClusterBuilder
         {
             hostBuilder.ConfigureServices((context, services) =>
             {
-                var initialSilos = int.Parse(context.Configuration[nameof(InProcessTestClusterOptions.InitialSilosCount)]);
+                var initialSilos = int.Parse(context.Configuration[nameof(InProcessTestClusterOptions.InitialSilosCount)]!);
                 var siloNames = Enumerable.Range(0, initialSilos).Select(GetSiloName).ToList();
                 services.Configure<StaticClusterDeploymentOptions>(options => options.SiloNames = siloNames);
             });

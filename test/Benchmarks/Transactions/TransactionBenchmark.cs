@@ -8,7 +8,7 @@ namespace Benchmarks.Transactions;
 
 public class TransactionBenchmark : IDisposable
 {
-    private TestCluster host;
+    private TestCluster host = null!;
     private readonly int runs;
     private readonly int transactionsPerRun;
     private readonly int concurrent;
@@ -72,7 +72,9 @@ public class TransactionBenchmark : IDisposable
         {
             hostBuilder.AddAzureTableTransactionalStateStorageAsDefault(options =>
             {
-                options.TableServiceClient = new(AzuriteContainerManager.ConnectionString);
+                options.TableServiceClient = TestDefaultConfiguration.UseAadAuthentication
+                    ? new(TestDefaultConfiguration.TableEndpoint, TestDefaultConfiguration.TokenCredential)
+                    : new(TestDefaultConfiguration.AzureStorageConnectionString);
             });
         }
     }
@@ -121,9 +123,9 @@ public class TransactionBenchmark : IDisposable
 
     public async Task<Report> RunAsync(int run, int transactiosPerRun, int concurrentPerRun)
     {
-        ILoadGrain load = this.host.Client.GetGrain<ILoadGrain>(Guid.NewGuid());
+        ILoadGrain load = this.host.Client!.GetGrain<ILoadGrain>(Guid.NewGuid()); // Benchmark setup deploys the client.
         await load.Generate(run, transactiosPerRun, concurrentPerRun);
-        Report report = null;
+        Report? report = null;
         while (report == null)
         {
             await Task.Delay(TimeSpan.FromSeconds(10));

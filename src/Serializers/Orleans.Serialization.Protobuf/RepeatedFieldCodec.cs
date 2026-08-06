@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Google.Protobuf.Collections;
 using Orleans.Serialization.Buffers;
@@ -31,7 +32,7 @@ public sealed class RepeatedFieldCodec<T> : IFieldCodec<RepeatedField<T>>
 
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, RepeatedField<T> value) where TBufferWriter : IBufferWriter<byte>
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] RepeatedField<T> value) where TBufferWriter : IBufferWriter<byte>
     {
         if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
         {
@@ -55,6 +56,7 @@ public sealed class RepeatedFieldCodec<T> : IFieldCodec<RepeatedField<T>>
     }
 
     /// <inheritdoc/>
+    [return: MaybeNull]
     public RepeatedField<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         if (field.WireType == WireType.Reference)
@@ -65,7 +67,7 @@ public sealed class RepeatedFieldCodec<T> : IFieldCodec<RepeatedField<T>>
         field.EnsureWireTypeTagDelimited();
 
         var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-        RepeatedField<T> result = null;
+        RepeatedField<T>? result = null;
         uint fieldId = 0;
         while (true)
         {
@@ -80,10 +82,7 @@ public sealed class RepeatedFieldCodec<T> : IFieldCodec<RepeatedField<T>>
             {
                 case 0:
                     var length = (int)UInt32Codec.ReadValue(ref reader, header);
-                    if (length > 10240 && length > reader.Length)
-                    {
-                        ThrowInvalidSizeException(length);
-                    }
+                    reader.EnsureAvailable((uint)length);
 
                     result = new RepeatedField<T>{ Capacity = length };
                     ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
@@ -94,7 +93,7 @@ public sealed class RepeatedFieldCodec<T> : IFieldCodec<RepeatedField<T>>
                         ThrowLengthFieldMissing();
                     }
 
-                    result.Add(_fieldCodec.ReadValue(ref reader, header));
+                    result!.Add(_fieldCodec.ReadValue(ref reader, header)!);
                     break;
                 default:
                     reader.ConsumeUnknownField(header);
@@ -110,9 +109,6 @@ public sealed class RepeatedFieldCodec<T> : IFieldCodec<RepeatedField<T>>
 
         return result;
     }
-
-    private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-        $"Declared length of {typeof(RepeatedField<T>)}, {length}, is greater than total length of input.");
 
     private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized RepeatedField is missing its length field.");
 }

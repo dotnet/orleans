@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Pipelines;
 using System.Runtime.Serialization;
@@ -51,7 +52,8 @@ namespace Orleans.Serialization.UnitTests
             services.AddSingleton<IGeneralizedCodec, DotNetSerializableCodec>();
 
             _serviceProvider = services.BuildServiceProvider();
-            _sessionPool = _serviceProvider.GetService<SerializerSessionPool>();
+            // AddSerializer guarantees that the session pool is registered.
+            _sessionPool = _serviceProvider.GetService<SerializerSessionPool>()!;
             _serializer = _serviceProvider.GetRequiredService<Serializer<object>>();
             _log = log;
         }
@@ -84,7 +86,7 @@ namespace Orleans.Serialization.UnitTests
                 //Assert.True(Equals(original, deserialized), $"Deserialized value \"{deserialized}\" must equal original value \"{original}\"");
                 Assert.Equal(writer.Position, reader.Position);
                 Assert.Equal(writerSession.ReferencedObjects.CurrentReferenceId, readerSession.ReferencedObjects.CurrentReferenceId);
-                return deserialized;
+                return deserialized!;
             }
         }
 
@@ -159,10 +161,10 @@ namespace Orleans.Serialization.UnitTests
 #endif
             protected BaseException(SerializationInfo info, StreamingContext context) : base(info, context)
             {
-                BaseField = (SimpleISerializableObject)info.GetValue("BaseField", typeof(SimpleISerializableObject));
+                BaseField = (SimpleISerializableObject?)info.GetValue("BaseField", typeof(SimpleISerializableObject));
             }
 
-            public SimpleISerializableObject BaseField { get; set; }
+            public SimpleISerializableObject? BaseField { get; set; }
 
 #if NET8_0_OR_GREATER
             [Obsolete]
@@ -177,8 +179,8 @@ namespace Orleans.Serialization.UnitTests
         [Serializable]
         private class UnserializableConformingException : BaseException
         {
-            public string SubClassField { get; set; }
-            public object SomeObject { get; set; }
+            public string? SubClassField { get; set; }
+            public object? SomeObject { get; set; }
 
             public UnserializableConformingException(string message, Exception innerException) : base(message, innerException) { }
 
@@ -222,6 +224,9 @@ namespace Orleans.Serialization.UnitTests
                 }
             }
 
+            // This test resolver intentionally widens the legacy non-nullable contract for blocked types.
+#pragma warning disable CS8764
+            [return: MaybeNull]
             public override Type ResolveType(string name)
             {
                 var result = _resolver.ResolveType(name);
@@ -232,8 +237,11 @@ namespace Orleans.Serialization.UnitTests
 
                 return result;
             }
+#pragma warning restore CS8764
 
-            public override bool TryResolveType(string name, out Type type)
+            // This test resolver intentionally widens the legacy non-nullable out contract on failure.
+#pragma warning disable CS8765
+            public override bool TryResolveType(string name, [MaybeNullWhen(false)] out Type type)
             {
                 if (_resolver.TryResolveType(name, out type))
                 {
@@ -248,6 +256,7 @@ namespace Orleans.Serialization.UnitTests
 
                 return false;
             }
+#pragma warning restore CS8765
         }
 
         [Fact]
@@ -267,7 +276,7 @@ namespace Orleans.Serialization.UnitTests
             using var formatterSession = _sessionPool.GetSession();
             var formatted = BitStreamFormatter.Format(serialized, formatterSession);
 
-            object deserialized = serializer.Deserialize<Exception>(serialized);
+            object deserialized = serializer.Deserialize<Exception>(serialized)!;
 
             // Type is wrong after round trip of unserializable exception
             var result = Assert.IsAssignableFrom<UnavailableExceptionFallbackException>(deserialized);
@@ -296,7 +305,7 @@ namespace Orleans.Serialization.UnitTests
                     BaseField = new SimpleISerializableObject() { Payload = "payload" }
                 };
             }));
-            deserialized = serializer.Deserialize<Exception>(serializer.SerializeToArray(source));
+            deserialized = serializer.Deserialize<Exception>(serializer.SerializeToArray(source))!;
 
             // Type is wrong after round trip of unserializable exception
             result = Assert.IsAssignableFrom<UnavailableExceptionFallbackException>(deserialized);
@@ -316,8 +325,8 @@ namespace Orleans.Serialization.UnitTests
         [Serializable]
         public class SimpleISerializableObject : ISerializable, IDeserializationCallback
         {
-            private List<string> _history;
-            private List<StreamingContext> _contexts;
+            private List<string>? _history;
+            private List<StreamingContext>? _contexts;
 
             public SimpleISerializableObject()
             {
@@ -334,7 +343,7 @@ namespace Orleans.Serialization.UnitTests
             public List<string> History => _history ??= new List<string>();
             public List<StreamingContext> Contexts => _contexts ??= new List<StreamingContext>();
 
-            public string Payload { get; set; }
+            public string? Payload { get; set; }
 
             public void GetObjectData(SerializationInfo info, StreamingContext context)
             {
@@ -370,14 +379,14 @@ namespace Orleans.Serialization.UnitTests
                 Contexts.Add(context);
             }
 
-            void IDeserializationCallback.OnDeserialization(object sender) => History.Add("deserialization");
+            void IDeserializationCallback.OnDeserialization(object? sender) => History.Add("deserialization");
         }
 
         [Serializable]
         public struct SimpleISerializableStruct : ISerializable, IDeserializationCallback
         {
-            private List<string> _history;
-            private List<StreamingContext> _contexts;
+            private List<string>? _history;
+            private List<StreamingContext>? _contexts;
 
             public SimpleISerializableStruct(SerializationInfo info, StreamingContext context)
             {
@@ -391,7 +400,7 @@ namespace Orleans.Serialization.UnitTests
             public List<string> History => _history ??= new List<string>();
             public List<StreamingContext> Contexts => _contexts ??= new List<StreamingContext>();
 
-            public string Payload { get; set; }
+            public string? Payload { get; set; }
 
             public void GetObjectData(SerializationInfo info, StreamingContext context)
             {
@@ -427,7 +436,7 @@ namespace Orleans.Serialization.UnitTests
                 Contexts.Add(context);
             }
 
-            void IDeserializationCallback.OnDeserialization(object sender) => History.Add("deserialization");
+            void IDeserializationCallback.OnDeserialization(object? sender) => History.Add("deserialization");
         }
     }
 }

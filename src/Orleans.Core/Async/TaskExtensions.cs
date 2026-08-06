@@ -58,7 +58,7 @@ namespace Orleans.Internal
             }
         }
 
-        internal static string ToString(this Task t) => t == null ? "null" : $"[Id={t.Id}, Status={t.Status}]";
+        internal static string ToString(this Task? t) => t == null ? "null" : $"[Id={t.Id}, Status={t.Status}]";
 
         public static void WaitWithThrow(this Task task, TimeSpan timeout)
         {
@@ -85,7 +85,7 @@ namespace Orleans.Internal
         /// <param name="exceptionMessage">Text to put into the timeout exception message</param>
         /// <exception cref="TimeoutException">If we time out we will get this exception</exception>
         /// <returns>The completed task</returns>
-        public static async Task WithTimeout(this Task taskToComplete, TimeSpan timeout, string exceptionMessage = null)
+        public static async Task WithTimeout(this Task taskToComplete, TimeSpan timeout, string? exceptionMessage = null)
         {
             if (taskToComplete.IsCompleted)
             {
@@ -120,7 +120,7 @@ namespace Orleans.Internal
         /// <exception cref="TimeoutException">If we time out we will get this exception</exception>
         /// <exception cref="TimeoutException">If we time out we will get this exception</exception>
         /// <returns>The value of the completed task</returns>
-        public static async Task<T> WithTimeout<T>(this Task<T> taskToComplete, TimeSpan timeSpan, string exceptionMessage = null)
+        public static async Task<T> WithTimeout<T>(this Task<T> taskToComplete, TimeSpan timeSpan, string? exceptionMessage = null)
         {
             if (taskToComplete.IsCompleted)
             {
@@ -232,10 +232,10 @@ namespace Orleans.Internal
                 return Task.CompletedTask;
             }
 
-            var waitForCancellation = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var waitForCancellation = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
             token.Register(obj =>
             {
-                var tcs = (TaskCompletionSource<object>)obj;
+                var tcs = (TaskCompletionSource<object?>)obj!;
                 tcs.TrySetResult(null);
             }, waitForCancellation);
 

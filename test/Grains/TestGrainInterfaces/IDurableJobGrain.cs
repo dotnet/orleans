@@ -10,7 +10,7 @@ namespace UnitTests.GrainInterfaces;
 
 public interface IDurableJobGrain : IGrainWithStringKey
 {
-    Task<DurableJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string> metadata = null);
+    Task<DurableJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string>? metadata = null);
 
     Task<bool> TryCancelJobAsync(DurableJob job);
 
@@ -24,4 +24,6 @@ public interface IDurableJobGrain : IGrainWithStringKey
     Task<IJobRunContext> GetJobRun(string jobId);
 
     Task<bool> WasCancellationTokenCancelled(string jobId);
+
+    Task<string> GetJobTraceId(string jobId);
 }

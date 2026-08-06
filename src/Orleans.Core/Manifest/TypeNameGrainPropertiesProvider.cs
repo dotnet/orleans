@@ -14,7 +14,7 @@ namespace Orleans.Metadata
         public void Populate(Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
             properties[WellKnownGrainTypeProperties.TypeName] = grainClass.Name;
-            properties[WellKnownGrainTypeProperties.FullTypeName] = grainClass.FullName;
+            properties[WellKnownGrainTypeProperties.FullTypeName] = grainClass.FullName!;
             properties["diag.type"] = RuntimeTypeNameFormatter.Format(grainClass);
             properties["diag.asm"] = CachedTypeResolver.GetName(grainClass.Assembly);
         }

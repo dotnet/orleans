@@ -20,8 +20,8 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// monitor to report statistics for current object pool
         /// </summary>
-        private readonly IObjectPoolMonitor monitor;
-        private readonly PeriodicAction periodicMonitoring;
+        private readonly IObjectPoolMonitor? monitor;
+        private readonly PeriodicAction? periodicMonitoring;
 
         /// <summary>
         /// Simple object pool
@@ -29,7 +29,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="factoryFunc">Function used to create new resources of type T</param>
         /// <param name="monitor">monitor to report statistics for object pool</param>
         /// <param name="monitorWriteInterval"></param>
-        public ObjectPool(Func<T> factoryFunc, IObjectPoolMonitor monitor = null, TimeSpan? monitorWriteInterval = null)
+        public ObjectPool(Func<T> factoryFunc, IObjectPoolMonitor? monitor = null, TimeSpan? monitorWriteInterval = null)
         {
             if (factoryFunc == null)
             {
@@ -55,9 +55,8 @@ namespace Orleans.Providers.Streams.Common
         /// <returns></returns>
         public virtual T Allocate()
         {
-            T resource;
             //if couldn't pop a resource from the pool, create a new resource using factoryFunc from outside of the pool
-            if (!pool.TryPop(out resource))
+            if (!pool.TryPop(out var resource))
             {
                 resource = factoryFunc();
                 Interlocked.Increment(ref this.totalObjects);
@@ -83,7 +82,7 @@ namespace Orleans.Providers.Streams.Common
         {
             var availableObjects = this.pool.Count;
             long claimedObjects = this.totalObjects - availableObjects;
-            this.monitor.Report(this.totalObjects, availableObjects, claimedObjects);
+            this.monitor!.Report(this.totalObjects, availableObjects, claimedObjects); // Only invoked via periodicMonitoring, which is only set when monitor is non-null (see constructor).
         }
     }
 }

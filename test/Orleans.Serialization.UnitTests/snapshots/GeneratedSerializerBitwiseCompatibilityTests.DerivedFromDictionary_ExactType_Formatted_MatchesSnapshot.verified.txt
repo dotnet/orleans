@@ -1,0 +1,13 @@
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0016  [#2 TagDelimited Id: 0 SchemaType: Encoded RuntimeType: Orleans.Serialization.Codecs.WellKnownStringComparerCodec (name: Encoded "TypeName "StringComparer" (hash 2ED42C31)" (Orleans.Serialization.Codecs.WellKnownStringComparerCodec,Orleans.Serialization))] Value: {
+0x0017   [#3 VarInt Id: 0 SchemaType: Expected] Value: 1 (0x1)
+0x0019   [#4 VarInt Id: 1 SchemaType: Expected] Value: 1 (0x1)
+0x001B  }
+0x001C  [#5 VarInt Id: 1 SchemaType: Expected] Value: 2 (0x2)
+0x001E  [#6 LengthPrefixed Id: 2 SchemaType: Expected] Value: (length: 1b) ["a"]
+0x0021  [#7 VarInt Id: 2 SchemaType: Expected] Value: 2 (0x2)
+0x0023  [#8 LengthPrefixed Id: 2 SchemaType: Expected] Value: (length: 1b) ["b"]
+0x0026  [#9 VarInt Id: 2 SchemaType: Expected] Value: 4 (0x4)
+0x0028  - End of base type fields -
+0x0029  [#10 VarInt Id: 0 SchemaType: Expected] Value: 246 (0xF6)
+0x002C }

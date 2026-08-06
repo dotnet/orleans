@@ -27,12 +27,12 @@ namespace Orleans.Hosting
         }
 
         internal static IServiceCollection AddFaultInjectionAzureTableTransactionalStateStorage(this IServiceCollection services, string name,
-            Action<OptionsBuilder<AzureTableTransactionalStateOptions>> configureOptions = null)
+            Action<OptionsBuilder<AzureTableTransactionalStateOptions>>? configureOptions = null)
         {
             configureOptions?.Invoke(services.AddOptions<AzureTableTransactionalStateOptions>(name));
 
-            services.TryAddSingleton<ITransactionalStateStorageFactory>(sp => sp.GetKeyedService<ITransactionalStateStorageFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-            services.AddKeyedSingleton<ITransactionalStateStorageFactory>(name, (sp, key) => FaultInjectionAzureTableTransactionStateStorageFactory.Create(sp, key as string));
+            services.TryAddSingleton<ITransactionalStateStorageFactory>(sp => sp.GetKeyedService<ITransactionalStateStorageFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)!);
+            services.AddKeyedSingleton<ITransactionalStateStorageFactory>(name, (sp, key) => FaultInjectionAzureTableTransactionStateStorageFactory.Create(sp, (key as string)!));
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(s => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredKeyedService<ITransactionalStateStorageFactory>(name));
 
             return services;

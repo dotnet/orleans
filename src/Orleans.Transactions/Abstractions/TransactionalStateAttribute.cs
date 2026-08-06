@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace Orleans.Transactions.Abstractions
 {
@@ -6,9 +6,9 @@ namespace Orleans.Transactions.Abstractions
     public class TransactionalStateAttribute : Attribute, IFacetMetadata, ITransactionalStateConfiguration
     {
         public string StateName { get; }
-        public string StorageName { get; }
+        public string? StorageName { get; }
 
-        public TransactionalStateAttribute(string stateName, string storageName = null)
+        public TransactionalStateAttribute(string stateName, string? storageName = null)
         {
             this.StateName = stateName;
             this.StorageName = storageName;

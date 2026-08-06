@@ -14,9 +14,10 @@ namespace Orleans.TestingHost
     public class InProcessSiloHandle : SiloHandle
     {
         private bool isActive = true;
+        private int disposed;
         
         /// <summary>Gets a reference to the silo host.</summary>
-        public IHost SiloHost { get; init; }
+        public IHost SiloHost { get; init; } = null!;
 
         /// <summary>
         /// Gets the silo's service provider.
@@ -36,7 +37,7 @@ namespace Orleans.TestingHost
         public static async Task<InProcessSiloHandle> CreateAsync(
             string siloName,
             IConfiguration configuration,
-            Action<IHostBuilder> postConfigureHostBuilder = null)
+            Action<IHostBuilder>? postConfigureHostBuilder = null)
         {
             var host = await Task.Run(async () =>
             {
@@ -91,9 +92,17 @@ namespace Orleans.TestingHost
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
-            if (!this.IsActive) return;
+            if (!disposing)
+            {
+                return;
+            }
 
-            if (disposing)
+            if (Interlocked.Exchange(ref this.disposed, 1) != 0)
+            {
+                return;
+            }
+
+            if (this.IsActive)
             {
                 try
                 {
@@ -102,25 +111,35 @@ namespace Orleans.TestingHost
                 catch
                 {
                 }
-
-                this.SiloHost?.Dispose();
             }
+
+            this.SiloHost?.Dispose();
         }
 
         /// <inheritdoc />
         public override async ValueTask DisposeAsync()
         {
-            if (!this.IsActive) return;
+            if (Interlocked.Exchange(ref this.disposed, 1) != 0)
+            {
+                return;
+            }
 
             try
             {
-                await StopSiloAsync(true).ConfigureAwait(false);
+                if (this.IsActive)
+                {
+                    await StopSiloAsync(true).ConfigureAwait(false);
+                }
             }
             finally
             {
                 if (this.SiloHost is IAsyncDisposable asyncDisposable)
                 {
                     await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                }
+                else
+                {
+                    this.SiloHost?.Dispose();
                 }
             }
         }

@@ -51,7 +51,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="exception">The exception to be printed.</param>
         /// <returns>Formatted string representation of the exception, including expanding and formatting any nested sub-expressions.</returns>
-        public static string PrintException(Exception exception)
+        public static string PrintException(Exception? exception)
         {
             if (exception == null)
                 return "";

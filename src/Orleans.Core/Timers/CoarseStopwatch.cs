@@ -148,7 +148,7 @@ namespace Orleans.Runtime
             _value = -delta;
         }
 
-        public override readonly bool Equals(object obj) => obj is CoarseStopwatch stopwatch && _value == stopwatch._value;
+        public override readonly bool Equals(object? obj) => obj is CoarseStopwatch stopwatch && _value == stopwatch._value;
         public readonly bool Equals(CoarseStopwatch other) => _value == other._value;
         public override readonly int GetHashCode() => HashCode.Combine(_value);
         public static bool operator ==(CoarseStopwatch left, CoarseStopwatch right) => left.Equals(right);

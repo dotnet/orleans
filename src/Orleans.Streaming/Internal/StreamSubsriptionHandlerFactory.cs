@@ -47,7 +47,8 @@ namespace Orleans.Streams
         public StreamSubscriptionHandle<T> Create<T>()
         {
             var stream = this.streamProvider.GetStream<T>(StreamId) as StreamImpl<T>;
-            return new StreamSubscriptionHandleImpl<T>(SubscriptionId, stream);
+            // Orleans.Streaming providers create stream handles from StreamImpl<T> instances.
+            return new StreamSubscriptionHandleImpl<T>(SubscriptionId, stream!);
         }
     }
 }

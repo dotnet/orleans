@@ -8,8 +8,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-using Newtonsoft.Json;
-
 using Orleans.Configuration;
 using Orleans.Runtime;
 
@@ -18,22 +16,15 @@ using static System.FormattableString;
 
 namespace Orleans.Reminders.Redis
 {
-    internal partial class RedisReminderTable : IReminderTable
+    internal partial class RedisReminderTable : IReminderTable, IDisposable, IAsyncDisposable
     {
         private readonly RedisKey _hashSetKey;
         private readonly RedisReminderTableOptions _redisOptions;
         private readonly ClusterOptions _clusterOptions;
         private readonly ILogger _logger;
-        private IConnectionMultiplexer _muxer;
-        private IDatabase _db;
-
-        private readonly JsonSerializerSettings _jsonSettings = new JsonSerializerSettings()
-        {
-            DateFormatHandling = DateFormatHandling.IsoDateFormat,
-            DefaultValueHandling = DefaultValueHandling.Ignore,
-            MissingMemberHandling = MissingMemberHandling.Ignore,
-            NullValueHandling = NullValueHandling.Ignore,
-        };
+        private IConnectionMultiplexer _muxer = null!;
+        private IDatabase _db = null!;
+        private bool _muxerIsShared;
 
         public RedisReminderTable(
             ILogger<RedisReminderTable> logger,
@@ -51,7 +42,7 @@ namespace Orleans.Reminders.Redis
         {
             try
             {
-                _muxer = await _redisOptions.CreateMultiplexer(_redisOptions);
+                (_muxer, _muxerIsShared) = await _redisOptions.CreateMultiplexer(_redisOptions);
                 _db = _muxer.GetDatabase();
 
                 if (_redisOptions.EntryExpiry is { } expiry)
@@ -65,7 +56,7 @@ namespace Orleans.Reminders.Redis
             }
         }
 
-        public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+        public async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
         {
             try
             {
@@ -77,7 +68,7 @@ namespace Orleans.Reminders.Redis
                 }
                 else
                 {
-                    return ConvertToEntry(values.SingleOrDefault());
+                    return ConvertToEntry(((string?)values.SingleOrDefault())!);
                 }
             }
             catch (Exception exception)
@@ -92,7 +83,7 @@ namespace Orleans.Reminders.Redis
             {
                 var (from, to) = GetFilter(grainId);
                 RedisValue[] values = await _db.SortedSetRangeByValueAsync(_hashSetKey, from, to);
-                IEnumerable<ReminderEntry> records = values.Select(static v => ConvertToEntry(v));
+                IEnumerable<ReminderEntry> records = values.Select(static v => ConvertToEntry(((string?)v)!));
                 return new ReminderTableData(records);
             }
             catch (Exception exception)
@@ -121,7 +112,7 @@ namespace Orleans.Reminders.Redis
                     values = values1.Concat(values2);
                 }
 
-                IEnumerable<ReminderEntry> records = values.Select(static v => ConvertToEntry(v));
+                IEnumerable<ReminderEntry> records = values.Select(static v => ConvertToEntry(((string?)v)!));
                 return new ReminderTableData(records);
             }
             catch (Exception exception)
@@ -156,7 +147,7 @@ namespace Orleans.Reminders.Redis
             }
         }
 
-        public async Task<string> UpsertRow(ReminderEntry entry)
+        public async Task<string?> UpsertRow(ReminderEntry entry)
         {
             const string UpsertScript =
                 """
@@ -188,9 +179,47 @@ namespace Orleans.Reminders.Redis
             }
         }
 
+        public void Dispose()
+        {
+            var muxer = _muxer;
+            if (muxer is null)
+            {
+                return;
+            }
+
+            var muxerIsShared = _muxerIsShared;
+            _muxer = null!;
+            _db = null!;
+            _muxerIsShared = false;
+
+            if (!muxerIsShared)
+            {
+                muxer.Dispose();
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            var muxer = _muxer;
+            if (muxer is null)
+            {
+                return;
+            }
+
+            var muxerIsShared = _muxerIsShared;
+            _muxer = null!;
+            _db = null!;
+            _muxerIsShared = false;
+
+            if (!muxerIsShared)
+            {
+                await muxer.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+
         private static ReminderEntry ConvertToEntry(string reminderValue)
         {
-            string[] segments = JsonConvert.DeserializeObject<string[]>($"[{reminderValue}]");
+            string[] segments = RedisReminderSerializer.DeserializeMember(reminderValue);
 
             return new ReminderEntry
             {
@@ -224,11 +253,11 @@ namespace Orleans.Reminders.Redis
 
         private (RedisValue from, RedisValue to) GetFilter(params string[] segments)
         {
-            string prefix = JsonConvert.SerializeObject(segments, _jsonSettings);
-            return ($"{prefix[1..^1]},\"", $"{prefix[1..^1]},#");
+            var filter = RedisReminderSerializer.GetFilter(segments);
+            return (filter.From, filter.To);
         }
 
-        private (RedisValue eTag, RedisValue value) ConvertFromEntry(ReminderEntry entry)
+        private (string eTag, RedisValue value) ConvertFromEntry(ReminderEntry entry)
         {
             string grainHash = entry.GrainId.GetUniformHashCode().ToString("X8");
             string eTag = Guid.NewGuid().ToString();
@@ -242,7 +271,7 @@ namespace Orleans.Reminders.Redis
                 entry.Period.ToString()
             };
 
-            return (eTag, JsonConvert.SerializeObject(segments, _jsonSettings)[1..^1]);
+            return (eTag, RedisReminderSerializer.SerializeMember(segments));
         }
 
         private readonly struct ReminderEntryLogValue(ReminderEntry entry)
@@ -254,6 +283,6 @@ namespace Orleans.Reminders.Redis
             Level = LogLevel.Debug,
             Message = "UpsertRow entry = {Entry}, ETag = {ETag}"
         )]
-        private partial void LogDebugUpsertRow(ReminderEntryLogValue entry, string eTag);
+        private partial void LogDebugUpsertRow(ReminderEntryLogValue entry, string? eTag);
     }
 }

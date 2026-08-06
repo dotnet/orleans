@@ -1,4 +1,4 @@
-﻿namespace Orleans.Configuration
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Option to configure ZooKeeperMembership
@@ -9,6 +9,6 @@
         /// Connection string for ZooKeeper Storage
         /// </summary>
         [Redact]
-        public string ConnectionString { get; set; }
+        public string ConnectionString { get; set; } = null!;
     }
 }

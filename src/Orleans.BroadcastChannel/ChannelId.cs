@@ -5,7 +5,6 @@ using System.Runtime.Serialization;
 using System.Text;
 using Orleans.Runtime;
 
-#nullable enable
 namespace Orleans.BroadcastChannel
 {
     /// <summary>

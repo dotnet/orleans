@@ -1,9 +1,9 @@
-#nullable enable
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
+using Orleans.Timers;
 
 namespace Orleans.Runtime
 {
@@ -28,6 +28,8 @@ namespace Orleans.Runtime
 
         internal ActivationId ActivationId { get; set; }
         private readonly ILogger _logger;
+
+        internal ILogger SchedulerLogger => _shared.SchedulerLogger;
 
         internal InsideRuntimeClient RuntimeClient => _shared.RuntimeClient;
 
@@ -79,7 +81,7 @@ namespace Orleans.Runtime
             WorkItemGroup = _shared.CreateWorkItemGroup(this);
             if (!Constants.IsSingletonSystemTarget(GrainId.Type))
             {
-                GrainInstruments.IncrementSystemTargetCounts(Constants.SystemTargetName(GrainId.Type));
+                _shared.GrainInstruments.IncrementSystemTargetCounts(Constants.SystemTargetName(GrainId.Type));
             }
         }
 
@@ -113,6 +115,10 @@ namespace Orleans.Runtime
             else if (typeof(TComponent) == typeof(PlacementStrategy))
             {
                 result = (TComponent)(object)SystemTargetPlacementStrategy.Instance;
+            }
+            else if (typeof(TComponent) == typeof(ITimerRegistry))
+            {
+                result = (TComponent)(object)_shared.TimerRegistry;
             }
             else
             {
@@ -384,7 +390,7 @@ namespace Orleans.Runtime
         {
             if (!Constants.IsSingletonSystemTarget(GrainId.Type))
             {
-                GrainInstruments.DecrementSystemTargetCounts(Constants.SystemTargetName(GrainId.Type));
+                _shared.GrainInstruments.DecrementSystemTargetCounts(Constants.SystemTargetName(GrainId.Type));
             }
 
             StopAllTimers();

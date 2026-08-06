@@ -3,15 +3,23 @@ using System.Diagnostics.Metrics;
 
 namespace Orleans.Runtime;
 
-internal static class ReminderInstruments
+internal sealed class ReminderInstruments(OrleansInstruments instruments)
 {
-    public static Histogram<double> TardinessSeconds = Instruments.Meter.CreateHistogram<double>(InstrumentNames.REMINDERS_TARDINESS, "seconds");
-    public static ObservableGauge<int> ActiveReminders;
-    public static void RegisterActiveRemindersObserve(Func<int> observeValue)
+    private readonly Histogram<double> _tardinessSeconds = instruments.Meter.CreateHistogram<double>(InstrumentNames.REMINDERS_TARDINESS, "seconds");
+    private readonly Counter<int> _ticksDelivered = instruments.Meter.CreateCounter<int>(InstrumentNames.REMINDERS_COUNTERS_TICKS_DELIVERED);
+    private ObservableGauge<int>? _activeReminders;
+
+    internal bool TardinessSecondsEnabled => _tardinessSeconds.Enabled;
+
+    internal void RegisterActiveRemindersObserve(Func<int> observeValue)
     {
-        ActiveReminders = Instruments.Meter.CreateObservableGauge(InstrumentNames.REMINDERS_NUMBER_ACTIVE_REMINDERS, observeValue);
+        _activeReminders = instruments.Meter.CreateObservableGauge(
+            InstrumentNames.REMINDERS_NUMBER_ACTIVE_REMINDERS,
+            observeValue,
+            description: "Upper bound on the number of reminders tracked locally, including temporary tombstones");
     }
 
-    public static Counter<int> TicksDelivered = Instruments.Meter.CreateCounter<int>(InstrumentNames.REMINDERS_COUNTERS_TICKS_DELIVERED);
+    internal void OnTardiness(TimeSpan tardiness) => _tardinessSeconds.Record(tardiness.TotalSeconds);
 
+    internal void OnTickDelivered() => _ticksDelivered.Add(1);
 }

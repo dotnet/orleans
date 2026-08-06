@@ -41,7 +41,7 @@ namespace Orleans.Streams
             return explicitPubSub.UnregisterProducer(streamId, streamProducer);
         }
 
-        public Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string filterData)
+        public Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string? filterData)
         {
             return implicitPubSub.IsImplicitSubscriber(streamConsumer, streamId)
                 ? implicitPubSub.RegisterConsumer(subscriptionId, streamId, streamConsumer, filterData)

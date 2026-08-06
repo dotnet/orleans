@@ -23,8 +23,9 @@ namespace Orleans.Streams
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IDeploymentConfiguration deploymentConfig;
         private readonly DeploymentBasedQueueBalancerOptions options;
+        private readonly TimeProvider _timeProvider;
         private readonly ConcurrentDictionary<SiloAddress, bool> immatureSilos;
-        private List<QueueId> allQueues;
+        private List<QueueId> allQueues = null!; // Initialized in Initialize.
         private bool isStarting;
         
         public DeploymentBasedQueueBalancer(
@@ -38,6 +39,7 @@ namespace Orleans.Streams
             this.siloStatusOracle = siloStatusOracle ?? throw new ArgumentNullException(nameof(siloStatusOracle));
             this.deploymentConfig = deploymentConfig ?? throw new ArgumentNullException(nameof(deploymentConfig));
             this.options = options;
+            _timeProvider = services.GetKeyedService<TimeProvider>(StreamingTimeProviderNames.Streaming) ?? TimeProvider.System;
 
             isStarting = true;
 
@@ -68,7 +70,7 @@ namespace Orleans.Streams
         
         private async Task NotifyAfterStart()
         {
-            await Task.Delay(this.options.SiloMaturityPeriod);
+            await Task.Delay(this.options.SiloMaturityPeriod, _timeProvider);
             isStarting = false;
             await NotifyListeners();
         }
@@ -76,7 +78,7 @@ namespace Orleans.Streams
         private async Task RecordImmatureSilo(SiloAddress updatedSilo)
         {
             immatureSilos[updatedSilo] = true;      // record as immature
-            await Task.Delay(this.options.SiloMaturityPeriod);
+            await Task.Delay(this.options.SiloMaturityPeriod, _timeProvider);
             immatureSilos[updatedSilo] = false;     // record as mature
         }
 
@@ -88,8 +90,7 @@ namespace Orleans.Streams
                 ? balancer.IdealDistribution
                 : balancer.GetDistribution(GetActiveSilos(siloStatusOracle, immatureSilos));
 
-            List<QueueId> myQueues;
-            if (distribution.TryGetValue(siloStatusOracle.SiloName, out myQueues))
+            if (distribution.TryGetValue(siloStatusOracle.SiloName, out var myQueues))
             {
                 if (!useIdealDistribution)
                 {
@@ -110,7 +111,7 @@ namespace Orleans.Streams
                 bool immatureBit;
                 if (!(immatureSilos.TryGetValue(kvp.Key, out immatureBit) && immatureBit)) // if not immature now or any more
                 {
-                    string siloName;
+                    string? siloName;
                     if (siloStatusOracle.TryGetSiloName(kvp.Key, out siloName))
                     {
                         activeSiloNames.Add(siloName);
@@ -139,11 +140,10 @@ namespace Orleans.Streams
             HashSet<QueueId> queuesOfImmatureSilos = new HashSet<QueueId>();
             foreach (var silo in immatureSilos.Where(s => s.Value)) // take only those from immature set that have their immature status bit set
             {
-                string siloName;
+                string? siloName;
                 if (siloStatusOracle.TryGetSiloName(silo.Key, out siloName))
                 {
-                    List<QueueId> queues;
-                    if (idealDistribution.TryGetValue(siloName, out queues))
+                    if (idealDistribution.TryGetValue(siloName, out var queues))
                     {
                         queuesOfImmatureSilos.UnionWith(queues);
                     }

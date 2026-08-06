@@ -17,18 +17,28 @@ namespace Orleans.EventSourcing.LogStorage
         /// Gets and Sets StateAndMetaData
         /// </summary>
         [Id(0)]
-        public LogStateWithMetaData<TEntry> StateAndMetaData { get; set; }
+        public LogStateWithMetaData<TEntry> StateAndMetaData
+        {
+            get => field ??= new LogStateWithMetaData<TEntry>();
+            set => field = value ?? new LogStateWithMetaData<TEntry>();
+        }
 
         /// <summary>
         /// Gets and Sets Etag
         /// </summary>
         [Id(1)]
-        public string ETag { get; set; }
+        public string? ETag { get; set; }
 
         [Id(2)]
         public bool RecordExists { get; set; }
 
         public LogStateWithMetaData<TEntry> State { get => StateAndMetaData; set => StateAndMetaData = value; }
+
+        LogStateWithMetaData<TEntry>? IGrainState<LogStateWithMetaData<TEntry>>.State
+        {
+            get => State;
+            set => StateAndMetaData = value ?? new LogStateWithMetaData<TEntry>();
+        }
 
         /// <summary>
         /// Initializes a new instance of GrainStateWithMetaDataAndETag class

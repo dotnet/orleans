@@ -50,7 +50,7 @@ namespace Orleans.Runtime.Placement
             var relevantSilos = new List<KeyValuePair<SiloAddress, CachedLocalStat>>();
             var totalSilos = _localCache.Count;
             var compatibleSilosWithoutStats = 0;
-            SiloAddress sampledCompatibleSiloWithoutStats = default;
+            SiloAddress? sampledCompatibleSiloWithoutStats = default;
             foreach (var silo in silos)
             {
                 if (!_localCache.TryGetValue(silo, out var localSiloStat))
@@ -104,7 +104,7 @@ namespace Orleans.Runtime.Placement
             // Some compatible silos might not have published statistics yet.
             if (compatibleSilosWithoutStats > 0)
             {
-                return sampledCompatibleSiloWithoutStats;
+                return sampledCompatibleSiloWithoutStats!;
             }
 
             // All compatible silos have published stats and are overloaded.

@@ -16,7 +16,7 @@ namespace Orleans.Hosting;
 
 internal sealed class AzureTableStorageClusteringProviderBuilder : IProviderBuilder<ISiloBuilder>, IProviderBuilder<IClientBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseAzureStorageClustering((OptionsBuilder<AzureStorageClusteringOptions> optionsBuilder) =>
             optionsBuilder.Configure<IServiceProvider>((options, services) =>
@@ -35,7 +35,7 @@ internal sealed class AzureTableStorageClusteringProviderBuilder : IProviderBuil
                 }
                 else
                 {
-                    // Construct a connection multiplexer from a connection string.
+                    // Construct a table service client from a connection string.
                     var connectionName = configurationSection["ConnectionName"];
                     var connectionString = configurationSection["ConnectionString"];
                     if (!string.IsNullOrEmpty(connectionName) && string.IsNullOrEmpty(connectionString))
@@ -48,18 +48,18 @@ internal sealed class AzureTableStorageClusteringProviderBuilder : IProviderBuil
                     {
                         if (Uri.TryCreate(connectionString, UriKind.Absolute, out var uri))
                         {
-                            options.TableServiceClient = new TableServiceClient(uri);
+                            options.SetTableServiceClient(uri);
                         }
                         else
                         {
-                            options.TableServiceClient = new TableServiceClient(connectionString);
+                            options.SetTableServiceClient(connectionString);
                         }
                     }
                 }
             }));
     }
 
-    public void Configure(IClientBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(IClientBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseAzureStorageClustering((OptionsBuilder<AzureStorageGatewayOptions> optionsBuilder) =>
             optionsBuilder.Configure<IServiceProvider>((options, services) =>
@@ -78,7 +78,7 @@ internal sealed class AzureTableStorageClusteringProviderBuilder : IProviderBuil
                 }
                 else
                 {
-                    // Construct a connection multiplexer from a connection string.
+                    // Construct a table service client from a connection string.
                     var connectionName = configurationSection["ConnectionName"];
                     var connectionString = configurationSection["ConnectionString"];
                     if (!string.IsNullOrEmpty(connectionName) && string.IsNullOrEmpty(connectionString))
@@ -91,11 +91,11 @@ internal sealed class AzureTableStorageClusteringProviderBuilder : IProviderBuil
                     {
                         if (Uri.TryCreate(connectionString, UriKind.Absolute, out var uri))
                         {
-                            options.TableServiceClient = new TableServiceClient(uri);
+                            options.SetTableServiceClient(uri);
                         }
                         else
                         {
-                            options.TableServiceClient = new TableServiceClient(connectionString);
+                            options.SetTableServiceClient(connectionString);
                         }
                     }
                 }

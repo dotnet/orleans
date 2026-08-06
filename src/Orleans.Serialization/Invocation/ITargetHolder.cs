@@ -1,6 +1,3 @@
-#nullable enable
-using System;
-
 namespace Orleans.Serialization.Invocation;
 
 /// <summary>

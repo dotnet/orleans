@@ -8,9 +8,9 @@ namespace Orleans.Runtime
         private readonly GrainManifest _siloManifest;
         private readonly IClusterMembershipService _clusterMembershipService;
         private readonly IClusterManifestProvider _clusterManifestProvider;
-        private readonly ClusterManifestUpdate _noUpdate = default;
+        private readonly ClusterManifestUpdate? _noUpdate = default;
         private MembershipVersion _cachedMembershipVersion;
-        private ClusterManifestUpdate _cachedUpdate;
+        private ClusterManifestUpdate? _cachedUpdate;
 
         public ClusterManifestSystemTarget(
             IClusterMembershipService clusterMembershipService,
@@ -25,7 +25,7 @@ namespace Orleans.Runtime
         }
 
         public ValueTask<ClusterManifest> GetClusterManifest() => new(_clusterManifestProvider.Current);
-        public ValueTask<ClusterManifestUpdate> GetClusterManifestUpdate(MajorMinorVersion version)
+        public ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(MajorMinorVersion version)
         {
             var manifest = _clusterManifestProvider.Current;
 

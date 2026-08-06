@@ -6,8 +6,6 @@ using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
 
-#nullable disable
-
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
 #elif PERSISTENCE_ADONET
@@ -85,13 +83,13 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="size">The size of the parameter value.</param>
         /// <param name="dbType">the <see cref="DbType"/> of the parameter.</param>
         /// <returns>A parameter created using the given arguments.</returns>
-        public static IDbDataParameter CreateParameter<T>(this IDbCommand command, ParameterDirection direction, string parameterName, T value, int? size = null, DbType? dbType = null)
+        public static IDbDataParameter CreateParameter<T>(this IDbCommand command, ParameterDirection direction, string parameterName, T? value, int? size = null, DbType? dbType = null)
         {
             //There should be no boxing for value types. See at:
             //http://stackoverflow.com/questions/8823239/comparing-a-generic-against-null-that-could-be-a-value-or-reference-type
             var parameter = command.CreateParameter();
             parameter.ParameterName = parameterName;
-            parameter.Value = (object)value ?? DBNull.Value;
+            parameter.Value = (object?)value ?? DBNull.Value;
             parameter.DbType = dbType ?? typeMap[typeof(T)];
             parameter.Direction = direction;
             if (size != null) { parameter.Size = size.Value; }
@@ -109,7 +107,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="direction">The direction of the parameter.</param>
         /// <param name="size">The size of the parameter value.</param>
         /// <param name="dbType">the <see cref="DbType"/> of the parameter.</param>
-        public static void AddParameter<T>(this IDbCommand command, string parameterName, T value, ParameterDirection direction = ParameterDirection.Input, int? size = null, DbType? dbType = null)
+        public static void AddParameter<T>(this IDbCommand command, string parameterName, T? value, ParameterDirection direction = ParameterDirection.Input, int? size = null, DbType? dbType = null)
         {
             command.Parameters.Add(command.CreateParameter(direction, parameterName, value, size));
         }
@@ -123,7 +121,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="default">The default value if value in position is <see cref="System.DBNull"/>.</param>
         /// <returns>Either the given value or the default for the requested type.</returns>
         /// <remarks>This function throws if the given <see paramref="fieldName"/> does not exist.</remarks>
-        public static TValue GetValueOrDefault<TValue>(this IDataRecord record, string fieldName, TValue @default = default)
+        public static TValue? GetValueOrDefault<TValue>(this IDataRecord record, string fieldName, TValue? @default = default)
         {
 
             try
@@ -170,7 +168,7 @@ namespace Orleans.Tests.SqlUtils
         /// <returns>Either the given value or the default for the requested type.</returns>
         /// <exception cref="DataException"/>
         /// <remarks>This function throws if the given <see paramref="fieldName"/> does not exist.</remarks>
-        public static async Task<TValue> GetValueOrDefaultAsync<TValue>(this DbDataReader record, string fieldName, TValue @default = default)
+        public static async Task<TValue?> GetValueOrDefaultAsync<TValue>(this DbDataReader record, string fieldName, TValue? @default = default)
         {
             try
             {
@@ -195,7 +193,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="default">The default value if value in position is <see cref="System.DBNull"/>.</param>
         /// <returns>Either the given value or the default for the requested type.</returns>
         /// <exception cref="IndexOutOfRangeException"/>                
-        public static TValue GetValueOrDefault<TValue>(this IDataRecord record, int ordinal, TValue @default = default)
+        public static TValue? GetValueOrDefault<TValue>(this IDataRecord record, int ordinal, TValue? @default = default)
         {
             return record.IsDBNull(ordinal) ? @default : (TValue)record.GetValue(ordinal);
         }
@@ -210,7 +208,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="default">The default value if value in position is <see cref="System.DBNull"/>.</param>
         /// <returns>Either the given value or the default for the requested type.</returns>
         /// <exception cref="IndexOutOfRangeException"/>                
-        public static async Task<TValue> GetValueOrDefaultAsync<TValue>(this DbDataReader record, int ordinal, TValue @default = default)
+        public static async Task<TValue?> GetValueOrDefaultAsync<TValue>(this DbDataReader record, int ordinal, TValue? @default = default)
         {
 
             return (await record.IsDBNullAsync(ordinal).ConfigureAwait(false)) ? @default : (await record.GetFieldValueAsync<TValue>(ordinal).ConfigureAwait(false));
@@ -359,11 +357,11 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="parameters">The parameters.</param>
         /// <param name="nameMap">Maps a given property name to another one defined in the map.</param>
         /// <remarks>Does not support collection parameters currently. Does not cache reflection results.</remarks>
-        public static void ReflectionParameterProvider<T>(this IDbCommand command, T parameters, IReadOnlyDictionary<string, string> nameMap = null)
+        public static void ReflectionParameterProvider<T>(this IDbCommand command, T? parameters, IReadOnlyDictionary<string, string>? nameMap = null)
         {
             if (!EqualityComparer<T>.Default.Equals(parameters, default))
             {
-                var properties = parameters.GetType().GetProperties();
+                var properties = parameters!.GetType().GetProperties();
                 for (int i = 0; i < properties.Length; ++i)
                 {
                     var property = properties[i];
@@ -392,7 +390,7 @@ namespace Orleans.Tests.SqlUtils
             //This is done like this in order to box value types.
             //Otherwise property.SetValue() would have a copy of the struct, which would
             //get garbage collected. Consequently the original struct value would not be set.            
-            object obj = Activator.CreateInstance<TResult>();
+            object obj = Activator.CreateInstance<TResult>()!;
             var properties = obj.GetType().GetProperties();
             for (int i = 0; i < properties.Length; ++i)
             {

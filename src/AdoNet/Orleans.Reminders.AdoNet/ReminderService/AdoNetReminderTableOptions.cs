@@ -8,12 +8,12 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the ADO.NET invariant.
         /// </summary>
-        public string Invariant { get; set; }
+        public string Invariant { get; set; } = null!;
 
         /// <summary>
         /// Gets or sets the connection string.
         /// </summary>
         [Redact]
-        public string ConnectionString { get; set; }
+        public string ConnectionString { get; set; } = null!;
     }
 }

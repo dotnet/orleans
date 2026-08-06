@@ -120,7 +120,7 @@ namespace Orleans.Runtime.Development
         private void Release(string category, AcquiredLease acquiredLease)
         {
             Tuple<string,string> leaseKey = Tuple.Create(category, acquiredLease.ResourceKey);
-            if (this.leases.TryGetValue(leaseKey, out Lease lease) && lease.Token == acquiredLease.Token)
+            if (this.leases.TryGetValue(leaseKey, out Lease? lease) && lease.Token == acquiredLease.Token)
             {
                 leases.Remove(leaseKey);
             }
@@ -130,7 +130,7 @@ namespace Orleans.Runtime.Development
         {
             DateTime now = DateTime.UtcNow;
             // if lease exists, and we have the right token, and lease has not expired, renew.
-            if (!this.leases.TryGetValue(Tuple.Create(category, acquiredLease.ResourceKey), out Lease lease) || lease.Token != acquiredLease.Token)
+            if (!this.leases.TryGetValue(Tuple.Create(category, acquiredLease.ResourceKey), out Lease? lease) || lease.Token != acquiredLease.Token)
             {
                 return new AcquireLeaseResult(new AcquiredLease(acquiredLease.ResourceKey), ResponseCode.InvalidToken, new OrleansException("Invalid token provided, caller is not the owner."));
             }
@@ -152,7 +152,7 @@ namespace Orleans.Runtime.Development
                     Token = Guid.NewGuid().ToString();
                 }
             }
-            public string Token { get; private set; }
+            public string Token { get; private set; } = null!;
         }
     }
 }
