@@ -1,12 +1,16 @@
-using Azure.Data.Tables;
+using Infrastructure;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Dashboard;
 using Orleans.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
-var storageConnectionString = builder.Configuration["StorageConnectionString"]
-    ?? throw new InvalidOperationException("StorageConnectionString is not configured.");
+var tableServiceClient = AzureTableServiceClientFactory.Create(builder.Configuration, builder.Environment);
+var clusterId = AzureTableServiceClientFactory.GetRequiredValue(builder.Configuration, "Orleans:ClusterId");
+var serviceId = AzureTableServiceClientFactory.GetRequiredValue(builder.Configuration, "Orleans:ServiceId");
+var clusteringTableName = AzureTableServiceClientFactory.GetRequiredValue(
+    builder.Configuration,
+    "Orleans:ClusteringTableName");
 
 builder.Services.AddWebAppApplicationInsights("Dashboard");
 builder.Host.UseOrleans(siloBuilder =>
@@ -14,15 +18,19 @@ builder.Host.UseOrleans(siloBuilder =>
     siloBuilder
         .Configure<ClusterOptions>(options =>
         {
-            options.ClusterId = "Cluster";
-            options.ServiceId = "Service";
+            options.ClusterId = clusterId;
+            options.ServiceId = serviceId;
         })
         .Configure<SiloOptions>(options =>
         {
-            options.SiloName = "Dashboard";
+            options.SiloName = builder.Configuration["Orleans:SiloName"] ?? $"Dashboard-{Environment.MachineName}";
         })
-        .ConfigureEndpoints(siloPort: 11_112, gatewayPort: 30_001)
-        .UseAzureStorageClustering(options => options.TableServiceClient = new TableServiceClient(storageConnectionString))
+        .ConfigureSampleEndpoints(builder.Configuration, builder.Environment, 11_112, 30_001)
+        .UseAzureStorageClustering(options =>
+        {
+            options.TableServiceClient = tableServiceClient;
+            options.TableName = clusteringTableName;
+        })
         .AddDashboard(config =>
             config.HideTrace =
                 !string.IsNullOrEmpty(builder.Configuration.GetValue<string>("HideTrace"))
@@ -36,6 +44,8 @@ builder.Services.DontHostGrainsHere();
 var app = builder.Build();
 
 app.MapOrleansDashboard();
-app.MapGet("/health", () => Results.Ok("Dashboard"));
+app.MapGet("/health/startup", () => Results.Ok());
+app.MapGet("/health/ready", () => Results.Ok());
+app.MapGet("/health/live", () => Results.Ok());
 
-app.Run();
+await app.RunAsync();

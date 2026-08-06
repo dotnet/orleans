@@ -95,7 +95,7 @@ The following official implementations of `IMembershipTable` are currently avail
 * [Apache ZooKeeper](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.ZooKeeper),
 * [Azure Cosmos DB](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.Cosmos),
 * [Azure Table Storage](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.AzureStorage),
-* [HashiCorp Consul](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.Consul),
+* [HashiCorp Consul](../host/configuration-guide/clustering/consul.md),
 * [Redis](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.Redis),
 * and an in-memory implementation for development.
 
@@ -514,7 +514,7 @@ The following listing contains implementation notes for some of the official imp
 
 1. **[Apache ZooKeeper](https://zookeeper.apache.org/)**: In this implementation, the configured deployment ID is used as a root node, and the silo identity (`ip:port@epoch`) as its child node. Together, they guarantee a unique path per silo. For concurrency control, optimistic concurrency control based on the [node version](https://zookeeper.apache.org/doc/r3.4.6/zookeeperOver.html#Nodes+and+ephemeral+nodes) is used. Every time data is read from the deployment root node, the version for every read child silo node is stored and used when trying to write back. Each time a node's data changes, the ZooKeeper service atomically increases the version number. For multi-row transactions, the [multi method](https://zookeeper.apache.org/doc/r3.4.6/api/org/apache/zookeeper/ZooKeeper.html#multi(java.lang.Iterable)) is utilized, guaranteeing serializable transactions over silo nodes with the same parent deployment ID node.
 
-1. **[HashiCorp Consul](https://www.consul.io)**: Consul's Key/Value store was used to implement the membership table. See [Consul Deployment](../deployment/consul-deployment.md) for more details.
+1. **[HashiCorp Consul](https://www.consul.io)**: Consul's key/value store is used to implement the membership table. See [Configure Consul clustering](../host/configuration-guide/clustering/consul.md) for details.
 
 1. **[AWS DynamoDB](https://aws.amazon.com/dynamodb/)**: In this implementation, the cluster Deployment ID is used as the Partition Key and Silo Identity (`ip-port-generation`) as the RangeKey, making the record unique. Optimistic concurrency is achieved using the `ETag` attribute by making conditional writes on DynamoDB. The implementation logic is quite similar to Azure Table Storage.
 

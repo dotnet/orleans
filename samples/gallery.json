@@ -222,23 +222,23 @@
   {
     "slug": "azure-app-service-deployment",
     "title": "Azure App Service Deployment",
-    "description": "A shopping cart and infrastructure template for deploying an Orleans cluster to Azure App Service.",
+    "description": "A Windows and Linux Azure App Service deployment with managed identity, private silo networking, health checks, Easy Auth, Bicep, and OIDC.",
     "path": "Deployment/AzureAppService",
-    "sourceRepository": "https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-App-Service",
+    "sourceRepository": "https://github.com/dotnet/orleans",
     "image": "Deployment/AzureAppService/media/shopping-cart-arch.png",
     "languages": ["C#", "Razor", "Bicep", "YAML"],
-    "tags": ["deployment", "azure", "app-service"],
+    "tags": ["deployment", "azure", "app-service", "windows", "linux"],
     "featured": true
   },
   {
     "slug": "azure-container-apps-deployment",
     "title": "Azure Container Apps Deployment",
-    "description": "An end-to-end Orleans cluster, client, dashboard, scaler, and Bicep deployment for Azure Container Apps.",
+    "description": "A managed-identity Orleans cluster with clients, dashboard, scaler, and Bicep deployment for Azure Container Apps.",
     "path": "Deployment/AzureContainerApps",
     "sourceRepository": "https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-Container-Apps",
-    "image": "Deployment/AzureContainerApps/docs/media/app-map.png",
+    "image": null,
     "languages": ["C#", "Bicep", "YAML"],
-    "tags": ["deployment", "azure", "container-apps", "autoscaling"],
+    "tags": ["deployment", "azure", "container-apps", "managed-identity", "networking"],
     "featured": true
   }
 ]

@@ -1,12 +1,16 @@
-using Azure.Data.Tables;
+using Infrastructure;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Scaler.Services;
 
 var builder = WebApplication.CreateBuilder(args);
-var storageConnectionString = builder.Configuration["StorageConnectionString"]
-    ?? throw new InvalidOperationException("StorageConnectionString is not configured.");
+var tableServiceClient = AzureTableServiceClientFactory.Create(builder.Configuration, builder.Environment);
+var clusterId = AzureTableServiceClientFactory.GetRequiredValue(builder.Configuration, "Orleans:ClusterId");
+var serviceId = AzureTableServiceClientFactory.GetRequiredValue(builder.Configuration, "Orleans:ServiceId");
+var clusteringTableName = AzureTableServiceClientFactory.GetRequiredValue(
+    builder.Configuration,
+    "Orleans:ClusteringTableName");
 
 builder.Logging.SetMinimumLevel(LogLevel.Warning).AddJsonConsole();
 builder.UseOrleansClient(clientBuilder =>
@@ -14,10 +18,14 @@ builder.UseOrleansClient(clientBuilder =>
     clientBuilder
         .Configure<ClusterOptions>(options =>
         {
-            options.ClusterId = "Cluster";
-            options.ServiceId = "Service";
+            options.ClusterId = clusterId;
+            options.ServiceId = serviceId;
         })
-        .UseAzureStorageClustering(options => options.TableServiceClient = new TableServiceClient(storageConnectionString));
+        .UseAzureStorageClustering(options =>
+        {
+            options.TableServiceClient = tableServiceClient;
+            options.TableName = clusteringTableName;
+        });
 });
 
 builder.Services.AddGrpc();
@@ -26,6 +34,9 @@ builder.Services.AddWebAppApplicationInsights("Scaler");
 var app = builder.Build();
 
 app.MapGrpcService<ExternalScalerService>();
-app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
+app.MapGet("/", () => "The external scaler gRPC endpoint is running.");
+app.MapGet("/health/startup", () => Results.Ok());
+app.MapGet("/health/ready", () => Results.Ok());
+app.MapGet("/health/live", () => Results.Ok());
 
-app.Run();
+await app.RunAsync();

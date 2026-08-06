@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ApplicationManifest ApplicationTypeName="OrleansApplicationType"
+                     ApplicationTypeVersion="1.0.0"
+                     xmlns="http://schemas.microsoft.com/2011/01/fabric"
+                     xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Parameters>
+    <Parameter Name="OrleansSilo_InstanceCount" DefaultValue="3" />
+    <Parameter Name="Orleans_ServiceId" DefaultValue="OrleansService" />
+    <Parameter Name="Orleans_ClusterId" DefaultValue="production" />
+    <Parameter Name="Orleans_TableServiceUri"
+               DefaultValue="https://orleansstorage.table.core.windows.net" />
+  </Parameters>
+
+  <ServiceManifestImport>
+    <ServiceManifestRef ServiceManifestName="OrleansSiloPkg"
+                        ServiceManifestVersion="1.0.0" />
+    <EnvironmentOverrides CodePackageRef="Code">
+      <EnvironmentVariable Name="ORLEANS_SERVICE_ID"
+                           Value="[Orleans_ServiceId]" />
+      <EnvironmentVariable Name="ORLEANS_CLUSTER_ID"
+                           Value="[Orleans_ClusterId]" />
+      <EnvironmentVariable Name="ORLEANS_TABLE_SERVICE_URI"
+                           Value="[Orleans_TableServiceUri]" />
+    </EnvironmentOverrides>
+    <Policies>
+      <RunAsPolicy CodePackageRef="Code"
+                   UserRef="OrleansSiloUser"
+                   EntryPointType="Main" />
+      <IdentityBindingPolicy
+        ServiceIdentityRef="OrleansSiloServiceIdentity"
+        ApplicationIdentityRef="OrleansSiloApplicationIdentity" />
+    </Policies>
+  </ServiceManifestImport>
+
+  <DefaultServices>
+    <Service Name="OrleansSilo"
+             ServicePackageActivationMode="ExclusiveProcess">
+      <StatelessService ServiceTypeName="OrleansSiloType"
+                        InstanceCount="[OrleansSilo_InstanceCount]">
+        <SingletonPartition />
+      </StatelessService>
+    </Service>
+  </DefaultServices>
+
+  <Principals>
+    <Users>
+      <User Name="OrleansSiloUser" />
+    </Users>
+    <ManagedIdentities>
+      <ManagedIdentity Name="OrleansSiloApplicationIdentity" />
+    </ManagedIdentities>
+  </Principals>
+</ApplicationManifest>

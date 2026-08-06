@@ -1,154 +1,122 @@
 ---
 title: Troubleshoot deployments
-description: Learn how to troubleshoot common Orleans deployment issues.
-ms.date: 01/21/2026
+description: Triage Orleans deployment and production incidents.
+ms.date: 08/02/2026
 ms.topic: troubleshooting
 ms.custom: devops
-zone_pivot_groups: orleans-version
 ---
 
 # Troubleshoot deployments
 
-:::zone target="docs" pivot="orleans-7-0,orleans-8-0,orleans-9-0,orleans-10-0"
+Start with a timeline. Record the first user-visible symptom, deployment or configuration changes, membership events, dependency incidents, and platform actions. Preserve logs and traces before restarting every instance.
 
-This page provides general guidelines for troubleshooting common Orleans deployment issues.
+## Stabilize the service
 
-## SiloUnavailableException
+1. Stop an active rollout or automated scale-in.
+1. Preserve enough healthy capacity and failure-domain redundancy.
+1. Shed optional load and disable unbounded retries.
+1. Isolate a suspected bad version or dependency without deleting membership or state.
+1. Capture service ID, cluster ID, version, silo names, advertised endpoints, and provider health.
 
-A <xref:Orleans.Runtime.SiloUnavailableException> indicates that the target silo for a grain call is unavailable. This commonly occurs when:
+Don't repeatedly restart all silos. Simultaneous restarts remove evidence, increase provider load, and can turn partial degradation into an outage.
 
-- **Silo terminated abruptly**: A silo crashed or was forcefully terminated and has been evicted from the cluster. This is expected behavior during cluster membership changes.
-- **Network partition**: The target silo is temporarily unreachable due to network issues.
-- **Silo shutdown during request**: The silo began shutting down while a request was in flight.
+## No silo can start
 
-When this exception occurs during a grain call, the grain reference remains valid. You can retry the call later, and Orleans will route the request to the new activation location.
+Check:
 
-If this exception occurs during initial client connection (`IClusterClient.Connect`), it typically means no silos are available to accept the connection. Common causes include:
+- Configuration parsing, credentials, certificates, and clock synchronization.
+- Connectivity and authorization to the clustering provider.
+- Whether service ID, cluster ID, and provider namespace match the intended environment.
+- Stale membership records after a disaster or forced termination.
+- Startup probe deadlines and platform kill events.
+- Provider throttling or an unavailable quorum.
 
-- **Silos haven't started yet**: Ensure silos start before attempting to initialize the client. Sometimes silos take time to start and register with the clustering provider.
-- **Incorrect clustering configuration**: Verify that the client and silos use the same clustering provider and connection settings.
-- **Network connectivity issues**: Check firewall rules and network security groups to ensure the client can reach silo gateway endpoints.
+Use a fresh cluster ID or membership namespace for disaster recovery. Don't delete membership records until you've proved that no partitioned silo from that cluster remains alive.
 
-## Common configuration issues
+## Silos start but don't form one cluster
 
-> [!TIP]
-> Use managed identity instead of connection strings whenever possible. Connection strings contain secrets and should be avoided in production.
+Compare every silo's:
 
-- **Mismatched configuration between components**: All silos and clients must use the same clustering provider and configuration to join the same cluster.
-- **Using local configuration when deploying to cloud environments**: Ensure clustering provider configuration is appropriate for the deployment environment.
+- Service ID and cluster ID.
+- Clustering provider type, endpoint, database or table, and namespace.
+- Advertised IP address and silo port.
+- DNS results, network policy, firewall, and service-mesh behavior.
+- Orleans package and application versions.
 
-## Version considerations
+From each silo network, test TCP connectivity to every advertised silo endpoint. A process can listen successfully while advertising an address no peer can reach.
 
-Orleans 7.0 and later includes a version-tolerant serializer that supports rolling upgrades and mixed-version clusters. You can safely run silos with different Orleans versions during deployments, as long as the versions are within the same major version family (for example, 8.x with 8.y).
+## Clients can't connect
 
-However, it's still recommended to keep Orleans versions consistent across your solution to:
+Clients must use the same service ID, cluster ID, and clustering provider as the silos. Confirm that the provider returns active gateways and that the client network can reach every advertised gateway endpoint.
 
-- Avoid confusion during debugging
-- Ensure all features work as expected
-- Simplify dependency management
+A web load balancer or Kubernetes service doesn't make individual gateway addresses reachable. Test the exact addresses stored in membership.
 
-For information about the version-tolerant serializer, see [Orleans serialization](../host/configuration-guide/serialization.md).
+## Calls fail during membership changes
 
-## Missing logs
+A <xref:Orleans.Runtime.SiloUnavailableException>, timeout, or connection failure can occur while a silo leaves or becomes unreachable. The grain reference remains usable, and Orleans can route later calls to a new activation.
 
-Ensure logging is configured properly. Orleans uses the standard <xref:Microsoft.Extensions.Logging.ILogger> abstraction. Configure your logging provider (Serilog, NLog, Console, Application Insights, etc.) to capture Orleans logs at the appropriate level.
+The failed call has an **unknown outcome**: it might have run before the response was lost. Retry only when the operation is idempotent or deduplicated and the retry policy is bounded. See [Failure handling](handling-failures.md).
 
-```csharp
-builder.Logging.SetMinimumLevel(LogLevel.Information);
+Frequent membership churn points to host restarts, liveness thresholds, resource exhaustion, network loss, provider latency, or incompatible rollout behavior. Correlate membership events with platform events and process telemetry.
+
+## High latency or rejection rate
+
+Inspect:
+
+- CPU throttling, scheduler delay, garbage collection, memory pressure, and thread-pool starvation.
+- Hot grain keys, long-running turns, blocking calls, and fan-out.
+- Gateway load shedding, dropped or expired messages, and socket counts.
+- Dependency latency, throttling, connection pools, circuit breakers, and retry volume.
+- Activation growth and reactivation after a silo loss.
+
+Add capacity only after verifying that the provider and downstream services can absorb it. Use [Capacity planning and scaling](capacity-planning.md) to avoid scaling a retry storm.
+
+## Dependency degradation
+
+Keep liveness healthy when a remote dependency is down. Use readiness only if the application can't safely serve any new work. Otherwise expose the dependency as degraded and preserve the documented reduced capability.
+
+Confirm that timeouts and circuit breakers are working and that retry traffic is bounded. Check credential expiry, provider quotas, DNS, TLS validation, and regional incidents.
+
+## Shutdown and rollout failures
+
+If calls fail during planned replacement:
+
+- Confirm readiness becomes false when shutdown starts.
+- Compare the .NET host shutdown timeout with the platform termination grace period.
+- Check whether the platform sends a graceful termination signal before killing the process.
+- Reduce rollout concurrency and preserve surge capacity.
+- Verify old and new contracts, serializers, storage schemas, and configuration are compatible.
+
+See [Graceful shutdown and upgrades](upgrades.md).
+
+## Missing or unsafe telemetry
+
+Orleans logs through `Microsoft.Extensions.Logging` and publishes metrics and traces using .NET diagnostics APIs. See [Orleans observability](../host/monitoring/index.md).
+
+Ensure telemetry includes cluster and deployment identity but doesn't record secrets or high-cardinality grain keys as metric dimensions. If telemetry disappears with the service, send it to an external collector and give shutdown flushing a bounded deadline.
+
+## Kubernetes checks
+
+Use:
+
+```bash
+kubectl get pods --namespace <namespace> --show-labels
+kubectl describe pod --namespace <namespace> <pod-name>
+kubectl logs --namespace <namespace> <pod-name> --previous
+kubectl auth can-i list pods --namespace <namespace> --as system:serviceaccount:<namespace>:<service-account>
 ```
 
-## Container and Kubernetes troubleshooting
+Check pod IP, identity labels, downward-API environment variables, service account, role binding, probe failures, exit reason, and resource throttling. See [Host Orleans on Kubernetes](kubernetes.md).
 
-For container-based deployments (Docker, Kubernetes, Azure Container Apps):
+## Escalation evidence
 
-- **Pod scheduling issues**: Check resource requests and limits are appropriate for your workload.
-- **Clustering provider connectivity**: Ensure all silos can connect to the configured clustering provider (Redis, Azure Storage, SQL Server, etc.).
-- **Silo endpoint configuration**: Ensure <xref:Orleans.Configuration.EndpointOptions.SiloPort> and <xref:Orleans.Configuration.EndpointOptions.GatewayPort> are correctly exposed and mapped.
-- **Startup, liveness, and readiness probes**: Configure appropriate health check endpoints. Align the startup probe duration with <xref:Orleans.Configuration.ClusterMembershipOptions.MaxJoinAttemptTime> to ensure [Orleans membership protocol](../implementation/cluster-management.md) has enough time to start up during disaster recovery.
+Collect a bounded time window containing:
 
-For detailed Kubernetes troubleshooting, see [Deploy Orleans to Kubernetes](kubernetes.md).
+- Application, Orleans, platform, and provider logs.
+- Metrics and traces around the first symptom.
+- Membership snapshots and advertised endpoints.
+- Deployment manifests and effective configuration with secrets removed.
+- Runtime and application versions.
+- A minimal sequence that reproduces the failure, if available.
 
-:::zone-end
-
-:::zone target="docs" pivot="orleans-3-x"
-
-This page provides general guidelines for troubleshooting issues occurring during deployment. These are common issues to watch out for. Check the logs for more detailed information.
-
-> [!NOTE]
-> For Azure Cloud Services (classic) specific troubleshooting, see [Troubleshoot Azure Cloud Service deployments](troubleshooting-azure-cloud-services-deployments.md). Note that Azure Cloud Services (classic) was retired on August 31, 2024.
-
-## The <xref:Orleans.Runtime.SiloUnavailableException>
-
-This exception indicates that the target silo for a grain call is unavailable. This commonly occurs when a silo terminates abruptly and is evicted from the cluster, which is expected behavior during cluster membership changes.
-
-If this exception occurs during initial client connection, ensure silos start before attempting to initialize the client. Sometimes silos take time to start, so retrying client initialization can be beneficial. If it still throws an exception, check the silo configuration and ensure the silos start properly.
-
-## Common connection string issues
-
-- **Using the local connection string when deploying to Azure**: The website fails to connect.
-- **Using different connection strings for silos and the front end (web and worker roles)**: The website fails to initialize the client because it cannot connect to the silos.
-
-Check the connection string configuration in the Azure portal. Logs might not display properly if connection strings aren't set up correctly.
-
-## Improperly modified configuration files
-
-Ensure proper endpoints are configured in the _ServiceDefinition.csdef_ file; otherwise, the deployment won't work. Errors stating that endpoint information cannot be obtained will occur.
-
-## Missing logs
-
-Ensure the connection strings are set up properly.
-
-It's likely the _Web.config_ file in the web role or the _app.config_ file in the worker role was modified improperly. Incorrect versions in these files can cause deployment issues. Be careful when handling updates.
-
-## Version issues
-
-Ensure the same version of Orleans is used in every project in the solution. Using different versions can lead to worker role recycling. Check the logs for more information. Visual Studio provides some silo startup error messages in the deployment history.
-
-## Role keeps recycling
-
-- Verify all appropriate Orleans assemblies are in the solution and have **Copy Local** set to **True**.
-- Check the logs for unhandled exceptions during initialization.
-- Ensure the connection strings are correct.
-- Refer to the Azure Cloud Services troubleshooting pages for more information.
-
-## How to check logs
-
-- Use Cloud Explorer in Visual Studio to navigate to the appropriate storage table or blob in the storage account.
-
-The `WADLogsTable` is a good starting point for examining logs.
-
-- Only errors might be logged. If informational logs are also desired, modify the configuration to set the logging severity level.
-
-Programmatic configuration:
-
-- When creating a <xref:Orleans.Runtime.Configuration.ClusterConfiguration> object, set `config.Defaults.DefaultTraceLevel = Severity.Info`.
-- When creating a <xref:Orleans.Runtime.Configuration.ClientConfiguration> object, set `config.DefaultTraceLevel = Severity.Info`.
-
-Declarative configuration:
-
-- Add `<Tracing DefaultTraceLevel="Info" />` to the _OrleansConfiguration.xml_ and/or _ClientConfiguration.xml_ files.
-
-In the _diagnostics.wadcfgx_ file for the web and worker roles, ensure the `scheduledTransferLogLevelFilter` attribute in the `Logs` element is set to `Information`. This setting acts as an additional layer of trace filtering defining which traces are sent to the `WADLogsTable` in Azure Storage.
-
-Find more information about this in the [Configuration Guide](../host/configuration-guide/index.md).
-
-## Compatibility with ASP.NET
-
-The Razor view engine included in ASP.NET uses the same code generation assemblies as Orleans (`Microsoft.CodeAnalysis` and `Microsoft.CodeAnalysis.CSharp`). This can present a version compatibility problem at runtime.
-
-To resolve this, try upgrading `Microsoft.CodeDom.Providers.DotNetCompilerPlatform` (the NuGet package ASP.NET uses to include these assemblies) to the latest version and setting binding redirects like this:
-
-```xml
-<dependentAssembly>
-    <assemblyIdentity name="Microsoft.CodeAnalysis.CSharp"
-        publicKeyToken="31bf3856ad364e35" culture="neutral" />
-    <bindingRedirect oldVersion="0.0.0.0-2.0.0.0" newVersion="1.3.1.0" />
-</dependentAssembly>
-<dependentAssembly>
-    <assemblyIdentity name="Microsoft.CodeAnalysis"
-        publicKeyToken="31bf3856ad364e35" culture="neutral" />
-    <bindingRedirect oldVersion="0.0.0.0-2.0.0.0" newVersion="1.3.1.0" />
-</dependentAssembly>
-```
-
-:::zone-end
+State what is known, unknown, and inferred. In particular, don't describe a timed-out business operation as definitely failed unless the application has reconciled its outcome.

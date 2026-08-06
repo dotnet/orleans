@@ -2,29 +2,30 @@
 
 <MudDialog>
     <DialogContent>
-        <MudForm @ref="_form" Model=@Product autocomplete="off">
+        <MudForm @ref="_form" Model="@Product" autocomplete="off">
             <MudTextField Label="Name" HelperText="Product name"
                           @bind-Value="Product.Name" For="@(() => Product.Name)" autocomplete="off" />
             <MudTextField Label="Description" HelperText="Product description"
                           @bind-Value="Product.Description" For="@(() => Product.Description)" autocomplete="off" />
-            <MudSelect T="ProductCategory" Label="Category" Variant=Variant.Text AnchorOrigin=Origin.BottomCenter>
+            <MudSelect T="ProductCategory" Label="Category" Variant="Variant.Text"
+                       AnchorOrigin="Origin.BottomCenter" @bind-Value="Product.Category">
                 @foreach (var category in Enum.GetValues<ProductCategory>())
                 {
-                    <MudSelectItem T="ProductCategory" Value=@category />
+                    <MudSelectItem T="ProductCategory" Value="@category" />
                 }
             </MudSelect>
-            <MudNumericField @bind-Value=Product.Quantity Label="Quantity" Variant="Variant.Text" />
-            <MudNumericField @bind-Value=Product.UnitPrice Label="Unit Price" Variant="Variant.Text" />
+            <MudNumericField @bind-Value="Product.Quantity" Label="Quantity" Variant="Variant.Text" />
+            <MudNumericField @bind-Value="Product.UnitPrice" Label="Unit Price" Variant="Variant.Text" />
         </MudForm>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick=@Bogus Color=Color.Tertiary Variant=Variant.Filled
-                   Size=Size.Large Disabled=@_isSaving>Bogus</MudButton>
-        <MudButton OnClick=@Close Color=Color.Secondary Variant=Variant.Filled
-                   Size=Size.Large Disabled=@_isSaving>Cancel</MudButton>
-        <MudButton StartIcon=@Icons.Material.Filled.Save
-                   Color=Color.Primary Size=Size.Large Variant=Variant.Filled
-                   OnClick=@Save Disabled=@_isSaving>
+        <MudButton OnClick="@PopulateWithSampleData" Color="Color.Tertiary" Variant="Variant.Filled"
+                   Size="Size.Large" Disabled="@_isSaving">Sample data</MudButton>
+        <MudButton OnClick="@Close" Color="Color.Secondary" Variant="Variant.Filled"
+                   Size="Size.Large" Disabled="@_isSaving">Cancel</MudButton>
+        <MudButton StartIcon="@Icons.Material.Filled.Save"
+                   Color="Color.Primary" Size="Size.Large" Variant="Variant.Filled"
+                   OnClick="@SaveAsync" Disabled="@_isSaving">
             @if (_isSaving)
             {
                 <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
@@ -39,62 +40,105 @@
 </MudDialog>
 
 @code {
-    bool _isSaving;
-    MudForm? _form;
+    private bool _isSaving;
+    private MudForm? _form;
 
+    [Parameter]
     public ProductDetails Product { get; set; } = new();
 
-    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [CascadingParameter]
+    private IMudDialogInstance? MudDialog { get; set; }
 
     [Parameter, EditorRequired]
     public EventCallback<ProductDetails> ProductUpdated { get; set; }
 
     [Inject]
-    public IDialogService DialogService { get; set; } = null!;
+    private IDialogService DialogService { get; set; } = null!;
 
-    public async Task OpenAsync(string title, Func<ProductDetails, Task> onProductUpdated) =>
-        await DialogService.ShowAsync<ManageProductModal>(
-            title, new DialogParameters()
+    [Inject]
+    private ILogger<ManageProductModal> Logger { get; set; } = null!;
+
+    [Inject]
+    private ToastService ToastService { get; set; } = null!;
+
+    public async Task OpenAsync(
+        string title,
+        Func<ProductDetails, Task> onProductUpdated,
+        ProductDetails? product = null)
+    {
+        var parameters = new DialogParameters
+        {
             {
-                {
-                    nameof(ProductUpdated),
-                    new EventCallbackFactory().Create(
-                        this, new Func<ProductDetails, Task>(onProductUpdated))
-                }
-            });
+                nameof(ProductUpdated),
+                new EventCallbackFactory().Create(
+                    this,
+                    new Func<ProductDetails, Task>(onProductUpdated))
+            },
+            {
+                nameof(Product),
+                product is null ? new ProductDetails() : product with { }
+            },
+        };
+
+        await DialogService.ShowAsync<ManageProductModal>(
+            title,
+            parameters);
+    }
 
     public void Close() => MudDialog?.Cancel();
 
-    private void Bogus() => Product = ProductDetailsExtensions.ProductDetailsFaker.Generate();
-
-    private Task Save()
+    private void PopulateWithSampleData()
     {
-        if (_form is not null)
+        var productId = Product.Id;
+        Product = ProductDetailsExtensions.ProductDetailsFaker.Generate() with
         {
-            _form.Validate();
-            if (_form.IsValid)
-            {
-                return OnValidSubmitAsync();
-            }
-        }
-
-        return Task.CompletedTask;
+            Id = productId,
+        };
     }
 
-    private async Task OnValidSubmitAsync()
+    private async Task SaveAsync()
     {
-        if (Product is not null && ProductUpdated.HasDelegate)
+        if (_form is null)
         {
-            try
-            {
-                _isSaving = true;
-                await ProductUpdated.InvokeAsync(Product);
-            }
-            finally
-            {
-                _isSaving = false;
-                Close();
-            }
+            return;
+        }
+
+        await _form.Validate();
+        if (!_form.IsValid || !ProductUpdated.HasDelegate)
+        {
+            return;
+        }
+
+        try
+        {
+            _isSaving = true;
+            await ProductUpdated.InvokeAsync(Product);
+            Close();
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            Logger.LogWarning(exception, "Product update authorization failed.");
+            await ToastService.ShowToastAsync(
+                "Product wasn't saved",
+                "Your account isn't authorized to manage products.");
+        }
+        catch (OrleansException exception)
+        {
+            Logger.LogError(exception, "Orleans failed to save the product.");
+            await ToastService.ShowToastAsync(
+                "Product save outcome is unknown",
+                "Refresh the catalog before retrying the change.");
+        }
+        catch (TimeoutException exception)
+        {
+            Logger.LogError(exception, "The product update timed out.");
+            await ToastService.ShowToastAsync(
+                "Product save outcome is unknown",
+                "Refresh the catalog before retrying the change.");
+        }
+        finally
+        {
+            _isSaving = false;
         }
     }
 }

@@ -84,11 +84,11 @@ conceptualContent:
                 text: Service Fabric deployment
                 url: deployment/service-fabric.md
               - itemType: concept
-                text: Consul deployment
-                url: deployment/consul-deployment.md
-              - itemType: concept
-                text: Azure App Service
+                text: Azure App Service on Windows
                 url: deployment/deploy-to-azure-app-service.md
+              - itemType: concept
+                text: Azure App Service on Linux
+                url: deployment/deploy-to-azure-app-service-linux.md
               - itemType: concept
                 text: Azure Container Apps
                 url: deployment/deploy-to-azure-container-apps.md
@@ -97,6 +97,9 @@ conceptualContent:
               - itemType: get-started
                 text: Host configuration
                 url: host/configuration-guide/index.md
+              - itemType: how-to-guide
+                text: Configure Consul clustering
+                url: host/configuration-guide/clustering/consul.md
               - itemType: get-started
                 text: Observability
                 url: host/monitoring/index.md

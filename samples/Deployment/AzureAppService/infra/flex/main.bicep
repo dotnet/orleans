@@ -1,11 +1,94 @@
+targetScope = 'resourceGroup'
+
+@minLength(2)
+@maxLength(16)
 param appName string
+
 param location string = resourceGroup().location
+param serviceId string = 'ShoppingCartService'
+param authenticationTenantId string
+param authenticationClientId string
+
+@secure()
+param authenticationClientSecret string
+
+@allowed([
+  'windows'
+  'linux'
+])
+param operatingSystem string = 'windows'
+
+@minValue(3)
+param workerCount int = 3
+
+param assignStorageRoles bool = true
+param allowSharedKeyAccess bool = false
+
+var storageName = '${replace(toLower(appName), '-', '')}storage'
+
+resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
+  name: '${appName}-vnet'
+  location: location
+  properties: {
+    addressSpace: {
+      addressPrefixes: [
+        '172.17.0.0/16'
+        '192.168.0.0/16'
+      ]
+    }
+    subnets: [
+      {
+        name: 'default'
+        properties: {
+          addressPrefix: '172.17.0.0/24'
+          delegations: [
+            {
+              name: 'app-service'
+              properties: {
+                serviceName: 'Microsoft.Web/serverFarms'
+              }
+            }
+          ]
+          serviceEndpoints: [
+            {
+              service: 'Microsoft.Storage'
+            }
+          ]
+        }
+      }
+      {
+        name: 'staging'
+        properties: {
+          addressPrefix: '192.168.0.0/24'
+          delegations: [
+            {
+              name: 'app-service'
+              properties: {
+                serviceName: 'Microsoft.Web/serverFarms'
+              }
+            }
+          ]
+          serviceEndpoints: [
+            {
+              service: 'Microsoft.Storage'
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
 
 module storageModule 'storage.bicep' = {
   name: 'orleansStorageModule'
   params: {
-    name: '${appName}storage'
+    name: storageName
     location: location
+    allowSharedKeyAccess: allowSharedKeyAccess
+    allowedSubnetIds: [
+      vnet.properties.subnets[0].id
+      vnet.properties.subnets[1].id
+    ]
   }
 }
 
@@ -18,58 +101,36 @@ module logsModule 'logs-and-insights.bicep' = {
   }
 }
 
-resource vnet 'Microsoft.Network/virtualNetworks@2021-05-01' = {
-  name: '${appName}-vnet'
-  location: location
-  properties: {
-    addressSpace: {
-      addressPrefixes: [
-        '172.17.0.0/16',
-        '192.168.0.0/16'
-      ]
-    }
-    subnets: [
-      {
-        name: 'default'
-        properties: {
-          addressPrefix: '172.17.0.0/24'
-          delegations: [
-            {
-              name: 'delegation'
-              properties: {
-                serviceName: 'Microsoft.Web/serverFarms'
-              }
-            }
-          ]
-        }
-      }
-      {
-        name: 'staging'
-        properties: {
-          addressPrefix: '192.168.0.0/24'
-          delegations: [
-            {
-              name: 'delegation'
-              properties: {
-                serviceName: 'Microsoft.Web/serverFarms'
-              }
-            }
-          ]
-        }
-      }
-    ]
-  }
-}
-
-module siloModule 'app-service.bicep' = {
-  name: 'orleansSiloModule'
+module appServiceModule 'app-service.bicep' = {
+  name: 'orleansAppServiceModule'
   params: {
     appName: appName
     location: location
-    vnetSubnetId: vnet.properties.subnets[0].id
+    productionSubnetId: vnet.properties.subnets[0].id
     stagingSubnetId: vnet.properties.subnets[1].id
     appInsightsConnectionString: logsModule.outputs.appInsightsConnectionString
-    appInsightsInstrumentationKey: logsModule.outputs.appInsightsInstrumentationKey
-    storageConnectionString: storageModule.outputs.connectionString
+    storageTableServiceUri: storageModule.outputs.tableServiceUri
+    serviceId: serviceId
+    authenticationTenantId: authenticationTenantId
+    authenticationClientId: authenticationClientId
+    authenticationClientSecret: authenticationClientSecret
+    operatingSystem: operatingSystem
+    workerCount: workerCount
   }
 }
+
+module applicationStorageRole 'storage-role.bicep' = if (assignStorageRoles) {
+  name: 'applicationStorageRole'
+  params: {
+    storageAccountName: storageName
+    principalId: appServiceModule.outputs.applicationPrincipalId
+    assignmentPurpose: 'application'
+  }
+}
+
+output appServiceName string = appServiceModule.outputs.appName
+output productionDefaultHostName string = appServiceModule.outputs.productionDefaultHostName
+output stagingDefaultHostName string = appServiceModule.outputs.stagingDefaultHostName
+output stagingSlotName string = appServiceModule.outputs.stagingSlotName
+output storageAccountName string = storageModule.outputs.storageAccountName
+output operatingSystem string = operatingSystem

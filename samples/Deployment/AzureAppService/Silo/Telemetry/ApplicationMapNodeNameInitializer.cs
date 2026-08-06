@@ -10,5 +10,7 @@ internal class ApplicationMapNodeNameInitializer : ITelemetryInitializer
     internal ApplicationMapNodeNameInitializer(string name) => _name = name;
 
     public void Initialize(ITelemetry telemetry) =>
-        telemetry.Context.Cloud.RoleName = _name;
+        (telemetry.Context.Cloud.RoleName, telemetry.Context.Cloud.RoleInstance) = (
+            _name,
+            Environment.GetEnvironmentVariable("WEBSITE_INSTANCE_ID") ?? Environment.MachineName);
 }

@@ -2,7 +2,7 @@
 
 namespace Abstractions
 {
-    public interface IHelloGrain : IGrainWithStringKey
+    public interface IHelloGrain : IGrainWithIntegerKey
     {
         Task<string> SayHello();
     }

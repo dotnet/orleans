@@ -1,12 +1,16 @@
-using Azure.Data.Tables;
 using Clients.WorkerService;
+using Infrastructure;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 
-var builder = Host.CreateApplicationBuilder(args);
-var storageConnectionString = builder.Configuration["StorageConnectionString"]
-    ?? throw new InvalidOperationException("StorageConnectionString is not configured.");
+var builder = WebApplication.CreateBuilder(args);
+var tableServiceClient = AzureTableServiceClientFactory.Create(builder.Configuration, builder.Environment);
+var clusterId = AzureTableServiceClientFactory.GetRequiredValue(builder.Configuration, "Orleans:ClusterId");
+var serviceId = AzureTableServiceClientFactory.GetRequiredValue(builder.Configuration, "Orleans:ServiceId");
+var clusteringTableName = AzureTableServiceClientFactory.GetRequiredValue(
+    builder.Configuration,
+    "Orleans:ClusteringTableName");
 
 builder.Services.AddWorkerAppApplicationInsights("Worker Service Client");
 builder.Services.AddHostedService<Worker>();
@@ -16,11 +20,18 @@ builder.UseOrleansClient(clientBuilder =>
     clientBuilder
         .Configure<ClusterOptions>(options =>
         {
-            options.ClusterId = "Cluster";
-            options.ServiceId = "Service";
+            options.ClusterId = clusterId;
+            options.ServiceId = serviceId;
         })
-        .UseAzureStorageClustering(options => options.TableServiceClient = new TableServiceClient(storageConnectionString));
+        .UseAzureStorageClustering(options =>
+        {
+            options.TableServiceClient = tableServiceClient;
+            options.TableName = clusteringTableName;
+        });
 });
 
-var host = builder.Build();
-await host.RunAsync();
+var app = builder.Build();
+app.MapGet("/health/startup", () => Results.Ok());
+app.MapGet("/health/ready", () => Results.Ok());
+app.MapGet("/health/live", () => Results.Ok());
+await app.RunAsync();

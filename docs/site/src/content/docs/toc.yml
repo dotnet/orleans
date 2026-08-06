@@ -144,6 +144,10 @@ items:
             href: host/configuration-guide/server-configuration.md
           - name: Typical configurations
             href: host/configuration-guide/typical-configurations.md
+          - name: Clustering providers
+            items:
+              - name: Consul
+                href: host/configuration-guide/clustering/consul.md
           - name: Options classes
             href: host/configuration-guide/list-of-options-classes.md
           - name: Silo metadata
@@ -183,8 +187,10 @@ items:
     items:
       - name: Running the app
         href: deployment/index.md
-      - name: Azure App Service
+      - name: Azure App Service on Windows
         href: deployment/deploy-to-azure-app-service.md
+      - name: Azure App Service on Linux
+        href: deployment/deploy-to-azure-app-service-linux.md
       - name: Azure Container Apps
         href: deployment/deploy-to-azure-container-apps.md
       - name: Kubernetes
@@ -195,8 +201,6 @@ items:
         href: deployment/handling-failures.md
       - name: Troubleshooting Azure Cloud Services (Legacy)
         href: deployment/troubleshooting-azure-cloud-services-deployments.md
-      - name: Consul deployments
-        href: deployment/consul-deployment.md
       - name: Troubleshoot deployments
         href: deployment/troubleshooting-deployments.md
   - name: Code samples
