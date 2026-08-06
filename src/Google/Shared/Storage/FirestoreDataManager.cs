@@ -200,6 +200,31 @@ internal class FirestoreDataManager
     }
 
     /// <summary>
+    /// Updates an existing entity without checking its current ETag.
+    /// </summary>
+    /// <param name="entity">The entity.</param>
+    /// <returns>The entity's new ETag.</returns>
+    public async Task<string> UpdateUnconditionally<TEntity>(TEntity entity) where TEntity : FirestoreEntity, new()
+    {
+        var collection = this.GetCollection();
+        if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Updating entity {id} on collection {collection} without an ETag", entity.Id, this._partition);
+
+        try
+        {
+            ValidateEntity(entity);
+
+            var docRef = collection.Document(entity.Id);
+            var result = await docRef.UpdateAsync(entity.GetFields(), Precondition.MustExist);
+            return Utils.FormatTimestamp(result.UpdateTime);
+        }
+        catch (Exception ex)
+        {
+            this.LogError(ex, nameof(this.UpdateUnconditionally));
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Delete an entity.
     /// </summary>
     /// <param name="id">The entity's id</param>
@@ -214,7 +239,7 @@ internal class FirestoreDataManager
         {
             var docRef = collection.Document(id);
 
-            if (!string.IsNullOrWhiteSpace(eTag))
+            if (!string.IsNullOrWhiteSpace(eTag) && eTag != "*")
             {
                 await docRef.DeleteAsync(Precondition.LastUpdated(Utils.ParseTimestamp(eTag)));
             }

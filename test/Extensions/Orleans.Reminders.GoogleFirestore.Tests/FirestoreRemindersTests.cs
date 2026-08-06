@@ -78,4 +78,31 @@ public class FirestoreRemindersTests : ReminderTableTestsBase, IClassFixture<Tes
         Assert.Equal(first.ReminderName, (await RemindersTable.ReadRow(first.GrainId, first.ReminderName))?.ReminderName);
         Assert.Equal(second.ReminderName, (await RemindersTable.ReadRow(second.GrainId, second.ReminderName))?.ReminderName);
     }
+
+    [SkippableFact]
+    public async Task StaleETagDoesNotOverwriteReminder()
+    {
+        var reminder = new ReminderEntry
+        {
+            GrainId = GrainId.Parse($"user/{Guid.NewGuid():N}"),
+            ReminderName = "stale-etag",
+            StartAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            Period = TimeSpan.FromMinutes(1),
+        };
+
+        reminder.ETag = await RemindersTable.UpsertRow(reminder);
+        var staleETag = reminder.ETag;
+        reminder.StartAt = reminder.StartAt.AddMinutes(1);
+        reminder.ETag = await RemindersTable.UpsertRow(reminder);
+        var currentETag = reminder.ETag;
+
+        reminder.StartAt = reminder.StartAt.AddMinutes(1);
+        reminder.ETag = staleETag;
+        Assert.Null(await RemindersTable.UpsertRow(reminder));
+
+        var stored = await RemindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
+        Assert.NotNull(stored);
+        Assert.Equal(currentETag, stored.ETag);
+        Assert.Equal(new DateTime(2026, 1, 1, 0, 1, 0, DateTimeKind.Utc), stored.StartAt);
+    }
 }

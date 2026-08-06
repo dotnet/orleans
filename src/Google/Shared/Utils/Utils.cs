@@ -29,16 +29,23 @@ internal static partial class Utils
     internal static string FormatTimestamp(Timestamp ts)
     {
         var proto = ts.ToProto();
-        return $"{proto.Seconds}.{proto.Nanos}";
+        return FormattableString.Invariant($"{proto.Seconds}.{proto.Nanos}");
     }
 
     internal static Timestamp ParseTimestamp(string ts)
     {
         var parts = ts.Split('.');
+        if (parts.Length != 2
+            || !long.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var seconds)
+            || !int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var nanos))
+        {
+            throw new FormatException("The value is not a valid Firestore ETag.");
+        }
+
         return Timestamp.FromProto(new()
         {
-            Seconds = long.Parse(parts[0]),
-            Nanos = int.Parse(parts[1])
+            Seconds = seconds,
+            Nanos = nanos,
         });
     }
 

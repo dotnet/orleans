@@ -43,7 +43,7 @@ internal class OrleansSiloInstanceManager
         {
             manager._logger.LogError(ex,
                 "Error trying to connect to Google Firestore collection {Collection} on project {Project}", options.RootCollectionName, options.ProjectId);
-            throw new OrleansException($"Error trying to connect to Google Firestore collection {options.RootCollectionName} on project {options.ProjectId}", ex);
+            throw;
         }
     }
 

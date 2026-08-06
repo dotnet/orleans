@@ -67,8 +67,9 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
         }
         else
         {
-            grainState.RecordExists = true;
-            grainState.State = this._grainStorageSerializer.Deserialize<T>(entity.Payload);
+            var loadedState = this._grainStorageSerializer.Deserialize<T>(entity.Payload);
+            grainState.RecordExists = loadedState is not null;
+            grainState.State = loadedState ?? CreateInstance<T>();
             grainState.ETag = Utils.FormatTimestamp(entity.ETag!.Value);
         }
     }
@@ -93,7 +94,11 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
         try
         {
             string newETag;
-            if (!string.IsNullOrWhiteSpace(grainState.ETag))
+            if (grainState.ETag == "*")
+            {
+                newETag = await this._dataManager.UpdateUnconditionally(entity).ConfigureAwait(false);
+            }
+            else if (!string.IsNullOrWhiteSpace(grainState.ETag))
             {
                 entity.ETag = Utils.ParseTimestamp(grainState.ETag);
                 newETag = await this._dataManager.Update(entity).ConfigureAwait(false);
@@ -107,6 +112,10 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
             grainState.RecordExists = true;
         }
         catch (RpcException ex) when (IsConcurrencyFailure(ex))
+        {
+            throw CreateInconsistentStateException(nameof(WriteStateAsync), stateName, grainId, grainState.ETag, ex);
+        }
+        catch (FormatException ex)
         {
             throw CreateInconsistentStateException(nameof(WriteStateAsync), stateName, grainId, grainState.ETag, ex);
         }
@@ -157,15 +166,22 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
                     Name = stateName,
                 };
 
-                grainState.ETag = string.IsNullOrWhiteSpace(grainState.ETag)
-                    ? await this._dataManager.CreateEntity(entity).ConfigureAwait(false)
-                    : await UpdateClearedEntity(entity, grainState.ETag).ConfigureAwait(false);
+                grainState.ETag = grainState.ETag switch
+                {
+                    "*" => await this._dataManager.UpdateUnconditionally(entity).ConfigureAwait(false),
+                    { Length: > 0 } etag => await UpdateClearedEntity(entity, etag).ConfigureAwait(false),
+                    _ => await this._dataManager.CreateEntity(entity).ConfigureAwait(false),
+                };
             }
 
             grainState.RecordExists = false;
             grainState.State = CreateInstance<T>();
         }
         catch (RpcException ex) when (IsConcurrencyFailure(ex))
+        {
+            throw CreateInconsistentStateException(nameof(ClearStateAsync), stateName, grainId, grainState.ETag, ex);
+        }
+        catch (FormatException ex)
         {
             throw CreateInconsistentStateException(nameof(ClearStateAsync), stateName, grainId, grainState.ETag, ex);
         }

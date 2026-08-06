@@ -97,48 +97,6 @@ namespace UnitTests.GrainInterfaces
         Task DoDelete();
     }
 
-    public interface IGoogleStorageTestGrain : IGrainWithGuidKey
-    {
-        Task<int> GetValue();
-        Task DoWrite(int val);
-        Task<int> DoRead();
-        Task DoDelete();
-    }
-
-    public interface IGoogleStorageGenericGrain<T> : IGrainWithIntegerKey
-        where T : notnull
-    {
-        Task<T> GetValue();
-        Task DoWrite(T val);
-        Task<T> DoRead();
-        Task DoDelete();
-    }
-
-    public interface IGoogleStorageTestGrain_GuidExtendedKey : IGrainWithGuidCompoundKey
-    {
-        Task<string> GetExtendedKeyValue();
-        Task<int> GetValue();
-        Task DoWrite(int val);
-        Task<int> DoRead();
-        Task DoDelete();
-    }
-
-    public interface IGoogleStorageTestGrain_LongKey : IGrainWithIntegerKey
-    {
-        Task<int> GetValue();
-        Task DoWrite(int val);
-        Task<int> DoRead();
-        Task DoDelete();
-    }
-
-    public interface IGoogleStorageTestGrain_LongExtendedKey : IGrainWithIntegerCompoundKey
-    {
-        Task<string> GetExtendedKeyValue();
-        Task<int> GetValue();
-        Task DoWrite(int val);
-        Task<int> DoRead();
-        Task DoDelete();
-    }
     public interface IPersistenceErrorGrain : IGrainWithGuidKey
     {
         Task<int> GetValue();
