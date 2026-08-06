@@ -11,6 +11,7 @@ using Orleans.Providers;
 using TestExtensions;
 using UnitTests.Persistence;
 using Orleans.Persistence.GoogleFirestore;
+using UnitTests.StorageTests.Relational;
 
 namespace Orleans.Persistence.GoogleFirestore.Tests;
 
@@ -162,6 +163,118 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         Assert.Equal(expected.A, actual.A);
         Assert.Equal(expected.B, actual.B);
         Assert.Equal(expected.C, actual.C);
+    }
+
+    [SkippableTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SerializedNullIsReadAsMissingState(bool useJson)
+    {
+        var storage = await CreateStorage(useJson);
+        var grainId = GrainId.Create("test", Guid.NewGuid().ToString("N"));
+        var writtenState = new GrainState<TestStoreGrainState>(null);
+
+        await storage.WriteStateAsync("state", grainId, writtenState);
+
+        Assert.True(writtenState.RecordExists);
+        Assert.NotNull(writtenState.ETag);
+
+        var readState = TestStoreGrainState.NewRandomState();
+        await storage.ReadStateAsync("state", grainId, readState);
+
+        Assert.False(readState.RecordExists);
+        Assert.Equal(writtenState.ETag, readState.ETag);
+        var state = Assert.IsType<TestStoreGrainState>(readState.State);
+        Assert.Equal(default, state.A);
+        Assert.Equal(default, state.B);
+        Assert.Equal(default, state.C);
+    }
+
+    [SkippableFact]
+    public async Task WildcardETagOverwritesExistingState()
+    {
+        var storage = await CreateStorage();
+        var grainId = GrainId.Create("test", Guid.NewGuid().ToString("N"));
+        var initialState = TestStoreGrainState.NewRandomState();
+        await storage.WriteStateAsync("state", grainId, initialState);
+
+        var replacementState = TestStoreGrainState.NewRandomState();
+        replacementState.ETag = "*";
+        await storage.WriteStateAsync("state", grainId, replacementState);
+
+        Assert.True(replacementState.RecordExists);
+        Assert.NotNull(replacementState.ETag);
+        Assert.NotEqual("*", replacementState.ETag);
+
+        var readState = new GrainState<TestStoreGrainState>(new());
+        await storage.ReadStateAsync("state", grainId, readState);
+        Assert.Equal(replacementState.ETag, readState.ETag);
+        var expected = Assert.IsType<TestStoreGrainState>(replacementState.State);
+        var actual = Assert.IsType<TestStoreGrainState>(readState.State);
+        Assert.Equal(expected.A, actual.A);
+        Assert.Equal(expected.B, actual.B);
+        Assert.Equal(expected.C, actual.C);
+    }
+
+    [SkippableTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task WildcardETagClearsExistingState(bool deleteStateOnClear)
+    {
+        var storage = await CreateStorage(deleteStateOnClear: deleteStateOnClear);
+        var grainId = GrainId.Create("test", Guid.NewGuid().ToString("N"));
+        var grainState = TestStoreGrainState.NewRandomState();
+        await storage.WriteStateAsync("state", grainId, grainState);
+
+        grainState.ETag = "*";
+        await storage.ClearStateAsync("state", grainId, grainState);
+
+        Assert.False(grainState.RecordExists);
+        Assert.Equal(deleteStateOnClear, grainState.ETag is null);
+
+        var readState = TestStoreGrainState.NewRandomState();
+        await storage.ReadStateAsync("state", grainId, readState);
+        Assert.False(readState.RecordExists);
+    }
+
+    [SkippableFact]
+    public async Task DuplicateWriteThrowsInconsistentStateException()
+    {
+        var tests = new CommonStorageTests(await CreateStorage());
+        var exception = await tests.PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException();
+
+        Assert.Null(exception.CurrentEtag);
+        Assert.Equal("Unknown", exception.StoredEtag);
+    }
+
+    [SkippableFact]
+    public async Task WriteWithUnknownETagThrowsInconsistentStateException()
+    {
+        var tests = new CommonStorageTests(await CreateStorage());
+        var exception = await tests.PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException();
+
+        Assert.NotNull(exception.CurrentEtag);
+        Assert.Equal("Unknown", exception.StoredEtag);
+    }
+
+    [SkippableFact]
+    public async Task ClearWithStaleETagThrowsInconsistentStateException()
+    {
+        var storage = await CreateStorage();
+        var grainId = GrainId.Create("test", Guid.NewGuid().ToString("N"));
+        var grainState = TestStoreGrainState.NewRandomState();
+        await storage.WriteStateAsync("state", grainId, grainState);
+        var staleETag = grainState.ETag;
+
+        grainState.State = TestStoreGrainState.NewRandomState().State;
+        await storage.WriteStateAsync("state", grainId, grainState);
+
+        grainState.ETag = staleETag;
+        var exception = await Assert.ThrowsAsync<InconsistentStateException>(
+            () => storage.ClearStateAsync("state", grainId, grainState));
+
+        Assert.Equal(staleETag, exception.CurrentEtag);
+        Assert.Equal("Unknown", exception.StoredEtag);
     }
 
     [SkippableTheory, TestCategory("Functional")]

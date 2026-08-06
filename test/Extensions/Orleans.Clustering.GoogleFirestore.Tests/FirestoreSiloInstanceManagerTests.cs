@@ -42,6 +42,35 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
     }
 
     [SkippableFact]
+    public async Task CleanDefunctSilosSupportsMoreThanOneWriteBatch()
+    {
+        const int count = FirestoreDataManager.MAX_BATCH_ENTRIES + 1;
+        var entries = Enumerable.Range(0, count).Select(i => new SiloInstanceEntity
+        {
+            Id = SiloAddressUtils.NewLocalSiloAddress(i + 1).ToParsableString(),
+            ClusterId = this._clusterId,
+            Address = IPAddress.Loopback.ToString(),
+            Port = 10000 + i,
+            Generation = i + 1,
+            HostName = IPAddress.Loopback.ToString(),
+            ProxyPort = 30000 + i,
+            SiloName = $"Silo-{i}",
+            RoleName = "Test",
+            StartTime = TestStartTime,
+        }).ToArray();
+
+        foreach (var chunk in entries.Chunk(50))
+        {
+            await Task.WhenAll(chunk.Select(this._manager.RegisterSiloInstance));
+        }
+
+        await this._manager.CleanupDefunctSiloEntries(TestStartTime.AddTicks(1));
+
+        var membership = await this._manager.FindAllSiloEntries();
+        Assert.Empty(membership.Silos);
+    }
+
+    [SkippableFact]
     public async Task Register_CheckData()
     {
         await RegisterSiloInstance();

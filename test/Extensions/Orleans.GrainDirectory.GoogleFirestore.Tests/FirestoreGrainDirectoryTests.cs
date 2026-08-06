@@ -72,6 +72,31 @@ public class FirestoreGrainDirectoryTests : GrainDirectoryTests<GoogleFirestoreG
     }
 
     [SkippableFact]
+    public async Task UnregisterSilosSupportsMoreThanOneQueryBatch()
+    {
+        const int count = 12;
+        var addresses = Enumerable.Range(0, count).Select(i => new GrainAddress
+        {
+            ActivationId = ActivationId.NewId(),
+            GrainId = GrainId.Parse($"user/{Guid.NewGuid():N}"),
+            SiloAddress = SiloAddress.FromParsableString($"10.0.23.12:{1000 + i}@{5678 + i}"),
+            MembershipVersion = new MembershipVersion(51),
+        }).ToArray();
+
+        foreach (var address in addresses)
+        {
+            await GrainDirectory.Register(address);
+        }
+
+        await GrainDirectory.UnregisterSilos(addresses.Select(address => address.SiloAddress!).ToList());
+
+        foreach (var address in addresses)
+        {
+            Assert.Null(await GrainDirectory.Lookup(address.GrainId));
+        }
+    }
+
+    [SkippableFact]
     public void ConversionTest()
     {
         var addr = new GrainAddress

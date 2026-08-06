@@ -1,7 +1,9 @@
 using System;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using Grpc.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
@@ -17,6 +19,7 @@ internal class GoogleFirestoreReminderTable : IReminderTable
     private readonly ClusterOptions _clusterOptions;
     private readonly FirestoreOptions _firestoreOptions;
     private readonly FirestoreDataManager _dataManager;
+    private readonly TaskCompletionSource _initializationTask = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public GoogleFirestoreReminderTable(
         ILoggerFactory loggerFactory,
@@ -33,33 +36,56 @@ internal class GoogleFirestoreReminderTable : IReminderTable
             loggerFactory.CreateLogger<FirestoreDataManager>());
     }
 
-    public async Task Init()
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
-        var sw = Stopwatch.StartNew();
-
         try
         {
-            this._logger.LogInformation("Initializing GoogleFirestoreStorage Reminders table...");
-
-            await this._dataManager.Initialize();
-
-            this._logger.LogInformation("Initializing GoogleFirestoreStorage Reminders table took {ElapsedMilliseconds}ms.", sw.ElapsedMilliseconds);
+            while (true)
+            {
+                var sw = Stopwatch.StartNew();
+                try
+                {
+                    this._logger.LogInformation("Initializing GoogleFirestoreStorage Reminders table...");
+                    await this._dataManager.Initialize();
+                    this._initializationTask.TrySetResult();
+                    this._logger.LogInformation("Initializing GoogleFirestoreStorage Reminders table took {ElapsedMilliseconds}ms.", sw.ElapsedMilliseconds);
+                    return;
+                }
+                catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+                {
+                    this._logger.LogError(ex, "Error initializing GoogleFirestoreStorage Reminders table in {ElapsedMilliseconds}ms. Retrying.", sw.ElapsedMilliseconds);
+                    await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+                }
+                finally
+                {
+                    sw.Stop();
+                }
+            }
+        }
+        catch (OperationCanceledException ex)
+        {
+            this._initializationTask.TrySetCanceled(ex.CancellationToken);
+            throw;
         }
         catch (Exception ex)
         {
-            this._logger.LogError(ex, "Error initializing GoogleFirestoreStorage Reminders table in {ElapsedMilliseconds}.", sw.ElapsedMilliseconds);
+            this._initializationTask.TrySetException(ex);
             throw;
         }
-        finally
-        {
-            sw.Stop();
-        }
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        this._initializationTask.TrySetCanceled(CancellationToken.None);
+        return Task.CompletedTask;
     }
 
     public async Task<string?> UpsertRow(ReminderEntry entry)
     {
         try
         {
+            await this._initializationTask.Task;
+
             if (this._logger.IsEnabled(LogLevel.Debug)) this._logger.LogDebug("UpsertRow entry = {Data}", entry.ToString());
 
             var entity = new ReminderEntity
@@ -72,24 +98,22 @@ internal class GoogleFirestoreReminderTable : IReminderTable
                 GrainId = entry.GrainId.ToString()
             };
 
-            if (!string.IsNullOrWhiteSpace(entry.ETag))
+            if (string.IsNullOrWhiteSpace(entry.ETag) || entry.ETag == "*")
             {
-                entity.ETag = Utils.ParseTimestamp(entry.ETag);
+                return await this._dataManager.UpsertEntity(entity).ConfigureAwait(false);
             }
 
-            var newETag = await this._dataManager.UpsertEntity(entity).ConfigureAwait(false);
-
-            return newETag;
+            entity.ETag = Utils.ParseTimestamp(entry.ETag);
+            return await this._dataManager.Update(entity).ConfigureAwait(false);
         }
-        // catch (RpcException ex)
-        // {
-        //     if (ex.StatusCode == StatusCode.AlreadyExists)
-        //     {
-        //         var existing = await this._dataManager.ReadEntity<ReminderEntity>(FormatReminderId(entry)).ConfigureAwait(false);
-        //         return Utils.FormatTimestamp(existing!.ETag!.Value);
-        //     }
-        //     throw;
-        // }
+        catch (RpcException ex) when (IsContention(ex))
+        {
+            return null;
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
         catch (Exception ex)
         {
             this._logger.LogWarning(ex,
@@ -102,11 +126,17 @@ internal class GoogleFirestoreReminderTable : IReminderTable
     {
         try
         {
+            await this._initializationTask.Task;
+
             if (this._logger.IsEnabled(LogLevel.Trace)) this._logger.LogTrace("RemoveRow entry = {GrainId} name = {Name}", grainId, reminderName);
 
             var result = await this._dataManager.DeleteEntity(FormatReminderId(reminderName, grainId), eTag).ConfigureAwait(false);
 
             return result;
+        }
+        catch (FormatException)
+        {
+            return false;
         }
         catch (Exception exc)
         {
@@ -120,6 +150,8 @@ internal class GoogleFirestoreReminderTable : IReminderTable
     {
         try
         {
+            await this._initializationTask.Task;
+
             var entries = await this._dataManager.QueryEntities<ReminderEntity>(
                 reminder => reminder
                     .WhereEqualTo(nameof(ReminderEntity.GrainId), grainId.ToString())
@@ -143,6 +175,8 @@ internal class GoogleFirestoreReminderTable : IReminderTable
     {
         try
         {
+            await this._initializationTask.Task;
+
             var entries = new List<ReminderEntity>();
 
             if (begin < end)
@@ -190,6 +224,8 @@ internal class GoogleFirestoreReminderTable : IReminderTable
     {
         try
         {
+            await this._initializationTask.Task;
+
             var entity = await this._dataManager.ReadEntity<ReminderEntity>(FormatReminderId(reminderName, grainId)).ConfigureAwait(false);
 
             if (entity is null) return null;
@@ -210,6 +246,8 @@ internal class GoogleFirestoreReminderTable : IReminderTable
 
     public async Task TestOnlyClearTable()
     {
+        await this._initializationTask.Task;
+
         var entities = await this._dataManager.ReadAllEntities<ReminderEntity>().ConfigureAwait(false);
 
         var tasks = new List<Task>();
@@ -226,6 +264,9 @@ internal class GoogleFirestoreReminderTable : IReminderTable
     private static string FormatReminderId(ReminderEntry entry) => FormatReminderId(entry.ReminderName, entry.GrainId);
     private static string FormatReminderId(string reminderName, GrainId grainId) =>
         $"{Utils.SanitizeId(reminderName)}.{Utils.SanitizeGrainId(grainId)}";
+
+    private static bool IsContention(RpcException exception) =>
+        exception.StatusCode is StatusCode.Aborted or StatusCode.AlreadyExists or StatusCode.FailedPrecondition or StatusCode.NotFound;
 
     private ReminderTableData ConvertFromEntities(IEnumerable<ReminderEntity> entities)
     {
