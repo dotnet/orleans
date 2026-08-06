@@ -1,0 +1,12 @@
+@page "/products"
+@attribute [Authorize(Policy = AuthorizationPolicies.ProductManagement)]
+
+<ProductTable Title="Product Management" Products="@_products" EditProduct="@UpdateProductAsync">
+    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add"
+               Color="Color.Primary" Size="Size.Large" DropShadow="false"
+               OnClick="@CreateNewProductAsync">
+        Create New Product
+    </MudButton>
+    <MudDivider Vertical="true" FlexItem="true" Class="my-3 mx-4" />
+</ProductTable>
+<ManageProductModal @ref="_modal" ProductUpdated="@CreateProductAsync" />

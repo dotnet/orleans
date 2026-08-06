@@ -23,6 +23,9 @@ jobs:
     environment: production
     env:
       APP_NAME: ${{ vars.AZURE_APP_NAME }}
+      APP_SERVICE_OS: ${{ vars.AZURE_APP_SERVICE_OS }}
+      AUTHENTICATION_CLIENT_ID: ${{ vars.AUTHENTICATION_CLIENT_ID }}
+      AUTHENTICATION_TENANT_ID: ${{ vars.AUTHENTICATION_TENANT_ID }}
       AZURE_RESOURCE_GROUP_LOCATION: ${{ vars.AZURE_RESOURCE_GROUP_LOCATION }}
       AZURE_RESOURCE_GROUP_NAME: ${{ vars.AZURE_RESOURCE_GROUP_NAME }}
 
@@ -58,15 +61,28 @@ jobs:
       - name: Deploy infrastructure
         id: infrastructure
         shell: bash
+        env:
+          AUTHENTICATION_CLIENT_SECRET: ${{ secrets.AUTHENTICATION_CLIENT_SECRET }}
         run: |
+          case "$APP_SERVICE_OS" in
+            windows|linux) ;;
+            *)
+              echo "AZURE_APP_SERVICE_OS must be 'windows' or 'linux'." >&2
+              exit 1
+              ;;
+          esac
+
           outputs=$(az deployment group create \
             --name "orleans-shopping-cart-${GITHUB_RUN_ID}" \
             --resource-group "$AZURE_RESOURCE_GROUP_NAME" \
-            --template-file samples/Deployment/AzureAppService/infra/flex/main.bicep \
+            --template-file "samples/Deployment/AzureAppService/infra/${APP_SERVICE_OS}/main.bicep" \
             --parameters \
               appName="$APP_NAME" \
               allowSharedKeyAccess=false \
               assignStorageRoles=false \
+              authenticationClientId="$AUTHENTICATION_CLIENT_ID" \
+              authenticationClientSecret="$AUTHENTICATION_CLIENT_SECRET" \
+              authenticationTenantId="$AUTHENTICATION_TENANT_ID" \
               location="$AZURE_RESOURCE_GROUP_LOCATION" \
             --query properties.outputs \
             --output json)

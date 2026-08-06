@@ -1,17 +1,31 @@
 # Orleans shopping cart on Azure App Service
 
-This Orleans sample deploys a multi-instance shopping cart to Azure App Service. It demonstrates:
+This sample deploys a multi-instance Orleans shopping cart to either Windows or Linux Azure App Service. It demonstrates:
 
-- Three Windows App Service workers running a cohosted ASP.NET Core app and Orleans silo.
-- Per-instance Orleans endpoints using `WEBSITE_PRIVATE_IP` and `WEBSITE_PRIVATE_PORTS`.
-- Production and staging clusters on separate virtual network integration subnets.
-- Azure Table Storage clustering and grain state using one dedicated user-assigned managed identity shared by both slots.
-- App Service health checks, startup warm-up, graceful shutdown, and slot-based rollout.
+- Three App Service workers running a cohosted ASP.NET Core app and Orleans silo.
+- Per-instance Orleans endpoints discovered from `WEBSITE_PRIVATE_IP` and `WEBSITE_PRIVATE_PORTS`.
+- Separate production and staging virtual network integration subnets.
+- Azure Table Storage clustering and grain state using a user-assigned managed identity.
+- App Service Health check, startup warm-up, graceful shutdown, and slot-based rollout.
+- Microsoft Entra authentication and app-role authorization for product administration.
 - Application Insights logging and request/dependency telemetry.
-- GitHub Actions deployment using OpenID Connect instead of a client secret.
+- GitHub Actions deployment using OpenID Connect (OIDC) instead of a deployment client secret.
 
 > [!IMPORTANT]
 > App Service HTTP scale-out isn't sufficient for Orleans by itself. The sample allocates two private ports per instance and uses regional virtual network integration so silos can connect directly over TCP.
+
+## Choose a platform
+
+Both entry points call the shared modules under `infra/flex` and deploy the same application:
+
+| Platform | Template | Platform-specific configuration |
+| --- | --- | --- |
+| Windows | `infra/windows/main.bicep` | Windows App Service plan and `netFrameworkVersion` |
+| Linux | `infra/linux/main.bicep` | Linux plan with `reserved: true` and `linuxFxVersion` |
+
+Both platforms advertise the dynamically allocated private address and ports while listening on all local interfaces. Each worker uses the read-only `WEBSITE_INSTANCE_ID` as its Orleans silo name for diagnostics. Before using either topology in production, scale it out and verify direct TCP reachability between every advertised silo endpoint.
+
+ZIP deployment places the published files in `D:\home\site\wwwroot` on Windows and `/home/site/wwwroot` on Linux. The application doesn't depend on either path or persist grain state there; durable state is stored in Azure Table Storage.
 
 ## Run locally
 
@@ -23,31 +37,64 @@ dotnet run `
   --environment ASPNETCORE_ENVIRONMENT=Development
 ```
 
-The Development environment intentionally uses localhost clustering and in-memory state. Any other environment requires App Service's private endpoint variables and Azure Storage configuration; it never falls back to localhost clustering.
+Development mode intentionally uses localhost clustering and in-memory state. Every other environment requires App Service's private endpoint variables and Azure Storage configuration; it never falls back to a single-host production cluster.
+
+The storefront remains available locally, but product management is unavailable because local execution doesn't have the trusted `X-MS-CLIENT-PRINCIPAL` header injected by App Service Authentication.
+
+## Configure Microsoft Entra authentication
+
+Create a Microsoft Entra app registration for App Service Authentication:
+
+1. Add an app role with value `ProductAdministrator` and allow users or groups.
+1. Create a client secret and record its value.
+1. Assign the app role to product administrators through the enterprise application.
+1. Add production and staging Web redirect URIs ending in `/.auth/login/aad/callback`.
+
+The exact production and staging hostnames are deployment outputs. You can deploy the infrastructure first, add those redirect URIs, and then deploy the application.
+
+App Service Authentication allows anonymous storefront traffic. The application trusts only the platform-injected principal header, protects the `/products` route, hides its navigation item from unauthorized users, and repeats authorization in `ProductService` before mutating grain state.
 
 ## Deploy manually
 
-Install the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli), sign in, and create a resource group:
+Install the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli), sign in, and choose an operating system:
 
 ```powershell
 $location = "westus3"
 $resourceGroup = "orleans-shopping-cart"
 $appName = "<globally-unique-lowercase-name-up-to-16-characters>"
+$operatingSystem = "linux" # Use "windows" for Windows App Service.
+$authenticationTenantId = "<microsoft-entra-tenant-id>"
+$authenticationClientId = "<app-registration-client-id>"
+$authenticationClientSecret = "<app-registration-client-secret>"
 
 az login
 az group create --name $resourceGroup --location $location
 ```
 
-Deploy the infrastructure:
+For Linux, confirm that the target region offers the configured built-in .NET runtime:
+
+```powershell
+az webapp list-runtimes --os linux |
+  Select-String "DOTNETCORE"
+```
+
+Deploy the selected template:
 
 ```powershell
 az deployment group create `
   --resource-group $resourceGroup `
-  --template-file .\infra\flex\main.bicep `
-  --parameters appName=$appName location=$location
+  --template-file ".\infra\$operatingSystem\main.bicep" `
+  --parameters `
+    appName=$appName `
+    location=$location `
+    authenticationTenantId=$authenticationTenantId `
+    authenticationClientId=$authenticationClientId `
+    authenticationClientSecret=$authenticationClientSecret
 ```
 
-This initial deployment is a bootstrap operation. Its identity needs permission to create resources and role assignments in the resource group. The template grants each slot's stable user-assigned managed identity **Storage Table Data Contributor** on the sample storage account.
+The secret parameter is marked `@secure()` so Azure doesn't retain its value in deployment history. For production, rotate it before expiration and prefer a Key Vault reference or separate app registrations for production and staging.
+
+The initial deployment is a bootstrap operation. Its identity needs permission to create resources and role assignments. The template grants the application's user-assigned managed identity **Storage Table Data Contributor** on the sample storage account.
 
 Publish and deploy to staging:
 
@@ -87,7 +134,7 @@ $stagingHost = az webapp show `
 Invoke-WebRequest "https://$stagingHost/health/ready"
 ```
 
-Then swap staging into production:
+Add both callback URLs to the app registration, then swap staging into production:
 
 ```powershell
 az webapp deployment slot swap `
@@ -103,45 +150,54 @@ Managed identity role assignments can take several minutes to propagate after th
 
 Copy [`infra/deploy.yml`](infra/deploy.yml) to `.github/workflows/deploy-app-service.yml`.
 
-Configure GitHub OpenID Connect federation for the `production` environment and add these environment variables:
+Configure GitHub OIDC federation for the `production` environment and add these environment variables:
 
 | Variable | Value |
 | --- | --- |
+| `AUTHENTICATION_CLIENT_ID` | App Service Authentication app-registration client ID |
+| `AUTHENTICATION_TENANT_ID` | Microsoft Entra tenant ID for user authentication |
 | `AZURE_APP_NAME` | Globally unique App Service name |
+| `AZURE_APP_SERVICE_OS` | `windows` or `linux` |
 | `AZURE_CLIENT_ID` | Client ID of the federated deployment identity |
 | `AZURE_RESOURCE_GROUP_LOCATION` | Azure region |
 | `AZURE_RESOURCE_GROUP_NAME` | Existing target resource group |
 | `AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
-| `AZURE_TENANT_ID` | Microsoft Entra tenant ID |
+| `AZURE_TENANT_ID` | Microsoft Entra tenant ID for Azure deployment |
 
-The workflow requests only `contents: read` and `id-token: write`. It deploys with `assignStorageRoles=false`, so its Azure identity doesn't need permission to create role assignments after bootstrap. Grant it **Contributor** on the target resource group, or preferably a custom role limited to the resource types in the Bicep template.
+Add `AUTHENTICATION_CLIENT_SECRET` as a GitHub environment secret. This secret is for App Service user authentication; GitHub's Azure deployment uses OIDC and doesn't use a client secret.
 
-### Upgrade an existing sample deployment
+The workflow requests only `contents: read` and `id-token: write`. It deploys with `assignStorageRoles=false`, so its Azure identity doesn't need permission to create role assignments after bootstrap. Grant it **Contributor** on the target resource group, or preferably a custom role limited to the resources in the Bicep template.
 
-The template preserves the original Windows plan name, `${appName}storage` account, `ShoppingCartService` service ID, `Default` and `Staging` cluster IDs, and the existing clustering and persistence table names.
+## Upgrade an existing Windows deployment
 
-If an existing deployment still uses a storage account key, don't run the new full template first: replacing the App Service settings would remove the legacy credential before the new build starts.
+The Windows template preserves the existing App Service plan and storage account names, the `ShoppingCartService` service ID, the `Default` and `Staging` cluster IDs, and existing membership and persistence table names.
 
-Migrate in this order:
+If an existing deployment still uses a storage account key, don't run the full template first. Migrate in this order:
 
-1. Create `${appName}-identity`, assign it to the existing app and `${appName}stg` slot, and grant it **Storage Table Data Contributor** on `${appName}storage`.
-1. Add `AZURE_CLIENT_ID`, `ORLEANS_AZURE_STORAGE_URI`, `ORLEANS_SERVICE_ID=ShoppingCartService`, and the existing slot-specific cluster IDs using `az webapp config appsettings set`. That command merges these values and leaves the legacy connection-string setting in place.
-1. Manually deploy the managed-identity build to `${appName}stg`, wait for readiness, and swap it into production.
+1. Create `${appName}-identity`, assign it to the app and `${appName}stg` slot, and grant it **Storage Table Data Contributor** on `${appName}storage`.
+1. Merge `AZURE_CLIENT_ID`, `ORLEANS_AZURE_STORAGE_URI`, `ORLEANS_SERVICE_ID=ShoppingCartService`, and the existing slot-specific cluster IDs into both slots.
+1. Deploy the managed-identity build to staging, wait for readiness, and swap it into production.
 1. Keep shared-key access enabled for the rollback window because the former production build now runs in staging.
-1. After the rollback window, deploy and verify the managed-identity build in staging again.
-1. Run the full Bicep deployment with `allowSharedKeyAccess=false assignStorageRoles=false`. At this point both slots use managed identity, and the template removes the legacy setting without duplicating the manually created role assignment.
+1. After both slots run the managed-identity build, deploy `infra/windows/main.bicep` with `allowSharedKeyAccess=false assignStorageRoles=false`.
+
+Don't change an existing App Service plan between Windows and Linux. Deploy a separate app and migrate traffic instead.
 
 ## Operational behavior
 
-- `ORLEANS_CLUSTER_ID` is slot-sticky. The staging and production slots remain separate clusters except during the controlled production warm-up phase of a swap.
-- The same `ORLEANS_SERVICE_ID` identifies the application in both slots.
-- Each cluster uses separate membership and grain-state tables.
-- The app returns readiness only after the .NET host and Orleans silo start. Readiness turns off before Orleans shutdown.
-- The .NET host allows up to 30 seconds for graceful Orleans shutdown. App Service can terminate a worker sooner, so correctness doesn't depend on graceful shutdown completing.
-- The production and staging subnets are `/24` to leave room for worker replacement and platform upgrades.
-- The storage account disables shared-key authentication and admits table traffic only through the two integration subnets.
+- Production and staging use separate delegated subnets and slot-sticky cluster IDs.
+- Both slots retain the stable `ShoppingCartService` service ID across deployments.
+- Each cluster uses separate Azure Table membership and grain-state tables.
+- The app returns readiness only after the host and silo start, and removes readiness before shutdown.
+- The host allows up to 30 seconds for Orleans shutdown. App Service can terminate a worker sooner, so correctness must tolerate silo loss and unknown call outcomes.
+- HTTPS and TLS settings protect HTTP ingress. Orleans private silo and gateway TCP traffic isn't encrypted by this sample; add Orleans TLS if the threat model requires transport encryption inside the virtual network.
+- Application Insights receives ASP.NET Core, dependency, exception, application, and Orleans logs.
+- Linux App Service runs Easy Auth in a sidecar container; Windows uses the in-process App Service module. Both inject the same principal header contract.
+- `DOTNETCORE|10.0`, `v10.0`, and `net10.0` are deployment literals, not Orleans product-version branding.
 
-For complete deployment and upgrade constraints, see [Deploy Orleans to Azure App Service](https://aka.ms/orleans-on-app-service).
+For complete platform guidance, see:
+
+- [Deploy Orleans to Azure App Service on Windows](https://aka.ms/orleans-on-app-service)
+- [Deploy Orleans to Azure App Service on Linux](https://learn.microsoft.com/dotnet/orleans/deployment/deploy-to-azure-app-service-linux)
 
 ## Application model
 
@@ -149,4 +205,4 @@ The product ID passed to `GetGrain<IProductGrain>(product.Id)` is the product gr
 
 ## Acknowledgements
 
-This sample derives from [IEvangelist/orleans-shopping-cart](https://github.com/IEvangelist/orleans-shopping-cart) and was imported from [Azure-Samples/Orleans-Cluster-on-Azure-App-Service](https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-App-Service). The original MIT license is preserved in this directory.
+This sample derives from [IEvangelist/orleans-shopping-cart](https://github.com/IEvangelist/orleans-shopping-cart) and was imported from [Azure-Samples/Orleans-Cluster-on-Azure-App-Service](https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-App-Service). Product-administration authorization incorporates the defense-in-depth design from [Azure-Samples PR #13](https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-App-Service/pull/13). The original MIT license is preserved in this directory.

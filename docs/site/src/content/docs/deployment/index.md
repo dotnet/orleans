@@ -28,7 +28,8 @@ Use these articles together:
 
 - [Kubernetes](kubernetes.md)
 - [Service Fabric](service-fabric.md)
-- [Azure App Service](deploy-to-azure-app-service.md)
+- [Azure App Service on Windows](deploy-to-azure-app-service.md)
+- [Azure App Service on Linux](deploy-to-azure-app-service-linux.md)
 - [Azure Container Apps](deploy-to-azure-container-apps.md)
 - Other orchestrators, virtual machines, or bare-metal hosts that satisfy the [platform requirements](platform-guides.md)
 

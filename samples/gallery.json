@@ -222,12 +222,12 @@
   {
     "slug": "azure-app-service-deployment",
     "title": "Azure App Service Deployment",
-    "description": "An Orleans shopping cart with managed identity, private silo networking, health checks, Bicep, and OIDC deployment to Azure App Service.",
+    "description": "A Windows and Linux Azure App Service deployment with managed identity, private silo networking, health checks, Easy Auth, Bicep, and OIDC.",
     "path": "Deployment/AzureAppService",
     "sourceRepository": "https://github.com/dotnet/orleans",
     "image": "Deployment/AzureAppService/media/shopping-cart-arch.png",
     "languages": ["C#", "Razor", "Bicep", "YAML"],
-    "tags": ["deployment", "azure", "app-service"],
+    "tags": ["deployment", "azure", "app-service", "windows", "linux"],
     "featured": true
   },
   {

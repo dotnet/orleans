@@ -84,8 +84,11 @@ conceptualContent:
                 text: Service Fabric deployment
                 url: deployment/service-fabric.md
               - itemType: concept
-                text: Azure App Service
+                text: Azure App Service on Windows
                 url: deployment/deploy-to-azure-app-service.md
+              - itemType: concept
+                text: Azure App Service on Linux
+                url: deployment/deploy-to-azure-app-service-linux.md
               - itemType: concept
                 text: Azure Container Apps
                 url: deployment/deploy-to-azure-container-apps.md

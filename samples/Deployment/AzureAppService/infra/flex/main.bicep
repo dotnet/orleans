@@ -6,6 +6,17 @@ param appName string
 
 param location string = resourceGroup().location
 param serviceId string = 'ShoppingCartService'
+param authenticationTenantId string
+param authenticationClientId string
+
+@secure()
+param authenticationClientSecret string
+
+@allowed([
+  'windows'
+  'linux'
+])
+param operatingSystem string = 'windows'
 
 @minValue(3)
 param workerCount int = 3
@@ -100,6 +111,10 @@ module appServiceModule 'app-service.bicep' = {
     appInsightsConnectionString: logsModule.outputs.appInsightsConnectionString
     storageTableServiceUri: storageModule.outputs.tableServiceUri
     serviceId: serviceId
+    authenticationTenantId: authenticationTenantId
+    authenticationClientId: authenticationClientId
+    authenticationClientSecret: authenticationClientSecret
+    operatingSystem: operatingSystem
     workerCount: workerCount
   }
 }
@@ -118,3 +133,4 @@ output productionDefaultHostName string = appServiceModule.outputs.productionDef
 output stagingDefaultHostName string = appServiceModule.outputs.stagingDefaultHostName
 output stagingSlotName string = appServiceModule.outputs.stagingSlotName
 output storageAccountName string = storageModule.outputs.storageAccountName
+output operatingSystem string = operatingSystem

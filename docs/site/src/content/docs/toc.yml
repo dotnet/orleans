@@ -187,8 +187,10 @@ items:
     items:
       - name: Running the app
         href: deployment/index.md
-      - name: Azure App Service
+      - name: Azure App Service on Windows
         href: deployment/deploy-to-azure-app-service.md
+      - name: Azure App Service on Linux
+        href: deployment/deploy-to-azure-app-service-linux.md
       - name: Azure Container Apps
         href: deployment/deploy-to-azure-container-apps.md
       - name: Kubernetes

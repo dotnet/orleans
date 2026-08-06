@@ -4,7 +4,10 @@
 using System.Globalization;
 using Azure.Data.Tables;
 using Azure.Identity;
+using Microsoft.AspNetCore.Authentication;
 using Orleans.Configuration;
+using Orleans.ShoppingCart.Silo.Authentication;
+using Orleans.ShoppingCart.Silo.Authorization;
 using Orleans.ShoppingCart.Silo.Health;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,8 +31,20 @@ services.AddMudServices();
 services.AddRazorPages();
 services.AddServerSideBlazor();
 services.AddHttpContextAccessor();
+services
+    .AddAuthentication(AppServiceAuthenticationDefaults.AuthenticationScheme)
+    .AddScheme<AuthenticationSchemeOptions, AppServiceAuthenticationHandler>(
+        AppServiceAuthenticationDefaults.AuthenticationScheme,
+        _ => { });
+services.AddAuthorization(options =>
+    options.AddPolicy(
+        AuthorizationPolicies.ProductManagement,
+        policy => policy
+            .RequireAuthenticatedUser()
+            .RequireRole(AuthorizationPolicies.ProductAdministratorRole)));
 services.AddSingleton<ShoppingCartService>();
 services.AddSingleton<InventoryService>();
+services.AddScoped<ProductService>();
 services.AddScoped<ComponentStateChangedObserver>();
 services.AddSingleton<ToastService>();
 services.AddLocalStorageServices();
@@ -65,6 +80,8 @@ else
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapGet("/health/live", () => Results.Ok());
 app.MapGet(
