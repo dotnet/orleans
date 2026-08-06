@@ -47,6 +47,25 @@ namespace Orleans.Hosting
         {
             configurator.ConfigureCheckpointer(EventHubCheckpointerFactory.CreateFactory, configureOptions);
         }
+
+        /// <summary>
+        /// Configures the stream provider to persist checkpoints using Orleans grains.
+        /// </summary>
+        /// <param name="configurator">The configuration builder.</param>
+        /// <param name="configureOptions">The grain checkpointer configuration.</param>
+        public static void UseGrainCheckpointer(
+            this ISiloEventHubStreamConfigurator configurator,
+            Action<OptionsBuilder<GrainStreamQueueCheckpointerOptions>>? configureOptions = null)
+        {
+            SiloPersistentStreamConfiguratorExtension.UseGrainCheckpointer(
+                configurator,
+                options =>
+                {
+                    options.Configure(static value =>
+                        value.CheckpointComparer = StreamCheckpointComparers.Numeric);
+                    configureOptions?.Invoke(options);
+                });
+        }
     }
 
     public class SiloEventHubStreamConfigurator : SiloRecoverableStreamConfigurator, ISiloEventHubStreamConfigurator

@@ -69,5 +69,40 @@ namespace Orleans.Hosting
             configurator.ConfigureComponent((s, n) => LeaseBasedQueueBalancer.Create(s, n),
                 configureOptions);
         }
+
+        /// <summary>
+        /// Configures the stream provider to use grain-based checkpointer.
+        /// </summary>
+        /// <remarks>
+        /// Checkpoints are persisted using the <c>PubSubStore</c> grain storage provider.
+        /// </remarks>
+        /// <param name="configurator">The configuration builder.</param>
+        public static void UseGrainCheckpointer(this ISiloPersistentStreamConfigurator configurator)
+        {
+            UseGrainCheckpointer(configurator, configureOptions: null);
+        }
+
+        /// <summary>
+        /// Configures the stream provider to use a grain-based checkpointer.
+        /// </summary>
+        /// <param name="configurator">The configuration builder.</param>
+        /// <param name="configureOptions">The grain checkpointer configuration.</param>
+        public static void UseGrainCheckpointer(
+            this ISiloPersistentStreamConfigurator configurator,
+            Action<OptionsBuilder<GrainStreamQueueCheckpointerOptions>>? configureOptions)
+        {
+            configurator.ConfigureComponent<GrainStreamQueueCheckpointerOptions, IStreamQueueCheckpointerFactory>(
+                GrainStreamQueueCheckpointerFactory.CreateFactory,
+                options =>
+                {
+                    options.Validate(
+                        static value => value.PersistInterval > TimeSpan.Zero,
+                        $"{nameof(GrainStreamQueueCheckpointerOptions.PersistInterval)} must be greater than zero.");
+                    options.Validate(
+                        static value => !string.IsNullOrWhiteSpace(value.StorageProviderName),
+                        $"{nameof(GrainStreamQueueCheckpointerOptions.StorageProviderName)} is required.");
+                    configureOptions?.Invoke(options);
+                });
+        }
     }
 }

@@ -133,6 +133,8 @@ namespace Orleans.Hosting
         public static void ConfigurePartitionReceiver(this ISiloEventHubStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.EventHubReceiverOptions>> configureOptions) { }
 
         public static void UseAzureTableCheckpointer(this ISiloEventHubStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureTableStreamCheckpointerOptions>> configureOptions) { }
+
+        public static void UseGrainCheckpointer(this ISiloEventHubStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.GrainStreamQueueCheckpointerOptions>>? configureOptions = null) { }
     }
 }
 

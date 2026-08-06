@@ -279,23 +279,42 @@ public class EventHubCheckpointerTests
     [Fact, TestCategory("BVT")]
     public async Task FlushBeforeLoad_DoesNotPersistUninitializedOffset()
     {
-        var constructor = typeof(EventHubCheckpointer).GetConstructor(
-            BindingFlags.Instance | BindingFlags.NonPublic,
-            binder: null,
-            new[] { typeof(Orleans.Configuration.AzureTableStreamCheckpointerOptions), typeof(string), typeof(string), typeof(string), typeof(Microsoft.Extensions.Logging.ILoggerFactory) },
-            modifiers: null);
-        Assert.NotNull(constructor);
-
-        var checkpointer = (EventHubCheckpointer)constructor.Invoke(new object[]
-        {
-            new Orleans.Configuration.AzureTableStreamCheckpointerOptions(),
-            "provider",
-            "partition",
-            "service",
-            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance
-        });
+        var checkpointer = CreateUninitializedCheckpointer();
 
         await checkpointer.FlushAsync(CancellationToken.None);
+
+        Assert.False(checkpointer.CheckpointExists);
+        Assert.Equal(EventHubConstants.StartOfStream, GetLatestOffset(checkpointer));
+    }
+
+    [Theory, TestCategory("BVT")]
+    [InlineData("20")]
+    [InlineData("10")]
+    [InlineData("not-an-offset")]
+    public async Task Update_WhenOffsetDoesNotAdvance_DoesNotChangeCheckpoint(string candidate)
+    {
+        var checkpointer = CreateUninitializedCheckpointer();
+        SetPersistedOffset(checkpointer, "20");
+
+        checkpointer.Update(candidate, new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc));
+        await checkpointer.FlushAsync(CancellationToken.None);
+
+        Assert.True(checkpointer.CheckpointExists);
+        Assert.Equal("20", GetLatestOffset(checkpointer));
+        Assert.Equal("20", GetCheckpointEntity(checkpointer).Offset);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void Update_WhenOffsetAdvances_TracksLatestCheckpoint()
+    {
+        var checkpointer = CreateUninitializedCheckpointer();
+        SetPersistedOffset(checkpointer, "20");
+
+        checkpointer.Update("21", new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc));
+
+        Assert.True(checkpointer.CheckpointExists);
+        Assert.Equal("21", GetLatestOffset(checkpointer));
+        Assert.Equal("21", GetCheckpointEntity(checkpointer).Offset);
     }
 
     [Fact, TestCategory("BVT")]
@@ -432,5 +451,61 @@ public class EventHubCheckpointerTests
 
         UpdateDeliveryProgress(receiver, MakeToken(75));
         Assert.Equal("75", checkpointer.LastOffset);
+    }
+
+    private static EventHubCheckpointer CreateUninitializedCheckpointer()
+    {
+        var constructor = typeof(EventHubCheckpointer).GetConstructor(
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            binder: null,
+            [
+                typeof(Orleans.Configuration.AzureTableStreamCheckpointerOptions),
+                typeof(string),
+                typeof(string),
+                typeof(string),
+                typeof(Microsoft.Extensions.Logging.ILoggerFactory),
+            ],
+            modifiers: null);
+        Assert.NotNull(constructor);
+
+        return (EventHubCheckpointer)constructor.Invoke(
+        [
+            new Orleans.Configuration.AzureTableStreamCheckpointerOptions(),
+            "provider",
+            "partition",
+            "service",
+            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
+        ]);
+    }
+
+    private static void SetPersistedOffset(EventHubCheckpointer checkpointer, string offset)
+    {
+        SetField(checkpointer, "latestOffset", offset);
+        SetField(checkpointer, "persistedOffset", offset);
+        GetCheckpointEntity(checkpointer).Offset = offset;
+    }
+
+    private static string GetLatestOffset(EventHubCheckpointer checkpointer)
+        => (string)GetField(checkpointer, "latestOffset");
+
+    private static EventHubPartitionCheckpointEntity GetCheckpointEntity(EventHubCheckpointer checkpointer)
+        => (EventHubPartitionCheckpointEntity)GetField(checkpointer, "entity");
+
+    private static object GetField(EventHubCheckpointer checkpointer, string name)
+    {
+        var field = typeof(EventHubCheckpointer).GetField(
+            name,
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        return field.GetValue(checkpointer)!;
+    }
+
+    private static void SetField(EventHubCheckpointer checkpointer, string name, object value)
+    {
+        var field = typeof(EventHubCheckpointer).GetField(
+            name,
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        field.SetValue(checkpointer, value);
     }
 }
