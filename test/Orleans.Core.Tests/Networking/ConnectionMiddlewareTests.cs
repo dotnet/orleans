@@ -74,6 +74,16 @@ namespace Orleans.Core.Tests.Networking
             Assert.Equal(1, middleware.InvocationCount);
         }
 
+        [Fact]
+        public void UseMiddleware_Generic_RequiresRegistration()
+        {
+            var services = new ServiceCollection().BuildServiceProvider();
+            var builder = new TestConnectionBuilder(services);
+            builder.UseMiddleware<InjectedMiddleware>();
+
+            Assert.Throws<InvalidOperationException>(() => builder.Build());
+        }
+
         private static ConnectionContext CreateContext()
         {
             var pipe = new Pipe();

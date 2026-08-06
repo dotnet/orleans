@@ -10,6 +10,11 @@ namespace Orleans.Runtime.Messaging
     /// <see cref="ConnectionDelegate"/> to continue the pipeline.
     /// </para>
     /// <para>
+    /// Middleware instances can be invoked concurrently for multiple connections.
+    /// Per-connection state should be stored in local variables or on the
+    /// <see cref="ConnectionContext"/>.
+    /// </para>
+    /// <para>
     /// Register via <c>builder.UseMiddleware()</c> or manually with
     /// <c>builder.Use(next =&gt; ctx =&gt; middleware.OnConnectionAsync(ctx, next))</c>.
     /// </para>

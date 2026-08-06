@@ -75,6 +75,28 @@ namespace Orleans.Core.Tests.Networking
         }
 
         [Fact]
+        public async Task WriteFrame_CompletedReader_Throws()
+        {
+            var pipe = new Pipe();
+            var context = new TestConnectionContext(pipe);
+            await pipe.Reader.CompleteAsync();
+
+            await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await ConnectionFrameHelper.WriteFrameAsync(context, 0x01, Array.Empty<byte>(), CancellationToken.None));
+        }
+
+        [Fact]
+        public async Task WriteFrame_ZeroCopyPath_CompletedReader_Throws()
+        {
+            var pipe = new Pipe();
+            var context = new TestConnectionContext(pipe);
+            await pipe.Reader.CompleteAsync();
+
+            await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await ConnectionFrameHelper.WriteFrameAsync(context, 0x01, _ => { }, CancellationToken.None));
+        }
+
+        [Fact]
         public async Task ReadFrame_RejectsFrameExceedingMaxLength()
         {
             var pipe = new Pipe();

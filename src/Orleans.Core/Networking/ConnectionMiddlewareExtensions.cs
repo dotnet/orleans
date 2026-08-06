@@ -12,14 +12,14 @@ namespace Orleans
     {
         /// <summary>
         /// Adds an <see cref="IConnectionMiddleware"/> to the connection pipeline.
-        /// The middleware is resolved from DI when registered, or activated using DI otherwise.
+        /// The middleware must be registered as a singleton service and must be safe for concurrent use.
         /// </summary>
         /// <typeparam name="T">The middleware type implementing <see cref="IConnectionMiddleware"/>.</typeparam>
         public static IConnectionBuilder UseMiddleware<T>(this IConnectionBuilder builder) where T : IConnectionMiddleware
         {
             builder.Use(next =>
             {
-                var middleware = ActivatorUtilities.GetServiceOrCreateInstance<T>(builder.ApplicationServices);
+                var middleware = builder.ApplicationServices.GetRequiredService<T>();
                 return context => middleware.OnConnectionAsync(context, next);
             });
 
@@ -29,6 +29,10 @@ namespace Orleans
         /// <summary>
         /// Adds an <see cref="IConnectionMiddleware"/> instance to the connection pipeline.
         /// </summary>
+        /// <remarks>
+        /// The instance is shared by all connections and must be safe for concurrent use.
+        /// The caller owns the instance and is responsible for disposing it.
+        /// </remarks>
         public static IConnectionBuilder UseMiddleware(this IConnectionBuilder builder, IConnectionMiddleware middleware)
         {
             if (middleware is null)

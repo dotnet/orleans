@@ -120,10 +120,7 @@ namespace Orleans.Runtime.Messaging
             CancellationToken cancellationToken)
         {
             WriteFrameToOutput(connection.Transport.Output, frameType, payload);
-
-            var flushResult = await connection.Transport.Output.FlushAsync(cancellationToken);
-            if (flushResult.IsCanceled)
-                throw new OperationCanceledException("Flush canceled while writing frame.");
+            await FlushFrameAsync(connection.Transport.Output, cancellationToken);
         }
 
         /// <summary>
@@ -137,10 +134,16 @@ namespace Orleans.Runtime.Messaging
             CancellationToken cancellationToken)
         {
             WriteFrameWithPrefixingWriter(connection.Transport.Output, frameType, writePayload, MemoryPool<byte>.Shared);
+            await FlushFrameAsync(connection.Transport.Output, cancellationToken);
+        }
 
-            var flushResult = await connection.Transport.Output.FlushAsync(cancellationToken);
+        private static async ValueTask FlushFrameAsync(PipeWriter output, CancellationToken cancellationToken)
+        {
+            var flushResult = await output.FlushAsync(cancellationToken);
             if (flushResult.IsCanceled)
                 throw new OperationCanceledException("Flush canceled while writing frame.");
+            if (flushResult.IsCompleted)
+                throw new InvalidOperationException("Connection terminated while writing frame.");
         }
 
         /// <summary>
