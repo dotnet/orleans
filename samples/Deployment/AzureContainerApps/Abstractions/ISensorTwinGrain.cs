@@ -9,11 +9,19 @@ namespace Abstractions
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class SensorState
     {
+        [Id(0)]
         public string? SensorId { get; set; }
+
+        [Id(1)]
         public double Value { get; set; }
-        public DateTime TimeStamp { get; set; } = DateTime.Now;
+
+        [Id(2)]
+        public DateTime TimeStamp { get; set; } = DateTime.UtcNow;
+
+        [Id(3)]
         public SensorType Type { get; set; } = SensorType.Unspecified;
     }
 

@@ -1,5 +1,5 @@
-using Azure.Data.Tables;
 using Abstractions;
+using Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Orleans;
 using Orleans.Configuration;
@@ -8,8 +8,12 @@ using Orleans.Runtime;
 using System.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
-var storageConnectionString = builder.Configuration["StorageConnectionString"]
-    ?? throw new InvalidOperationException("StorageConnectionString is not configured.");
+var tableServiceClient = AzureTableServiceClientFactory.Create(builder.Configuration, builder.Environment);
+var clusterId = AzureTableServiceClientFactory.GetRequiredValue(builder.Configuration, "Orleans:ClusterId");
+var serviceId = AzureTableServiceClientFactory.GetRequiredValue(builder.Configuration, "Orleans:ServiceId");
+var clusteringTableName = AzureTableServiceClientFactory.GetRequiredValue(
+    builder.Configuration,
+    "Orleans:ClusteringTableName");
 
 // Add services to the container.
 builder.Services.AddEndpointsApiExplorer();
@@ -29,10 +33,14 @@ builder.UseOrleansClient(clientBuilder =>
     clientBuilder
         .Configure<ClusterOptions>(options =>
         {
-            options.ClusterId = "Cluster";
-            options.ServiceId = "Service";
+            options.ClusterId = clusterId;
+            options.ServiceId = serviceId;
         })
-        .UseAzureStorageClustering(options => options.TableServiceClient = new TableServiceClient(storageConnectionString));
+        .UseAzureStorageClustering(options =>
+        {
+            options.TableServiceClient = tableServiceClient;
+            options.TableName = clusteringTableName;
+        });
 });
 
 var app = builder.Build();
@@ -52,9 +60,12 @@ var clusterClient = app.Services.GetRequiredService<IClusterClient>();
 // -------------------
 
 // server is up
-app.MapGet("/", () => "The silo is up and running.")
+app.MapGet("/", () => "The Orleans client is running.")
    .Produces<string>(StatusCodes.Status200OK)
    .WithName("Status");
+app.MapGet("/health/startup", () => Results.Ok());
+app.MapGet("/health/ready", () => Results.Ok());
+app.MapGet("/health/live", () => Results.Ok());
 
 // gets the list of active Orleans grains in the cluster
 app.MapGet("/grains", async () =>
@@ -94,7 +105,7 @@ app.MapGet("/hello/{grain:int}", async (int grain) => {
   .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
   .WithName("Welcome");
 
-app.Run();
+await app.RunAsync();
 
 // record to show a summary of the cluster
 public record GrainSummary(string GrainType, int Count, string Host);

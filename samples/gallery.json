@@ -233,12 +233,12 @@
   {
     "slug": "azure-container-apps-deployment",
     "title": "Azure Container Apps Deployment",
-    "description": "An end-to-end Orleans cluster, client, dashboard, scaler, and Bicep deployment for Azure Container Apps.",
+    "description": "A managed-identity Orleans cluster with clients, dashboard, scaler, and Bicep deployment for Azure Container Apps.",
     "path": "Deployment/AzureContainerApps",
     "sourceRepository": "https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-Container-Apps",
-    "image": "Deployment/AzureContainerApps/docs/media/app-map.png",
+    "image": null,
     "languages": ["C#", "Bicep", "YAML"],
-    "tags": ["deployment", "azure", "container-apps", "autoscaling"],
+    "tags": ["deployment", "azure", "container-apps", "managed-identity", "networking"],
     "featured": true
   }
 ]

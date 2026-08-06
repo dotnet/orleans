@@ -3,7 +3,7 @@
     "HelloOrleans.Dashboard": {
       "commandName": "Project",
       "launchBrowser": true,
-      "launchUrl": "http://localhost:8080",
+      "launchUrl": "",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },

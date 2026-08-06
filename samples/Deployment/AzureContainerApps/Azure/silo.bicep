@@ -1,63 +1,45 @@
 param name string
 param location string = resourceGroup().location
 param containerAppEnvironmentId string
-param repositoryImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+param repositoryImage string
+param registryServer string
+param runtimeIdentityId string
 param envVars array = []
-param registry string
-param registryUsername string
-param minReplicas int = 1
-param maxReplicas int = 10
-param scalerUrl string
-@secure()
-param registryPassword string
+@minValue(1)
+@maxValue(65535)
+param advertisedSiloPort int
+@minValue(1)
+@maxValue(65535)
+param advertisedGatewayPort int
 
-resource containerApp 'Microsoft.App/containerApps@2022-01-01-preview' ={
-  name: name
-  location: location
-  properties: {
-    managedEnvironmentId: containerAppEnvironmentId
-    configuration: {
-      activeRevisionsMode: 'multiple'
-      secrets: [
-        {
-          name: 'container-registry-password'
-          value: registryPassword
-        }
-      ]
-      registries: [
-        {
-          server: registry
-          username: registryUsername
-          passwordSecretRef: 'container-registry-password'
-        }
-      ]
+var ingress = {
+  external: true
+  targetPort: 11111
+  exposedPort: advertisedSiloPort
+  transport: 'tcp'
+  additionalPortMappings: [
+    {
+      external: true
+      targetPort: 30000
+      exposedPort: advertisedGatewayPort
     }
-    template: {
-      containers: [
-        {
-          image: repositoryImage
-          name: name
-          env: envVars
-        }
-      ]
-      scale: {
-        minReplicas: minReplicas
-        maxReplicas: maxReplicas
-        rules: [
-          {
-            name: 'scaler'
-            custom: {
-              type: 'external'
-              metadata: {
-                scalerAddress: '${scalerUrl}:80'
-                graintype: 'sensortwin'
-                siloNameFilter: 'silo'
-                upperbound: '300'
-              }
-            }
-          }
-        ]
-      }
-    }
+  ]
+}
+
+module containerApp 'containerapp.bicep' = {
+  name: '${name}-app'
+  params: {
+    containerAppEnvironmentId: containerAppEnvironmentId
+    envVars: envVars
+    ingress: ingress
+    location: location
+    maxReplicas: 1
+    minReplicas: 1
+    name: name
+    registryServer: registryServer
+    repositoryImage: repositoryImage
+    runtimeIdentityId: runtimeIdentityId
   }
 }
+
+output id string = containerApp.outputs.id

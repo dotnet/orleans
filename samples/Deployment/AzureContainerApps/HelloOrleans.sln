@@ -17,7 +17,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Clients.WorkerService", "Cl
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{5D6267A9-46FB-457D-8BFE-FBEC0CE869A3}"
 	ProjectSection(SolutionItems) = preProject
-		.github\workflows\deploy.yml = .github\workflows\deploy.yml
+		deployment\deploy.yml = deployment\deploy.yml
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Scaler", "Scaler\Scaler.csproj", "{F2B10436-72B9-40EF-8E8E-80DDBFCB1207}"
@@ -26,10 +26,16 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Infrastructure", "Infrastru
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Bicep", "Bicep", "{FB9AF459-6C74-4A6F-95F6-ADC65F1B00D5}"
 	ProjectSection(SolutionItems) = preProject
+		Azure\bootstrap.bicep = Azure\bootstrap.bicep
+		Azure\containerapp.bicep = Azure\containerapp.bicep
 		Azure\dashboard.bicep = Azure\dashboard.bicep
 		Azure\environment.bicep = Azure\environment.bicep
+		Azure\foundation.bicep = Azure\foundation.bicep
+		Azure\identity.bicep = Azure\identity.bicep
 		Azure\main.bicep = Azure\main.bicep
 		Azure\minimalapiclient.bicep = Azure\minimalapiclient.bicep
+		Azure\private-dns.bicep = Azure\private-dns.bicep
+		Azure\registry.bicep = Azure\registry.bicep
 		Azure\scaler.bicep = Azure\scaler.bicep
 		Azure\silo.bicep = Azure\silo.bicep
 		Azure\storage.bicep = Azure\storage.bicep
