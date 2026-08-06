@@ -2,7 +2,6 @@
   <PropertyGroup>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <DefineConstants>$(DefineConstants);GOOGLE_TESTS</DefineConstants>
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
@@ -17,11 +16,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="$(SourceRoot)src\Google\Shared\Storage\FirestoreDataManager.cs" Link="Shared\Storage\FirestoreDataManager.cs" />
-    <Compile Include="$(SourceRoot)src\Google\Shared\Storage\FirestoreEntity.cs" Link="Shared\Storage\FirestoreEntity.cs" />
-    <Compile Include="$(SourceRoot)src\Google\Shared\Storage\FirestoreOptions.cs" Link="Shared\Storage\FirestoreOptions.cs" />
-    <Compile Include="$(SourceRoot)src\Google\Shared\Storage\GoogleCloudOptions.cs" Link="Shared\Storage\GoogleCloudOptions.cs" />
-    <Compile Include="$(SourceRoot)src\Google\Shared\Utils\Utils.cs" Link="Shared\Utils\Utils.cs" />
     <Compile Include="$(SourceRoot)test\Extensions\GoogleFirestore\GoogleEmulatorHost.cs" Link="GoogleEmulatorHost.cs" />
     <Compile Include="$(SourceRoot)test\Extensions\GoogleFirestore\Usings.cs" Link="Usings.cs" />
   </ItemGroup>

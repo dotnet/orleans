@@ -10,28 +10,25 @@ using Orleans.Runtime;
 
 namespace Orleans.Clustering.GoogleFirestore;
 
-internal class OrleansSiloInstanceManager
+internal partial class OrleansSiloInstanceManager
 {
-    public const string INSTANCE_STATUS_CREATED = nameof(SiloStatus.Created);  //"Created";
-    public const string INSTANCE_STATUS_ACTIVE = nameof(SiloStatus.Active);    //"Active";
-    public const string INSTANCE_STATUS_DEAD = nameof(SiloStatus.Dead);        //"Dead";
-
+    private const string ClusterGroup = "Cluster";
     private readonly FirestoreDataManager _storage;
     private readonly ILogger _logger;
     private readonly string _clusterId;
 
-    public OrleansSiloInstanceManager(string clusterId, ILoggerFactory loggerFactory, FirestoreOptions options)
+    private OrleansSiloInstanceManager(string clusterId, ILoggerFactory loggerFactory, FirestoreOptions options)
     {
         this._clusterId = clusterId;
-        this._logger = loggerFactory.CreateLogger($"{nameof(OrleansSiloInstanceManager)}");
+        this._logger = loggerFactory.CreateLogger<OrleansSiloInstanceManager>();
         this._storage = new FirestoreDataManager(
-            MembershipEntity.CLUSTER_GROUP,
+            ClusterGroup,
             clusterId,
             options,
             loggerFactory.CreateLogger<FirestoreDataManager>());
     }
 
-    public static async Task<OrleansSiloInstanceManager> GetManager(string clusterId, ILoggerFactory loggerFactory, FirestoreOptions options)
+    internal static async Task<OrleansSiloInstanceManager> GetManager(string clusterId, ILoggerFactory loggerFactory, FirestoreOptions options)
     {
         var manager = new OrleansSiloInstanceManager(clusterId, loggerFactory, options);
         try
@@ -41,13 +38,12 @@ internal class OrleansSiloInstanceManager
         }
         catch (Exception ex)
         {
-            manager._logger.LogError(ex,
-                "Error trying to connect to Google Firestore collection {Collection} on project {Project}", options.RootCollectionName, options.ProjectId);
+            manager.LogErrorConnecting(ex, options.RootCollectionName, options.ProjectId);
             throw;
         }
     }
 
-    public ClusterVersionEntity CreateClusterVersionEntity(int version)
+    internal ClusterVersionEntity CreateClusterVersionEntity(int version)
     {
         return new ClusterVersionEntity
         {
@@ -55,27 +51,6 @@ internal class OrleansSiloInstanceManager
             Id = this._clusterId,
             MembershipVersion = version
         };
-    }
-
-    public Task<string> RegisterSiloInstance(SiloInstanceEntity entry)
-    {
-        entry.Status = INSTANCE_STATUS_CREATED;
-        this._logger.LogInformation((int)ErrorCode.Runtime_Error_100270, "Registering silo instance: {Data}", entry.ToString());
-        return this._storage.UpsertEntity(entry);
-    }
-
-    public Task<string> UnregisterSiloInstance(SiloInstanceEntity entry)
-    {
-        entry.Status = INSTANCE_STATUS_DEAD;
-        this._logger.LogInformation((int)ErrorCode.Runtime_Error_100271, "Unregistering silo instance: {Data}", entry.ToString());
-        return this._storage.UpsertEntity(entry);
-    }
-
-    public Task<string> ActivateSiloInstance(SiloInstanceEntity entry)
-    {
-        this._logger.LogInformation((int)ErrorCode.Runtime_Error_100272, "Activating silo instance: {Data}", entry.ToString());
-        entry.Status = INSTANCE_STATUS_ACTIVE;
-        return this._storage.UpsertEntity(entry);
     }
 
     /// <summary>
@@ -89,15 +64,15 @@ internal class OrleansSiloInstanceManager
         return address.ToGatewayUri();
     }
 
-    public async Task<IList<Uri>> FindAllGatewayProxyEndpoints()
+    internal async Task<IList<Uri>> FindAllGatewayProxyEndpoints()
     {
-        if (this._logger.IsEnabled(LogLevel.Debug)) this._logger.LogDebug((int)ErrorCode.Runtime_Error_100277, "Searching for active gateway silos for deployment {DeploymentId}.", this._clusterId);
+        LogSearchingForGateways(this._clusterId);
 
         try
         {
             var results = await this._storage.QueryEntities<SiloInstanceEntity>(
                 silo => silo
-                    .WhereEqualTo(nameof(SiloInstanceEntity.Status), INSTANCE_STATUS_ACTIVE)
+                    .WhereEqualTo(nameof(SiloInstanceEntity.Status), (int)SiloStatus.Active)
                 );
 
             var gatewaySiloInstances = results
@@ -105,31 +80,29 @@ internal class OrleansSiloInstanceManager
                 .Select(ConvertToGatewayUri)
                 .ToList();
 
-            this._logger.LogInformation((int)ErrorCode.Runtime_Error_100278, "Found {GatewaySiloCount} active Gateway Silos for deployment {DeploymentId}.", gatewaySiloInstances.Count, this._clusterId);
+            LogFoundGateways(gatewaySiloInstances.Count, this._clusterId);
             return gatewaySiloInstances;
         }
         catch (Exception exc)
         {
-            this._logger.LogError((int)ErrorCode.Runtime_Error_100331, exc, "Error searching for active gateway silos for deployment {DeploymentId} ", this._clusterId);
+            LogErrorSearchingForGateways(exc, this._clusterId);
             throw;
         }
     }
 
     internal Task<string> MergeTableEntryAsync(IDictionary<string, object?> fields, string id) => this._storage.MergeEntity(fields, id); // we merge this without checking eTags.
 
-    internal Task<SiloInstanceEntity?> ReadSingleTableEntryAsync(string id) => this._storage.ReadEntity<SiloInstanceEntity>(id);
-
     internal async Task<int> DeleteTableEntries()
     {
         return await this._storage.ClearCollection();
     }
 
-    public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+    internal async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
     {
         var entities = await this._storage.ReadAllEntities<SiloInstanceEntity>();
         entities = entities
             .Where(entity => entity.Id != this._clusterId)
-            .Where(entity => entity.Status != INSTANCE_STATUS_ACTIVE)
+            .Where(entity => entity.Status != (int)SiloStatus.Active)
             .Where(entity => GetEffectiveUpdateTime(entity) < beforeDate)
             .ToArray();
 
@@ -284,4 +257,27 @@ internal class OrleansSiloInstanceManager
 
         return result;
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error trying to connect to Google Firestore collection {Collection} on project {Project}")]
+    private partial void LogErrorConnecting(Exception exception, string collection, string project);
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Runtime_Error_100277,
+        Level = LogLevel.Debug,
+        Message = "Searching for active gateway silos for deployment {DeploymentId}.")]
+    private partial void LogSearchingForGateways(string deploymentId);
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Runtime_Error_100278,
+        Level = LogLevel.Debug,
+        Message = "Found {GatewaySiloCount} active Gateway Silos for deployment {DeploymentId}.")]
+    private partial void LogFoundGateways(int gatewaySiloCount, string deploymentId);
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Runtime_Error_100331,
+        Level = LogLevel.Error,
+        Message = "Error searching for active gateway silos for deployment {DeploymentId}")]
+    private partial void LogErrorSearchingForGateways(Exception exception, string deploymentId);
 }

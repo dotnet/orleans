@@ -14,7 +14,7 @@ using Orleans.Serialization.Serializers;
 
 namespace Orleans.Persistence.GoogleFirestore;
 
-internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
+internal partial class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
 {
     private const string PERSISTENCE_GROUP = "Persistence";
 
@@ -47,18 +47,13 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
     {
         if (this._dataManager is null) throw new InvalidOperationException("GoogleFirestoreStorage is not initialized.");
 
-        if (this._logger.IsEnabled(LogLevel.Trace)) this._logger.LogTrace(
-                "Reading: StateName={StateName} GrainId={GrainId} from Firestore",
-                stateName,
-                grainId);
+        LogReadingState(stateName, grainId);
 
         var entity = await this._dataManager.ReadEntity<GrainStateEntity>(GetDocumentId(stateName, grainId)).ConfigureAwait(false);
 
         if (entity?.Payload is not { Length: > 0 })
         {
-            if (this._logger.IsEnabled(LogLevel.Trace)) this._logger.LogTrace(
-                    "Read: GrainId={GrainId} from Firestore returned no data",
-                    grainId);
+            LogReadReturnedNoData(grainId);
             ResetGrainState(grainState);
             if (entity?.ETag is { } etag)
             {
@@ -78,11 +73,7 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
     {
         if (this._dataManager is null) throw new InvalidOperationException("GoogleFirestoreStorage is not initialized.");
 
-        if (this._logger.IsEnabled(LogLevel.Trace)) this._logger.LogTrace(
-            "Reading: StateName={StateName} Grainid={GrainId} ETag = {ETag} from Firestore",
-            stateName,
-            grainId,
-            grainState.ETag);
+        LogWritingState(stateName, grainId, grainState.ETag);
 
         var entity = new GrainStateEntity
         {
@@ -121,7 +112,7 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
         }
         catch (Exception ex)
         {
-            this._logger.LogError(ex, "Error writing to GoogleFirestoreStorage GrainId={GrainId} ETag={ETag}", grainId, grainState.ETag);
+            LogWriteError(ex, grainId, grainState.ETag);
             throw;
         }
     }
@@ -130,11 +121,7 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
     {
         if (this._dataManager is null) throw new InvalidOperationException("GoogleFirestoreStorage is not initialized.");
 
-        if (this._logger.IsEnabled(LogLevel.Trace)) this._logger.LogTrace(
-            "Clearing: StateName={StateName} GrainId={GrainId} ETag={ETag} from Firestore",
-            stateName,
-            grainId,
-            grainState.ETag);
+        LogClearingState(stateName, grainId, grainState.ETag);
 
         var operation = "Clearing";
 
@@ -187,14 +174,7 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
         }
         catch (Exception ex)
         {
-            this._logger.LogError(
-                ex,
-                "Error {Operation}: StateName={GrainType} GrainId={GrainId} ETag={ETag} from Firestore",
-                operation,
-                stateName,
-                grainId,
-                grainState.ETag);
-
+            LogClearError(ex, operation, stateName, grainId, grainState.ETag);
             throw;
         }
     }
@@ -239,7 +219,7 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
 
         try
         {
-            this._logger.LogInformation("Initializing GoogleFirestoreStorage {ProviderName}...", this._name);
+            LogInitializing(this._name);
             this._dataManager = new FirestoreDataManager(
                 PERSISTENCE_GROUP,
                 Utils.SanitizeId(this._clusterOptions.ServiceId),
@@ -248,11 +228,11 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
 
             await this._dataManager.Initialize();
 
-            this._logger.LogInformation("Initializing GoogleFirestoreStorage {ProviderName} in stage took {ElapsedMilliseconds}ms.", this._name, sw.ElapsedMilliseconds);
+            LogInitialized(this._name, sw.ElapsedMilliseconds);
         }
         catch (Exception ex)
         {
-            this._logger.LogError(ex, "Error initializing GoogleFirestoreStorage {ProviderName} in {ElapsedMilliseconds}.", this._name, sw.ElapsedMilliseconds);
+            LogInitializationError(ex, this._name, sw.ElapsedMilliseconds);
             throw;
         }
         finally
@@ -265,6 +245,51 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
 
     public void Participate(ISiloLifecycle lifecycle) =>
         lifecycle.Subscribe(OptionFormattingUtilities.Name<GoogleFirestoreStorage>(this._name), ServiceLifecycleStage.ApplicationServices, Init, Close);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "Reading: StateName={StateName} GrainId={GrainId} from Firestore")]
+    private partial void LogReadingState(string stateName, GrainId grainId);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "Read: GrainId={GrainId} from Firestore returned no data")]
+    private partial void LogReadReturnedNoData(GrainId grainId);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "Writing: StateName={StateName} GrainId={GrainId} ETag={ETag} to Firestore")]
+    private partial void LogWritingState(string stateName, GrainId grainId, string? etag);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error writing to GoogleFirestoreStorage GrainId={GrainId} ETag={ETag}")]
+    private partial void LogWriteError(Exception exception, GrainId grainId, string? etag);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "Clearing: StateName={StateName} GrainId={GrainId} ETag={ETag} from Firestore")]
+    private partial void LogClearingState(string stateName, GrainId grainId, string? etag);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error {Operation}: StateName={StateName} GrainId={GrainId} ETag={ETag} from Firestore")]
+    private partial void LogClearError(Exception exception, string operation, string stateName, GrainId grainId, string? etag);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Initializing GoogleFirestoreStorage {ProviderName}...")]
+    private partial void LogInitializing(string providerName);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Initialized GoogleFirestoreStorage {ProviderName} in {ElapsedMilliseconds}ms.")]
+    private partial void LogInitialized(string providerName, long elapsedMilliseconds);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error initializing GoogleFirestoreStorage {ProviderName} in {ElapsedMilliseconds}ms.")]
+    private partial void LogInitializationError(Exception exception, string providerName, long elapsedMilliseconds);
 }
 
 internal static class GoogleFirestoreStorageFactory

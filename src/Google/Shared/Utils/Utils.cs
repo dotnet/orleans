@@ -11,8 +11,6 @@ namespace Orleans.Clustering.GoogleFirestore;
 namespace Orleans.Persistence.GoogleFirestore;
 #elif ORLEANS_REMINDERS
 namespace Orleans.Reminders.GoogleFirestore;
-#elif GOOGLE_TESTS
-namespace Orleans.Tests.GoogleFirestore;
 #elif ORLEANS_DIRECTORY
 namespace Orleans.GrainDirectory.GoogleFirestore;
 #else
@@ -24,7 +22,6 @@ internal static partial class Utils
     private const string ENCODED_ID_PREFIX = "id-";
 
     internal static string FormatDateTime(DateTimeOffset dto) => dto.ToString("O", CultureInfo.InvariantCulture);
-    internal static DateTimeOffset ParseDateTime(string dto) => DateTimeOffset.ParseExact(dto, "O", CultureInfo.InvariantCulture);
 
     internal static string FormatTimestamp(Timestamp ts)
     {

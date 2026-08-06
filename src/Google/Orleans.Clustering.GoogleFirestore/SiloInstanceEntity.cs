@@ -24,7 +24,7 @@ internal class SiloInstanceEntity : MembershipEntity
     public string HostName { get; set; } = default!;
 
     [FirestoreProperty("Status")]
-    public string Status { get; set; } = default!;
+    public int Status { get; set; }
 
     [FirestoreProperty("ProxyPort")]
     public int ProxyPort { get; set; }
@@ -86,7 +86,7 @@ internal class SiloInstanceEntity : MembershipEntity
         sb.Append(" LocalPort=").Append(this.Port);
         sb.Append(" Generation=").Append(this.Generation);
         sb.Append(" Host=").Append(this.HostName);
-        sb.Append(" Status=").Append(this.Status);
+        sb.Append(" Status=").Append((SiloStatus)this.Status);
         sb.Append(" ProxyPort=").Append(this.ProxyPort);
         sb.Append(" SiloName=").Append(this.SiloName);
 
@@ -105,7 +105,7 @@ internal class SiloInstanceEntity : MembershipEntity
         var entry = new MembershipEntry
         {
             HostName = this.HostName,
-            Status = (SiloStatus)Enum.Parse(typeof(SiloStatus), this.Status),
+            Status = (SiloStatus)this.Status,
             ProxyPort = this.ProxyPort,
             SiloAddress = SiloAddress.New(IPAddress.Parse(this.Address), this.Port, this.Generation),
             SiloName = this.SiloName,
@@ -137,7 +137,7 @@ internal class SiloInstanceEntity : MembershipEntity
             Port = entry.SiloAddress.Endpoint.Port,
             Generation = entry.SiloAddress.Generation,
             HostName = entry.HostName,
-            Status = entry.Status.ToString(),
+            Status = (int)entry.Status,
             ProxyPort = entry.ProxyPort,
             SiloName = entry.SiloName,
             RoleName = entry.RoleName,

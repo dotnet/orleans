@@ -4,8 +4,6 @@ namespace Orleans.Clustering.GoogleFirestore;
 namespace Orleans.Persistence.GoogleFirestore;
 #elif ORLEANS_REMINDERS
 namespace Orleans.Reminders.GoogleFirestore;
-#elif GOOGLE_TESTS
-namespace Orleans.Tests.GoogleFirestore;
 #elif ORLEANS_DIRECTORY
 namespace Orleans.GrainDirectory.GoogleFirestore;
 #else

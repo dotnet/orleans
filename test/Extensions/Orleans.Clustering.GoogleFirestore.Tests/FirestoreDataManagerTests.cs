@@ -3,8 +3,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Grpc.Core;
 using Google.Cloud.Firestore;
-using Orleans.Tests.GoogleFirestore;
-using Utils = Orleans.Tests.GoogleFirestore.Utils;
+using Orleans.Clustering.GoogleFirestore;
+using Utils = Orleans.Clustering.GoogleFirestore.Utils;
 
 namespace Orleans.Clustering.GoogleFirestore.Tests;
 

@@ -24,8 +24,4 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
     <PackageReference Include="Google.Cloud.Firestore" />
   </ItemGroup>
-
-  <ItemGroup>
-    <InternalsVisibleTo Include="Orleans.GrainDirectory.GoogleFirestore.Tests" />
-  </ItemGroup>
 </Project>

@@ -5,8 +5,6 @@ namespace Orleans.Clustering.GoogleFirestore;
 
 internal class MembershipEntity : FirestoreEntity
 {
-    public const string CLUSTER_GROUP = "Cluster";
-    
     [FirestoreProperty("ClusterId")]
     public string ClusterId { get; set; } = default!;
 
