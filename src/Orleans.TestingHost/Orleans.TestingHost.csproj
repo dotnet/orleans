@@ -26,6 +26,6 @@
     <InternalsVisibleTo Include="Orleans.Placement.Tests" />
     <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
     <InternalsVisibleTo Include="Orleans.Streaming.Tests" />
+    <InternalsVisibleTo Include="Orleans.Streaming.Kinesis.Tests" />
   </ItemGroup>
 </Project>
-
