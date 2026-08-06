@@ -1,6 +1,5 @@
 using Aspire.Hosting;
 using Aspire.Hosting.Azure;
-using Aspire.Hosting.SqlServer;
 
 namespace Orleans.Docs.Snippets.Aspire;
 
@@ -202,21 +201,22 @@ public static class AppHostExamples
     {
         var builder = DistributedApplication.CreateBuilder(args);
 
-        // Add a SQL Server instance and database
+        // Add a SQL Server instance and database.
+        // Note: Aspire infers the Orleans provider type from the resource class name
+        // (SqlServerDatabaseResource → "SqlServerDatabase"), which does not match
+        // the Orleans provider name "AdoNet".
+        //
+        // There is no public API to override this inference in the current version
+        // of Aspire.Hosting.Orleans. As a workaround, configure the Orleans providers
+        // manually in the silo using UseOrleans(siloBuilder => {...}) and read the
+        // connection string from IConfiguration.
         var sql = builder.AddSqlServer("sql");
-        var db = sql.AddDatabase("orleans-db")
-            // Aspire infers the provider name from the C# class name
-            // (SqlServerDatabaseResource → "SqlServerDatabase"), which doesn't
-            // match what Orleans expects. Override it explicitly:
-            .WithOrleansProviderType("AdoNet");
+        var db = sql.AddDatabase("orleans-db");
 
-        var orleans = builder.AddOrleans("cluster")
-            .WithClustering(db)
-            .WithGrainStorage("Default", db)
-            .WithReminders(db);
-
+        // Pass the database resource so Aspire injects ConnectionStrings__orleans-db.
+        // Then configure Orleans manually in the silo (see silo example).
         builder.AddProject<Projects.Silo>("silo")
-            .WithReference(orleans)
+            .WithReference(db)
             .WaitFor(sql);
 
         builder.Build().Run();

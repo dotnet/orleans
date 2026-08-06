@@ -185,7 +185,7 @@ builder.AddKeyedSqlServerClient("orleans-db"); // key = Aspire database resource
 ```
 
 > [!IMPORTANT]
-> ADO.NET resources require `.WithOrleansProviderType("AdoNet")` in the AppHost. Aspire infers the Orleans provider name from the resource's .NET class name (for example, `SqlServerDatabaseResource` → `SqlServerDatabase`), which does not match the `AdoNet` provider name that Orleans expects. This call overrides the inference.
+> ADO.NET resources require manual Orleans configuration in the silo. Aspire infers the Orleans provider name from the resource's .NET class name (for example, `SqlServerDatabaseResource` → `SqlServerDatabase`), which does not match the `AdoNet` provider name that Orleans expects. There is no public API to override this inference in `Aspire.Hosting.Orleans`. Instead, pass the database resource directly to the silo project with `.WithReference(db)` so Aspire injects the connection string, then configure Orleans providers manually using `UseOrleans(siloBuilder => {...})`.
 
 **AppHost example:**
 
@@ -317,7 +317,7 @@ Aspire infers the provider type name from the .NET class name of the resource by
 - `RedisResource` → `Redis`
 - `AzureBlobStorageResource` → `AzureBlobStorage`
 - `AzureTableStorageResource` → `AzureTableStorage`
-- `SqlServerDatabaseResource` → `SqlServerDatabase` (incorrect — must override with `.WithOrleansProviderType("AdoNet")`)
+- `SqlServerDatabaseResource` → `SqlServerDatabase` (incorrect for Orleans ADO.NET — no public override API; configure ADO.NET providers manually in the silo instead)
 
 Use `.WithOrleansProviderType("X")` to override the inferred name when the C# class name doesn't match what Orleans expects.
 
@@ -382,11 +382,6 @@ The `Aspire.Hosting.Orleans` package provides these extension methods:
 |--------|-------------|
 | `.WithGrainDirectory(name, resource)` | Configures a named grain directory using the specified resource (Redis or Azure Tables). |
 
-### Resource provider type override
-
-| Method | Description |
-|--------|-------------|
-| `resource.WithOrleansProviderType(type)` | Overrides the inferred Orleans provider type name for a resource. Required for ADO.NET resources and any resource whose .NET class name doesn't match the Orleans provider name. |
 
 ## Azure Storage with Aspire
 
@@ -446,7 +441,7 @@ If you need explicit control over the connection string, you can bypass Aspire's
 
 7. **Set stable cluster IDs for production**: Always call `.WithClusterId()` and `.WithServiceId()` with fixed, meaningful values in production to ensure silos and clients recognize each other across restarts and deployments.
 
-8. **Use `.WithOrleansProviderType()` for ADO.NET**: Because Aspire infers the provider type name from the .NET class name, ADO.NET resources require an explicit override to match what Orleans expects.
+8. **Configure ADO.NET providers manually**: Because Aspire infers the provider type name from the .NET class name and there is no public override API, ADO.NET clustering/storage/reminders must be configured manually in the silo using `UseOrleans(siloBuilder => {...})`.
 
 ## See also
 
@@ -471,3 +466,6 @@ Consider upgrading to Orleans 8.0 or later to take advantage of the Aspire integ
 Aspire integration is available in Orleans 8.0 and later. Orleans 3.x does not support Aspire.
 
 :::zone-end
+
+
+
