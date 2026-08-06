@@ -123,13 +123,31 @@ public static class SiloProgram
 
         builder.AddServiceDefaults();
 
-        // Register the ADO.NET client using the Aspire resource name as the key.
-        // The key must match the resource name used in the AppHost exactly.
-        builder.AddKeyedSqlServerClient("orleans-db");
+        // Configure Orleans manually because Aspire cannot automatically wire ADO.NET
+        // providers — provider type inference produces "SqlServerDatabase" instead of
+        // the "AdoNet" provider name Orleans expects.
+        builder.UseOrleans(siloBuilder =>
+        {
+            var connectionString = builder.Configuration.GetConnectionString("orleans-db")!;
 
-        // Aspire injects Orleans__Clustering__ProviderType=AdoNet,
-        // Orleans__Clustering__ServiceKey=orleans-db, etc.
-        builder.UseOrleans();
+            siloBuilder.UseAdoNetClustering(options =>
+            {
+                options.Invariant = "System.Data.SqlClient";
+                options.ConnectionString = connectionString;
+            });
+
+            siloBuilder.AddAdoNetGrainStorageAsDefault(options =>
+            {
+                options.Invariant = "System.Data.SqlClient";
+                options.ConnectionString = connectionString;
+            });
+
+            siloBuilder.UseAdoNetReminderService(options =>
+            {
+                options.Invariant = "System.Data.SqlClient";
+                options.ConnectionString = connectionString;
+            });
+        });
 
         builder.Build().Run();
     }
