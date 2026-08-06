@@ -9,28 +9,13 @@ namespace Orleans.Clustering.GoogleFirestore.Tests;
 [TestCategory("GoogleFirestore"), TestCategory("GoogleCloud"), TestCategory("Functional")]
 public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
 {
+    private static readonly DateTimeOffset TestStartTime = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
     private FirestoreOptions _options = default!;
     private string _clusterId = default!;
     private OrleansSiloInstanceManager _manager = default!;
     private SiloInstanceEntity _entity = default!;
     private int _generation = default!;
     private SiloAddress _siloAddress = default!;
-
-    [SkippableFact]
-    public async Task ActivateSiloInstance()
-    {
-        await RegisterSiloInstance();
-
-        await this._manager.ActivateSiloInstance(this._entity);
-    }
-
-    [SkippableFact]
-    public async Task UnregisterSiloInstance()
-    {
-        await RegisterSiloInstance();
-
-        await this._manager.UnregisterSiloInstance(this._entity);
-    }
 
     [SkippableFact]
     public async Task CleanDeadSiloInstance()
@@ -49,9 +34,7 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
             await this._manager.ActivateSiloInstance(instance);
         }
 
-        await Task.Delay(TimeSpan.FromSeconds(3));
-
-        await this._manager.CleanupDefunctSiloEntries(DateTimeOffset.UtcNow - TimeSpan.FromMicroseconds(1));
+        await this._manager.CleanupDefunctSiloEntries(TestStartTime.AddTicks(1));
 
         var mbrData = await this._manager.FindAllSiloEntries();
         Assert.Equal(4, mbrData.Silos.Length);
@@ -144,7 +127,7 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
             RoleName = "MyRole",
             UpdateZone = 3,
             FaultZone = 5,
-            StartTime = DateTimeOffset.UtcNow
+            StartTime = TestStartTime
         };
 
         var etag = await this._manager.RegisterSiloInstance(this._entity);

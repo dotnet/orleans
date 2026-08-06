@@ -67,10 +67,12 @@ namespace UnitTests.RemindersTest
         {
             var upserts = await Task.WhenAll(Enumerable.Range(0, 5).Select(i =>
             {
-                var reminder = CreateReminder(MakeTestGrainReference(), i.ToString());
+                var grainId = MakeTestGrainReference();
+                var startAt = DateTime.UtcNow;
                 return Task.WhenAll(Enumerable.Range(1, 5).Select(j =>
                 {
-                    reminder.StartAt = DateTime.UtcNow;
+                    var reminder = CreateReminder(grainId, i.ToString());
+                    reminder.StartAt = startAt.AddMilliseconds(j);
                     return RetryHelper.RetryOnExceptionAsync(5, RetryOperation.Sigmoid, async () =>
                     {
                         return await remindersTable.UpsertRow(reminder);

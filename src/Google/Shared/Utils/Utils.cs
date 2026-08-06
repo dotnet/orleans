@@ -19,20 +19,20 @@ namespace Orleans.GrainDirectory.GoogleFirestore;
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
 
-public static partial class Utils
+internal static partial class Utils
 {
     private const string ENCODED_ID_PREFIX = "id-";
 
-    public static string FormatDateTime(DateTimeOffset dto) => dto.ToString("O", CultureInfo.InvariantCulture);
-    public static DateTimeOffset ParseDateTime(string dto) => DateTimeOffset.ParseExact(dto, "O", CultureInfo.InvariantCulture);
+    internal static string FormatDateTime(DateTimeOffset dto) => dto.ToString("O", CultureInfo.InvariantCulture);
+    internal static DateTimeOffset ParseDateTime(string dto) => DateTimeOffset.ParseExact(dto, "O", CultureInfo.InvariantCulture);
 
-    public static string FormatTimestamp(Timestamp ts)
+    internal static string FormatTimestamp(Timestamp ts)
     {
         var proto = ts.ToProto();
         return $"{proto.Seconds}.{proto.Nanos}";
     }
 
-    public static Timestamp ParseTimestamp(string ts)
+    internal static Timestamp ParseTimestamp(string ts)
     {
         var parts = ts.Split('.');
         return Timestamp.FromProto(new()
@@ -42,9 +42,9 @@ public static partial class Utils
         });
     }
 
-    public static string SanitizeGrainId(GrainId grainId) => SanitizeId(grainId.ToString());
+    internal static string SanitizeGrainId(GrainId grainId) => SanitizeId(grainId.ToString());
 
-    public static string SanitizeId(string id)
+    internal static string SanitizeId(string id)
     {
         ArgumentNullException.ThrowIfNull(id);
 
@@ -54,7 +54,7 @@ public static partial class Utils
             .Replace('/', '_');
     }
 
-    public static string ParseId(string id)
+    internal static string ParseId(string id)
     {
         ArgumentNullException.ThrowIfNull(id);
         if (!id.StartsWith(ENCODED_ID_PREFIX, StringComparison.Ordinal))
@@ -69,7 +69,7 @@ public static partial class Utils
         return Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
     }
 
-    public static GrainId ParseGrainId(string grainId) => GrainId.Parse(ParseId(grainId));
+    internal static GrainId ParseGrainId(string grainId) => GrainId.Parse(ParseId(grainId));
 
     [GeneratedRegex("__.*__", RegexOptions.CultureInvariant)]
     internal static partial Regex ForbiddenIdRegex();
