@@ -1,6 +1,5 @@
 using Docker.DotNet;
 using DotNet.Testcontainers.Builders;
-using DotNet.Testcontainers.Configurations;
 using DotNet.Testcontainers.Containers;
 using Xunit;
 
@@ -11,8 +10,6 @@ namespace TestExtensions;
 /// </summary>
 public sealed class TestcontainerManager<TContainer> where TContainer : IContainer
 {
-    private static readonly Lazy<string?> DockerDaemonOsTypeLazy = new(GetDockerDaemonOsType);
-
     private readonly string _serviceName;
     private readonly Lazy<TContainer> _container;
     private readonly Action<TContainer>? _onStarted;
@@ -46,13 +43,6 @@ public sealed class TestcontainerManager<TContainer> where TContainer : IContain
 
     private async Task<string?> StartAndGetSkipReasonAsync()
     {
-        var dockerDaemonOsType = DockerDaemonOsTypeLazy.Value;
-        if (string.IsNullOrWhiteSpace(dockerDaemonOsType))
-            return GetDockerUnavailableSkipReason();
-
-        if (string.Equals(dockerDaemonOsType, "windows", StringComparison.OrdinalIgnoreCase))
-            return $"Docker is running in Windows container mode, so {_serviceName} tests are skipped.";
-
         try
         {
             var container = _container.Value;
@@ -76,6 +66,10 @@ public sealed class TestcontainerManager<TContainer> where TContainer : IContain
         {
             return GetDockerUnavailableSkipReason(exception);
         }
+        catch (InvalidOperationException exception)
+        {
+            return GetDockerUnavailableSkipReason(exception);
+        }
     }
 
     private string GetDockerUnavailableSkipReason(Exception? exception = null)
@@ -84,35 +78,4 @@ public sealed class TestcontainerManager<TContainer> where TContainer : IContain
         return exception is null ? reason : $"{reason} {exception.Message}";
     }
 
-    private static string? GetDockerDaemonOsType()
-    {
-        try
-        {
-            using var dockerClient = TestcontainersSettings.OS.DockerEndpointAuthConfig
-                .GetDockerClientConfiguration(Guid.NewGuid())
-                .CreateClient();
-            var dockerInfo = dockerClient.System.GetSystemInfoAsync().GetAwaiter().GetResult();
-            return dockerInfo.OSType;
-        }
-        catch (DockerUnavailableException)
-        {
-            return null;
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
-        catch (OperationCanceledException)
-        {
-            return null;
-        }
-        catch (DockerApiException)
-        {
-            return null;
-        }
-        catch (InvalidOperationException)
-        {
-            return null;
-        }
-    }
 }
