@@ -1,161 +1,71 @@
 ---
 title: Grain extensions
-description: Learn how to extend an Orleans Grain.
-ms.date: 03/31/2025
+description: Add runtime-provided interfaces to Orleans grains.
+ms.date: 08/02/2026
 ms.topic: concept-article
 ---
 
 # Grain extensions
 
-Grain extensions provide a way to add extra behavior to grains. By extending a grain with an interface deriving from <xref:Orleans.Runtime.IGrainExtension>, new methods and functionality can be added to the grain.
+Grain extensions attach an additional callable interface to grain activations. Orleans uses extensions internally for features such as cancellation and streaming. Applications can use them for infrastructure behavior that should be available across many grain types.
 
-This article presents two examples of grain extensions. The first example shows how to add a `Deactivate` method to all grains, usable for deactivating the grain. The second example shows how to add `GetState` and `SetState` methods to any grain, allowing manipulation of the grain's internal state.
+Extensions are an advanced integration mechanism. Prefer a normal grain interface when the behavior is part of the grain's domain contract.
 
-## Deactivate extension example
+## Define an extension
 
-This example demonstrates adding a `Deactivate` method to all grains automatically. Use the method to deactivate the grain; it accepts a string as a message parameter. Orleans grains already support this functionality via the <xref:Orleans.Core.Internal.IGrainManagementExtension> interface. Nevertheless, this example shows how this or similar functionality could be added.
-
-### Deactivate extension interface
-
-Start by defining an `IGrainDeactivateExtension` interface containing the `Deactivate` method. The interface must derive from `IGrainExtension`.
+The interface derives from <xref:Orleans.Runtime.IGrainExtension> and uses normal grain method return types:
 
 ```csharp
-public interface IGrainDeactivateExtension : IGrainExtension
+public interface IDiagnosticsExtension : IGrainExtension
 {
-    Task Deactivate(string msg);
+    ValueTask<string> GetStatus();
 }
-```
 
-### Deactivate extension implementation
-
-Next, implement the `GrainDeactivateExtension` class, providing the implementation for the `Deactivate` method.
-
-To access the target grain, retrieve the <xref:Orleans.Runtime.IGrainContext> from the constructor. It's injected via dependency injection when creating the extension.
-
-```csharp
-public sealed class GrainDeactivateExtension : IGrainDeactivateExtension
+public sealed class DiagnosticsExtension(
+    IGrainContext grainContext) : IDiagnosticsExtension
 {
-    private IGrainContext _context;
-
-    public GrainDeactivateExtension(IGrainContext context)
+    public ValueTask<string> GetStatus()
     {
-        _context = context;
-    }
-
-    public Task Deactivate(string msg)
-    {
-        var reason = new DeactivationReason(DeactivationReasonCode.ApplicationRequested, msg);
-        _context.Deactivate(reason);
-        return Task.CompletedTask;
+        return ValueTask.FromResult(
+            $"Active grain: {grainContext.GrainId}");
     }
 }
 ```
 
-### Deactivate extension registration and usage
+Orleans generates extension request and reference code at build time.
 
-Now that the interface and implementation are defined, register the extension when configuring the silo using the <xref:Orleans.Hosting.HostingGrainExtensions.AddGrainExtension*> method.
+## Register the extension
 
-```csharp
-siloBuilder.AddGrainExtension<IGrainDeactivateExtension, GrainDeactivateExtension>();
-```
-
-To use the extension on any grain, retrieve a reference to the extension and call its `Deactivate` method.
+Register a default implementation on the silo:
 
 ```csharp
-var grain = client.GetGrain<SomeExampleGrain>(someKey);
-var grainReferenceAsInterface = grain.AsReference<IGrainDeactivateExtension>();
-
-await grainReferenceAsInterface.Deactivate("Because, I said so...");
+siloBuilder.AddGrainExtension<
+    IDiagnosticsExtension,
+    DiagnosticsExtension>();
 ```
 
-## State manipulation extension example
+The implementation is created through dependency injection for the target grain context.
 
-This example demonstrates adding `GetState` and `SetState` methods to any grain through extensions, allowing manipulation of the grain's internal state.
+## Call the extension
 
-### State manipulation extension interface
-
-First, define the `IGrainStateAccessor<T>` interface containing the `GetState` and `SetState` methods. Again, this interface must derive from `IGrainExtension`.
+Cast an existing grain reference to the extension interface:
 
 ```csharp
-public interface IGrainStateAccessor<T> : IGrainExtension
-{
-    Task<T> GetState();
-    Task SetState(T state);
-}
+IUserGrain user =
+    grainFactory.GetGrain<IUserGrain>("user-42");
+
+IDiagnosticsExtension diagnostics =
+    user.AsReference<IDiagnosticsExtension>();
+
+string status = await diagnostics.GetStatus();
 ```
 
-Once access to the target grain is available, use the extension to manipulate its state. In this example, use an extension to access and modify a specific integer state value within the target grain.
+The extension reference keeps the same grain identity. It doesn't address a separate grain.
 
-### State manipulation extension implementation
+Incoming [grain call filters](interceptors.md) run for extension calls. Filters should not assume every `ImplementationMethod` belongs to the grain implementation class.
 
-The extension used is `IGrainStateAccessor<T>`, providing methods to get and set a state value of type `T`. To create the extension, implement the interface in a class taking a `getter` and a `setter` as arguments in its constructor.
+## Per-activation components
 
-```csharp
-public sealed class GrainStateAccessor<T> : IGrainStateAccessor<T>
-{
-    private readonly Func<T> _getter;
-    private readonly Action<T> _setter;
+Framework components can use <xref:Orleans.Runtime.IGrainContext> component APIs and `GetGrainExtension<T>()` to provide an activation-specific extension. Those APIs are intended for runtime integrations that control grain activation setup. Application code should normally use `AddGrainExtension` and constructor-injected dependencies instead of mutating a grain context during activation.
 
-    public GrainStateAccessor(Func<T> getter, Action<T> setter)
-    {
-        _getter = getter;
-        _setter = setter;
-    }
-
-    public Task<T> GetState()
-    {
-        return Task.FromResult(_getter.Invoke());
-    }
-
-    public Task SetState(T state)
-    {
-        _setter.Invoke(state);
-        return Task.CompletedTask;
-    }
-}
-```
-
-In the preceding implementation, the `GrainStateAccessor<T>` class takes `getter` and `setter` arguments in its constructor. These delegates read and modify the target grain's state. The `GetState()` method returns a <xref:System.Threading.Tasks.Task`1> wrapping the current value of the `T` state, while the `SetState(T state)` method sets the new value of the `T` state.
-
-### State manipulation extension registration and usage
-
-To use the extension to access and modify the target grain's state, register the extension and set its components in the target grain's <xref:Orleans.Grain.OnActivateAsync?displayProperty=nameWithType> method.
-
-```csharp
-public override Task OnActivateAsync()
-{
-    // Retrieve the IGrainStateAccessor<T> extension
-    var accessor = new GrainStateAccessor<int>(
-        getter: () => this.Value,
-        setter: value => this.Value = value);
-
-    // Set the extension as a component of the target grain's context
-    ((IGrainBase)this).GrainContext.SetComponent<IGrainStateAccessor<int>>(accessor);
-
-    return base.OnActivateAsync();
-}
-```
-
-In the preceding example, create a new instance of `GrainStateAccessor<int>` taking a `getter` and `setter` for an integer state value. The `getter` reads the `Value` property of the target grain, while the `setter` sets the new value of the `Value` property. Then, set this instance as a component of the target grain's context using the <xref:Orleans.Runtime.IGrainContext.SetComponent*?displayProperty=nameWithType> method.
-
-Once the extension is registered, use it to get and set the target grain's state by accessing it through a reference to the extension.
-
-```csharp
-// Get a reference to the IGrainStateAccessor<int> extension
-var accessor = grain.AsReference<IGrainStateAccessor<int>>();
-
-// Get the current value of the state
-var value = await accessor.GetState();
-
-// Set a new value of the state
-await accessor.SetState(10);
-```
-
-In the preceding example, get a reference to the `IGrainStateAccessor<int>` extension for a specific grain instance using the <xref:Orleans.GrainExtensions.AsReference*> method. Then, use this reference to call the `GetState()` and `SetState(T state)` methods to read and modify the state value of the target grain.
-
-## See also
-
-- [Develop a grain](index.md)
-- [Grain identity](grain-identity.md)
-- [Grain lifecycle overview](grain-lifecycle.md)
-- [Grain placement](grain-placement.md)
+Avoid exposing mutable grain state through a generic extension. Doing so bypasses the grain's domain invariants and couples infrastructure to implementation details.

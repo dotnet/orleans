@@ -1,227 +1,102 @@
 ---
 title: Grain references
-description: Learn about grain references in .NET Orleans.
-ms.date: 05/23/2025
+description: Create, use, and reason about grain references in Orleans.
+ms.date: 08/02/2026
 ms.topic: concept-article
 ---
 
 # Grain references
 
-Before calling a method on a grain, you first need a reference to that grain. A grain reference is a proxy object implementing the same grain interface as the corresponding grain class. It encapsulates the logical identity (type and unique key) of the target grain. You use grain references to make calls to the target grain. Each grain reference points to a single grain (a single instance of the grain class), but you can create multiple independent references to the same grain.
+A grain reference is a generated proxy that implements a grain interface and addresses one logical grain. It contains the grain's [identity](grain-identity.md) and the interface used to call it, but it doesn't contain the activation's network location.
 
-Since a grain reference represents the logical identity of the target grain, it's independent of the grain's physical location and remains valid even after a complete system restart. You can use grain references like any other .NET object. You can pass it to a method, use it as a method return value, and even save it to persistent storage.
+References remain valid when Orleans deactivates, recreates, or migrates the target activation. Getting a reference is a local operation and doesn't activate the grain.
 
-You can obtain a grain reference by passing the identity of a grain to the <xref:Orleans.IGrainFactory.GetGrain``1(System.Type,System.Guid)?displayProperty=nameWithType> method, where `T` is the grain interface and `key` is the unique key of the grain within its type.
+## Get a reference
 
-The following examples show how to obtain a grain reference for the `IPlayerGrain` interface defined previously.
-
-From within a grain class:
-
-```csharp
-// This would typically be read from an HTTP request parameter or elsewhere.
-Guid playerId = Guid.NewGuid();
-IPlayerGrain player = GrainFactory.GetGrain<IPlayerGrain>(playerId);
-```
-
-From Orleans client code:
-
-```csharp
-// This would typically be read from an HTTP request parameter or elsewhere.
-Guid playerId = Guid.NewGuid();
-IPlayerGrain player = client.GetGrain<IPlayerGrain>(playerId);
-```
-
-Grain references contain three pieces of information:
-
-1. The grain _type_, which uniquely identifies the grain class.
-1. The grain _key_, which uniquely identifies a logical instance of that grain class.
-1. The _interface_ which the grain reference must implement.
-
-> [!NOTE]
-> The grain _type_ and _key_ form the [grain identity](grain-identity.md).
-
-Notice that the preceding calls to <xref:Orleans.IGrainFactory.GetGrain*?displayProperty=nameWithType> accepted only two of these three things:
-
-- The _interface_ implemented by the grain reference, `IPlayerGrain`.
-- The grain _key_, which is the value of `playerId`.
-
-Despite stating that a grain reference contains a grain _type_, _key_, and _interface_, the examples only provided Orleans with the _key_ and _interface_. This is because Orleans maintains a mapping between grain interfaces and grain types. When you ask the grain factory for `IShoppingCartGrain`, Orleans consults its mapping to find the corresponding grain type so it can create the reference. This works when there's only one implementation of a grain interface. However, if there are multiple implementations, you need to disambiguate them in the <xref:Orleans.IGrainFactory.GetGrain*> call. For more information, see the next section, [Disambiguating grain type resolution](#disambiguating-grain-type-resolution).
-
-> [!NOTE]
-> Orleans generates grain reference implementation types for each grain interface in your application during compilation. These grain reference implementations inherit from the <xref:Orleans.Runtime.GrainReference?displayProperty=nameWithType> class. <xref:Orleans.IGrainFactory.GetGrain*> returns instances of the generated <xref:Orleans.Runtime.GrainReference?displayProperty=nameWithType> implementation corresponding to the requested grain interface.
-
-## Disambiguating grain type resolution
-
-When multiple implementations of a grain interface exist, such as in the following example, Orleans attempts to determine the intended implementation when creating a grain reference. Consider the following example, where there are two implementations of the `ICounterGrain` interface:
+Use <xref:Orleans.IGrainFactory.GetGrain*> from a client, hosted service, or grain:
 
 ```csharp
 public interface ICounterGrain : IGrainWithStringKey
 {
-    ValueTask<int> UpdateCount();
+    ValueTask<int> Add(int amount);
 }
 
-public class UpCounterGrain : ICounterGrain
-{
-    private int _count;
+ICounterGrain counter =
+    grainFactory.GetGrain<ICounterGrain>("orders-processed");
 
-    public ValueTask<string> UpdateCount() => new(++_count); // Increment count
-}
-
-public class DownCounterGrain : ICounterGrain
-{
-    private int _count;
-
-    public ValueTask<string> UpdateCount() => new(--_count); // Decrement count
-}
+int value = await counter.Add(1);
 ```
 
-The following call to <xref:Orleans.IGrainFactory.GetGrain*> throws an exception because Orleans doesn't know how to unambiguously map `ICounterGrain` to one of the grain classes.
+Within a class deriving from <xref:Orleans.Grain>, use its `GrainFactory` property. In other services, inject <xref:Orleans.IGrainFactory> or <xref:Orleans.IClusterClient>.
 
-```csharp
-// This will throw an exception: there is no unambiguous mapping from ICounterGrain to a grain class.
-ICounterGrain myCounter = grainFactory.GetGrain<ICounterGrain>("my-counter");
-```
+Grain references are serializable. They can be passed as grain method arguments, returned from calls, and included in persistent state.
 
-An <xref:System.ArgumentException?displayProperty=nameWithType> is thrown with the following message:
+## Interface-to-type resolution
 
-```Output
-Unable to identify a single appropriate grain type for interface ICounterGrain. Candidates: upcounter (UpCounterGrain), downcounter (DownCounterGrain)
-```
+The interface and key are usually enough for Orleans to identify the grain type. If exactly one grain class implements the interface, Orleans maps the interface to that class.
 
-The error message tells you which grain implementations Orleans found that match the requested grain interface type, `ICounterGrain`. It shows the grain type names (`upcounter` and `downcounter`) and the grain classes (`UpCounterGrain` and `DownCounterGrain`).
-
-> [!NOTE]
-> The grain type names in the preceding error message, `upcounter` and `downcounter`, are derived from the grain class names, `UpCounterGrain` and `DownCounterGrain` respectively. This is the default behavior in Orleans and it can be customized by adding a `[GrainType(string)]` attribute to the grain class. For example:
->
-> ```csharp
-> [GrainType("up")]
-> public class UpCounterGrain : IUpCounterGrain { /* as above */ }
-> ```
-
-There are several ways to resolve this ambiguity, detailed in the following subsections.
-
-### Disambiguating grain types using unique marker interfaces
-
-The clearest way to disambiguate these grains is to give them unique grain interfaces. For example, if you add the interface `IUpCounterGrain` to the `UpCounterGrain` class and add the interface `IDownCounterGrain` to the `DownCounterGrain` class, as in the following example, you can resolve the correct grain reference by passing `IUpCounterGrain` or `IDownCounterGrain` to the <xref:Orleans.IGrainFactory.GetGrain*> call instead of the ambiguous `ICounterGrain` type.
+When multiple classes implement the same interface, prefer distinct marker interfaces:
 
 ```csharp
 public interface ICounterGrain : IGrainWithStringKey
 {
-    ValueTask<int> UpdateCount();
+    ValueTask<int> Add(int amount);
 }
 
-// Define unique interfaces for our implementations
-public interface IUpCounterGrain : ICounterGrain, IGrainWithStringKey {}
-public interface IDownCounterGrain : ICounterGrain, IGrainWithStringKey {}
+public interface IUpCounterGrain : ICounterGrain;
 
-public class UpCounterGrain : IUpCounterGrain
+public interface IDownCounterGrain : ICounterGrain;
+
+public sealed class UpCounterGrain : Grain, IUpCounterGrain
 {
-    private int _count;
+    private int _value;
 
-    public ValueTask<string> UpdateCount() => new(++_count); // Increment count
+    public ValueTask<int> Add(int amount) =>
+        ValueTask.FromResult(_value += amount);
 }
 
-public class DownCounterGrain : IDownCounterGrain
+public sealed class DownCounterGrain : Grain, IDownCounterGrain
 {
-    private int _count;
+    private int _value;
 
-    public ValueTask<string> UpdateCount() => new(--_count); // Decrement count
-}
-```
-
-To create a reference to either grain, consider the following code:
-
-```csharp
-// Get a reference to an UpCounterGrain.
-ICounterGrain myUpCounter = grainFactory.GetGrain<IUpCounterGrain>("my-counter");
-
-// Get a reference to a DownCounterGrain.
-ICounterGrain myDownCounter = grainFactory.GetGrain<IDownCounterGrain>("my-counter");
-```
-
-> [!NOTE]
-> In the preceding example, you created two grain references with the same key but different grain types. The first, stored in the `myUpCounter` variable, references the grain with the ID `upcounter/my-counter`. The second, stored in the `myDownCounter` variable, references the grain with the ID `downcounter/my-counter`. The combination of grain _type_ and grain _key_ uniquely identifies a grain. Therefore, `myUpCounter` and `myDownCounter` refer to different grains.
-
-#### Disambiguating grain types by providing a grain class prefix
-
-You can provide a grain class name prefix to <xref:Orleans.IGrainFactory.GetGrain*?displayProperty=nameWithType>, for example:
-
-```csharp
-ICounterGrain myUpCounter = grainFactory.GetGrain<ICounterGrain>("my-counter", grainClassNamePrefix: "Up");
-ICounterGrain myDownCounter = grainFactory.GetGrain<ICounterGrain>("my-counter", grainClassNamePrefix: "Down");
-```
-
-### Specifying the default grain implementation using the naming convention
-
-When disambiguating multiple implementations of the same grain interface, Orleans selects an implementation using the convention of stripping a leading 'I' from the interface name. For example, if the interface name is `ICounterGrain` and there are two implementations, `CounterGrain` and `DownCounterGrain`, Orleans chooses `CounterGrain` when asked for a reference to `ICounterGrain`, as in the following example:
-
-```csharp
-/// This will refer to an instance of CounterGrain, since that matches the convention.
-ICounterGrain myUpCounter = grainFactory.GetGrain<ICounterGrain>("my-counter");
-```
-
-### Specifying the default grain type using an attribute
-
-You can add the <xref:Orleans.Metadata.DefaultGrainTypeAttribute?displayProperty=nameWithType> attribute to a grain interface to specify the grain type of the default implementation for that interface, as shown in the following example:
-
-```csharp
-[DefaultGrainType("up-counter")]
-public interface ICounterGrain : IGrainWithStringKey
-{
-    ValueTask<int> UpdateCount();
-}
-
-[GrainType("up-counter")]
-public class UpCounterGrain : ICounterGrain
-{
-    private int _count;
-
-    public ValueTask<string> UpdateCount() => new(++_count); // Increment count
-}
-
-[GrainType("down-counter")]
-public class DownCounterGrain : ICounterGrain
-{
-    private int _count;
-
-    public ValueTask<string> UpdateCount() => new(--_count); // Decrement count
+    public ValueTask<int> Add(int amount) =>
+        ValueTask.FromResult(_value -= amount);
 }
 ```
 
 ```csharp
-/// This will refer to an instance of UpCounterGrain, due to the [DefaultGrainType("up-counter"')] attribute
-ICounterGrain myUpCounter = grainFactory.GetGrain<ICounterGrain>("my-counter");
+IUpCounterGrain up =
+    grainFactory.GetGrain<IUpCounterGrain>("counter");
+
+IDownCounterGrain down =
+    grainFactory.GetGrain<IDownCounterGrain>("counter");
 ```
 
-### Disambiguating grain types by providing the resolved grain ID
+The two references have the same key but different grain types, so they address different logical grains.
 
-Some overloads of <xref:Orleans.IGrainFactory.GetGrain*?displayProperty=nameWithType> accept an argument of type <xref:Orleans.Runtime.GrainId?displayProperty=nameWithType>. When using these overloads, Orleans doesn't need to map from an interface type to a grain type, so there's no ambiguity to resolve. For example:
+For compatibility scenarios, <xref:Orleans.Metadata.DefaultGrainTypeAttribute> can select the default implementation for an interface, and `GetGrain` overloads accepting a grain class name prefix can disambiguate implementations. Explicit marker interfaces are usually clearer and safer to refactor.
+
+## Cast a reference to another supported interface
+
+If the same grain implementation supports another grain interface or extension interface, use <xref:Orleans.GrainExtensions.AsReference*>:
 
 ```csharp
-public interface ICounterGrain : IGrainWithStringKey
-{
-    ValueTask<int> UpdateCount();
-}
-
-[GrainType("up-counter")]
-public class UpCounterGrain : ICounterGrain
-{
-    private int _count;
-
-    public ValueTask<string> UpdateCount() => new(++_count); // Increment count
-}
-
-[GrainType("down-counter")]
-public class DownCounterGrain : ICounterGrain
-{
-    private int _count;
-
-    public ValueTask<string> UpdateCount() => new(--_count); // Decrement count
-}
+IUserGrain user = grainFactory.GetGrain<IUserGrain>("user-42");
+IUserProfileGrain profile = user.AsReference<IUserProfileGrain>();
 ```
+
+This doesn't create a different grain. It creates another typed proxy for the same grain identity. The target grain type must support the requested interface.
+
+Within a grain, pass a reference to itself instead of passing `this`:
 
 ```csharp
-// This will refer to an instance of UpCounterGrain, since "up-counter" was specified as the grain type
-// and the UpCounterGrain uses [GrainType("up-counter")] to specify its grain type.
-ICounterGrain myUpCounter = grainFactory.GetGrain<ICounterGrain>(GrainId.Create("up-counter", "my-counter"));
+IUserGrain self = this.AsReference<IUserGrain>();
 ```
+
+## Reference equality and storage
+
+Multiple proxy objects can refer to the same grain. Compare logical identity when identity matters rather than relying on CLR object identity. Persist references only when retaining the interface relationship is useful; persist domain keys when the application should resolve the current interface at use time.
+
+## Advanced: resolve from GrainId
+
+Some `GetGrain` overloads accept <xref:Orleans.Runtime.GrainId>. These are intended for framework and infrastructure code that already has a resolved grain type and encoded key. Most application code should use a typed key overload because it preserves compile-time key and interface checks.
