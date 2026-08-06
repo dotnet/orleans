@@ -2,7 +2,7 @@ using System.Diagnostics;
 using Google.Cloud.Firestore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Orleans.Tests.GoogleFirestore;
+using Orleans.Clustering.GoogleFirestore;
 using Xunit.Abstractions;
 
 

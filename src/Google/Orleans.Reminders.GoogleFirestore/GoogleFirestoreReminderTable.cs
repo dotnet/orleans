@@ -12,7 +12,7 @@ using Orleans.Configuration;
 
 namespace Orleans.Reminders.GoogleFirestore;
 
-internal class GoogleFirestoreReminderTable : IReminderTable
+internal partial class GoogleFirestoreReminderTable : IReminderTable
 {
     private const string PERSISTENCE_GROUP = "Reminders";
     private readonly ILogger _logger;
@@ -45,15 +45,15 @@ internal class GoogleFirestoreReminderTable : IReminderTable
                 var sw = Stopwatch.StartNew();
                 try
                 {
-                    this._logger.LogInformation("Initializing GoogleFirestoreStorage Reminders table...");
+                    LogInitializing();
                     await this._dataManager.Initialize();
                     this._initializationTask.TrySetResult();
-                    this._logger.LogInformation("Initializing GoogleFirestoreStorage Reminders table took {ElapsedMilliseconds}ms.", sw.ElapsedMilliseconds);
+                    LogInitialized(sw.ElapsedMilliseconds);
                     return;
                 }
                 catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
                 {
-                    this._logger.LogError(ex, "Error initializing GoogleFirestoreStorage Reminders table in {ElapsedMilliseconds}ms. Retrying.", sw.ElapsedMilliseconds);
+                    LogInitializationRetry(ex, sw.ElapsedMilliseconds);
                     await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
                 }
                 finally
@@ -86,7 +86,7 @@ internal class GoogleFirestoreReminderTable : IReminderTable
         {
             await this._initializationTask.Task;
 
-            if (this._logger.IsEnabled(LogLevel.Debug)) this._logger.LogDebug("UpsertRow entry = {Data}", entry.ToString());
+            LogUpsertRow(entry);
 
             var entity = new ReminderEntity
             {
@@ -116,8 +116,7 @@ internal class GoogleFirestoreReminderTable : IReminderTable
         }
         catch (Exception ex)
         {
-            this._logger.LogWarning(ex,
-                "Intermediate error upserting reminder entry {Data} to Firestore.", entry.ToString());
+            LogUpsertError(ex, entry);
             throw;
         }
     }
@@ -128,7 +127,7 @@ internal class GoogleFirestoreReminderTable : IReminderTable
         {
             await this._initializationTask.Task;
 
-            if (this._logger.IsEnabled(LogLevel.Trace)) this._logger.LogTrace("RemoveRow entry = {GrainId} name = {Name}", grainId, reminderName);
+            LogRemoveRow(grainId, reminderName);
 
             var result = await this._dataManager.DeleteEntity(FormatReminderId(reminderName, grainId), eTag).ConfigureAwait(false);
 
@@ -140,8 +139,7 @@ internal class GoogleFirestoreReminderTable : IReminderTable
         }
         catch (Exception exc)
         {
-            this._logger.LogWarning(exc,
-                "Intermediate error when deleting reminder entry = {GrainId} name = {Name} on Firestore.", grainId, reminderName);
+            LogRemoveError(exc, grainId, reminderName);
             throw;
         }
     }
@@ -159,14 +157,13 @@ internal class GoogleFirestoreReminderTable : IReminderTable
 
             var data = ConvertFromEntities(entries);
 
-            if (this._logger.IsEnabled(LogLevel.Trace)) this._logger.LogTrace("Read for grain {GrainId} Table={Data}", grainId, data.ToString());
+            LogReadForGrain(grainId, data);
 
             return data;
         }
         catch (Exception exc)
         {
-            this._logger.LogWarning(exc,
-                "Intermediate error reading reminders for grain {GrainId} from Firestore.", grainId);
+            LogReadForGrainError(exc, grainId);
             throw;
         }
     }
@@ -208,14 +205,13 @@ internal class GoogleFirestoreReminderTable : IReminderTable
 
             var data = ConvertFromEntities(entries);
 
-            if (this._logger.IsEnabled(LogLevel.Trace)) this._logger.LogTrace("Read for grain {RingRange} Table={Data}", RangeFactory.CreateRange(begin, end), data.ToString());
+            LogReadForRange(RangeFactory.CreateRange(begin, end), data);
 
             return data;
         }
         catch (Exception exc)
         {
-            this._logger.LogWarning(exc,
-                "Intermediate error reading reminders in range {RingRange} from Firestore.", RangeFactory.CreateRange(begin, end));
+            LogReadForRangeError(exc, RangeFactory.CreateRange(begin, end));
             throw;
         }
     }
@@ -232,14 +228,13 @@ internal class GoogleFirestoreReminderTable : IReminderTable
 
             var entry = ConvertFromEntity(entity);
 
-            if (this._logger.IsEnabled(LogLevel.Trace)) this._logger.LogTrace("Read for grain {GrainId} Table={Data}", grainId, entry.ToString());
+            LogReadRow(grainId, entry);
 
             return entry;
         }
         catch (Exception exc)
         {
-            this._logger.LogWarning(exc,
-                "Intermediate error reading reminder entry = {GrainId} name = {Name} from Firestore.", grainId, reminderName);
+            LogReadRowError(exc, grainId, reminderName);
             throw;
         }
     }
@@ -258,7 +253,7 @@ internal class GoogleFirestoreReminderTable : IReminderTable
 
         await Task.WhenAll(tasks).ConfigureAwait(false);
 
-        this._logger.LogInformation("TestOnlyClearTable completed successfully.");
+        LogClearedTable();
     }
 
     private static string FormatReminderId(ReminderEntry entry) => FormatReminderId(entry.ReminderName, entry.GrainId);
@@ -280,8 +275,7 @@ internal class GoogleFirestoreReminderTable : IReminderTable
             }
             catch (Exception exc)
             {
-                this._logger.LogError(exc, "Failed to parse ReminderTableEntry entry = {GrainId} name = {Name}. This entry is corrupt, going to ignore it.",
-                    entity.GrainId, entity.Name);
+                LogParseError(exc, entity.GrainId, entity.Name);
             }
         }
 
@@ -303,9 +297,83 @@ internal class GoogleFirestoreReminderTable : IReminderTable
         }
         catch (Exception exc)
         {
-            this._logger.LogError(exc, "Failed to parse ReminderTableEntry entry = {GrainId} name = {Name}. This entry is corrupt, going to ignore it.",
-                entity.GrainId, entity.Name);
+            LogParseError(exc, entity.GrainId, entity.Name);
             throw;
         }
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Initializing GoogleFirestoreStorage Reminders table...")]
+    private partial void LogInitializing();
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Initialized GoogleFirestoreStorage Reminders table in {ElapsedMilliseconds}ms.")]
+    private partial void LogInitialized(long elapsedMilliseconds);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error initializing GoogleFirestoreStorage Reminders table in {ElapsedMilliseconds}ms. Retrying.")]
+    private partial void LogInitializationRetry(Exception exception, long elapsedMilliseconds);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "UpsertRow entry = {Data}")]
+    private partial void LogUpsertRow(ReminderEntry data);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Intermediate error upserting reminder entry {Data} to Firestore.")]
+    private partial void LogUpsertError(Exception exception, ReminderEntry data);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "RemoveRow entry = {GrainId} name = {Name}")]
+    private partial void LogRemoveRow(GrainId grainId, string name);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Intermediate error when deleting reminder entry = {GrainId} name = {Name} on Firestore.")]
+    private partial void LogRemoveError(Exception exception, GrainId grainId, string name);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "Read for grain {GrainId} Table={Data}")]
+    private partial void LogReadForGrain(GrainId grainId, ReminderTableData data);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Intermediate error reading reminders for grain {GrainId} from Firestore.")]
+    private partial void LogReadForGrainError(Exception exception, GrainId grainId);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "Read for range {RingRange} Table={Data}")]
+    private partial void LogReadForRange(object ringRange, ReminderTableData data);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Intermediate error reading reminders in range {RingRange} from Firestore.")]
+    private partial void LogReadForRangeError(Exception exception, object ringRange);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "Read for grain {GrainId} Table={Data}")]
+    private partial void LogReadRow(GrainId grainId, ReminderEntry data);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Intermediate error reading reminder entry = {GrainId} name = {Name} from Firestore.")]
+    private partial void LogReadRowError(Exception exception, GrainId grainId, string name);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "TestOnlyClearTable completed successfully.")]
+    private partial void LogClearedTable();
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Failed to parse ReminderTableEntry entry = {GrainId} name = {Name}. This entry is corrupt, going to ignore it.")]
+    private partial void LogParseError(Exception exception, string grainId, string name);
 }

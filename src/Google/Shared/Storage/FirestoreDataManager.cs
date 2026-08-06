@@ -14,29 +14,27 @@ namespace Orleans.Clustering.GoogleFirestore;
 namespace Orleans.Persistence.GoogleFirestore;
 #elif ORLEANS_REMINDERS
 namespace Orleans.Reminders.GoogleFirestore;
-#elif GOOGLE_TESTS
-namespace Orleans.Tests.GoogleFirestore;
 #elif ORLEANS_DIRECTORY
 namespace Orleans.GrainDirectory.GoogleFirestore;
 #else
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
 
-internal class FirestoreDataManager
+internal partial class FirestoreDataManager
 {
     public const int MAX_BATCH_ENTRIES = 500; // Batches are only allowed to have 500 operations
     private readonly FirestoreOptions _options;
     private readonly FirestoreDb _db;
     private readonly string _group;
     private readonly string _partition;
-    protected readonly ILogger Logger;
+    private readonly ILogger _logger;
 
     public FirestoreDataManager(string group, string partition, FirestoreOptions options, ILogger logger)
     {
         this._group = group ?? throw new ArgumentNullException(nameof(group));
         this._partition = partition ?? throw new ArgumentNullException(nameof(partition));
         this._options = options ?? throw new ArgumentNullException(nameof(options));
-        this.Logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         this._db = !string.IsNullOrWhiteSpace(this._options.EmulatorHost)
             ? new FirestoreDbBuilder
@@ -53,7 +51,7 @@ internal class FirestoreDataManager
     /// </summary>
     public async Task Initialize()
     {
-        if (this.Logger.IsEnabled(LogLevel.Debug)) this.Logger.LogDebug("Initializing FirestoreDataManager");
+        LogInitializing();
 
         try
         {
@@ -76,7 +74,7 @@ internal class FirestoreDataManager
         }
         catch (Exception ex)
         {
-            this.LogError(ex, nameof(this.Initialize));
+            LogOperationError(ex, nameof(this.Initialize), this._partition);
             throw;
         }
     }
@@ -114,7 +112,7 @@ internal class FirestoreDataManager
     public async Task<string> CreateEntity<TEntity>(TEntity entity) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
-        if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Creating entity {id} on collection {collection}", entity.Id, this._partition);
+        LogEntityOperation("Creating", entity.Id, this._partition);
 
         try
         {
@@ -127,7 +125,7 @@ internal class FirestoreDataManager
         }
         catch (Exception ex)
         {
-            this.LogError(ex, nameof(this.CreateEntity));
+            LogOperationError(ex, nameof(this.CreateEntity), this._partition);
             throw;
         }
     }
@@ -135,7 +133,7 @@ internal class FirestoreDataManager
     public async Task<string> UpsertEntity<TEntity>(TEntity entity) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
-        if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Upserting entity {id} on collection {collection}", entity.Id, this._partition);
+        LogEntityOperation("Upserting", entity.Id, this._partition);
 
         try
         {
@@ -149,7 +147,7 @@ internal class FirestoreDataManager
         }
         catch (Exception ex)
         {
-            this.LogError(ex, nameof(this.UpsertEntity));
+            LogOperationError(ex, nameof(this.UpsertEntity), this._partition);
             throw;
         }
     }
@@ -157,7 +155,7 @@ internal class FirestoreDataManager
     public async Task<string> MergeEntity(IDictionary<string, object?> fields, string id)
     {
         var collection = this.GetCollection();
-        if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Merging entity {id} on collection {collection}", id, this._partition);
+        LogEntityOperation("Merging", id, this._partition);
 
         try
         {
@@ -168,7 +166,7 @@ internal class FirestoreDataManager
         }
         catch (Exception ex)
         {
-            this.LogError(ex, nameof(this.MergeEntity));
+            LogOperationError(ex, nameof(this.MergeEntity), this._partition);
             throw;
         }
     }
@@ -181,7 +179,7 @@ internal class FirestoreDataManager
     public async Task<string> Update<TEntity>(TEntity entity) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
-        if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Merging entity {id} on collection {collection}", entity.Id, this._partition);
+        LogEntityOperation("Updating", entity.Id, this._partition);
 
         try
         {
@@ -194,7 +192,7 @@ internal class FirestoreDataManager
         }
         catch (Exception ex)
         {
-            this.LogError(ex, nameof(this.Update));
+            LogOperationError(ex, nameof(this.Update), this._partition);
             throw;
         }
     }
@@ -207,7 +205,7 @@ internal class FirestoreDataManager
     public async Task<string> UpdateUnconditionally<TEntity>(TEntity entity) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
-        if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Updating entity {id} on collection {collection} without an ETag", entity.Id, this._partition);
+        LogUnconditionalEntityUpdate(entity.Id, this._partition);
 
         try
         {
@@ -219,7 +217,7 @@ internal class FirestoreDataManager
         }
         catch (Exception ex)
         {
-            this.LogError(ex, nameof(this.UpdateUnconditionally));
+            LogOperationError(ex, nameof(this.UpdateUnconditionally), this._partition);
             throw;
         }
     }
@@ -233,7 +231,7 @@ internal class FirestoreDataManager
     public async Task<bool> DeleteEntity(string id, string? eTag = null)
     {
         var collection = this.GetCollection();
-        if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Deleting entity {id} on collection {collection}", id, this._partition);
+        LogEntityOperation("Deleting", id, this._partition);
 
         try
         {
@@ -259,7 +257,7 @@ internal class FirestoreDataManager
         }
         catch (Exception ex)
         {
-            this.LogError(ex, nameof(this.DeleteEntity));
+            LogOperationError(ex, nameof(this.DeleteEntity), this._partition);
             throw;
         }
     }
@@ -272,7 +270,7 @@ internal class FirestoreDataManager
     public async Task<TEntity?> ReadEntity<TEntity>(string id) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
-        if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Reading entity {id} on collection {collection}", id, this._partition);
+        LogEntityOperation("Reading", id, this._partition);
 
         try
         {
@@ -282,7 +280,7 @@ internal class FirestoreDataManager
 
             if (!snapshot.Exists)
             {
-                if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Entity {id} not found on collection {collection}", id, this._partition);
+                LogEntityNotFound(id, this._partition);
 
                 return null;
             }
@@ -293,7 +291,7 @@ internal class FirestoreDataManager
         }
         catch (Exception ex)
         {
-            this.LogError(ex, nameof(this.ReadEntity));
+            LogOperationError(ex, nameof(this.ReadEntity), this._partition);
             throw;
         }
     }
@@ -305,7 +303,7 @@ internal class FirestoreDataManager
     public async Task<TEntity[]> ReadAllEntities<TEntity>() where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
-        if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Reading all entities on collection {collection}", this._partition);
+        LogCollectionOperation("Reading all entities from", this._partition);
 
         try
         {
@@ -313,7 +311,7 @@ internal class FirestoreDataManager
 
             if (snapshot.Count == 0)
             {
-                if (this.Logger.IsEnabled(LogLevel.Debug)) this.Logger.LogTrace("No entities found on collection {collection}", this._partition);
+                LogNoEntitiesFound(this._partition);
 
                 return Array.Empty<TEntity>();
             }
@@ -322,7 +320,7 @@ internal class FirestoreDataManager
         }
         catch (Exception ex)
         {
-            this.LogError(ex, nameof(this.ReadAllEntities));
+            LogOperationError(ex, nameof(this.ReadAllEntities), this._partition);
             throw;
         }
     }
@@ -335,7 +333,7 @@ internal class FirestoreDataManager
     {
         var collection = this.GetCollection();
 
-        if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Deleting entities on collection {collection}", this._partition);
+        LogCollectionOperation("Deleting entities from", this._partition);
 
         if (entities.Length == 0) return;
 
@@ -358,7 +356,7 @@ internal class FirestoreDataManager
         }
         catch (Exception ex)
         {
-            this.LogError(ex, nameof(this.DeleteEntities));
+            LogOperationError(ex, nameof(this.DeleteEntities), this._partition);
             throw;
         }
     }
@@ -371,7 +369,7 @@ internal class FirestoreDataManager
     public async Task<TEntity[]> QueryEntities<TEntity>(Func<CollectionReference, Query> query) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
-        if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Querying entities on collection {collection}", this._partition);
+        LogCollectionOperation("Querying entities from", this._partition);
 
         try
         {
@@ -379,7 +377,7 @@ internal class FirestoreDataManager
 
             if (snapshot.Count == 0)
             {
-                if (this.Logger.IsEnabled(LogLevel.Debug)) this.Logger.LogTrace("No entities found on collection {collection}", this._partition);
+                LogNoEntitiesFound(this._partition);
 
                 return Array.Empty<TEntity>();
             }
@@ -388,12 +386,10 @@ internal class FirestoreDataManager
         }
         catch (Exception ex)
         {
-            this.LogError(ex, nameof(this.QueryEntities));
+            LogOperationError(ex, nameof(this.QueryEntities), this._partition);
             throw;
         }
     }
-
-    public Task ExecuteTransaction(Func<Transaction, Task> transactionScope) => this._db.RunTransactionAsync(transactionScope);
 
     public Task<TEntity> ExecuteTransaction<TEntity>(Func<Transaction, Task<TEntity>> transactionScope) => this._db.RunTransactionAsync(transactionScope);
 
@@ -416,13 +412,45 @@ internal class FirestoreDataManager
     public CollectionReference GetCollection() =>
         this._db.Collection($"{this._options.RootCollectionName}").Document(this._group).Collection(this._partition);
 
-    internal static string GetEmulatorEndpoint(string endpoint) =>
+    private static string GetEmulatorEndpoint(string endpoint) =>
         endpoint.Contains("://", StringComparison.Ordinal)
         && Uri.TryCreate(endpoint, UriKind.Absolute, out var uri)
         && !string.IsNullOrEmpty(uri.Authority)
             ? uri.Authority
             : endpoint;
 
-    private void LogError(Exception ex, string operation) =>
-        this.Logger.LogError(ex, "Error on {operation} on collection {collection}", operation, this._partition);
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Initializing FirestoreDataManager")]
+    private partial void LogInitializing();
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "{Operation} entity {Id} on collection {Collection}")]
+    private partial void LogEntityOperation(string operation, string id, string collection);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "Updating entity {Id} on collection {Collection} without an ETag")]
+    private partial void LogUnconditionalEntityUpdate(string id, string collection);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "Entity {Id} not found on collection {Collection}")]
+    private partial void LogEntityNotFound(string id, string collection);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "{Operation} collection {Collection}")]
+    private partial void LogCollectionOperation(string operation, string collection);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "No entities found on collection {Collection}")]
+    private partial void LogNoEntitiesFound(string collection);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error on {Operation} on collection {Collection}")]
+    private partial void LogOperationError(Exception exception, string operation, string collection);
 }

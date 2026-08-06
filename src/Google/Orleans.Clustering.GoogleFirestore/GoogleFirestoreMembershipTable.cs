@@ -8,7 +8,7 @@ using Orleans.Configuration;
 
 namespace Orleans.Clustering.GoogleFirestore;
 
-internal class GoogleFirestoreMembershipTable : IMembershipTable
+internal partial class GoogleFirestoreMembershipTable : IMembershipTable
 {
     private readonly FirestoreOptions _options;
     private readonly ILoggerFactory _loggerFactory;
@@ -37,7 +37,7 @@ internal class GoogleFirestoreMembershipTable : IMembershipTable
         if (tryInitTableVersion)
         {
             var created = await this._instanceManager.TryCreateTableVersionEntryAsync();
-            if (created) this._logger.LogInformation("Created new table version row.");
+            if (created) LogCreatedTableVersion();
         }
     }
 
@@ -59,14 +59,13 @@ internal class GoogleFirestoreMembershipTable : IMembershipTable
 
             var table = Convert((new[] { data.Silo }, data.Version));
 
-            if (this._logger.IsEnabled(LogLevel.Debug)) this._logger.LogDebug("Read my entry {SiloAddress} Table={Data}", key.ToString(), data.ToString());
+            LogReadEntry(key, table);
 
             return table;
         }
         catch (Exception exc)
         {
-            this._logger.LogWarning(exc,
-                "Intermediate error reading silo entry for key {SiloAddress} from the Firestore.", key.ToString());
+            LogReadEntryError(exc, key);
             throw;
         }
     }
@@ -77,15 +76,13 @@ internal class GoogleFirestoreMembershipTable : IMembershipTable
         {
             var entries = await this._instanceManager.FindAllSiloEntries();
             var data = Convert(entries);
-            if (this._logger.IsEnabled(LogLevel.Trace)) this._logger.LogTrace("ReadAll Table={Data}", data.ToString());
+            LogReadAll(data);
 
             return data;
         }
         catch (Exception exc)
         {
-            this._logger.LogWarning(
-                exc,
-                "Intermediate error reading all silo entries from Firestore.");
+            LogReadAllError(exc);
             throw;
         }
     }
@@ -94,7 +91,7 @@ internal class GoogleFirestoreMembershipTable : IMembershipTable
     {
         try
         {
-            if (this._logger.IsEnabled(LogLevel.Debug)) this._logger.LogDebug("InsertRow entry = {Data}, table version = {TableVersion}", entry.ToString(), tableVersion);
+            LogInsertRow(entry, tableVersion);
 
             var silo = SiloInstanceEntity.FromMembershipEntry(entry, this._clusterId);
             var version = this._instanceManager.CreateClusterVersionEntity(tableVersion.Version);
@@ -103,15 +100,12 @@ internal class GoogleFirestoreMembershipTable : IMembershipTable
             var result = await this._instanceManager.InsertSiloEntryConditionally(silo, version);
 
             if (result == false)
-                this._logger.LogWarning(
-                    "Insert failed due to contention on the table. Will retry. Entry {Data}, table version = {TableVersion}", entry.ToString(), tableVersion);
+                LogInsertContention(entry, tableVersion);
             return result;
         }
         catch (Exception exc)
         {
-            this._logger.LogWarning(
-                exc,
-                "Intermediate error inserting entry {Data} tableVersion {TableVersion} to Firestore.", entry.ToString(), tableVersion == null ? "null" : tableVersion.ToString());
+            LogInsertError(exc, entry, tableVersion);
             throw;
         }
     }
@@ -120,7 +114,7 @@ internal class GoogleFirestoreMembershipTable : IMembershipTable
     {
         try
         {
-            if (this._logger.IsEnabled(LogLevel.Debug)) this._logger.LogDebug("UpdateRow entry = {Data}, etag = {ETag}, table version = {TableVersion}", entry.ToString(), etag, tableVersion);
+            LogUpdateRow(entry, etag, tableVersion);
 
             var silo = SiloInstanceEntity.FromMembershipEntry(entry, this._clusterId);
             silo.ETag = Utils.ParseTimestamp(etag);
@@ -129,18 +123,12 @@ internal class GoogleFirestoreMembershipTable : IMembershipTable
 
             var result = await this._instanceManager.UpdateSiloEntryConditionally(silo, version);
             if (result == false)
-                this._logger.LogWarning(
-                    "Update failed due to contention on the table. Will retry. Entry {Data}, eTag {ETag}, table version = {TableVersion}",
-                    entry.ToString(),
-                    etag,
-                    tableVersion);
+                LogUpdateContention(entry, etag, tableVersion);
             return result;
         }
         catch (Exception exc)
         {
-            this._logger.LogWarning(
-                exc,
-                "Intermediate error updating entry {Data} tableVersion {TableVersion} to Firestore.", entry.ToString(), tableVersion == null ? "null" : tableVersion.ToString());
+            LogUpdateError(exc, entry, tableVersion);
             throw;
         }
     }
@@ -149,7 +137,7 @@ internal class GoogleFirestoreMembershipTable : IMembershipTable
     {
         try
         {
-            if (this._logger.IsEnabled(LogLevel.Debug)) this._logger.LogDebug("Merge entry = {Data}", entry.ToString());
+            LogMergeEntry(entry);
 
             var silo = SiloInstanceEntity.FromMembershipEntry(entry, this._clusterId);
 
@@ -157,9 +145,7 @@ internal class GoogleFirestoreMembershipTable : IMembershipTable
         }
         catch (Exception exc)
         {
-            this._logger.LogWarning(
-                exc,
-                "Intermediate error updating IAmAlive field for entry {Data} to Firestore.", entry.ToString());
+            LogUpdateIAmAliveError(exc, entry);
             throw;
         }
     }
@@ -173,4 +159,69 @@ internal class GoogleFirestoreMembershipTable : IMembershipTable
             data.Version.ToTableVersion()
         );
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Created new table version row.")]
+    private partial void LogCreatedTableVersion();
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Read my entry {SiloAddress} Table={Data}")]
+    private partial void LogReadEntry(SiloAddress siloAddress, MembershipTableData data);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Intermediate error reading silo entry for key {SiloAddress} from Firestore.")]
+    private partial void LogReadEntryError(Exception exception, SiloAddress siloAddress);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "ReadAll Table={Data}")]
+    private partial void LogReadAll(MembershipTableData data);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Intermediate error reading all silo entries from Firestore.")]
+    private partial void LogReadAllError(Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "InsertRow entry = {Data}, table version = {TableVersion}")]
+    private partial void LogInsertRow(MembershipEntry data, TableVersion tableVersion);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Insert failed due to contention on the table. Will retry. Entry {Data}, table version = {TableVersion}")]
+    private partial void LogInsertContention(MembershipEntry data, TableVersion tableVersion);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Intermediate error inserting entry {Data} tableVersion {TableVersion} to Firestore.")]
+    private partial void LogInsertError(Exception exception, MembershipEntry data, TableVersion tableVersion);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "UpdateRow entry = {Data}, etag = {ETag}, table version = {TableVersion}")]
+    private partial void LogUpdateRow(MembershipEntry data, string etag, TableVersion tableVersion);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Update failed due to contention on the table. Will retry. Entry {Data}, eTag {ETag}, table version = {TableVersion}")]
+    private partial void LogUpdateContention(MembershipEntry data, string etag, TableVersion tableVersion);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Intermediate error updating entry {Data} tableVersion {TableVersion} to Firestore.")]
+    private partial void LogUpdateError(Exception exception, MembershipEntry data, TableVersion tableVersion);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Merge entry = {Data}")]
+    private partial void LogMergeEntry(MembershipEntry data);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Intermediate error updating IAmAlive field for entry {Data} to Firestore.")]
+    private partial void LogUpdateIAmAliveError(Exception exception, MembershipEntry data);
 }

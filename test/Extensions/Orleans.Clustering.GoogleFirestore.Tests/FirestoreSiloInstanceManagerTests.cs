@@ -9,10 +9,11 @@ namespace Orleans.Clustering.GoogleFirestore.Tests;
 [TestCategory("GoogleFirestore"), TestCategory("GoogleCloud"), TestCategory("Functional")]
 public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
 {
+    private const string ClusterGroup = "Cluster";
     private static readonly DateTimeOffset TestStartTime = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
-    private FirestoreOptions _options = default!;
     private string _clusterId = default!;
     private OrleansSiloInstanceManager _manager = default!;
+    private FirestoreDataManager _storage = default!;
     private SiloInstanceEntity _entity = default!;
     private int _generation = default!;
     private SiloAddress _siloAddress = default!;
@@ -21,24 +22,21 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
     public async Task CleanDeadSiloInstance()
     {
         this._generation = 0;
-        await RegisterSiloInstance();
-        // and mark it as dead
-        await this._manager.UnregisterSiloInstance(this._entity);
+        await WriteSiloInstance(SiloStatus.Dead);
 
         // Create new active entries
         for (int i = 1; i < 5; i++)
         {
             this._generation = i;
             this._siloAddress = SiloAddressUtils.NewLocalSiloAddress(this._generation);
-            var instance = await RegisterSiloInstance();
-            await this._manager.ActivateSiloInstance(instance);
+            await WriteSiloInstance(SiloStatus.Active);
         }
 
         await this._manager.CleanupDefunctSiloEntries(TestStartTime.AddTicks(1));
 
         var mbrData = await this._manager.FindAllSiloEntries();
         Assert.Equal(4, mbrData.Silos.Length);
-        Assert.All(mbrData.Silos, e => Assert.NotEqual(OrleansSiloInstanceManager.INSTANCE_STATUS_DEAD, e.Status));
+        Assert.All(mbrData.Silos, e => Assert.NotEqual((int)SiloStatus.Dead, e.Status));
     }
 
     [SkippableFact]
@@ -56,12 +54,13 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
             ProxyPort = 30000 + i,
             SiloName = $"Silo-{i}",
             RoleName = "Test",
+            Status = (int)SiloStatus.Dead,
             StartTime = TestStartTime,
         }).ToArray();
 
         foreach (var chunk in entries.Chunk(50))
         {
-            await Task.WhenAll(chunk.Select(this._manager.RegisterSiloInstance));
+            await Task.WhenAll(chunk.Select(this._storage.UpsertEntity));
         }
 
         await this._manager.CleanupDefunctSiloEntries(TestStartTime.AddTicks(1));
@@ -71,65 +70,15 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
     }
 
     [SkippableFact]
-    public async Task Register_CheckData()
-    {
-        await RegisterSiloInstance();
-
-        await this._manager.RegisterSiloInstance(this._entity);
-
-        var (silo, version) = await this._manager.FindSiloAndVersionEntities(this._siloAddress);
-
-        Assert.NotNull(version); // ETag should not be null
-        Assert.NotNull(silo); // Silo instance should not be null
-
-        Assert.Equal(OrleansSiloInstanceManager.INSTANCE_STATUS_CREATED, silo.Status);
-
-        CheckSiloInstanceTableEntry(this._entity, silo);
-    }
-
-    [SkippableFact]
-    public async Task Activate_CheckData()
-    {
-        await RegisterSiloInstance();
-
-        await this._manager.ActivateSiloInstance(this._entity);
-
-        var (silo, version) = await this._manager.FindSiloAndVersionEntities(this._siloAddress);
-
-        Assert.NotNull(version); // ETag should not be null
-        Assert.NotNull(silo); // Silo instance should not be null
-
-        Assert.Equal(OrleansSiloInstanceManager.INSTANCE_STATUS_ACTIVE, silo.Status);
-
-        CheckSiloInstanceTableEntry(this._entity, silo);
-    }
-
-    [SkippableFact]
-    public async Task Unregister_CheckData()
-    {
-        await RegisterSiloInstance();
-
-        await this._manager.UnregisterSiloInstance(this._entity);
-
-        var (silo, version) = await this._manager.FindSiloAndVersionEntities(this._siloAddress);
-
-        Assert.NotNull(version); // ETag should not be null
-        Assert.NotNull(silo); // Silo instance should not be null
-
-        Assert.Equal(OrleansSiloInstanceManager.INSTANCE_STATUS_DEAD, silo.Status);
-
-        CheckSiloInstanceTableEntry(this._entity, silo);
-    }
-
-    [SkippableFact]
     public async Task FindAllGatewayProxyEndpoints()
     {
-        await RegisterSiloInstance();
+        await WriteSiloInstance(SiloStatus.Created);
 
         var gateways = await this._manager.FindAllGatewayProxyEndpoints();
         Assert.Empty(gateways);  // "Number of gateways before Silo.Activate"
 
-        await this._manager.ActivateSiloInstance(this._entity);
+        this._entity.Status = (int)SiloStatus.Active;
+        await this._storage.UpsertEntity(this._entity);
 
         gateways = await this._manager.FindAllGatewayProxyEndpoints();
         Assert.Single(gateways);  // "Number of gateways after Silo.Activate"
@@ -139,7 +88,7 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
         Assert.Equal(this._entity.ProxyPort, myGateway.Port);  // "Gateway port"
     }
 
-    private async Task<SiloInstanceEntity> RegisterSiloInstance()
+    private async Task WriteSiloInstance(SiloStatus status)
     {
         IPEndPoint myEndpoint = this._siloAddress.Endpoint;
 
@@ -154,39 +103,20 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
             ProxyPort = 30000,
             SiloName = "MyInstance",
             RoleName = "MyRole",
+            Status = (int)status,
             UpdateZone = 3,
             FaultZone = 5,
             StartTime = TestStartTime
         };
 
-        var etag = await this._manager.RegisterSiloInstance(this._entity);
+        var etag = await this._storage.UpsertEntity(this._entity);
         this._entity.ETag = Clustering.GoogleFirestore.Utils.ParseTimestamp(etag);
-
-        return this._entity;
-    }
-
-    private static void CheckSiloInstanceTableEntry(SiloInstanceEntity referenceEntry, SiloInstanceEntity entry)
-    {
-        Assert.Equal(referenceEntry.Id, entry.Id);
-        Assert.Equal(referenceEntry.ClusterId, entry.ClusterId);
-        Assert.Equal(referenceEntry.Address, entry.Address);
-        Assert.Equal(referenceEntry.Port, entry.Port);
-        Assert.Equal(referenceEntry.Generation, entry.Generation);
-        Assert.Equal(referenceEntry.HostName, entry.HostName);
-        Assert.Equal(referenceEntry.ProxyPort, entry.ProxyPort);
-        Assert.Equal(referenceEntry.SiloName, entry.SiloName);
-        Assert.Equal(referenceEntry.RoleName, entry.RoleName);
-        Assert.Equal(referenceEntry.UpdateZone, entry.UpdateZone);
-        Assert.Equal(referenceEntry.FaultZone, entry.FaultZone);
-        Assert.Equal(referenceEntry.IAmAliveTime, entry.IAmAliveTime);
-
-        Assert.Equal(referenceEntry.SuspectingSilos, entry.SuspectingSilos);
     }
 
     public async Task InitializeAsync()
     {
         var id = $"orleans-test-{Guid.NewGuid():N}";
-        this._options = new FirestoreOptions
+        var options = new FirestoreOptions
         {
             ProjectId = GoogleEmulatorHost.ProjectId,
             EmulatorHost = GoogleEmulatorHost.FirestoreEndpoint,
@@ -200,7 +130,13 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
         this._manager = await OrleansSiloInstanceManager.GetManager(
             this._clusterId,
             NullLoggerFactory.Instance,
-            this._options);
+            options);
+
+        this._storage = new FirestoreDataManager(
+            ClusterGroup,
+            this._clusterId,
+            options,
+            NullLogger<FirestoreDataManager>.Instance);
 
         await this._manager.TryCreateTableVersionEntryAsync();
     }

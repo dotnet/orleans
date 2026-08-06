@@ -12,7 +12,7 @@ using Orleans.Configuration;
 
 namespace Orleans.GrainDirectory.GoogleFirestore;
 
-public class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle>
+public partial class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle>
 {
     private const int MAX_IN_FILTER = 10;
     private const string DIRECTORY_GROUP = "GrainDirectory";
@@ -47,7 +47,7 @@ public class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycleParticip
         }
         catch (Exception ex)
         {
-            this._logger.LogError(ex, "Unable to lookup activation for grain {GrainId} from Firestore", grainId);
+            LogLookupError(ex, grainId);
             throw;
         }
     }
@@ -67,7 +67,7 @@ public class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycleParticip
         }
         catch (Exception ex)
         {
-            this._logger.LogError(ex, "Unable to register activation {Activation} for grain {GrainId} in Firestore", address.ActivationId, address.GrainId);
+            LogRegisterError(ex, address.ActivationId, address.GrainId);
             throw;
         }
     }
@@ -87,7 +87,7 @@ public class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycleParticip
         }
         catch (Exception ex)
         {
-            this._logger.LogError(ex, "Unable to unregister activation {Activation} for grain {GrainId} in Firestore", address.ActivationId, address.GrainId);
+            LogUnregisterError(ex, address.ActivationId, address.GrainId);
             throw;
         }
     }
@@ -120,58 +120,12 @@ public class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycleParticip
         }
         catch (Exception ex)
         {
-            this._logger.LogError(ex, "Unable to unregister silos | {SiloAddresses} | in Firestore", string.Join('|', siloAddresses));
+            LogUnregisterSilosError(ex, string.Join('|', siloAddresses));
             throw;
         }
     }
 
-    internal async Task UnregisterMany(List<GrainAddress> addresses)
-    {
-        try
-        {
-            const string idField = "__name__";
-
-            var ids = addresses.Select(s => Utils.SanitizeGrainId(s.GrainId)).ToArray();
-
-            var entities = new List<GrainDirectoryEntity>();
-
-            foreach (var chunk in ids.Chunk(MAX_IN_FILTER))
-            {
-                var fromStorage = await this._dataManager.QueryEntities<GrainDirectoryEntity>(
-                    entity => entity
-                        .WhereIn(idField, chunk)
-                ).ConfigureAwait(false);
-
-                foreach (var entity in fromStorage)
-                {
-                    var address = addresses.Where(a =>
-                        a.GrainId == Utils.ParseGrainId(entity.Id) &&
-                        a.ActivationId.ToParsableString() == entity.ActivationId)
-                        .SingleOrDefault();
-
-                    if (address is not null)
-                    {
-                        entities.Add(entity);
-                    }
-                }
-            }
-
-            if (entities.Count > 0)
-            {
-                foreach (var chunk in entities.Chunk(FirestoreDataManager.MAX_BATCH_ENTRIES))
-                {
-                    await this._dataManager.DeleteEntities(chunk).ConfigureAwait(false);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            this._logger.LogError(ex, "Unable to unregister many activations | {Addresses} | in Firestore", string.Join('|', addresses));
-            throw;
-        }
-    }
-
-    internal static GrainDirectoryEntity ConvertToEntity(GrainAddress address)
+    private static GrainDirectoryEntity ConvertToEntity(GrainAddress address)
     {
         return new GrainDirectoryEntity
         {
@@ -182,7 +136,7 @@ public class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycleParticip
         };
     }
 
-    internal static GrainAddress GetGrainAddress(GrainDirectoryEntity entity)
+    private static GrainAddress GetGrainAddress(GrainDirectoryEntity entity)
     {
         return new GrainAddress
         {
@@ -196,22 +150,22 @@ public class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycleParticip
     public void Participate(ISiloLifecycle lifecycle) =>
         lifecycle.Subscribe(nameof(GoogleFirestoreGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, Init);
 
-    public async Task Init(CancellationToken ct = default)
+    private async Task Init(CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
 
         try
         {
-            this._logger.LogInformation("Initializing Google Firestore Grain Directory...");
+            LogInitializing();
 
 
             await this._dataManager.Initialize();
 
-            this._logger.LogInformation("Initialized Google Firestore Grain Directory in {ElapsedMilliseconds}ms.", sw.ElapsedMilliseconds);
+            LogInitialized(sw.ElapsedMilliseconds);
         }
         catch (Exception ex)
         {
-            this._logger.LogError(ex, "Error initializing Google Firestore Grain Directory in {ElapsedMilliseconds}.", sw.ElapsedMilliseconds);
+            LogInitializationError(ex, sw.ElapsedMilliseconds);
             throw;
         }
         finally
@@ -219,4 +173,39 @@ public class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycleParticip
             sw.Stop();
         }
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Unable to lookup activation for grain {GrainId} from Firestore")]
+    private partial void LogLookupError(Exception exception, GrainId grainId);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Unable to register activation {Activation} for grain {GrainId} in Firestore")]
+    private partial void LogRegisterError(Exception exception, ActivationId activation, GrainId grainId);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Unable to unregister activation {Activation} for grain {GrainId} in Firestore")]
+    private partial void LogUnregisterError(Exception exception, ActivationId activation, GrainId grainId);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Unable to unregister silos | {SiloAddresses} | in Firestore")]
+    private partial void LogUnregisterSilosError(Exception exception, string siloAddresses);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Initializing Google Firestore Grain Directory...")]
+    private partial void LogInitializing();
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Initialized Google Firestore Grain Directory in {ElapsedMilliseconds}ms.")]
+    private partial void LogInitialized(long elapsedMilliseconds);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error initializing Google Firestore Grain Directory in {ElapsedMilliseconds}ms.")]
+    private partial void LogInitializationError(Exception exception, long elapsedMilliseconds);
 }
