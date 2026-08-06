@@ -25,7 +25,7 @@ using Orleans.Providers;
 
 namespace UnitTests.Streaming.Reliability
 {
-    [TestCategory("Streaming"), TestCategory("Reliability")]
+    [TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("AzureStorage")]
     public class StreamReliabilityTests : BaseInProcessTestClusterFixture
     {
         private readonly ITestOutputHelper _output;
