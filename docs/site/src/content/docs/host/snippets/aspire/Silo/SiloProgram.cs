@@ -84,7 +84,7 @@ public static class SiloProgram
         var builder = Host.CreateApplicationBuilder(args);
 
         builder.AddServiceDefaults();
-        builder.AddKeyedAzureTableClient("reminders");
+        builder.AddKeyedAzureTableServiceClient("reminders");
         builder.UseOrleans();
 
         builder.Build().Run();
@@ -119,19 +119,19 @@ public static class SiloProgram
 
             siloBuilder.UseAdoNetClustering(options =>
             {
-                options.Invariant = "System.Data.SqlClient";
+                options.Invariant = "Microsoft.Data.SqlClient";
                 options.ConnectionString = connectionString;
             });
 
             siloBuilder.AddAdoNetGrainStorageAsDefault(options =>
             {
-                options.Invariant = "System.Data.SqlClient";
+                options.Invariant = "Microsoft.Data.SqlClient";
                 options.ConnectionString = connectionString;
             });
 
             siloBuilder.UseAdoNetReminderService(options =>
             {
-                options.Invariant = "System.Data.SqlClient";
+                options.Invariant = "Microsoft.Data.SqlClient";
                 options.ConnectionString = connectionString;
             });
         });

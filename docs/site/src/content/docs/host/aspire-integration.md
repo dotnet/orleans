@@ -319,7 +319,7 @@ Aspire infers the provider type name from the .NET class name of the resource by
 - `AzureTableStorageResource` → `AzureTableStorage`
 - `SqlServerDatabaseResource` → `SqlServerDatabase` (incorrect for Orleans ADO.NET — no public override API; configure ADO.NET providers manually in the silo instead)
 
-Use `.WithOrleansProviderType("X")` to override the inferred name when the C# class name doesn't match what Orleans expects.
+Because there is no public API to override inferred provider type names in `Aspire.Hosting.Orleans`, configure ADO.NET providers manually in the silo using `UseOrleans(siloBuilder => {...})` and read the database connection string from configuration.
 
 ## Configure the Orleans client project
 
@@ -466,6 +466,4 @@ Consider upgrading to Orleans 8.0 or later to take advantage of the Aspire integ
 Aspire integration is available in Orleans 8.0 and later. Orleans 3.x does not support Aspire.
 
 :::zone-end
-
-
 
