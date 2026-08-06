@@ -31,7 +31,7 @@ An HTTP-only platform isn't sufficient unless Orleans silos can also establish d
 - [Kubernetes](kubernetes.md) provides direct pod networking. Explicit endpoint configuration is recommended; the Orleans hosting package is optional and limited to simple one-`Deployment`-per-cluster topologies.
 - [Service Fabric](service-fabric.md) uses an application-authored stateless Reliable Service integration with runtime-allocated endpoints and an external Orleans clustering provider.
 - Azure App Service requires validation of private per-instance address and port mapping on [Windows](deploy-to-azure-app-service.md) and [Linux](deploy-to-azure-app-service-linux.md).
-- [Azure Container Apps](deploy-to-azure-container-apps.md) requires validation of replica-to-replica TCP reachability and stable advertised endpoints.
+- [Azure Container Apps](deploy-to-azure-container-apps.md) can map unique TCP port pairs on an internal environment's private IP to one replica per silo app; scaling multiple silos as replicas of one app relies on per-replica networking that the platform doesn't publish as a supported contract.
 
 For another platform, prove the required capabilities with at least three silos under rolling replacement, scale-in, host restart, and network interruption. Record the exact endpoint mapping and shutdown behavior in the deployment runbook.
 
