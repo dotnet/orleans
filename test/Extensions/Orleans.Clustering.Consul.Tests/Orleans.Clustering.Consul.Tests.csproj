@@ -13,5 +13,6 @@
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Clustering.Consul\Orleans.Clustering.Consul.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>
 </Project>
