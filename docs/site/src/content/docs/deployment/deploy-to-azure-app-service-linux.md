@@ -56,7 +56,7 @@ az webapp list-runtimes --os linux
 
 Confirm that the output includes the .NET version represented by the template's `DOTNETCORE|10.0` literal. Runtime availability varies by cloud and region. If the token isn't available, update the mechanical runtime and target-framework literals together to a supported version.
 
-Linux startup is container-based. The built-in .NET stack starts the framework-dependent ZIP deployment without a custom startup command. ZIP deployment extracts the publish output to the case-sensitive `/home/site/wwwroot` path, compared with `D:\home\site\wwwroot` on Windows. The sample doesn't depend on either location or store durable state on the App Service filesystem.
+Linux startup is container-based. The built-in .NET stack starts the framework-dependent ZIP deployment without a custom startup command. The template sets `SCM_DO_BUILD_DURING_DEPLOYMENT=false` so Oryx runs the prepublished binaries instead of restoring and rebuilding them. ZIP deployment extracts the publish output to the case-sensitive `/home/site/wwwroot` path, compared with `D:\home\site\wwwroot` on Windows. The sample doesn't depend on either location or store durable state on the App Service filesystem.
 
 App Service Authentication runs as an ambassador sidecar rather than the Windows in-process module, but both platforms inject the same authenticated principal headers. `WEBSITE_WARMUP_PATH`, `WEBSITE_WARMUP_STATUSES`, and `WEBSITE_SWAP_WARMUP_PING_PATH` still apply. If startup legitimately exceeds the platform limit, adjust `WEBSITES_CONTAINER_START_TIME_LIMIT` within the supported range instead of returning readiness before Orleans starts.
 

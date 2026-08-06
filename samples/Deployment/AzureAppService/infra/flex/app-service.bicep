@@ -49,10 +49,6 @@ var commonAppSettings = [
     value: serviceId
   }
   {
-    name: 'WEBSITE_ADD_SITENAME_BINDINGS_IN_APPHOST_CONFIG'
-    value: '1'
-  }
-  {
     name: 'WEBSITE_HEALTHCHECK_MAXPINGFAILURES'
     value: '2'
   }
@@ -73,6 +69,19 @@ var commonAppSettings = [
     value: '200'
   }
 ]
+var platformAppSettings = isLinux
+  ? [
+      {
+        name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
+        value: 'false'
+      }
+    ]
+  : [
+      {
+        name: 'WEBSITE_ADD_SITENAME_BINDINGS_IN_APPHOST_CONFIG'
+        value: '1'
+      }
+    ]
 var commonSiteConfig = {
   alwaysOn: true
   ftpsState: 'Disabled'
@@ -164,6 +173,7 @@ resource appService 'Microsoft.Web/sites@2024-11-01' = {
       {
         appSettings: concat(
           commonAppSettings,
+          platformAppSettings,
           [
             {
               name: 'ORLEANS_CLUSTER_ID'
@@ -203,6 +213,7 @@ resource stagingSlot 'Microsoft.Web/sites/slots@2024-11-01' = {
       {
         appSettings: concat(
           commonAppSettings,
+          platformAppSettings,
           [
             {
               name: 'ORLEANS_CLUSTER_ID'
