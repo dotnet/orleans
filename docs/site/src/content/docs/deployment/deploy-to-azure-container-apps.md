@@ -9,9 +9,9 @@ ms.topic: concept-article
 
 Azure Container Apps can host Orleans, but the topology must preserve Orleans endpoint semantics. Orleans silos connect to the unique silo and gateway endpoint that each member advertises. Container Apps service discovery and TCP or HTTP ingress instead address a **container app or revision** and load-balance across its replicas. They don't provide a supported replica DNS name or replica IP address.
 
-To build a cluster from documented Container Apps endpoints, use a virtual-network-integrated internal environment and its private static IP. Deploy each silo as a separate Container App with exactly one replica and assign each app a unique pair of TCP ingress ports on that private IP. Repeat that resource to add silos. You must still complete the production acceptance tests on this page. A single Container App scaled to multiple silo replicas can work in a particular environment, and the Azure sample demonstrates that design, but direct replica addresses aren't part of the documented Container Apps networking contract.
+To build a cluster from documented Container Apps endpoints, use a virtual-network-integrated internal environment and its private static IP. Deploy each silo as a separate Container App with exactly one replica and assign each app a unique pair of TCP ingress ports on that private IP. Repeat that resource to add silos. You must still complete the production acceptance tests on this page. A single Container App scaled to multiple silo replicas can work in a particular environment, but direct replica addresses aren't part of the documented Container Apps networking contract.
 
-Use the [Deploy and scale an Orleans app on Azure](../quickstarts/deploy-scale-orleans-on-azure.md) quickstart to learn the Azure Developer CLI deployment flow. The maintained [Orleans cluster on Azure Container Apps sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureContainerApps) is also useful for studying a multi-component topology and custom scaling. Review the [sample limitations](#understand-the-maintained-sample) before adapting either resource for production.
+Use the [Deploy and scale an Orleans app on Azure](../quickstarts/deploy-scale-orleans-on-azure.md) quickstart to learn the Azure Developer CLI deployment flow. The maintained [Orleans cluster on Azure Container Apps sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureContainerApps) is also useful for studying a multi-component topology and the external-scaler contract. Review the [sample limitations](#understand-the-maintained-sample) before adapting either resource for production.
 
 ## Choose a topology
 
@@ -146,7 +146,7 @@ permissions:
   id-token: write
 
 steps:
-  - uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
+  - uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
     with:
       client-id: ${{ vars.AZURE_CLIENT_ID }}
       tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -251,16 +251,17 @@ For the multiple-replica-in-one-app topology, add a blocking test that matches e
 
 The [in-repo sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureContainerApps), imported from the [original Azure sample](https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-Container-Apps), demonstrates:
 
-- Separate silo, dashboard, Minimal API client, worker client, and external scaler Container Apps in one environment.
-- Bicep that provisions Azure Container Registry, Azure Storage, a Container Apps environment, Application Insights, Log Analytics, and the five Container Apps.
-- A `deploy`-branch workflow with provision, build, and deploy jobs. It builds five images, tags them with the Git commit SHA, and updates each app.
-- Azure Table Storage clustering shared by silos and clients through an account-key connection string.
-- A silo app in multiple-revision mode with no configured ingress, one to ten replicas, and a custom KEDA external scaler based on a deliberately contrived 300-grains-per-silo threshold.
-- A dashboard process that is also an Orleans silo, fixed silo and gateway ports, Application Insights, and Log Analytics.
+- Two dedicated silo Container Apps, a dashboard silo, a Minimal API client, a worker client, and an external-scaler service in one internal environment.
+- One replica per Orleans server app. The two silos and dashboard advertise the environment's private static IP with unique exposed port pairs: `11111`/`30000`, `11112`/`30001`, and `11113`/`30002`.
+- Stable Container Apps resource APIs, virtual-network integration with private DNS, explicit startup/readiness/liveness probes, a 60-second termination grace period, and nonzero replica floors.
+- A user-assigned runtime identity, managed-identity ACR pulls, disabled registry admin credentials, and disabled storage shared-key access.
+- Azure Table Storage clustering through `DefaultAzureCredential`. The runtime identity has **Storage Table Data Contributor** on the precreated membership table. The sample doesn't configure durable grain storage.
+- A separately run bootstrap template for role assignments and a routine deployment workflow that uses GitHub OIDC, SHA-pinned actions, Git-SHA image tags, and digest-pinned Container App revisions.
 - Clients that discover individual gateways through Orleans membership rather than using HTTP ingress as an Orleans transport.
+- The external-scaler gRPC service as a study component. It isn't attached to a silo scaling rule because scaling one app to multiple silo replicas would reintroduce the unsupported endpoint assumption.
 
 The maintained sample incorporates the bounded-input design from open [Azure-Samples pull request 18](https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-Container-Apps/pull/18). Its hello grain uses an integer key, the public route accepts only keys from 0 through 255 before calling Orleans, the provider endpoint returns numeric keys, and inactive hello grains have a two-minute collection age. Preserve that bounded-input pattern when adapting the API. A collection age alone doesn't make an unbounded key space safe.
 
-The sample is an architecture demonstration, not a production deployment manifest. Its application projects reference the Orleans source in this repository, but the imported deployment assets still use preview-era Container Apps Bicep resources, an Azure service-principal secret with broad **Contributor** access, storage account and registry keys, registry admin access, mutable placeholder images, and older GitHub Actions. It doesn't register durable grain storage, define production health probes, configure a termination grace period, or prove that observed replica IPs are a supported Container Apps endpoint contract. Its minimum silo count is one, and its scaling threshold isn't a capacity recommendation.
+The sample is still an architecture demonstration rather than a production deployment manifest. The registry and storage data endpoints remain public, although they require Microsoft Entra authentication. All runtime apps share one identity. The simple readiness endpoints don't implement application-specific draining, and the workflow updates existing apps in place, which can temporarily overlap revisions that advertise the same endpoint. For production upgrades, use the replacement-app procedure on this page. The one-replica apps don't prove cross-zone or independent failure-domain placement, and the external scaler doesn't make a capacity recommendation.
 
-Use the sample to understand component relationships, Orleans membership-based gateway discovery, workload generation, and scaling experiments. Replace its identity, infrastructure, provider, health, lifecycle, CI, and endpoint assumptions using the guidance on this page.
+Use the sample to understand component relationships, Orleans membership-based gateway discovery, managed identity, workload generation, and explicit endpoint mapping. Complete the networking, failure, upgrade, security, state-recovery, and readiness acceptance tests on this page before using the topology in production.
