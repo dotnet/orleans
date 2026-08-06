@@ -115,6 +115,38 @@ public static class SiloProgram
         builder.Build().Run();
     }
     // </reminders_inmemory_silo>
+
+    // <adonet_silo>
+    public static void AdoNetSilo(string[] args)
+    {
+        var builder = Host.CreateApplicationBuilder(args);
+
+        builder.AddServiceDefaults();
+
+        // Register the ADO.NET client using the Aspire resource name as the key.
+        // The key must match the resource name used in the AppHost exactly.
+        builder.AddKeyedSqlServerClient("orleans-db");
+
+        // Aspire injects Orleans__Clustering__ProviderType=AdoNet,
+        // Orleans__Clustering__ServiceKey=orleans-db, etc.
+        builder.UseOrleans();
+
+        builder.Build().Run();
+    }
+    // </adonet_silo>
+
+    // <grain_directory_silo>
+    public static void GrainDirectorySilo(string[] args)
+    {
+        var builder = Host.CreateApplicationBuilder(args);
+
+        builder.AddServiceDefaults();
+        builder.AddKeyedRedisClient("orleans-redis");
+        builder.UseOrleans();
+
+        builder.Build().Run();
+    }
+    // </grain_directory_silo>
 }
 
 // Stub health check classes for documentation examples

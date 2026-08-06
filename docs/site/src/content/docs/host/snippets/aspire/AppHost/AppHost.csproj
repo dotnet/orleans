@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.Azure.Storage" Version="13.4.6" />
+    <PackageReference Include="Aspire.Hosting.SqlServer" Version="13.4.6" />
   </ItemGroup>
 
   <!-- Project references removed - Silo and Client are library projects
