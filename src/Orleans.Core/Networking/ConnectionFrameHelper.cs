@@ -69,18 +69,31 @@ namespace Orleans.Runtime.Messaging
             if (frameLength > maxFrameLength)
                 throw new InvalidOperationException($"Frame length {frameLength} exceeds maximum allowed length of {maxFrameLength}.");
 
-            var totalNeeded = 4 + frameLength;
-            while (buffer.Length < totalNeeded)
+            input.AdvanceTo(buffer.GetPosition(4));
+
+            var frameBytes = new byte[frameLength];
+            var bytesRead = 0;
+            while (bytesRead < frameLength)
             {
-                input.AdvanceTo(buffer.Start, buffer.End);
                 readResult = await input.ReadAsync(cancellationToken);
                 buffer = readResult.Buffer;
-                CheckCompletionWithData(ref readResult, totalNeeded);
-            }
 
-            var frameSlice = buffer.Slice(4, frameLength);
-            var frameBytes = new byte[frameLength];
-            frameSlice.CopyTo(frameBytes);
+                if (readResult.IsCanceled)
+                {
+                    input.AdvanceTo(buffer.Start, buffer.End);
+                    throw new InvalidOperationException("Connection terminated during frame exchange.");
+                }
+
+                var bytesToCopy = (int)Math.Min(buffer.Length, frameLength - bytesRead);
+                buffer.Slice(0, bytesToCopy).CopyTo(frameBytes.AsSpan(bytesRead, bytesToCopy));
+                bytesRead += bytesToCopy;
+                input.AdvanceTo(buffer.GetPosition(bytesToCopy));
+
+                if (readResult.IsCompleted && bytesRead < frameLength)
+                {
+                    throw new InvalidOperationException("Connection terminated during frame exchange.");
+                }
+            }
 
             byte frameType = frameBytes[0];
             byte[] payload;
@@ -93,8 +106,6 @@ namespace Orleans.Runtime.Messaging
             {
                 payload = Array.Empty<byte>();
             }
-
-            input.AdvanceTo(buffer.GetPosition(totalNeeded));
 
             return (frameType, payload);
         }
@@ -156,17 +167,17 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         public static string ReadLengthPrefixedString(byte[] data, ref int offset)
         {
-            if (offset + 4 > data.Length)
+            if ((uint)offset > (uint)data.Length || data.Length - offset < sizeof(int))
                 throw new InvalidOperationException("Not enough data to read string length.");
 
-            var length = BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(offset, 4));
-            offset += 4;
+            var length = BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(offset, sizeof(int)));
+            offset += sizeof(int);
 
             if (length < 0)
                 throw new InvalidOperationException($"Invalid string length: {length}.");
             if (length == 0)
                 return string.Empty;
-            if (offset + length > data.Length)
+            if (length > data.Length - offset)
                 throw new InvalidOperationException($"Not enough data to read string of length {length}. Available: {data.Length - offset}.");
 
             var result = Encoding.UTF8.GetString(data, offset, length);

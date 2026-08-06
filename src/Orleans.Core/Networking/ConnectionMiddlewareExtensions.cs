@@ -12,14 +12,14 @@ namespace Orleans
     {
         /// <summary>
         /// Adds an <see cref="IConnectionMiddleware"/> to the connection pipeline.
-        /// The middleware is resolved from DI.
+        /// The middleware is resolved from DI when registered, or activated using DI otherwise.
         /// </summary>
         /// <typeparam name="T">The middleware type implementing <see cref="IConnectionMiddleware"/>.</typeparam>
         public static IConnectionBuilder UseMiddleware<T>(this IConnectionBuilder builder) where T : IConnectionMiddleware
         {
             builder.Use(next =>
             {
-                var middleware = ActivatorUtilities.CreateInstance<T>(builder.ApplicationServices);
+                var middleware = ActivatorUtilities.GetServiceOrCreateInstance<T>(builder.ApplicationServices);
                 return context => middleware.OnConnectionAsync(context, next);
             });
 

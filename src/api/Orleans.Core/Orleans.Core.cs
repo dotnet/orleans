@@ -87,6 +87,14 @@ namespace Orleans
         public void Populate(System.IServiceProvider services, System.Type grainClass, Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) { }
     }
 
+    public static partial class ConnectionMiddlewareExtensions
+    {
+        public static Microsoft.AspNetCore.Connections.IConnectionBuilder UseMiddleware(this Microsoft.AspNetCore.Connections.IConnectionBuilder builder, Runtime.Messaging.IConnectionMiddleware middleware) { throw null; }
+
+        public static Microsoft.AspNetCore.Connections.IConnectionBuilder UseMiddleware<T>(this Microsoft.AspNetCore.Connections.IConnectionBuilder builder)
+            where T : Runtime.Messaging.IConnectionMiddleware { throw null; }
+    }
+
     public delegate void ConnectionToClusterLostHandler(object? sender, System.EventArgs e);
     public delegate TInstance Factory<out TInstance>();
     public delegate TInstance Factory<in TParam1, out TInstance>(TParam1 param1);
@@ -1620,6 +1628,26 @@ namespace Orleans.Runtime.Messaging
         public ConnectionFailedException(string message, System.Exception innerException) { }
 
         public ConnectionFailedException(string message) { }
+    }
+
+    public static partial class ConnectionFrameHelper
+    {
+        public const int DefaultMaxFrameLength = 1048576;
+        public const int FramePrefixSize = 5;
+        public static System.Threading.Tasks.ValueTask<(byte FrameType, byte[] Payload)> ReadFrameAsync(Microsoft.AspNetCore.Connections.ConnectionContext connection, System.Threading.CancellationToken cancellationToken, int maxFrameLength = 1048576) { throw null; }
+
+        public static string ReadLengthPrefixedString(byte[] data, ref int offset) { throw null; }
+
+        public static System.Threading.Tasks.ValueTask WriteFrameAsync(Microsoft.AspNetCore.Connections.ConnectionContext connection, byte frameType, System.Action<System.Buffers.IBufferWriter<byte>> writePayload, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public static System.Threading.Tasks.ValueTask WriteFrameAsync(Microsoft.AspNetCore.Connections.ConnectionContext connection, byte frameType, byte[] payload, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public static void WriteLengthPrefixedString(System.Buffers.IBufferWriter<byte> writer, string value) { }
+    }
+
+    public partial interface IConnectionMiddleware
+    {
+        System.Threading.Tasks.Task OnConnectionAsync(Microsoft.AspNetCore.Connections.ConnectionContext context, Microsoft.AspNetCore.Connections.ConnectionDelegate next);
     }
 
     [GenerateSerializer]

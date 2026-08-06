@@ -6,9 +6,8 @@ namespace Orleans.Runtime.Messaging
     /// <summary>
     /// Interface for connection middleware.
     /// <para>
-    /// Implementers only need to provide <see cref="OnConnectionAsync"/>; the pipeline
-    /// automatically invokes the next delegate after this middleware completes (unless
-    /// the middleware calls next itself or throws).
+    /// Implementers provide <see cref="OnConnectionAsync"/> and invoke the supplied
+    /// <see cref="ConnectionDelegate"/> to continue the pipeline.
     /// </para>
     /// <para>
     /// Register via <c>builder.UseMiddleware()</c> or manually with

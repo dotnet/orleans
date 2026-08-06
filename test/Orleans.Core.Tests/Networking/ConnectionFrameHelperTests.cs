@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Buffers.Binary;
 using System.IO.Pipelines;
 using System.Text;
 using System.Threading;
@@ -131,6 +132,28 @@ namespace Orleans.Core.Tests.Networking
         }
 
         [Fact]
+        public async Task ReadFrame_ConsumesDataUnderBackpressure()
+        {
+            var pipe = new Pipe(new PipeOptions(
+                pauseWriterThreshold: 64,
+                resumeWriterThreshold: 32,
+                minimumSegmentSize: 16,
+                useSynchronizationContext: false));
+            var context = new TestConnectionContext(pipe);
+            var expectedPayload = new byte[256];
+            Array.Fill(expectedPayload, (byte)0x2A);
+
+            var writeTask = WriteFrameInChunksAsync(pipe.Writer, 0x04, expectedPayload, 16);
+            var readTask = ConnectionFrameHelper.ReadFrameAsync(context, CancellationToken.None).AsTask();
+
+            await Task.WhenAll(writeTask, readTask).WaitAsync(TimeSpan.FromSeconds(10));
+
+            var (frameType, payload) = await readTask;
+            Assert.Equal(0x04, frameType);
+            Assert.Equal(expectedPayload, payload);
+        }
+
+        [Fact]
         public void WriteLengthPrefixedString_ReadLengthPrefixedString_RoundTrips()
         {
             var buffer = new ArrayBufferWriter<byte>();
@@ -187,6 +210,44 @@ namespace Orleans.Core.Tests.Networking
 
             Assert.Throws<InvalidOperationException>(() =>
                 ConnectionFrameHelper.ReadLengthPrefixedString(data, ref offset));
+        }
+
+        [Fact]
+        public void ReadLengthPrefixedString_OversizedLength_Throws()
+        {
+            var data = new byte[sizeof(int)];
+            BinaryPrimitives.WriteInt32LittleEndian(data, int.MaxValue);
+            int offset = 0;
+
+            Assert.Throws<InvalidOperationException>(() =>
+                ConnectionFrameHelper.ReadLengthPrefixedString(data, ref offset));
+        }
+
+        [Fact]
+        public void ReadLengthPrefixedString_NegativeOffset_Throws()
+        {
+            var data = Array.Empty<byte>();
+            int offset = -1;
+
+            Assert.Throws<InvalidOperationException>(() =>
+                ConnectionFrameHelper.ReadLengthPrefixedString(data, ref offset));
+        }
+
+        private static async Task WriteFrameInChunksAsync(PipeWriter writer, byte frameType, byte[] payload, int chunkSize)
+        {
+            var frame = new byte[ConnectionFrameHelper.FramePrefixSize + payload.Length];
+            BinaryPrimitives.WriteInt32LittleEndian(frame, payload.Length + 1);
+            frame[4] = frameType;
+            payload.CopyTo(frame, ConnectionFrameHelper.FramePrefixSize);
+
+            for (var offset = 0; offset < frame.Length; offset += chunkSize)
+            {
+                var length = Math.Min(chunkSize, frame.Length - offset);
+                writer.Write(frame.AsSpan(offset, length));
+                await writer.FlushAsync();
+            }
+
+            await writer.CompleteAsync();
         }
 
         /// <summary>

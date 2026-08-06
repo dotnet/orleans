@@ -55,9 +55,11 @@ namespace Orleans.Core.Tests.Networking
         public async Task UseMiddleware_Generic_ResolvesFromDI()
         {
             var callOrder = new List<string>();
+            var middleware = new InjectedMiddleware(callOrder);
 
             var services = new ServiceCollection()
                 .AddSingleton(callOrder)
+                .AddSingleton(middleware)
                 .BuildServiceProvider();
 
             var builder = new TestConnectionBuilder(services);
@@ -69,6 +71,7 @@ namespace Orleans.Core.Tests.Networking
             await pipeline(context);
 
             Assert.Equal(new[] { "injected-middleware" }, callOrder);
+            Assert.Equal(1, middleware.InvocationCount);
         }
 
         private static ConnectionContext CreateContext()
@@ -123,8 +126,11 @@ namespace Orleans.Core.Tests.Networking
                 _callOrder = callOrder;
             }
 
+            public int InvocationCount { get; private set; }
+
             public async Task OnConnectionAsync(ConnectionContext context, ConnectionDelegate next)
             {
+                InvocationCount++;
                 _callOrder.Add("injected-middleware");
                 await next(context);
             }
