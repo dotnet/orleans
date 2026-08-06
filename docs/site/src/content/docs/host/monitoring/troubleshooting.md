@@ -102,4 +102,4 @@ For intermittent or production-only failures, retain:
 - Membership snapshots and provider health.
 - A process trace or dump when scheduler, CPU, or memory behavior is involved.
 
-Redact secrets and grain state before sharing artifacts. See [.NET diagnostics](../../../core/diagnostics/) for `dotnet-counters`, `dotnet-trace`, and dump collection guidance.
+Redact secrets and grain state before sharing artifacts. See [.NET diagnostics](https://learn.microsoft.com/dotnet/core/diagnostics/) for `dotnet-counters`, `dotnet-trace`, and dump collection guidance.

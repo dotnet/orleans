@@ -101,4 +101,4 @@ Certificate selectors are called during authentication, but certificate loading,
 
 - <xref:Orleans.Connections.Security.TlsOptions>
 - <xref:Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseTls*>
-- [.NET TLS/SSL best practices](../../core/extensions/sslstream-best-practices.md)
+- [.NET TLS/SSL best practices](https://learn.microsoft.com/dotnet/core/extensions/sslstream-best-practices)
