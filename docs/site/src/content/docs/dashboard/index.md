@@ -46,10 +46,10 @@ builder.UseOrleans(siloBuilder =>
 var app = builder.Build();
 
 app.MapOrleansDashboard("/dashboard")
-    .RequireAuthorization("DashboardOperators");
+    .RequireAuthorization();
 ```
 
-The route group includes static dashboard assets and its backing APIs. Apply authentication, authorization, rate limits, headers, and other endpoint conventions to the returned group rather than protecting only the HTML page.
+The route group includes static dashboard assets and its backing APIs. Apply authentication, authorization, rate limits, headers, and other endpoint conventions to the returned group rather than protecting only the HTML page. Use the policy-based configuration in the preceding secure dashboard example when dashboard access is limited to an operator role.
 
 ## Configure collection
 

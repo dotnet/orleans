@@ -26,7 +26,7 @@ Record application correlation fields in structured properties or an approved ac
 Subscribe to the `Microsoft.Orleans` meter. Discover the exact instrument set emitted by your deployed version instead of copying a static list:
 
 ```dotnetcli
-dotnet counters monitor -n <ProcessName> --counters Microsoft.Orleans
+dotnet-counters monitor -n <ProcessName> --counters Microsoft.Orleans
 ```
 
 The current source of truth is [InstrumentNames.cs](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Diagnostics/Metrics/InstrumentNames.cs). Provider packages can add instruments beyond that runtime set.
