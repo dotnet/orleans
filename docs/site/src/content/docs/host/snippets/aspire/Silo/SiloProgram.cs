@@ -132,19 +132,19 @@ public static class SiloProgram
 
             siloBuilder.UseAdoNetClustering(options =>
             {
-                options.Invariant = "System.Data.SqlClient";
+                options.Invariant = "Microsoft.Data.SqlClient";
                 options.ConnectionString = connectionString;
             });
 
             siloBuilder.AddAdoNetGrainStorageAsDefault(options =>
             {
-                options.Invariant = "System.Data.SqlClient";
+                options.Invariant = "Microsoft.Data.SqlClient";
                 options.ConnectionString = connectionString;
             });
 
             siloBuilder.UseAdoNetReminderService(options =>
             {
-                options.Invariant = "System.Data.SqlClient";
+                options.Invariant = "Microsoft.Data.SqlClient";
                 options.ConnectionString = connectionString;
             });
         });
