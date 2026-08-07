@@ -9,7 +9,15 @@ ms.topic: concept-article
 
 The Orleans stream API doesn't promise one universal delivery guarantee. The selected provider and its backing service determine when an event is accepted, whether failed delivery is retried, what order is observable, and whether old events remain available.
 
-Orleans doesn't provide an exactly-once processing guarantee. Network failures can make publication outcomes ambiguous, persistent providers can redeliver, and a consumer can fail after applying a side effect but before acknowledging completion. Design consumers to be idempotent or record deduplication state atomically with their effects.
+Orleans doesn't guarantee exactly-once delivery or processing by itself. Network failures can make publication outcomes ambiguous, and persistent providers can redeliver events.
+
+## Exactly-once effects
+
+An application can achieve exactly-once observable effects within a transactional boundary. Identify each event with a stable value, such as an application-defined event ID or a provider <xref:Orleans.Streams.StreamSequenceToken> only when the provider guarantees that the token is stable across redelivery. Atomically commit both the event's effects and the fact that the identity was processed. On redelivery, skip an identity which was already committed.
+
+Recording a sequence token alone isn't sufficient. If the consumer records the token before applying the effect, a failure between those operations can lose the effect. If it applies the effect before recording the token, a failure can cause the effect to be applied again. The effect and checkpoint must share one atomic commit, or the effect destination must provide equivalent deduplication.
+
+For effects outside that transaction, use an idempotency key, transactional inbox or outbox, or a destination which rejects duplicate event IDs. The scope and stability of sequence tokens are provider-specific. Tokens from non-rewindable queue providers can represent a read position and can change when an event is redelivered. Use an application event ID unless the provider explicitly guarantees a token which is suitable for deduplication.
 
 ## Producer acknowledgment
 
