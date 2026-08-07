@@ -7,7 +7,7 @@ ms.topic: how-to
 
 # Background services and startup tasks
 
-Use standard .NET hosted services for application initialization and background work. Orleans participates in the same Generic Host, so registration order can ensure Orleans is ready before a hosted service starts.
+Use standard [.NET hosted services](https://learn.microsoft.com/dotnet/core/extensions/workers) for application initialization and background work. Orleans participates in the same Generic Host, so registration order can ensure Orleans is ready before a hosted service starts.
 
 ## Run continuous background work
 

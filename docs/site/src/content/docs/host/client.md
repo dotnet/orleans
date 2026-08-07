@@ -47,7 +47,7 @@ Calls from a co-hosted client use the silo's cluster knowledge and don't require
 
 ## Use an external client
 
-Install [Microsoft.Orleans.Client](https://www.nuget.org/packages/Microsoft.Orleans.Client), then add the client to the Generic Host:
+Install [Microsoft.Orleans.Client](https://www.nuget.org/packages/Microsoft.Orleans.Client), then add the client to the [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensions/generic-host):
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
@@ -67,7 +67,7 @@ var app = builder.Build();
 await app.RunAsync();
 ```
 
-The client connects during host startup and is available from dependency injection afterward. Register hosted services that use Orleans after `UseOrleansClient` so the host starts them after the client:
+The client connects during host startup and is available from [.NET dependency injection](https://learn.microsoft.com/dotnet/core/extensions/dependency-injection) afterward. Register hosted services that use Orleans after `UseOrleansClient` so the host starts them after the client:
 
 :::code language="csharp" source="snippets/ClusterClientHostedService.cs":::
 
@@ -90,7 +90,7 @@ After startup, Orleans refreshes gateways and reconnects as cluster membership c
 
 External client code isn't governed by the grain turn-based concurrency model. Multiple threads can use `IClusterClient` and grain references concurrently. Protect mutable client-side state using normal .NET synchronization.
 
-Grain calls return `Task`, `Task<T>`, `ValueTask`, or `ValueTask<T>` according to the grain interface. Always await calls rather than blocking threads.
+Grain calls return `Task`, `Task<T>`, `ValueTask`, or `ValueTask<T>` according to the [grain interface rules](../grains/index.md#grain-interfaces-and-classes). Always await calls rather than blocking threads.
 
 ## Receive messages from grains
 

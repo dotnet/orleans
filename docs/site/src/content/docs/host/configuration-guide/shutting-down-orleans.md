@@ -7,7 +7,7 @@ ms.topic: how-to
 
 # Shut down Orleans silos
 
-Orleans is an `IHostedService` inside the .NET Generic Host. When the host stops, Orleans leaves the cluster, closes gateways and networking, deactivates grains, and stops providers in reverse lifecycle order.
+Orleans is an `IHostedService` inside the [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensions/generic-host). When the host stops, Orleans leaves the cluster, closes gateways and networking, deactivates grains, and stops providers in reverse lifecycle order.
 
 ## Let the Generic Host own shutdown
 
@@ -24,7 +24,7 @@ builder.UseOrleans(siloBuilder =>
 await builder.Build().RunAsync();
 ```
 
-The console lifetime handles <kbd>Ctrl</kbd>+<kbd>C</kbd>, `SIGINT`, and `SIGTERM`. ASP.NET Core hosts use the same host lifetime model.
+The console lifetime handles <kbd>Ctrl</kbd>+<kbd>C</kbd>, `SIGINT`, and `SIGTERM`. ASP.NET Core hosts use the same host lifetime model. For details, see [.NET Generic Host shutdown](https://learn.microsoft.com/dotnet/core/extensions/generic-host#host-shutdown).
 
 In tests or embedded hosts, call `StopAsync` and dispose the host:
 

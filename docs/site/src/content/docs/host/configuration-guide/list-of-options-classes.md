@@ -7,7 +7,7 @@ ms.topic: reference
 
 # Core Orleans configuration options
 
-Orleans options use the [.NET options pattern](../../../core/extensions/options.md). Configure them with `ISiloBuilder.Configure<TOptions>` or `IClientBuilder.Configure<TOptions>`. Orleans also automatically binds the specific sections listed in [Declarative configuration](index.md#declarative-configuration); other option types require explicit binding.
+Orleans options use the [.NET options pattern](https://learn.microsoft.com/dotnet/core/extensions/options). Configure them with `ISiloBuilder.Configure<TOptions>` or `IClientBuilder.Configure<TOptions>`. Orleans also automatically binds the specific sections listed in [Declarative configuration](index.md#declarative-configuration); other option types require explicit binding.
 
 This page is a curated starting point, not an exhaustive property catalog. The [`Orleans.Configuration` API reference](https://learn.microsoft.com/dotnet/api/orleans.configuration) and provider package APIs are the source of truth for the installed Orleans version.
 

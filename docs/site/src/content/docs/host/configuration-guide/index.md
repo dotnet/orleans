@@ -7,7 +7,7 @@ ms.topic: overview
 
 # Orleans configuration guide
 
-Orleans uses the [.NET Generic Host](../../../core/extensions/generic-host.md), dependency injection, and the [.NET options pattern](../../../core/extensions/options.md). Start with one of these hosting models:
+Orleans uses the [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensions/generic-host), [dependency injection](https://learn.microsoft.com/dotnet/core/extensions/dependency-injection), and the [.NET options pattern](https://learn.microsoft.com/dotnet/core/extensions/options). Start with one of these hosting models:
 
 | Model | Use it when | Entry point |
 |---|---|---|
@@ -98,7 +98,7 @@ Environment variables use double underscores, for example `Orleans__ClusterId` a
 
 ## Configuration precedence
 
-The Generic Host combines configuration providers in its normal order. Programmatic options configuration also participates in the options pipeline, so avoid configuring the same value in multiple places unless the override is intentional. Keep service and cluster identity stable and inject environment-specific endpoints, credentials, and provider connection details at deployment time.
+The Generic Host combines [.NET configuration providers](https://learn.microsoft.com/dotnet/core/extensions/configuration-providers) in its normal order. Programmatic options configuration also participates in the options pipeline, so avoid configuring the same value in multiple places unless the override is intentional. Keep service and cluster identity stable and inject environment-specific endpoints, credentials, and provider connection details at deployment time.
 
 ## Production checklist
 

@@ -11,7 +11,7 @@ An external client runs outside a silo process and reaches the cluster through s
 
 :::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="external_client":::
 
-The host starts Orleans before later registered hosted services and stops it with the rest of the application. Resolve `IClusterClient` or `IGrainFactory` from dependency injection; don't build a second client singleton manually.
+Client settings participate in the [.NET options pattern](https://learn.microsoft.com/dotnet/core/extensions/options). The host starts Orleans before later registered hosted services and stops it with the rest of the application. Resolve `IClusterClient` or `IGrainFactory` from [.NET dependency injection](https://learn.microsoft.com/dotnet/core/extensions/dependency-injection); don't build a second client singleton manually.
 
 ## Required settings
 
@@ -19,7 +19,7 @@ The host starts Orleans before later registered hosted services and stops it wit
 - `ClusterId` identifies one deployment of that service. Use a different value to isolate environments or parallel deployments.
 - The client clustering provider discovers gateway-enabled silos. Its settings must point to the same membership data as the silos.
 
-Common production clustering packages include Azure Table Storage, ADO.NET, Redis, Azure Cosmos DB, DynamoDB, Consul, and ZooKeeper. Static and localhost clustering are intended for development. Kubernetes hosting is a silo integration, not a client clustering provider.
+Common production [clustering packages](server-configuration.md#choose-a-clustering-provider) include Azure Table Storage, ADO.NET, Redis, Azure Cosmos DB, DynamoDB, Consul, and ZooKeeper. Static and localhost clustering are intended for development. Kubernetes hosting is a silo integration, not a client clustering provider.
 
 When Aspire supplies the Orleans resource, register the corresponding keyed service client and use the parameterless form:
 

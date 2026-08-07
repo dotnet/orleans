@@ -7,9 +7,9 @@ ms.topic: how-to
 
 # Orleans and Aspire integration
 
-The `Aspire.Hosting.Orleans` package models an Orleans cluster and its backing services in an Aspire AppHost. Aspire supplies cluster identity, endpoints, provider configuration, service discovery, dependency ordering, and observability context to silo and client projects.
+The `Aspire.Hosting.Orleans` package models an Orleans cluster and its backing services in an Aspire AppHost. [Aspire](https://aspire.dev/get-started/what-is-aspire/) supplies cluster identity, endpoints, provider configuration, service discovery, dependency ordering, and observability context to silo and client projects.
 
-Use Aspire when you want a repeatable local distributed environment or already use an AppHost to describe deployment resources. Aspire orchestrates Orleans; it doesn't replace Orleans clustering, storage, reminder, or stream providers.
+Use Aspire when you want a repeatable local distributed environment or already use an AppHost to describe deployment resources. Aspire orchestrates Orleans; it doesn't replace Orleans clustering, storage, reminder, or stream providers. See [Install the Aspire CLI](https://aspire.dev/get-started/install-cli/) for the supported toolchain.
 
 ## Add Orleans to the AppHost
 

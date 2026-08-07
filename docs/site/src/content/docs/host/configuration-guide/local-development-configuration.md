@@ -40,4 +40,4 @@ Aspire is usually the easiest option because it allocates endpoints, starts depe
 
 Use in-memory providers for fast unit-level iteration. Use containers or emulators when you need to test provider behavior, serialization formats, schema setup, or restart durability. Keep the same provider package and configuration shape that production uses whenever practical.
 
-For integration tests that create in-process clusters, use `Microsoft.Orleans.TestingHost` and `TestClusterBuilder` instead of manually assigning ports.
+For integration tests that create in-process clusters, use the [`Microsoft.Orleans.TestingHost`](https://www.nuget.org/packages/Microsoft.Orleans.TestingHost) package and `TestClusterBuilder` instead of manually assigning ports. For complete applications, see the [Orleans samples](https://github.com/dotnet/orleans/tree/main/samples).

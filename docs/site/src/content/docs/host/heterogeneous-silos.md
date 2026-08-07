@@ -63,6 +63,6 @@ Clients obtain cluster type information after connecting. Handle deployments so 
 - A request fails when no active silo supports its target grain type.
 - Every silo that supports one grain type must use a compatible implementation and contract.
 - Stateless worker grains should be consistently available across the cluster rather than split into incompatible heterogeneous sets.
-- Implicit stream subscriptions require compatible grain availability; use explicit subscriptions when heterogeneous deployment makes ownership ambiguous.
+- Implicit stream subscriptions require compatible grain availability; use [explicit subscriptions](../streaming/streams-programming-apis.md) when heterogeneous deployment makes ownership ambiguous.
 
 Test topology changes with production-like role counts, especially the loss and replacement of the last silo supporting a type.

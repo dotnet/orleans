@@ -11,10 +11,10 @@ Orleans ADO.NET providers use a relational database for one or more runtime capa
 
 | Capability | Package | Configure on |
 |---|---|---|
-| Clustering | `Microsoft.Orleans.Clustering.AdoNet` | Silos and external clients |
-| Grain storage | `Microsoft.Orleans.Persistence.AdoNet` | Silos |
-| Reminders | `Microsoft.Orleans.Reminders.AdoNet` | Silos |
-| Grain directory | `Microsoft.Orleans.GrainDirectory.AdoNet` | Silos |
+| Clustering | [`Microsoft.Orleans.Clustering.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.AdoNet) | Silos and external clients |
+| Grain storage | [`Microsoft.Orleans.Persistence.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AdoNet) | Silos |
+| Reminders | [`Microsoft.Orleans.Reminders.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.AdoNet) | Silos |
+| Grain directory | [`Microsoft.Orleans.GrainDirectory.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.AdoNet) | Silos |
 
 Install only the packages for the capabilities the application uses. Also reference the database driver package.
 

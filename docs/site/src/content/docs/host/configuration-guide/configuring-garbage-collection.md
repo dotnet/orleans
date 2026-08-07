@@ -16,7 +16,7 @@ Orleans silos are long-running, highly concurrent server processes. Enable serve
 </PropertyGroup>
 ```
 
-Server GC creates heaps and collection threads based on the processors available to the process. It is effective only when more than one processor is available.
+[Server GC](https://learn.microsoft.com/dotnet/standard/garbage-collection/workstation-server-gc) creates heaps and collection threads based on the processors available to the process. It is effective only when more than one processor is available.
 
 ## Containers and CPU limits
 
@@ -34,4 +34,4 @@ Don't size a silo solely from average managed-heap usage. Include native memory,
 
 Monitor allocation rate, heap size, pause duration, time in GC, process working set, and activation count together. A GC setting can't compensate for unbounded activation growth or retained application objects.
 
-For runtime configuration details, see [.NET garbage collection configuration](../../../core/runtime-config/garbage-collector.md) and <xref:System.Runtime.GCSettings.IsServerGC>.
+For runtime configuration details, see [.NET garbage collection configuration](https://learn.microsoft.com/dotnet/core/runtime-config/garbage-collector) and <xref:System.Runtime.GCSettings.IsServerGC>.

@@ -66,4 +66,4 @@ Fail startup when a required dependency can't initialize. For optional or contin
 
 The `Orleans.Runtime.SiloLifecycleSubject` logger reports participants, timing, and errors by stage. Enable `Information` logs while diagnosing startup ordering or slow shutdown. Lifecycle callbacks should log the external operation they are waiting for and honor cancellation.
 
-For a simpler one-time callback, see [Background services and startup tasks](configuration-guide/startup-tasks.md). For host termination behavior, see [Shut down Orleans silos](configuration-guide/shutting-down-orleans.md).
+For implementation details, see [Orleans lifecycle](../implementation/orleans-lifecycle.md). For a simpler one-time callback, see [Background services and startup tasks](configuration-guide/startup-tasks.md). For host termination behavior, see [Shut down Orleans silos](configuration-guide/shutting-down-orleans.md).
