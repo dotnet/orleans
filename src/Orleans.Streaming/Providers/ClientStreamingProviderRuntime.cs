@@ -31,7 +31,7 @@ namespace Orleans.Providers
             this.clientContext = clientContext;
             this.runtimeClient = serviceProvider.GetService<IRuntimeClient>()!; // Registered by DefaultClientServices.
             grainBasedPubSub = new GrainBasedPubSubRuntime(GrainFactory);
-            var tmp = new ImplicitStreamPubSub(this.grainFactory, this.implicitSubscriberTable);
+            var tmp = new ImplicitStreamPubSub(this.implicitSubscriberTable);
             implicitPubSub = tmp;
             combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(grainBasedPubSub, tmp);
             streamDirectory = new StreamDirectory();
