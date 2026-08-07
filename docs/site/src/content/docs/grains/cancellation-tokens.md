@@ -1,7 +1,7 @@
 ---
 title: Cancel Orleans grain calls
 description: Use CancellationToken for cooperative cancellation of Orleans grain calls.
-ms.date: 08/02/2026
+ms.date: 08/07/2026
 ms.topic: concept-article
 ---
 
@@ -116,3 +116,8 @@ Cancellation callbacks registered from grain code execute in the grain's schedul
 Orleans treats a `CancellationToken` specially in generated request contracts. Adding or removing a token parameter is wire-compatible with callers compiled against the other form: a missing token is represented as `CancellationToken.None`, and an extra token from an older caller can be ignored. Making a newly added parameter optional also preserves C# source compatibility for common call sites.
 
 The older `GrainCancellationToken` API isn't needed for new applications. Use the standard .NET token.
+
+## Related .NET guidance
+
+- [Cancellation in managed threads](https://learn.microsoft.com/dotnet/standard/threading/cancellation-in-managed-threads)
+- [Task cancellation](https://learn.microsoft.com/dotnet/standard/parallel-programming/task-cancellation)

@@ -1,7 +1,7 @@
 ---
 title: Grain activation and lifecycle
 description: Understand grain activation, deactivation, collection, lifecycle participation, and migration in Orleans.
-ms.date: 08/02/2026
+ms.date: 08/07/2026
 ms.topic: concept-article
 ---
 
@@ -106,6 +106,8 @@ public sealed class CacheParticipant : ILifecycleParticipant<IGrainLifecycle>
 ```
 
 Lifecycle participation is an advanced integration mechanism. Most grains should use `OnActivateAsync` and `OnDeactivateAsync`.
+
+For the runtime lifecycle model shared by silos and grain activations, see [Orleans runtime lifecycle](../implementation/orleans-lifecycle.md).
 
 ## Grain migration
 

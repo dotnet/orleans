@@ -1,7 +1,7 @@
 ---
 title: Grain placement filters
 description: Filter Orleans grain placement candidates using silo metadata.
-ms.date: 08/02/2026
+ms.date: 08/07/2026
 ms.topic: concept-article
 ---
 
@@ -16,7 +16,7 @@ Use filters for constraints and preferences such as availability zone, hardware 
 
 ## Configure silo metadata
 
-Built-in filters compare metadata on the calling silo with metadata on candidate silos. Configure consistent keys and values on every participating silo:
+Built-in filters compare [silo metadata](../host/configuration-guide/silo-metadata.md) on the calling silo with metadata on candidate silos. Configure consistent keys and values on every participating silo:
 
 ```csharp
 siloBuilder.UseSiloMetadata(

@@ -1,7 +1,7 @@
 ---
 title: Grain services
 description: Implement silo-resident partitioned services for Orleans grains.
-ms.date: 08/02/2026
+ms.date: 08/07/2026
 ms.topic: how-to
 ---
 
@@ -106,5 +106,7 @@ public sealed class DocumentGrain(
 ```
 
 The client can route to a remote silo; don't assume calls stay local.
+
+Grain service implementation APIs are provided by [Microsoft.Orleans.Runtime](https://www.nuget.org/packages/Microsoft.Orleans.Runtime), which silo applications receive through `Microsoft.Orleans.Server`.
 
 For a compiled implementation used by Orleans tests, see [`TestGrainService.cs`](https://github.com/dotnet/orleans/blob/main/test/Orleans.Runtime.Tests/GrainServiceTests/TestGrainService.cs).

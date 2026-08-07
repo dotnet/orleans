@@ -1,7 +1,7 @@
 ---
 title: External tasks and grain scheduling
 description: Safely use asynchronous libraries, CPU work, and blocking APIs from Orleans grains.
-ms.date: 08/02/2026
+ms.date: 08/07/2026
 ms.topic: concept-article
 ---
 
@@ -51,11 +51,11 @@ Don't read or mutate grain fields inside the `Task.Run` delegate. That code isn'
 
 ## ConfigureAwait
 
-Don't use `ConfigureAwait(false)` directly in grain methods. It can resume the continuation outside the activation scheduler. General-purpose libraries can use `ConfigureAwait(false)` internally; grain code returns to its scheduler when it normally awaits the library's task.
+Don't use `ConfigureAwait(false)` directly in grain methods. It can resume the continuation outside the activation scheduler. General-purpose libraries can use `ConfigureAwait(false)` internally; grain code returns to its scheduler when it normally awaits the library's task. For more information about context capture in .NET, see the [ConfigureAwait FAQ](https://devblogs.microsoft.com/dotnet/configureawait-faq/).
 
 ## Start activation-scheduled work
 
-`Task.Factory.StartNew` without an explicit scheduler uses `TaskScheduler.Current`, which is the Orleans scheduler in grain code. This is rarely needed; ordinary async methods are clearer.
+`Task.Factory.StartNew` without an explicit scheduler uses `TaskScheduler.Current`, which is the Orleans scheduler in grain code. This is rarely needed; ordinary async methods are clearer. For the .NET scheduling differences, see [Task.Run vs Task.Factory.StartNew](https://devblogs.microsoft.com/dotnet/task-run-vs-task-factory-startnew/).
 
 If an advanced integration passes an async delegate to `Task.Factory.StartNew`, unwrap the nested task:
 

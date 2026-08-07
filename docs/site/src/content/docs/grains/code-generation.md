@@ -1,7 +1,7 @@
 ---
 title: Orleans source generation
 description: Understand build-time code generation for grains and serialization in Orleans.
-ms.date: 08/02/2026
+ms.date: 08/07/2026
 ms.topic: concept-article
 ---
 
@@ -13,9 +13,9 @@ Orleans generates grain proxies, method dispatch code, serializers, and copiers 
 
 Use the package matching the project role:
 
-- `Microsoft.Orleans.Client` for client applications.
-- `Microsoft.Orleans.Server` for silo applications.
-- `Microsoft.Orleans.Sdk` for class libraries containing grain contracts, implementations, or serializable types.
+- [Microsoft.Orleans.Client](https://www.nuget.org/packages/Microsoft.Orleans.Client) for client applications.
+- [Microsoft.Orleans.Server](https://www.nuget.org/packages/Microsoft.Orleans.Server) for silo applications.
+- [Microsoft.Orleans.Sdk](https://www.nuget.org/packages/Microsoft.Orleans.Sdk) for class libraries containing grain contracts, implementations, or serializable types.
 
 These packages include the source generator and analyzers.
 
@@ -54,8 +54,12 @@ When a project must generate serializers for accessible types declared elsewhere
 
 Prefer owning serialization annotations with the type whenever possible. Generating for external declaring assemblies broadens the compatibility surface and can increase build output.
 
+## Other .NET languages
+
+For end-to-end interop examples, see the [Orleans F# sample](https://learn.microsoft.com/samples/dotnet/samples/orleans-fsharp-sample/) and [Orleans Visual Basic sample](https://learn.microsoft.com/samples/dotnet/samples/orleans-vb-sample/).
+
 ## Inspect diagnostics and output
 
 Treat Orleans analyzer and generator diagnostics as contract errors, not warnings to suppress. Generated files can be inspected through normal compiler-generated-file tooling when debugging, but application code should depend on the public interfaces rather than generated implementation names.
 
-For serialization rules and version tolerance, see the Orleans serialization documentation. For the runtime invocation pipeline, see the advanced implementation documentation.
+For serialization rules and version tolerance, see [Orleans serialization](../host/configuration-guide/serialization.md).

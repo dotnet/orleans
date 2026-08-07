@@ -1,7 +1,7 @@
 ---
 title: Grain placement and migration
 description: Understand placement, resource-optimized defaults, and activation movement in Orleans.
-ms.date: 08/02/2026
+ms.date: 08/07/2026
 ms.topic: concept-article
 ---
 
@@ -12,6 +12,8 @@ When a grain isn't active, Orleans selects a compatible silo and creates an acti
 ## Default placement
 
 <xref:Orleans.Runtime.ResourceOptimizedPlacement> is the default placement strategy. It uses sampled silo runtime statistics and a power-of-k-choices algorithm to balance new activations while avoiding overloaded silos. It considers CPU, memory, available memory, activation count, and a preference for the local silo.
+
+For design background on its resource scoring and signal smoothing, see [Resource-based placement with cooperative dual-mode Kalman filtering](https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/).
 
 Configure its weights through <xref:Orleans.Configuration.ResourceOptimizedPlacementOptions>:
 
@@ -40,7 +42,9 @@ Apply a placement attribute to a grain implementation when its requirements diff
 | <xref:Orleans.Placement.HashBasedPlacementAttribute> | Maps the grain ID across the current compatible silo set. |
 | <xref:Orleans.Placement.ActivationCountBasedPlacementAttribute> | Favors sampled silos with fewer activations. |
 | <xref:Orleans.Placement.SiloRoleBasedPlacementAttribute> | Restricts placement by silo role. |
-| <xref:Orleans.Concurrency.StatelessWorkerAttribute> | Uses local, scalable worker-pool placement. |
+| <xref:Orleans.Concurrency.StatelessWorkerAttribute> | Uses local, scalable [worker-pool placement](stateless-worker-grains.md). |
+
+Activation-count-based placement applies the power-of-two-choices technique described in [The Power of Two Choices in Randomized Load Balancing](https://www.eecs.harvard.edu/~michaelm/postscripts/mythesis.pdf).
 
 ```csharp
 [PreferLocalPlacement]
@@ -67,7 +71,7 @@ Per-grain attributes still take precedence.
 
 ## Placement filters
 
-Placement filters reduce the compatible candidate set before the placement strategy selects a silo. They can express requirements or preferences based on silo metadata. Placement filters are experimental and produce diagnostic `ORLEANSEXP004`.
+Placement filters reduce the compatible candidate set before the placement strategy selects a silo. They can express requirements or preferences based on [silo metadata](../host/configuration-guide/silo-metadata.md). Placement filters are experimental and produce diagnostic `ORLEANSEXP004`.
 
 See [Placement filters](grain-placement-filtering.md) for the built-in filters and experimental status.
 
@@ -125,4 +129,4 @@ Both features migrate eligible activations and can operate together. They add cl
 
 Custom placement strategies and directors are advanced runtime extensions. Implement them only when built-in strategies plus placement filters can't express the requirement. A director must handle membership changes, empty candidate sets, overloaded silos, and deterministic testing.
 
-For implementation details and examples, inspect the built-in directors under [`src/Orleans.Runtime/Placement`](https://github.com/dotnet/orleans/tree/main/src/Orleans.Runtime/Placement).
+For implementation details and examples, inspect the built-in directors under [`src/Orleans.Runtime/Placement`](https://github.com/dotnet/orleans/tree/main/src/Orleans.Runtime/Placement), including [`PreferLocalPlacementDirector`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Placement/PreferLocalPlacementDirector.cs).

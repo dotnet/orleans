@@ -1,7 +1,7 @@
 ---
 title: Grain timers and reminders
 description: Schedule activation-scoped and durable periodic work in Orleans.
-ms.date: 08/02/2026
+ms.date: 08/07/2026
 ms.topic: concept-article
 ---
 
@@ -113,10 +113,10 @@ Reminders are intended for periods measured in minutes, hours, or days, not high
 
 ## Configure reminder storage
 
-Every silo must configure a reminder provider. Production deployments should use a durable provider such as Azure Table, ADO.NET, Redis, or Cosmos DB. In-memory reminders are suitable only for local development and tests because definitions are lost when the cluster stops.
+Every silo must configure a reminder provider. Production deployments should use a durable provider such as Azure Table, ADO.NET, Redis, or [Cosmos DB](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Cosmos). In-memory reminders are suitable only for local development and tests because definitions are lost when the cluster stops.
 
-The provider-specific configuration is covered by each reminder provider package. For a compiled in-repository configuration example, see the [reminder configuration snippets](https://github.com/dotnet/orleans/tree/main/docs/site/src/content/docs/grains/snippets/timers).
+The provider-specific configuration is covered by each reminder provider package. For a compiled in-repository configuration example, see the [reminder configuration snippets](https://github.com/dotnet/orleans/tree/main/docs/site/src/content/docs/grains/snippets/timers). When composing resources with .NET Aspire, see [Orleans and Aspire integration](../host/aspire-integration.md).
 
 ## POCO grains
 
-Grains implementing <xref:Orleans.IGrainBase> directly can use the same extension APIs. Inject <xref:Orleans.Timers.ITimerRegistry> or <xref:Orleans.Timers.IReminderRegistry> when lower-level registration is required.
+Grains implementing <xref:Orleans.IGrainBase> directly can use the same extension APIs. Inject <xref:Orleans.Timers.ITimerRegistry> or <xref:Orleans.Timers.IReminderRegistry> when lower-level registration is required. See [POCO grains](../migration-guide.md#poco-grains-and-igrainbase) for the interface-only grain model.
