@@ -22,6 +22,17 @@
     "featured": false
   },
   {
+    "slug": "authenticated-silo-connections",
+    "title": "Authenticated Silo Connections",
+    "description": "A silo cluster using TLS and Microsoft Entra workload authentication for silo connections.",
+    "path": "AuthenticatedSiloConnections",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "image": null,
+    "languages": ["C#"],
+    "tags": ["security", "tls", "entra", "networking"],
+    "featured": false
+  },
+  {
     "slug": "bank-account",
     "title": "Bank Account",
     "description": "A bank transfer simulation demonstrating ACID transactions across stateful grains.",
