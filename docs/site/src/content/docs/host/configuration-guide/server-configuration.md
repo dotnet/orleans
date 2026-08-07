@@ -11,11 +11,11 @@ Install [Microsoft.Orleans.Server](https://www.nuget.org/packages/Microsoft.Orle
 
 :::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="redis_silo":::
 
-`UseOrleans` hosts a silo and registers a co-hosted `IClusterClient`. Use `UseOrleansClient` only in a process that doesn't host grains.
+<xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*> hosts a silo and registers a co-hosted <xref:Orleans.IClusterClient>. Use <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*> only in a process that doesn't host grains.
 
-## Choose a clustering provider
+## Clustering provider
 
-Every silo and external client must use the same `ServiceId`, `ClusterId`, and clustering backend. Install the package for the deployment platform:
+Every silo and external client must use the same <xref:Orleans.Configuration.ClusterOptions.ServiceId>, <xref:Orleans.Configuration.ClusterOptions.ClusterId>, and clustering backend. Install the package for the deployment platform:
 
 | Backend | Typical package or integration | Notes |
 |---|---|---|
@@ -27,34 +27,28 @@ Every silo and external client must use the same `ServiceId`, `ClusterId`, and c
 | Consul | [`Microsoft.Orleans.Clustering.Consul`](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.Consul) | Uses Consul key/value storage. |
 | ZooKeeper | [`Microsoft.Orleans.Clustering.ZooKeeper`](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.ZooKeeper) | Uses a ZooKeeper ensemble. |
 
-Use `UseLocalhostClustering`, development clustering, or static gateways only for local development and tests.
+Use <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalhostClustering*>, development clustering, or static gateways only for local development and tests.
 
-[`Microsoft.Orleans.Hosting.Kubernetes`](https://www.nuget.org/packages/Microsoft.Orleans.Hosting.Kubernetes) configures a silo from its pod environment through `UseKubernetesHosting`; it is not a clustering provider. Kubernetes deployments still need one of the shared clustering providers above.
+[`Microsoft.Orleans.Hosting.Kubernetes`](https://www.nuget.org/packages/Microsoft.Orleans.Hosting.Kubernetes) configures a silo from its pod environment through <xref:Orleans.Hosting.KubernetesHostingExtensions.UseKubernetesHosting*>; it is not a clustering provider. Kubernetes deployments still need one of the shared clustering providers above.
 
 Clustering stores membership, not grain state. Configure grain storage and reminders separately when the application uses them. Provider packages expose `Use...Clustering`, `Add...GrainStorage`, and `Use...ReminderService` methods and can also participate in [declarative configuration](index.md#declarative-configuration).
 
-## Cluster identity
+## Orleans clustering information
 
-`ServiceId` identifies the logical application and namespaces provider data. Keep it stable for the lifetime of the application. `ClusterId` identifies a specific cluster, such as `orders-production` or `orders-green`. All participants in one cluster must agree on both values.
+<xref:Orleans.Configuration.ClusterOptions.ServiceId> identifies the logical application and namespaces provider data. Keep it stable for the lifetime of the application. <xref:Orleans.Configuration.ClusterOptions.ClusterId> identifies a specific cluster, such as `orders-production` or `orders-green`. All participants in one cluster must agree on both values.
 
-## Configure endpoints
+## Endpoints
 
 A silo has two advertised endpoints:
 
 - The silo endpoint is used for silo-to-silo traffic. Its default port is `11111`.
 - The gateway endpoint is used by external clients. Its default port is `30000`; set it to `0` to disable the gateway.
 
-Orleans must also know the IP address to advertise. If `AdvertisedIPAddress` isn't configured, Orleans selects a local address and falls back to loopback if necessary. The listening endpoints default to the advertised address and corresponding advertised port; Orleans does **not** listen on every interface unless you configure wildcard listening endpoints.
+Orleans must also know the IP address to advertise. If <xref:Orleans.Configuration.EndpointOptions.AdvertisedIPAddress> isn't configured, Orleans selects a local address and falls back to loopback if necessary. The listening endpoints default to the advertised address and corresponding advertised port; Orleans does **not** listen on every interface unless you configure wildcard listening endpoints.
 
 For a directly reachable host, the helper configures advertised ports and an address:
 
-```csharp
-siloBuilder.ConfigureEndpoints(
-    advertisedIP: IPAddress.Parse("10.0.0.12"),
-    siloPort: 11_111,
-    gatewayPort: 30_000,
-    listenOnAnyHostAddress: true);
-```
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="direct_endpoints":::
 
 For containers, NAT, or port forwarding, configure advertised and listening endpoints independently:
 
@@ -66,21 +60,11 @@ This silo listens on ports `40000` and `50000` but publishes `172.16.0.42:11111`
 
 Use named providers when grain types need different stores:
 
-```csharp
-siloBuilder
-    .AddRedisGrainStorage("hot-state", options => { /* ... */ })
-    .AddAdoNetGrainStorage("archive", options => { /* ... */ })
-    .UseRedisReminderService(options => { /* ... */ });
-```
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="named_providers":::
 
 Configure runtime behavior with the options pattern:
 
-```csharp
-siloBuilder.Configure<ClusterMembershipOptions>(options =>
-{
-    options.ValidateInitialConnectivity = true;
-});
-```
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="membership_options":::
 
 Prefer defaults until measurements or deployment requirements justify a change. See [Core configuration options](list-of-options-classes.md) rather than copying every property into application configuration.
 

@@ -18,66 +18,36 @@ An Orleans client lets application code call grains, use streams, and access oth
 
 Start with a co-hosted client unless isolation is a requirement.
 
-## Use the co-hosted client
+## Co-hosted clients
 
-`UseOrleans` registers `IClusterClient` and `IGrainFactory` in the host service provider:
+<a id="obtain-a-client-from-a-host"></a>
 
-```csharp
-var builder = WebApplication.CreateBuilder(args);
+<xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*> registers <xref:Orleans.IClusterClient> and <xref:Orleans.IGrainFactory> in the host service provider:
 
-builder.UseOrleans(siloBuilder =>
-{
-    // Configure the silo and its providers.
-});
-
-var app = builder.Build();
-
-app.MapPost("/players/{id}/games/{gameId}",
-    async (Guid id, Guid gameId, IClusterClient client) =>
-    {
-        var player = client.GetGrain<IPlayerGrain>(id);
-        await player.JoinGame(gameId);
-        return Results.Accepted();
-    });
-
-await app.RunAsync();
-```
+:::code language="csharp" source="snippets/hosting/HostingExamples.cs" id="local_silo_and_client":::
 
 Calls from a co-hosted client use the silo's cluster knowledge and don't require a gateway. If the target activation is local, Orleans can also avoid a network hop.
 
-## Use an external client
+## External clients
 
-Install [Microsoft.Orleans.Client](https://www.nuget.org/packages/Microsoft.Orleans.Client), then add the client to the [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensions/generic-host):
+<a id="initialize-a-grain-client"></a>
+<a id="example"></a>
 
-```csharp
-var builder = WebApplication.CreateBuilder(args);
+Install [Microsoft.Orleans.Client](https://www.nuget.org/packages/Microsoft.Orleans.Client), then add the client to the [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensions/generic-host) with <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*>:
 
-builder.UseOrleansClient(clientBuilder =>
-{
-    clientBuilder.Configure<ClusterOptions>(options =>
-    {
-        options.ServiceId = "game";
-        options.ClusterId = "game-production";
-    });
+:::code language="csharp" source="snippets/hosting/HostingExamples.cs" id="external_client":::
 
-    // Configure the same clustering provider used by the silos.
-});
-
-var app = builder.Build();
-await app.RunAsync();
-```
-
-The client connects during host startup and is available from [.NET dependency injection](https://learn.microsoft.com/dotnet/core/extensions/dependency-injection) afterward. Register hosted services that use Orleans after `UseOrleansClient` so the host starts them after the client:
+The client connects during host startup and is available from [.NET dependency injection](https://learn.microsoft.com/dotnet/core/extensions/dependency-injection) afterward. Register hosted services that use Orleans after <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*> so the host starts them after the client:
 
 :::code language="csharp" source="snippets/ClusterClientHostedService.cs":::
 
 See [Client configuration](configuration-guide/client-configuration.md) for clustering and gateway settings.
 
-## Connection resiliency
+## Client connectivity
 
 Orleans includes a default connection retry filter. During initial startup it retries eligible connection failures with linear backoff, up to 15 retries. If those retries are exhausted, the host fails to start instead of appearing healthy without a cluster connection.
 
-You can replace the default with `UseConnectionRetryFilter` or an `IClientConnectionRetryFilter`. Custom policies should:
+You can replace the default with <xref:Orleans.Hosting.ClientBuilderExtensions.UseConnectionRetryFilter*> or <xref:Orleans.IClientConnectionRetryFilter>. Custom policies should:
 
 - Retry only transient failures.
 - Apply a finite attempt or time limit.
@@ -86,16 +56,16 @@ You can replace the default with `UseConnectionRetryFilter` or an `IClientConnec
 
 After startup, Orleans refreshes gateways and reconnects as cluster membership changes. A transient failure can still surface from an individual grain call. The grain reference remains valid, but retry the operation only if the application can safely tolerate duplicate execution.
 
-## Make concurrent calls
+## Make calls to grains
 
-External client code isn't governed by the grain turn-based concurrency model. Multiple threads can use `IClusterClient` and grain references concurrently. Protect mutable client-side state using normal .NET synchronization.
+External client code isn't governed by the grain turn-based concurrency model. Multiple threads can use <xref:Orleans.IClusterClient> and grain references concurrently. Protect mutable client-side state using normal .NET synchronization.
 
-Grain calls return `Task`, `Task<T>`, `ValueTask`, or `ValueTask<T>` according to the [grain interface rules](../grains/index.md#grain-interfaces-and-classes). Always await calls rather than blocking threads.
+Grain calls return <xref:System.Threading.Tasks.Task>, <xref:System.Threading.Tasks.Task`1>, <xref:System.Threading.Tasks.ValueTask>, or <xref:System.Threading.Tasks.ValueTask`1> according to the [grain interface rules](../grains/index.md#grain-interfaces-and-classes). Always await calls rather than blocking threads.
 
-## Receive messages from grains
+## Receive notifications
 
 Use [grain observers](../grains/observers.md) for best-effort, one-way callbacks to client objects. Add application-level acknowledgement or recovery when delivery matters. Use [streams](../streaming/index.md) when the stream provider's subscription and delivery model better fits the workflow.
 
-## Client lifetime
+## Dependency injection
 
 Let the Generic Host own client startup and shutdown. Don't create a client per request, cache a second client in a static field, or dispose the dependency-injected singleton. When the host receives a termination signal, it closes the client as part of normal shutdown.

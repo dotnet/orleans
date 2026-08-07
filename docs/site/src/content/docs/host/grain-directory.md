@@ -15,9 +15,15 @@ Orleans uses the built-in `LocalGrainDirectory` by default. Despite its name, th
 
 The default directory is eventually consistent during membership changes. A brief duplicate activation is possible during failures; Orleans resolves the conflict and deactivates the duplicate. Grain state and operations should therefore tolerate activation races and retries.
 
-## Choose another directory
+## Which grain directory should you use?
 
 Use a pluggable directory for grain types that need different operational characteristics:
+
+<a id="adonet-grain-directory"></a>
+<a id="supported-databases"></a>
+<a id="installation"></a>
+<a id="adonetgraindirectoryoptions"></a>
+<a id="database-setup"></a>
 
 | Directory | Package | Consider it when |
 |---|---|---|
@@ -28,23 +34,20 @@ Use a pluggable directory for grain types that need different operational charac
 
 External directories add network calls and another availability dependency. Apply them selectively and load-test activation-heavy workloads.
 
-## Configure a named directory
+## Configuration
+
+<a id="grain-configuration"></a>
+<a id="silo-configuration"></a>
 
 Register the provider under a name and select it on the grain implementation:
 
 :::code language="csharp" source="snippets/hosting/HostingExamples.cs" id="named_grain_directory":::
 
-```csharp
-[GrainDirectory("durable-directory")]
-public sealed class ShoppingCartGrain : Grain, IShoppingCartGrain
-{
-    // ...
-}
-```
+:::code language="csharp" source="snippets/hosting/HostingExamples.cs" id="grain_directory_attribute":::
 
-Grain types without `GrainDirectoryAttribute` continue to use the default directory. You can register multiple named providers for different grain types.
+Grain types without <xref:Orleans.GrainDirectory.GrainDirectoryAttribute> continue to use the default directory. You can register multiple named providers for different grain types.
 
-To replace the default for all unannotated grain types, use the provider's `Use...GrainDirectoryAsDefault` extension, for example `UseRedisGrainDirectoryAsDefault`, `UseAzureTableGrainDirectoryAsDefault`, or `UseAdoNetGrainDirectoryAsDefault`.
+To replace the default for all unannotated grain types, use the provider's `Use...GrainDirectoryAsDefault` extension, for example <xref:Orleans.Hosting.RedisGrainDirectoryExtensions.UseRedisGrainDirectoryAsDefault*>, <xref:Orleans.Hosting.AzureTableGrainDirectorySiloBuilderExtensions.UseAzureTableGrainDirectoryAsDefault*>, or <xref:Orleans.Hosting.AdoNetGrainDirectorySiloBuilderExtensions.UseAdoNetGrainDirectoryAsDefault*>.
 
 Named directories can also be configured under `Orleans:GrainDirectory:{name}` with an installed declarative provider:
 
@@ -61,20 +64,19 @@ Named directories can also be configured under `Orleans:GrainDirectory:{name}` w
 }
 ```
 
-## Experimental distributed grain directory
+## Strongly-consistent in-cluster directory
 
-`AddDistributedGrainDirectory` adds a strongly consistent in-cluster directory based on partitioned ranges and membership views.
+<a id="key-features"></a>
+<a id="when-to-use"></a>
+
+<xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*> adds a strongly consistent in-cluster directory based on partitioned ranges and membership views.
 
 > [!CAUTION]
-> `AddDistributedGrainDirectory` is experimental and emits diagnostic `ORLEANSEXP003`. Its API and behavior can change or be removed. It is not the default grain directory.
+> <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*> is experimental and emits diagnostic `ORLEANSEXP003`. Its API and behavior can change or be removed. It is not the default grain directory.
 
-```csharp
-#pragma warning disable ORLEANSEXP003
-siloBuilder.AddDistributedGrainDirectory();
-#pragma warning restore ORLEANSEXP003
-```
+:::code language="csharp" source="snippets/hosting/HostingExamples.cs" id="distributed_grain_directory":::
 
-The experimental directory defaults to one partition per silo (`GrainDirectoryOptions.PartitionsPerSilo = 1`). Change this only after testing with the expected cluster size and workload.
+The experimental directory defaults to one partition per silo (<xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo> = `1`). Change this only after testing with the expected cluster size and workload.
 
 Evaluate it when stronger coordination during membership changes is worth adopting an experimental feature. Keep a rollout and rollback plan, and don't describe it as a drop-in production default.
 

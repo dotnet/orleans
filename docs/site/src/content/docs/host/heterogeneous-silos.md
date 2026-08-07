@@ -25,20 +25,15 @@ For example:
 
 The same grain implementation must be compatible across every silo that advertises support for that grain type.
 
-## Configure supported grain classes explicitly
+## Configuration
 
 When one binary can run in several roles, configure <xref:Orleans.Configuration.GrainTypeOptions.Classes>:
 
 :::code language="csharp" source="snippets/hosting/HostingExamples.cs" id="configure_grain_types":::
 
-`GrainTypeOptions.Classes` is a set of `Type` values. Use it to include the exact grain classes the process can host or remove discovered classes that a role must not host:
+<xref:Orleans.Configuration.GrainTypeOptions.Classes> is a set of <xref:System.Type> values. Use it to include the exact grain classes the process can host or remove discovered classes that a role must not host:
 
-```csharp
-siloBuilder.Configure<GrainTypeOptions>(options =>
-{
-    options.Classes.Remove(typeof(RecommendationGrain));
-});
-```
+:::code language="csharp" source="snippets/hosting/HostingExamples.cs" id="exclude_grain_type":::
 
 Don't use obsolete grain-class exclusion option names from earlier Orleans versions.
 
@@ -50,7 +45,7 @@ Use heterogeneous grain type registration when a silo cannot host the implementa
 
 ## Deployment rules
 
-- Keep `ServiceId`, `ClusterId`, clustering, and protocol configuration consistent across all roles.
+- Keep <xref:Orleans.Configuration.ClusterOptions.ServiceId>, <xref:Orleans.Configuration.ClusterOptions.ClusterId>, clustering, and protocol configuration consistent across all roles.
 - Deploy at least one healthy silo for every supported grain type before clients invoke it.
 - Maintain capacity and redundancy independently for each specialized grain set.
 - Roll out contract changes before implementations that require them.

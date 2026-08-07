@@ -1,13 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
     <OutputType>Library</OutputType>
   </PropertyGroup>
 
   <!-- <client_packages> -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Client" Version="10.2.1" />
-    <PackageReference Include="Microsoft.Orleans.Clustering.Redis" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Client" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.Redis" Version="10.2.2" />
     <PackageReference Include="Aspire.StackExchange.Redis" Version="13.4.6" />
   </ItemGroup>
   <!-- </client_packages> -->

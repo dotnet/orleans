@@ -38,16 +38,7 @@ Use `Microsoft.Data.SqlClient` for SQL Server:
 
 Configure an external client with the same clustering database:
 
-```csharp
-builder.UseOrleansClient(clientBuilder =>
-{
-    clientBuilder.UseAdoNetClustering(options =>
-    {
-        options.Invariant = "Microsoft.Data.SqlClient";
-        options.ConnectionString = connectionString;
-    });
-});
-```
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="adonet_client":::
 
 > [!IMPORTANT]
 > `System.Data.SqlClient` isn't the SQL Server invariant. Reference the `Microsoft.Data.SqlClient` package and use the `Microsoft.Data.SqlClient` invariant.
@@ -99,7 +90,7 @@ Store connection strings in a secret provider or deployment environment, not in 
 
 ## Operational guidance
 
-- Keep `ServiceId` stable so Orleans reads the expected application rows.
+- Keep <xref:Orleans.Configuration.ClusterOptions.ServiceId> stable so Orleans reads the expected application rows.
 - Size connection pools for the total number of silo and client processes.
 - Encrypt connections and use least-privilege database identities.
 - Monitor database latency, throttling, deadlocks, and pool exhaustion.

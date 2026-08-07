@@ -29,14 +29,14 @@ Orleans keeps its ADO.NET schema scripts beside each provider's source. Run the 
 - [Oracle](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Shared/Oracle-Main.sql)
 - [SQLite](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Shared/Sqlite-Main.sql) for supported local persistence scenarios
 
-## Clustering scripts
+## Clustering
 
 - [SQL Server](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Clustering.AdoNet/SQLServer-Clustering.sql)
 - [PostgreSQL](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Clustering.AdoNet/PostgreSQL-Clustering.sql)
 - [MySQL/MariaDB](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Clustering.AdoNet/MySQL-Clustering.sql)
 - [Oracle](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Clustering.AdoNet/Oracle-Clustering.sql)
 
-## Grain storage scripts
+## Persistence
 
 - [SQL Server](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Persistence.AdoNet/SQLServer-Persistence.sql)
 - [PostgreSQL](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Persistence.AdoNet/PostgreSQL-Persistence.sql)
@@ -44,7 +44,7 @@ Orleans keeps its ADO.NET schema scripts beside each provider's source. Run the 
 - [Oracle](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Persistence.AdoNet/Oracle-Persistence.sql)
 - [SQLite](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Persistence.AdoNet/Sqlite-Persistence.sql)
 
-## Reminder scripts
+## Reminders
 
 - [SQL Server](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Reminders.AdoNet/SQLServer-Reminders.sql)
 - [PostgreSQL](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Reminders.AdoNet/PostgreSQL-Reminders.sql)

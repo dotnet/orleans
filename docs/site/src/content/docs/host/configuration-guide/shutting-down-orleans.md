@@ -7,44 +7,27 @@ ms.topic: how-to
 
 # Shut down Orleans silos
 
-Orleans is an `IHostedService` inside the [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensions/generic-host). When the host stops, Orleans leaves the cluster, closes gateways and networking, deactivates grains, and stops providers in reverse lifecycle order.
+Orleans is an <xref:Microsoft.Extensions.Hosting.IHostedService> inside the [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensions/generic-host). When the host stops, Orleans leaves the cluster, closes gateways and networking, deactivates grains, and stops providers in reverse lifecycle order.
 
-## Let the Generic Host own shutdown
+## Graceful silo shutdown
 
-Use `RunAsync` or `RunConsoleAsync` and don't terminate the process directly:
+Use <xref:Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.RunAsync*> or <xref:Microsoft.Extensions.Hosting.HostingHostBuilderExtensions.RunConsoleAsync*> and don't terminate the process directly:
 
-```csharp
-var builder = Host.CreateApplicationBuilder(args);
-
-builder.UseOrleans(siloBuilder =>
-{
-    // Configure Orleans.
-});
-
-await builder.Build().RunAsync();
-```
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="run_silo":::
 
 The console lifetime handles <kbd>Ctrl</kbd>+<kbd>C</kbd>, `SIGINT`, and `SIGTERM`. ASP.NET Core hosts use the same host lifetime model. For details, see [.NET Generic Host shutdown](https://learn.microsoft.com/dotnet/core/extensions/generic-host#host-shutdown).
 
-In tests or embedded hosts, call `StopAsync` and dispose the host:
+In tests or embedded hosts, call <xref:Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.StopAsync*> and dispose the host:
 
-```csharp
-await host.StopAsync(cancellationToken);
-host.Dispose();
-```
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="stop_host":::
 
-Don't call `Environment.Exit`, kill the process from application code, or dispose Orleans services independently of the host.
+Don't call <xref:System.Environment.Exit*>, kill the process from application code, or dispose Orleans services independently of the host.
 
 ## Configure a shutdown budget
 
 The host cancellation token bounds every hosted service, including Orleans lifecycle participants and grain deactivation. Configure <xref:Microsoft.Extensions.Hosting.HostOptions.ShutdownTimeout> for the expected workload:
 
-```csharp
-builder.Services.Configure<HostOptions>(options =>
-{
-    options.ShutdownTimeout = TimeSpan.FromSeconds(45);
-});
-```
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="shutdown_timeout":::
 
 Set the orchestrator's termination grace period longer than the host shutdown timeout. Include time for:
 
@@ -58,7 +41,7 @@ If the external grace period expires first, the process is killed and graceful s
 ## Make application code shutdown-safe
 
 - Honor cancellation tokens in hosted services, startup tasks, lifecycle participants, and provider calls.
-- Keep `OnDeactivateAsync` bounded; persist important state during normal operation rather than relying only on shutdown.
+- Keep <xref:Orleans.Grain.OnDeactivateAsync*> bounded; persist important state during normal operation rather than relying only on shutdown.
 - Stop accepting new application work before the termination deadline.
 - Make recovery safe after abrupt termination, because crashes and node loss remain possible.
 - Avoid synchronous blocking and unbounded retries in shutdown callbacks.
@@ -68,5 +51,7 @@ Grains can move or reactivate elsewhere after a silo leaves. Don't use graceful 
 ## Containers and orchestrators
 
 Configure readiness to fail before sending the termination signal when the platform supports a pre-stop phase. Send a normal termination signal, allow the host timeout to elapse, and reserve forceful termination for hung processes.
+
+## See also
 
 For ordered Orleans callbacks, see [Orleans silo lifecycle](../silo-lifecycle.md).

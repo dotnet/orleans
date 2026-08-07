@@ -24,36 +24,19 @@ For a first local process, see [Local development configuration](local-developme
 
 ## Programmatic configuration
 
-Configure Orleans through `ISiloBuilder` or `IClientBuilder`:
+Configure Orleans through <xref:Orleans.Hosting.ISiloBuilder> or <xref:Orleans.Hosting.IClientBuilder>. Provider extension methods validate configuration when the host starts. Prefer programmatic configuration when credentials require SDK objects such as <xref:Azure.Core.TokenCredential>, when configuration is computed, or when compile-time discoverability is important.
 
-```csharp
-var builder = Host.CreateApplicationBuilder(args);
-
-builder.UseOrleans(siloBuilder =>
-{
-    siloBuilder.Configure<ClusterOptions>(options =>
-    {
-        options.ServiceId = "orders";
-        options.ClusterId = "orders-production";
-    });
-
-    // Add clustering, storage, reminders, and other providers here.
-});
-
-await builder.Build().RunAsync();
-```
-
-Provider extension methods validate configuration when the host starts. Prefer programmatic configuration when credentials require SDK objects such as `TokenCredential`, when configuration is computed, or when compile-time discoverability is important.
+See [Server configuration](server-configuration.md) and [Client configuration](client-configuration.md) for compiled examples.
 
 ## Declarative configuration
 
-Orleans automatically binds the `Orleans` configuration section when `UseOrleans()` or `UseOrleansClient()` is called. The following sections are recognized:
+Orleans automatically binds the `Orleans` configuration section when <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*> or <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*> is called. The following sections are recognized:
 
 | Path | Applies to | Purpose |
 |---|---|---|
-| `Orleans` | Silo and client | `ClusterOptions`, including `ServiceId` and `ClusterId` |
+| `Orleans` | Silo and client | <xref:Orleans.Configuration.ClusterOptions>, including <xref:Orleans.Configuration.ClusterOptions.ServiceId> and <xref:Orleans.Configuration.ClusterOptions.ClusterId> |
 | `Orleans:Name` | Silo | Silo name |
-| `Orleans:Messaging` | Silo and client | `SiloMessagingOptions` or `ClientMessagingOptions` |
+| `Orleans:Messaging` | Silo and client | <xref:Orleans.Configuration.SiloMessagingOptions> or <xref:Orleans.Configuration.ClientMessagingOptions> |
 | `Orleans:Gateway` | Client | Gateway refresh and connection behavior |
 | `Orleans:Endpoints` | Silo | Advertised and listening endpoints |
 | `Orleans:Clustering` | Silo and client | One clustering provider |
@@ -63,33 +46,7 @@ Orleans automatically binds the `Orleans` configuration section when `UseOrleans
 | `Orleans:GrainStorage:{name}` | Silo | Named grain storage providers |
 | `Orleans:GrainDirectory:{name}` | Silo | Named grain directory providers |
 
-A provider section selects a registered provider with `ProviderType`. Install the provider's NuGet package so its configuration builder is discoverable:
-
-```json
-{
-  "Orleans": {
-    "ServiceId": "orders",
-    "ClusterId": "orders-production",
-    "Clustering": {
-      "ProviderType": "Redis",
-      "ConnectionString": "redis.example.com:6380,ssl=true"
-    },
-    "Endpoints": {
-      "AdvertisedIPAddress": "10.0.0.12",
-      "SiloPort": 11111,
-      "GatewayPort": 30000,
-      "SiloListeningEndpoint": "0.0.0.0:11111",
-      "GatewayListeningEndpoint": "0.0.0.0:30000"
-    },
-    "GrainStorage": {
-      "Default": {
-        "ProviderType": "Redis",
-        "ConnectionString": "redis.example.com:6380,ssl=true"
-      }
-    }
-  }
-}
-```
+A provider section selects a registered provider with `ProviderType`. Install the provider's NuGet package so its configuration builder is discoverable. See [Server configuration](server-configuration.md#clustering-provider) for the provider catalog and [Typical configurations](typical-configurations.md) for deployment-oriented examples.
 
 Environment variables use double underscores, for example `Orleans__ClusterId` and `Orleans__Endpoints__SiloPort`.
 
@@ -103,11 +60,11 @@ The Generic Host combines [.NET configuration providers](https://learn.microsoft
 ## Production checklist
 
 - Use a durable, shared clustering provider; don't use development or static clustering for a production cluster.
-- Give every silo and client the same `ServiceId`, `ClusterId`, and clustering provider settings.
+- Give every silo and client the same <xref:Orleans.Configuration.ClusterOptions.ServiceId>, <xref:Orleans.Configuration.ClusterOptions.ClusterId>, and clustering provider settings.
 - Advertise addresses reachable by other silos and clients, especially behind NAT, containers, or load balancers.
 - Use durable reminder and grain storage providers when the application depends on those features.
 - Configure [server garbage collection](configuring-garbage-collection.md).
 - Allow the Generic Host to perform [graceful shutdown](shutting-down-orleans.md).
 - Validate provider connectivity and credentials before rollout.
 
-For option types and API entry points, see [Core configuration options](list-of-options-classes.md) and the [`Orleans.Configuration` API reference](xref:Orleans.Configuration).
+For option types and API entry points, see [Core configuration options](list-of-options-classes.md) and <xref:Orleans.Configuration>.

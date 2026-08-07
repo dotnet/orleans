@@ -9,12 +9,7 @@ ms.topic: how-to
 
 Orleans silos are long-running, highly concurrent server processes. Enable server garbage collection in the silo project:
 
-```xml
-<PropertyGroup>
-  <ServerGarbageCollection>true</ServerGarbageCollection>
-  <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
-</PropertyGroup>
-```
+:::code language="xml" source="../snippets/hosting/Hosting.csproj" id="server_gc":::
 
 [Server GC](https://learn.microsoft.com/dotnet/standard/garbage-collection/workstation-server-gc) creates heaps and collection threads based on the processors available to the process. It is effective only when more than one processor is available.
 

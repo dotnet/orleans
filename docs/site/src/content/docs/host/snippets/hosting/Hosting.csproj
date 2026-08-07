@@ -1,7 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
     <OutputType>Library</OutputType>
+    <!-- <server_gc> -->
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+    <!-- </server_gc> -->
   </PropertyGroup>
 
   <ItemGroup>
@@ -9,15 +14,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Server" Version="10.2.1" />
-    <PackageReference Include="Microsoft.Orleans.Client" Version="10.2.1" />
-    <PackageReference Include="Microsoft.Orleans.Clustering.Redis" Version="10.2.1" />
-    <PackageReference Include="Microsoft.Orleans.Persistence.Redis" Version="10.2.1" />
-    <PackageReference Include="Microsoft.Orleans.Reminders.Redis" Version="10.2.1" />
-    <PackageReference Include="Microsoft.Orleans.GrainDirectory.Redis" Version="10.2.1" />
-    <PackageReference Include="Microsoft.Orleans.Clustering.AdoNet" Version="10.2.1" />
-    <PackageReference Include="Microsoft.Orleans.Persistence.AdoNet" Version="10.2.1" />
-    <PackageReference Include="Microsoft.Orleans.Reminders.AdoNet" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Server" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Client" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.Redis" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.Redis" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Reminders.Redis" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.GrainDirectory.Redis" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.AdoNet" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.AdoNet" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Reminders.AdoNet" Version="10.2.2" />
   </ItemGroup>
 
 </Project>

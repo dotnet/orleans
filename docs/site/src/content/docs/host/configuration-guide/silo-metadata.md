@@ -7,13 +7,19 @@ ms.topic: how-to
 
 # Silo metadata
 
+<a id="key-concepts"></a>
+
 Silo metadata is an immutable string-to-string map published by each silo. Use it to describe placement-relevant capabilities such as region, hardware, role, or reservation type.
 
 Metadata supports [grain placement filtering](../../grains/grain-placement-filtering.md). Don't put credentials, frequently changing health data, or large payloads in it.
 
-## Configure metadata
+## Configuration
 
-`UseSiloMetadata()` reads `Orleans:Metadata`:
+### Configure silo metadata with configuration
+
+<a id="example-appsettingsjson-configuration"></a>
+
+<xref:Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadataHostingExtensions.UseSiloMetadata*> reads `Orleans:Metadata`:
 
 ```json
 {
@@ -27,14 +33,7 @@ Metadata supports [grain placement filtering](../../grains/grain-placement-filte
 }
 ```
 
-```csharp
-var builder = Host.CreateApplicationBuilder(args);
-
-builder.UseOrleans(siloBuilder =>
-{
-    siloBuilder.UseSiloMetadata();
-});
-```
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="silo_metadata_from_configuration":::
 
 Environment variables can set deployment-specific values, for example:
 
@@ -43,26 +42,27 @@ Orleans__Metadata__cloud.region=westus3
 Orleans__Metadata__role=recommendations
 ```
 
+### Configuring silo metadata in code
+
+<a id="example-direct-code-configuration"></a>
+
 You can also supply values programmatically:
 
-```csharp
-siloBuilder.UseSiloMetadata(new Dictionary<string, string>
-{
-    ["cloud.region"] = region,
-    ["hardware.accelerator"] = hasGpu ? "gpu" : "none",
-    ["role"] = "recommendations"
-});
-```
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="configure_silo_metadata":::
 
 Metadata is fixed for the lifetime of a silo instance. Restart the silo to publish changed values.
 
-## Read metadata
+## Usage
 
-Inject `ISiloMetadataCache` into a silo service or Orleans component:
+### Access metadata for a specific silo
+
+<a id="example-access-metadata-for-a-silo"></a>
+
+Inject <xref:Orleans.Runtime.MembershipService.SiloMetadata.ISiloMetadataCache> into a silo service or Orleans component:
 
 :::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="read_silo_metadata":::
 
-The cache follows cluster membership and fetches metadata from active silos. `GetSiloMetadata` returns the locally cached value, so it doesn't add a remote call to the request path.
+The cache follows cluster membership and fetches metadata from active silos. <xref:Orleans.Runtime.MembershipService.SiloMetadata.ISiloMetadataCache.GetSiloMetadata*> returns the locally cached value, so it doesn't add a remote call to the request path.
 
 ## Define a metadata contract
 
@@ -72,4 +72,4 @@ The cache follows cluster membership and fetches metadata from active silos. `Ge
 - Keep values low-cardinality when they feed placement or telemetry.
 - Ensure enough silos match every required placement filter.
 
-Metadata complements heterogeneous silo configuration: use `GrainTypeOptions.Classes` when a silo cannot host a grain class, and metadata placement filters when it can host the class but should be selected based on capability.
+Metadata complements heterogeneous silo configuration: use <xref:Orleans.Configuration.GrainTypeOptions.Classes> when a silo cannot host a grain class, and metadata placement filters when it can host the class but should be selected based on capability.

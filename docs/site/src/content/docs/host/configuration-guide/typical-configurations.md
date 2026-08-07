@@ -11,18 +11,18 @@ Choose the smallest hosting model that matches the deployment.
 
 | Scenario | Hosting model | Clustering | State and reminders |
 |---|---|---|---|
-| One-process development | Co-hosted silo and client | `UseLocalhostClustering` | Memory providers |
+| One-process development | Co-hosted silo and client | <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalhostClustering*> | Memory providers |
 | Local distributed development | Aspire with multiple silo replicas | Local container or emulator | Local container or emulator |
 | Production service with HTTP/API entry points | Co-host ASP.NET Core and Orleans in each silo when resource isolation isn't required | Platform-appropriate durable provider | Durable providers |
 | Isolated frontend and worker tier | External Orleans client in frontend; silo-only worker tier | Same durable provider and cluster identity in both tiers | Durable providers on silos |
 
-## Single-process development
+## Local development
 
 :::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="local_silo_and_client":::
 
 This is intentionally disposable. See [Local development configuration](local-development-configuration.md) before adding more local silos.
 
-## Aspire development and deployment modeling
+## Recommended: Aspire configuration
 
 The compiled AppHost examples define Orleans resources and their dependencies:
 
@@ -36,10 +36,16 @@ Use `.WithReplicas(...)` to model multiple silos. Local Redis containers and Azu
 
 ## Production configuration
 
+<a id="production-configuration-with-redis"></a>
+<a id="production-configuration-with-azure-storage"></a>
+<a id="reliable-production-deployment-using-azure"></a>
+<a id="reliable-production-deployment-using-sql-server"></a>
+<a id="traditional-configurations-without-aspire"></a>
+
 A production configuration should make these choices explicit:
 
 1. Pick a durable clustering provider supported by the platform.
-2. Set stable `ServiceId` and environment/deployment-specific `ClusterId` values.
+2. Set stable <xref:Orleans.Configuration.ClusterOptions.ServiceId> and environment/deployment-specific <xref:Orleans.Configuration.ClusterOptions.ClusterId> values.
 3. Configure advertised addresses that every silo and client can route to.
 4. Add durable storage, reminders, streams, and grain directories only for features the application uses.
 5. Supply credentials through the deployment environment, preferably using workload identity.
@@ -51,13 +57,13 @@ The provider used for clustering doesn't need to match the grain storage or remi
 
 ## Separate external client
 
-Use an external client when the frontend and silo tier need separate scaling, security boundaries, deployments, or resource isolation. Configure `UseOrleansClient` with exactly the same service identity, cluster identity, and clustering backend as the silo tier. The client reaches gateway endpoints, so expose and secure those routes separately from silo-to-silo endpoints.
+Use an external client when the frontend and silo tier need separate scaling, security boundaries, deployments, or resource isolation. Configure <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*> with exactly the same service identity, cluster identity, and clustering backend as the silo tier. The client reaches gateway endpoints, so expose and secure those routes separately from silo-to-silo endpoints.
 
 ## Avoid development configuration in production
 
 Don't use any of the following in production:
 
-- `UseLocalhostClustering`, development clustering, or static gateway lists.
+- <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalhostClustering*>, development clustering, or static gateway lists.
 - Memory grain storage or memory reminders when data must survive.
 - Azurite or other emulator endpoints.
 - Loopback or wildcard addresses as advertised endpoints.

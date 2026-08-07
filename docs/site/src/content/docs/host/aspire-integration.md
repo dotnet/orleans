@@ -7,11 +7,18 @@ ms.topic: how-to
 
 # Orleans and Aspire integration
 
+## Overview
+
+<a id="prerequisites"></a>
+
 The `Aspire.Hosting.Orleans` package models an Orleans cluster and its backing services in an Aspire AppHost. [Aspire](https://aspire.dev/get-started/what-is-aspire/) supplies cluster identity, endpoints, provider configuration, service discovery, dependency ordering, and observability context to silo and client projects.
 
 Use Aspire when you want a repeatable local distributed environment or already use an AppHost to describe deployment resources. Aspire orchestrates Orleans; it doesn't replace Orleans clustering, storage, reminder, or stream providers. See [Install the Aspire CLI](https://aspire.dev/get-started/install-cli/) for the supported toolchain.
 
-## Add Orleans to the AppHost
+## Configure the AppHost
+
+<a id="required-packages"></a>
+<a id="apphost-project"></a>
 
 Reference `Aspire.Hosting.Orleans` and the Aspire integrations for the resources you use:
 
@@ -19,19 +26,26 @@ Reference `Aspire.Hosting.Orleans` and the Aspire integrations for the resources
 
 Define a clustering resource and an Orleans resource, then reference Orleans from the silo project:
 
+<a id="basic-orleans-cluster-with-redis-clustering"></a>
+
 :::code language="csharp" source="snippets/aspire/AppHost/AppHostExamples.cs" id="basic_orleans_cluster":::
 
 `.WithReplicas(3)` starts three local silo replicas. `.WaitFor(redis)` prevents the silo project from starting before Redis is ready.
 
 Add only the capabilities the application needs:
 
+<a id="orleans-with-grain-storage-and-reminders"></a>
+
 :::code language="csharp" source="snippets/aspire/AppHost/AppHostExamples.cs" id="orleans_with_storage_reminders":::
 
 The named grain storage resources correspond to named Orleans providers such as `Default` and `PubSubStore`.
 
-## Configure the silo project
+## Configure the Orleans silo project
 
-Register the keyed Aspire client for every backing resource consumed by Orleans, then call parameterless `UseOrleans()`:
+<a id="orleans-silo-project"></a>
+<a id="service-defaults-pattern"></a>
+
+Register the keyed Aspire client for every backing resource consumed by Orleans, then call parameterless <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*>:
 
 :::code language="csharp" source="snippets/aspire/Silo/SiloProgram.cs" id="silo_basic_config":::
 
@@ -40,21 +54,29 @@ The AppHost injects the `Orleans` configuration hierarchy. Orleans binds cluster
 > [!IMPORTANT]
 > Resource references inject configuration, but the application project must register the matching keyed service client. For example, use `AddKeyedRedisClient`, `AddKeyedAzureTableServiceClient`, or the matching Aspire integration method for the resource type and name.
 
-Use the `UseOrleans` delegate only for configuration that the AppHost doesn't model, such as application-specific options or custom services.
+Use the <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*> delegate only for configuration that the AppHost doesn't model, such as application-specific options or custom services.
 
-## Configure a separate client
+## Configure the Orleans client project
+
+<a id="orleans-client-project-if-separate-from-silo"></a>
+
+<a id="separate-silo-and-client-projects"></a>
 
 Create a client-only view of the Orleans resource with `.AsClient()`:
 
 :::code language="csharp" source="snippets/aspire/AppHost/AppHostExamples.cs" id="separate_silo_and_client":::
 
-In the client project, register the keyed resource client and call parameterless `UseOrleansClient()`:
+In the client project, register the keyed resource client and call parameterless <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*>:
 
 :::code language="csharp" source="snippets/aspire/Client/ClientProgram.cs" id="client_basic_config":::
 
 The client receives the same cluster identity and clustering provider settings as the silos, but doesn't receive silo hosting capabilities.
 
-## Use Azure resources
+## Azure Storage with Aspire
+
+<a id="development-vs-production-configuration"></a>
+<a id="local-development-using-emulators"></a>
+<a id="production-using-managed-services"></a>
 
 This compiled example uses Azurite for local Azure Storage development:
 
@@ -68,11 +90,18 @@ Register the matching Azure Tables client in the silo:
 
 The same principle applies to Redis and databases: the AppHost resource can launch a local container during development and bind to a managed service in deployment.
 
-## Understand generated configuration
+## AppHost extension methods reference
 
-`AddOrleans` produces standard Orleans configuration. The application projects still call `UseOrleans` or `UseOrleansClient`, and Orleans validates the resulting provider configuration at startup. You can inspect injected environment variables in the Aspire dashboard when diagnosing a missing provider, keyed resource, or endpoint.
+`AddOrleans` produces standard Orleans configuration. The application projects still call <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*> or <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*>, and Orleans validates the resulting provider configuration at startup. You can inspect injected environment variables in the Aspire dashboard when diagnosing a missing provider, keyed resource, or endpoint.
 
 Common AppHost operations include:
+
+<a id="core-methods"></a>
+<a id="clustering"></a>
+<a id="grain-storage"></a>
+<a id="reminders"></a>
+<a id="streaming"></a>
+<a id="grain-directory"></a>
 
 | Operation | Purpose |
 |---|---|
@@ -87,11 +116,15 @@ Common AppHost operations include:
 
 Consult the [Aspire Orleans integration reference](https://aspire.dev/integrations/frameworks/orleans/) for resource types and overloads supported by your Aspire version.
 
-## Production considerations
+## Best practices
+
+<a id="opentelemetry-configuration"></a>
+<a id="health-checks"></a>
+<a id="see-also"></a>
 
 - Treat the AppHost as a resource model, not as a substitute for durable services.
 - Use managed identities or workload identities instead of embedding secrets.
-- Keep `ServiceId` stable and isolate environments with `ClusterId`.
+- Keep <xref:Orleans.Configuration.ClusterOptions.ServiceId> stable and isolate environments with <xref:Orleans.Configuration.ClusterOptions.ClusterId>.
 - Run multiple silo replicas across failure domains.
 - Configure readiness, telemetry export, and graceful termination in each application project.
 - Match keyed service names exactly between the AppHost and application projects.

@@ -9,74 +9,48 @@ ms.topic: how-to
 
 Use standard [.NET hosted services](https://learn.microsoft.com/dotnet/core/extensions/workers) for application initialization and background work. Orleans participates in the same Generic Host, so registration order can ensure Orleans is ready before a hosted service starts.
 
-## Run continuous background work
+<a id="using-backgroundservice-recommended"></a>
 
-Register Orleans first, then the `BackgroundService`:
+## Using <xref:Microsoft.Extensions.Hosting.BackgroundService> (Recommended)
 
-```csharp
-var builder = Host.CreateApplicationBuilder(args);
+Register Orleans first, then the <xref:Microsoft.Extensions.Hosting.BackgroundService>:
 
-builder.UseOrleans(siloBuilder =>
-{
-    // Configure Orleans.
-});
-
-builder.Services.AddHostedService<GrainPingService>();
-
-await builder.Build().RunAsync();
-```
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="register_background_service":::
 
 :::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="background_service":::
 
-Honor `stoppingToken` so the service doesn't delay silo shutdown. Use `IHostedService` directly for one-time startup and shutdown work.
+Honor `stoppingToken` so the service doesn't delay silo shutdown. Use <xref:Microsoft.Extensions.Hosting.IHostedService> directly for one-time startup and shutdown work.
 
-## Run a required Orleans startup task
+## Orleans startup tasks
 
-Use `AddStartupTask` when initialization must complete at an Orleans lifecycle stage before startup can continue:
+### Register a delegate
 
-```csharp
-siloBuilder.AddStartupTask(
-    async (services, cancellationToken) =>
-    {
-        var grainFactory = services.GetRequiredService<IGrainFactory>();
-        var grain = grainFactory.GetGrain<IInitializerGrain>("application");
-        await grain.Initialize(cancellationToken);
-    },
-    ServiceLifecycleStage.Active);
-```
+Use <xref:Orleans.Hosting.SiloBuilderStartupExtensions.AddStartupTask*> when initialization must complete at an Orleans lifecycle stage before startup can continue:
 
-The default stage is `ServiceLifecycleStage.Active`. An exception fails silo startup. This is appropriate for mandatory validation or initialization, but not for optional work that can retry after the host becomes ready.
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="register_startup_task":::
 
-For reusable tasks, implement `IStartupTask`:
+The default stage is <xref:Orleans.ServiceLifecycleStage.Active>. An exception fails silo startup. This is appropriate for mandatory validation or initialization, but not for optional work that can retry after the host becomes ready.
 
-```csharp
-public sealed class ValidateDependenciesTask : IStartupTask
-{
-    private readonly IDependencyValidator _validator;
+<a id="register-an-istartuptask-implementation"></a>
 
-    public ValidateDependenciesTask(IDependencyValidator validator)
-    {
-        _validator = validator;
-    }
+### Register an <xref:Orleans.Runtime.IStartupTask> implementation
 
-    public Task Execute(CancellationToken cancellationToken) =>
-        _validator.ValidateAsync(cancellationToken);
-}
-```
+For reusable tasks, implement <xref:Orleans.Runtime.IStartupTask>:
 
-```csharp
-siloBuilder.AddStartupTask<ValidateDependenciesTask>(
-    ServiceLifecycleStage.ApplicationServices);
-```
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="validate_dependencies_task":::
+
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="register_validate_dependencies_task":::
 
 ## Choose the right mechanism
 
+<a id="using-ihostedservice"></a>
+
 | Requirement | Mechanism |
 |---|---|
-| Continuous loop or scheduled application work | `BackgroundService` |
-| One-time host startup and shutdown work | `IHostedService` |
-| Mandatory initialization at a specific Orleans stage | `AddStartupTask` |
-| Start and stop callbacks integrated with an Orleans subsystem | `ILifecycleParticipant<ISiloLifecycle>` |
+| Continuous loop or scheduled application work | <xref:Microsoft.Extensions.Hosting.BackgroundService> |
+| One-time host startup and shutdown work | <xref:Microsoft.Extensions.Hosting.IHostedService> |
+| Mandatory initialization at a specific Orleans stage | <xref:Orleans.Hosting.SiloBuilderStartupExtensions.AddStartupTask*> |
+| Start and stop callbacks integrated with an Orleans subsystem | <xref:Orleans.ILifecycleParticipant`1> with <xref:Orleans.Runtime.ISiloLifecycle> |
 
 Don't use a startup task for long-running loops, database migrations that multiple replicas could race to apply, or work that needs unbounded retries. Coordinate migrations externally or make them safely single-writer.
 

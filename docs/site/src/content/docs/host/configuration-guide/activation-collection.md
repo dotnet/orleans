@@ -11,11 +11,13 @@ A grain activation is the in-memory instance that currently represents a grain i
 
 Activation collection is separate from .NET garbage collection. Orleans first deactivates the grain and removes runtime references; .NET GC can then reclaim the managed objects.
 
-## Idle activation collection
+## How activation collection works
 
-An activation becomes eligible for collection after it has been idle for `GrainCollectionOptions.CollectionAge`. The default is 15 minutes. Orleans scans on the `CollectionQuantum`, which defaults to one minute, so deactivation isn't scheduled at an exact instant.
+An activation becomes eligible for collection after it has been idle for <xref:Orleans.Configuration.GrainCollectionOptions.CollectionAge>. The default is 15 minutes. Orleans scans on <xref:Orleans.Configuration.GrainCollectionOptions.CollectionQuantum>, which defaults to one minute, so deactivation isn't scheduled at an exact instant.
 
-Incoming grain calls, reminders, and stream events count as activity. Outgoing calls and arbitrary application I/O don't keep an activation active for collection purposes. Timers don't keep an activation active by default, but a timer created with `GrainTimerCreationOptions.KeepAlive` resets activation idleness after each callback.
+Incoming grain calls, reminders, and stream events count as activity. Outgoing calls and arbitrary application I/O don't keep an activation active for collection purposes. Timers don't keep an activation active by default, but a timer created with <xref:Orleans.Runtime.GrainTimerCreationOptions.KeepAlive> resets activation idleness after each callback.
+
+## Configuration
 
 Configure a global age and targeted overrides:
 
@@ -23,48 +25,50 @@ Configure a global age and targeted overrides:
 
 Prefer type-specific changes over a cluster-wide increase. Longer ages trade memory for fewer activation and state-load operations.
 
-## Request deactivation behavior
+## Explicit control of activation collection
 
-Call `DeactivateOnIdle()` when the current activation should deactivate after its current turn:
+### Expedite activation collection
 
-```csharp
-this.DeactivateOnIdle();
-```
+Call <xref:Orleans.Grain.DeactivateOnIdle*> when the current activation should deactivate after its current turn:
+
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="deactivate_on_idle":::
 
 Queued calls are forwarded to a new or existing activation.
 
-Call `DelayDeactivation(duration)` to keep an activation from idle collection for at least a period:
+### Delay activation collection
 
-```csharp
-this.DelayDeactivation(TimeSpan.FromMinutes(30));
-```
+Call <xref:Orleans.Grain.DelayDeactivation*> to keep an activation from idle collection for at least a period:
+
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="delay_deactivation":::
 
 A negative duration cancels the previous delay. Delaying deactivation is an optimization, not a durability or placement guarantee. Failures, shutdown, migration, and resource pressure can still remove an activation.
 
-Apply `[KeepAlive]` to a grain implementation only when the activation should be exempt from normal idle collection:
+### Keep alive
 
-```csharp
-[KeepAlive]
-public sealed class ReferenceDataGrain : Grain, IReferenceDataGrain
-{
-    // ...
-}
-```
+Apply <xref:Orleans.KeepAliveAttribute> to a grain implementation only when the activation should be exempt from normal idle collection:
+
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="keep_alive_grain":::
 
 Keep-alive activations still consume memory and aren't a substitute for durable state.
 
-## Memory-pressure activation shedding
+## Memory-based activation shedding
+
+<a id="enable-memory-based-activation-shedding"></a>
 
 Orleans can shed activations when process memory exceeds a configured percentage:
 
 The defaults are:
 
+### Configuration options
+
 | Option | Default |
 |---|---:|
-| `EnableActivationSheddingOnMemoryPressure` | `false` |
-| `MemoryUsageLimitPercentage` | `80` |
-| `MemoryUsageTargetPercentage` | `75` |
-| `MemoryUsagePollingPeriod` | 5 seconds |
+| <xref:Orleans.Configuration.GrainCollectionOptions.EnableActivationSheddingOnMemoryPressure> | `false` |
+| <xref:Orleans.Configuration.GrainCollectionOptions.MemoryUsageLimitPercentage> | `80` |
+| <xref:Orleans.Configuration.GrainCollectionOptions.MemoryUsageTargetPercentage> | `75` |
+| <xref:Orleans.Configuration.GrainCollectionOptions.MemoryUsagePollingPeriod> | 5 seconds |
+
+### How it works
 
 When enabled, Orleans estimates how many activations to deactivate to move from the limit toward the target, prioritizing older activations. Memory pressure can override normal keep-alive timing because protecting the process is more important than preserving an optimization.
 
@@ -72,7 +76,7 @@ Set container or process memory limits before tuning percentage thresholds. Leav
 
 ## Activation and deactivation timeouts
 
-`GrainCollectionOptions.ActivationTimeout` and `DeactivationTimeout` both default to 30 seconds. These are runtime safety bounds, not goals. Keep `OnActivateAsync`, `OnDeactivateAsync`, state access, and dependency calls cancellable and normally much faster.
+<xref:Orleans.Configuration.GrainCollectionOptions.ActivationTimeout> and <xref:Orleans.Configuration.GrainCollectionOptions.DeactivationTimeout> both default to 30 seconds. These are runtime safety bounds, not goals. Keep <xref:Orleans.Grain.OnActivateAsync*> and <xref:Orleans.Grain.OnDeactivateAsync*>, state access, and dependency calls cancellable and normally much faster.
 
 ## Tune from measurements
 
