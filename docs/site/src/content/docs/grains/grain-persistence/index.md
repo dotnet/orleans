@@ -94,6 +94,12 @@ Storage providers expose <xref:Orleans.Storage.IGrainStorageSerializer> through 
 
 <span id="redis-grain-persistence"></span>
 
+Redis configuration has moved to [Redis grain persistence](redis-storage.md).
+
+<span id="memory-storage"></span>
+
+Memory storage configuration has moved to [Memory grain persistence](memory-storage.md).
+
 ## Legacy grain state base class
 
 The <xref:Orleans.Grain`1> base class and <xref:Orleans.Providers.StorageProviderAttribute> remain supported for compatibility, but new code should use <xref:Orleans.Runtime.IPersistentState`1>. Constructor injection supports multiple state records and makes the storage dependency explicit.

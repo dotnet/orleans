@@ -29,7 +29,7 @@ Subscribe to the `Microsoft.Orleans` meter. Discover the exact instrument set em
 dotnet-counters monitor -n <ProcessName> --counters Microsoft.Orleans
 ```
 
-The current source of truth is [InstrumentNames.cs](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Diagnostics/Metrics/InstrumentNames.cs). Provider packages can add instruments beyond that runtime set.
+To inspect instruments under active development, see [InstrumentNames.cs on the `main` branch](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Diagnostics/Metrics/InstrumentNames.cs). Discover the emitted instruments from the deployed process because provider packages and released versions can differ from that branch.
 
 Useful starting signals include:
 

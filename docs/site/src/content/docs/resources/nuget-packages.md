@@ -105,8 +105,8 @@ These packages don't replace the cluster membership provider.
 | Package | Purpose |
 | --- | --- |
 | [Microsoft.Orleans.EventSourcing](https://www.nuget.org/packages/Microsoft.Orleans.EventSourcing) | Event-sourced grain base types and log-consistency abstractions. |
-| [Microsoft.Orleans.Journaling](https://www.nuget.org/packages/Microsoft.Orleans.Journaling) | Durable journaled collections and values. |
-| [Microsoft.Orleans.Journaling.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.AzureStorage) | Azure Blob Storage for Orleans journaling. |
+| [Microsoft.Orleans.Journaling](https://www.nuget.org/packages/Microsoft.Orleans.Journaling) | Experimental durable journaled collections and values (`ORLEANSEXP005`). |
+| [Microsoft.Orleans.Journaling.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.AzureStorage) | Experimental Azure Blob Storage provider for Orleans Journaling. |
 | [Microsoft.Orleans.Transactions](https://www.nuget.org/packages/Microsoft.Orleans.Transactions) | Distributed transaction runtime. |
 | [Microsoft.Orleans.Transactions.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Transactions.AzureStorage) | Azure Storage transaction state. |
 

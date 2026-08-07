@@ -17,6 +17,8 @@ An Orleans deployment has three distinct network paths:
 
 HTTP ingress isn't an Orleans transport. A web API can share a process with a silo, but its HTTP port and load balancer are separate from the silo and gateway TCP endpoints.
 
+This page owns deployment configuration and operational requirements. For the membership, messaging, directory, and activation components which use these paths, see [Runtime architecture](../implementation/runtime-architecture.md).
+
 ## Listening and advertised endpoints
 
 A **listening endpoint** is the local interface and port on which a process accepts connections. An **advertised endpoint** is the address and port stored in membership so other processes can connect.

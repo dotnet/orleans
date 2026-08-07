@@ -18,6 +18,8 @@ There are broadly two kinds of serialization used in Orleans:
 
 Most of this article focuses on grain call serialization via the serialization framework included in Orleans. The [Grain storage serializers](#grain-storage-serializers) section discusses grain storage serialization.
 
+For the generated-code pipeline, runtime manifests, wire identity, and codec dispatch internals, see [Serialization and code generation internals](../../implementation/serialization.md).
+
 ## Use Orleans serialization
 
 Orleans includes an advanced and extensible serialization framework referred to as **Orleans.Serialization**. The serialization framework included in Orleans is designed to meet the following goals:
@@ -67,7 +69,7 @@ If you don't want the primary constructor parameters automatically included as s
 
 ## MessagePack serialization
 
-Starting with Orleans 8.2, you can use [MessagePack](https://github.com/neuecc/MessagePack-CSharp) as an external serializer for Orleans. MessagePack is a high-performance binary serialization format that produces smaller payloads than JSON while maintaining fast serialization and deserialization speeds.
+You can use [MessagePack](https://github.com/neuecc/MessagePack-CSharp) as an external serializer for Orleans. MessagePack is a high-performance binary serialization format that produces smaller payloads than JSON while maintaining fast serialization and deserialization speeds.
 
 ### When to use MessagePack
 
@@ -192,18 +194,18 @@ Orleans promotes safety by default, including safety from some classes of concur
 
 ## Grain storage serializers
 
-Orleans includes a provider-backed persistence model for grains, accessed via the <xref:Orleans.Grain`1.State?displayName=nameWithType> property or by injecting one or more <xref:Orleans.Runtime.IPersistentState`1> values into your grain. Before Orleans 7.0, each provider had a different mechanism for configuring serialization. In Orleans 7.0, there's now a general-purpose grain state serializer interface, <xref:Orleans.Storage.IGrainStorageSerializer>, offering a consistent way to customize state serialization for each provider. Supported storage providers implement a pattern involving setting the <xref:Orleans.Storage.IStorageProviderSerializerOptions.GrainStorageSerializer?displayProperty=nameWithType> property on the provider's options class, for example:
+Orleans includes a provider-backed persistence model for grains, accessed via the <xref:Orleans.Grain`1.State?displayName=nameWithType> property or by injecting one or more <xref:Orleans.Runtime.IPersistentState`1> values into your grain. The general-purpose <xref:Orleans.Storage.IGrainStorageSerializer> interface offers a consistent way to customize state serialization for each provider. Supported storage providers implement a pattern involving setting the <xref:Orleans.Storage.IStorageProviderSerializerOptions.GrainStorageSerializer?displayProperty=nameWithType> property on the provider's options class, for example:
 
 - <xref:Orleans.Configuration.DynamoDBStorageOptions.GrainStorageSerializer?displayProperty=nameWithType>
 - <xref:Orleans.Configuration.AzureBlobStorageOptions.GrainStorageSerializer?displayProperty=nameWithType>
 - <xref:Orleans.Configuration.AzureTableStorageOptions.GrainStorageSerializer?displayProperty=nameWithType>
 - <xref:Orleans.Configuration.AdoNetGrainStorageOptions.GrainStorageSerializer>
 
-Grain storage serialization currently defaults to `Newtonsoft.Json` to serialize state. You can replace this by modifying that property at configuration time. The following example demonstrates this using [OptionsBuilder\<TOptions\>](../../../core/extensions/options.md#optionsbuilder-api):
+Grain storage serialization currently defaults to `Newtonsoft.Json` to serialize state. You can replace this by modifying that property at configuration time. The following example demonstrates this using [OptionsBuilder\<TOptions\>](https://learn.microsoft.com/dotnet/core/extensions/options#optionsbuilder-api):
 
 :::code language="csharp" source="snippets/serialization/GrainStorageExamples.cs" id="grain_storage_serializer_config":::
 
-For more information, see [OptionsBuilder API](../../../core/extensions/options.md#optionsbuilder-api).
+For more information, see [OptionsBuilder API](https://learn.microsoft.com/dotnet/core/extensions/options#optionsbuilder-api).
 
 :::zone-end
 
@@ -508,14 +510,14 @@ Orleans promotes safety by default, including safety from some classes of concur
 
 ## Grain storage serializers
 
-Orleans includes a provider-backed persistence model for grains, accessed via the <xref:Orleans.Grain`1.State?displayName=nameWithType> property or by injecting one or more <xref:Orleans.Runtime.IPersistentState`1> values into your grain. Before Orleans 7.0, each provider had a different mechanism for configuring serialization. In Orleans 7.0, there's now a general-purpose grain state serializer interface, <xref:Orleans.Storage.IGrainStorageSerializer>, offering a consistent way to customize state serialization for each provider. Supported storage providers implement a pattern involving setting the <xref:Orleans.Storage.IStorageProviderSerializerOptions.GrainStorageSerializer?displayProperty=nameWithType> property on the provider's options class, for example:
+Orleans includes a provider-backed persistence model for grains, accessed via the <xref:Orleans.Grain`1.State?displayName=nameWithType> property or by injecting one or more <xref:Orleans.Runtime.IPersistentState`1> values into your grain. The general-purpose <xref:Orleans.Storage.IGrainStorageSerializer> interface offers a consistent way to customize state serialization for each provider. Supported storage providers implement a pattern involving setting the <xref:Orleans.Storage.IStorageProviderSerializerOptions.GrainStorageSerializer?displayProperty=nameWithType> property on the provider's options class, for example:
 
 - <xref:Orleans.Configuration.DynamoDBStorageOptions.GrainStorageSerializer?displayProperty=nameWithType>
 - <xref:Orleans.Configuration.AzureBlobStorageOptions.GrainStorageSerializer?displayProperty=nameWithType>
 - <xref:Orleans.Configuration.AzureTableStorageOptions.GrainStorageSerializer?displayProperty=nameWithType>
 - <xref:Orleans.Configuration.AdoNetGrainStorageOptions.GrainStorageSerializer>
 
-Grain storage serialization currently defaults to `Newtonsoft.Json` to serialize state. You can replace this by modifying that property at configuration time. The following example demonstrates this using [OptionsBuilder\<TOptions\>](../../../core/extensions/options.md#optionsbuilder-api):
+Grain storage serialization currently defaults to `Newtonsoft.Json` to serialize state. You can replace this by modifying that property at configuration time. The following example demonstrates this using [OptionsBuilder\<TOptions\>](https://learn.microsoft.com/dotnet/core/extensions/options#optionsbuilder-api):
 
 ```csharp
 siloBuilder.AddAzureBlobGrainStorage(
@@ -527,7 +529,7 @@ siloBuilder.AddAzureBlobGrainStorage(
     });
 ```
 
-For more information, see [OptionsBuilder API](../../../core/extensions/options.md#optionsbuilder-api).
+For more information, see [OptionsBuilder API](https://learn.microsoft.com/dotnet/core/extensions/options#optionsbuilder-api).
 
 :::zone-end
 
@@ -549,14 +551,14 @@ Orleans uses the following rules to decide which serializers to generate:
 
 1. Scan all types in all assemblies referencing the core Orleans library.
 1. From those assemblies, generate serializers for types directly referenced in grain interface method signatures or state class signatures, or for any type marked with <xref:System.SerializableAttribute>.
-1. Additionally, a grain interface or implementation project can point to arbitrary types for serialization generation by adding <xref:Orleans.CodeGeneration.KnownTypeAttribute> or <xref:Orleans.CodeGeneration.KnownAssemblyAttribute> assembly-level attributes. These tell the code generator to generate serializers for specific types or all eligible types within an assembly. For more information on assembly-level attributes, see [Apply attributes at the assembly level](../../../standard/attributes/applying-attributes.md#apply-attributes-at-the-assembly-level).
+1. Additionally, a grain interface or implementation project can point to arbitrary types for serialization generation by adding <xref:Orleans.CodeGeneration.KnownTypeAttribute> or <xref:Orleans.CodeGeneration.KnownAssemblyAttribute> assembly-level attributes. These tell the code generator to generate serializers for specific types or all eligible types within an assembly. For more information on assembly-level attributes, see [Apply attributes at the assembly level](https://learn.microsoft.com/dotnet/standard/attributes/applying-attributes#apply-attributes-at-the-assembly-level).
 
 ## Fallback serialization
 
 Orleans supports transmission of arbitrary types at runtime. Therefore, the built-in code generator cannot determine the entire set of types that will be transmitted ahead of time. Additionally, certain types cannot have serializers generated for them because they are inaccessible (e.g., `private`) or have inaccessible fields (e.g., `readonly`). Thus, there's a need for just-in-time serialization of types that were unexpected or couldn't have serializers generated ahead of time. The serializer responsible for these types is called the *fallback serializer*. Orleans ships with two fallback serializers:
 
 - <xref:Orleans.Serialization.BinaryFormatterSerializer?displayProperty=fullName>, which uses .NET's <xref:System.Runtime.Serialization.Formatters.Binary.BinaryFormatter>; and
-- <xref:Orleans.Serialization.ILBasedSerializer?displayProperty=fullName>, which emits [CIL](../../../standard/glossary.md#il) instructions at runtime to create serializers that leverage Orleans' serialization framework to serialize each field. This means that if an inaccessible type `MyPrivateType` contains a field `MyType` which has a custom serializer, that custom serializer will be used to serialize it.
+- <xref:Orleans.Serialization.ILBasedSerializer?displayProperty=fullName>, which emits [CIL](https://learn.microsoft.com/dotnet/standard/glossary#il) instructions at runtime to create serializers that leverage Orleans' serialization framework to serialize each field. This means that if an inaccessible type `MyPrivateType` contains a field `MyType` which has a custom serializer, that custom serializer will be used to serialize it.
 
 Configure the fallback serializer using the <xref:Orleans.Configuration.SerializationProviderOptions.FallbackSerializationProvider> property on both <xref:Orleans.Runtime.Configuration.ClientConfiguration> (client) and <xref:Orleans.Runtime.Configuration.GlobalConfiguration> (silos).
 
@@ -587,7 +589,7 @@ The <xref:Orleans.Serialization.BinaryFormatterSerializer> is the default fallba
 
 ## Exception serialization
 
-Exceptions are serialized using the [fallback serializer](serialization.md#fallback-serialization). With the default configuration, `BinaryFormatter` is the fallback serializer. Therefore, you must follow the [ISerializable pattern](/previous-versions/dotnet/fundamentals/serialization/binary/custom-serialization) to ensure correct serialization of all properties in an exception type.
+Exceptions are serialized using the [fallback serializer](serialization.md#fallback-serialization). With the default configuration, `BinaryFormatter` is the fallback serializer. Therefore, implement <xref:System.Runtime.Serialization.ISerializable> to ensure all exception properties are serialized correctly.
 
 Here is an example of an exception type with correctly implemented serialization:
 

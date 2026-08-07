@@ -150,3 +150,5 @@ Persistent-state components supplied by Orleans participate automatically. Migra
 Automatic activation repartitioning and rebalancing use migration to improve locality or cluster balance. Both are experimental. See [Grain placement](grain-placement.md) for their status and configuration.
 
 Use <xref:Orleans.Placement.ImmovableAttribute> to exclude a grain type from automatic migration. It doesn't block an explicit <xref:Orleans.Grain.MigrateOnIdle> request.
+
+For the runtime protocols behind activation, collection, deactivation, and migration, see [Activation lifecycle and migration](../implementation/activation-lifecycle.md). Application code should continue to rely on the public lifecycle APIs described here rather than runtime internals.

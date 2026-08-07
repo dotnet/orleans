@@ -199,7 +199,7 @@ To persist grain state, add and configure a grain-storage provider explicitly, p
 
 ## Explore the deployed sample
 
-The Bicep deployment outputs the private environment IP plus the dashboard, API, and scaler host names. Connect from a machine in the virtual network or a peered network, then:
+The Bicep deployment outputs the private environment IP plus the dashboard, API, and scaler host names. Connect from a machine in the environment virtual network. For a peered network, also link the Container Apps private DNS zone to that virtual network or configure equivalent resolution with Azure DNS Private Resolver before using the emitted host names. Then:
 
 1. Open the dashboard and verify that `Silo-A`, `Silo-B`, and `Dashboard` are active.
 1. Call `GET /hello/0` and `GET /hello/255`; both bounded grain identities should succeed.

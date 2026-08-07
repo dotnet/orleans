@@ -1,11 +1,13 @@
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
+  collectIncludeTargets,
   convertDocfxMarkdown,
   convertHubYaml,
   createSidebar,
+  isSnippetSupportMarkdown,
 } from '../scripts/lib/docfx.mjs';
 
 const temporaryDirectories = [];
@@ -24,6 +26,13 @@ afterEach(async () => {
 });
 
 describe('DocFX conversion', () => {
+  test('identifies inactive snippet support Markdown', () => {
+    expect(isSnippetSupportMarkdown('host/snippets/README.md')).toBe(true);
+    expect(isSnippetSupportMarkdown('host/snippets-v3/ReadMe.md')).toBe(true);
+    expect(isSnippetSupportMarkdown('host/README.md')).toBe(false);
+    expect(isSnippetSupportMarkdown('host/snippets/guide.md')).toBe(false);
+  });
+
   test('expands includes and source regions while converting supported constructs', async () => {
     const directory = await temporaryDirectory();
     await mkdir(path.join(directory, 'includes'));
@@ -185,6 +194,85 @@ describe('DocFX conversion', () => {
     ).rejects.toThrow("INCLUDE 'missing.md'");
   });
 
+  test('collects the active nested include closure once', async () => {
+    const directory = await temporaryDirectory();
+    const contentRoot = path.join(directory, 'content');
+    const docsRoot = path.join(contentRoot, 'docs');
+    const includesRoot = path.join(contentRoot, 'includes');
+    await mkdir(docsRoot, { recursive: true });
+    await mkdir(includesRoot, { recursive: true });
+    const firstPage = path.join(docsRoot, 'first.md');
+    const secondPage = path.join(docsRoot, 'second.md');
+    const shared = path.join(includesRoot, 'shared.md');
+    const nested = path.join(includesRoot, 'nested.md');
+    await writeFile(firstPage, '[!INCLUDE [shared](../includes/shared.md)]\r\n');
+    await writeFile(secondPage, '[!INCLUDE [shared](../includes/shared.md)]\n');
+    await writeFile(shared, '[!INCLUDE [nested](nested.md)]\r\n');
+    await writeFile(nested, 'Active nested guidance.\n');
+    await writeFile(path.join(includesRoot, 'inactive.md'), 'Inactive guidance.\n');
+
+    const targets = await collectIncludeTargets([firstPage, secondPage], contentRoot);
+
+    expect([...targets].sort()).toEqual([nested, shared].sort());
+  });
+
+  test('rejects circular include graphs', async () => {
+    const directory = await temporaryDirectory();
+    const first = path.join(directory, 'first.md');
+    const second = path.join(directory, 'second.md');
+    await writeFile(first, '[!INCLUDE [second](second.md)]\n');
+    await writeFile(second, '[!INCLUDE [first](first.md)]\n');
+
+    await expect(collectIncludeTargets([first], directory)).rejects.toThrow(
+      'Circular INCLUDE detected',
+    );
+  });
+
+  test('rejects include traversal and absolute paths', async () => {
+    const directory = await temporaryDirectory();
+    const contentRoot = path.join(directory, 'content');
+    const docsRoot = path.join(contentRoot, 'docs');
+    await mkdir(docsRoot, { recursive: true });
+    const outside = path.join(directory, 'outside.md');
+    await writeFile(outside, 'Outside guidance.\n');
+    const traversal = path.join(docsRoot, 'traversal.md');
+    await writeFile(traversal, '[!INCLUDE [outside](../../outside.md)]\n');
+    await expect(collectIncludeTargets([traversal], contentRoot)).rejects.toThrow(
+      'resolves outside',
+    );
+
+    const absolute = path.join(docsRoot, 'absolute.md');
+    await writeFile(absolute, `[!INCLUDE [outside](${outside.replaceAll('\\', '/')})]\n`);
+    await expect(collectIncludeTargets([absolute], contentRoot)).rejects.toThrow(
+      'Unsafe INCLUDE path',
+    );
+
+    const driveRelative = path.join(docsRoot, 'drive-relative.md');
+    await writeFile(driveRelative, '[!INCLUDE [outside](nested/C:../outside.md)]\n');
+    await expect(collectIncludeTargets([driveRelative], contentRoot)).rejects.toThrow(
+      'Unsafe INCLUDE path',
+    );
+  });
+
+  test('rejects include symlinks which escape the content root', async () => {
+    const directory = await temporaryDirectory();
+    const contentRoot = path.join(directory, 'content');
+    const docsRoot = path.join(contentRoot, 'docs');
+    const includesRoot = path.join(contentRoot, 'includes');
+    const outsideRoot = path.join(directory, 'outside');
+    await mkdir(docsRoot, { recursive: true });
+    await mkdir(includesRoot, { recursive: true });
+    await mkdir(outsideRoot, { recursive: true });
+    await writeFile(path.join(outsideRoot, 'note.md'), 'Outside guidance.\n');
+    await symlink(outsideRoot, path.join(includesRoot, 'linked'), 'junction');
+    const page = path.join(docsRoot, 'page.md');
+    await writeFile(page, '[!INCLUDE [outside](../includes/linked/note.md)]\n');
+
+    await expect(collectIncludeTargets([page], contentRoot)).rejects.toThrow(
+      'resolves outside',
+    );
+  });
+
   test('rejects image directives whose path casing does not match', async () => {
     const directory = await temporaryDirectory();
     await mkdir(path.join(directory, 'media'));
@@ -271,13 +359,17 @@ describe('DocFX conversion', () => {
     const tocPath = path.join(directory, 'toc.yml');
     await writeFile(
       tocPath,
-      'items:\n  - name: Get started\n    items:\n      - name: Overview\n        href: overview.md\n',
+      'items:\n  - name: Get started\n    items:\n      - name: Overview\n        href: overview.md\n  - name: Samples\n    href: /samples/\n',
     );
 
     await expect(createSidebar(tocPath)).resolves.toEqual([
       {
         label: 'Get started',
         items: [{ label: 'Overview', link: '/docs/overview/' }],
+      },
+      {
+        label: 'Samples',
+        link: '/samples/',
       },
     ]);
 

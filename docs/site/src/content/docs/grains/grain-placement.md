@@ -9,6 +9,8 @@ ms.topic: concept-article
 
 When a grain isn't active, Orleans selects a compatible silo and creates an activation there. This process is **placement**. Callers continue using location-transparent grain references, so placement doesn't change application call sites.
 
+This article covers application-facing placement configuration. For the runtime algorithms and coordination protocols behind placement and activation movement, see [Placement and activation balancing](../implementation/load-balancing.md).
+
 ## Default placement
 
 <xref:Orleans.Runtime.ResourceOptimizedPlacement> is the default placement strategy. It uses sampled silo runtime statistics and a power-of-k-choices algorithm to balance new activations while avoiding overloaded silos. It considers CPU, memory, available memory, activation count, and a preference for the local silo.

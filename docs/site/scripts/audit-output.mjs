@@ -2,6 +2,8 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import legacyPaths from '../src/data/legacy-pages.json' with { type: 'json' };
+import redirects from '../src/data/redirects.json' with { type: 'json' };
+import { compatibilityOutputPath } from './lib/compatibility-paths.mjs';
 
 const siteRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const distRoot = path.join(siteRoot, 'dist');
@@ -96,10 +98,21 @@ if (files.includes(snippetReadme)) {
 }
 
 for (const legacyPath of legacyPaths) {
-  const relativeLegacy = decodeURIComponent(legacyPath.slice('/orleans/'.length));
-  const outputPath = path.join(distRoot, relativeLegacy);
+  const outputPath = compatibilityOutputPath(legacyPath, distRoot);
   if (!files.includes(outputPath)) {
     failures.push(`Missing legacy Pages compatibility path '${legacyPath}'.`);
+  }
+}
+
+for (const [source, target] of Object.entries(redirects)) {
+  const outputPath = compatibilityOutputPath(source, distRoot);
+  if (!files.includes(outputPath)) {
+    failures.push(`Missing explicit compatibility redirect '${source}'.`);
+    continue;
+  }
+  const html = await readFile(outputPath, 'utf8');
+  if (!/http-equiv="refresh"/i.test(html) || !html.includes(target) || !html.includes('location.hash')) {
+    failures.push(`Compatibility path '${source}' is not an anchor-preserving redirect to '${target}'.`);
   }
 }
 
