@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Text;
 using Amazon.DynamoDBv2.Model;
 using Orleans.Configuration;
 using Orleans.Storage;
@@ -45,6 +46,8 @@ internal class StateEntity
 
         if (fields.TryGetValue(DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME, out var etag))
             this.ETag = long.Parse(etag.N);
+
+        this.StorageSize = GetItemSize(fields);
     }
 
     public static string MakeRowKey(long sequenceId)
@@ -87,6 +90,8 @@ internal class StateEntity
 
     public long? ETag { get; set; }
 
+    public int StorageSize { get; private set; }
+
     public void SetState<TState>(TState state, IGrainStorageSerializer serializer) where TState : class, new()
     {
         this.State = serializer.Serialize(state).ToArray();
@@ -115,6 +120,37 @@ internal class StateEntity
         if (this.ETag.HasValue)
             item[DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME] = new AttributeValue { N = this.ETag.Value.ToString() };
 
+        this.StorageSize = GetItemSize(item);
         return item;
+    }
+
+    public static int GetItemSize(Dictionary<string, AttributeValue> item)
+    {
+        var size = 0;
+        checked
+        {
+            foreach (var (name, value) in item)
+            {
+                size += Encoding.UTF8.GetByteCount(name);
+                if (value.S is { } stringValue)
+                {
+                    size += Encoding.UTF8.GetByteCount(stringValue);
+                }
+                else if (value.N is { } numberValue)
+                {
+                    size += Encoding.UTF8.GetByteCount(numberValue);
+                }
+                else if (value.B is { } binaryValue)
+                {
+                    size += checked((int)binaryValue.Length);
+                }
+                else
+                {
+                    throw new InvalidOperationException($"Unsupported DynamoDB attribute type for '{name}'.");
+                }
+            }
+        }
+
+        return size;
     }
 }

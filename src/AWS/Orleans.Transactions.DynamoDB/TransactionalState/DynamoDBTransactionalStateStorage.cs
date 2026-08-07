@@ -28,6 +28,11 @@ namespace Orleans.Transactions.DynamoDB.TransactionalState;
 /// <typeparam name="TState">The state type.</typeparam>
 public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalStateStorage<TState> where TState : class, new()
 {
+    private const int MaxSnapshotLoadAttempts = 5;
+    private const int MaxDynamoDBItemSize = 400 * 1024;
+    private const int MaxDynamoDBTransactionSize = 4 * 1024 * 1024;
+    private const int TransactionSizeSafetyMargin = 64 * 1024;
+
     private readonly DynamoDBStorage storage;
     private readonly string tableName;
     private readonly string partitionKey;
@@ -147,6 +152,13 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                 throw new ArgumentException("Etag does not match", nameof(expectedETag));
             }
 
+            var serializedMetadata = this.ConvertToStorageFormat(metadata);
+            var timestamp = DateTimeOffset.UtcNow;
+            var committedSequenceId = commitUpTo.HasValue && commitUpTo.Value > key.CommittedSequenceId
+                ? commitUpTo.Value
+                : key.CommittedSequenceId;
+            this.ValidateKeyItemSize(serializedMetadata, timestamp, committedSequenceId);
+
             // assemble all storage operations into a single batch
             // these operations must commit in sequence, but not necessarily atomically
             // so we can split this up if needed
@@ -168,7 +180,11 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                         }
                     };
 
-                    await batchOperation.Add(new TransactWriteItem { Delete = delete }, entity.PartitionKey, entity.RowKey).ConfigureAwait(false);
+                    await batchOperation.Add(
+                        new TransactWriteItem { Delete = delete },
+                        entity.PartitionKey,
+                        entity.RowKey,
+                        entity.StorageSize).ConfigureAwait(false);
 
                     states.RemoveAt(states.Count - 1);
                     LogTraceDeleteTransaction(entity.PartitionKey, entity.RowKey, entity.TransactionId);
@@ -231,12 +247,9 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                 }
 
             // third, persist metadata and commit position
-            key.Metadata = this.ConvertToStorageFormat(metadata);
-            key.Timestamp = DateTimeOffset.UtcNow;
-            if (commitUpTo.HasValue && commitUpTo.Value > key.CommittedSequenceId)
-            {
-                key.CommittedSequenceId = commitUpTo.Value;
-            }
+            key.Metadata = serializedMetadata;
+            key.Timestamp = timestamp;
+            key.CommittedSequenceId = committedSequenceId;
 
             batchOperation.MarkKeyChanged();
             if (keyWasNew)
@@ -270,7 +283,8 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                     await batchOperation.Add(
                         new TransactWriteItem { Delete = delRequest },
                         stateToDelete.Value.PartitionKey,
-                        stateToDelete.Value.RowKey).ConfigureAwait(false);
+                        stateToDelete.Value.RowKey,
+                        stateToDelete.Value.StorageSize).ConfigureAwait(false);
 
                     LogTraceDeleteTransaction(this.partitionKey, states[i].Value.RowKey, states[i].Value.TransactionId);
                 }
@@ -319,16 +333,23 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
 
     private async Task<(KeyEntity Key, List<KeyValuePair<long, StateEntity>> States)> LoadSnapshotAsync()
     {
-        while (true)
+        KeyEntity keyBefore = null!;
+        KeyEntity keyAfter = null!;
+        for (var attempt = 0; attempt < MaxSnapshotLoadAttempts; attempt++)
         {
-            var keyBefore = await LoadKeyEntityAsync().ConfigureAwait(false);
+            keyBefore = await LoadKeyEntityAsync().ConfigureAwait(false);
             var stateEntities = await LoadStateEntitiesAsync().ConfigureAwait(false);
-            var keyAfter = await LoadKeyEntityAsync().ConfigureAwait(false);
+            keyAfter = await LoadKeyEntityAsync().ConfigureAwait(false);
             if (keyBefore.ETag == keyAfter.ETag)
             {
                 return (keyAfter, stateEntities);
             }
         }
+
+        throw new InconsistentStateException(
+            "Could not load a consistent DynamoDB transactional state snapshot.",
+            storedEtag: keyBefore.ETag?.ToString() ?? "null",
+            currentEtag: keyAfter.ETag?.ToString() ?? "null");
     }
 
     /// <summary>
@@ -410,6 +431,33 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
 
     private byte[] ConvertToStorageFormat<T>(T value) => this.serializer.Serialize(value).ToArray();
 
+    private void ValidateKeyItemSize(byte[] metadata, DateTimeOffset timestamp, long committedSequenceId)
+    {
+        var candidate = new KeyEntity(this.partitionKey)
+        {
+            CommittedSequenceId = committedSequenceId,
+            Metadata = metadata,
+            Timestamp = timestamp,
+            ETag = long.MaxValue
+        };
+
+        ValidateItemSize(candidate.ToStorageFormat(), nameof(metadata));
+    }
+
+    private static int ValidateItemSize(Dictionary<string, AttributeValue> item, string parameterName)
+    {
+        var itemSize = StateEntity.GetItemSize(item);
+        if (itemSize > MaxDynamoDBItemSize)
+        {
+            throw new ArgumentOutOfRangeException(
+                parameterName,
+                itemSize,
+                $"DynamoDB items cannot exceed {MaxDynamoDBItemSize} bytes.");
+        }
+
+        return itemSize;
+    }
+
     private bool FindState(long sequenceId, out int pos)
     {
         pos = 0;
@@ -436,12 +484,27 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
         ILogger logger)
     {
         private const int MaxDataOperations = 99;
+        private const int MaxDataSize =
+            MaxDynamoDBTransactionSize - MaxDynamoDBItemSize - TransactionSizeSafetyMargin;
+
         private readonly List<(TransactWriteItem Item, string PartitionKey, string RowKey)> operations = [];
+        private int operationsSize;
         private bool keyChanged;
 
-        public async ValueTask Add(TransactWriteItem operation, string partitionKey, string rowKey)
+        public async ValueTask Add(
+            TransactWriteItem operation,
+            string partitionKey,
+            string rowKey,
+            int? affectedItemSize = null)
         {
+            var operationSize = GetOperationSize(operation, affectedItemSize);
+            if (this.operations.Count > 0 && this.operationsSize + operationSize > MaxDataSize)
+            {
+                await FlushCore().ConfigureAwait(false);
+            }
+
             this.operations.Add((operation, partitionKey, rowKey));
+            this.operationsSize += operationSize;
             if (this.operations.Count == MaxDataOperations)
             {
                 await FlushCore().ConfigureAwait(false);
@@ -455,10 +518,15 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
         private async Task FlushCore()
         {
             var currentETag = key.ETag;
-            var nextETag = currentETag.GetValueOrDefault(-1) + 1;
+            var nextETag = checked(currentETag.GetValueOrDefault(-1) + 1);
             key.ETag = nextETag;
             var keyItem = key.ToStorageFormat();
             key.ETag = currentETag;
+            var keyItemSize = ValidateItemSize(keyItem, "metadata");
+            if (this.operationsSize + keyItemSize > MaxDynamoDBTransactionSize)
+            {
+                throw new InvalidOperationException("DynamoDB transaction size calculation exceeded the service limit.");
+            }
 
             var keyPut = new Put
             {
@@ -502,6 +570,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                 }
 
                 this.operations.Clear();
+                this.operationsSize = 0;
             }
             catch (TransactionCanceledException exception) when (IsStorageConflict(exception))
             {
@@ -540,6 +609,20 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
             return exception.CancellationReasons?.Any(
                 reason => string.Equals(reason.Code, "ConditionalCheckFailed", StringComparison.Ordinal)) is true
                 || exception.Message.Contains("ConditionalCheckFailed", StringComparison.Ordinal);
+        }
+
+        private static int GetOperationSize(TransactWriteItem operation, int? affectedItemSize)
+        {
+            if (operation.Put?.Item is { } item)
+            {
+                return ValidateItemSize(item, "state");
+            }
+            if (operation.Delete is not null)
+            {
+                return affectedItemSize ?? MaxDynamoDBItemSize;
+            }
+
+            throw new InvalidOperationException("Only DynamoDB put and delete operations are supported.");
         }
     }
 
