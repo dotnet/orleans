@@ -9,7 +9,7 @@ metadata:
     description: Samples, tutorials, and education for .NET Orleans. Microsoft's cloud native and distributed systems platform.
     ms.topic: hub-page
     ms.service: dotnet-orleans
-    ms.date: 07/03/2024
+    ms.date: 08/02/2026
 
 highlightedContent:
     # itemType: architecture | concept | deploy | download | get-started | how-to-guide | learn | overview | quickstart | reference | tutorial | whats-new
@@ -20,8 +20,11 @@ highlightedContent:
         - itemType: deploy
           title: Deploy Orleans apps
           url: deployment/index.md
+        - itemType: quickstart
+          title: Build your first Orleans app
+          url: quickstarts/build-your-first-orleans-app.md
         - itemType: whats-new
-          title: "Migrate from Orleans 3.x to 7.0"
+          title: Migration guide
           url: migration-guide.md
         - itemType: concept
           title: Why Orleans?
@@ -139,22 +142,22 @@ conceptualContent:
           links:
             - itemType: video
               text: An introduction to Orleans
-              url: /shows/reactor/an-introduction-to-orleans
+              url: https://learn.microsoft.com/shows/reactor/an-introduction-to-orleans
             - itemType: video
               text: Building real applications with Orleans
-              url: /shows/on-net/building-real-applications-with-orleans
+              url: https://learn.microsoft.com/shows/on-net/building-real-applications-with-orleans
             - itemType: video
               text: Building distributed applications with Orleans
-              url: /shows/on-net/orleans-onnet
+              url: https://learn.microsoft.com/shows/on-net/orleans-onnet
             - itemType: video
               text: Deploying Orleans Apps to Kubernetes
-              url: /shows/on-net/deploying-orleans-apps-to-kubernetes
+              url: https://learn.microsoft.com/shows/on-net/deploying-orleans-apps-to-kubernetes
             - itemType: video
               text: Clustering in Orleans
-              url: /shows/on-net/clustering-in-orleans
+              url: https://learn.microsoft.com/shows/on-net/clustering-in-orleans
             - itemType: video
               text: Setting up Observability in Orleans
-              url: /shows/on-net/setting-up-observability-in-orleans
+              url: https://learn.microsoft.com/shows/on-net/setting-up-observability-in-orleans
 
 additionalContent:
     sections:
@@ -163,21 +166,21 @@ additionalContent:
               - title: .NET
                 links:
                     - text: .NET documentation
-                      url: /dotnet
+                      url: https://learn.microsoft.com/dotnet/
                     - text: ASP.NET documentation
-                      url: /aspnet
+                      url: https://learn.microsoft.com/aspnet/
                     - text: Azure documentation
-                      url: /azure
+                      url: https://learn.microsoft.com/azure/
                     - text: C# documentation
-                      url: /dotnet/csharp
+                      url: https://learn.microsoft.com/dotnet/csharp/
               - title: Webcasts and shows
                 links:
                     - text: Azure Friday
-                      url: /shows/azure-friday/
+                      url: https://learn.microsoft.com/shows/azure-friday/
                     - text: The Cloud Native Show
-                      url: /shows/The-Cloud-Native-Show
+                      url: https://learn.microsoft.com/shows/the-cloud-native-show/
                     - text: On .NET
-                      url: /shows/On-NET
+                      url: https://learn.microsoft.com/shows/on-net/
                     - text: .NET Community Standup
                       url: https://dotnet.microsoft.com/platform/community/standup
                     - text: On .NET Live
@@ -187,9 +190,9 @@ additionalContent:
                     - text: Orleans on GitHub
                       url: https://github.com/dotnet/orleans
                     - text: Orleans samples on GitHub
-                      url: https://github.com/dotnet/samples/tree/main/orleans
-                    - text: .NET samples
-                      url: https://github.com/dotnet/samples
+                      url: https://github.com/dotnet/orleans/tree/main/samples
+                    - text: Orleans sample catalog
+                      url: https://github.com/dotnet/orleans/blob/main/samples/README.md
                     - text: .NET Platform
                       url: https://github.com/dotnet
               - title: Interact
@@ -211,36 +214,36 @@ additionalContent:
 
           - title: ".NET Orleans core API reference"
             summary: API reference documentation for .NET Orleans.Core
-            url: /dotnet/api/orleans.core
+            url: https://learn.microsoft.com/dotnet/api/orleans.core
 
           - title: ".NET Orleans runtime API reference"
             summary: API reference documentation for .NET Orleans.Runtime
-            url: /dotnet/api/orleans.runtime
+            url: https://learn.microsoft.com/dotnet/api/orleans.runtime
 
           - title: ".NET Orleans streams API reference"
             summary: API reference documentation for .NET Orleans.Streams
-            url: /dotnet/api/orleans.streams
+            url: https://learn.microsoft.com/dotnet/api/orleans.streams
 
           - title: ".NET Orleans providers API reference"
             summary: API reference documentation for .NET Orleans.Providers
-            url: /dotnet/api/orleans.providers
+            url: https://learn.microsoft.com/dotnet/api/orleans.providers
 
           - title: ".NET Orleans storage API reference"
             summary: API reference documentation for .NET Orleans.Storage
-            url: /dotnet/api/orleans.storage
+            url: https://learn.microsoft.com/dotnet/api/orleans.storage
 
           - title: ".NET Orleans Azure Storage API reference"
             summary: API reference documentation for .NET Orleans.Clustering.AzureStorage
-            url: /dotnet/api/orleans.clustering.azurestorage
+            url: https://learn.microsoft.com/dotnet/api/orleans.clustering.azurestorage
 
           - title: ".NET Orleans services API reference"
             summary: API reference documentation for .NET Orleans.Services
-            url: /dotnet/api/orleans.services
+            url: https://learn.microsoft.com/dotnet/api/orleans.services
 
           - title: ".NET Orleans transactions API reference"
             summary: API reference documentation for .NET Orleans.Transactions
-            url: /dotnet/api/orleans.transactions
+            url: https://learn.microsoft.com/dotnet/api/orleans.transactions
 
 
     # footer (optional)
-    footer: "Are you interested in contributing to the .NET docs? For more information, see our [contributor guide](/contribute/dotnet/dotnet-contribute)."
+    footer: "Are you interested in contributing to the .NET docs? For more information, see our [contributor guide](https://learn.microsoft.com/contribute/content/dotnet/dotnet-contribute)."

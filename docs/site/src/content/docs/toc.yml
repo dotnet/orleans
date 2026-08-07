@@ -208,9 +208,7 @@ items:
       - name: Overview
         href: tutorials-and-samples/index.md
       - name: Hello World
-        href: tutorials-and-samples/overview-helloworld.md
-      - name: Orleans basics
-        href: tutorials-and-samples/tutorial-1.md
+        href: tutorials-and-samples/hello-world.md
       - name: Adventure game
         href: tutorials-and-samples/adventure.md
       - name: Unit testing

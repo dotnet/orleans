@@ -1,7 +1,7 @@
 ---
 title: Adventure game sample project
 description: Explore the Adventure sample project written with .NET Orleans.
-ms.date: 03/30/2025
+ms.date: 08/02/2026
 ms.topic: sample
 ---
 
@@ -11,13 +11,12 @@ This sample is a simple multiplayer text adventure game inspired by old-fashione
 
 ## Instructions
 
-1. Navigate to the [Orleans Text Adventure Game](/samples/dotnet/samples/orleans-text-adventure-game) in the samples browser experience.
-1. Select **Browse code** to view the source code.
-1. Clone the source code and build the solution.
+1. Open the [Adventure sample](https://github.com/dotnet/orleans/tree/main/samples/Adventure) in the Orleans repository.
+1. Clone the Orleans repository and build the sample.
 1. Start the _AdventureServer_ first, then the _AdventureClient_.
 1. You are then prompted to enter your name on the command line. Enter it and begin the game.
 
-For more information, see [Building the sample](/samples/dotnet/samples/orleans-text-adventure-game#building-the-sample).
+For exact commands and prerequisites, see the sample's [README](https://github.com/dotnet/orleans/blob/main/samples/Adventure/README.md).
 
 ## Overview
 

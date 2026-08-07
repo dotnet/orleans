@@ -161,7 +161,7 @@ A variety of samples are available in the official [.NET Samples Browser](https:
 
 ## Get started
 
-Please see the [getting started tutorial](https://dotnet.github.io/orleans/docs/tutorials-and-samples/tutorial-1/).
+Please see the [getting started tutorial](https://dotnet.github.io/orleans/docs/tutorials-and-samples/hello-world/).
 
 ### Building
 

@@ -1,237 +1,107 @@
 ---
-title: Best practices in Orleans
-description: Learn some of the best practices in Orleans for .NET Orleans app development.
-ms.date: 07/03/2024
+title: Orleans best practices
+description: Design, implement, and operate Orleans applications effectively.
+ms.date: 08/02/2026
+ms.topic: best-practice
 ---
 
-# Best practices in Orleans
+# Orleans best practices
 
-Orleans was built to greatly simplify the building of distributed scalable applications, especially for the cloud. Orleans invented the Virtual Actor Model as an evolution of the Actor Model optimized for cloud scenarios.
+Orleans works best when an application models many independently addressable entities whose state and work can be partitioned by key. These practices are starting points; measure representative workloads and adjust the design to the application's domain.
 
-Grains (virtual actors) are the base building blocks of an Orleans-based application. They encapsulate the state and behavior of application entities and maintain their lifecycle. The programming model of Orleans and the characteristics of its runtime fit some types of applications better than others. This document is intended to capture some of the tried and proven application patterns that work well in Orleans.
+## Model grains around domain ownership
 
-## Suitable apps
+- Give each grain a clear identity and responsibility, such as a user, account, device, order, room, or session.
+- Keep invariants which must change together in the same grain when practical.
+- Avoid networks of tiny grains which make several calls to complete one operation.
+- Avoid singleton coordinator grains on high-throughput paths. Partition coordination by key or use staged aggregation.
+- Don't assume that grain references imply locality. A grain call can cross a process or machine.
 
-Consider Orleans when:
+An ordinary stateful grain has one activation in the cluster unless its placement or registration says otherwise. Orleans doesn't automatically create replicas of it to increase throughput. Use partitioned identities, stateless workers, read replicas designed at the application layer, or another appropriate pattern.
 
-- Significant number (hundreds, millions, billions, and even trillions) of loosely coupled entities. To put the number in perspective, Orleans can easily create a grain for every person on Earth in a small cluster, so long as a subset of that total number is active at any point in time.
-  - Examples: user profiles, purchase orders, application/game sessions, stocks.
-- Entities are small enough to be single-threaded.
-  - Example: Determine if the stock should be purchased based on the current price.
-- Workload is interactive.
-  - Example: request-response, start/monitor/complete.
-- More than one server is expected or may be required.
-  - Orleans runs on a cluster that is expanded by adding servers to expand the cluster.
-- Global coordination is not needed or on a smaller scale between a few entities at a time.
-  - Scalability and performance of execution are achieved by parallelizing and distributing a large number of mostly independent tasks with no single point of synchronization.
+## Keep grain turns short and asynchronous
 
-## Unsuitable apps
+- Don't block threads with `.Wait()`, `.Result`, synchronous I/O, sleeps, or locks.
+- [Await](https://learn.microsoft.com/dotnet/csharp/language-reference/operators/await) I/O and grain calls.
+- Avoid CPU-intensive loops in a grain turn. Move substantial parallel computation to an appropriate worker or compute service.
+- Bound fan-out and concurrency instead of creating an unbounded number of calls.
+- Pass cancellation tokens where the contract supports cancellation, and treat cancellation as cooperative.
 
-Orleans is not the best fit when:
+Grain activations process one turn at a time by default. Reentrant grains and call-chain reentrancy can interleave turns, so don't enable them merely to avoid a call-cycle problem. First simplify the call graph; if interleaving is intentional, document and test the invariants which span `await` points.
 
-- Memory must be shared between entities.
-  - Each grain maintains its states and should not be shared.
-- A small number of large entities may be multithreaded.
-  - A microservice may be a better option when supporting complex logic in a single service.
-- Global coordination and/or consistency are needed.
-  - Such global coordination would severely limit the performance of an Orleans-based application. Orleans was built to easily scale to a global scale without the need for in-depth manual coordination.
-- Operations that run for a long time.
-  - Batch jobs, Single Instruction Multiple Data (SIMD) tasks.
-  - This depends on the need of the application and may be a fit for Orleans.
+## Design grain APIs for a network
 
-## Grains overview
+- Prefer coarse operations which express domain intent over chatty property-style APIs.
+- Keep arguments and return values reasonably sized.
+- Treat every grain call as fallible. Calls can time out or fail because of membership changes, process failures, overload, serialization, or application exceptions.
+- Design retries around idempotency. Orleans provides at-most-once message delivery by default, not exactly-once processing.
+- Avoid retrying indefinitely inside several layers. Establish bounded, observable retry policy at an appropriate boundary.
 
-- Grains resemble objects. However, they are distributed, virtual, and asynchronous.
-- They are loosely coupled, isolated, and primarily independent.
-  - Each grain is encapsulated which also maintains its state independently of other grains.
-  - Grains fail independently.
-- Avoid chatty communication between grains.
-  - Direct memory use is significantly less expensive than message passing.
-  - Highly chatty grains may be better combined as a single grain.
-  - Complexity/Size of arguments and serialization needs to be considered.
-  - Deserializing twice may be more expensive than resending a binary message.
-- Avoid bottleneck grains.
-  - Single coordinator/Registry/Monitor.
-  - Do staged aggregation if required.
+## Persist state deliberately
 
-### Asynchronicity
+Use <xref:Orleans.Runtime.IPersistentState`1> or another supported state model and select a provider appropriate to the durability, consistency, latency, and operational requirements.
 
-- No thread blocking: All items must be Async (Task Asynchronous Programming (TAP)).
-- [await](/dotnet/csharp/programming-guide/concepts/async/) is the best syntax to use when composing async operations.
-- Common Scenarios:
-  - Return a concrete value:
-  - `return Task.FromResult(value);`
-  - Return a <xref:System.Threading.Tasks.Task> of the same type:
-  - `return foo.Bar();`
-  - `await` a <xref:System.Threading.Tasks.Task> and continue execution:
+- Changing an in-memory state object doesn't write it automatically. Call the persistence API and await it before reporting success when durability is part of the operation's contract.
+- Handle storage failures explicitly. A failed write means the requested durability wasn't achieved.
+- Keep serialized types version tolerant. Use <xref:Orleans.GenerateSerializerAttribute> and stable <xref:Orleans.IdAttribute> values; don't reuse or renumber existing field IDs.
+- Keep state objects small enough for the provider's item and request limits.
+- Don't use memory storage when state must survive process loss or be shared by multiple silos.
+- Don't rely on a silo's local file system as shared production storage.
 
-    ```csharp
-    var x = await bar.Foo();
+Persistence doesn't replicate an activation's in-memory state. Recovery after process failure depends on state having been written to a durable, available provider.
 
-    var y = DoSomething(x);
+## Choose production providers as a set
 
-    return y;
-    ```
+A multi-silo deployment needs shared cluster membership. Most production applications also need deliberate choices for grain storage, reminders, streams, durable jobs, and grain directories.
 
-  - Fan-out:
+- Keep <xref:Orleans.Configuration.ClusterOptions.ServiceId> stable for an application and use <xref:Orleans.Configuration.ClusterOptions.ClusterId> to distinguish deployments which must not join each other.
+- Use separate deployment identities for development, test, staging, and production.
+- Follow the provider's authentication, encryption, backup, capacity, and high-availability guidance.
+- Test provider throttling, transient failures, and regional outages.
+- Don't expose silo or gateway endpoints directly to untrusted public clients. Put an authenticated application protocol such as HTTPS in front of the cluster.
 
-    ```csharp
-    var tasks = new List<Task>();
+For local development, localhost clustering and in-memory providers are convenient. They don't simulate all failure modes or guarantees of production infrastructure.
 
-    foreach (var grain in grains)
-    {
-        tasks.Add(grain.Foo());
-    }
-    await Task.WhenAll(tasks);
+## Plan for membership changes
 
-    DoMoreWork();
-    ```
+Silos can join, leave, restart, or fail at any time.
 
-### Implementation of grains
+- Run enough silos and infrastructure replicas to meet the application's availability goals.
+- Expect in-flight calls to fail during a silo failure. After membership converges, later calls can reactivate grains on healthy silos.
+- Use rolling deployment and grain versioning features when contracts or implementations change.
+- Understand the configured placement strategy. Activation rebalancing can improve distribution, but it doesn't remove hot keys or replace capacity planning.
+- Use graceful shutdown where possible, but validate abrupt process loss too.
 
-- Never perform a thread-blocking operation within a grain. All operations other than local computations must be explicitly asynchronous.
-  - Examples: Synchronously waiting for an IO operation or a web service call, locking, running an excessive loop that is waiting for a condition, and so on.
-- When to use a <xref:Orleans.Concurrency.StatelessWorkerAttribute>:
-  - Functional operations such as decryption, decompression, and before forwarding for processing.
-  - When only *local* grains are required in multiple activations.
-  - Example: Performs well with staged aggregation within local silo first.
-- Grains are non-reentrant by default.
-  - Deadlock can occur due to call cycles.
-  - Examples:
-  - The grain calls itself.
-  - Grain A calls B which calls C which in turn is calling A (A -> B -> C -> A).
-  - Grain A calls Grain B as Grain B is calling Grain A (A -> B -> A).
-  - Timeouts are used to automatically break deadlocks.
-  - <xref:Orleans.Concurrency.ReentrantAttribute> can be used to allow the grain class reentrant.
-  - Reentrant is still single-threaded however, it may interleave (divide processing/memory between tasks).
-  - Handling interleaving increases risk by being error-prone.
-- Inheritance:
-  - Grain classes inherit from the Grain base class. Grain interfaces (one or more) can be added to each grain.
-  - Disambiguation may be needed to implement the same interface in multiple grain classes.
-- Generics are supported.
+## Observe the application
 
-## Grain state persistence
+Use standard [.NET logging](https://learn.microsoft.com/dotnet/core/extensions/logging), [metrics](https://learn.microsoft.com/dotnet/core/diagnostics/metrics), and [distributed tracing](https://learn.microsoft.com/dotnet/core/diagnostics/distributed-tracing), and consider the Orleans Dashboard for cluster inspection.
 
-Orleans' grain state persistence APIs are designed to be easy-to-use and provide
-extensible storage functionality.
+- Include grain type and safe identifiers in logs without recording secrets or sensitive state.
+- Monitor call latency, timeouts, rejected requests, queue length, activation counts, memory, CPU, garbage collection, membership changes, and provider health.
+- Alert on symptoms visible to users as well as infrastructure signals.
+- Keep log levels configurable through the .NET configuration system.
+- Use health and readiness checks appropriate to the host environment.
 
-- <xref:Orleans.IGrainState?displayProperty=nameWithType> is extended by a .NET interface that contains fields that should be included in the grain's persisted state.
-- Grains are persisted by using [IPersistentState\<TState\>](../grains/grain-persistence/index.md) is extended by the grain class that adds a strongly typed <xref:Orleans.Grain`1.State> property into the grain's base class.
-- The initial <xref:Orleans.Grain`1.ReadStateAsync?displayProperty=nameWithType> automatically occurs before `ActiveAsync()` has been called for a grain.
-- When the grain's state object's data is changed, then the grain should call <xref:Orleans.Grain`1.WriteStateAsync?displayProperty=nameWithType>.
-  - Typically, grains call `State.WriteStateAsync()` at the end of grain method to return the Write promise.
-  - The Storage provider *could* try to batch Writes that may increase efficiency, but behavioral contracts and configurations are orthogonal (independent) to the storage API used by the grain.
-  - A **timer** is an alternative method to write updates periodically.
-  - The timer allows the application to determine the amount of "eventual consistency"/statelessness allowed.
-  - Timing (immediate/none/minutes) can also be controlled as to when to update.
-  - <xref:Orleans.Runtime.PersistentStateAttribute> decorated classes, like other grain classes, can only be associated with one storage provider.
-  - [StorageProvider(ProviderName = "name")](xref:Orleans.Providers.StorageProviderAttribute) attribute associates the grain class with a particular provider.
-  - `<StorageProvider>` will need to be added to the silo config file which should also include the corresponding "name" from `[StorageProvider(ProviderName="name")]`.
+## Test at the right levels
 
-## Storage providers
+- Unit test domain logic independently where possible.
+- Use `Microsoft.Orleans.TestingHost` for tests which need grain activation, serialization, scheduling, or multi-silo behavior.
+- Test serialization compatibility for messages and persisted state.
+- Add integration tests against the production provider types used by the application.
+- Exercise retries, duplicate requests, timeouts, process termination, rolling upgrades, and recovery.
+- Load test representative key distributions. Uniform synthetic keys can hide hot-grain problems.
 
-Built-in storage providers:
+## Review production readiness
 
-- Orleans.Storage houses all of the built-in storage providers.
-- <xref:Orleans.Storage.MemoryStorage> (Data stored in memory without durable persistence) is used *only* for debugging and unit testing.
+Before deployment, confirm that the application has:
 
-- AzureTableStorage:
+- Shared membership and durable providers where required.
+- Stable cluster and service identities.
+- Authentication and network boundaries.
+- Bounded retries and idempotent operations.
+- Capacity limits, backpressure, and overload behavior.
+- Logs, metrics, traces, health checks, and alerts.
+- Backup, restore, upgrade, and rollback procedures.
+- Tests for failures which can occur in the chosen infrastructure.
 
-  - Configure the Azure storage account information with an optional <xref:Orleans.Configuration.AzureTableStorageOptions.DeleteStateOnClear?displayProperty=nameWithType> (hard or soft deletions).
-  - Orleans serializer efficiently stores JSON data in one Azure table cell.
-  - Data size limit == max size of the Azure column which is 64kb of binary data.
-  - Community-contributed code that extends the use of multiple table columns which increases the overall maximum size to 1MB.
-
-### Storage provider debugging tips
-
-- TraceOverride Verbose3 will log much more information about storage
-    operations.
-  - Update silo config file.
-  - LogPrefix="Storage" for all providers, or specific type using "Storage.Memory" / "Storage.Azure" / "Storage.Shard".
-
-How to deal with storage operation failures:
-
-- Grains and storage providers can await storage operations and *retry* failures as needed.
-- Unhandled failures will propagate back to the caller and will be seen by the client as a broken promise.
-- Other than the initial read, there is not a concept that automatically destroys activations if a storage operation fails.
-- Retrying failing storage is *not* a default feature for built-in storage providers.
-
-### Grain persistence tips
-
-Grain size:
-
-- Optimal throughput is achieved by using *multiple smaller grains* rather than a few larger grains. However, the best practice of choosing a grain size and type is based on the *application domain model*.
-  - Example: Users, Orders, etc.
-
-External changing data:
-
-- Grains can re-read the current state data from storage by using `State.ReadStateAsync()`.
-- A timer can also be used to re-read data from storage periodically as well.
-  - The functional requirements could be based on a suitable "staleness" of the information.
-  - Example: Content cache grain.
-
-- Adding and removing fields.
-  - The storage provider will determine the effects of adding and removing additional fields from their persisted state.
-  - Azure table does not support schemas and should automatically adjust to the additional fields.
-
-Writing custom providers:
-
-- Storage providers are simple to write which is also a significant extension element for Orleans.
-- The API <xref:Orleans.GrainState> API contract drives the storage API contract (`Write`, `Clear`, <xref:Orleans.Grain`1.ReadStateAsync*>).
-- The storage behavior is typically configurable (Batch writing, Hard or Soft Deletions, and so on) and defined by the storage provider.
-
-## Cluster management
-
-- Orleans automatically manages clusters.
-  - Failed nodes --that is that can fail and join at any moment-- are automatically handled by Orleans.
-  - The same silo instance table that is created for the clustering protocol can also be used for diagnostics. The table keeps a history of all of the silos in the cluster.
-  - There are also configuration options of aggressive or more lenient failure detection.
-- Failures can happen at any time and are a normal occurrence.
-  - In the event a silo fails, the grains that were activated on the failed silo will automatically be reactivated later on other silos within the cluster.
-  - Grains can timeout. A retry solution such as Polly can assist with retries.
-  - Orleans provides a message delivery guarantee where each message is delivered at-most-once.
-  - It is the responsibility of the caller to [retry](https://github.com/App-vNext/Polly/wiki/Retry) any failed calls if needed.
-  - Common practice is to retry from end-to-end from the client/front end.
-
-## Deployment and production management
-
-Scaling out and in:
-
-- Monitor the Service-Level Agreement (SLA)
-- Add or Remove instances
-- Orleans automatically rebalances and takes advantage of the new hardware. However, activated grains are not rebalanced when a new silo is added to the cluster.
-
-## Logging and testing
-
-- Logging, Tracing, and Monitoring:
-  - Inject logging using dependency injection:
-
-    ```csharp
-    public HelloGrain(ILogger<HelloGrain> logger)
-    {
-        _logger = logger;
-    }
-    ```
-
-  - [Microsoft.Extensions.Logging](/dotnet/api/microsoft.extensions.logging) is utilized for functional and flexible logging.
-
-Testing:
-
-- `Microsoft.Orleans.TestingHost` NuGet package contains <xref:Orleans.TestingHost.TestCluster> which can be used to create an in-memory cluster, comprised of two silos by default, which can be used to test grains.
-- For more information, see [Unit testing with Orleans](../implementation/testing.md).
-
-Troubleshooting:
-
-- Use Azure table-based membership for development and testing.
-  - Works with Azure Storage Emulator for local troubleshooting.
-  - OrleansSiloInstances table displays the state of the cluster.
-  - Use unique deployment Ids (partition keys) to keep it simple.
-- Silo isn't starting.
-  - Check OrleansSiloInstances to determine if the silo registered there.
-  - Make sure that the firewall is open for TCP ports: 11111 and 30000.
-  - Check the logs, including the extra log that contains startup errors.
-- Frontend (Client) cannot connect to the silo cluster.
-  - The client must be hosted in the same service as the silos.
-  - Check OrleansSiloInstances to make sure the silos (gateways) are registered.
-  - Check the client log to make sure that the gateways match the ones listed in the OrleansSiloInstances' table.
-  - Check the client log to validate that the client was able to connect to one or more of the gateways.
+For specific provider packages, see [Orleans NuGet packages](nuget-packages.md). For version upgrades, use the [migration guide](../migration-guide.md).

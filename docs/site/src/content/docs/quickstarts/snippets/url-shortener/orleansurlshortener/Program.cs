@@ -3,11 +3,13 @@ using Orleans.Runtime;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// <orleans-configuration>
 builder.Host.UseOrleans(static siloBuilder =>
 {
     siloBuilder.UseLocalhostClustering();
     siloBuilder.AddMemoryGrainStorage("urls");
 });
+// </orleans-configuration>
 
 using var app = builder.Build();
 // </configuration>

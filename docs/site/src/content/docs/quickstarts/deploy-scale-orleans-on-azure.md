@@ -3,7 +3,7 @@ title: Deploy and scale an Orleans app on Azure
 description: Host and scale an Orleans app on Azure Container Apps with Azure Container Registry and Azure Table Storage or Azure Cosmos DB for NoSQL.
 ms.topic: how-to
 ms.devlang: csharp
-ms.date: 07/03/2024
+ms.date: 08/02/2026
 zone_pivot_groups: orleans-persistence-option
 # CustomerIntent: As a developer, I want to host my Orleans application in Azure so that I can take advantage of the scaling capabilities for the database and application services.
 ---
@@ -14,15 +14,15 @@ In this quickstart, you deploy and scale an Orleans URL shortener app on Azure C
 
 At the end of this quickstart, you have a scalable app running in Azure to provide URL shortener functionality. Along the way you learn to:
 
-- Pull and Azure Developer CLI template
+- Pull an Azure Developer CLI template
 - Deploy an Orleans app to Azure
 - Scale the app to multiple instances
 
 ## Prerequisites
 
 - An Azure account with an active subscription. [Create an account for free](https://azure.microsoft.com/pricing/purchase-options/azure-account?cid=msft_learn).
-- [Azure Developer CLI](/azure/developer/azure-developer-cli/install-azd)
-- [.NET 8](https://dotnet.microsoft.com/download)
+- [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [Docker](https://www.docker.com/)
 
 ## Get and deploy the sample application
@@ -86,17 +86,17 @@ The sample application is available as an Azure Developer CLI template. Through 
 
 The original deployment only deployed the minimal services necessary to host the URL shortener app. To use an Azure data service for grain persistence, you must first configure the template to deploy your preferred service.
 
-::: zone pivot="azure-storage"
+:::zone pivot="azure-storage"
 
-1. Using the terminal, run `azd env set` to configure the `DEPLOY_AZURE_TABLE_STORAGE` environment variable to enable deployment of Azure Cosmos DB for NoSQL.
+1. Using the terminal, run `azd env set` to configure the `DEPLOY_AZURE_TABLE_STORAGE` environment variable to enable deployment of Azure Table Storage.
 
    ```azuredeveloper
    azd env set DEPLOY_AZURE_TABLE_STORAGE true
    ```
 
-::: zone-end
+:::zone-end
 
-::: zone pivot="azure-cosmos-db-nosql"
+:::zone pivot="azure-cosmos-db-nosql"
 
 1. Using the terminal, run `azd env set` to configure the `DEPLOY_AZURE_COSMOS_DB_NOSQL` environment variable to enable deployment of Azure Cosmos DB for NoSQL.
 
@@ -104,7 +104,7 @@ The original deployment only deployed the minimal services necessary to host the
    azd env set DEPLOY_AZURE_COSMOS_DB_NOSQL true
    ```
 
-::: zone-end
+:::zone-end
 
 1. Run `azd provision` to redeploy your application architecture with the new configuration. Wait for the provisioning process to complete. The process can take **approximately two minutes**.
 
@@ -117,20 +117,32 @@ The original deployment only deployed the minimal services necessary to host the
 
 ## Install NuGet packages
 
-Prior to using the grain, you must install the corresponding `Microsoft.Orleans.Clustering.*` and `Microsoft.Orleans.Persistence.*` NuGet packages. These services use role-based access control for passwordless authentication, so you must also import the `Azure.Identity` NuGet package.
+Before adding shared providers, align the template with the maintained snippets:
 
-::: zone pivot="azure-storage"
-
-1. Change your current working directory to _./src/web/_.
+1. Change the working directory to _./src/web/_.
 
    ```bash
    cd ./src/web
    ```
 
+1. In the project file, change `TargetFramework` to `net10.0`.
+
+1. In _./src/web/Dockerfile_, update both [.NET container images](https://learn.microsoft.com/dotnet/core/docker/container-images): use `mcr.microsoft.com/dotnet/sdk:10.0` for the build stage and `mcr.microsoft.com/dotnet/aspnet:10.0` for the runtime stage.
+
+1. Upgrade the Orleans host package:
+
+   ```dotnetcli
+   dotnet package add Microsoft.Orleans.Server --version 10.2.2
+   ```
+
+Next, install the corresponding `Microsoft.Orleans.Clustering.*` and `Microsoft.Orleans.Persistence.*` NuGet packages. These services use role-based access control for passwordless authentication, so you must also import the `Azure.Identity` NuGet package.
+
+:::zone pivot="azure-storage"
+
 1. Import the `Azure.Identity` package from NuGet:
 
    ```dotnetcli
-   dotnet add package Azure.Identity --version 1.*
+   dotnet package add Azure.Identity
    ```
 
 1. Import the `Microsoft.Orleans.Clustering.AzureStorage` and `Microsoft.Orleans.Persistence.AzureStorage` packages.
@@ -141,18 +153,18 @@ Prior to using the grain, you must install the corresponding `Microsoft.Orleans.
    | **Persistence** | `Microsoft.Orleans.Persistence.AzureStorage` |
 
    ```dotnetcli
-   dotnet add package Microsoft.Orleans.Clustering.AzureStorage --version 8.*
-   dotnet add package Microsoft.Orleans.Persistence.AzureStorage --version 8.*
+   dotnet package add Microsoft.Orleans.Clustering.AzureStorage --version 10.2.2
+   dotnet package add Microsoft.Orleans.Persistence.AzureStorage --version 10.2.2
    ```
 
-::: zone-end
+:::zone-end
 
-::: zone pivot="azure-cosmos-db-nosql"
+:::zone pivot="azure-cosmos-db-nosql"
 
 1. Import the `Azure.Identity` package from NuGet:
 
    ```dotnetcli
-   dotnet add package Azure.Identity --version 1.*
+   dotnet package add Azure.Identity
    ```
 
 1. Import the `Microsoft.Orleans.Clustering.Cosmos` and `Microsoft.Orleans.Persistence.Cosmos` packages.
@@ -163,129 +175,55 @@ Prior to using the grain, you must install the corresponding `Microsoft.Orleans.
    | **Persistence** | `Microsoft.Orleans.Persistence.Cosmos` |
 
    ```dotnetcli
-   dotnet add package Microsoft.Orleans.Clustering.Cosmos --version 8.*
-   dotnet add package Microsoft.Orleans.Persistence.Cosmos --version 8.*
+   dotnet package add Microsoft.Orleans.Clustering.Cosmos --version 10.2.2
+   dotnet package add Microsoft.Orleans.Persistence.Cosmos --version 10.2.2
    ```
 
-::: zone-end
+:::zone-end
 
 ## Configure and redeploy the sample app
 
-The sample app is currently configured to create a localhost cluster and persist grains in-memory. When hosted in Azure, Orleans can be configured to use more scalable, centralized state using a data service in Azure.
+The sample app initially creates a localhost cluster and persists grain state in memory. When hosted in Azure, Orleans can use a shared data service for cluster membership and durable grain state.
 
-1. Add the following `using` directives:
+1. Find and remove the existing `builder` configuration code in the _src/web/Program.cs_ file.
 
-   ```csharp
-   using Azure.Identity;
-   using Orleans.Configuration;
-   ```
+   :::code source="snippets/url-shortener/orleansurlshortener/Program.cs" id="orleans-configuration":::
 
-1. Find and remove the current `builder` configuration code in the _src/web/Program.cs_ file.
+:::zone pivot="azure-storage"
 
-   ```csharp
-   builder.Host.UseOrleans(static siloBuilder =>
-   {
-       siloBuilder
-           .UseLocalhostClustering()
-           .AddMemoryGrainStorage("urls");
-   });
-   ```
+1. Add the required `using` directives:
 
-::: zone pivot="azure-storage"
+   :::code source="snippets/deploy-scale-orleans-on-azure/azure-storage/Program.cs" id="azure-storage-usings":::
 
 1. Replace the `builder` configuration with the example here, which implements these key concepts:
 
    - A conditional environment check is added to ensure the app runs properly in both local development and Azure hosted scenarios.
-   - The `UseAzureStorageClustering` method configures the Orleans cluster to use Azure Table Storage and authenticates using the <xref:Azure.Identity.DefaultAzureCredential> class.
-   - Use the `Configure` method to assign IDs for the Orleans cluster.
-   - The `ClusterID` is a unique ID for the cluster that allows clients and silos to talk to one another.
-   - The `ClusterID` can change across deployments.
-   - The `ServiceID` is a unique ID for the application that is used internally by Orleans and should remain consistent across deployments.
+   - <xref:Orleans.Hosting.AzureTableClusteringExtensions.UseAzureStorageClustering*?displayProperty=nameWithType> configures the Orleans cluster to use Azure Table Storage and authenticates using <xref:Azure.Identity.DefaultAzureCredential>.
+   - The configuration assigns <xref:Orleans.Configuration.ClusterOptions.ClusterId> and <xref:Orleans.Configuration.ClusterOptions.ServiceId>.
+   - <xref:Orleans.Configuration.ClusterOptions.ClusterId> identifies a cluster so its clients and silos can communicate. Use a different value for deployments that must remain isolated.
+   - <xref:Orleans.Configuration.ClusterOptions.ServiceId> identifies the application and should remain consistent across deployments.
 
-    ```csharp
-    if (builder.Environment.IsDevelopment())
-    {
-        builder.Host.UseOrleans(static siloBuilder =>
-        {
-            siloBuilder
-                .UseLocalhostClustering()
-                .AddMemoryGrainStorage("urls");
-        });
-    }
-    else
-    {
-        builder.Host.UseOrleans(siloBuilder =>
-        {
-            var endpoint = new Uri(builder.Configuration["AZURE_TABLE_STORAGE_ENDPOINT"]!);
-            var credential = new DefaultAzureCredential();
+    :::code source="snippets/deploy-scale-orleans-on-azure/azure-storage/Program.cs" id="azure-storage-configuration":::
 
-            siloBuilder
-                .UseAzureStorageClustering(options =>
-                {
-                    options.ConfigureTableServiceClient(endpoint, credential);
-                })
-                .AddAzureTableGrainStorage(name: "urls", options =>
-                {
-                    options.ConfigureTableServiceClient(endpoint, credential);
-                })
-                .Configure<ClusterOptions>(options =>
-                {
-                    options.ClusterId = "url-shortener";
-                    options.ServiceId = "urls";
-                });
-        });
-    }
-    ```
+:::zone-end
 
-::: zone-end
+:::zone pivot="azure-cosmos-db-nosql"
 
-::: zone pivot="azure-cosmos-db-nosql"
+1. Add the required `using` directives:
+
+   :::code source="snippets/deploy-scale-orleans-on-azure/cosmos/Program.cs" id="cosmos-usings":::
 
 1. Replace the `builder` configuration with the example here, which implements these key concepts:
 
    - A conditional environment check is added to ensure the app runs properly in both local development and Azure hosted scenarios.
-   - The `UseCosmosClustering` method configures the Orleans cluster to use Azure Cosmos DB for NoSQL and authenticates using the <xref:Azure.Identity.DefaultAzureCredential> class.
-   - Use the `Configure` method to assign IDs for the Orleans cluster.
-   - The `ClusterID` is a unique ID for the cluster that allows clients and silos to talk to one another.
-   - The `ClusterID` can change across deployments.
-   - The `ServiceID` is a unique ID for the application that is used internally by Orleans and should remain consistent across deployments.
+   - <xref:Orleans.Hosting.HostingExtensions.UseCosmosClustering*?displayProperty=nameWithType> configures the Orleans cluster to use Azure Cosmos DB for NoSQL and authenticates using <xref:Azure.Identity.DefaultAzureCredential>.
+   - The configuration assigns <xref:Orleans.Configuration.ClusterOptions.ClusterId> and <xref:Orleans.Configuration.ClusterOptions.ServiceId>.
+   - <xref:Orleans.Configuration.ClusterOptions.ClusterId> identifies a cluster so its clients and silos can communicate. Use a different value for deployments that must remain isolated.
+   - <xref:Orleans.Configuration.ClusterOptions.ServiceId> identifies the application and should remain consistent across deployments.
 
-   ```csharp
-   if (builder.Environment.IsDevelopment())
-   {
-       builder.Host.UseOrleans(static siloBuilder =>
-       {
-           siloBuilder
-               .UseLocalhostClustering()
-               .AddMemoryGrainStorage("urls");
-       });
-   }
-   else
-   {
-       builder.Host.UseOrleans(siloBuilder =>
-       {
-           var endpoint = builder.Configuration["AZURE_COSMOS_DB_NOSQL_ENDPOINT"]!;
-           var credential = new DefaultAzureCredential();
+   :::code source="snippets/deploy-scale-orleans-on-azure/cosmos/Program.cs" id="cosmos-configuration":::
 
-           siloBuilder
-               .UseCosmosClustering(options =>
-               {
-                   options.ConfigureCosmosClient(endpoint, credential);
-               })
-               .AddCosmosGrainStorage(name: "urls", options =>
-               {
-                   options.ConfigureCosmosClient(endpoint, credential);
-               })
-               .Configure<ClusterOptions>(options =>
-               {
-                   options.ClusterId = "url-shortener";
-                   options.ServiceId = "urls";
-               });
-       });
-   }
-   ```
-
-::: zone-end
+:::zone-end
 
 1. Run `azd deploy` to redeploy your application code as a Docker container. Wait for the deployment process to complete. The process can take **approximately one minute**.
 
@@ -318,7 +256,7 @@ Optionally, you can verify that the cluster and state data is stored as expected
    > [!IMPORTANT]
    > The environment name specified earlier in this quickstart is also the target resource group name.
 
-::: zone pivot="azure-storage"
+:::zone pivot="azure-storage"
 
 1. Navigate to the overview page of the Azure Storage account.
 
@@ -333,13 +271,13 @@ Optionally, you can verify that the cluster and state data is stored as expected
 
    :::image type="content" source="media/deploy-scale-orleans-on-azure/storage-table-entities.png" alt-text="A screenshot showing Orleans data in Azure Table Storage.":::
 
-::: zone-end
+:::zone-end
 
-::: zone pivot="azure-cosmos-db-nosql"
+:::zone pivot="azure-cosmos-db-nosql"
 
 1. Navigate to the overview page of the Azure Cosmos DB for NoSQL account.
 
-1. Within the navigation,select **Data Explorer**.
+1. Within the navigation, select **Data Explorer**.
 
 1. Observe the following containers you created earlier in this guide:
 
@@ -347,7 +285,7 @@ Optionally, you can verify that the cluster and state data is stored as expected
 
    - **OrleansCluster**: This table tracks essential silo data for the Orleans cluster.
 
-::: zone-end
+:::zone-end
 
 ## Scale the app
 
@@ -371,19 +309,19 @@ Orleans is designed for distributed applications. Even an app as simple as the U
 
 ## Related content
 
-::: zone pivot="azure-storage"
+:::zone pivot="azure-storage"
 
-- [Azure Table Storage](/azure/storage/tables)
+- [Azure Table Storage](https://learn.microsoft.com/azure/storage/tables/table-storage-overview)
 - [Azure Storage grain persistence](../grains/grain-persistence/azure-storage.md)
 
-::: zone-end
+:::zone-end
 
-::: zone pivot="azure-cosmos-db-nosql"
+:::zone pivot="azure-cosmos-db-nosql"
 
-- [Azure Cosmos DB for NoSQL](/azure/cosmos-db/nosql)
+- [Azure Cosmos DB for NoSQL](https://learn.microsoft.com/azure/cosmos-db/nosql/overview)
 - [Azure Cosmos DB grain persistence](../grains/grain-persistence/azure-cosmos-db.md)
 
-::: zone-end
+:::zone-end
 
 ## Next step
 
