@@ -207,6 +207,75 @@ namespace Orleans.Configuration
         }
     }
 
+    /// <summary>
+    /// Configures memory usage for an Event Hubs stream cache.
+    /// </summary>
+    public class EventHubStreamCacheMemoryOptions
+    {
+        /// <summary>
+        /// The default maximum number of bytes which active caches for one provider can allocate.
+        /// </summary>
+        public const long DefaultMaxActiveCacheMemory = 512L * 1024 * 1024;
+
+        /// <summary>
+        /// The default maximum number of bytes retained in the payload buffer pool.
+        /// </summary>
+        public const long DefaultMaxBufferPoolMemory = 64L * 1024 * 1024;
+
+        /// <summary>
+        /// Gets or sets the maximum number of bytes which active caches for one provider can allocate.
+        /// Reads pause after this limit is reached. Batches which are already in flight can temporarily exceed the limit.
+        /// </summary>
+        public long MaxActiveCacheMemory { get; set; } = DefaultMaxActiveCacheMemory;
+
+        /// <summary>
+        /// Gets or sets the maximum number of bytes retained in the payload buffer pool.
+        /// </summary>
+        public long MaxBufferPoolMemory { get; set; } = DefaultMaxBufferPoolMemory;
+    }
+
+    /// <summary>
+    /// Validates <see cref="EventHubStreamCacheMemoryOptions"/>.
+    /// </summary>
+    public class EventHubStreamCacheMemoryOptionsValidator : IConfigurationValidator
+    {
+        private readonly EventHubStreamCacheMemoryOptions options;
+        private readonly string name;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventHubStreamCacheMemoryOptionsValidator"/> class.
+        /// </summary>
+        /// <param name="options">The options to validate.</param>
+        /// <param name="name">The stream provider name.</param>
+        public EventHubStreamCacheMemoryOptionsValidator(EventHubStreamCacheMemoryOptions options, string name)
+        {
+            this.options = options;
+            this.name = name;
+        }
+
+        /// <inheritdoc />
+        public void ValidateConfiguration()
+        {
+            if (options.MaxActiveCacheMemory <= 0)
+            {
+                throw new OrleansConfigurationException(
+                    $"{nameof(EventHubStreamCacheMemoryOptions)} on stream provider {this.name} is invalid. {nameof(EventHubStreamCacheMemoryOptions.MaxActiveCacheMemory)} must be greater than zero.");
+            }
+
+            if (options.MaxBufferPoolMemory < 0)
+            {
+                throw new OrleansConfigurationException(
+                    $"{nameof(EventHubStreamCacheMemoryOptions)} on stream provider {this.name} is invalid. {nameof(EventHubStreamCacheMemoryOptions.MaxBufferPoolMemory)} must be greater than or equal to zero.");
+            }
+
+            if (options.MaxBufferPoolMemory > options.MaxActiveCacheMemory)
+            {
+                throw new OrleansConfigurationException(
+                    $"{nameof(EventHubStreamCacheMemoryOptions)} on stream provider {this.name} is invalid. {nameof(EventHubStreamCacheMemoryOptions.MaxBufferPoolMemory)} must not exceed {nameof(EventHubStreamCacheMemoryOptions.MaxActiveCacheMemory)}.");
+            }
+        }
+    }
+
     public class EventHubReceiverOptions
     {
         /// <summary>
