@@ -13,6 +13,8 @@ To build a cluster from documented Container Apps endpoints, use a virtual-netwo
 
 Use the [Deploy and scale an Orleans app on Azure](../quickstarts/deploy-scale-orleans-on-azure.md) quickstart to learn the Azure Developer CLI deployment flow. The maintained [Orleans cluster on Azure Container Apps sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureContainerApps) is also useful for studying a multi-component topology and the external-scaler contract. Review the [sample limitations](#understand-the-maintained-sample) before adapting either resource for production.
 
+If the application uses Aspire, the [Aspire deployment flow for Azure Container Apps](https://aspire.dev/deployment/azure/container-apps/) can provision and publish platform resources. It doesn't remove the Orleans endpoint requirements on this page: review the generated topology, keep one replica per advertised silo endpoint, configure external clustering and durable state, and add the required health, identity, upgrade, and capacity controls before production.
+
 ## Choose a topology
 
 | Topology | Endpoint behavior | Guidance |
@@ -76,7 +78,7 @@ A **listening endpoint** is where the process binds inside its container. An **a
 
 Container Apps provides `CONTAINER_APP_REPLICA_NAME` to identify a replica and `CONTAINER_APP_HOSTNAME` to identify a revision host. Neither value is a supported per-replica network address. Don't advertise an app or revision host name from multiple silo replicas: a peer can be routed to a different replica than the membership entry identifies.
 
-See [Networking in Azure Container Apps](/azure/container-apps/networking), [Configure ingress](/azure/container-apps/ingress-how-to), and [Topology, networking, and clustering](networking.md) for the underlying network requirements.
+See [Networking in Azure Container Apps](https://learn.microsoft.com/azure/container-apps/networking), [Configure ingress](https://learn.microsoft.com/azure/container-apps/ingress-how-to), and [Topology, networking, and clustering](networking.md) for the underlying network requirements.
 
 ## Configure clustering and durable state
 
@@ -127,18 +129,18 @@ Define the environment and every Container App using a stable Azure Resource Man
 - Explicit startup, readiness, and liveness probes.
 - A `terminationGracePeriodSeconds` value longer than the measured .NET host and Orleans shutdown time. Container Apps defaults the process grace period to 30 seconds and sends `SIGKILL` when it expires.
 - A user-assigned or system-assigned managed identity for each runtime app.
-- [Managed-identity image pulls](/azure/container-apps/managed-identity-image-pull) from Azure Container Registry. Grant only `AcrPull`, or the equivalent repository-reader role for a registry using ABAC.
+- [Managed-identity image pulls](https://learn.microsoft.com/azure/container-apps/managed-identity-image-pull) from Azure Container Registry. Grant only `AcrPull`, or the equivalent repository-reader role for a registry using ABAC.
 - Azure Table Storage or another supported clustering provider, durable grain storage where required, and private service access where the security model requires it.
 - Log Analytics or Azure Monitor diagnostic routing, plus application metrics and tracing.
 - Immutable image digests or unique image tags. Don't deploy a mutable `latest` tag.
 
-Never scale the Orleans cluster to zero. Keep enough silo apps running to meet the tested availability and capacity floor after losing one instance. Scale out by adding a new one-replica silo app and waiting for it to become active in membership. Scale in one app at a time after removing it from application traffic and allowing graceful shutdown. See [Set scaling rules in Azure Container Apps](/azure/container-apps/scale-app).
+Never scale the Orleans cluster to zero. Keep enough silo apps running to meet the tested availability and capacity floor after losing one instance. Scale out by adding a new one-replica silo app and waiting for it to become active in membership. Scale in one app at a time after removing it from application traffic and allowing graceful shutdown. See [Set scaling rules in Azure Container Apps](https://learn.microsoft.com/azure/container-apps/scale-app).
 
-For true secrets, prefer a Container Apps [Key Vault secret reference](/azure/container-apps/manage-secrets#reference-secret-from-key-vault) using a managed identity with **Key Vault Secrets User**. Don't put storage keys, registry passwords, certificates, or deployment credentials directly in source, images, Bicep parameters, or ordinary environment variables.
+For true secrets, prefer a Container Apps [Key Vault secret reference](https://learn.microsoft.com/azure/container-apps/manage-secrets#reference-secret-from-key-vault) using a managed identity with **Key Vault Secrets User**. Don't put storage keys, registry passwords, certificates, or deployment credentials directly in source, images, Bicep parameters, or ordinary environment variables.
 
 ## Secure continuous deployment
 
-Use [GitHub OpenID Connect (OIDC) and workload identity federation](/azure/developer/github/connect-from-azure-openid-connect) instead of a long-lived service-principal secret:
+Use [GitHub OpenID Connect (OIDC) and workload identity federation](https://learn.microsoft.com/azure/developer/github/connect-from-azure-openid-connect) instead of a long-lived service-principal secret:
 
 ```yaml
 permissions:
@@ -174,7 +176,7 @@ Define HTTP startup, readiness, and liveness probes explicitly in infrastructure
 
 Readiness controls Container Apps ingress traffic. For a one-replica silo app, failing readiness prevents new connections through its advertised silo and gateway ingress ports, but existing TCP connections can remain open. Readiness doesn't update Orleans membership or complete a drain by itself. Coordinate the readiness transition with stopping new application work, leaving membership, closing existing connections, and normal .NET host termination. Set `terminationGracePeriodSeconds` above the measured shutdown time with margin, and keep the .NET host shutdown timeout shorter than that platform deadline.
 
-See [Health probes in Azure Container Apps](/azure/container-apps/health-probes), [Application lifecycle in Azure Container Apps](/azure/container-apps/application-lifecycle-management), and [Health and observability](health-and-observability.md).
+See [Health probes in Azure Container Apps](https://learn.microsoft.com/azure/container-apps/health-probes), [Application lifecycle in Azure Container Apps](https://learn.microsoft.com/azure/container-apps/application-lifecycle-management), and [Health and observability](health-and-observability.md).
 
 ## Plan revisions and upgrades
 
@@ -191,7 +193,7 @@ This process is a rolling replacement across distinct Container App resources, n
 
 Old and new silos can share a `ClusterId` only when their grain interfaces, serializers, persisted state, provider schemas, and side effects are compatible. For an incompatible blue-green deployment, use a distinct `ClusterId` and endpoint set. Route application HTTP traffic between matching client or API deployments. Container Apps revision weights and labels affect ingress traffic only; they don't split direct Orleans TCP traffic.
 
-See [Revisions in Azure Container Apps](/azure/container-apps/revisions), [Traffic splitting](/azure/container-apps/traffic-splitting), and [Graceful shutdown and upgrades](upgrades.md).
+See [Revisions in Azure Container Apps](https://learn.microsoft.com/azure/container-apps/revisions), [Traffic splitting](https://learn.microsoft.com/azure/container-apps/traffic-splitting), and [Graceful shutdown and upgrades](upgrades.md).
 
 ## Configure observability
 

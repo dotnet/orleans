@@ -8,7 +8,7 @@ ms.custom: devops
 
 # Deploy Orleans to Azure App Service on Windows
 
-This tutorial deploys the [Orleans shopping cart sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureAppService) as a multi-instance cluster on Windows Azure App Service. For Linux plan, runtime, startup, and Easy Auth differences, see [Deploy Orleans to Azure App Service on Linux](deploy-to-azure-app-service-linux.md).
+This tutorial deploys the [Orleans shopping cart sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureAppService) as a multi-instance cluster on [Windows Azure App Service](https://learn.microsoft.com/azure/app-service/overview). For Linux plan, runtime, startup, and Easy Auth differences, see [Deploy Orleans to Azure App Service on Linux](deploy-to-azure-app-service-linux.md).
 
 The sample cohosts an ASP.NET Core Blazor app and an Orleans silo in each worker. It uses:
 
@@ -25,7 +25,7 @@ The sample cohosts an ASP.NET Core Blazor app and an Orleans silo in each worker
 
 Orleans silos communicate directly with individual silos over long-lived TCP connections. The App Service HTTP load balancer doesn't provide this connectivity.
 
-Regional virtual network integration gives each worker a private address in `WEBSITE_PRIVATE_IP`. With `vnetPrivatePortsCount: 1`, App Service exposes a dynamically allocated port in `WEBSITE_PRIVATE_PORTS`. The read-only `WEBSITE_INSTANCE_ID` becomes the Orleans silo name for diagnostics. The application:
+[Regional virtual network integration](https://learn.microsoft.com/azure/app-service/overview-vnet-integration) gives each worker a private address in `WEBSITE_PRIVATE_IP`. With `vnetPrivatePortsCount: 1`, App Service exposes a dynamically allocated port in `WEBSITE_PRIVATE_PORTS`. The read-only `WEBSITE_INSTANCE_ID` becomes the Orleans silo name for diagnostics. See the [App Service environment-variable reference](https://learn.microsoft.com/azure/app-service/reference-app-settings) for the platform settings. The application:
 
 1. Advertises the private address and allocated silo port.
 1. Listens on all local interfaces because the advertised address might not be locally bindable.
@@ -54,9 +54,9 @@ Use a dedicated tier that supports virtual network integration and deployment sl
 
 - An Azure subscription and permission to create resources and role assignments.
 - The [.NET SDK selected by `global.json`](https://dotnet.microsoft.com/download).
-- [Azure CLI](/cli/azure/install-azure-cli) with Bicep.
+- [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) with Bicep.
 - A clone of the [`dotnet/orleans`](https://github.com/dotnet/orleans) repository.
-- A Microsoft Entra app registration for App Service Authentication.
+- A Microsoft Entra app registration for [App Service Authentication](https://learn.microsoft.com/azure/app-service/overview-authentication-authorization).
 
 Set local deployment values:
 
@@ -120,7 +120,7 @@ The template creates:
 - A three-worker Premium v3 Windows plan and production/staging slots.
 - A virtual network with separate `/24` delegated subnets.
 - A storage account restricted to those subnets, with shared-key authorization disabled.
-- A shared user-assigned identity and **Storage Table Data Contributor** assignment.
+- A shared [user-assigned managed identity](https://learn.microsoft.com/azure/app-service/overview-managed-identity) and **Storage Table Data Contributor** assignment.
 - App Service Authentication for both slots.
 - Log Analytics and workspace-based Application Insights.
 
@@ -164,6 +164,8 @@ https://<staging-default-hostname>/health/ready
 
 ## Swap into production
 
+Review [App Service deployment slot behavior](https://learn.microsoft.com/azure/app-service/deploy-staging-slots) before using a slot swap for an Orleans rollout.
+
 ```azurecli
 az webapp deployment slot swap `
   --name $appName `
@@ -202,7 +204,7 @@ The workflow pins actions to immutable commit SHAs, grants only `contents: read`
 
 ## Health and shutdown
 
-App Service uses `/health/ready` for startup warm-up, slot warm-up, and Health check. It succeeds only after the host and silo start, then becomes unavailable when shutdown begins. `/health/live` is a cheap local process check and deliberately doesn't depend on shared storage.
+App Service uses `/health/ready` for startup warm-up, slot warm-up, and [Health check](https://learn.microsoft.com/azure/app-service/monitor-instances-health-check). It succeeds only after the host and silo start, then becomes unavailable when shutdown begins. `/health/live` is a cheap local process check and deliberately doesn't depend on shared storage.
 
 The host allows up to 30 seconds for Orleans to leave membership. App Service can terminate a worker sooner, so application correctness must tolerate silo loss and unknown call outcomes.
 

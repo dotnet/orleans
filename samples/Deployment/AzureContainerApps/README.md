@@ -55,7 +55,7 @@ flowchart LR
 - The registry and storage data endpoints remain public so GitHub-hosted runners and Container Apps can reach them, but they require Microsoft Entra authentication. Adapt the sample with private endpoints and a private runner when public endpoints are not acceptable.
 - The workflow updates existing apps in place. Container Apps can overlap old and new revisions while readiness is evaluated. For a production upgrade, deploy a replacement one-replica silo app with unused ports, wait for it to join, and then drain and remove the old app.
 
-See [Host Orleans on Azure Container Apps](../../../docs/site/src/content/docs/deployment/deploy-to-azure-container-apps.md) for production topology, upgrade, and acceptance-test guidance.
+See [Host Orleans on Azure Container Apps](https://dotnet.github.io/orleans/docs/deployment/deploy-to-azure-container-apps/) for production topology, upgrade, and acceptance-test guidance.
 
 ## Project layout
 
@@ -215,7 +215,7 @@ To remove capacity, first stop new application work for that silo, allow Orleans
 
 ### Study the external scaler
 
-The gRPC scaler remains in the solution so you can study Orleans management statistics and the KEDA external-scaler protocol. It isn't attached to the silo apps because Container Apps doesn't publish a supported unique address for each replica of a scaled app. Use measured platform metrics or an application-owned deployment controller to add and remove whole one-replica silo apps; don't use the sample threshold as production capacity guidance.
+The gRPC scaler remains in the solution so you can study Orleans management statistics and the [KEDA external-scaler protocol](https://keda.sh/docs/latest/concepts/external-scalers/). It isn't attached to the silo apps because Container Apps doesn't publish a supported unique address for each replica of a scaled app. Use measured platform metrics or an application-owned deployment controller to add and remove whole one-replica silo apps; don't use the sample threshold as production capacity guidance.
 
 ### Inspect health and revisions
 

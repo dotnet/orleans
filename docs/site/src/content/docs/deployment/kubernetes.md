@@ -8,7 +8,7 @@ ms.custom: devops
 
 # Host Orleans on Kubernetes
 
-Kubernetes can host Orleans when pods have direct network connectivity and the application uses a production clustering provider. Orleans doesn't require a Kubernetes-specific hosting package. The recommended approach is to configure each silo explicitly from the pod name and pod IP supplied by the Kubernetes downward API.
+Kubernetes can host Orleans when pods have direct network connectivity and the application uses a production clustering provider. Orleans doesn't require a Kubernetes-specific hosting package. The recommended approach is to configure each silo explicitly from the pod name and pod IP supplied by the Kubernetes [downward API](https://kubernetes.io/docs/concepts/workloads/pods/downward-api/).
 
 ## Configure the silo
 
@@ -157,7 +157,7 @@ Apply the manifest in a namespace dedicated or appropriately shared for the appl
 kubectl apply --namespace <namespace> --filename orleans.yaml
 ```
 
-The baseline disables service account token mounting because Orleans doesn't need to call the Kubernetes API. Add a service account and permissions only for application features that require them.
+The baseline disables [service account token mounting](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/) because Orleans doesn't need to call the Kubernetes API. Add a service account and permissions only for application features that require them.
 
 ## Deploy with Aspire
 
@@ -178,7 +178,7 @@ For the supported APIs and deployment commands, see [Orleans and Aspire integrat
 
 ## Optional Kubernetes hosting package
 
-The `Microsoft.Orleans.Hosting.Kubernetes` package is optional and isn't generally recommended. Consider it only for a simple topology where exactly one Kubernetes `Deployment` object owns exactly one Orleans cluster.
+The [`Microsoft.Orleans.Hosting.Kubernetes`](https://www.nuget.org/packages/Microsoft.Orleans.Hosting.Kubernetes) package is optional and isn't generally recommended. Consider it only for a simple topology where exactly one Kubernetes `Deployment` object owns exactly one Orleans cluster.
 
 > [!IMPORTANT]
 > Don't use the package for an Orleans cluster composed from multiple `Deployment` objects, StatefulSets, custom controllers, or blue-green or canary workloads sharing a cluster identity. Configure endpoints explicitly instead.
@@ -220,7 +220,7 @@ If a service mesh intercepts TCP, validate long-lived connections, pod-address p
 
 ## Health probes
 
-The three paths in the manifest are placeholders that the application must implement according to [Health and observability](health-and-observability.md):
+The three paths in the manifest are [startup, readiness, and liveness probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/) that the application must implement according to [Health and observability](health-and-observability.md):
 
 - Startup succeeds after the silo joins the cluster and required initialization completes.
 - Readiness becomes false before shutdown and whenever the application can't safely accept new traffic.
@@ -230,7 +230,7 @@ The five-minute startup allowance is an example, not a universal default. Set it
 
 ## Resource requests and limits
 
-Set requests and limits from measurements under representative load, including a silo loss and rolling deployment. Kubernetes uses requests for scheduling and uses limits to constrain a running container; they aren't interchangeable capacity settings.
+Set [container resource requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/) from measurements under representative load, including a silo loss and rolling deployment. Kubernetes uses requests for scheduling and uses limits to constrain a running container; they aren't interchangeable capacity settings.
 
 - **CPU requests** reserve scheduling capacity. If requests are too low, Kubernetes can place too many silos on one node and create contention during bursts or failover.
 - **CPU limits** can throttle the .NET process even when the node has spare CPU. Tail latency, membership probes, garbage collection, and activation recovery can all suffer under throttling. The baseline intentionally specifies a CPU request without a CPU limit.
@@ -239,7 +239,7 @@ Set requests and limits from measurements under representative load, including a
 
 Monitor CPU throttling, working set, allocation rate, garbage collection, scheduler delay, activation count, and pod restarts. Revisit resource settings when grain state, placement, traffic, runtime, or node sizes change.
 
-Namespace `ResourceQuota` and `LimitRange` policies can reject pods or inject defaults. Verify the effective pod specification after admission rather than assuming the submitted manifest is what runs.
+Namespace [`ResourceQuota`](https://kubernetes.io/docs/concepts/policy/resource-quotas/) and [`LimitRange`](https://kubernetes.io/docs/concepts/policy/limit-range/) policies can reject pods or inject defaults. Verify the effective pod specification after admission rather than assuming the submitted manifest is what runs.
 
 For workload sizing, overload protection, and scaling signals, see [Capacity planning and scaling](capacity-planning.md).
 

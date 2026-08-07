@@ -8,7 +8,7 @@ ms.custom: devops
 
 # Host Orleans on Service Fabric
 
-Orleans can run on [Azure Service Fabric](/azure/service-fabric) as an unpartitioned stateless Reliable Service. Each Service Fabric service instance hosts one Orleans silo in a normal .NET generic host.
+Orleans can run on [Azure Service Fabric](https://learn.microsoft.com/azure/service-fabric) as an unpartitioned stateless Reliable Service. Each Service Fabric service instance hosts one Orleans silo in a normal .NET generic host.
 
 There is no Orleans Service Fabric hosting or clustering package. The integration is application-authored using:
 
@@ -88,7 +88,7 @@ Apply network controls so only trusted silos can reach the silo ports and only t
 
 Service Fabric opens the communication listener before calling the stateless service's `RunAsync`. In this integration, `OpenAsync` completes only after the Orleans host starts, so Service Fabric doesn't publish the listener address while silo startup is still in progress.
 
-That lifecycle boundary is necessary but isn't a complete application health model. Add application-authored Service Fabric [health reports](/azure/service-fabric/service-fabric-health-introduction) for sustained conditions that operators or monitored upgrades must evaluate, such as:
+That lifecycle boundary is necessary but isn't a complete application health model. Add application-authored Service Fabric [health reports](https://learn.microsoft.com/azure/service-fabric/service-fabric-health-introduction) for sustained conditions that operators or monitored upgrades must evaluate, such as:
 
 - Failure to join the intended Orleans cluster.
 - Loss of a required storage or clustering dependency.
@@ -124,7 +124,7 @@ Old and new silos coexist during a rolling upgrade. They must be compatible at e
 - Clustering, reminder, stream, and storage schemas.
 - External side effects and deduplication records.
 
-Increment the application type version and service manifest version for a release. Also increment the version of every changed code, configuration, or data package; changing binaries without changing the `CodePackage` version doesn't identify a new code package to Service Fabric. Test automatic rollback with mixed versions and with state written by the new version. See [Graceful shutdown and upgrades](upgrades.md) and [Service Fabric application upgrades](/azure/service-fabric/service-fabric-application-upgrade).
+Increment the application type version and service manifest version for a release. Also increment the version of every changed code, configuration, or data package; changing binaries without changing the `CodePackage` version doesn't identify a new code package to Service Fabric. Test automatic rollback with mixed versions and with state written by the new version. See [Graceful shutdown and upgrades](upgrades.md) and [Service Fabric application upgrades](https://learn.microsoft.com/azure/service-fabric/service-fabric-application-upgrade).
 
 For an incompatible release, use a separately named Service Fabric application and a distinct Orleans `ClusterId`, then follow the [blue-green guidance](upgrades.md#blue-green-upgrades). Don't let incompatible clusters concurrently own the same mutable grain state.
 
@@ -135,13 +135,13 @@ Two identities have different purposes:
 - A **RunAs identity** is the local operating-system account for the code package. The sample creates a dedicated local user and applies a `RunAsPolicy` instead of running under Service Fabric's default account.
 - A **managed identity** authenticates the application to Azure resources. The sample maps `OrleansSiloApplicationIdentity` in the application manifest to `OrleansSiloServiceIdentity` in the service manifest.
 
-The manifest mapping alone doesn't create or assign an Azure identity. The sample is configured for a **user-assigned identity**. Deploy the application as an Azure resource, assign the user-assigned identity in the Azure Resource Manager deployment, and map its friendly name to `OrleansSiloApplicationIdentity`. Applications not deployed as Azure resources can't use Service Fabric application managed identities. See [Deploy a Service Fabric application with a user-assigned managed identity](/azure/service-fabric/how-to-deploy-service-fabric-application-user-assigned-managed-identity).
+The manifest mapping alone doesn't create or assign an Azure identity. The sample is configured for a **user-assigned identity**. Deploy the application as an Azure resource, assign the user-assigned identity in the Azure Resource Manager deployment, and map its friendly name to `OrleansSiloApplicationIdentity`. Applications not deployed as Azure resources can't use Service Fabric application managed identities. See [Deploy a Service Fabric application with a user-assigned managed identity](https://learn.microsoft.com/azure/service-fabric/how-to-deploy-service-fabric-application-user-assigned-managed-identity).
 
 A system-assigned identity uses the reserved application identity name `SystemAssigned`; update the application principal and identity-binding policy accordingly if you choose that model.
 
 Grant the managed identity only the provider permissions it needs. For the sample's Azure Table clustering provider, assign a role containing table data actions, such as **Storage Table Data Contributor**, at the narrowest practical scope. A management-plane Contributor role doesn't grant table data access.
 
-Don't put credentials in source, manifests, application parameters, or command lines. When workload identity isn't available, use an external secret store or [Service Fabric encrypted secrets](/azure/service-fabric/service-fabric-application-secret-management), and plan rotation and expiry alerts.
+Don't put credentials in source, manifests, application parameters, or command lines. When workload identity isn't available, use an external secret store or [Service Fabric encrypted secrets](https://learn.microsoft.com/azure/service-fabric/service-fabric-application-secret-management), and plan rotation and expiry alerts.
 
 Treat `ServiceId` as the stable application identity and `ClusterId` as the environment or deployment identity. The sample declares nonsecret defaults in the service manifest and parameterized environment overrides in the application manifest. Replace the example table URI and set environment-specific application parameters at deployment. Preserve the effective parameter map during application upgrades because Service Fabric doesn't automatically carry application parameters forward. Validate effective configuration before starting the host and fail startup explicitly when required values are absent.
 
