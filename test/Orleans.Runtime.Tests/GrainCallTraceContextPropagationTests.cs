@@ -115,7 +115,9 @@ namespace UnitTests.General
             Assert.NotNull(activity);
             Assert.Equal("orleans", activity.GetTagItem("rpc.system.name"));
             Assert.Equal(typeof(ITraceContextPropagationGrain).FullName, activity.GetTagItem("orleans.rpc.service"));
-            Assert.Equal(nameof(ITraceContextPropagationGrain.GetTraceContextInfo), activity.GetTagItem("rpc.method"));
+            Assert.Equal(
+                $"{typeof(ITraceContextPropagationGrain).FullName}/{nameof(ITraceContextPropagationGrain.GetTraceContextInfo)}",
+                activity.GetTagItem("rpc.method"));
             Assert.Null(activity.GetTagItem("rpc.system"));
             Assert.Null(activity.GetTagItem("rpc.service"));
             Assert.NotNull(activity.GetTagItem("orleans.rpc.target_id"));

@@ -52,7 +52,7 @@ namespace Orleans.Runtime
                 // RPC attributes from https://opentelemetry.io/docs/specs/semconv/rpc/
                 activity.SetTag(ActivityTagKeys.RpcSystem, RpcSystem);
                 activity.SetTag(ActivityTagKeys.RpcService, context.InterfaceName);
-                activity.SetTag(ActivityTagKeys.RpcMethod, context.MethodName);
+                activity.SetTag(ActivityTagKeys.RpcMethod, $"{context.InterfaceName}/{context.MethodName}");
 
                 if (activity.IsAllDataRequested)
                 {
