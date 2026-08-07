@@ -26,6 +26,8 @@ Grain references are logical addresses. Callers don't create grain objects direc
 
 This virtual lifecycle separates a grain's identity from its in-memory activation. Idle activations can be removed from memory, and a later call can activate the grain again. If durable state is configured and written by the grain, a new activation can restore that state.
 
+For the model's design and history, see the [Orleans virtual actors research project](https://www.microsoft.com/research/project/orleans-virtual-actors/).
+
 ## Grains
 
 Grains are units of identity, isolation, placement, and execution. A grain class implements one or more grain interfaces, usually identified using one of these marker interfaces:
@@ -69,7 +71,7 @@ These capabilities are composable. An application selects providers and guarante
 
 ## Distributed ACID transactions
 
-Orleans transactions coordinate supported persistent state across multiple grains using distributed ACID transactions with serializable isolation. Transactional state uses dedicated APIs and storage configuration; ordinary grain persistence doesn't become transactional automatically.
+Orleans transactions coordinate supported persistent state across multiple grains using distributed [ACID](https://learn.microsoft.com/windows/win32/cossdk/acid-properties) transactions with serializable isolation. Transactional state uses dedicated APIs and storage configuration; ordinary grain persistence doesn't become transactional automatically.
 
 For more information, see [Transactions](grains/transactions.md).
 

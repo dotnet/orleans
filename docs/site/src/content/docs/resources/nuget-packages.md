@@ -19,6 +19,8 @@ All official packages use the `Microsoft.Orleans` prefix and are published on [N
 
 Most applications should begin with one of these packages and then add only the provider and feature packages they use.
 
+For installation guidance, see [`dotnet package add`](https://learn.microsoft.com/dotnet/core/tools/dotnet-package-add) and [NuGet package installation workflows](https://learn.microsoft.com/nuget/consume-packages/overview-and-workflow).
+
 ## Hosting and observability
 
 | Package | Purpose |
@@ -127,7 +129,6 @@ Orleans source-generates serializers for annotated application types. Add an int
 | Package | Purpose |
 | --- | --- |
 | [Microsoft.Orleans.TestingHost](https://www.nuget.org/packages/Microsoft.Orleans.TestingHost) | Host configurable in-process test clusters. |
-| [Microsoft.Orleans.Testing.Reminders](https://www.nuget.org/packages/Microsoft.Orleans.Testing.Reminders) | Reminder testing support. |
 | [Microsoft.Orleans.Serialization.TestKit](https://www.nuget.org/packages/Microsoft.Orleans.Serialization.TestKit) | Verify custom serializer behavior. |
 | [Microsoft.Orleans.Transactions.TestKit.Base](https://www.nuget.org/packages/Microsoft.Orleans.Transactions.TestKit.Base) | Shared transaction test kit. |
 | [Microsoft.Orleans.Transactions.TestKit.xUnit](https://www.nuget.org/packages/Microsoft.Orleans.Transactions.TestKit.xUnit) | xUnit integration for the transaction test kit. |

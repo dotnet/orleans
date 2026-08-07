@@ -22,7 +22,7 @@ An ordinary stateful grain has one activation in the cluster unless its placemen
 ## Keep grain turns short and asynchronous
 
 - Don't block threads with `.Wait()`, `.Result`, synchronous I/O, sleeps, or locks.
-- Await I/O and grain calls.
+- [Await](https://learn.microsoft.com/dotnet/csharp/language-reference/operators/await) I/O and grain calls.
 - Avoid CPU-intensive loops in a grain turn. Move substantial parallel computation to an appropriate worker or compute service.
 - Bound fan-out and concurrency instead of creating an unbounded number of calls.
 - Pass cancellation tokens where the contract supports cancellation, and treat cancellation as cooperative.
@@ -74,7 +74,7 @@ Silos can join, leave, restart, or fail at any time.
 
 ## Observe the application
 
-Use standard .NET logging, metrics, and distributed tracing, and consider the Orleans Dashboard for cluster inspection.
+Use standard [.NET logging](https://learn.microsoft.com/dotnet/core/extensions/logging), [metrics](https://learn.microsoft.com/dotnet/core/diagnostics/metrics), and [distributed tracing](https://learn.microsoft.com/dotnet/core/diagnostics/distributed-tracing), and consider the Orleans Dashboard for cluster inspection.
 
 - Include grain type and safe identifiers in logs without recording secrets or sensitive state.
 - Monitor call latency, timeouts, rejected requests, queue length, activation counts, memory, CPU, garbage collection, membership changes, and provider health.

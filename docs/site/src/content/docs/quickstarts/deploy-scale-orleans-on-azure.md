@@ -21,7 +21,7 @@ At the end of this quickstart, you have a scalable app running in Azure to provi
 ## Prerequisites
 
 - An Azure account with an active subscription. [Create an account for free](https://azure.microsoft.com/pricing/purchase-options/azure-account?cid=msft_learn).
-- [Azure Developer CLI](/azure/developer/azure-developer-cli/install-azd)
+- [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd)
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [Docker](https://www.docker.com/)
 
@@ -88,7 +88,7 @@ The original deployment only deployed the minimal services necessary to host the
 
 :::zone pivot="azure-storage"
 
-1. Using the terminal, run `azd env set` to configure the `DEPLOY_AZURE_TABLE_STORAGE` environment variable to enable deployment of Azure Cosmos DB for NoSQL.
+1. Using the terminal, run `azd env set` to configure the `DEPLOY_AZURE_TABLE_STORAGE` environment variable to enable deployment of Azure Table Storage.
 
    ```azuredeveloper
    azd env set DEPLOY_AZURE_TABLE_STORAGE true
@@ -301,14 +301,14 @@ Orleans is designed for distributed applications. Even an app as simple as the U
 
 :::zone pivot="azure-storage"
 
-- [Azure Table Storage](/azure/storage/tables)
+- [Azure Table Storage](https://learn.microsoft.com/azure/storage/tables/table-storage-overview)
 - [Azure Storage grain persistence](../grains/grain-persistence/azure-storage.md)
 
 :::zone-end
 
 :::zone pivot="azure-cosmos-db-nosql"
 
-- [Azure Cosmos DB for NoSQL](/azure/cosmos-db/nosql)
+- [Azure Cosmos DB for NoSQL](https://learn.microsoft.com/azure/cosmos-db/nosql/overview)
 - [Azure Cosmos DB grain persistence](../grains/grain-persistence/azure-cosmos-db.md)
 
 :::zone-end

@@ -8,7 +8,7 @@ ms.devlang: csharp
 
 # Quickstart: Build your first Orleans app
 
-This quickstart is the canonical beginner path for Orleans. You build a URL shortener in one ASP.NET Core process, define a grain, persist its state in memory for local development, and call it from Minimal API endpoints.
+This quickstart is the canonical beginner path for Orleans. You build a URL shortener in one ASP.NET Core process, define a grain, persist its state in memory for local development, and call it from [Minimal API](https://learn.microsoft.com/aspnet/core/fundamentals/minimal-apis) endpoints.
 
 You learn how to:
 
@@ -25,7 +25,7 @@ You learn how to:
 
 ## Create the application
 
-Run these commands in a terminal:
+Run these [.NET CLI](https://learn.microsoft.com/dotnet/core/tools/) commands in a terminal:
 
 ```dotnetcli
 dotnet new web -n OrleansURLShortener -f net10.0
@@ -33,7 +33,7 @@ cd OrleansURLShortener
 dotnet package add Microsoft.Orleans.Server
 ```
 
-`Microsoft.Orleans.Server` is the metapackage for an application that hosts a silo. It also includes the Orleans SDK and client APIs, so this single-project application can define grains and call them.
+[`Microsoft.Orleans.Server`](https://www.nuget.org/packages/Microsoft.Orleans.Server) is the metapackage for an application that hosts a silo. It also includes the Orleans SDK and client APIs, so this single-project application can define grains and call them. For details about the commands, see [`dotnet new`](https://learn.microsoft.com/dotnet/core/tools/dotnet-new) and [`dotnet package add`](https://learn.microsoft.com/dotnet/core/tools/dotnet-package-add).
 
 ## Configure Orleans
 

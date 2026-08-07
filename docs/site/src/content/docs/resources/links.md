@@ -28,8 +28,8 @@ Use GitHub issues for reproducible bugs and feature proposals. Use Discussions o
 
 ## Talks and research
 
-- [An introduction to Orleans](/shows/reactor/an-introduction-to-orleans)
-- [Building real applications with Orleans](/shows/on-net/building-real-applications-with-orleans)
+- [An introduction to Orleans](https://learn.microsoft.com/shows/reactor/an-introduction-to-orleans)
+- [Building real applications with Orleans](https://learn.microsoft.com/shows/on-net/building-real-applications-with-orleans)
 - [Orleans: Distributed Virtual Actors for Programmability and Scalability](https://www.microsoft.com/research/publication/orleans-distributed-virtual-actors-for-programmability-and-scalability/)
 - [Orleans: Virtual Actors](https://www.microsoft.com/research/project/orleans-virtual-actors/)
 
