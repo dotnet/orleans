@@ -120,6 +120,8 @@ namespace DefaultCluster.Tests.TimerTests
             using var timerObserver = TimerDiagnosticObserver.Create();
             var runTimer = grain.RunSelfDisposingTimer();
             var created = await timerObserver.WaitForTimerCreatedAsync(grain, TimerDiagnosticTimeout);
+            using var cts = new CancellationTokenSource(TimerDiagnosticTimeout);
+            await fixture.WaitForTimerChangeAsync(created.Timer, changeCount: 1, cts.Token);
             await AdvanceTimerToTickCountAsync(grain, timerObserver, created.DueTime, TimeSpan.FromMilliseconds(100), expectedTickCount: 1);
             await runTimer;
         }
@@ -219,7 +221,7 @@ namespace DefaultCluster.Tests.TimerTests
 
         public sealed class Fixture : BaseInProcessTestClusterFixture
         {
-            private readonly FakeTimeProvider timeProvider = new(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+            private readonly TrackingFakeTimeProvider timeProvider = new(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
 
             protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
@@ -237,6 +239,9 @@ namespace DefaultCluster.Tests.TimerTests
             }
 
             public void AdvanceTime(TimeSpan duration) => FakeTimeSilo.Advance(timeProvider, duration);
+
+            public Task WaitForTimerChangeAsync(object timer, int changeCount, CancellationToken cancellationToken) =>
+                timeProvider.WaitForTimerChangeAsync(timer, changeCount, cancellationToken);
         }
 
         /// <summary>
