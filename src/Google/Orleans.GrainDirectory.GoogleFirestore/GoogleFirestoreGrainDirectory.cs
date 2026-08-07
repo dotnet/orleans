@@ -35,64 +35,108 @@ public partial class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycle
             loggerFactory.CreateLogger<FirestoreDataManager>());
     }
 
-    public async Task<GrainAddress?> Lookup(GrainId grainId)
+    public Task<GrainAddress?> Lookup(GrainId grainId) => Lookup(grainId, CancellationToken.None);
+
+    Task<GrainAddress?> IGrainDirectory.Lookup(GrainId grainId, CancellationToken cancellationToken) =>
+        Lookup(grainId, cancellationToken);
+
+    private async Task<GrainAddress?> Lookup(GrainId grainId, CancellationToken cancellationToken)
     {
         try
         {
             var result = await this._dataManager
-                .ReadEntity<GrainDirectoryEntity>(Utils.SanitizeGrainId(grainId))
+                .ReadEntity<GrainDirectoryEntity>(Utils.SanitizeGrainId(grainId), cancellationToken)
                 .ConfigureAwait(false);
 
             return result is null ? null : GetGrainAddress(result);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogLookupError(ex, grainId);
             throw;
         }
     }
 
-    public async Task<GrainAddress?> Register(GrainAddress address)
+    public Task<GrainAddress?> Register(GrainAddress address) =>
+        Register(address, previousAddress: null, cancellationToken: CancellationToken.None);
+
+    Task<GrainAddress?> IGrainDirectory.Register(GrainAddress address, CancellationToken cancellationToken) =>
+        Register(address, previousAddress: null, cancellationToken: cancellationToken);
+
+    Task<GrainAddress?> IGrainDirectory.Register(
+        GrainAddress address,
+        GrainAddress? previousAddress,
+        CancellationToken cancellationToken) =>
+        Register(address, previousAddress, cancellationToken);
+
+    private async Task<GrainAddress?> Register(
+        GrainAddress address,
+        GrainAddress? previousAddress,
+        CancellationToken cancellationToken)
     {
+        if (previousAddress is not null)
+        {
+            await Unregister(previousAddress, cancellationToken).ConfigureAwait(false);
+        }
+
         try
         {
             var entry = ConvertToEntity(address);
-            await this._dataManager.CreateEntity(entry).ConfigureAwait(false);
+            await this._dataManager.CreateEntity(entry, cancellationToken).ConfigureAwait(false);
             return address;
         }
         catch (RpcException exception) when (exception.StatusCode == StatusCode.AlreadyExists)
         {
-            var result = await this.Lookup(address.GrainId);
+            var result = await Lookup(address.GrainId, cancellationToken).ConfigureAwait(false);
             return result;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogRegisterError(ex, address.ActivationId, address.GrainId);
             throw;
         }
     }
 
-    public async Task Unregister(GrainAddress address)
+    public Task Unregister(GrainAddress address) => Unregister(address, CancellationToken.None);
+
+    Task IGrainDirectory.Unregister(GrainAddress address, CancellationToken cancellationToken) =>
+        Unregister(address, cancellationToken);
+
+    private async Task Unregister(GrainAddress address, CancellationToken cancellationToken)
     {
         try
         {
-            var found = await this._dataManager.ReadEntity<GrainDirectoryEntity>(Utils.SanitizeGrainId(address.GrainId)).ConfigureAwait(false);
+            var found = await this._dataManager
+                .ReadEntity<GrainDirectoryEntity>(Utils.SanitizeGrainId(address.GrainId), cancellationToken)
+                .ConfigureAwait(false);
 
             if (found is null) return;
 
             if (found.ActivationId == address.ActivationId.ToParsableString())
             {
-                await this._dataManager.DeleteEntity(found.Id, Utils.FormatTimestamp(found.ETag!.Value)).ConfigureAwait(false);
+                await this._dataManager
+                    .DeleteEntity(found.Id, Utils.FormatTimestamp(found.ETag!.Value), cancellationToken)
+                    .ConfigureAwait(false);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogUnregisterError(ex, address.ActivationId, address.GrainId);
             throw;
         }
     }
 
-    public async Task UnregisterSilos(List<SiloAddress> siloAddresses)
+    public Task UnregisterSilos(List<SiloAddress> siloAddresses) =>
+        UnregisterSilos(siloAddresses, CancellationToken.None);
+
+    Task IGrainDirectory.UnregisterSilos(
+        List<SiloAddress> siloAddresses,
+        CancellationToken cancellationToken) =>
+        UnregisterSilos(siloAddresses, cancellationToken);
+
+    private async Task UnregisterSilos(
+        List<SiloAddress> siloAddresses,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -104,8 +148,8 @@ public partial class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycle
             {
                 var found = await this._dataManager.QueryEntities<GrainDirectoryEntity>(
                     entity => entity
-                        .WhereIn(nameof(GrainDirectoryEntity.SiloAddress), chunk)
-                ).ConfigureAwait(false);
+                        .WhereIn(nameof(GrainDirectoryEntity.SiloAddress), chunk),
+                    cancellationToken).ConfigureAwait(false);
 
                 entities.AddRange(found);
             }
@@ -117,11 +161,12 @@ public partial class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycle
                     await Task.WhenAll(chunk.Select(entity =>
                         this._dataManager.DeleteEntity(
                             entity.Id,
-                            Utils.FormatTimestamp(entity.ETag!.Value)))).ConfigureAwait(false);
+                            Utils.FormatTimestamp(entity.ETag!.Value),
+                            cancellationToken))).ConfigureAwait(false);
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogUnregisterSilosError(ex, string.Join('|', siloAddresses));
             throw;
@@ -162,11 +207,11 @@ public partial class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycle
             LogInitializing();
 
 
-            await this._dataManager.Initialize();
+            await this._dataManager.Initialize(ct);
 
             LogInitialized(sw.ElapsedMilliseconds);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogInitializationError(ex, sw.ElapsedMilliseconds);
             throw;

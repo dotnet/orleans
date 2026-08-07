@@ -62,7 +62,7 @@ public class GoogleFirestoreClusteringTests : IAsyncLifetime
 
         foreach (var chunk in entries.Chunk(50))
         {
-            await Task.WhenAll(chunk.Select(this._storage.UpsertEntity));
+            await Task.WhenAll(chunk.Select(entity => this._storage.UpsertEntity(entity)));
         }
 
         await this._membershipTable.CleanupDefunctSiloEntries(TestStartTime.AddTicks(1));

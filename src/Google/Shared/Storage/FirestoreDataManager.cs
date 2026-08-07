@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
@@ -49,7 +50,7 @@ internal partial class FirestoreDataManager
     /// <summary>
     /// Initialize the data manager.
     /// </summary>
-    public async Task Initialize()
+    public async Task Initialize(CancellationToken cancellationToken = default)
     {
         LogInitializing();
 
@@ -57,12 +58,14 @@ internal partial class FirestoreDataManager
         {
             var group = this._db.Collection(this._options.RootCollectionName).Document(this._group);
 
-            var snapshot = await group.GetSnapshotAsync();
+            var snapshot = await ExecuteWithCancellation(group.GetSnapshotAsync(cancellationToken), cancellationToken);
 
             if (!snapshot.Exists)
             {
                 // Create a header document to ensure the subcollection can be created afterwards
-                await group.CreateAsync(new { StorageGroup = this._group });
+                await ExecuteWithCancellation(
+                    group.CreateAsync(new { StorageGroup = this._group }, cancellationToken),
+                    cancellationToken);
             }
         }
         catch (RpcException ex)
@@ -72,7 +75,7 @@ internal partial class FirestoreDataManager
                 throw;
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogOperationError(ex, nameof(this.Initialize), this._partition);
             throw;
@@ -82,10 +85,10 @@ internal partial class FirestoreDataManager
     /// <summary>
     /// Clears the collection.
     /// </summary>
-    public async Task<int> ClearCollection()
+    public async Task<int> ClearCollection(CancellationToken cancellationToken = default)
     {
         var collection = this.GetCollection();
-        var colSnapshot = await collection.GetSnapshotAsync();
+        var colSnapshot = await ExecuteWithCancellation(collection.GetSnapshotAsync(cancellationToken), cancellationToken);
 
         if (colSnapshot.Count == 0) return 0;
 
@@ -98,7 +101,7 @@ internal partial class FirestoreDataManager
                 batch.Delete(doc.Reference);
             }
 
-            await batch.CommitAsync();
+            await ExecuteWithCancellation(batch.CommitAsync(cancellationToken), cancellationToken);
         }
 
         return colSnapshot.Count;
@@ -109,7 +112,7 @@ internal partial class FirestoreDataManager
     /// </summary>
     /// <param name="entity">The entity</param>
     /// <returns>The entity's eTag</returns>
-    public async Task<string> CreateEntity<TEntity>(TEntity entity) where TEntity : FirestoreEntity, new()
+    public async Task<string> CreateEntity<TEntity>(TEntity entity, CancellationToken cancellationToken = default) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
         LogEntityOperation("Creating", entity.Id, this._partition);
@@ -119,18 +122,18 @@ internal partial class FirestoreDataManager
             ValidateEntity(entity);
 
             var docRef = collection.Document(entity.Id);
-            var result = await docRef.CreateAsync(entity);
+            var result = await ExecuteWithCancellation(docRef.CreateAsync(entity, cancellationToken), cancellationToken);
 
             return Utils.FormatTimestamp(result.UpdateTime);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogOperationError(ex, nameof(this.CreateEntity), this._partition);
             throw;
         }
     }
 
-    public async Task<string> UpsertEntity<TEntity>(TEntity entity) where TEntity : FirestoreEntity, new()
+    public async Task<string> UpsertEntity<TEntity>(TEntity entity, CancellationToken cancellationToken = default) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
         LogEntityOperation("Upserting", entity.Id, this._partition);
@@ -141,11 +144,13 @@ internal partial class FirestoreDataManager
 
             var docRef = collection.Document(entity.Id);
 
-            var result = await docRef.SetAsync(entity, SetOptions.Overwrite);
+            var result = await ExecuteWithCancellation(
+                docRef.SetAsync(entity, SetOptions.Overwrite, cancellationToken),
+                cancellationToken);
 
             return Utils.FormatTimestamp(result.UpdateTime);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogOperationError(ex, nameof(this.UpsertEntity), this._partition);
             throw;
@@ -157,7 +162,7 @@ internal partial class FirestoreDataManager
     /// </summary>
     /// <param name="entity">The entity</param>
     /// <returns>The entity's eTag</returns>
-    public async Task<string> Update<TEntity>(TEntity entity) where TEntity : FirestoreEntity, new()
+    public async Task<string> Update<TEntity>(TEntity entity, CancellationToken cancellationToken = default) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
         LogEntityOperation("Updating", entity.Id, this._partition);
@@ -168,10 +173,12 @@ internal partial class FirestoreDataManager
 
             var docRef = collection.Document(entity.Id);
 
-            var result = await docRef.UpdateAsync(entity.GetFields(), Precondition.LastUpdated(entity.ETag!.Value));
+            var result = await ExecuteWithCancellation(
+                docRef.UpdateAsync(entity.GetFields(), Precondition.LastUpdated(entity.ETag!.Value), cancellationToken),
+                cancellationToken);
             return Utils.FormatTimestamp(result.UpdateTime);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogOperationError(ex, nameof(this.Update), this._partition);
             throw;
@@ -183,7 +190,7 @@ internal partial class FirestoreDataManager
     /// </summary>
     /// <param name="entity">The entity.</param>
     /// <returns>The entity's new ETag.</returns>
-    public async Task<string> UpdateUnconditionally<TEntity>(TEntity entity) where TEntity : FirestoreEntity, new()
+    public async Task<string> UpdateUnconditionally<TEntity>(TEntity entity, CancellationToken cancellationToken = default) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
         LogUnconditionalEntityUpdate(entity.Id, this._partition);
@@ -193,10 +200,12 @@ internal partial class FirestoreDataManager
             ValidateEntity(entity);
 
             var docRef = collection.Document(entity.Id);
-            var result = await docRef.UpdateAsync(entity.GetFields(), Precondition.MustExist);
+            var result = await ExecuteWithCancellation(
+                docRef.UpdateAsync(entity.GetFields(), Precondition.MustExist, cancellationToken),
+                cancellationToken);
             return Utils.FormatTimestamp(result.UpdateTime);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogOperationError(ex, nameof(this.UpdateUnconditionally), this._partition);
             throw;
@@ -209,7 +218,7 @@ internal partial class FirestoreDataManager
     /// <param name="id">The entity's id</param>
     /// <param name="eTag">The entity's eTag</param>
     /// <returns>Whether the delete completed successfully.</returns>
-    public async Task<bool> DeleteEntity(string id, string? eTag = null)
+    public async Task<bool> DeleteEntity(string id, string? eTag = null, CancellationToken cancellationToken = default)
     {
         var collection = this.GetCollection();
         LogEntityOperation("Deleting", id, this._partition);
@@ -220,11 +229,15 @@ internal partial class FirestoreDataManager
 
             if (!string.IsNullOrWhiteSpace(eTag) && eTag != "*")
             {
-                await docRef.DeleteAsync(Precondition.LastUpdated(Utils.ParseTimestamp(eTag)));
+                await ExecuteWithCancellation(
+                    docRef.DeleteAsync(Precondition.LastUpdated(Utils.ParseTimestamp(eTag)), cancellationToken),
+                    cancellationToken);
             }
             else
             {
-                await docRef.DeleteAsync(Precondition.MustExist);
+                await ExecuteWithCancellation(
+                    docRef.DeleteAsync(Precondition.MustExist, cancellationToken),
+                    cancellationToken);
             }
             return true;
         }
@@ -236,7 +249,7 @@ internal partial class FirestoreDataManager
             }
             throw;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogOperationError(ex, nameof(this.DeleteEntity), this._partition);
             throw;
@@ -248,7 +261,7 @@ internal partial class FirestoreDataManager
     /// </summary>
     /// <param name="id">The entity's id</param>
     /// <returns>The entity or null of not exist</returns>
-    public async Task<TEntity?> ReadEntity<TEntity>(string id) where TEntity : FirestoreEntity, new()
+    public async Task<TEntity?> ReadEntity<TEntity>(string id, CancellationToken cancellationToken = default) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
         LogEntityOperation("Reading", id, this._partition);
@@ -257,7 +270,7 @@ internal partial class FirestoreDataManager
         {
             var docRef = collection.Document(id);
 
-            var snapshot = await docRef.GetSnapshotAsync();
+            var snapshot = await ExecuteWithCancellation(docRef.GetSnapshotAsync(cancellationToken), cancellationToken);
 
             if (!snapshot.Exists)
             {
@@ -270,7 +283,7 @@ internal partial class FirestoreDataManager
 
             return entity;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogOperationError(ex, nameof(this.ReadEntity), this._partition);
             throw;
@@ -281,14 +294,14 @@ internal partial class FirestoreDataManager
     /// Read all entities.
     /// </summary>
     /// <returns>The entities</returns>
-    public async Task<TEntity[]> ReadAllEntities<TEntity>() where TEntity : FirestoreEntity, new()
+    public async Task<TEntity[]> ReadAllEntities<TEntity>(CancellationToken cancellationToken = default) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
         LogCollectionOperation("Reading all entities from", this._partition);
 
         try
         {
-            var snapshot = await collection.GetSnapshotAsync();
+            var snapshot = await ExecuteWithCancellation(collection.GetSnapshotAsync(cancellationToken), cancellationToken);
 
             if (snapshot.Count == 0)
             {
@@ -299,7 +312,7 @@ internal partial class FirestoreDataManager
 
             return snapshot.Documents.Select(d => d.ConvertTo<TEntity>()).ToArray();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogOperationError(ex, nameof(this.ReadAllEntities), this._partition);
             throw;
@@ -310,7 +323,7 @@ internal partial class FirestoreDataManager
     /// Delete entities in a partition.
     /// </summary>
     /// <param name="entities">Entities to be deleted</param>
-    public async Task DeleteEntities<TEntity>(TEntity[] entities) where TEntity : FirestoreEntity, new()
+    public async Task DeleteEntities<TEntity>(TEntity[] entities, CancellationToken cancellationToken = default) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
 
@@ -334,9 +347,9 @@ internal partial class FirestoreDataManager
                 batch.Delete(docRef, Precondition.LastUpdated(entity.ETag!.Value));
             }
 
-            await batch.CommitAsync();
+            await ExecuteWithCancellation(batch.CommitAsync(cancellationToken), cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogOperationError(ex, nameof(this.DeleteEntities), this._partition);
             throw;
@@ -348,14 +361,18 @@ internal partial class FirestoreDataManager
     /// </summary>
     /// <param name="query">The query filter</param>
     /// <returns>An array of entities</returns>
-    public async Task<TEntity[]> QueryEntities<TEntity>(Func<CollectionReference, Query> query) where TEntity : FirestoreEntity, new()
+    public async Task<TEntity[]> QueryEntities<TEntity>(
+        Func<CollectionReference, Query> query,
+        CancellationToken cancellationToken = default) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
         LogCollectionOperation("Querying entities from", this._partition);
 
         try
         {
-            var snapshot = await query(collection).GetSnapshotAsync();
+            var snapshot = await ExecuteWithCancellation(
+                query(collection).GetSnapshotAsync(cancellationToken),
+                cancellationToken);
 
             if (snapshot.Count == 0)
             {
@@ -366,19 +383,26 @@ internal partial class FirestoreDataManager
 
             return snapshot.Documents.Select(d => d.ConvertTo<TEntity>()).ToArray();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogOperationError(ex, nameof(this.QueryEntities), this._partition);
             throw;
         }
     }
 
-    public Task<TEntity> ExecuteTransaction<TEntity>(Func<Transaction, Task<TEntity>> transactionScope) => this._db.RunTransactionAsync(transactionScope);
+    public Task<TEntity> ExecuteTransaction<TEntity>(
+        Func<Transaction, Task<TEntity>> transactionScope,
+        CancellationToken cancellationToken = default) =>
+        ExecuteWithCancellation(
+            this._db.RunTransactionAsync(transactionScope, options: null, cancellationToken: cancellationToken),
+            cancellationToken);
 
-    public Task<bool> EntityExists(string id)
+    public Task<bool> EntityExists(string id, CancellationToken cancellationToken = default)
     {
         var document = this.GetCollection().Document(id);
-        return this.ExecuteTransaction(async transaction => (await transaction.GetSnapshotAsync(document)).Exists);
+        return this.ExecuteTransaction(
+            async transaction => (await transaction.GetSnapshotAsync(document, transaction.CancellationToken)).Exists,
+            cancellationToken);
     }
 
     private static void ValidateEntity<TEntity>(TEntity entity, bool updating = false) where TEntity : FirestoreEntity, new()
@@ -388,6 +412,34 @@ internal partial class FirestoreDataManager
         {
             if (!entity.ETag.HasValue) throw new InvalidOperationException("ETag is required to update an entity");
             if (entity.ETag.Value.ToDateTimeOffset() < DateTimeOffset.UnixEpoch) throw new InvalidOperationException("ETag must be greater than 1970-01-01T00:00:00Z");
+        }
+    }
+
+    private static async Task ExecuteWithCancellation(Task task, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await task;
+        }
+        catch (RpcException exception) when (
+            cancellationToken.IsCancellationRequested && exception.StatusCode == StatusCode.Cancelled)
+        {
+            throw new OperationCanceledException("The Firestore operation was canceled.", exception, cancellationToken);
+        }
+    }
+
+    private static async Task<TResult> ExecuteWithCancellation<TResult>(
+        Task<TResult> task,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await task;
+        }
+        catch (RpcException exception) when (
+            cancellationToken.IsCancellationRequested && exception.StatusCode == StatusCode.Cancelled)
+        {
+            throw new OperationCanceledException("The Firestore operation was canceled.", exception, cancellationToken);
         }
     }
 

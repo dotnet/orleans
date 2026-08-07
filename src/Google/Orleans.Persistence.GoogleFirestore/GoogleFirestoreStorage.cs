@@ -226,11 +226,11 @@ internal partial class GoogleFirestoreStorage : IGrainStorage, ILifecyclePartici
                 this._options,
                 this._loggerFactory.CreateLogger<FirestoreDataManager>());
 
-            await this._dataManager.Initialize();
+            await this._dataManager.Initialize(ct);
 
             LogInitialized(this._name, sw.ElapsedMilliseconds);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogInitializationError(ex, this._name, sw.ElapsedMilliseconds);
             throw;

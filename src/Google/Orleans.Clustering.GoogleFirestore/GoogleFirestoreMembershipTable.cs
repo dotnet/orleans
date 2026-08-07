@@ -67,7 +67,7 @@ internal partial class GoogleFirestoreMembershipTable : IMembershipTable
 
         await Task.WhenAll(defunctEntries
             .Chunk(FirestoreDataManager.MaxBatchSize)
-            .Select(this._storage.DeleteEntities));
+            .Select(chunk => this._storage.DeleteEntities(chunk)));
     }
 
     public async Task<MembershipTableData> ReadRow(SiloAddress key)
@@ -77,8 +77,12 @@ internal partial class GoogleFirestoreMembershipTable : IMembershipTable
             var collection = this._storage.GetCollection();
             var data = await this._storage.ExecuteTransaction(async transaction =>
             {
-                var versionSnapshot = await transaction.GetSnapshotAsync(collection.Document(this._partitionId));
-                var siloSnapshot = await transaction.GetSnapshotAsync(collection.Document(key.ToParsableString()));
+                var versionSnapshot = await transaction.GetSnapshotAsync(
+                    collection.Document(this._partitionId),
+                    transaction.CancellationToken);
+                var siloSnapshot = await transaction.GetSnapshotAsync(
+                    collection.Document(key.ToParsableString()),
+                    transaction.CancellationToken);
                 if (!versionSnapshot.Exists)
                     throw new KeyNotFoundException($"Could not find cluster version entry for {this._partitionId}");
 
@@ -108,7 +112,7 @@ internal partial class GoogleFirestoreMembershipTable : IMembershipTable
             var collection = this._storage.GetCollection();
             var entries = await this._storage.ExecuteTransaction(async transaction =>
             {
-                var snapshot = await transaction.GetSnapshotAsync(collection);
+                var snapshot = await transaction.GetSnapshotAsync(collection, transaction.CancellationToken);
                 var versionSnapshot = snapshot.Documents.SingleOrDefault(document => document.Id == this._partitionId)
                     ?? throw new KeyNotFoundException($"Could not find cluster version entry for {this._partitionId}");
                 var silos = snapshot.Documents
@@ -219,7 +223,7 @@ internal partial class GoogleFirestoreMembershipTable : IMembershipTable
             var document = this._storage.GetCollection().Document(id);
             await this._storage.ExecuteTransaction(async transaction =>
             {
-                var snapshot = await transaction.GetSnapshotAsync(document);
+                var snapshot = await transaction.GetSnapshotAsync(document, transaction.CancellationToken);
                 if (!snapshot.Exists)
                     throw new KeyNotFoundException($"Could not find silo entry for {id}");
 
