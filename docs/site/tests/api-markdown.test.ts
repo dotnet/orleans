@@ -49,6 +49,18 @@ describe('native API Markdown companions', () => {
     );
   });
 
+  test('omits NuGet links only for explicitly unpublished API assemblies', () => {
+    const unpublished = structuredClone(pkg);
+    unpublished.package.name = 'Microsoft.Orleans.Reminders.Abstractions';
+
+    expect(renderPackageMarkdown(unpublished)).not.toContain(
+      'https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Abstractions',
+    );
+    expect(renderTypeMarkdown(unpublished, unpublished.types[0])).not.toContain(
+      'https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Abstractions',
+    );
+  });
+
   test('renders member documentation, parameters, returns, exceptions, and examples', () => {
     const markdown = renderMemberKindMarkdown(pkg, grain, 'method', '/orleans/');
 

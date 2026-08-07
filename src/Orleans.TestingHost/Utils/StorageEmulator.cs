@@ -10,7 +10,7 @@ namespace Orleans.TestingHost.Utils
     /// A wrapper on Azure Storage Emulator.
     /// </summary>
     /// <remarks>It might be tricky to implement this as a <see cref="IDisposable">IDisposable</see>, isolated, autonomous instance, 
-    /// see at <see href="http://azure.microsoft.com/en-us/documentation/articles/storage-use-emulator/">Use the Azure Storage Emulator for Development and Testing</see>
+    /// see <see href="https://learn.microsoft.com/azure/storage/common/storage-use-azurite">Use the Azurite emulator for local Azure Storage development</see>.
     /// for pointers.</remarks>
     public static class StorageEmulator
     {

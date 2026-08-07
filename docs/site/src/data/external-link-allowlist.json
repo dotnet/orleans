@@ -1,0 +1,9 @@
+{
+  "description": "Exact external URLs which cannot be probed reliably. Every entry requires a narrow reason.",
+  "urls": {
+    "https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html": "AWS serves this public CLI configuration page to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",
+    "https://docs.aws.amazon.com/sdk-for-net/v4/developer-guide/creds-assign.html": "AWS serves this public SDK credential-resolution page to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",
+    "https://en.wikipedia.org/wiki/Kalman_filter": "Wikipedia serves this public article to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",
+    "https://www.nginx.com/blog/nginx-power-of-two-choices-load-balancing-algorithm/": "The NGINX/F5 site redirects browsers but rejects the bounded automated HEAD/GET probe with HTTP 403."
+  }
+}

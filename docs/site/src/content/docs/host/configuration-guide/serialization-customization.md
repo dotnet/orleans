@@ -16,7 +16,7 @@ Orleans provides two serializer implementations:
 - [Microsoft.Orleans.Serialization.SystemTextJson](https://nuget.org/packages/Microsoft.Orleans.Serialization.SystemTextJson)
 - [Microsoft.Orleans.Serialization.NewtonsoftJson](https://nuget.org/packages/Microsoft.Orleans.Serialization.NewtonsoftJson)
 
-To configure either of these packages, see [Serialization configuration in Orleans](serialization-configuration.md?pivots=orleans-7-0).
+To configure either of these packages, see [Serialization configuration in Orleans](serialization-configuration.md).
 
 ## Custom serializer implementation
 

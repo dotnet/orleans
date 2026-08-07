@@ -5,6 +5,7 @@ import {
   collectIncludeTargets,
   collectUidMap,
   convertDocfxMarkdown,
+  isDocumentationFragmentMarkdown,
   isSnippetSupportMarkdown,
 } from './lib/docfx.mjs';
 import { prepareGallery } from './lib/gallery.mjs';
@@ -43,7 +44,7 @@ const markdownFiles = sourceFiles.filter((file) => path.extname(file).toLowerCas
 const includeRoots = markdownFiles.filter(
   (file) => !isSnippetSupportMarkdown(path.relative(sourceRoot, file)),
 );
-const includeTargets = await collectIncludeTargets(includeRoots, includeRoot);
+const includeTargets = await collectIncludeTargets(includeRoots, { allowedRoot: includeRoot });
 const uidMap = await collectUidMap(markdownFiles, sourceRoot);
 let pages = 0;
 let assets = 0;
@@ -52,7 +53,10 @@ for (const sourcePath of sourceFiles) {
   const relativePath = path.relative(sourceRoot, sourcePath);
   const extension = path.extname(sourcePath).toLowerCase();
   if (extension === '.md') {
-    if (includeTargets.has(path.resolve(sourcePath)) || isSnippetSupportMarkdown(relativePath)) {
+    if (
+      includeTargets.has(path.resolve(sourcePath)) ||
+      isDocumentationFragmentMarkdown(relativePath)
+    ) {
       continue;
     }
     const outputPath = path.join(
@@ -63,6 +67,7 @@ for (const sourcePath of sourceFiles) {
       source: await readFile(sourcePath, 'utf8'),
       sourcePath,
       sourceRoot,
+      snippetRoots: [sourceRoot],
       includeRoot,
       uidMap,
       editUrl: `https://github.com/dotnet/orleans/edit/main/${path.relative(repositoryRoot, sourcePath).replaceAll('\\', '/')}`,
