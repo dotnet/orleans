@@ -36,6 +36,45 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.Same(queueBalancer, changed.QueueBalancer);
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void StreamingEvents_EmitPullingAgentManagerState_EmitsState()
+        {
+            using var observer = new Observer(StreamingEvents.AllEvents);
+            var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 13000), 1);
+            var queue = QueueId.GetQueueId("queue", 1, 1);
+
+            StreamingEvents.EmitPullingAgentManagerState("provider", siloAddress, [queue], runningAgents: 1);
+
+            var state = Assert.IsType<StreamingEvents.PullingAgentManagerState>(Assert.Single(observer.Events));
+            Assert.Equal("provider", state.StreamProvider);
+            Assert.Same(siloAddress, state.SiloAddress);
+            Assert.Equal(queue, Assert.Single(state.CurrentQueues));
+            Assert.Equal(1, state.RunningAgents);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void StreamingEvents_EmitQueueBalancerMaturityCompleted_EmitsMaturityCompleted()
+        {
+            using var observer = new Observer(StreamingEvents.AllEvents);
+            var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 13000), 1);
+            var maturedSiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 13001), 1);
+            var queueBalancer = new TestQueueBalancer();
+
+            StreamingEvents.EmitQueueBalancerMaturityCompleted(
+                "provider",
+                siloAddress,
+                maturedSiloAddress,
+                isLocalSilo: false,
+                queueBalancer);
+
+            var completed = Assert.IsType<StreamingEvents.QueueBalancerMaturityCompleted>(Assert.Single(observer.Events));
+            Assert.Equal("provider", completed.StreamProvider);
+            Assert.Same(siloAddress, completed.SiloAddress);
+            Assert.Same(maturedSiloAddress, completed.MaturedSiloAddress);
+            Assert.False(completed.IsLocalSilo);
+            Assert.Same(queueBalancer, completed.QueueBalancer);
+        }
+
         private sealed class TestQueueBalancer : IStreamQueueBalancer
         {
             public IEnumerable<QueueId> GetMyQueues() => [];

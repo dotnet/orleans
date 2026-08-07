@@ -1166,6 +1166,21 @@ namespace Orleans.Streaming.Diagnostics
             public ProducerUnregistered(string streamProvider, Runtime.StreamId streamId, Runtime.GrainId producerGrainId, Runtime.SiloAddress? siloAddress) : base(default!, default) { }
         }
 
+        public sealed partial class PullingAgentManagerState : StreamingEvent
+        {
+            public readonly Streams.QueueId[] CurrentQueues;
+            public readonly int RunningAgents;
+            public PullingAgentManagerState(string streamProvider, Runtime.SiloAddress? siloAddress, Streams.QueueId[] currentQueues, int runningAgents) : base(default!, default) { }
+        }
+
+        public sealed partial class QueueBalancerMaturityCompleted : StreamingEvent
+        {
+            public readonly bool IsLocalSilo;
+            public readonly Runtime.SiloAddress MaturedSiloAddress;
+            public readonly Streams.IStreamQueueBalancer QueueBalancer;
+            public QueueBalancerMaturityCompleted(string streamProvider, Runtime.SiloAddress? siloAddress, Runtime.SiloAddress maturedSiloAddress, bool isLocalSilo, Streams.IStreamQueueBalancer queueBalancer) : base(default!, default) { }
+        }
+
         public sealed partial class StreamInactive : StreamingEvent
         {
             public readonly System.TimeSpan InactivityPeriod;
