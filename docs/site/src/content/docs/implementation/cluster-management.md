@@ -11,7 +11,7 @@ Cluster membership answers one question for the rest of the runtime: which silo 
 
 ## Identity, status, and views
 
-A silo identity includes its advertised endpoint and a generation value, so a restarted process at the same endpoint is a new identity. Its status progresses through `Created`, `Joining`, `Active`, and a terminating status (`ShuttingDown`, `Stopping`, or `Dead`).
+A silo identity includes its advertised endpoint and a generation value, so a restarted process at the same endpoint is a new identity. Its <xref:Orleans.Runtime.SiloStatus> progresses through `Created`, `Joining`, `Active`, and a terminating status (`ShuttingDown`, `Stopping`, or `Dead`).
 
 Each successful membership-table mutation advances a version. `MembershipTableManager` publishes immutable snapshots through `ClusterMembershipService`; consumers ignore older versions. Directory ownership, gateway discovery, and failure recovery therefore observe a monotonically ordered sequence of views even if notifications arrive out of order.
 
@@ -37,7 +37,7 @@ A starting silo writes its row, becomes `Joining`, and validates two-way connect
 
 The periodic `IAmAlive` value is not the peer heartbeat. It is a timestamp written to the membership row for diagnostics and startup disaster recovery. A sufficiently stale active row can be ignored during the joining connectivity check, allowing a cluster to recover after all processes were lost without cleanly declaring each other dead.
 
-## Failure detection and death votes
+## Failure detection and death votes <a name="the-membership-protocol"></a>
 
 Active silos monitor peers selected from the membership view. `ClusterHealthMonitor` sends probes over silo-to-silo messaging, tracks consecutive failures, and can use indirect probes to distinguish a failed target from an unhealthy observer. A failed monitor writes a timestamped vote into the target's membership row.
 
@@ -63,25 +63,25 @@ Declaring a member dead requires enough unexpired votes from distinct observers.
 
 Once a row is `Dead`, that identity never returns to `Active`. If the process was only partitioned, it terminates when it learns that the cluster declared it dead. Its host can restart it with a new generation.
 
-## Default settings
+## Default settings <a name="membership-protocol-configuration"></a>
 
-The defaults are defined by [`ClusterMembershipOptions`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Configuration/Options/ClusterMembershipOptions.cs):
+The defaults are defined by <xref:Orleans.Configuration.ClusterMembershipOptions>:
 
 | Option | Default | Protocol role |
 | --- | ---: | --- |
-| `NumProbedSilos` | 10 | Number of peers monitored by each silo |
-| `ProbeTimeout` | 5 seconds | Baseline direct probe timeout |
-| `NumMissedProbesLimit` | 3 | Failed probes before a death vote |
-| `NumVotesForDeathDeclaration` | 2 | Fresh votes required to mark a member dead |
-| `DeathVoteExpirationTimeout` | 2 minutes | Lifetime of a death vote |
-| `TableRefreshTimeout` | 1 minute | Fallback membership-table refresh period |
-| `IAmAliveTablePublishTimeout` | 30 seconds | Membership-row liveness timestamp period |
+| <xref:Orleans.Configuration.ClusterMembershipOptions.NumProbedSilos?displayProperty=nameWithType> | 10 | Number of peers monitored by each silo |
+| <xref:Orleans.Configuration.ClusterMembershipOptions.ProbeTimeout?displayProperty=nameWithType> | 5 seconds | Baseline direct probe timeout |
+| <xref:Orleans.Configuration.ClusterMembershipOptions.NumMissedProbesLimit?displayProperty=nameWithType> | 3 | Failed probes before a death vote |
+| <xref:Orleans.Configuration.ClusterMembershipOptions.NumVotesForDeathDeclaration?displayProperty=nameWithType> | 2 | Fresh votes required to mark a member dead |
+| <xref:Orleans.Configuration.ClusterMembershipOptions.DeathVoteExpirationTimeout?displayProperty=nameWithType> | 2 minutes | Lifetime of a death vote |
+| <xref:Orleans.Configuration.ClusterMembershipOptions.TableRefreshTimeout?displayProperty=nameWithType> | 1 minute | Fallback membership-table refresh period |
+| <xref:Orleans.Configuration.ClusterMembershipOptions.IAmAliveTablePublishTimeout?displayProperty=nameWithType> | 30 seconds | Membership-row liveness timestamp period |
 
 These values are protocol parameters, not independent timers: indirect probing, local health, scheduling delays, and table contention all affect observed detection time. Following [Lifeguard's local-health awareness principle](https://arxiv.org/abs/1707.00788), the runtime increases probe tolerance when `LocalSiloHealthMonitor` detects thread-pool delay, timer delay, or other local distress, reducing false accusations from an unhealthy observer.
 
-## Membership-table contract
+## Membership-table contract <a name="membership-table"></a>
 
-An `IMembershipTable` implementation is more than a list of endpoints. It must support:
+An <xref:Orleans.IMembershipTable> implementation is more than a list of endpoints. It must support:
 
 - insertion of a new silo row;
 - optimistic, conditional update of a silo row;

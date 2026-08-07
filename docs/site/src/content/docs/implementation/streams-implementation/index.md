@@ -34,23 +34,23 @@ flowchart LR
     Agent --> Consumers
 ```
 
-## Provider composition and lifecycle
+## Provider composition and lifecycle <a name="persistent-streams"></a>
 
-`PersistentStreamProvider` is the common implementation. A provider-specific <xref:Orleans.Streams.IQueueAdapterFactory> creates:
+<xref:Orleans.Providers.Streams.Common.PersistentStreamProvider> is the common implementation. A provider-specific <xref:Orleans.Streams.IQueueAdapterFactory> creates:
 
-- an `IQueueAdapter` for enqueue and receive semantics;
+- an <xref:Orleans.Streams.IQueueAdapter> for enqueue and receive semantics;
 - an <xref:Orleans.Streams.IStreamQueueMapper> for stream-to-queue mapping;
 - an <xref:Orleans.Streams.IStreamQueueBalancer> for silo ownership;
-- an `IQueueAdapterCache` for per-agent caches; and
+- an <xref:Orleans.Streams.IQueueAdapterCache> for per-agent caches; and
 - optional failure handlers, filters, and backoff providers.
 
 During lifecycle initialization the provider resolves its named adapter factory and creates the adapter. At the active stage it initializes the pulling manager and starts agents. Shutdown stops agents before the provider closes.
 
 By default, pulling agents start automatically. Explicit grain-based and implicit subscriptions are both enabled.
 
-Source: [`PersistentStreamProvider`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Streaming/PersistentStreams/PersistentStreamProvider.cs) and [`PersistentStreamProviderOptions`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Streaming/PersistentStreams/Options/PersistentStreamProviderOptions.cs).
+API: <xref:Orleans.Providers.Streams.Common.PersistentStreamProvider>. Implementation: [provider lifecycle](https://github.com/dotnet/orleans/blob/main/src/Orleans.Streaming/PersistentStreams/PersistentStreamProvider.cs) and [provider options](https://github.com/dotnet/orleans/blob/main/src/Orleans.Streaming/PersistentStreams/Options/PersistentStreamProviderOptions.cs).
 
-## Queue mapping and ownership
+## Queue mapping and ownership <a name="streamqueuemapper-and-streamqueuebalancer"></a>
 
 The queue mapper deterministically assigns a stream identity to a queue. All producers and consumers for a provider must use compatible mapping or events can be written to queues which no intended agent reads.
 
@@ -58,7 +58,9 @@ The queue balancer assigns queues to silos and publishes sequenced ownership cha
 
 Source: [`PersistentStreamPullingManager`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Streaming/PersistentStreams/PersistentStreamPullingManager.cs).
 
-## Pulling-agent loop
+## Pulling-agent loop <a name="pulling-agents"></a>
+
+<a name="pulling-protocol"></a>
 
 Each `PersistentStreamPullingAgent` is a system target with single-threaded Orleans scheduling. Its loop:
 
@@ -73,11 +75,13 @@ Each `PersistentStreamPullingAgent` is a system target with single-threaded Orle
 
 The default maximum adapter batch-container batch size is 1 and the empty-poll period is 100 ms. These defaults are runtime behavior, not a universal throughput recommendation.
 
-## Cache and cursor invariants
+## Cache and cursor invariants <a name="queue-cache"></a>
 
-An <xref:Orleans.Streams.IQueueCache> decouples queue reads from consumer delivery. Each subscription has an `IQueueCacheCursor`, so a slow consumer does not directly block a fast consumer at a later cursor.
+<a name="backpressure"></a>
 
-The cache tracks the earliest delivery progress across active subscriptions. Purging must not remove an item still needed by any cursor. `SimpleQueueCache` uses pressure buckets to stop or slow reads as lag grows instead of discarding undelivered events. Its default capacity is 4,096 batch containers.
+An <xref:Orleans.Streams.IQueueCache> decouples queue reads from consumer delivery. Each subscription has an <xref:Orleans.Streams.IQueueCacheCursor>, so a slow consumer does not directly block a fast consumer at a later cursor.
+
+The cache tracks the earliest delivery progress across active subscriptions. Purging must not remove an item still needed by any cursor. <xref:Orleans.Providers.Streams.Common.SimpleQueueCache> uses pressure buckets to stop or slow reads as lag grows instead of discarding undelivered events. Its default capacity is 4,096 batch containers.
 
 ```mermaid
 flowchart TB
@@ -97,11 +101,11 @@ Cache capacity is not durability. The queue remains the durable boundary, subjec
 
 The agent registers as a producer for each stream and obtains subscription records from stream pub-sub. It holds a pin cursor while subscription handshakes complete so cache cleanup cannot pass the requested start token. New subscription notifications update the agent's local pub-sub cache.
 
-Sequence tokens allow a rewindable adapter to start from a supported historical position. An adapter which reports `IsRewindable = false` must reject unsupported tokens rather than pretending to honor them.
+Sequence tokens allow a rewindable adapter to start from a supported historical position. An adapter whose <xref:Orleans.Streams.IQueueAdapter.IsRewindable?displayProperty=nameWithType> property is `false` must reject unsupported tokens rather than pretending to honor them.
 
 ## Delivery and failure semantics
 
-The agent normally awaits delivery before advancing a subscription cursor, creating per-subscription backpressure. When delivery fails, it invokes the configured `IStreamFailureHandler`. Depending on provider policy, an explicit subscription can be faulted and removed.
+The agent normally awaits delivery before advancing a subscription cursor, creating per-subscription backpressure. When delivery fails, it invokes the configured <xref:Orleans.Streams.IStreamFailureHandler>. Depending on provider policy, an explicit subscription can be faulted and removed.
 
 Persistent streams are not universally exactly once. Semantics depend on:
 
@@ -117,11 +121,11 @@ A queue message can be delivered again after ownership change or failure. Consum
 
 Provider authors should keep these responsibilities separate:
 
-- `IQueueAdapter` defines external queue reads/writes and rewindability.
-- `IQueueAdapterReceiver` defines receive, acknowledgement, and shutdown.
-- `IStreamQueueMapper` defines stable partition mapping.
-- `IStreamQueueBalancer` defines cluster ownership.
-- `IQueueCache` and cursors define buffering and safe purge.
-- `IStreamFailureHandler` defines delivery failure policy.
+- <xref:Orleans.Streams.IQueueAdapter> defines external queue reads/writes and rewindability.
+- <xref:Orleans.Streams.IQueueAdapterReceiver> defines receive, acknowledgement, and shutdown.
+- <xref:Orleans.Streams.IStreamQueueMapper> defines stable partition mapping.
+- <xref:Orleans.Streams.IStreamQueueBalancer> defines cluster ownership.
+- <xref:Orleans.Streams.IQueueCache> and its cursors define buffering and safe purge.
+- <xref:Orleans.Streams.IStreamFailureHandler> defines delivery failure policy.
 
 See [provider authoring](../provider-authoring.md) for hosting and validation patterns and [Azure Queue streams](azure-queue-streams.md) for a concrete adapter.

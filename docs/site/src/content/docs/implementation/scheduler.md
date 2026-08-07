@@ -14,7 +14,9 @@ Orleans separates **request scheduling** from **task scheduling**:
 
 This distinction explains how reentrant calls can interleave without two pieces of grain code running in parallel on the same activation.
 
-## `WorkItemGroup` and `ActivationTaskScheduler`
+## `WorkItemGroup` and `ActivationTaskScheduler` <a name="task-scheduling"></a>
+
+<a name="task-scheduling-in-orleans"></a>
 
 Each activation owns a `WorkItemGroup` and an `ActivationTaskScheduler`, which derives from the .NET <xref:System.Threading.Tasks.TaskScheduler> abstraction. The task scheduler enqueues work into the group. The group implements a small state machine (`Waiting`, `Runnable`, and `Running`) and schedules itself onto the [.NET managed thread pool](https://learn.microsoft.com/dotnet/standard/threading/the-managed-thread-pool).
 
@@ -41,18 +43,9 @@ Source: [`WorkItemGroup`](https://github.com/dotnet/orleans/blob/main/src/Orlean
 
 ## Async methods become multiple turns
 
-An async grain method runs synchronously until it awaits incomplete work. Its continuation is later queued back to the same activation scheduler.
+An async grain method runs synchronously until it awaits incomplete work. Its continuation is later queued back to the same activation scheduler. Code before the incomplete await executes in one turn; code after it executes in a later turn.
 
-```csharp
-public async Task UpdateAsync()
-{
-    ApplyFirstChange();       // turn 1
-    await ReadDependency();   // yields
-    ApplySecondChange();      // a later turn
-}
-```
-
-For a non-reentrant activation, other application requests normally wait while this request is incomplete. For reentrant or selectively interleavable calls, another request can run during the await. It still runs as a separate synchronous turn; it does not execute in parallel with `ApplyFirstChange` or `ApplySecondChange`.
+For a non-reentrant activation, other application requests normally wait while this request is incomplete. For reentrant or selectively interleavable calls, another request can run during the await. It still runs as a separate synchronous turn; it does not execute in parallel with either portion of the awaiting method.
 
 Therefore, grain state is protected from parallel access by the scheduler but can still change across an `await` when interleaving is allowed. Code must recheck assumptions after awaits in reentrant grains.
 
@@ -63,8 +56,8 @@ Therefore, grain state is protected from parallel access by the scheduler but ca
 - the default non-reentrant model;
 - grain-wide reentrancy;
 - call-chain reentrancy;
-- `[AlwaysInterleave]`; and
-- predicate-based `[MayInterleave]`.
+- <xref:Orleans.Concurrency.AlwaysInterleaveAttribute>; and
+- predicate-based <xref:Orleans.Concurrency.MayInterleaveAttribute>.
 
 The user-facing rules are documented in [request scheduling](../grains/request-scheduling.md). Internally, request admission and task serialization remain separate layers.
 
@@ -78,7 +71,7 @@ This prevents a continuation or runtime callback from bypassing activation isola
 
 Blocking a turn prevents every queued continuation and admitted request for that activation from progressing. Sync-over-async can deadlock when the awaited completion needs the same activation scheduler.
 
-`Task.Run` executes outside the activation scheduler. It can be useful for isolated CPU work, but code running there must not directly access mutable grain state or assume `RuntimeContext.Current` is the activation. Return immutable results and apply them in a scheduled continuation.
+<xref:System.Threading.Tasks.Task.Run*> executes outside the activation scheduler. It can be useful for isolated CPU work, but code running there must not directly access mutable grain state or assume `RuntimeContext.Current` is the activation. Return immutable results and apply them in a scheduled continuation.
 
 ## Fairness and diagnostics
 

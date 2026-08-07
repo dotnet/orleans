@@ -11,7 +11,7 @@ The [`Microsoft.Orleans.TestingHost`](https://www.nuget.org/packages/Microsoft.O
 
 This page describes the harness internals. Test-fixture patterns and basic unit-testing guidance belong in task-oriented testing documentation.
 
-## Cluster object model
+## Cluster object model <a name="use-the-inprocesstestcluster-recommended"></a>
 
 ```mermaid
 flowchart TB
@@ -32,61 +32,61 @@ flowchart TB
     S2 --> Hosts
 ```
 
-`InProcessTestClusterBuilder` accumulates host, silo, and client delegates. `Build` passes its options to an `InProcessTestCluster`; the cluster retains that mutable options object. `DeployAsync` starts the configured silo hosts and initializes the client when requested. With client initialization enabled, it performs a best-effort initial membership-view check but can continue after warning that views have not stabilized. Each `InProcessSiloHandle` owns one Generic Host and exposes its service provider for test inspection.
+<xref:Orleans.TestingHost.InProcessTestClusterBuilder> accumulates host, silo, and client delegates. <xref:Orleans.TestingHost.InProcessTestClusterBuilder.Build*> passes its options to an <xref:Orleans.TestingHost.InProcessTestCluster>; the cluster retains that mutable options object. <xref:Orleans.TestingHost.InProcessTestCluster.DeployAsync*> starts the configured silo hosts and initializes the client when requested. With client initialization enabled, it performs a best-effort initial membership-view check but can continue after warning that views have not stabilized. Each <xref:Orleans.TestingHost.InProcessSiloHandle> owns one Generic Host and exposes its service provider for test inspection.
 
 The processes are shared, but the hosts and dependency-injection containers are not. Static process state can still leak between silos, which is one reason production code should not use static mutable state for silo-local behavior.
 
-Source: [`InProcessTestClusterBuilder`](https://github.com/dotnet/orleans/blob/main/src/Orleans.TestingHost/InProcTestClusterBuilder.cs), [`InProcessTestCluster`](https://github.com/dotnet/orleans/blob/main/src/Orleans.TestingHost/InProcTestCluster.cs), and [`InProcessSiloHandle`](https://github.com/dotnet/orleans/blob/main/src/Orleans.TestingHost/InProcessSiloHandle.cs).
+API: <xref:Orleans.TestingHost.InProcessTestClusterBuilder>, <xref:Orleans.TestingHost.InProcessTestCluster>, and <xref:Orleans.TestingHost.InProcessSiloHandle>. Implementation: [builder](https://github.com/dotnet/orleans/blob/main/src/Orleans.TestingHost/InProcTestClusterBuilder.cs), [cluster](https://github.com/dotnet/orleans/blob/main/src/Orleans.TestingHost/InProcTestCluster.cs), and [silo handle](https://github.com/dotnet/orleans/blob/main/src/Orleans.TestingHost/InProcessSiloHandle.cs).
 
 ## Defaults
 
-`InProcessTestClusterBuilder` defaults to:
+<xref:Orleans.TestingHost.InProcessTestClusterBuilder> defaults to:
 
 | Setting | Default |
 | --- | --- |
-| Initial silos | 2 |
-| Cluster ID | Newly generated |
-| Service ID | Newly generated GUID |
-| Client initialization on deploy | `true` |
+| <xref:Orleans.TestingHost.InProcessTestClusterOptions.InitialSilosCount?displayProperty=nameWithType> | 2 |
+| <xref:Orleans.TestingHost.InProcessTestClusterOptions.ClusterId?displayProperty=nameWithType> | Newly generated |
+| <xref:Orleans.TestingHost.InProcessTestClusterOptions.ServiceId?displayProperty=nameWithType> | Newly generated GUID |
+| <xref:Orleans.TestingHost.InProcessTestClusterOptions.InitializeClientOnDeploy?displayProperty=nameWithType> | `true` |
 | Test-cluster membership | `true` |
 | Test-cluster grain directory | `true` |
-| Gateway per silo | `true` |
-| Real environment statistics | `false` |
+| <xref:Orleans.TestingHost.InProcessTestClusterOptions.GatewayPerSilo?displayProperty=nameWithType> | `true` |
+| <xref:Orleans.TestingHost.InProcessTestClusterOptions.UseRealEnvironmentStatistics?displayProperty=nameWithType> | `false` |
 | Connection transport | In-memory |
 
 Simulated environment statistics make resource-based tests deterministic, but they do not reproduce operating-system CPU or memory pressure. Opt into real statistics only when the test specifically needs those signals.
 
-These defaults are defined in [`InProcTestClusterBuilder`](https://github.com/dotnet/orleans/blob/main/src/Orleans.TestingHost/InProcTestClusterBuilder.cs) and [`InProcTestClusterOptions`](https://github.com/dotnet/orleans/blob/main/src/Orleans.TestingHost/InProcTestClusterOptions.cs).
+These defaults are defined by <xref:Orleans.TestingHost.InProcessTestClusterBuilder> and <xref:Orleans.TestingHost.InProcessTestClusterOptions>; see their [builder](https://github.com/dotnet/orleans/blob/main/src/Orleans.TestingHost/InProcTestClusterBuilder.cs) and [options](https://github.com/dotnet/orleans/blob/main/src/Orleans.TestingHost/InProcTestClusterOptions.cs) implementations.
 
-## Configuration layers
+## Configuration layers <a name="configure-the-test-cluster"></a>
 
 The builder separates three scopes:
 
-- `ConfigureHost` applies to both silo and client Generic Hosts and is useful for shared configuration or keyed SDK clients.
-- `ConfigureSilo` receives per-silo options and an `ISiloBuilder`.
-- `ConfigureClient` configures the cluster client.
+- <xref:Orleans.TestingHost.InProcessTestClusterBuilder.ConfigureHost*> applies to both silo and client Generic Hosts and is useful for shared configuration or keyed SDK clients.
+- <xref:Orleans.TestingHost.InProcessTestClusterBuilder.ConfigureSilo*> receives per-silo options and an <xref:Orleans.Hosting.ISiloBuilder>.
+- <xref:Orleans.TestingHost.InProcessTestClusterBuilder.ConfigureClient*> configures the cluster client.
 
 Delegates run for each relevant host. A singleton registered by a silo delegate is singleton within that silo's container, not across the cluster. A concrete instance captured by a delegate is shared because the test supplied the same object.
 
-## Dynamic topology
+## Dynamic topology <a name="add-and-remove-silos-during-tests"></a>
 
-`StartAdditionalSiloAsync()` and `StartSilosAsync(int)` create new hosts using the cluster's current options and configuration delegates. `StopSiloAsync`, `StopSilosAsync`, `StopAllSilosAsync`, `WaitForLivenessToStabilizeAsync`, and `WaitForClusterManifestToStabilizeAsync` coordinate membership and manifest transitions for failure and elasticity tests.
+<xref:Orleans.TestingHost.InProcessTestCluster.StartAdditionalSiloAsync*> and <xref:Orleans.TestingHost.InProcessTestCluster.StartSilosAsync*> create new hosts using the cluster's current options and configuration delegates. <xref:Orleans.TestingHost.InProcessTestCluster.StopSiloAsync*>, <xref:Orleans.TestingHost.InProcessTestCluster.StopSilosAsync*>, <xref:Orleans.TestingHost.InProcessTestCluster.StopAllSilosAsync*>, <xref:Orleans.TestingHost.InProcessTestCluster.WaitForLivenessToStabilizeAsync*>, and <xref:Orleans.TestingHost.InProcessTestCluster.WaitForClusterManifestToStabilizeAsync*> coordinate membership and manifest transitions for failure and elasticity tests.
 
-The overloads which take `startAdditionalSiloOnNewPort` are obsolete. Tests should use the parameterless `StartAdditionalSilo` methods or `StartSilosAsync(int)`. Lower-level `StartSiloAsync` overloads remain available when a test must supply an instance number or configuration overrides.
+The overloads which take `startAdditionalSiloOnNewPort` are obsolete. Tests should use the parameterless <xref:Orleans.TestingHost.InProcessTestCluster.StartAdditionalSilo*> overloads or <xref:Orleans.TestingHost.InProcessTestCluster.StartSilosAsync*>. Lower-level <xref:Orleans.TestingHost.InProcessTestCluster.StartSiloAsync*> overloads remain available when a test must supply an instance number or configuration overrides.
 
 Stopping a host gracefully exercises shutdown. Disposing or terminating a handle without graceful membership update is a different failure mode and should be chosen deliberately when testing failure detection.
 
-## `TestCluster` and custom silo creation
+## Class-configurator test cluster and custom silo creation <a name="use-the-testcluster"></a>
 
-`TestClusterBuilder` is the class-configurator-based harness. It defaults to two silos, in-memory transport, generated cluster identity, test membership, client initialization, file logging, and homogeneous-silo assumptions. It also installs `ConfigureDistributedGrainDirectory`, so its silos opt into the experimental distributed grain directory instead of the production runtime's default `LocalGrainDirectory`.
+<xref:Orleans.TestingHost.TestClusterBuilder> is the class-configurator-based harness. It defaults to two silos, in-memory transport, generated cluster identity, test membership, client initialization, file logging, and homogeneous-silo assumptions. It also installs `ConfigureDistributedGrainDirectory`, so its silos opt into the experimental distributed grain directory instead of the production runtime's default `LocalGrainDirectory`.
 
-`ISiloConfigurator`, `IHostConfigurator`, and `IClientBuilderConfigurator` types are serializable configuration identities which can be applied to every host. Assigning `TestClusterBuilder.CreateSiloAsync` sets `ConnectionTransport` to `TcpSocket`, so the built-in client uses its TCP transport instead of the harness's in-memory transport. The delegate bypasses `DefaultCreateSiloAsync` and cannot access the harness's private in-memory transport hub, so it must configure the custom silo host with a compatible transport.
+<xref:Orleans.TestingHost.ISiloConfigurator>, <xref:Orleans.TestingHost.IHostConfigurator>, and <xref:Orleans.TestingHost.IClientBuilderConfigurator> are serializable configuration identities which can be applied to every host. Assigning <xref:Orleans.TestingHost.TestClusterBuilder.CreateSiloAsync?displayProperty=nameWithType> sets <xref:Orleans.TestingHost.TestClusterOptions.ConnectionTransport?displayProperty=nameWithType> to `TcpSocket`, so the built-in client uses its TCP transport instead of the harness's in-memory transport. The delegate bypasses <xref:Orleans.TestingHost.TestCluster.DefaultCreateSiloAsync*> and cannot access the harness's private in-memory transport hub, so it must configure the custom silo host with a compatible transport.
 
-`TestCluster` supports suites built around `SiloHandle` and configurator types. It does not use separate application domains; its hosts run in-process unless a custom silo creation path provides different isolation.
+<xref:Orleans.TestingHost.TestCluster> supports suites built around <xref:Orleans.TestingHost.SiloHandle> and configurator types. It does not use separate application domains; its hosts run in-process unless a custom silo creation path provides different isolation.
 
-Source: [`TestClusterBuilder`](https://github.com/dotnet/orleans/blob/main/src/Orleans.TestingHost/TestClusterBuilder.cs), [`TestCluster`](https://github.com/dotnet/orleans/blob/main/src/Orleans.TestingHost/TestCluster.cs), and [`TestClusterOptions`](https://github.com/dotnet/orleans/blob/main/src/Orleans.TestingHost/TestClusterOptions.cs).
+API: <xref:Orleans.TestingHost.TestClusterBuilder>, <xref:Orleans.TestingHost.TestCluster>, and <xref:Orleans.TestingHost.TestClusterOptions>. Implementation: [builder](https://github.com/dotnet/orleans/blob/main/src/Orleans.TestingHost/TestClusterBuilder.cs), [cluster](https://github.com/dotnet/orleans/blob/main/src/Orleans.TestingHost/TestCluster.cs), and [options](https://github.com/dotnet/orleans/blob/main/src/Orleans.TestingHost/TestClusterOptions.cs).
 
-## Fidelity boundaries
+## Fidelity boundaries <a name="use-mocks"></a>
 
 TestingHost deliberately substitutes infrastructure. Tests must account for those boundaries:
 

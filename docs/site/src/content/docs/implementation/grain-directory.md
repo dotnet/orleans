@@ -11,7 +11,7 @@ The grain directory maps a grain identity to an activation address. It is on the
 
 Orleans uses `LocalGrainDirectory` by default. `DistributedGrainDirectory` is experimental and must be enabled explicitly.
 
-## Default: `LocalGrainDirectory`
+## Default: `LocalGrainDirectory` <a name="overview-and-architecture"></a>
 
 `LocalGrainDirectory` partitions registrations over the membership ring. Hashing a grain identity selects the silo whose local `LocalGrainDirectoryPartition` is authoritative for that key. This follows the broad consistent-hashing distributed-hash-table model described by [Chord](https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf), adapted to Orleans membership and activation semantics. Each silo also keeps non-authoritative cache entries to avoid repeated remote lookups.
 
@@ -51,20 +51,16 @@ The runtime resolves a directory per grain type. The unnamed default resolves to
 
 Custom directories own their consistency, availability, and cleanup behavior. They should define what concurrent registration means, how failed silos are removed, and whether stale reads are possible. The surrounding message router cannot turn an eventually consistent custom directory into a strongly consistent one.
 
-## Experimental: `DistributedGrainDirectory`
+## Experimental: `DistributedGrainDirectory` <a name="distributed-grain-directory"></a>
 
-`AddDistributedGrainDirectory()` opts into a view-synchronous directory marked with compiler warning **`ORLEANSEXP003`**:
-
-```csharp
-#pragma warning disable ORLEANSEXP003
-siloBuilder.AddDistributedGrainDirectory();
-#pragma warning restore ORLEANSEXP003
-```
+<xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?displayProperty=nameWithType> opts into a view-synchronous directory marked with compiler warning **`ORLEANSEXP003`**:
 
 It is not the default. The experimental status allows its API and protocol to evolve.
 
-The implementation divides the hash ring into configurable ranges, analogous to the virtual-node partitioning described by [Dynamo](https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf). `GrainDirectoryOptions.PartitionsPerSilo` defaults to **1**, not 30. A partition normally serves requests locally. During a membership view change, old and new owners coordinate range locks, snapshots, and ownership transfer. The design applies the [virtually synchronous methodology for dynamic service replication](https://www.microsoft.com/en-us/research/publication/virtually-synchronous-methodology-for-dynamic-service-replication/) and has similarities to [Vertical Paxos and primary-backup replication](https://www.microsoft.com/en-us/research/publication/vertical-paxos-and-primary-backup-replication/).
+<a name="partitioning-strategy"></a>
+The implementation divides the hash ring into configurable ranges, analogous to the virtual-node partitioning described by [Dynamo](https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf). <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType> defaults to **1**, not 30. A partition normally serves requests locally. During a membership view change, old and new owners coordinate range locks, snapshots, and ownership transfer. The design applies the [virtually synchronous methodology for dynamic service replication](https://www.microsoft.com/en-us/research/publication/virtually-synchronous-methodology-for-dynamic-service-replication/) and has similarities to [Vertical Paxos and primary-backup replication](https://www.microsoft.com/en-us/research/publication/vertical-paxos-and-primary-backup-replication/).
 
+<a name="view-change-procedure"></a>
 ```mermaid
 sequenceDiagram
     participant Old as Previous range owner
@@ -81,9 +77,10 @@ sequenceDiagram
     Old->>Old: Delete transferred snapshot
 ```
 
+<a name="recovery-process"></a>
 Requests and responses carry view information. A range cannot serve a request under an incompatible ownership view. If an orderly transfer is impossible, the new owner recovers registrations by querying active silos rather than assuming the failed owner's state.
 
-Source: [`AddDistributedGrainDirectory`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Hosting/CoreHostingExtensions.cs#L150-L180), [`DistributedGrainDirectory`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/GrainDirectory/DistributedGrainDirectory.cs), and [`GrainDirectoryOptions`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Configuration/Options/GrainDirectoryOptions.cs).
+API: <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?displayProperty=nameWithType> and <xref:Orleans.Configuration.GrainDirectoryOptions>. Implementation: [hosting registration](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Hosting/CoreHostingExtensions.cs) and [`DistributedGrainDirectory`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/GrainDirectory/DistributedGrainDirectory.cs).
 
 ## Tradeoffs
 
@@ -94,6 +91,6 @@ Source: [`AddDistributedGrainDirectory`](https://github.com/dotnet/orleans/blob/
 | Normal lookup | Owner partition plus per-silo cache | Owner partition plus view coordination |
 | View change | Partition split/merge and cache repair | Sealed ranges and snapshot transfer |
 | Recovery emphasis | Duplicate detection and invalidation | Explicit range recovery |
-| Configuration | Existing default behavior | `PartitionsPerSilo`, default 1 |
+| Configuration | Existing default behavior | <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType>, default 1 |
 
 More partitions can improve ownership granularity but increase transfer and coordination work. This page documents the mechanism; any production rollout of an experimental component should include compatibility, failure, and load testing.

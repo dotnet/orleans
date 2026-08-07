@@ -27,7 +27,7 @@ flowchart LR
 
 ## Host composition
 
-A silo is a [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensions/generic-host) with Orleans services registered through [.NET dependency injection](https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/overview). `SiloHostedService` starts and stops the `Silo`; the `Silo` drives the ordered silo lifecycle. The default registration set composes:
+A silo is a [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensions/generic-host) with Orleans services registered through [.NET dependency injection](https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/overview). `SiloHostedService` starts and stops <xref:Orleans.Runtime.Silo>, which drives the ordered silo lifecycle. The default registration set composes:
 
 - `MessageCenter` for network connections, routing, forwarding, gateways, and dispatch.
 - `MembershipTableManager`, `MembershipAgent`, `ClusterHealthMonitor`, and `ClusterMembershipService` for membership.
@@ -37,7 +37,7 @@ A silo is a [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensio
 - `InsideRuntimeClient` for invoking local targets and producing responses.
 - `DeploymentLoadPublisher` and environment statistics for placement and overload decisions.
 
-See [`DefaultSiloServices`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Hosting/DefaultSiloServices.cs) for the composition root and [`Silo`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Silo/Silo.cs) for lifecycle orchestration.
+See [`DefaultSiloServices`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Hosting/DefaultSiloServices.cs) for the composition root and <xref:Orleans.Runtime.Silo> plus its [implementation](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Silo/Silo.cs) for lifecycle orchestration.
 
 An external client has no activation catalog or placement service. `ClusterClient` starts an `OutsideRuntimeClient`, discovers gateways, maintains gateway connections, and sends requests through a client `MessageCenter`. A silo also embeds a runtime client, but its `InsideRuntimeClient` can dispatch directly to local activations and system targets.
 
@@ -82,7 +82,7 @@ Understanding those boundaries is essential when extending the runtime. A custom
 
 Prefer supported extension points over replacing internal runtime types:
 
-- <xref:Orleans.Runtime.IPlacementDirector> and placement filters customize candidate selection.
+- <xref:Orleans.Runtime.Placement.IPlacementDirector> and placement filters customize candidate selection.
 - <xref:Orleans.GrainDirectory.IGrainDirectory> supplies a named grain directory.
 - serializer codecs, copiers, activators, and converters extend wire handling.
 - stream queue adapters, mappers, balancers, caches, and failure handlers extend persistent streams.

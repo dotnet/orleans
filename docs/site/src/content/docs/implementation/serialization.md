@@ -44,23 +44,11 @@ Source: [`OrleansSourceGenerator`](https://github.com/dotnet/orleans/blob/main/s
 
 ## Field identity is the wire contract
 
-`[Id(n)]` identifies a serialized member within its declaring type. IDs are not field order and must remain stable as source is edited.
+<xref:Orleans.IdAttribute> identifies a serialized member within its declaring type. IDs are not field order and must remain stable as source is edited.
 
-```csharp
-[GenerateSerializer]
-public sealed class AccountSnapshot
-{
-    [Id(0)]
-    public string Owner { get; init; } = "";
+For example, `[Id(0)]` and `[Id(1)]` identify two different members. Adding a new ID is compatible with readers which tolerate an omitted field. Reusing or renumbering an existing ID changes the meaning of bytes on the wire and can corrupt rolling upgrades or persisted data.
 
-    [Id(1)]
-    public decimal Balance { get; init; }
-}
-```
-
-Adding a new ID is compatible with readers which tolerate an omitted field. Reusing or renumbering an existing ID changes the meaning of bytes on the wire and can corrupt rolling upgrades or persisted data.
-
-`GenerateSerializerAttribute.GenerateFieldIds` defaults to `None`. Automatic public-property IDs are available, but explicit IDs make compatibility review visible. Primary constructor parameters are included by default for records and excluded by default for other types.
+<xref:Orleans.GenerateSerializerAttribute.GenerateFieldIds?displayProperty=nameWithType> defaults to <xref:Orleans.GenerateFieldIds.None?displayProperty=nameWithType>. Automatic public-property IDs are available, but explicit IDs make compatibility review visible. Primary constructor parameters are included by default for records and excluded by default for other types.
 
 Aliases provide stable type identity when CLR names move. A type alias must remain unique in the manifest. Generic and compound aliases are resolved through the manifest's alias tree.
 
@@ -78,7 +66,7 @@ The request object is serializable like any other Orleans value. Stable method a
 
 ## Runtime manifest and type safety
 
-Each generated assembly carries a `TypeManifestProviderAttribute`. `ISerializerBuilder.AddAssembly` finds those providers and contributes their components to <xref:Orleans.Serialization.Configuration.TypeManifestOptions>.
+Each generated assembly carries a <xref:Orleans.Serialization.Configuration.TypeManifestProviderAttribute>. <xref:Orleans.Serialization.SerializerBuilderExtensions.AddAssembly*?displayProperty=nameWithType> finds those providers and contributes their components to <xref:Orleans.Serialization.Configuration.TypeManifestOptions>.
 
 The manifest records:
 
@@ -87,13 +75,13 @@ The manifest records:
 - well-known numeric type IDs and aliases; and
 - explicitly allowed types and assemblies.
 
-`AllowAllTypes` defaults to `false`. This is a type-resolution boundary: receiving a formatted type name does not make every loadable CLR type valid input.
+<xref:Orleans.Serialization.Configuration.TypeManifestOptions.AllowAllTypes?displayProperty=nameWithType> defaults to `false`. This is a type-resolution boundary: receiving a formatted type name does not make every loadable CLR type valid input.
 
-Source: [`TypeManifestOptions`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Serialization/Configuration/TypeManifestOptions.cs), [`SerializerBuilderExtensions`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Serialization/Hosting/SerializerBuilderExtensions.cs), and [`ServiceCollectionExtensions.AddSerializer`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Serialization/Hosting/ServiceCollectionExtensions.cs).
+API: <xref:Orleans.Serialization.Configuration.TypeManifestOptions>, <xref:Orleans.Serialization.ISerializerBuilder>, and <xref:Orleans.Serialization.SerializerBuilderExtensions.AddAssembly*?displayProperty=nameWithType>. Implementation: [manifest options](https://github.com/dotnet/orleans/blob/main/src/Orleans.Serialization/Configuration/TypeManifestOptions.cs), [serializer builder extensions](https://github.com/dotnet/orleans/blob/main/src/Orleans.Serialization/Hosting/SerializerBuilderExtensions.cs), and [serializer service registration](https://github.com/dotnet/orleans/blob/main/src/Orleans.Serialization/Hosting/ServiceCollectionExtensions.cs).
 
 ## Extension points
 
-Use the registration APIs exposed by `ISerializerBuilder` for:
+Use the registration APIs exposed by <xref:Orleans.Serialization.ISerializerBuilder> for:
 
 - a field codec when a type needs custom wire encoding;
 - a deep copier when generated member-wise copy is unsuitable;

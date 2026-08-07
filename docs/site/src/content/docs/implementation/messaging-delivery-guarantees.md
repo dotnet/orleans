@@ -45,7 +45,7 @@ Transport code can also retry a failed socket send. That repairs a transport att
 
 ## Response timeout means unknown outcome
 
-`MessagingOptions.ResponseTimeout` defaults to 30 seconds, or 30 minutes when a debugger is attached. `CallbackData` completes the caller with <xref:System.TimeoutException> when no response reaches the callback in time.
+<xref:Orleans.Configuration.MessagingOptions.ResponseTimeout?displayProperty=nameWithType> defaults to 30 seconds, or 30 minutes when a debugger is attached. `CallbackData` completes the caller with <xref:System.TimeoutException> when no response reaches the callback in time.
 
 At that point, any of these can be true:
 
@@ -55,9 +55,9 @@ At that point, any of these can be true:
 - the grain method completed and its response was lost or delayed; or
 - a response will arrive after the callback has already been removed.
 
-The timeout therefore reports an **unknown outcome**, not a failed execution. By default, `CancelRequestOnTimeout` is `false`. Enabling cancellation requests cooperative cancellation; it still cannot prove that no side effect occurred.
+The timeout therefore reports an **unknown outcome**, not a failed execution. By default, <xref:Orleans.Configuration.MessagingOptions.CancelRequestOnTimeout?displayProperty=nameWithType> is `false`. Enabling cancellation requests cooperative cancellation; it still cannot prove that no side effect occurred.
 
-Source: [`MessagingOptions`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Configuration/Options/MessagingOptions.cs), [`CallbackData`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Runtime/CallbackData.cs), and [`TimeoutTests`](https://github.com/dotnet/orleans/blob/main/test/Orleans.Runtime.Internal.Tests/TimeoutTests.cs).
+API: <xref:Orleans.Configuration.MessagingOptions>. Implementation: [messaging options](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Configuration/Options/MessagingOptions.cs), [`CallbackData`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Runtime/CallbackData.cs), and [`TimeoutTests`](https://github.com/dotnet/orleans/blob/main/test/Orleans.Runtime.Internal.Tests/TimeoutTests.cs).
 
 ## Delivery model
 
@@ -76,7 +76,7 @@ Repeated retry can approximate at-least-once delivery only while the cluster and
 
 The runtime can return a rejection when it knows that it cannot process a request, for example because of invalid routing or overload. A rejection is stronger evidence than a timeout, but application code must still interpret the rejection type.
 
-Messages have expiration metadata derived from the response timeout. With `DropExpiredMessages = true` (the default), an expired request or response can be dropped instead of consuming work which can no longer complete the original callback.
+Messages have expiration metadata derived from the response timeout. With <xref:Orleans.Configuration.MessagingOptions.DropExpiredMessages?displayProperty=nameWithType> set to `true` (the default), an expired request or response can be dropped instead of consuming work which can no longer complete the original callback.
 
 ## Designing callers
 

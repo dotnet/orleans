@@ -19,35 +19,20 @@ An Orleans provider adapts an external system or alternate runtime implementatio
 
 <xref:Orleans.Providers.IProviderBuilder`1> is the bridge from Orleans configuration to a silo or client builder:
 
-```csharp
-public sealed class ExampleProviderBuilder : IProviderBuilder<ISiloBuilder>
-{
-    public void Configure(
-        ISiloBuilder builder,
-        string? name,
-        IConfigurationSection configurationSection)
-    {
-        builder.AddExampleProvider(
-            name ?? throw new ArgumentNullException(nameof(name)),
-            options => options.Bind(configurationSection));
-    }
-}
-```
-
 Provider packages associate a provider type string and category with a builder using assembly metadata. The host selects that builder from configuration, passes the provider name and section, and lets the builder call the same public registration API used by code-first configuration.
 
-The Azure Queue stream implementation demonstrates this pattern: [`AzureQueueStreamProviderBuilder`](https://github.com/dotnet/orleans/blob/main/src/Azure/Orleans.Streaming.AzureStorage/Hosting/AzureQueueStreamProviderBuilder.cs) implements builders for both `ISiloBuilder` and `IClientBuilder`.
+The Azure Queue stream implementation demonstrates this pattern: <xref:Orleans.Hosting.AzureQueueStreamProviderBuilder> implements builders for both <xref:Orleans.Hosting.ISiloBuilder> and <xref:Orleans.Hosting.IClientBuilder>. See its [implementation](https://github.com/dotnet/orleans/blob/main/src/Azure/Orleans.Streaming.AzureStorage/Hosting/AzureQueueStreamProviderBuilder.cs).
 
 ## Named-service composition
 
-Many provider kinds allow multiple instances. The provider name is therefore part of service identity, options identity, logging identity, and runtime lookup. `NamedServiceConfigurator` and its derived configurators register keyed components and named options without creating a private service provider.
+Many provider kinds allow multiple instances. The provider name is therefore part of service identity, options identity, logging identity, and runtime lookup. <xref:Orleans.Hosting.NamedServiceConfigurator> and its derived configurators register keyed components and named options without creating a private service provider.
 
 A registration extension should:
 
 - require a non-empty name when the provider category is named;
 - register options through `AddOptions<T>(name)` or an Orleans configurator;
 - register the contract and implementation under the same key;
-- use `TryAdd` only for truly shared defaults; and
+- use <xref:Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.TryAdd*> only for truly shared defaults; and
 - include the name in validators and diagnostics.
 
 Resolving an unkeyed singleton for a named component can make the first provider's options leak into every other provider.
@@ -61,14 +46,14 @@ The provider builder and options are the control plane. The runtime contract is 
 | Cluster membership | <xref:Orleans.IMembershipTable> |
 | Grain storage | <xref:Orleans.Storage.IGrainStorage> |
 | Grain directory | <xref:Orleans.GrainDirectory.IGrainDirectory> |
-| Reminder table | <xref:Orleans.Runtime.IReminderTable> |
+| Reminder table | <xref:Orleans.IReminderTable> |
 | Persistent streams | <xref:Orleans.Streams.IQueueAdapterFactory> and its adapter components |
 
 Do not let configuration concerns weaken the data-plane contract. For example, a membership provider must preserve conditional updates and ordered versions regardless of whether credentials came from a connection string, a keyed SDK client, or managed identity.
 
 ## Validation
 
-Options validation should fail before the silo joins the cluster or starts accepting traffic. Orleans providers commonly register an `IConfigurationValidator` so validation can include named options and service dependencies which ordinary data-annotation validation cannot express.
+Options validation should fail before the silo joins the cluster or starts accepting traffic. Orleans providers commonly register an <xref:Orleans.IConfigurationValidator> so validation can include named options and service dependencies which ordinary data-annotation validation cannot express.
 
 Validate at least:
 
@@ -86,7 +71,7 @@ Providers which allocate clients, receivers, leases, or background agents should
 
 Ownership must be explicit. If the application supplies a keyed SDK client, the provider generally should not dispose an object it does not own. If the provider creates receivers per queue, it should stop and dispose them when queue ownership moves.
 
-The persistent stream provider illustrates staged lifecycle composition: it creates the adapter during initialization, starts pulling agents at the active stage, then stops agents before closing. See [`PersistentStreamProvider.Participate`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Streaming/PersistentStreams/PersistentStreamProvider.cs#L218-L235).
+The persistent stream provider illustrates staged lifecycle composition: it creates the adapter during initialization, starts pulling agents at the active stage, then stops agents before closing. See <xref:Orleans.Providers.Streams.Common.PersistentStreamProvider.Participate*?displayProperty=nameWithType> and its [implementation](https://github.com/dotnet/orleans/blob/main/src/Orleans.Streaming/PersistentStreams/PersistentStreamProvider.cs).
 
 ## Testing a provider
 

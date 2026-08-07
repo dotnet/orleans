@@ -35,11 +35,11 @@ The pages in this track use Orleans source and tests as the specification. Inter
 | --- | --- |
 | Placement | <xref:Orleans.Runtime.ResourceOptimizedPlacement> |
 | Grain directory | `LocalGrainDirectory`, using the membership ring |
-| Experimental directory | Opt-in with `AddDistributedGrainDirectory`; warning `ORLEANSEXP003` |
-| Experimental directory partitions | `GrainDirectoryOptions.PartitionsPerSilo = 1` |
+| Experimental directory | Opt-in with <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?displayProperty=nameWithType>; warning `ORLEANSEXP003` |
+| Experimental directory partitions | <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType> defaults to 1 |
 | Membership probe timeout | 5 seconds |
 | Death-vote expiry | 2 minutes |
-| Response timeout | 30 seconds, or 30 minutes while a debugger is attached |
+| <xref:Orleans.Configuration.MessagingOptions.ResponseTimeout?displayProperty=nameWithType> | 30 seconds, or 30 minutes while a debugger is attached |
 | Automatic call retry after response timeout | None |
 
 Configuration values affect failure detection and resource use. This track explains their role in protocols, while the [hosting configuration guide](../host/configuration-guide/index.md) and [deployment guidance](../deployment/index.md) own operational recommendations.
