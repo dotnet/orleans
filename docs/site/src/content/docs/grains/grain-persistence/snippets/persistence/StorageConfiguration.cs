@@ -211,14 +211,14 @@ public static class StorageConfiguration
         // <configure_adonet_serializer>
         var builder = Host.CreateApplicationBuilder();
 
-        builder.Services.AddSingleton<IGrainStorageSerializer, ExampleStorageSerializer>();
+        builder.Services.AddSingleton<ExampleStorageSerializer>();
         builder.UseOrleans(siloBuilder =>
         {
             siloBuilder.AddAdoNetGrainStorage(
                 "stateStore",
                 (OptionsBuilder<AdoNetGrainStorageOptions> optionsBuilder) =>
                 {
-                    optionsBuilder.Configure<IGrainStorageSerializer>((options, serializer) =>
+                    optionsBuilder.Configure<ExampleStorageSerializer>((options, serializer) =>
                     {
                         options.Invariant = "Npgsql";
                         options.ConnectionString =
