@@ -23,6 +23,8 @@ export default defineConfig({
   base: '/orleans/',
   redirects: {
     '/docs/deployment/consul-deployment': '/orleans/docs/host/configuration-guide/clustering/consul/',
+    '/docs/tutorials-and-samples/overview-helloworld': '/orleans/docs/tutorials-and-samples/hello-world/',
+    '/docs/tutorials-and-samples/tutorial-1': '/orleans/docs/tutorials-and-samples/hello-world/',
   },
   integrations: [
     starlight({
