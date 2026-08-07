@@ -47,6 +47,33 @@ var builder = Host.CreateApplicationBuilder(args)
 await builder.RunAsync();
 ```
 
+### Using Orleans grain storage for checkpoints
+
+Azure Table Storage remains the default checkpoint store for compatibility with existing deployments. As an alternative, checkpoints can be stored using Orleans grains and the configured `PubSubStore` grain storage provider:
+
+```csharp
+siloBuilder
+    .AddMemoryGrainStorage("PubSubStore")
+    .AddEventHubStreams("EventHubStreamProvider", configurator =>
+    {
+        configurator.ConfigureEventHub(builder => builder.Configure(options =>
+        {
+            options.ConnectionString = "YOUR_EVENT_HUB_CONNECTION_STRING";
+            options.ConsumerGroup = "YOUR_CONSUMER_GROUP";
+            options.Path = "YOUR_EVENT_HUB_NAME";
+        }));
+        configurator.UseGrainCheckpointer(builder => builder.Configure(options =>
+        {
+            options.PersistInterval = TimeSpan.FromSeconds(30);
+        }));
+    });
+```
+
+The grain checkpointer applies numeric ordering to Event Hubs offsets so that an older offset cannot overwrite a newer checkpoint. Configure a durable `PubSubStore` provider in production; in-memory grain storage does not preserve checkpoints across cluster restarts. Switching checkpoint stores does not migrate existing offsets and can cause events to be replayed.
+Set `GrainStreamQueueCheckpointerOptions.StorageProviderName` to use another registered grain storage provider.
+
+`UseGrainCheckpointer` extends `ISiloPersistentStreamConfigurator`, so it can also be used with other persistent stream providers. Event Hubs configures numeric checkpoint ordering by default; other providers can set `GrainStreamQueueCheckpointerOptions.CheckpointComparer` for their checkpoint format.
+
 ## Example - Using Event Hub Streams in a Grain
 
 ```csharp

@@ -15,6 +15,18 @@ namespace Orleans.Streams
         /// <param name="partition">The partition.</param>
         /// <returns>The stream checkpointer.</returns>
         Task<IStreamQueueCheckpointer<string>> Create(string partition);
+
+        /// <summary>
+        /// Creates a stream checkpointer for the specified partition.
+        /// </summary>
+        /// <param name="partition">The partition.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>The stream checkpointer.</returns>
+        Task<IStreamQueueCheckpointer<string>> Create(string partition, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Create(partition).WaitAsync(cancellationToken);
+        }
     }
 
     /// <summary>
@@ -36,11 +48,34 @@ namespace Orleans.Streams
         Task<TCheckpoint> Load();
 
         /// <summary>
+        /// Loads the checkpoint.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>The checkpoint.</returns>
+        Task<TCheckpoint> Load(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Load().WaitAsync(cancellationToken);
+        }
+
+        /// <summary>
         /// Updates the checkpoint.
         /// </summary>
         /// <param name="offset">The offset.</param>
         /// <param name="utcNow">The current UTC time.</param>
         void Update(TCheckpoint offset, DateTime utcNow);
+
+        /// <summary>
+        /// Updates the checkpoint.
+        /// </summary>
+        /// <param name="offset">The offset.</param>
+        /// <param name="utcNow">The current UTC time.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        void Update(TCheckpoint offset, DateTime utcNow, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Update(offset, utcNow);
+        }
 
         /// <summary>
         /// Flushes any pending checkpoint to persistent storage, ensuring the latest offset is durably saved.

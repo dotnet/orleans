@@ -32,7 +32,7 @@ namespace UnitTests.StreamingTests
             var streamId = StreamId.Create("namespace", Guid.NewGuid());
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             // Use Arg.Any<int>() to match regardless of the maxCacheAddCount value.
-            receiver.GetQueueMessagesAsync(Arg.Any<int>())
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult<IList<IBatchContainer>>(
                 [
                     new GeneratedBatchContainer(streamId, 1, new EventSequenceTokenV2(1)),
@@ -72,7 +72,7 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var streamId = StreamId.Create("namespace", Guid.NewGuid());
             var receiver = Substitute.For<IQueueAdapterReceiver>();
-            receiver.GetQueueMessagesAsync(Arg.Any<int>())
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult<IList<IBatchContainer>>(
                 [
                     new GeneratedBatchContainer(streamId, 1, new EventSequenceTokenV2(1)),
@@ -122,7 +122,7 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             // Simulate a receiver binary compiled before the return value was annotated as non-null.
-            receiver.GetQueueMessagesAsync(Arg.Any<int>())
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult<IList<IBatchContainer>>(null!));
             var agent = CreateAgent(pubSub: null, queueId);
             var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
@@ -131,7 +131,7 @@ namespace UnitTests.StreamingTests
             var readResult = await testAccessor.ReadFromQueue(queueId, receiver, 1);
 
             Assert.False(readResult);
-            await receiver.Received(1).GetQueueMessagesAsync(1);
+            await receiver.Received(1).GetQueueMessagesAsync(1, CancellationToken.None);
             Assert.Empty(await testAccessor.GetPubSubCache());
         }
 
@@ -493,7 +493,7 @@ namespace UnitTests.StreamingTests
             Assert.False(cursor.MoveNext());
 
             var receiver = Substitute.For<IQueueAdapterReceiver>();
-            receiver.GetQueueMessagesAsync(Arg.Any<int>())
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult<IList<IBatchContainer>>([new TestBatchContainer(streamId, newToken)]));
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
@@ -545,7 +545,7 @@ namespace UnitTests.StreamingTests
             var consumer = new RewindConsumer(rewindToken);
 
             var receiver = Substitute.For<IQueueAdapterReceiver>();
-            receiver.GetQueueMessagesAsync(Arg.Any<int>())
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
                 .Returns(
                     Task.FromResult<IList<IBatchContainer>>([new TestBatchContainer(streamId, attemptedToken)]),
                     Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
@@ -667,7 +667,7 @@ namespace UnitTests.StreamingTests
             var queueReadReleased = new TaskCompletionSource<IList<IBatchContainer>>(TaskCreationOptions.RunContinuationsAsynchronously);
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var receiver = Substitute.For<IQueueAdapterReceiver>();
-            receiver.GetQueueMessagesAsync(Arg.Any<int>())
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
                 .Returns(async _ =>
                 {
                     queueReadStarted.TrySetResult(true);
@@ -713,7 +713,7 @@ namespace UnitTests.StreamingTests
         {
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var receiver = Substitute.For<IQueueAdapterReceiver>();
-            receiver.GetQueueMessagesAsync(Arg.Any<int>())
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
             receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
@@ -726,7 +726,7 @@ namespace UnitTests.StreamingTests
 
             await testAccessor.RunQueuePump(queueId, CancellationToken.None);
 
-            await receiver.Received(1).GetQueueMessagesAsync(Arg.Any<int>());
+            await receiver.Received(1).GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
@@ -738,7 +738,7 @@ namespace UnitTests.StreamingTests
 
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var receiver = Substitute.For<IQueueAdapterReceiver>();
-            receiver.GetQueueMessagesAsync(Arg.Any<int>())
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
             receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
@@ -788,7 +788,7 @@ namespace UnitTests.StreamingTests
 
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var receiver = Substitute.For<IQueueAdapterReceiver>();
-            receiver.GetQueueMessagesAsync(Arg.Any<int>())
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
             receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
@@ -841,7 +841,7 @@ namespace UnitTests.StreamingTests
             var streamId = StreamId.Create("namespace", Guid.NewGuid());
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             var receiverShutdownStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            receiver.GetQueueMessagesAsync(Arg.Any<int>())
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
                 .Returns(
                     Task.FromResult<IList<IBatchContainer>>([
                         new GeneratedBatchContainer(streamId, 1, new EventSequenceTokenV2(1)),
@@ -892,7 +892,7 @@ namespace UnitTests.StreamingTests
 
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var receiver = Substitute.For<IQueueAdapterReceiver>();
-            receiver.GetQueueMessagesAsync(Arg.Any<int>())
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
             receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 

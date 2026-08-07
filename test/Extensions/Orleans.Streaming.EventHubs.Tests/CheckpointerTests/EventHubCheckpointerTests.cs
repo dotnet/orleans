@@ -22,13 +22,14 @@ public class EventHubCheckpointerTests
     /// </summary>
     private class TestCheckpointer : IStreamQueueCheckpointer<string>
     {
-        public bool CheckpointExists => true;
+        public bool CheckpointExists { get; init; } = true;
+        public string LoadedOffset { get; init; } = EventHubConstants.StartOfStream;
         public string? LastOffset { get; private set; }
         public int UpdateCount { get; private set; }
         public string? FlushedOffset { get; private set; }
         public int FlushCount { get; private set; }
 
-        public Task<string> Load() => Task.FromResult("-1");
+        public Task<string> Load() => Task.FromResult(LoadedOffset);
 
         public void Update(string offset, DateTime utcNow)
         {
@@ -146,6 +147,27 @@ public class EventHubCheckpointerTests
         public Task CloseAsync() => Task.CompletedTask;
     }
 
+    private sealed class CancellableEventHubReceiver : IEventHubReceiver
+    {
+        public TaskCompletionSource<CancellationToken> ReceiveStarted { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
+            => Task.FromResult<IEnumerable<EventData>>([]);
+
+        public async Task<IEnumerable<EventData>> ReceiveAsync(
+            int maxCount,
+            TimeSpan waitTime,
+            CancellationToken cancellationToken)
+        {
+            ReceiveStarted.SetResult(cancellationToken);
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return [];
+        }
+
+        public Task CloseAsync() => Task.CompletedTask;
+    }
+
     private sealed class BlockingEventHubReceiver : IEventHubReceiver
     {
         public int CloseCount { get; private set; }
@@ -182,7 +204,8 @@ public class EventHubCheckpointerTests
     private static async Task<EventHubAdapterReceiver> CreateReceiver(
         TestCheckpointer checkpointer,
         TestEventHubQueueCache? cache = null,
-        IEventHubReceiver? eventHubReceiver = null)
+        IEventHubReceiver? eventHubReceiver = null,
+        Action<string>? onReceiverCreated = null)
     {
         var settings = new EventHubPartitionSettings
         {
@@ -210,11 +233,32 @@ public class EventHubCheckpointerTests
                 instruments),
             loadSheddingOptions: new Orleans.Configuration.LoadSheddingOptions(),
             environmentStatisticsProvider: new Orleans.Statistics.EnvironmentStatisticsProvider(),
-            eventHubReceiverFactory: (_, _, _) => eventHubReceiver ?? new TestEventHubReceiver());
+            eventHubReceiverFactory: (_, offset, _) =>
+            {
+                onReceiverCreated?.Invoke(offset);
+                return eventHubReceiver ?? new TestEventHubReceiver();
+            });
 
         await receiver.Initialize(TimeSpan.FromSeconds(5));
 
         return receiver;
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task Initialize_WhenCheckpointDoesNotExist_UsesStartOfStream()
+    {
+        string? receiverOffset = null;
+        var checkpointer = new TestCheckpointer
+        {
+            CheckpointExists = false,
+            LoadedOffset = string.Empty,
+        };
+
+        _ = await CreateReceiver(
+            checkpointer,
+            onReceiverCreated: offset => receiverOffset = offset);
+
+        Assert.Equal(EventHubConstants.StartOfStream, receiverOffset);
     }
 
     [Fact, TestCategory("BVT")]
@@ -229,6 +273,23 @@ public class EventHubCheckpointerTests
         Assert.Empty(messages);
         Assert.Equal(1, eventHubReceiver.ReceiveCount);
         Assert.Equal(0, cache.AddCount);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task GetQueueMessagesAsync_ForwardsCancellationToken()
+    {
+        var eventHubReceiver = new CancellableEventHubReceiver();
+        var receiver = await CreateReceiver(
+            new TestCheckpointer(),
+            eventHubReceiver: eventHubReceiver);
+        using var cancellation = new CancellationTokenSource();
+
+        var operation = receiver.GetQueueMessagesAsync(10, cancellation.Token);
+        Assert.Equal(cancellation.Token, await eventHubReceiver.ReceiveStarted.Task);
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
     }
 
     [Fact, TestCategory("BVT")]
@@ -279,23 +340,42 @@ public class EventHubCheckpointerTests
     [Fact, TestCategory("BVT")]
     public async Task FlushBeforeLoad_DoesNotPersistUninitializedOffset()
     {
-        var constructor = typeof(EventHubCheckpointer).GetConstructor(
-            BindingFlags.Instance | BindingFlags.NonPublic,
-            binder: null,
-            new[] { typeof(Orleans.Configuration.AzureTableStreamCheckpointerOptions), typeof(string), typeof(string), typeof(string), typeof(Microsoft.Extensions.Logging.ILoggerFactory) },
-            modifiers: null);
-        Assert.NotNull(constructor);
-
-        var checkpointer = (EventHubCheckpointer)constructor.Invoke(new object[]
-        {
-            new Orleans.Configuration.AzureTableStreamCheckpointerOptions(),
-            "provider",
-            "partition",
-            "service",
-            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance
-        });
+        var checkpointer = CreateUninitializedCheckpointer();
 
         await checkpointer.FlushAsync(CancellationToken.None);
+
+        Assert.False(checkpointer.CheckpointExists);
+        Assert.Equal(EventHubConstants.StartOfStream, GetLatestOffset(checkpointer));
+    }
+
+    [Theory, TestCategory("BVT")]
+    [InlineData("20")]
+    [InlineData("10")]
+    [InlineData("not-an-offset")]
+    public async Task Update_WhenOffsetDoesNotAdvance_DoesNotChangeCheckpoint(string candidate)
+    {
+        var checkpointer = CreateUninitializedCheckpointer();
+        SetPersistedOffset(checkpointer, "20");
+
+        checkpointer.Update(candidate, new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc));
+        await checkpointer.FlushAsync(CancellationToken.None);
+
+        Assert.True(checkpointer.CheckpointExists);
+        Assert.Equal("20", GetLatestOffset(checkpointer));
+        Assert.Equal("20", GetCheckpointEntity(checkpointer).Offset);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void Update_WhenOffsetAdvances_TracksLatestCheckpoint()
+    {
+        var checkpointer = CreateUninitializedCheckpointer();
+        SetPersistedOffset(checkpointer, "20");
+
+        checkpointer.Update("21", new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc));
+
+        Assert.True(checkpointer.CheckpointExists);
+        Assert.Equal("21", GetLatestOffset(checkpointer));
+        Assert.Equal("21", GetCheckpointEntity(checkpointer).Offset);
     }
 
     [Fact, TestCategory("BVT")]
@@ -432,5 +512,61 @@ public class EventHubCheckpointerTests
 
         UpdateDeliveryProgress(receiver, MakeToken(75));
         Assert.Equal("75", checkpointer.LastOffset);
+    }
+
+    private static EventHubCheckpointer CreateUninitializedCheckpointer()
+    {
+        var constructor = typeof(EventHubCheckpointer).GetConstructor(
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            binder: null,
+            [
+                typeof(Orleans.Configuration.AzureTableStreamCheckpointerOptions),
+                typeof(string),
+                typeof(string),
+                typeof(string),
+                typeof(Microsoft.Extensions.Logging.ILoggerFactory),
+            ],
+            modifiers: null);
+        Assert.NotNull(constructor);
+
+        return (EventHubCheckpointer)constructor.Invoke(
+        [
+            new Orleans.Configuration.AzureTableStreamCheckpointerOptions(),
+            "provider",
+            "partition",
+            "service",
+            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
+        ]);
+    }
+
+    private static void SetPersistedOffset(EventHubCheckpointer checkpointer, string offset)
+    {
+        SetField(checkpointer, "latestOffset", offset);
+        SetField(checkpointer, "persistedOffset", offset);
+        GetCheckpointEntity(checkpointer).Offset = offset;
+    }
+
+    private static string GetLatestOffset(EventHubCheckpointer checkpointer)
+        => (string)GetField(checkpointer, "latestOffset");
+
+    private static EventHubPartitionCheckpointEntity GetCheckpointEntity(EventHubCheckpointer checkpointer)
+        => (EventHubPartitionCheckpointEntity)GetField(checkpointer, "entity");
+
+    private static object GetField(EventHubCheckpointer checkpointer, string name)
+    {
+        var field = typeof(EventHubCheckpointer).GetField(
+            name,
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        return field.GetValue(checkpointer)!;
+    }
+
+    private static void SetField(EventHubCheckpointer checkpointer, string name, object value)
+    {
+        var field = typeof(EventHubCheckpointer).GetField(
+            name,
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        field.SetValue(checkpointer, value);
     }
 }

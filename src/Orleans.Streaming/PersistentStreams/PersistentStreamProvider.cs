@@ -105,7 +105,7 @@ namespace Orleans.Providers.Streams.Common
         {
             if(!this.stateManager.PresetState(ProviderState.Initialized)) return;
             this.adapterFactory = this.runtime.ServiceProvider.GetRequiredKeyedService<IQueueAdapterFactory>(this.Name);
-            this.queueAdapter = await adapterFactory.CreateAdapter();
+            this.queueAdapter = await adapterFactory.CreateAdapter(token);
 
             if (this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit
                 || this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)

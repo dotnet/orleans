@@ -563,6 +563,7 @@ namespace Orleans.Streaming.EventHubs
         System.Threading.Tasks.Task CloseAsync();
         System.Threading.Tasks.Task CloseAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData>> ReceiveAsync(int maxCount, System.TimeSpan waitTime);
+        System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData>> ReceiveAsync(int maxCount, System.TimeSpan waitTime, System.Threading.CancellationToken cancellationToken);
     }
 
     public partial class SlowConsumingPressureMonitor : ICachePressureMonitor
@@ -659,6 +660,8 @@ namespace Orleans.Streaming.EventHubs.Testing
         public void ConfigureDataGeneratorForStream(Runtime.StreamId streamId) { }
 
         public System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData>> ReceiveAsync(int maxCount, System.TimeSpan waitTime) { throw null; }
+
+        public System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData>> ReceiveAsync(int maxCount, System.TimeSpan waitTime, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public void StopProducingOnStream(Runtime.StreamId streamId) { }
     }
