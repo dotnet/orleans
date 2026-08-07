@@ -140,9 +140,9 @@ namespace Orleans.DurableJobs
 
         public System.Threading.Tasks.Task MarkAsCompleteAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
-        protected abstract System.Threading.Tasks.Task PersistAddJobAsync(string jobId, string jobName, System.DateTimeOffset dueTime, Runtime.GrainId target, System.Collections.Generic.IReadOnlyDictionary<string, string>? metadata, System.Threading.CancellationToken cancellationToken);
+        protected abstract System.Threading.Tasks.Task PersistAddJobAsync(DurableJob job, System.Threading.CancellationToken cancellationToken);
         protected abstract System.Threading.Tasks.Task PersistRemoveJobAsync(string jobId, System.Threading.CancellationToken cancellationToken);
-        protected abstract System.Threading.Tasks.Task PersistRetryJobAsync(string jobId, System.DateTimeOffset newDueTime, System.Threading.CancellationToken cancellationToken);
+        protected abstract System.Threading.Tasks.Task PersistRetryJobAsync(IJobRunContext jobContext, System.DateTimeOffset newDueTime, System.Threading.CancellationToken cancellationToken);
         public System.Threading.Tasks.Task<bool> RemoveJobAsync(string jobId, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task RetryJobLaterAsync(IJobRunContext jobContext, System.DateTimeOffset newDueTime, System.Threading.CancellationToken cancellationToken) { throw null; }

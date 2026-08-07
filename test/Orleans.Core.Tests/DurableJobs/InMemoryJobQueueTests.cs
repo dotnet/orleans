@@ -248,6 +248,22 @@ public class InMemoryJobQueueTests
     }
 
     [Fact]
+    public void RetryJobLater_PreservesTraceContext()
+    {
+        const string traceParent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+        const string traceState = "vendor=value";
+        var queue = new InMemoryJobQueue();
+        var job = CreateJob("job1", DateTimeOffset.UtcNow.AddSeconds(1), traceParent, traceState);
+
+        queue.Enqueue(job, 0);
+        queue.RetryJobLater(CreateJobContext(job, "run1", 1), DateTimeOffset.UtcNow.AddSeconds(10));
+
+        var retriedJob = Assert.Single(queue.GetSnapshot()).Job;
+        Assert.Equal(traceParent, retriedJob.TraceParent);
+        Assert.Equal(traceState, retriedJob.TraceState);
+    }
+
+    [Fact]
     public void RetryJobLater_NonExistentJob_DoesNotThrow()
     {
         var queue = new InMemoryJobQueue();
@@ -410,7 +426,7 @@ public class InMemoryJobQueueTests
         Assert.False(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
     }
 
-    private static DurableJob CreateJob(string id, DateTimeOffset dueTime)
+    private static DurableJob CreateJob(string id, DateTimeOffset dueTime, string? traceParent = null, string? traceState = null)
     {
         return new DurableJob
         {
@@ -419,7 +435,9 @@ public class InMemoryJobQueueTests
             DueTime = dueTime,
             TargetGrainId = GrainId.Create("test", id),
             ShardId = "shard1",
-            Metadata = null
+            Metadata = null,
+            TraceParent = traceParent,
+            TraceState = traceState,
         };
     }
 
