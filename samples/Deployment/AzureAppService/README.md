@@ -148,6 +148,8 @@ Managed identity role assignments can take several minutes to propagate after th
 
 ## Configure GitHub Actions
 
+Complete the [manual infrastructure deployment](#deploy-manually) once with its default `assignStorageRoles=true` before using the routine workflow. The checked-in workflow deliberately passes `assignStorageRoles=false` so its OIDC identity doesn't need permission to create role assignments; it isn't a bootstrap workflow.
+
 Copy [`infra/deploy.yml`](infra/deploy.yml) to `.github/workflows/deploy-app-service.yml`.
 
 Configure [GitHub OIDC federation for Azure](https://learn.microsoft.com/azure/developer/github/connect-from-azure-openid-connect) for the `production` environment and add these environment variables:
