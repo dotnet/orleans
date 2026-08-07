@@ -11,7 +11,8 @@ namespace Orleans.Streams
     /// </summary>
     public class GrainStreamQueueCheckpointer : IStreamQueueCheckpointer<string>
     {
-        private const string StorageProviderKeyPrefix = "__orleans_storage_provider__:";
+        private const char KeySeparator = '-';
+        private const string StorageProviderKeyPrefix = "__orleans_storage_provider__-";
         private readonly IStreamCheckpointerGrain _grain;
         private readonly GrainStreamQueueCheckpointerOptions _options;
         private readonly object _lock = new();
@@ -113,18 +114,24 @@ namespace Orleans.Streams
             string partition,
             string storageProviderName)
         {
-            var existingKey = $"{providerName}_{serviceId}_{partition}";
+            var key = new StringBuilder();
+            AppendKeyPart(key, serviceId);
+            AppendKeyPart(key, providerName);
+            AppendKeyPart(key, partition);
             if (string.Equals(
                 storageProviderName,
                 ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME,
                 StringComparison.Ordinal))
             {
-                return existingKey;
+                return key.ToString();
             }
 
             var encodedStorageProvider = Convert.ToBase64String(Encoding.UTF8.GetBytes(storageProviderName));
-            return $"{StorageProviderKeyPrefix}{encodedStorageProvider}:{existingKey}";
+            return $"{StorageProviderKeyPrefix}{encodedStorageProvider}{KeySeparator}{key}";
         }
+
+        private static void AppendKeyPart(StringBuilder key, string value)
+            => key.Append(value.Length).Append(KeySeparator).Append(value);
 
         internal static string GetConfiguredStorageProviderName(ReadOnlySpan<byte> grainKey)
         {
@@ -134,7 +141,7 @@ namespace Orleans.Streams
                 throw new InvalidOperationException("The configured checkpoint grain key has an invalid format.");
             }
 
-            var providerNameEnd = key.IndexOf(':', StorageProviderKeyPrefix.Length);
+            var providerNameEnd = key.IndexOf(KeySeparator, StorageProviderKeyPrefix.Length);
             if (providerNameEnd < 0)
             {
                 throw new InvalidOperationException("The checkpoint grain key contains an invalid storage provider name.");
@@ -187,6 +194,7 @@ namespace Orleans.Streams
         /// <inheritdoc />
         public async Task FlushAsync(CancellationToken cancellationToken)
         {
+            var retryingSave = false;
             while (true)
             {
                 Task inProgressSave;
@@ -195,12 +203,28 @@ namespace Orleans.Streams
                     inProgressSave = _inProgressSave;
                 }
 
-                await inProgressSave.WaitAsync(cancellationToken);
+                if (retryingSave)
+                {
+                    await inProgressSave.WaitAsync(cancellationToken);
+                }
+                else
+                {
+                    try
+                    {
+                        await inProgressSave.WaitAsync(cancellationToken);
+                    }
+                    catch (Exception) when (!cancellationToken.IsCancellationRequested)
+                    {
+                    }
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
 
                 lock (_lock)
                 {
                     if (!ReferenceEquals(inProgressSave, _inProgressSave))
                     {
+                        retryingSave = false;
                         continue;
                     }
 
@@ -210,16 +234,49 @@ namespace Orleans.Streams
                     }
 
                     _inProgressSave = Save(_latestCheckpoint, cancellationToken);
+                    retryingSave = true;
                 }
             }
         }
 
         private async Task Save(string checkpoint, CancellationToken cancellationToken)
         {
-            await _grain.Update(checkpoint, cancellationToken);
+            string expectedCheckpoint;
             lock (_lock)
             {
-                _persistedCheckpoint = checkpoint;
+                expectedCheckpoint = _persistedCheckpoint;
+            }
+
+            while (true)
+            {
+                var persistedCheckpoint = await _grain.Update(
+                    checkpoint,
+                    expectedCheckpoint,
+                    cancellationToken);
+
+                lock (_lock)
+                {
+                    _persistedCheckpoint = persistedCheckpoint;
+                    if (string.Equals(persistedCheckpoint, checkpoint, StringComparison.Ordinal))
+                    {
+                        return;
+                    }
+
+                    if (_options.CheckpointComparer is { } comparer)
+                    {
+                        if (comparer.Compare(_latestCheckpoint, persistedCheckpoint) <= 0)
+                        {
+                            _latestCheckpoint = persistedCheckpoint;
+                        }
+
+                        if (comparer.Compare(checkpoint, persistedCheckpoint) <= 0)
+                        {
+                            return;
+                        }
+                    }
+
+                    expectedCheckpoint = persistedCheckpoint;
+                }
             }
         }
     }

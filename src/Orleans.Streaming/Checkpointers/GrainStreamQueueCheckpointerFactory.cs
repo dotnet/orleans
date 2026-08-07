@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Configuration.Overrides;
 using System;
 using System.Threading.Tasks;
 
@@ -45,7 +46,12 @@ namespace Orleans.Streams
         public static IStreamQueueCheckpointerFactory CreateFactory(IServiceProvider services, string providerName)
         {
             var options = services.GetOptionsByName<GrainStreamQueueCheckpointerOptions>(providerName);
-            return ActivatorUtilities.CreateInstance<GrainStreamQueueCheckpointerFactory>(services, providerName, options);
+            var clusterOptions = services.GetProviderClusterOptions(providerName);
+            return ActivatorUtilities.CreateInstance<GrainStreamQueueCheckpointerFactory>(
+                services,
+                providerName,
+                clusterOptions,
+                options);
         }
 
         /// <inheritdoc />

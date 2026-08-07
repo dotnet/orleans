@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Orleans.Configuration;
 using Orleans.Providers;
@@ -20,8 +21,8 @@ public sealed class GrainStreamQueueCheckpointerTests : StreamQueueCheckpointerT
         var grain = Substitute.For<IStreamCheckpointerGrain>();
         grain.Load(Arg.Any<CancellationToken>())
             .Returns(_ => new ValueTask<string>(store.Load()));
-        grain.Update(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(call => new ValueTask(store.Write(call.Arg<string>())));
+        grain.Update(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => new ValueTask<string>(store.Write(call.ArgAt<string>(0))));
         return Task.FromResult<IStreamQueueCheckpointer<string>>(
             new GrainStreamQueueCheckpointer(grain));
     }
@@ -71,7 +72,8 @@ public sealed class GrainStreamQueueCheckpointerTests : StreamQueueCheckpointerT
     {
         var grain = Substitute.For<IStreamCheckpointerGrain>();
         grain.Load(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult("10"));
-        grain.Update(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(ValueTask.CompletedTask);
+        grain.Update(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => ValueTask.FromResult(call.ArgAt<string>(0)));
         var checkpointer = new GrainStreamQueueCheckpointer(grain);
         await checkpointer.Load();
         var utcNow = DateTime.UtcNow;
@@ -81,8 +83,8 @@ public sealed class GrainStreamQueueCheckpointerTests : StreamQueueCheckpointerT
 
         await checkpointer.FlushAsync(cancellation.Token);
 
-        await grain.Received(1).Update("20", CancellationToken.None);
-        await grain.Received(1).Update("30", cancellation.Token);
+        await grain.Received(1).Update("20", "10", CancellationToken.None);
+        await grain.Received(1).Update("30", "20", cancellation.Token);
     }
 
     [Fact]
@@ -98,7 +100,7 @@ public sealed class GrainStreamQueueCheckpointerTests : StreamQueueCheckpointerT
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => grain.Load(cancellation.Token).AsTask());
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => grain.Update("20", cancellation.Token).AsTask());
+            () => grain.Update("20", "10", cancellation.Token).AsTask());
 
         Assert.Equal("10", state.Checkpoint);
         await storage.DidNotReceive().WriteStateAsync(Arg.Any<CancellationToken>());
@@ -113,26 +115,158 @@ public sealed class GrainStreamQueueCheckpointerTests : StreamQueueCheckpointerT
         var grain = CreateGrain(storage);
         using var cancellation = new CancellationTokenSource();
 
-        await grain.Update("20", cancellation.Token);
+        var checkpoint = await grain.Update("20", "10", cancellation.Token);
 
+        Assert.Equal("20", checkpoint);
         Assert.Equal("20", state.Checkpoint);
         await storage.Received(1).WriteStateAsync(cancellation.Token);
     }
 
     [Fact]
-    public void DefaultStorageProvider_PreservesExistingGrainKey()
+    public async Task GrainUpdate_WhenExpectedCheckpointIsStale_DoesNotWrite()
     {
-        var key = GrainStreamQueueCheckpointer.GetGrainKey(
-            "provider",
-            "service",
-            "partition",
-            ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
+        var state = new StreamCheckpointerGrainState { Checkpoint = "20" };
+        var storage = Substitute.For<IPersistentState<StreamCheckpointerGrainState>>();
+        storage.State.Returns(state);
+        var grain = CreateGrain(storage);
 
-        Assert.Equal("provider_service_partition", key);
+        var checkpoint = await grain.Update("30", "10", CancellationToken.None);
+
+        Assert.Equal("20", checkpoint);
+        Assert.Equal("20", state.Checkpoint);
+        await storage.DidNotReceive().WriteStateAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Create_DefaultStorageWithReservedPrefix_UsesLegacyGrainType()
+    public async Task GrainUpdate_WhenStorageWriteFails_RestoresPreviousCheckpoint()
+    {
+        var expected = new InvalidOperationException("checkpoint write failed");
+        var state = new StreamCheckpointerGrainState { Checkpoint = "10" };
+        var storage = Substitute.For<IPersistentState<StreamCheckpointerGrainState>>();
+        storage.State.Returns(state);
+        storage.WriteStateAsync(Arg.Any<CancellationToken>()).Returns(Task.FromException(expected));
+        var grain = CreateGrain(storage);
+
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => grain.Update("20", "10", CancellationToken.None).AsTask());
+
+        Assert.Same(expected, actual);
+        Assert.Equal("10", state.Checkpoint);
+    }
+
+    [Fact]
+    public async Task OrderedCheckpointers_WhenOneIsStale_DoNotRegressPersistedCheckpoint()
+    {
+        var state = new StreamCheckpointerGrainState { Checkpoint = "20" };
+        var storage = Substitute.For<IPersistentState<StreamCheckpointerGrainState>>();
+        storage.State.Returns(state);
+        var grain = CreateGrain(storage);
+        var options = new GrainStreamQueueCheckpointerOptions
+        {
+            CheckpointComparer = StreamCheckpointComparers.Numeric,
+        };
+        var first = new GrainStreamQueueCheckpointer(grain, options);
+        var second = new GrainStreamQueueCheckpointer(grain, options);
+        await first.Load();
+        await second.Load();
+
+        first.Update("40", DateTime.UtcNow);
+        await first.FlushAsync(CancellationToken.None);
+        second.Update("30", DateTime.UtcNow);
+        await second.FlushAsync(CancellationToken.None);
+
+        Assert.Equal("40", state.Checkpoint);
+        await storage.Received(1).WriteStateAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task FlushAsync_WhenRetryFails_PropagatesFailure()
+    {
+        var expected = new InvalidOperationException("checkpoint write failed");
+        var grain = Substitute.For<IStreamCheckpointerGrain>();
+        grain.Load(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult("10"));
+        grain.Update(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromException<string>(expected));
+        var checkpointer = new GrainStreamQueueCheckpointer(grain);
+        await checkpointer.Load();
+        checkpointer.Update("20", DateTime.UtcNow);
+
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => checkpointer.FlushAsync(CancellationToken.None));
+
+        Assert.Same(expected, actual);
+        await grain.Received(2).Update("20", "10", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Factory_UsesProviderSpecificServiceId()
+    {
+        const string providerName = "provider";
+        var grain = Substitute.For<IStreamCheckpointerGrain>();
+        grain.Load(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(string.Empty));
+        var clusterClient = Substitute.For<IClusterClient>();
+        clusterClient.GetGrain<IStreamCheckpointerGrain>(Arg.Any<string>()).Returns(grain);
+        using var services = new ServiceCollection()
+            .AddOptions()
+            .Configure<ClusterOptions>(options => options.ServiceId = "global-service")
+            .AddOptions<GrainStreamQueueCheckpointerOptions>(providerName)
+            .Services
+            .AddSingleton(clusterClient)
+            .AddKeyedSingleton(
+                providerName,
+                new ClusterOptions { ServiceId = "provider-service" })
+            .BuildServiceProvider();
+
+        var factory = GrainStreamQueueCheckpointerFactory.CreateFactory(services, providerName);
+        _ = await factory.Create("partition");
+
+        _ = clusterClient.Received(1).GetGrain<IStreamCheckpointerGrain>(
+            GrainStreamQueueCheckpointer.GetGrainKey(
+                providerName,
+                "provider-service",
+                "partition",
+                ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME));
+    }
+
+    [Theory]
+    [InlineData("provider_one", "service", "partition", "provider", "one_service", "partition")]
+    [InlineData("provider", "one_service", "partition", "provider", "one", "service_partition")]
+    public void GrainKey_IncludesServiceProviderAndPartitionWithoutAmbiguity(
+        string firstProvider,
+        string firstService,
+        string firstPartition,
+        string secondProvider,
+        string secondService,
+        string secondPartition)
+    {
+        var first = GrainStreamQueueCheckpointer.GetGrainKey(
+            firstProvider,
+            firstService,
+            firstPartition,
+            ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
+        var second = GrainStreamQueueCheckpointer.GetGrainKey(
+            secondProvider,
+            secondService,
+            secondPartition,
+            ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
+
+        Assert.NotEqual(first, second);
+    }
+
+    [Fact]
+    public void GrainKey_UsesStorageCompatibleSeparator()
+    {
+        var key = GrainStreamQueueCheckpointer.GetGrainKey(
+            "event-hubs",
+            "my-service",
+            "0",
+            ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
+
+        Assert.Equal("10-my-service10-event-hubs1-0", key);
+    }
+
+    [Fact]
+    public async Task Create_DefaultStorageWithReservedPrefix_UsesDefaultGrainType()
     {
         const string providerName = "__orleans_storage_provider__:QQ==:provider";
         var grain = Substitute.For<IStreamCheckpointerGrain>();
@@ -150,7 +284,11 @@ public sealed class GrainStreamQueueCheckpointerTests : StreamQueueCheckpointerT
             new GrainStreamQueueCheckpointerOptions());
 
         _ = clusterClient.Received(1).GetGrain<IStreamCheckpointerGrain>(
-            $"{providerName}_service_partition");
+            GrainStreamQueueCheckpointer.GetGrainKey(
+                providerName,
+                "service",
+                "partition",
+                ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME));
     }
 
     [Fact]
@@ -160,7 +298,7 @@ public sealed class GrainStreamQueueCheckpointerTests : StreamQueueCheckpointerT
         var storage = Substitute.For<IPersistentState<StreamCheckpointerGrainState>>();
         var context = Substitute.For<IGrainContext>();
         context.GrainId.Returns(GrainId.Create(
-            "streamcheckpointergrain",
+            "stream.checkpoint.configured",
             GrainStreamQueueCheckpointer.GetGrainKey(
                 "provider",
                 "service",
@@ -178,16 +316,17 @@ public sealed class GrainStreamQueueCheckpointerTests : StreamQueueCheckpointerT
                 return storage;
             });
 
-        _ = new ConfiguredStreamCheckpointerGrain(context, persistentStateFactory);
+        _ = new ConfiguredStreamCheckpointGrain(context, persistentStateFactory);
 
         Assert.NotNull(configuration);
-        Assert.Equal("streamcheckpointer", configuration.StateName);
+        Assert.Equal("chk", configuration.StateName);
         Assert.Equal(storageProviderName, configuration.StorageName);
     }
 
-    private static StreamCheckpointerGrainGrain CreateGrain(
+    private static StreamCheckpointGrain CreateGrain(
         IPersistentState<StreamCheckpointerGrainState> storage)
         => new(storage);
+
 }
 
 [TestCategory("BVT")]
@@ -208,8 +347,8 @@ public sealed class OrderedGrainStreamQueueCheckpointerTests : StreamQueueCheckp
         var grain = Substitute.For<IStreamCheckpointerGrain>();
         grain.Load(Arg.Any<CancellationToken>())
             .Returns(_ => new ValueTask<string>(store.Load()));
-        grain.Update(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(call => new ValueTask(store.Write(call.Arg<string>())));
+        grain.Update(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => new ValueTask<string>(store.Write(call.ArgAt<string>(0))));
         return Task.FromResult<IStreamQueueCheckpointer<string>>(
             new GrainStreamQueueCheckpointer(
                 grain,
@@ -258,4 +397,5 @@ public sealed class OrderedGrainStreamQueueCheckpointerTests : StreamQueueCheckp
         Assert.Empty(store.CompletedWrites);
         Assert.Equal(initial, store.PersistedCheckpoint);
     }
+
 }

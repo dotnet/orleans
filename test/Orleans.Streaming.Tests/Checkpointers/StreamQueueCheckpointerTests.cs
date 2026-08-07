@@ -189,20 +189,18 @@ public abstract class StreamQueueCheckpointerTests
     }
 
     [Fact]
-    public async Task FlushAsync_WhenPersistenceFails_PropagatesFailure()
+    public async Task FlushAsync_WhenInProgressWriteFails_RetriesLatestCheckpoint()
     {
         var (checkpointer, store) = await CreateLoadedSubject("10");
         var expected = new InvalidOperationException("checkpoint write failed");
         store.FailNextWrite(expected);
         checkpointer.Update("20", TestTimeUtc);
 
-        var actual = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => checkpointer.FlushAsync(CancellationToken.None));
+        await checkpointer.FlushAsync(CancellationToken.None);
 
-        Assert.Same(expected, actual);
-        Assert.Equal(["20"], store.WriteAttempts);
-        Assert.Empty(store.CompletedWrites);
-        Assert.Equal("10", store.PersistedCheckpoint);
+        Assert.Equal(["20", "20"], store.WriteAttempts);
+        Assert.Equal(["20"], store.CompletedWrites);
+        Assert.Equal("20", store.PersistedCheckpoint);
     }
 
     [Fact]
@@ -355,7 +353,7 @@ public abstract class StreamQueueCheckpointerTests
             }
         }
 
-        public async Task Write(string checkpoint)
+        public async Task<string> Write(string checkpoint)
         {
             Task? blocker;
             Exception? failure;
@@ -385,6 +383,8 @@ public abstract class StreamQueueCheckpointerTests
                 _completedWrites.Add(checkpoint);
                 Signal(ref _writeCompleted);
             }
+
+            return checkpoint;
         }
 
         public Task WaitForWriteAttempts(int count) => WaitForCount(count, completed: false);

@@ -2,6 +2,7 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Storage;
 using Orleans.Streams;
 
 namespace Orleans.Hosting
@@ -85,6 +86,10 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configures the stream provider to use a grain-based checkpointer.
         /// </summary>
+        /// <remarks>
+        /// The configured grain storage provider must be registered with the silo.
+        /// Each stream provider can select a different grain storage provider.
+        /// </remarks>
         /// <param name="configurator">The configuration builder.</param>
         /// <param name="configureOptions">The grain checkpointer configuration.</param>
         public static void UseGrainCheckpointer(
@@ -101,6 +106,12 @@ namespace Orleans.Hosting
                     options.Validate(
                         static value => !string.IsNullOrWhiteSpace(value.StorageProviderName),
                         $"{nameof(GrainStreamQueueCheckpointerOptions.StorageProviderName)} is required.");
+                    options.Validate<IServiceProviderIsKeyedService>(
+                        static (value, services) => services.IsKeyedService(
+                            typeof(IGrainStorage),
+                            value.StorageProviderName),
+                        $"{nameof(GrainStreamQueueCheckpointerOptions.StorageProviderName)} must identify a registered grain storage provider.");
+                    options.ValidateOnStart();
                     configureOptions?.Invoke(options);
                 });
         }

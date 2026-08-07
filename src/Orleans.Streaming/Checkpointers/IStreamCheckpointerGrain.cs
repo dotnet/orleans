@@ -7,7 +7,7 @@ namespace Orleans.Streams
     /// <summary>
     /// Stores a persistent stream queue checkpoint.
     /// </summary>
-    [DefaultGrainType("streamcheckpointergrain")]
+    [DefaultGrainType("stream.checkpoint")]
     public interface IStreamCheckpointerGrain : IGrainWithStringKey
     {
         /// <summary>
@@ -18,11 +18,16 @@ namespace Orleans.Streams
         ValueTask<string> Load(CancellationToken cancellationToken);
 
         /// <summary>
-        /// Updates the checkpoint.
+        /// Updates the checkpoint if the persisted value matches the expected value.
         /// </summary>
         /// <param name="offset">The offset.</param>
+        /// <param name="expectedCheckpoint">The expected persisted checkpoint.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
-        ValueTask Update(string offset, CancellationToken cancellationToken);
+        /// <returns>The persisted checkpoint after the update attempt.</returns>
+        ValueTask<string> Update(
+            string offset,
+            string expectedCheckpoint,
+            CancellationToken cancellationToken);
     }
 
     internal interface IConfiguredStreamCheckpointerGrain : IStreamCheckpointerGrain

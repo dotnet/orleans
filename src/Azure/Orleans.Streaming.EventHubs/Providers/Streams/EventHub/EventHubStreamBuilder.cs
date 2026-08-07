@@ -43,29 +43,20 @@ namespace Orleans.Hosting
             configurator.Configure(configureOptions);
         }
 
-        public static void UseAzureTableCheckpointer(this ISiloEventHubStreamConfigurator configurator, Action<OptionsBuilder<AzureTableStreamCheckpointerOptions>> configureOptions)
+        /// <summary>
+        /// Configures the stream provider to persist checkpoints using Azure Table Storage.
+        /// </summary>
+        /// <remarks>
+        /// This compatibility method is not an extension method. Use
+        /// <see cref="AzureTableStreamConfiguratorExtensions.UseAzureTableCheckpointer"/> instead.
+        /// </remarks>
+        public static void UseAzureTableCheckpointer(
+            ISiloEventHubStreamConfigurator configurator,
+            Action<OptionsBuilder<AzureTableStreamCheckpointerOptions>> configureOptions)
         {
-            configurator.ConfigureCheckpointer(EventHubCheckpointerFactory.CreateFactory, configureOptions);
+            AzureTableStreamConfiguratorExtensions.UseAzureTableCheckpointer(configurator, configureOptions);
         }
 
-        /// <summary>
-        /// Configures the stream provider to persist checkpoints using Orleans grains.
-        /// </summary>
-        /// <param name="configurator">The configuration builder.</param>
-        /// <param name="configureOptions">The grain checkpointer configuration.</param>
-        public static void UseGrainCheckpointer(
-            this ISiloEventHubStreamConfigurator configurator,
-            Action<OptionsBuilder<GrainStreamQueueCheckpointerOptions>>? configureOptions = null)
-        {
-            SiloPersistentStreamConfiguratorExtension.UseGrainCheckpointer(
-                configurator,
-                options =>
-                {
-                    options.Configure(static value =>
-                        value.CheckpointComparer = StreamCheckpointComparers.Numeric);
-                    configureOptions?.Invoke(options);
-                });
-        }
     }
 
     public class SiloEventHubStreamConfigurator : SiloRecoverableStreamConfigurator, ISiloEventHubStreamConfigurator
@@ -74,11 +65,18 @@ namespace Orleans.Hosting
             Action<Action<IServiceCollection>> configureServicesDelegate)
             : base(name, configureServicesDelegate, EventHubAdapterFactory.Create)
         {
-            this.ConfigureDelegate(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
-                .ConfigureNamedOptionForLogging<EventHubReceiverOptions>(name)
-                .ConfigureNamedOptionForLogging<EventHubStreamCachePressureOptions>(name)
-                .AddTransient<IConfigurationValidator>(sp => new EventHubOptionsValidator(sp.GetOptionsByName<EventHubOptions>(name), name))
-                .AddTransient<IConfigurationValidator>(sp => new StreamCheckpointerConfigurationValidator(sp, name)));
+            this.ConfigureDelegate(services =>
+            {
+                services.AddOptions<GrainStreamQueueCheckpointerOptions>(name)
+                    .Configure(static options => options.CheckpointComparer = StreamCheckpointComparers.Numeric);
+                services.AddOptions<AzureTableStreamCheckpointerOptions>(name)
+                    .Configure(static options => options.CheckpointComparer = StreamCheckpointComparers.Numeric);
+                services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
+                    .ConfigureNamedOptionForLogging<EventHubReceiverOptions>(name)
+                    .ConfigureNamedOptionForLogging<EventHubStreamCachePressureOptions>(name)
+                    .AddTransient<IConfigurationValidator>(sp => new EventHubOptionsValidator(sp.GetOptionsByName<EventHubOptions>(name), name))
+                    .AddTransient<IConfigurationValidator>(sp => new StreamCheckpointerConfigurationValidator(sp, name));
+            });
         }
     }
 

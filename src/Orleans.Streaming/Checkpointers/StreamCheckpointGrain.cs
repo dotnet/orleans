@@ -10,13 +10,14 @@ namespace Orleans.Streams
     /// Persists a stream queue checkpoint using Orleans grain storage.
     /// </summary>
     [PreferLocalPlacement]
-    [GrainType("streamcheckpointergrain")]
-    public class StreamCheckpointerGrainGrain : Grain, IStreamCheckpointerGrain
+    [GrainType("stream.checkpoint")]
+    public class StreamCheckpointGrain : Grain, IStreamCheckpointerGrain
     {
+        internal const string StateName = "chk";
         private readonly IPersistentState<StreamCheckpointerGrainState> _state;
 
-        public StreamCheckpointerGrainGrain(
-            [PersistentState("streamcheckpointer", ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME)]
+        public StreamCheckpointGrain(
+            [PersistentState(StateName, ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME)]
             IPersistentState<StreamCheckpointerGrainState> state)
         {
             _state = state;
@@ -29,20 +30,39 @@ namespace Orleans.Streams
                 : ValueTask.FromResult(_state.State.Checkpoint);
         }
 
-        public async ValueTask Update(string offset, CancellationToken cancellationToken)
+        public async ValueTask<string> Update(
+            string offset,
+            string expectedCheckpoint,
+            CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (!string.Equals(_state.State.Checkpoint, expectedCheckpoint, StringComparison.Ordinal))
+            {
+                return _state.State.Checkpoint;
+            }
+
+            var previousCheckpoint = _state.State.Checkpoint;
             _state.State.Checkpoint = offset;
-            await _state.WriteStateAsync(cancellationToken);
+            try
+            {
+                await _state.WriteStateAsync(cancellationToken);
+            }
+            catch
+            {
+                _state.State.Checkpoint = previousCheckpoint;
+                throw;
+            }
+
+            return offset;
         }
     }
 
     [PreferLocalPlacement]
-    [GrainType("configuredstreamcheckpointer")]
-    internal sealed class ConfiguredStreamCheckpointerGrain
-        : StreamCheckpointerGrainGrain, IConfiguredStreamCheckpointerGrain
+    [GrainType("stream.checkpoint.configured")]
+    internal sealed class ConfiguredStreamCheckpointGrain
+        : StreamCheckpointGrain, IConfiguredStreamCheckpointerGrain
     {
-        public ConfiguredStreamCheckpointerGrain(
+        public ConfiguredStreamCheckpointGrain(
             IGrainContext grainContext,
             IPersistentStateFactory persistentStateFactory)
             : base(persistentStateFactory.Create<StreamCheckpointerGrainState>(
@@ -55,7 +75,7 @@ namespace Orleans.Streams
 
         private sealed class CheckpointStateConfiguration(string storageProviderName) : IPersistentStateConfiguration
         {
-            public string StateName => "streamcheckpointer";
+            public string StateName => StreamCheckpointGrain.StateName;
 
             public string StorageName => storageProviderName;
         }

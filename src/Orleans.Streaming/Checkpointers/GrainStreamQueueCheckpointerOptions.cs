@@ -18,6 +18,10 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the name of the grain storage provider used to persist checkpoints.
         /// </summary>
+        /// <remarks>
+        /// The provider must be registered as a named grain storage provider.
+        /// Options are scoped by stream provider, so each stream provider can select a different grain storage provider.
+        /// </remarks>
         public string StorageProviderName { get; set; } = ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME;
 
         /// <summary>
