@@ -1,7 +1,7 @@
 ---
 title: Cancel Orleans grain calls
 description: Use CancellationToken for cooperative cancellation of Orleans grain calls.
-ms.date: 08/02/2026
+ms.date: 08/07/2026
 ms.topic: concept-article
 ---
 
@@ -11,7 +11,7 @@ Orleans supports <xref:System.Threading.CancellationToken> parameters on grain m
 
 ## Add cancellation to a contract
 
-Add at most one `CancellationToken` parameter. Put it last and make it optional when callers commonly don't need cancellation:
+Add at most one <xref:System.Threading.CancellationToken> parameter. Put it last and make it optional when callers commonly don't need cancellation:
 
 ```csharp
 public interface IImportGrain : IGrainWithGuidKey
@@ -99,7 +99,7 @@ clientBuilder.Configure<ClientMessagingOptions>(options =>
 
 Even when enabled, the timeout doesn't prove that the operation stopped. The cancellation message can be delayed, the method might not observe its token, or side effects might already have completed.
 
-`WaitForCancellationAcknowledgement` also defaults to `false`. Enabling it makes the caller wait for acknowledgement from the callee rather than completing local cancellation immediately. Use it only when that stronger coordination is worth the added latency and messaging.
+<xref:Orleans.Configuration.MessagingOptions.WaitForCancellationAcknowledgement> also defaults to `false`. Enabling it makes the caller wait for acknowledgement from the callee rather than completing local cancellation immediately. Use it only when that stronger coordination is worth the added latency and messaging.
 
 ## Design cancellable operations
 
@@ -113,6 +113,11 @@ Cancellation callbacks registered from grain code execute in the grain's schedul
 
 ## Contract evolution
 
-Orleans treats a `CancellationToken` specially in generated request contracts. Adding or removing a token parameter is wire-compatible with callers compiled against the other form: a missing token is represented as `CancellationToken.None`, and an extra token from an older caller can be ignored. Making a newly added parameter optional also preserves C# source compatibility for common call sites.
+Orleans treats <xref:System.Threading.CancellationToken> specially in generated request contracts. Adding or removing a token parameter is wire-compatible with callers compiled against the other form: a missing token is represented as <xref:System.Threading.CancellationToken.None?displayProperty=nameWithType>, and an extra token from an older caller can be ignored. Making a newly added parameter optional also preserves C# source compatibility for common call sites.
 
-The older `GrainCancellationToken` API isn't needed for new applications. Use the standard .NET token.
+The older <xref:Orleans.GrainCancellationToken> API isn't needed for new applications. Use the standard .NET token.
+
+## Related .NET guidance
+
+- [Cancellation in managed threads](https://learn.microsoft.com/dotnet/standard/threading/cancellation-in-managed-threads)
+- [Task cancellation](https://learn.microsoft.com/dotnet/standard/parallel-programming/task-cancellation)

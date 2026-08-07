@@ -1,7 +1,7 @@
 ---
 title: Orleans observers
 description: Send asynchronous notifications from grains to clients or other grains.
-ms.date: 08/02/2026
+ms.date: 08/07/2026
 ms.topic: concept-article
 ---
 
@@ -9,7 +9,7 @@ ms.topic: concept-article
 
 Observers let grains call an object hosted by an Orleans client or another grain. They are useful for live, best-effort notifications while the receiver is connected.
 
-Observers aren't durable subscriptions. A client can disconnect without notice, and a recreated observer has a different identity. Use an Orleans stream or another durable messaging mechanism when subscriptions or delivery must survive failures.
+Observers aren't durable subscriptions. A client can disconnect without notice, and a recreated observer has a different identity. Use [Orleans streams](../streaming/index.md) or another durable messaging mechanism when subscriptions or delivery must survive failures.
 
 ## Define an observer
 
@@ -95,9 +95,9 @@ public sealed class ChatRoomGrain : Grain, IChatRoomGrain
 }
 ```
 
-The current API is `Notify`, including the overload that accepts `Func<TObserver, Task>`. There is no `NotifyAsync` method.
+The current API is <xref:Orleans.Utilities.ObserverManager`2.Notify*>, including the overload that accepts <xref:System.Func`2> returning a <xref:System.Threading.Tasks.Task>. There is no `NotifyAsync` method.
 
-Subscriptions expire lazily after `ExpirationDuration`. Clients should renew before expiry. A notification exception causes `ObserverManager` to remove that observer; it doesn't fail the entire publish operation.
+Subscriptions expire lazily after <xref:Orleans.Utilities.ObserverManager`2.ExpirationDuration>. Clients should renew before expiry. A notification exception causes <xref:Orleans.Utilities.ObserverManager`1> to remove that observer; it doesn't fail the entire publish operation.
 
 Use <xref:Orleans.Utilities.ObserverManager`2> when the subscription identity should differ from the observer reference.
 
@@ -112,10 +112,10 @@ IChatObserver observer =
 await room.Subscribe(observer);
 ```
 
-Don't call `CreateObjectReference` for a grain. Grains are already addressable.
+Don't call <xref:Orleans.IGrainFactory.CreateObjectReference*> for a grain. Grains are already addressable.
 
 ## Execution and cancellation
 
 Calls to one client observer reference execute sequentially and aren't reentrant. Different observer references can execute concurrently.
 
-Observer methods can accept a <xref:System.Threading.CancellationToken> parameter. Cancellation remains cooperative and doesn't make observer delivery durable.
+Observer methods can accept a <xref:System.Threading.CancellationToken> parameter. Cancellation remains cooperative and doesn't make observer delivery durable. See [Cancel Orleans grain calls](cancellation-tokens.md) for cancellation semantics.

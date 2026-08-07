@@ -1,13 +1,15 @@
 ---
 title: Develop Orleans grains
 description: Define grain contracts, implement grains, and call them in Orleans.
-ms.date: 08/02/2026
+ms.date: 08/07/2026
 ms.topic: article
 ---
 
 # Develop Orleans grains
 
 A grain is an application object with a stable logical identity. Orleans activates it on demand, routes calls to its current activation, and removes idle activations from memory. Application code works with grain references instead of constructing grain classes or locating activations.
+
+Projects defining grain contracts or implementations reference [Microsoft.Orleans.Sdk](https://www.nuget.org/packages/Microsoft.Orleans.Sdk). For host and project setup, see [Orleans basics](../tutorials-and-samples/tutorial-1.md#project-setup).
 
 ## Define a grain contract
 
@@ -42,7 +44,7 @@ Orleans supports these grain method return types:
 - <xref:System.Threading.Tasks.ValueTask>
 - <xref:System.Threading.Tasks.ValueTask`1>
 
-Use `Task` or `ValueTask` for methods without a result, and their generic forms for methods returning a result. Don't use `void`, `async void`, or synchronous return types in grain contracts. A <xref:System.Threading.CancellationToken> can be included as a method parameter for cooperative cancellation.
+Use <xref:System.Threading.Tasks.Task> or <xref:System.Threading.Tasks.ValueTask> for methods without a result, and their generic forms for methods returning a result. Don't use `void`, `async void`, or synchronous return types in grain contracts. A <xref:System.Threading.CancellationToken> can be included as a method parameter for cooperative cancellation. For the underlying C# model, see [Asynchronous programming](https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/).
 
 Arguments, return values, and exceptions cross process boundaries. Make application data serializable by Orleans, normally using <xref:Orleans.GenerateSerializerAttribute> and stable <xref:Orleans.IdAttribute> values. Grain references are already serializable and can be passed in calls or stored as part of grain state.
 
@@ -71,10 +73,10 @@ public sealed class ShoppingCartGrain : Grain, IShoppingCartGrain
 }
 ```
 
-Orleans creates grain classes through dependency injection. Constructor injection is available for application services, and <xref:Orleans.IGrainFactory> is available through the `GrainFactory` property on <xref:Orleans.Grain>.
+Orleans creates grain classes through dependency injection. Constructor injection is available for application services, and <xref:Orleans.IGrainFactory> is available through <xref:Orleans.Grain.GrainFactory?displayProperty=nameWithType>.
 
 > [!IMPORTANT]
-> A grain activation processes one turn at a time. Don't block on tasks using `.Result`, `.Wait()`, or `GetAwaiter().GetResult()`. Use `await` so Orleans can resume the request on the activation scheduler.
+> A grain activation processes one turn at a time. Don't block on tasks using <xref:System.Threading.Tasks.Task`1.Result>, <xref:System.Threading.Tasks.Task.Wait*>, or `GetAwaiter().GetResult()`. Use `await` so Orleans can resume the request on the activation scheduler.
 
 ## Get and call a grain reference
 
@@ -100,7 +102,7 @@ A regular grain call completes in one of these ways:
 - The caller doesn't receive a response before its response timeout and observes <xref:System.TimeoutException>.
 - Messaging or cluster failures prevent the call from completing.
 
-A timeout tells the caller that no response arrived in time. It doesn't prove that the grain method didn't run or won't finish. `CancelRequestOnTimeout` defaults to `false`; when enabled, Orleans sends a best-effort cancellation signal after a timeout, and the grain must still cooperate by observing a cancellation token.
+A timeout tells the caller that no response arrived in time. It doesn't prove that the grain method didn't run or won't finish. <xref:Orleans.Configuration.MessagingOptions.CancelRequestOnTimeout> defaults to `false`; when enabled, Orleans sends a best-effort cancellation signal after a timeout, and the grain must still cooperate by observing a cancellation token.
 
 Distributed calls can be retried by application code or infrastructure after an uncertain outcome. Design operations to be idempotent when duplicate execution would be harmful. A common pattern is to include an operation ID and persist completed IDs with the state change.
 
@@ -114,7 +116,7 @@ public interface IReportGrain : IGrainWithGuidKey
 }
 ```
 
-Global defaults are configured through <xref:Orleans.Configuration.ClientMessagingOptions> and <xref:Orleans.Configuration.SiloMessagingOptions>. See [Cancellation tokens](cancellation-tokens.md) for cancellation semantics and configuration.
+Global defaults are configured through <xref:Orleans.Configuration.ClientMessagingOptions> and <xref:Orleans.Configuration.SiloMessagingOptions>. See [client configuration](../host/configuration-guide/client-configuration.md), [server configuration](../host/configuration-guide/server-configuration.md), and [cancellation tokens](cancellation-tokens.md).
 
 ## Activation and deactivation
 
@@ -134,7 +136,7 @@ public override Task OnDeactivateAsync(
 }
 ```
 
-The parameterless `OnActivateAsync()` overload is obsolete. Deactivation callbacks are best effort and don't run after process termination or some failures, so don't rely on them to persist critical state.
+<xref:Orleans.Grain.OnActivateAsync*> accepts a <xref:System.Threading.CancellationToken>; there is no parameterless overload. Deactivation callbacks are best effort and don't run after process termination or some failures, so don't rely on them to persist critical state.
 
 See [Grain lifecycle](grain-lifecycle.md) for collection, lifecycle participation, and migration.
 

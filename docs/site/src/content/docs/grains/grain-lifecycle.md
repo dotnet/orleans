@@ -1,7 +1,7 @@
 ---
 title: Grain activation and lifecycle
 description: Understand grain activation, deactivation, collection, lifecycle participation, and migration in Orleans.
-ms.date: 08/02/2026
+ms.date: 08/07/2026
 ms.topic: concept-article
 ---
 
@@ -33,7 +33,7 @@ public sealed class DeviceGrain(
 }
 ```
 
-The parameterless `OnActivateAsync()` overload is obsolete. If activation fails, Orleans doesn't make that activation available for calls.
+<xref:Orleans.Grain.OnActivateAsync*> accepts a <xref:System.Threading.CancellationToken>; there is no parameterless overload. If activation fails, Orleans doesn't make that activation available for calls.
 
 Avoid doing unnecessary work during activation. Activations can be recreated after collection, migration, silo restart, or failure.
 
@@ -55,11 +55,11 @@ public override async Task OnDeactivateAsync(
 }
 ```
 
-Deactivation is best effort. `OnDeactivateAsync` doesn't run if the process terminates abruptly or in some failure cases. Persist important state as part of the operation that changes it, not only during deactivation.
+Deactivation is best effort. <xref:Orleans.Grain.OnDeactivateAsync*> doesn't run if the process terminates abruptly or in some failure cases. Persist important state as part of the operation that changes it, not only during deactivation.
 
 ## Influence activation lifetime
 
-Call `DeactivateOnIdle()` to ask Orleans to deactivate the grain after the current request and queued work complete:
+Call <xref:Orleans.Grain.DeactivateOnIdle> to ask Orleans to deactivate the grain after the current request and queued work complete:
 
 ```csharp
 public Task Close()
@@ -69,9 +69,9 @@ public Task Close()
 }
 ```
 
-Call `DelayDeactivation(TimeSpan)` to keep an otherwise idle activation eligible for a specified period. This is a hint, not a durability guarantee; failures and shutdown can still remove the activation.
+Call <xref:Orleans.Grain.DelayDeactivation*> to keep an otherwise idle activation eligible for a specified period. This is a hint, not a durability guarantee; failures and shutdown can still remove the activation.
 
-Grain timers don't keep an activation alive by default. Set `GrainTimerCreationOptions.KeepAlive` only when timer activity should extend the activation lifetime.
+Grain timers don't keep an activation alive by default. Set <xref:Orleans.Runtime.GrainTimerCreationOptions.KeepAlive?displayProperty=nameWithType> only when timer activity should extend the activation lifetime.
 
 ## Lifecycle stages and participants
 
@@ -79,12 +79,12 @@ The grain lifecycle exposes ordered stages:
 
 | Stage | Purpose |
 |---|---|
-| `GrainLifecycleStage.First` | Earliest subscription point. |
-| `GrainLifecycleStage.SetupState` | State setup and loading. |
-| `GrainLifecycleStage.Activate` | Grain activation and deactivation callbacks. |
-| `GrainLifecycleStage.Last` | Latest subscription point. |
+| <xref:Orleans.Runtime.GrainLifecycleStage.First?displayProperty=nameWithType> | Earliest subscription point. |
+| <xref:Orleans.Runtime.GrainLifecycleStage.SetupState?displayProperty=nameWithType> | State setup and loading. |
+| <xref:Orleans.Runtime.GrainLifecycleStage.Activate?displayProperty=nameWithType> | Grain activation and deactivation callbacks. |
+| <xref:Orleans.Runtime.GrainLifecycleStage.Last?displayProperty=nameWithType> | Latest subscription point. |
 
-Components that need ordered activation-scoped behavior can implement `ILifecycleParticipant<IGrainLifecycle>` and subscribe through <xref:Orleans.Runtime.IGrainContext.ObservableLifecycle>. `IGrainActivationContext` has been removed; use <xref:Orleans.Runtime.IGrainContext>.
+Components that need ordered activation-scoped behavior can implement <xref:Orleans.ILifecycleParticipant`1> for <xref:Orleans.Runtime.IGrainLifecycle> and subscribe through <xref:Orleans.Runtime.IGrainContext.ObservableLifecycle>. `IGrainActivationContext` has been removed; use <xref:Orleans.Runtime.IGrainContext>.
 
 ```csharp
 public sealed class CacheParticipant : ILifecycleParticipant<IGrainLifecycle>
@@ -105,11 +105,13 @@ public sealed class CacheParticipant : ILifecycleParticipant<IGrainLifecycle>
 }
 ```
 
-Lifecycle participation is an advanced integration mechanism. Most grains should use `OnActivateAsync` and `OnDeactivateAsync`.
+Lifecycle participation is an advanced integration mechanism. Most grains should use <xref:Orleans.Grain.OnActivateAsync*> and <xref:Orleans.Grain.OnDeactivateAsync*>.
+
+For the runtime lifecycle model shared by silos and grain activations, see [Orleans runtime lifecycle](../implementation/orleans-lifecycle.md).
 
 ## Grain migration
 
-Migration moves an activation to another silo while preserving migration-participating in-memory state. Call `MigrateOnIdle()` to request migration after the activation finishes its current work:
+Migration moves an activation to another silo while preserving migration-participating in-memory state. Call <xref:Orleans.Grain.MigrateOnIdle> to request migration after the activation finishes its current work:
 
 ```csharp
 public Task RequestMigration()
@@ -147,4 +149,4 @@ Persistent-state components supplied by Orleans participate automatically. Migra
 
 Automatic activation repartitioning and rebalancing use migration to improve locality or cluster balance. Both are experimental. See [Grain placement](grain-placement.md) for their status and configuration.
 
-Use <xref:Orleans.Placement.ImmovableAttribute> to exclude a grain type from automatic migration. It doesn't block an explicit `MigrateOnIdle()` request.
+Use <xref:Orleans.Placement.ImmovableAttribute> to exclude a grain type from automatic migration. It doesn't block an explicit <xref:Orleans.Grain.MigrateOnIdle> request.
