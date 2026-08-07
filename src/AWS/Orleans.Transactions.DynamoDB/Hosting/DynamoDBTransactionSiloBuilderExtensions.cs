@@ -8,7 +8,7 @@ namespace Orleans.Hosting
     public static class DynamoDBTransactionSiloBuilderExtensions
     {
         /// <summary>
-        /// Configure silo to use dynamodb storage as the default transactional grain storage.
+        /// Configure silo to use DynamoDB storage as the default transactional grain storage.
         /// </summary>
         public static ISiloBuilder AddDynamoDBTransactionalStateStorageAsDefault(this ISiloBuilder builder, Action<DynamoDBTransactionalStorageOptions> configureOptions)
         {
@@ -16,7 +16,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use dynamodb storage for transactional grain storage.
+        /// Configure silo to use DynamoDB storage for transactional grain storage.
         /// </summary>
         public static ISiloBuilder AddDynamoDBTransactionalStateStorage(this ISiloBuilder builder, string name, Action<DynamoDBTransactionalStorageOptions> configureOptions)
         {
@@ -24,7 +24,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use dynamodb storage as the default transactional grain storage.
+        /// Configure silo to use DynamoDB storage as the default transactional grain storage.
         /// </summary>
         public static ISiloBuilder AddDynamoDBTransactionalStateStorageAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<DynamoDBTransactionalStorageOptions>>? configureOptions = null)
         {
@@ -32,7 +32,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use dynamodb storage for transactional grain storage.
+        /// Configure silo to use DynamoDB storage for transactional grain storage.
         /// </summary>
         public static ISiloBuilder AddDynamoDBTransactionalStateStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<DynamoDBTransactionalStorageOptions>>? configureOptions = null)
         {
