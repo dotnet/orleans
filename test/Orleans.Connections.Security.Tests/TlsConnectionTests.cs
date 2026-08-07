@@ -1,5 +1,11 @@
+using System.Collections.Concurrent;
+using System.Net.Security;
+using System.Text;
+using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Orleans.Configuration;
+using Orleans.Runtime.Messaging;
 using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
@@ -35,6 +41,10 @@ namespace Orleans.Connections.Security.Tests
         private const string CertificateSubjectName = "fakedomain.faketld";
         private const string CertificateConfigKey = "certificate";
         private const string ClientCertificateModeKey = "CertificateMode";
+        private const string ProtocolRecorderKey = "ProtocolRecorder";
+        private const string AuthenticatedSiloProtocol = "orleans-auth-test";
+        private const string OrleansProtocol = "Orleans1";
+        private static readonly ConcurrentDictionary<string, ProtocolRecorder> ProtocolRecorders = new();
 
         /// <summary>
         /// Tests the certificate utility functions for creating self-signed certificates.
@@ -198,6 +208,162 @@ namespace Orleans.Connections.Security.Tests
                     }
                 }
             }
+        }
+
+        [Fact]
+        public async Task SeparateSiloAndGatewayTls_NegotiateConfiguredApplicationProtocols()
+        {
+            var recorderId = Guid.NewGuid().ToString();
+            var recorder = new ProtocolRecorder();
+            Assert.True(ProtocolRecorders.TryAdd(recorderId, recorder));
+
+            TestCluster? testCluster = default;
+            try
+            {
+                var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
+                    CertificateSubjectName,
+                    [TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid]);
+                var builder = new TestClusterBuilder()
+                    .AddSiloBuilderConfigurator<AlpnTlsServerConfigurator>()
+                    .AddClientBuilderConfigurator<AlpnTlsClientConfigurator>();
+                builder.Options.InitialSilosCount = 2;
+                builder.Properties[CertificateConfigKey] = TestCertificateHelper.ConvertToBase64(certificate);
+                builder.Properties[ProtocolRecorderKey] = recorderId;
+
+                testCluster = builder.Build();
+                await testCluster.DeployAsync();
+
+                var grain = testCluster.Client.GetGrain<IPingGrain>("alpn");
+                Assert.Equal("ping", await grain.Echo("ping"));
+
+                Assert.Contains(AuthenticatedSiloProtocol, recorder.GetProtocols(ConnectionPath.SiloInbound));
+                Assert.Contains(AuthenticatedSiloProtocol, recorder.GetProtocols(ConnectionPath.SiloOutbound));
+                Assert.Contains(OrleansProtocol, recorder.GetProtocols(ConnectionPath.GatewayInbound));
+                Assert.Contains(OrleansProtocol, recorder.GetProtocols(ConnectionPath.ClientOutbound));
+                Assert.DoesNotContain(AuthenticatedSiloProtocol, recorder.GetProtocols(ConnectionPath.GatewayInbound));
+                Assert.DoesNotContain(AuthenticatedSiloProtocol, recorder.GetProtocols(ConnectionPath.ClientOutbound));
+            }
+            finally
+            {
+                ProtocolRecorders.TryRemove(recorderId, out _);
+                if (testCluster is not null)
+                {
+                    await testCluster.StopAllSilosAsync();
+                    testCluster.Dispose();
+                }
+            }
+        }
+
+        private sealed class AlpnTlsServerConfigurator : IHostConfigurator
+        {
+            public void Configure(IHostBuilder hostBuilder)
+            {
+                var configuration = hostBuilder.GetConfiguration();
+                var certificate = TestCertificateHelper.ConvertFromBase64(configuration[CertificateConfigKey]!);
+                var recorder = ProtocolRecorders[configuration[ProtocolRecorderKey]!];
+
+                hostBuilder.UseOrleans((_, siloBuilder) =>
+                {
+                    siloBuilder.UseSiloTls(options =>
+                    {
+                        ConfigureTls(options, certificate);
+                        options.OnAuthenticateAsClient = (_, authenticationOptions) =>
+                        {
+                            authenticationOptions.TargetHost = CertificateSubjectName;
+                            authenticationOptions.ApplicationProtocols =
+                            [
+                                new SslApplicationProtocol(AuthenticatedSiloProtocol),
+                                new SslApplicationProtocol(OrleansProtocol)
+                            ];
+                        };
+                        options.OnAuthenticateAsServer = (_, authenticationOptions) =>
+                        {
+                            authenticationOptions.ApplicationProtocols =
+                            [
+                                new SslApplicationProtocol(AuthenticatedSiloProtocol),
+                                new SslApplicationProtocol(OrleansProtocol)
+                            ];
+                        };
+                    });
+
+                    siloBuilder.UseGatewayTls(options =>
+                    {
+                        ConfigureTls(options, certificate);
+                        options.RemoteCertificateMode = RemoteCertificateMode.NoCertificate;
+                    });
+
+                    siloBuilder.Configure<SiloConnectionOptions>(options =>
+                    {
+                        options.ConfigureSiloInboundConnection(
+                            builder => builder.UseMiddleware(new ProtocolRecordingMiddleware(recorder, ConnectionPath.SiloInbound)));
+                        options.ConfigureSiloOutboundConnection(
+                            builder => builder.UseMiddleware(new ProtocolRecordingMiddleware(recorder, ConnectionPath.SiloOutbound)));
+                        options.ConfigureGatewayInboundConnection(
+                            builder => builder.UseMiddleware(new ProtocolRecordingMiddleware(recorder, ConnectionPath.GatewayInbound)));
+                    });
+                });
+            }
+        }
+
+        private sealed class AlpnTlsClientConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                var recorder = ProtocolRecorders[configuration[ProtocolRecorderKey]!];
+                clientBuilder.UseTls(options =>
+                {
+                    options.AllowAnyRemoteCertificate();
+                    options.OnAuthenticateAsClient = (_, authenticationOptions) =>
+                    {
+                        authenticationOptions.TargetHost = CertificateSubjectName;
+                    };
+                });
+
+                clientBuilder.Configure<ClientConnectionOptions>(options =>
+                    options.ConfigureConnection(
+                        builder => builder.UseMiddleware(new ProtocolRecordingMiddleware(recorder, ConnectionPath.ClientOutbound))));
+            }
+        }
+
+        private static void ConfigureTls(TlsOptions options, System.Security.Cryptography.X509Certificates.X509Certificate2 certificate)
+        {
+            options.LocalCertificate = certificate;
+            options.SslProtocols = System.Security.Authentication.SslProtocols.Tls12;
+            options.AllowAnyRemoteCertificate();
+            options.RemoteCertificateMode = RemoteCertificateMode.AllowCertificate;
+        }
+
+        private sealed class ProtocolRecordingMiddleware(ProtocolRecorder recorder, ConnectionPath path) : IConnectionMiddleware
+        {
+            public async Task OnConnectionAsync(ConnectionContext context, ConnectionDelegate next)
+            {
+                var feature = context.Features.Get<ITlsApplicationProtocolFeature>();
+                recorder.Record(path, feature is null ? null : Encoding.ASCII.GetString(feature.ApplicationProtocol.Span));
+                await next(context);
+            }
+        }
+
+        private sealed class ProtocolRecorder
+        {
+            private readonly ConcurrentDictionary<ConnectionPath, ConcurrentBag<string>> _protocols = new();
+
+            public void Record(ConnectionPath path, string? protocol)
+            {
+                _protocols.GetOrAdd(path, static _ => []).Add(protocol ?? "<none>");
+            }
+
+            public string[] GetProtocols(ConnectionPath path)
+            {
+                return _protocols.TryGetValue(path, out var protocols) ? protocols.ToArray() : [];
+            }
+        }
+
+        private enum ConnectionPath
+        {
+            SiloInbound,
+            SiloOutbound,
+            GatewayInbound,
+            ClientOutbound
         }
     }
 

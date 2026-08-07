@@ -68,6 +68,8 @@ namespace Orleans.Connections.Security
     public delegate System.Security.Cryptography.X509Certificates.X509Certificate ServerCertificateSelectionCallback(object sender, string? hostName);
     public partial class TlsClientAuthenticationOptions
     {
+        public System.Collections.Generic.List<System.Net.Security.SslApplicationProtocol>? ApplicationProtocols { get { throw null; } set { } }
+
         public System.Security.Cryptography.X509Certificates.X509RevocationMode CertificateRevocationCheckMode { get { throw null; } set { } }
 
         public System.Security.Cryptography.X509Certificates.X509CertificateCollection? ClientCertificates { get { throw null; } set { } }
@@ -110,6 +112,8 @@ namespace Orleans.Connections.Security
 
     public partial class TlsServerAuthenticationOptions
     {
+        public System.Collections.Generic.List<System.Net.Security.SslApplicationProtocol>? ApplicationProtocols { get { throw null; } set { } }
+
         public System.Security.Cryptography.X509Certificates.X509RevocationMode CertificateRevocationCheckMode { get { throw null; } set { } }
 
         public bool ClientCertificateRequired { get { throw null; } set { } }
@@ -128,6 +132,10 @@ namespace Orleans.Hosting
 {
     public static partial class OrleansConnectionSecurityHostingExtensions
     {
+        public static ISiloBuilder UseGatewayTls(this ISiloBuilder builder, System.Action<Connections.Security.TlsOptions> configureOptions) { throw null; }
+
+        public static ISiloBuilder UseSiloTls(this ISiloBuilder builder, System.Action<Connections.Security.TlsOptions> configureOptions) { throw null; }
+
         public static IClientBuilder UseTls(this IClientBuilder builder, System.Action<Connections.Security.TlsOptions> configureOptions) { throw null; }
 
         public static IClientBuilder UseTls(this IClientBuilder builder, System.Security.Cryptography.X509Certificates.StoreName storeName, string subject, bool allowInvalid, System.Security.Cryptography.X509Certificates.StoreLocation location, System.Action<Connections.Security.TlsOptions> configureOptions) { throw null; }
