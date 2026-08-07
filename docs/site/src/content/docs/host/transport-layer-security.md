@@ -1,129 +1,107 @@
 ---
-title: Orleans Transport Layer Security (TLS)
-description: Learn how to configure Transport Layer Security (TLS) and mutual TLS (mTLS) in .NET Orleans to secure network communication between hosts.
-ms.date: 03/11/2026
+title: Secure Orleans connections with TLS
+description: Configure server-authenticated TLS or mutual TLS for Orleans silo and client connections.
+ms.date: 08/02/2026
 ms.topic: how-to
-ai-usage: ai-assisted
 ---
 
-# Orleans Transport Layer Security (TLS)
+# Secure Orleans connections with TLS
 
-Transport Layer Security (TLS) is a cryptographic protocol that secures network communication between Orleans silos and clients. Configure TLS to implement mutual authentication (mTLS) and encrypt data in transit, protecting your Orleans deployment from unauthorized access and eavesdropping.
+Orleans can protect client-to-silo and silo-to-silo connections with Transport Layer Security (TLS). TLS encrypts traffic and authenticates the endpoint acting as the TLS server. Mutual TLS (mTLS) additionally requires and authenticates the endpoint acting as the TLS client.
 
-## Prerequisites
+> [!IMPORTANT]
+> <xref:Orleans.Connections.Security.TlsOptions.RemoteCertificateMode> defaults to `RequireCertificate`. On a silo's inbound connections, this default requires the connecting silo or Orleans client to present a certificate. To configure server-authenticated TLS without client certificates, explicitly set it to `NoCertificate` on every silo.
 
-Before configuring TLS, ensure you have:
+Install [Microsoft.Orleans.Connections.Security](https://www.nuget.org/packages/Microsoft.Orleans.Connections.Security) in every silo and client process.
 
-- An Orleans application with the [Microsoft.Orleans.Server](https://www.nuget.org/packages/Microsoft.Orleans.Server) NuGet package installed for silos.
-- The [Microsoft.Orleans.Client](https://www.nuget.org/packages/Microsoft.Orleans.Client) NuGet package installed for clients.
-- The [Microsoft.Orleans.Connections.Security](https://www.nuget.org/packages/Microsoft.Orleans.Connections.Security) NuGet package installed for both silos and clients.
-- A valid X.509 certificate for authentication, either in the Windows certificate store or as a file.
+## Choose an authentication model
 
-> [!TIP]
-> The accompanying `SiloExample` and `ClientExample` projects include a development-only startup path that creates temporary self-signed certificates so you can run the sample locally. The inline snippets below focus on the certificate store and certificate file patterns you would typically adapt for your own deployments.
+| Model | Inbound silo policy | Outbound local-certificate policy | Typical boundary |
+|---|---|---|---|
+| Server-authenticated TLS | `RemoteCertificateMode = NoCertificate` | `ClientCertificateMode = NoCertificate` | Clients already authenticate at an application gateway or another trusted layer |
+| mTLS | `RemoteCertificateMode = RequireCertificate` (the default) | `ClientCertificateMode = RequireCertificate` | Direct connections across a network where both workloads need cryptographic identity |
 
-## Configure TLS on silos
+The two similarly named options apply at different stages:
 
-To enable TLS on an Orleans silo, use the <xref:Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseTls*> extension method. This method provides several overloads for different certificate configuration scenarios.
+- <xref:Orleans.Connections.Security.TlsOptions.RemoteCertificateMode> controls whether the remote endpoint must present a certificate. In server middleware, `RequireCertificate` requires a certificate from an inbound Orleans client or silo, `AllowCertificate` requests one but permits none, and `NoCertificate` doesn't request one. Silo configuration uses this same value for outbound middleware; the TLS server still presents a certificate and platform validation authenticates it when no custom callback is installed.
+- <xref:Orleans.Connections.Security.TlsOptions.ClientCertificateMode> controls selection of the local client certificate in client middleware. On a silo, it applies when the silo initiates a silo-to-silo connection. On an Orleans client, it applies when the client initiates a gateway connection. It doesn't control inbound silo behavior.
 
-### Basic TLS configuration
+`ClientCertificateMode` defaults to `AllowCertificate`: a configured local certificate is sent when it's valid for client authentication, but a missing or unsuitable local certificate is tolerated. Setting it to `RequireCertificate` makes the outbound requirement explicit and fails configuration or connection setup when an appropriate local certificate isn't available.
 
-The following example shows how to configure TLS using a certificate from the Windows certificate store:
+Every silo both accepts and initiates connections. For mTLS, a silo certificate therefore needs the Server Authentication extended key usage (EKU) for inbound connections and the Client Authentication EKU for outbound connections. For server-authenticated TLS, the silo certificate only needs Server Authentication. An Orleans client certificate used for mTLS needs Client Authentication. Certificate identity, issuance, and trust should reflect workload roles rather than reusing one certificate and private key across the cluster.
 
-:::code language="csharp" source="./snippets/transport-layer-security/csharp/SiloExample/Program.cs" id="BasicTlsConfiguration":::
+TLS provides confidentiality, integrity, and certificate-based peer authentication for the Orleans transport. It doesn't authorize grain calls, isolate tenants, protect data after either process receives it, or secure membership/storage provider traffic unless those providers are separately configured. Compromise of a trusted certificate or private key can let an attacker impersonate that workload.
 
-In the preceding code:
+## Configure server-authenticated TLS
 
-- The `StoreName.My` parameter specifies the certificate store location (Personal certificates).
-- The `"my-certificate-subject"` parameter identifies the certificate by its subject name.
-- The `allowInvalid: false` parameter ensures that only valid certificates are accepted in production.
-- The `StoreLocation.CurrentUser` parameter specifies the certificate store scope.
-- The `OnAuthenticateAsClient` callback sets the `TargetHost` for outbound connections initiated by the silo.
+The silo presents a server certificate. Connecting clients and silos validate its chain, validity period, EKU, and DNS name but don't present a client certificate. The silo configuration explicitly disables remote certificates for inbound connections and local client certificates for outbound silo-to-silo connections.
 
-### Development environment configuration
+:::code language="csharp" source="./snippets/transport-layer-security/csharp/SiloExample/Program.cs" id="ServerAuthenticatedTls":::
 
-For development and testing, you might need to use self-signed certificates. The following example shows how to configure TLS with relaxed validation for development:
+Configure an Orleans client without a local certificate:
 
-:::code language="csharp" source="./snippets/transport-layer-security/csharp/SiloExample/Program.cs" id="DevelopmentTlsConfiguration":::
+:::code language="csharp" source="./snippets/transport-layer-security/csharp/ClientExample/Program.cs" id="ServerAuthenticatedTls":::
 
-In the preceding code:
+<xref:Orleans.Connections.Security.TlsClientAuthenticationOptions.TargetHost> must match a DNS Subject Alternative Name (SAN) on the server certificate. Use the stable service name clients use to reach the silos, not an arbitrary certificate subject.
 
-- The `context.HostingEnvironment.IsDevelopment()` method checks if the application is running in a development environment.
-- The <xref:Orleans.Connections.Security.TlsOptions.AllowAnyRemoteCertificate*> method disables certificate validation in development.
+## Configure mutual TLS
+
+For mTLS, silos require a certificate from every inbound Orleans client or silo and require a local client certificate for every outbound silo-to-silo connection:
+
+:::code language="csharp" source="./snippets/transport-layer-security/csharp/SiloExample/Program.cs" id="MutualTls":::
+
+:::code language="csharp" source="./snippets/transport-layer-security/csharp/ClientExample/Program.cs" id="MutualTls":::
+
+The default platform validation applies when <xref:Orleans.Connections.Security.TlsOptions.RemoteCertificateValidation> isn't set. If you provide that callback, keep normal chain and name checks and add only the deployment-specific policy you require. A callback which returns `true` unconditionally defeats peer authentication.
 
 > [!WARNING]
-> Never use `AllowAnyRemoteCertificate()` or `allowInvalid: true` in production deployments. These settings disable important security checks and expose your application to security vulnerabilities.
+> <xref:Orleans.Connections.Security.TlsOptions.AllowAnyRemoteCertificate> is suitable only for isolated local development. It accepts any remote certificate and therefore doesn't protect against impersonation or an active man-in-the-middle.
 
-### Certificate file configuration
+## Establish certificate trust
 
-If you have a certificate file instead of using the certificate store, configure TLS as shown in the following example:
+Treat these as separate trust decisions:
 
-:::code language="csharp" source="./snippets/transport-layer-security/csharp/SiloExample/Program.cs" id="CertificateTlsConfiguration":::
+- **Clients trust silos:** The issuing CA for silo server certificates is trusted by Orleans clients. The certificate SAN matches `TargetHost`.
+- **Silos trust clients:** For mTLS, the issuing CA for client certificates is trusted by every silo. Use a private CA or an additional validation policy when possession of an arbitrary public certificate isn't sufficient authorization.
+- **Silos trust silos:** Each silo validates the server certificate on outbound silo-to-silo connections. With mTLS, each silo also presents a client-authentication certificate.
 
-In the preceding code:
+Keep trust stores narrow. Don't place unrelated public or corporate roots in a workload-specific trust bundle when any certificate from those roots would be accepted as a cluster identity. Network policy should still restrict silo and gateway ports to expected peers.
 
-- The <xref:System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadPkcs12FromFile*> method loads a certificate from a PKCS#12 file (PFX format).
-- The certificate is passed directly to the `UseTls` method.
+## Protocols and revocation
 
-### Advanced TLS configuration
+<xref:Orleans.Connections.Security.TlsOptions.SslProtocols> defaults to TLS 1.2 and TLS 1.3. Retain those defaults unless an interoperability or policy requirement calls for a narrower set. Orleans doesn't enable TLS 1.0 or TLS 1.1 by default.
 
-For production deployments, you might need more control over certificate selection and validation. The following example demonstrates advanced TLS configuration:
+Set <xref:Orleans.Connections.Security.TlsOptions.CheckCertificateRevocation> to check remote certificates on inbound silo connections. For outbound connections, set <xref:Orleans.Connections.Security.TlsClientAuthenticationOptions.CertificateRevocationCheckMode> in <xref:Orleans.Connections.Security.TlsOptions.OnAuthenticateAsClient>. Before enabling revocation checks, verify that every workload can reach the certificate revocation list (CRL) or Online Certificate Status Protocol (OCSP) service and decide how outages should affect availability.
 
-:::code language="csharp" source="./snippets/transport-layer-security/csharp/SiloExample/Program.cs" id="AdvancedTlsConfiguration":::
+## Rotate certificates
 
-In the preceding code:
+Plan rotation before deployment:
 
-- The <xref:Orleans.Connections.Security.TlsOptions.LocalServerCertificateSelector*> callback dynamically selects the appropriate server certificate.
-- The <xref:Orleans.Connections.Security.TlsOptions.RemoteCertificateValidation*> callback provides custom validation logic for remote certificates.
-- The <xref:Orleans.Connections.Security.TlsOptions.CheckCertificateRevocation> property enables certificate revocation checking.
+1. Issue the replacement certificate with the same required names and EKUs.
+2. Distribute the new issuing chain to trust stores before any endpoint presents the new certificate.
+3. Make both old and new chains valid during an overlap window.
+4. Restart processes with the replacement certificate, or use <xref:Orleans.Connections.Security.TlsOptions.LocalServerCertificateSelector> and <xref:Orleans.Connections.Security.TlsOptions.LocalClientCertificateSelector> to select certificates dynamically.
+5. Confirm new connections use the replacement, then remove the old certificate and obsolete trust roots.
 
-## Configure TLS on clients
+Certificate selectors are called during authentication, but certificate loading, caching, disposal, and refresh are application responsibilities. Test rotation under normal reconnect and silo restart behavior. Alert on certificate expiration well before the overlap window closes.
 
-Orleans clients require similar TLS configuration to securely connect to TLS-enabled silos.
+## Production checklist
 
-### Basic client TLS configuration
-
-The following example shows how to configure TLS on an Orleans client:
-
-:::code language="csharp" source="./snippets/transport-layer-security/csharp/ClientExample/Program.cs" id="BasicClientTlsConfiguration":::
-
-In the preceding code:
-
-- The <xref:Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseTls*> extension method configures TLS for the client.
-- The <xref:Orleans.Connections.Security.TlsOptions.OnAuthenticateAsClient*> callback configures client-side TLS options and sets the `TargetHost` to match the server certificate name.
-- When you call `UseTls` with a client certificate, the client sends that certificate during the TLS handshake so the silo can enforce mutual TLS.
-
-### Development client configuration
-
-For development environments, configure the client with relaxed validation as shown in the following example:
-
-:::code language="csharp" source="./snippets/transport-layer-security/csharp/ClientExample/Program.cs" id="ClientDevelopmentTlsConfiguration":::
-
-### Certificate file client configuration
-
-Configure a client using a certificate file as shown in the following example:
-
-:::code language="csharp" source="./snippets/transport-layer-security/csharp/ClientExample/Program.cs" id="ClientCertificateTlsConfiguration":::
-
-## Best practices
-
-Follow these best practices when configuring TLS in Orleans:
-
-- **Use the latest TLS protocol**: Always prefer TLS 1.2 or TLS 1.3 for the strongest security. Avoid TLS 1.0 and TLS 1.1, which have known vulnerabilities.
-- **Let the OS choose the protocol version**: Don't explicitly set TLS protocol versions in production code. Instead, defer to operating system defaults to automatically select the best protocol. Only explicitly set protocol versions if you have a specific compatibility requirement with legacy systems. When you explicitly set protocol versions, your application can't automatically benefit from newer protocols added in future OS updates.
-- **Validate certificates**: Always validate certificate chains, expiration dates, and hostname matches in production. Never use `AllowAnyRemoteCertificate()` or disable certificate validation outside of development environments.
-- **Enable certificate revocation checking**: Use <xref:Orleans.Connections.Security.TlsOptions.CheckCertificateRevocation*> to verify that certificates haven't been revoked.
-- **Use strong certificates**: Ensure your X.509 certificates use strong key lengths (at least 2048 bits for RSA) and are signed by a trusted Certificate Authority (CA).
-- **Secure certificate storage**: Protect private keys with appropriate file permissions or by using hardware security modules (HSMs).
-- **Keep certificates current**: Monitor certificate expiration dates and renew certificates before they expire.
-- **Keep software updated**: Regularly update your .NET runtime and operating system to receive the latest security patches and protocol support.
-
-For more information on .NET TLS best practices, see [TLS/SSL best practices](../../core/extensions/sslstream-best-practices.md).
+- Give private-key files or key-store entries only to the workload identity that needs them.
+- Prefer separate certificates per workload or instance over one exported cluster-wide private key.
+- Validate SANs, EKUs, chain trust, validity, and revocation behavior.
+- For server-authenticated TLS, set `RemoteCertificateMode` and `ClientCertificateMode` to `NoCertificate` on silos.
+- For mTLS, set `RemoteCertificateMode` and `ClientCertificateMode` to `RequireCertificate` on silos and configure a client-authentication certificate on every connecting Orleans client.
+- Protect gateway and silo ports with network policy even when TLS is enabled.
+- Keep clocks synchronized because certificate validity checks depend on time.
+- Monitor TLS handshake failures and certificate expiration; don't log private keys or certificate passwords.
+- Store PFX passwords in a secret store rather than source or ordinary configuration files.
 
 ## See also
 
-- [Client configuration](configuration-guide/client-configuration.md)
-- [Server configuration](configuration-guide/server-configuration.md)
 - <xref:Orleans.Connections.Security.TlsOptions>
 - <xref:Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseTls*>
-- [Orleans Transport Layer Security (TLS) sample](/samples/dotnet/samples/orleans-transport-layer-security-tls/)
+- [Client configuration](configuration-guide/client-configuration.md)
+- [Server configuration](configuration-guide/server-configuration.md)
+- [.NET TLS/SSL best practices](https://learn.microsoft.com/dotnet/core/extensions/sslstream-best-practices)
+- [Orleans Transport Layer Security (TLS) sample](https://learn.microsoft.com/samples/dotnet/samples/orleans-transport-layer-security-tls/)

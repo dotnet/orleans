@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Connections.Security" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Dashboard" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Server" Version="10.2.2" />
   </ItemGroup>
 
