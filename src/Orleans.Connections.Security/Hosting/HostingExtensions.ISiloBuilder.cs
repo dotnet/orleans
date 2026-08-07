@@ -1,5 +1,7 @@
 using System;
+using System.Linq;
 using System.Security.Cryptography.X509Certificates;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Connections.Security;
 
@@ -139,6 +141,15 @@ namespace Orleans.Hosting
 
         private static ISiloBuilder UseSiloTls(this ISiloBuilder builder, TlsOptions options)
         {
+            if (builder.Services.Any(descriptor =>
+                descriptor.ServiceType == typeof(SiloConnectionAuthenticationRegistration)
+                || descriptor.ServiceType == typeof(SiloTlsRegistrationMarker)))
+            {
+                throw new InvalidOperationException("Silo TLS or connection authentication has already been configured.");
+            }
+
+            builder.Services.AddSingleton<SiloTlsRegistrationMarker>();
+
             return builder.Configure<SiloConnectionOptions>(connectionOptions =>
             {
                 connectionOptions.ConfigureSiloInboundConnection(connectionBuilder =>
@@ -155,6 +166,13 @@ namespace Orleans.Hosting
 
         private static ISiloBuilder UseGatewayTls(this ISiloBuilder builder, TlsOptions options)
         {
+            if (builder.Services.Any(descriptor => descriptor.ServiceType == typeof(GatewayTlsRegistrationMarker)))
+            {
+                throw new InvalidOperationException("Gateway TLS has already been configured.");
+            }
+
+            builder.Services.AddSingleton<GatewayTlsRegistrationMarker>();
+
             return builder.Configure<SiloConnectionOptions>(connectionOptions =>
             {
                 connectionOptions.ConfigureGatewayInboundConnection(connectionBuilder =>
