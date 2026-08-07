@@ -14,7 +14,8 @@ public interface IJobRunContext
     DurableJob Job { get; }
 
     /// <summary>
-    /// Gets the unique identifier for this execution run.
+    /// Gets the unique identifier for this execution run. A new identifier is generated each time the job is dequeued
+    /// and is not preserved across retries or shard reassignment.
     /// </summary>
     string RunId { get; }
 
@@ -37,7 +38,8 @@ internal class JobRunContext : IJobRunContext
     public DurableJob Job { get; }
 
     /// <summary>
-    /// Gets the unique identifier for this execution run.
+    /// Gets the unique identifier for this execution run. A new identifier is generated each time the job is dequeued
+    /// and is not preserved across retries or shard reassignment.
     /// </summary>
     [Id(1)]
     public string RunId { get; }

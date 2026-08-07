@@ -78,7 +78,10 @@ public interface IJobShard : IAsyncDisposable
     /// Reschedules a job to be retried at a later time.
     /// </summary>
     /// <param name="jobContext">The context of the job to retry.</param>
-    /// <param name="newDueTime">The new due time for the job.</param>
+    /// <param name="newDueTime">
+    /// The new due time for the job. This value supersedes <see cref="DurableJob.DueTime"/> on
+    /// <see cref="IJobRunContext.Job"/>.
+    /// </param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
     Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken);
@@ -164,7 +167,7 @@ public abstract class JobShard : IJobShard
             TraceState = request.TraceState,
         };
 
-        await PersistAddJobAsync(jobId, request.JobName, request.DueTime, request.Target, request.Metadata, cancellationToken);
+        await PersistAddJobAsync(job, cancellationToken);
         _jobQueue.Enqueue(job, 0);
         return job;
     }
@@ -187,7 +190,7 @@ public abstract class JobShard : IJobShard
     /// <inheritdoc/>
     public async Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken)
     {
-        await PersistRetryJobAsync(jobContext.Job.Id, newDueTime, cancellationToken);
+        await PersistRetryJobAsync(jobContext, newDueTime, cancellationToken);
         _jobQueue.RetryJobLater(jobContext, newDueTime);
     }
 
@@ -204,14 +207,10 @@ public abstract class JobShard : IJobShard
     /// <summary>
     /// Persists the addition of a new job to the underlying storage.
     /// </summary>
-    /// <param name="jobId">The unique identifier of the job.</param>
-    /// <param name="jobName">The name of the job.</param>
-    /// <param name="dueTime">The time when the job should be executed.</param>
-    /// <param name="target">The grain identifier of the target grain.</param>
-    /// <param name="metadata">Optional metadata to associate with the job.</param>
+    /// <param name="job">The job to persist.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
-    protected abstract Task PersistAddJobAsync(string jobId, string jobName, DateTimeOffset dueTime, GrainId target, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken);
+    protected abstract Task PersistAddJobAsync(DurableJob job, CancellationToken cancellationToken);
 
     /// <summary>
     /// Persists the removal of a job from the underlying storage.
@@ -224,11 +223,14 @@ public abstract class JobShard : IJobShard
     /// <summary>
     /// Persists the rescheduling of a job to the underlying storage.
     /// </summary>
-    /// <param name="jobId">The unique identifier of the job to retry.</param>
-    /// <param name="newDueTime">The new due time for the job.</param>
+    /// <param name="jobContext">The execution context of the job to retry.</param>
+    /// <param name="newDueTime">
+    /// The new due time for the job. This value supersedes <see cref="DurableJob.DueTime"/> on
+    /// <see cref="IJobRunContext.Job"/>.
+    /// </param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
-    protected abstract Task PersistRetryJobAsync(string jobId, DateTimeOffset newDueTime, CancellationToken cancellationToken);
+    protected abstract Task PersistRetryJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken);
 
     /// <inheritdoc/>
     public virtual ValueTask DisposeAsync()
