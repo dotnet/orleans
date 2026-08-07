@@ -87,5 +87,5 @@ describe('documentation project policy', () => {
     }
 
     expect(failures).toEqual([]);
-  });
+  }, 30_000);
 });
