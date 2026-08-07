@@ -64,3 +64,5 @@ Implicit subscriptions are declared in grain metadata. They aren't created by `S
 Clients can produce and explicitly consume streams after the provider is configured on <xref:Orleans.Hosting.IClientBuilder>. Client subscriptions are tied to the connected client process and must be re-established after reconnecting or restarting. Implicit subscriptions target grains, not clients.
 
 For failure behavior and sequence tokens, continue to [Delivery, ordering, replay, and recovery](delivery-semantics.md).
+
+For a larger compiled example, see [`SampleStreamingGrain.cs`](https://github.com/dotnet/orleans/blob/main/test/Grains/TestGrains/SampleStreamingGrain.cs) in the Orleans test suite.

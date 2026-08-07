@@ -13,13 +13,13 @@ A stream provider connects the Orleans streaming API to a transport and defines 
 
 | Provider | Package | Status | External event durability | Rewindable | External prerequisites |
 |---|---|---|---|---|---|
-| Memory | `Microsoft.Orleans.Streaming` | Stable | No; silo memory only | Yes, within the transient in-memory cache | None |
-| Azure Queue Storage | `Microsoft.Orleans.Streaming.AzureStorage` | Stable | Yes, in Azure Storage queues | No | Azure Storage account or Azurite; credentials and a stable Orleans service ID |
-| Azure Event Hubs | `Microsoft.Orleans.Streaming.EventHubs` | Stable | Yes, within Event Hubs retention | Yes | Event Hubs namespace, hub, consumer group, and checkpoint storage |
-| Amazon SQS | `Microsoft.Orleans.Streaming.SQS` | Stable | Yes, within SQS retention | No | AWS account, queue permissions, region/endpoint configuration |
-| ADO.NET | `Microsoft.Orleans.Streaming.AdoNet` | **Alpha** | Yes, in relational tables until expiry/dead-letter eviction | No | Supported database, ADO.NET driver, and Orleans streaming SQL schema |
-| NATS JetStream | `Microsoft.Orleans.Streaming.NATS` | **Alpha** | Configurable; file storage is the default | No | NATS server with JetStream and sufficient storage; subject/stream administration |
-| Redis Streams | `Microsoft.Orleans.Streaming.Redis` | **Alpha** | Configurable through Redis persistence and stream retention | Yes, while entries remain | Redis deployment, persistence/HA policy, and retention sizing |
+| Memory | [`Microsoft.Orleans.Streaming`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming) | Stable | No; silo memory only | Yes, within the transient in-memory cache | None |
+| Azure Queue Storage | [`Microsoft.Orleans.Streaming.AzureStorage`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.AzureStorage) | Stable | Yes, in Azure Storage queues | No | Azure Storage account or Azurite; credentials and a stable Orleans service ID |
+| Azure Event Hubs | [`Microsoft.Orleans.Streaming.EventHubs`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.EventHubs) | Stable | Yes, within Event Hubs retention | Yes | Event Hubs namespace, hub, consumer group, and checkpoint storage |
+| Amazon SQS | [`Microsoft.Orleans.Streaming.SQS`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.SQS) | Stable | Yes, within SQS retention | No | AWS account, queue permissions, region/endpoint configuration |
+| ADO.NET | [`Microsoft.Orleans.Streaming.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.AdoNet) | **Alpha** | Yes, in relational tables until expiry/dead-letter eviction | No | Supported database, ADO.NET driver, and Orleans streaming SQL schema |
+| NATS JetStream | [`Microsoft.Orleans.Streaming.NATS`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.NATS) | **Alpha** | Configurable; file storage is the default | No | NATS server with JetStream and sufficient storage; subject/stream administration |
+| Redis Streams | [`Microsoft.Orleans.Streaming.Redis`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.Redis) | **Alpha** | Configurable through Redis persistence and stream retention | Yes, while entries remain | Redis deployment, persistence/HA policy, and retention sizing |
 
 Alpha packages have an `alpha.1` version suffix. Treat their APIs and operational behavior as prerelease, validate failure modes under load, and pin versions deliberately.
 
@@ -31,7 +31,7 @@ Register memory streams with `AddMemoryStreams`. They use silo memory for queues
 
 ## Azure Queue Storage
 
-Register Azure Queue streams with `AddAzureQueueStreams`. The provider uses multiple Azure Storage queues and persistent-stream pulling agents. It isn't rewindable, and Azure Queue retries can produce duplicates or reorder delivery after failures.
+Register Azure Queue streams with `AddAzureQueueStreams`. The provider uses multiple [Azure Queue Storage](https://learn.microsoft.com/azure/storage/queues/storage-queues-introduction) queues and persistent-stream pulling agents. It isn't rewindable, and Azure Queue retries can produce duplicates or reorder delivery after failures.
 
 Configure the current <xref:Azure.Storage.Queues.QueueServiceClient> directly on `AzureQueueOptions`. When `QueueNames` is unset, Orleans generates names from the Orleans service ID, provider name, and queue ID. Keep the service ID and provider name stable across restarts. Set `QueueNames` explicitly only when you need to manage an existing queue topology, and keep those names unique across clusters that share a storage account.
 
@@ -47,23 +47,23 @@ The examples use durable Azure Table Storage for `PubSubStore`; queue durability
 
 ## Azure Event Hubs
 
-Register Event Hubs with `AddEventHubStreams`. Event Hubs retention and partition positions make this provider rewindable. Configure a consumer group dedicated to the Orleans application and durable checkpoint storage. Partition count bounds physical read parallelism, and retention bounds how far recovery can rewind.
+Register [Azure Event Hubs](https://learn.microsoft.com/azure/event-hubs/event-hubs-about) with `AddEventHubStreams`. Event Hubs retention and partition positions make this provider rewindable. Configure a consumer group dedicated to the Orleans application and durable checkpoint storage. Partition count bounds physical read parallelism, and retention bounds how far recovery can rewind.
 
 ## Amazon SQS
 
-Register SQS with `AddSqsStreams`. SQS retains accepted messages and redelivers after visibility timeout when processing isn't acknowledged. The Orleans provider isn't rewindable. Configure credentials using the deployment environment's AWS credential chain or protected connection configuration, and monitor queue age, redelivery, and dead-letter policy.
+Register [Amazon SQS](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html) with `AddSqsStreams`. Standard queues use [at-least-once delivery](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/standard-queues-at-least-once-delivery.html), and SQS redelivers after the [visibility timeout](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html) when processing isn't acknowledged. The Orleans provider isn't rewindable. Configure credentials using the deployment environment's AWS credential chain or protected connection configuration, and monitor queue age, redelivery, and dead-letter policy.
 
 ## ADO.NET streaming (alpha)
 
-Register ADO.NET streaming with `AddAdoNetStreams`. Install the matching database driver and apply the SQL Server, PostgreSQL, or MySQL streaming schema shipped in the package source. Messages are durable in relational tables but expire and can move to dead letters according to `AdoNetStreamOptions`. The provider isn't rewindable.
+Register [ADO.NET](https://learn.microsoft.com/dotnet/framework/data/adonet/ado-net-overview) streaming with `AddAdoNetStreams`. Install the matching database driver and apply the SQL Server, PostgreSQL, or MySQL streaming schema shipped in the package source. Messages are durable in relational tables but expire and can move to dead letters according to `AdoNetStreamOptions`. The provider isn't rewindable.
 
 ## NATS JetStream streaming (alpha)
 
-Register NATS with `AddNatsStreams`. The provider creates or uses a JetStream stream and deterministic subject partitions. File-backed storage is the default; memory-backed JetStream storage is optional and not durable across server loss. `PartitionCount` changes require corresponding server-side stream updates. The provider isn't rewindable.
+Register [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream) with `AddNatsStreams`. The provider creates or uses a JetStream stream and deterministic subject partitions. File-backed storage is the default; memory-backed JetStream storage is optional and not durable across server loss. `PartitionCount` changes require corresponding server-side stream updates. The provider isn't rewindable.
 
 ## Redis Streams streaming (alpha)
 
-Register Redis Streams with `AddRedisStreams`. The provider stores events and checkpoints in Redis and is rewindable while entries remain. Redis durability depends on its persistence and replication configuration. `MaxStreamLength` can bound retention; without it, stream length is unbounded, so capacity planning is required.
+Register [Redis Streams](https://redis.io/docs/latest/develop/data-types/streams/) with `AddRedisStreams`. The provider stores events and checkpoints in Redis and is rewindable while entries remain. Redis durability depends on its [persistence](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/) and replication configuration. `MaxStreamLength` can bound retention; without it, stream length is unbounded, so capacity planning is required.
 
 ## Custom adapters
 

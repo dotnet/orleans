@@ -7,7 +7,7 @@ ms.topic: quickstart
 
 # Orleans streaming quickstart
 
-This quickstart uses the `Microsoft.Orleans.Streaming` package and the memory stream provider. It needs no external broker, but both queued data and the `PubSubStore` are in memory. Use this configuration for development and tests, not for production durability.
+This quickstart uses the [`Microsoft.Orleans.Streaming`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming) package and the memory stream provider. It needs no external broker, but both queued data and the `PubSubStore` are in memory. Use this configuration for development and tests, not for production durability.
 
 ## Configure the silo
 

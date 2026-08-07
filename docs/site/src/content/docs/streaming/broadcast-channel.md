@@ -7,7 +7,7 @@ ms.topic: concept-article
 
 # Broadcast channels
 
-Broadcast channels provide nonpersistent, implicit fan-out to grains. They don't use a queue, retain history, retry from a log, or maintain explicit subscriptions. Use them for best-effort notifications where loss is acceptable; use [Orleans streams](index.md) when events or subscriptions need durability or replay.
+Broadcast channels, provided by the [`Microsoft.Orleans.BroadcastChannel`](https://www.nuget.org/packages/Microsoft.Orleans.BroadcastChannel) package, provide nonpersistent, implicit fan-out to grains. They don't use a queue, retain history, retry from a log, or maintain explicit subscriptions. Use them for best-effort notifications where loss is acceptable; use [Orleans streams](index.md) when events or subscriptions need durability or replay.
 
 ## Identity and routing
 
@@ -22,7 +22,7 @@ The provider name and channel namespace are independent. They can use the same s
 
 ## Configure silos and clients
 
-Register a named broadcast provider on every silo:
+Register a named broadcast provider on every silo with <xref:Orleans.Hosting.ChannelHostingExtensions.AddBroadcastChannel*>:
 
 :::code language="csharp" source="./snippets/broadcastchannel/BroadcastChannel.Silo/Program.cs":::
 
