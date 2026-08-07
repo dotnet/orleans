@@ -8,6 +8,9 @@
   <Folder Name="/AWS/">
     <Project Path="AWS/KinesisDynamoDB/KinesisDynamoDB.csproj" />
   </Folder>
+  <Folder Name="/AuthenticatedSiloConnections/">
+    <Project Path="AuthenticatedSiloConnections/AuthenticatedSiloConnections.csproj" />
+  </Folder>
   <Folder Name="/BankAccount/">
     <Project Path="BankAccount/AccountTransfer.Grains/AccountTransfer.Grains.csproj" />
     <Project Path="BankAccount/AccountTransfer.Interfaces/AccountTransfer.Interfaces.csproj" />

@@ -222,6 +222,8 @@ items:
             href: host/transport-layer-security.md
           - name: Connection middleware
             href: host/connection-middleware.md
+          - name: Authenticate Orleans connections
+            href: host/authenticated-silo-connections.md
       - name: Configuration
         items:
           - name: Overview
