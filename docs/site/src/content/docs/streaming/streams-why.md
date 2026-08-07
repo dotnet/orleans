@@ -1,73 +1,66 @@
 ---
-title: Why streams in Orleans?
-description: Learn why you'd want to use streams in .NET Orleans.
-ms.date: 03/30/2025
+title: Choose an Orleans messaging abstraction
+description: Choose between grain calls, grain observers, Orleans streams, and broadcast channels.
+ms.date: 08/02/2026
 ms.topic: concept-article
 ---
 
-# Why streams in Orleans?
+# Choose an Orleans messaging abstraction
 
-A wide range of technologies already exists for building stream processing systems. These include systems to **durably store stream data** (for example, [Event Hubs](https://azure.microsoft.com/services/event-hubs/) and [Kafka](https://kafka.apache.org/)) and systems to express **compute operations** over stream data (for example, [Azure Stream Analytics](https://azure.microsoft.com/services/stream-analytics/), [Apache Storm](https://storm.apache.org/), and [Apache Spark Streaming](https://spark.apache.org/streaming/)). These are great systems that allow you to build efficient data stream processing pipelines.
+Start from the relationship between sender and receiver and from the failure behavior your application needs.
 
-### Limitations of existing systems
+| Use | Best fit | Important behavior |
+|---|---|---|
+| Invoke a known grain and await a result | **Grain call** | Addressed request/response with Orleans call semantics. The caller knows the target grain identity. |
+| Push transient notifications from grains to a connected client | **Grain observer** | Ephemeral client callback. The application registers and removes observer references and handles disconnects. |
+| Publish typed events to multiple independent subscriptions | **Orleans stream** | Multicast pub/sub. Provider selection controls durability, retries, ordering, and replay. Explicit subscriptions can survive activation changes. |
+| Send best-effort notifications to grains selected from a channel identity | **Broadcast channel** | Implicit, nonpersistent fan-out. No queue, history, replay, or durable subscription registry. |
 
-However, these systems aren't suitable for **fine-grained free-form compute over stream data**. The streaming compute systems mentioned above all allow you to specify a **unified data-flow graph of operations applied in the same way to all stream items**. This is a powerful model when data is uniform and you want to express the same set of transformation, filtering, or aggregation operations over this data. But other use cases require expressing fundamentally different operations over different data items. In some of these cases, as part of the processing, you might occasionally need to make an external call, such as invoking an arbitrary REST API. Unified data-flow stream processing engines either don't support these scenarios, support them in a limited and constrained way, or are inefficient in supporting them. This is because they are inherently optimized for a **large volume of similar items and are usually limited in terms of expressiveness and processing**. Orleans Streams target these other scenarios.
+## Prefer grain calls for commands and queries
 
-### Motivation
+Use a grain call when the sender knows which grain owns the operation, needs a return value, or needs failure to propagate through the call. Grain calls make ownership and control flow explicit. Don't introduce a stream merely to avoid calling a known grain.
 
-It all started with requests from Orleans users to support returning a sequence of items from a grain method call. As you can imagine, that was only the tip of the iceberg; they needed much more.
+## Prefer observers for client callbacks
 
-A typical scenario for Orleans Streams is when you have per-user streams and want to perform **different processing for each user** within the context of that individual user. You might have millions of users, but some are interested in weather and subscribe to weather alerts for a particular location, while others are interested in sports events; someone else might be tracking the status of a particular flight. Processing these events requires different logic, but you don't want to run two independent instances of stream processing. Some users might be interested only in a particular stock and only if a certain external condition applies—a condition that might not necessarily be part of the stream data (and thus needs checking dynamically at runtime as part of processing).
+Use a grain observer when a connected Orleans client wants transient callbacks and can re-register after reconnecting. Observer references aren't durable subscriptions. They aren't a replacement for retained events or server-side pub/sub.
 
-Users change their interests all the time, so their subscriptions to specific event streams come and go dynamically. Thus, **the streaming topology changes dynamically and rapidly**. On top of that, **the processing logic per user evolves and changes dynamically based on user state and external events**. External events might modify the processing logic for a particular user. For example, in a game cheating detection system, when a new cheating method is discovered, the processing logic needs updating with the new rule to detect this violation. This must be done, of course, **without disrupting the ongoing processing pipeline**. Bulk data-flow stream processing engines weren't built to support such scenarios.
+## Prefer streams for multicast event flow
 
-It goes almost without saying that such a system must run on several network-connected machines, not just a single node. Hence, the processing logic must be distributed scalably and elastically across a cluster of servers.
+Streams decouple producers from consumers in identity, time, and placement. They fit per-entity event feeds, dynamic subscriptions, integration with external brokers, and stateful event processing in grains.
 
-### New requirements
+Orleans streams are multicast, not point-to-point work queues: every subscription to a logical stream receives the item. A provider can partition physical queues for scale, but that doesn't change the logical fan-out model. If only one worker must claim each job, model that ownership explicitly instead of assuming competing-consumer semantics.
 
-Four basic requirements were identified for a Stream Processing system to target the scenarios above:
+The provider is part of the design. A durable queue can retain accepted events across process failure; a rewindable provider can start a subscription from an earlier token; neither capability is implied by the Orleans stream API itself.
 
-1. Flexible stream processing logic
-1. Support for highly dynamic topologies
-1. Fine-grained stream granularity
-1. Distribution
+## Why Orleans streams are different
 
-#### Flexible stream processing logic
+Orleans streams complement event brokers and data-flow engines rather than replacing them. Brokers retain and transport events, while data-flow engines excel at applying a shared query or transformation pipeline to large event sets. Orleans streams are useful when each entity needs independently addressed, stateful processing expressed in ordinary grain code.
 
-The system should support different ways of expressing stream processing logic. Existing systems mentioned above require developers to write a declarative data-flow computation graph, usually following a functional programming style. This limits the expressiveness and flexibility of the processing logic. Orleans streams are indifferent to how processing logic is expressed. It can be expressed as a data flow (e.g., using [Reactive Extensions (Rx) in .NET](/previous-versions/dotnet/reactive-extensions/hh242985(v=vs.103))), a functional program, a declarative query, or general imperative logic. The logic can be stateful or stateless, might or might not have side effects, and can trigger external actions. All power goes to the developer.
+### Flexible processing logic
 
-#### Support for dynamic topologies
+<a id="flexible-stream-processing-logic"></a>
 
-The system should allow for dynamically evolving topologies. Existing systems mentioned above are usually limited to static topologies fixed at deployment time that cannot evolve at runtime. In the following example of a dataflow expression, everything is nice and simple until you need to change it:
+A stream consumer is application code. It can update grain state, make grain calls, publish to other streams, call external services, or choose behavior from the grain's current state. Processing can be imperative or functional, stateful or stateless, and can include side effects.
 
-``
-Stream.GroupBy(x=> x.key).Extract(x=>x.field).Select(x=>x+2).AverageWindow(x, 5sec).Where(x=>x > 0.8) *
-``
+Orleans streams don't provide a declarative query language or automatically compile a data-flow graph. Use a dedicated stream-processing engine when windowing, joins, aggregations, or a centrally managed query topology are the primary requirement. Use Orleans streams when events must enter fine-grained actor workflows with per-entity state and behavior.
 
-Change the threshold condition in the <xref:System.Linq.Enumerable.Where*> filter, add a <xref:System.Linq.Enumerable.Select*> statement, or add another branch in the data-flow graph and produce a new output stream. In existing systems, this isn't possible without tearing down the entire topology and restarting the data flow from scratch. Practically, these systems checkpoint the existing computation and can restart from the latest checkpoint. Still, such a restart is disruptive and costly for an online service producing results in real-time. Such a restart becomes especially impractical when dealing with a large number of such expressions executed with similar but different parameters (per-user, per-device, etc.) that continually change.
+### Dynamic, fine-grained topologies
 
-The system should allow evolving the stream processing graph at runtime by adding new links or nodes to the computation graph or changing the processing logic within the computation nodes.
+<a id="support-for-dynamic-topologies"></a>
+<a id="fine-grained-stream-granularity"></a>
 
-#### Fine-grained stream granularity
+The processing topology emerges from stream subscriptions and grain logic instead of being one deployment-wide graph. Applications can add or remove explicit subscriptions at runtime, use implicit subscriptions to activate grains from stream identities, and change how an individual grain responds as its state changes.
 
-In existing systems, the smallest unit of abstraction is usually the whole flow (topology). However, many target scenarios require an individual node/link in the topology to be a logical entity itself. This way, each entity can potentially be managed independently. For example, in a large stream topology comprising multiple links, different links can have different characteristics and be implemented over different physical transports. Some links might go over TCP sockets, while others use reliable queues. Different links can have different delivery guarantees. Different nodes can have different checkpointing strategies, and their processing logic can be expressed in different models or even different languages. Such flexibility usually isn't possible in existing systems.
+Streams are independently addressed by provider, namespace, and key. A grain can consume or produce multiple streams, and an application can use different providers for different links according to their durability, replay, throughput, and operational requirements. This granularity supports per-user, per-device, per-tenant, and similar event flows without deploying a separate pipeline for every entity.
 
-The unit of abstraction and flexibility argument is similar to comparing SoA (Service Oriented Architectures) vs. Actors. Actor systems allow more flexibility since each actor is essentially an independently managed "tiny service." Similarly, the stream system should allow for such fine-grained control.
+### Distributed execution
 
-#### Distribution
+Stream consumers are grains, so their processing is distributed using the Orleans runtime. The application can scale the cluster, distribute stream identities across grains, recover grain activations after failures, and combine stream processing with Orleans placement, persistence, and messaging.
 
-And of course, the system should have all the properties of a **"good distributed system"**. That includes:
+These properties don't remove the need to design for provider-specific delivery guarantees, ordering, replay, backpressure, and hot keys. See [Delivery, ordering, replay, and recovery](delivery-semantics.md) and [Operate and tune Orleans streams](streaming-operations.md).
 
-1. _Scalability_: Supports a large number of streams and compute elements.
-1. _Elasticity_: Allows adding/removing resources to grow/shrink based on load.
-1. _Reliability_: Resilient to failures.
-1. _Efficiency_: Uses underlying resources efficiently.
-1. _Responsiveness_: Enables near-real-time scenarios.
+## Prefer broadcast channels for transient fan-out
 
-These were the requirements for building [**Orleans Streaming**](index.md).
+Broadcast channels are useful for cache invalidation hints, live configuration notifications, and similar signals where occasional loss is acceptable. A channel key maps to a subscriber grain identity for every matching subscriber grain type; it doesn't broadcast to every activation in the cluster.
 
-_Clarification_: Orleans currently does not directly support writing declarative dataflow expressions like in the example above. The current Orleans Streaming APIs are more low-level building blocks, as described at [Orleans streaming APIs](streams-programming-apis.md).
-
-## See also
-
-[Orleans Streams Programming APIs](streams-programming-apis.md)
+Use a stream instead when consumers need durable subscription records, retained events, retries after consumer failure, or replay. See [Broadcast channels](broadcast-channel.md) for the complete identity and delivery model.

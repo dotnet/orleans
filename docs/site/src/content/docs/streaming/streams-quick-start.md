@@ -1,153 +1,54 @@
 ---
 title: Orleans streaming quickstart
-description: Learn from the streaming quickstart in .NET Orleans.
-ms.date: 03/30/2025
+description: Configure an Orleans in-memory stream, publish events, and consume them with an implicit subscription.
+ms.date: 08/02/2026
 ms.topic: quickstart
-zone_pivot_groups: orleans-version
-ai-usage: ai-assisted
 ---
 
 # Orleans streaming quickstart
 
-This guide shows you a quick way to set up and use Orleans Streams. To learn more about the details of streaming features, read other parts of this documentation.
+This quickstart uses the [`Microsoft.Orleans.Streaming`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming) package and the memory stream provider. It needs no external broker, but both queued data and the `PubSubStore` are in memory. Use this configuration for development and tests, not for production durability.
 
-## Required configurations
+## Configure the silo
 
-:::zone target="docs" pivot="orleans-7-0,orleans-8-0,orleans-9-0,orleans-10-0"
+<a id="required-configurations"></a>
 
-In this guide, you use a memory-based stream that uses grain messaging to send stream data to subscribers. You use the in-memory storage provider to store lists of subscriptions. Using memory-based mechanisms for streaming and storage is intended only for local development and testing, not for production environments.
+Register the same provider name used by producers and consumers. `PubSubStore` stores explicit stream subscription metadata.
 
-Orleans streaming requires the [Microsoft.Orleans.Streaming](https://www.nuget.org/packages/Microsoft.Orleans.Streaming) NuGet package. This package provides the streaming functionality for both the client and server, including the `AddMemoryStreams` extension method used in this guide.
+:::code language="csharp" source="snippets/streaming/Configuration.cs" id="memory_silo":::
 
-On the silo, where `silo` is an <xref:Orleans.Hosting.ISiloBuilder>, call <xref:Orleans.Hosting.SiloBuilderExtensions.AddMemoryStreams*>:
+If an external Orleans client publishes or subscribes, configure the same provider on that client:
 
-```csharp
-silo.AddMemoryStreams("StreamProvider")
-    .AddMemoryGrainStorage("PubSubStore");
-```
+:::code language="csharp" source="snippets/streaming/Configuration.cs" id="memory_client":::
 
-On the cluster client, where `client` is an <xref:Orleans.Hosting.IClientBuilder>, call <xref:Orleans.Hosting.ClientBuilderStreamingExtensions.AddMemoryStreams*>.
+## Define the event and stream identity
 
-```csharp
-client.AddMemoryStreams("StreamProvider");
-```
+Stream payloads use the normal Orleans serialization model. The example also centralizes the provider name and stream namespace so producers and consumers construct identical stream identities.
 
-:::zone-end
+:::code language="csharp" source="snippets/streaming/BasicStreaming.cs" id="stream_contract":::
 
-:::zone target="docs" pivot="orleans-3-x"
+:::code language="csharp" source="snippets/streaming/BasicStreaming.cs" id="stream_identity":::
 
-In this guide, use a simple message-based stream that uses grain messaging to send stream data to subscribers. Use the in-memory storage provider to store lists of subscriptions; this isn't a wise choice for real production applications.
+The stream namespace is `device-telemetry`, and the stream key is the device ID. The payload type is part of the typed handle, not part of <xref:Orleans.Runtime.StreamId>.
 
-On the silo, where `hostBuilder` is an <xref:Orleans.Hosting.ISiloHostBuilder>, call <xref:Orleans.Hosting.StreamHostingExtensions.AddSimpleMessageStreamProvider*>:
+## Publish events
 
-:::code language="csharp" source="snippets-v3/streams-quickstart/StreamConfiguration.cs" id="silo_sms_provider":::
+<a id="produce-events"></a>
 
-On the cluster client, where `clientBuilder` is an <xref:Orleans.IClientBuilder>, call <xref:Orleans.Hosting.ClientStreamExtensions.AddSimpleMessageStreamProvider*>.
+The producer obtains its stream handle during activation and starts an Orleans grain timer when requested:
 
-:::code language="csharp" source="snippets-v3/streams-quickstart/StreamConfiguration.cs" id="client_sms_provider":::
+:::code language="csharp" source="snippets/streaming/BasicStreaming.cs" id="stream_producer":::
 
-> [!NOTE]
-> By default, messages passed over the Simple Message Stream are considered immutable and might be passed by reference to other grains. To turn off this behavior, configure the SMS provider to turn off <xref:Orleans.Configuration.SimpleMessageStreamProviderOptions.OptimizeForImmutableData?displayProperty=nameWithType>.
+Use <xref:Orleans.GrainBaseExtensions.RegisterGrainTimer*> for grain timers. Awaiting <xref:Orleans.Streams.IAsyncObserver`1.OnNextAsync*> waits until the provider accepts responsibility according to its contract; it doesn't generally wait for every consumer to finish. See [Producer acknowledgment](delivery-semantics.md#producer-acknowledgment).
 
-:::code language="csharp" source="snippets-v3/streams-quickstart/StreamConfiguration.cs" id="silo_sms_provider_immutable":::
+## Consume with an implicit subscription
 
-:::zone-end
+<a id="subscribe-to-and-receive-streaming-data"></a>
 
-You can create streams, send data using them as producers, and receive data as subscribers.
+An implicit subscription maps the stream key to a grain key. Publishing to `device-telemetry/device-17` activates the `DeviceTelemetryGrain` whose string key is `device-17`. Implement <xref:Orleans.Streams.Core.IStreamSubscriptionObserver> to attach the observer supplied by Orleans:
 
-## Produce events
+:::code language="csharp" source="snippets/streaming/ImplicitSubscriptions.cs" id="implicit_subscription_grain":::
 
-:::zone target="docs" pivot="orleans-7-0,orleans-8-0,orleans-9-0,orleans-10-0"
+Obtain `ITemperatureProducerGrain` with the same device key and invoke `StartAsync` to begin publishing. The producer and consumer don't reference one another; they agree on provider name, stream identity, and event type.
 
-It's relatively easy to produce events for streams. First, get access to the stream provider defined in the config previously (`"StreamProvider"`), then choose a stream and push data to it.
-
-```csharp
-// Pick a GUID for a chat room grain and chat room stream
-var guid = new Guid("some guid identifying the chat room");
-// Get one of the providers which we defined in our config
-var streamProvider = GetStreamProvider("StreamProvider");
-// Get the reference to a stream
-var streamId = StreamId.Create("RANDOMDATA", guid);
-var stream = streamProvider.GetStream<int>(streamId);
-```
-
-:::zone-end
-
-:::zone target="docs" pivot="orleans-3-x"
-
-It's relatively easy to produce events for streams. First, get access to the stream provider defined in the config previously (`"SMSProvider"`), then choose a stream and push data to it.
-
-:::code language="csharp" source="snippets-v3/streams-quickstart/ProducerGrain.cs" id="produce_events":::
-
-:::zone-end
-
-As you can see, the stream has a GUID and a namespace. This makes it easy to identify unique streams. For example, the namespace for a chat room could be "Rooms", and the GUID could be the owning `RoomGrain`'s GUID.
-
-Here, use the GUID of a known chat room. Using the <xref:Orleans.Streams.IAsyncObserver`1.OnNextAsync*> method of the stream, push data to it. Let's do this inside a timer using random numbers. You could use any other data type for the stream as well.
-
-```csharp
-RegisterTimer(_ =>
-{
-    return stream.OnNextAsync(Random.Shared.Next());
-},
-null,
-TimeSpan.FromMilliseconds(1_000),
-TimeSpan.FromMilliseconds(1_000));
-```
-
-## Subscribe to and receive streaming data
-
-For receiving data, you can use implicit and explicit subscriptions, described in more detail at [Explicit and implicit subscriptions](streams-programming-apis.md#explicit-and-implicit-subscriptions). This example uses implicit subscriptions, which are easier. When a grain type wants to implicitly subscribe to a stream, it uses the attribute `[ImplicitStreamSubscription(namespace)]`.
-
-For your case, define a `ReceiverGrain` like this:
-
-```csharp
-[ImplicitStreamSubscription("RANDOMDATA")]
-public class ReceiverGrain : Grain, IRandomReceiver
-```
-
-Whenever data is pushed to streams in the `RANDOMDATA` namespace (as in the timer example), a grain of type `ReceiverGrain` with the same <xref:System.Guid> as the stream receives the message. Even if no activations of the grain currently exist, the runtime automatically creates a new one and sends the message to it.
-
-For this to work, complete the subscription process by setting the <xref:Orleans.Streams.IAsyncObserver`1.OnNextAsync*> method for receiving data. To do so, the `ReceiverGrain` should call something like this in its <xref:Orleans.Grain.OnActivateAsync*>:
-
-:::zone target="docs" pivot="orleans-7-0,orleans-8-0,orleans-9-0,orleans-10-0"
-
-```csharp
-// Create a GUID based on our GUID as a grain
-var guid = this.GetPrimaryKey();
-
-// Get one of the providers which we defined in config
-var streamProvider = GetStreamProvider("StreamProvider");
-
-// Get the reference to a stream
-var streamId = StreamId.Create("RANDOMDATA", guid);
-var stream = streamProvider.GetStream<int>(streamId);
-
-// Set our OnNext method to the lambda which simply prints the data.
-// This doesn't make new subscriptions, because we are using implicit
-// subscriptions via [ImplicitStreamSubscription].
-await stream.SubscribeAsync<int>(
-    async (data, token) =>
-    {
-        Console.WriteLine(data);
-        await Task.CompletedTask;
-    });
-```
-
-:::zone-end
-
-:::zone target="docs" pivot="orleans-3-x"
-
-:::code language="csharp" source="snippets-v3/streams-quickstart/ReceiverGrain.cs" id="subscribe_events":::
-
-:::zone-end
-
-You're all set! Now, the only requirement is that something triggers the producer grain's creation. Then, it registers the timer and starts sending random integers to all interested parties.
-
-Again, this guide skips many details and only provides a high-level overview. Read other parts of this manual and other resources on Rx to gain a good understanding of what's available and how it works.
-
-Reactive programming can be a powerful approach to solving many problems. For example, you could use LINQ in the subscriber to filter numbers and perform various interesting operations.
-
-## See also
-
-[Orleans Streams Programming APIs](streams-programming-apis.md)
+Next, read [Streaming APIs](streams-programming-apis.md), then replace the memory provider and memory `PubSubStore` with production services selected from the [provider matrix](stream-providers.md).
