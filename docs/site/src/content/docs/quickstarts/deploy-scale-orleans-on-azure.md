@@ -117,15 +117,27 @@ The original deployment only deployed the minimal services necessary to host the
 
 ## Install NuGet packages
 
-Prior to using the grain, you must install the corresponding `Microsoft.Orleans.Clustering.*` and `Microsoft.Orleans.Persistence.*` NuGet packages. These services use role-based access control for passwordless authentication, so you must also import the `Azure.Identity` NuGet package.
-
-:::zone pivot="azure-storage"
+Before adding shared providers, align the template with the maintained snippets:
 
 1. Change the working directory to _./src/web/_.
 
    ```bash
    cd ./src/web
    ```
+
+1. In the project file, change `TargetFramework` to `net10.0`.
+
+1. In _./src/web/Dockerfile_, update both [.NET container images](https://learn.microsoft.com/dotnet/core/docker/container-images): use `mcr.microsoft.com/dotnet/sdk:10.0` for the build stage and `mcr.microsoft.com/dotnet/aspnet:10.0` for the runtime stage.
+
+1. Upgrade the Orleans host package:
+
+   ```dotnetcli
+   dotnet package add Microsoft.Orleans.Server --version 10.2.2
+   ```
+
+Next, install the corresponding `Microsoft.Orleans.Clustering.*` and `Microsoft.Orleans.Persistence.*` NuGet packages. These services use role-based access control for passwordless authentication, so you must also import the `Azure.Identity` NuGet package.
+
+:::zone pivot="azure-storage"
 
 1. Import the `Azure.Identity` package from NuGet:
 
@@ -141,8 +153,8 @@ Prior to using the grain, you must install the corresponding `Microsoft.Orleans.
    | **Persistence** | `Microsoft.Orleans.Persistence.AzureStorage` |
 
    ```dotnetcli
-   dotnet package add Microsoft.Orleans.Clustering.AzureStorage
-   dotnet package add Microsoft.Orleans.Persistence.AzureStorage
+   dotnet package add Microsoft.Orleans.Clustering.AzureStorage --version 10.2.2
+   dotnet package add Microsoft.Orleans.Persistence.AzureStorage --version 10.2.2
    ```
 
 :::zone-end
@@ -163,8 +175,8 @@ Prior to using the grain, you must install the corresponding `Microsoft.Orleans.
    | **Persistence** | `Microsoft.Orleans.Persistence.Cosmos` |
 
    ```dotnetcli
-   dotnet package add Microsoft.Orleans.Clustering.Cosmos
-   dotnet package add Microsoft.Orleans.Persistence.Cosmos
+   dotnet package add Microsoft.Orleans.Clustering.Cosmos --version 10.2.2
+   dotnet package add Microsoft.Orleans.Persistence.Cosmos --version 10.2.2
    ```
 
 :::zone-end
@@ -175,7 +187,7 @@ The sample app initially creates a localhost cluster and persists grain state in
 
 1. Find and remove the existing `builder` configuration code in the _src/web/Program.cs_ file.
 
-   :::code source="snippets/url-shortener/orleansurlshortener/Program.cs" id="configuration":::
+   :::code source="snippets/url-shortener/orleansurlshortener/Program.cs" id="orleans-configuration":::
 
 :::zone pivot="azure-storage"
 
