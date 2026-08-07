@@ -1,4 +1,5 @@
 #nullable enable
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -686,8 +687,13 @@ public class AsyncEnumerableGrainCallTests
     private async Task AdvanceToNextCleanupAsync(AsyncEnumerableGrainExtensionListener listener, CancellationToken cancellationToken)
     {
         var cleanupCount = listener.CleanupCount + 1;
+        var timer = listener.Timer;
+        var timerChangeCount = _fixture.GetTimerChangeCount(timer);
         _fixture.AdvanceTimeByResponseTimeout();
         await listener.WaitForCleanupCountAsync(cleanupCount, cancellationToken);
+
+        // Cleanup is reported from inside the callback, before the one-shot timer is rearmed.
+        await _fixture.WaitForTimerChangeAsync(timer, timerChangeCount + 1, cancellationToken);
     }
 
     /// <summary>
@@ -695,7 +701,7 @@ public class AsyncEnumerableGrainCallTests
     /// </summary>
     public sealed class Fixture : BaseInProcessTestClusterFixture
     {
-        private readonly FakeTimeProvider _timeProvider = new(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        private readonly TrackingFakeTimeProvider _timeProvider = new(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
 
         protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
@@ -714,6 +720,98 @@ public class AsyncEnumerableGrainCallTests
 
         public void AdvanceTimeByResponseTimeout() =>
             FakeTimeSilo.Advance(_timeProvider, HostedCluster.GetSiloServiceProvider().GetRequiredService<IOptions<SiloMessagingOptions>>().Value.ResponseTimeout);
+
+        public int GetTimerChangeCount(object timer) => _timeProvider.GetTimerChangeCount(timer);
+
+        public Task WaitForTimerChangeAsync(object timer, int changeCount, CancellationToken cancellationToken) =>
+            _timeProvider.WaitForTimerChangeAsync(timer, changeCount, cancellationToken);
+
+        private sealed class TrackingFakeTimeProvider(DateTimeOffset startDateTime) : FakeTimeProvider(startDateTime)
+        {
+            private readonly ConcurrentDictionary<object, TrackingTimer> _timers = new(ReferenceEqualityComparer.Instance);
+
+            public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+            {
+                var timer = new TrackingTimer(base.CreateTimer(callback, state, dueTime, period));
+                if (state is not null)
+                {
+                    _timers[state] = timer;
+                }
+
+                return timer;
+            }
+
+            public int GetTimerChangeCount(object timer) => GetTimer(timer).ChangeCount;
+
+            public Task WaitForTimerChangeAsync(object timer, int changeCount, CancellationToken cancellationToken) =>
+                GetTimer(timer).WaitForChangeCountAsync(changeCount, cancellationToken);
+
+            private TrackingTimer GetTimer(object timer) =>
+                _timers.TryGetValue(timer, out var result)
+                    ? result
+                    : throw new InvalidOperationException("The grain timer is not registered with the fake time provider.");
+
+            private sealed class TrackingTimer(ITimer timer) : ITimer
+            {
+                private readonly object _lock = new();
+                private readonly ITimer _timer = timer;
+                private TaskCompletionSource _changed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                private int _changeCount;
+
+                public int ChangeCount
+                {
+                    get
+                    {
+                        lock (_lock)
+                        {
+                            return _changeCount;
+                        }
+                    }
+                }
+
+                public bool Change(TimeSpan dueTime, TimeSpan period)
+                {
+                    if (!_timer.Change(dueTime, period))
+                    {
+                        return false;
+                    }
+
+                    TaskCompletionSource changed;
+                    lock (_lock)
+                    {
+                        ++_changeCount;
+                        changed = _changed;
+                        _changed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                    }
+
+                    changed.TrySetResult();
+                    return true;
+                }
+
+                public async Task WaitForChangeCountAsync(int changeCount, CancellationToken cancellationToken)
+                {
+                    while (true)
+                    {
+                        Task changedTask;
+                        lock (_lock)
+                        {
+                            if (_changeCount >= changeCount)
+                            {
+                                return;
+                            }
+
+                            changedTask = _changed.Task;
+                        }
+
+                        await changedTask.WaitAsync(cancellationToken);
+                    }
+                }
+
+                public void Dispose() => _timer.Dispose();
+
+                public ValueTask DisposeAsync() => _timer.DisposeAsync();
+            }
+        }
     }
 
     /// <summary>
@@ -728,6 +826,7 @@ public class AsyncEnumerableGrainCallTests
         private readonly GrainId _targetGrainId;
         private IDisposable? _instanceSubscription;
         private TaskCompletionSource? _cleanupCompleted;
+        private object? _timer;
         private int _cleanupCount;
 
         public AsyncEnumerableGrainExtensionListener(GrainId targetGrainId)
@@ -743,6 +842,17 @@ public class AsyncEnumerableGrainCallTests
                 lock (_lock)
                 {
                     return _cleanupCount;
+                }
+            }
+        }
+
+        public object Timer
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _timer ?? throw new InvalidOperationException("The async enumerable grain extension has not been created.");
                 }
             }
         }
@@ -782,6 +892,11 @@ public class AsyncEnumerableGrainCallTests
             if (extension.GrainContext.GrainId != _targetGrainId)
             {
                 return;
+            }
+
+            lock (_lock)
+            {
+                _timer ??= extension.Timer;
             }
 
             if (value.Key == "OnEnumeratorCleanupCompleted")
