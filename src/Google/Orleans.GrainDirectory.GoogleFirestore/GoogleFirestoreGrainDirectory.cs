@@ -112,9 +112,12 @@ public partial class GoogleFirestoreGrainDirectory : IGrainDirectory, ILifecycle
 
             if (entities.Count > 0)
             {
-                foreach (var chunk in entities.Chunk(FirestoreDataManager.MAX_BATCH_ENTRIES))
+                foreach (var chunk in entities.Chunk(FirestoreDataManager.MaxBatchSize))
                 {
-                    await this._dataManager.DeleteEntities(chunk).ConfigureAwait(false);
+                    await Task.WhenAll(chunk.Select(entity =>
+                        this._dataManager.DeleteEntity(
+                            entity.Id,
+                            Utils.FormatTimestamp(entity.ETag!.Value)))).ConfigureAwait(false);
                 }
             }
         }

@@ -27,12 +27,15 @@ public class SiloInstanceEntityTests
             StartTime = startTime,
             IAmAliveTime = iAmAliveTime,
         };
-        membershipEntry.AddSuspector(SiloAddressUtils.NewLocalSiloAddress(2), suspectTime);
+        var suspectingSilo = SiloAddressUtils.NewLocalSiloAddress(2);
+        membershipEntry.AddSuspector(suspectingSilo, suspectTime);
+        membershipEntry.AddSuspector(suspectingSilo, suspectTime.AddMinutes(1));
 
-        var entity = SiloInstanceEntity.FromMembershipEntry(membershipEntry, "test-cluster");
+        var entity = SiloInstanceEntity.FromMembershipEntry(membershipEntry, membershipVersion: 42);
         var result = entity.ToMembershipEntry();
 
         Assert.Equal((int)status, entity.Status);
+        Assert.Equal(42, entity.MembershipVersion);
         Assert.Equal(membershipEntry.SiloAddress, result.SiloAddress);
         Assert.Equal(membershipEntry.ProxyPort, result.ProxyPort);
         Assert.Equal(membershipEntry.HostName, result.HostName);

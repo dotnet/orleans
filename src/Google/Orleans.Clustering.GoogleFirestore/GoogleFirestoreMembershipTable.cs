@@ -1,6 +1,9 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using Google.Cloud.Firestore;
+using Grpc.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
@@ -10,11 +13,13 @@ namespace Orleans.Clustering.GoogleFirestore;
 
 internal partial class GoogleFirestoreMembershipTable : IMembershipTable
 {
+    private const string ClusterGroup = "Cluster";
     private readonly FirestoreOptions _options;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger _logger;
     private readonly string _clusterId;
-    private OrleansSiloInstanceManager _instanceManager = default!;
+    private readonly string _partitionId;
+    private FirestoreDataManager _storage = default!;
 
     public GoogleFirestoreMembershipTable(
         ILoggerFactory loggerFactory,
@@ -25,39 +30,65 @@ internal partial class GoogleFirestoreMembershipTable : IMembershipTable
         this._logger = loggerFactory.CreateLogger<GoogleFirestoreMembershipTable>();
         this._options = options.Value;
         this._clusterId = clusterOptions.Value.ClusterId;
+        this._partitionId = Utils.SanitizeId(this._clusterId);
     }
 
     public async Task InitializeMembershipTable(bool tryInitTableVersion)
     {
-        this._instanceManager = await OrleansSiloInstanceManager.GetManager(
-            Utils.SanitizeId(this._clusterId),
-            this._loggerFactory,
-            this._options);
+        this._storage = CreateDataManager(this._clusterId);
+        await this._storage.Initialize();
 
         if (tryInitTableVersion)
         {
-            var created = await this._instanceManager.TryCreateTableVersionEntryAsync();
+            var created = await TryCreateTableVersionEntry();
             if (created) LogCreatedTableVersion();
         }
     }
 
     public async Task DeleteMembershipTableEntries(string clusterId)
     {
-        var manager = clusterId == this._clusterId
-            ? this._instanceManager
-            : await OrleansSiloInstanceManager.GetManager(Utils.SanitizeId(clusterId), this._loggerFactory, this._options);
-        await manager.DeleteTableEntries();
+        var storage = clusterId == this._clusterId ? this._storage : CreateDataManager(clusterId);
+        if (!ReferenceEquals(storage, this._storage))
+        {
+            await storage.Initialize();
+        }
+
+        await storage.ClearCollection();
     }
 
-    public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => this._instanceManager.CleanupDefunctSiloEntries(beforeDate);
+    public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+    {
+        var entities = await this._storage.ReadAllEntities<SiloInstanceEntity>();
+        var defunctEntries = entities
+            .Where(entity => entity.Id != this._partitionId)
+            .Where(entity => entity.Status != (int)SiloStatus.Active)
+            .Where(entity => GetEffectiveUpdateTime(entity) < beforeDate)
+            .ToArray();
+
+        await Task.WhenAll(defunctEntries
+            .Chunk(FirestoreDataManager.MaxBatchSize)
+            .Select(this._storage.DeleteEntities));
+    }
 
     public async Task<MembershipTableData> ReadRow(SiloAddress key)
     {
         try
         {
-            var data = await this._instanceManager.FindSiloAndVersionEntities(key);
+            var collection = this._storage.GetCollection();
+            var data = await this._storage.ExecuteTransaction(async transaction =>
+            {
+                var versionSnapshot = await transaction.GetSnapshotAsync(collection.Document(this._partitionId));
+                var siloSnapshot = await transaction.GetSnapshotAsync(collection.Document(key.ToParsableString()));
+                if (!versionSnapshot.Exists)
+                    throw new KeyNotFoundException($"Could not find cluster version entry for {this._partitionId}");
 
-            var table = Convert((new[] { data.Silo }, data.Version));
+                var silos = siloSnapshot.Exists
+                    ? new[] { siloSnapshot.ConvertTo<SiloInstanceEntity>() }
+                    : Array.Empty<SiloInstanceEntity>();
+                return (silos, versionSnapshot.ConvertTo<ClusterVersionEntity>());
+            });
+
+            var table = Convert(data);
 
             LogReadEntry(key, table);
 
@@ -74,7 +105,18 @@ internal partial class GoogleFirestoreMembershipTable : IMembershipTable
     {
         try
         {
-            var entries = await this._instanceManager.FindAllSiloEntries();
+            var collection = this._storage.GetCollection();
+            var entries = await this._storage.ExecuteTransaction(async transaction =>
+            {
+                var snapshot = await transaction.GetSnapshotAsync(collection);
+                var versionSnapshot = snapshot.Documents.SingleOrDefault(document => document.Id == this._partitionId)
+                    ?? throw new KeyNotFoundException($"Could not find cluster version entry for {this._partitionId}");
+                var silos = snapshot.Documents
+                    .Where(document => document.Id != this._partitionId)
+                    .Select(document => document.ConvertTo<SiloInstanceEntity>())
+                    .ToArray();
+                return (silos, versionSnapshot.ConvertTo<ClusterVersionEntity>());
+            });
             var data = Convert(entries);
             LogReadAll(data);
 
@@ -93,11 +135,27 @@ internal partial class GoogleFirestoreMembershipTable : IMembershipTable
         {
             LogInsertRow(entry, tableVersion);
 
-            var silo = SiloInstanceEntity.FromMembershipEntry(entry, this._clusterId);
-            var version = this._instanceManager.CreateClusterVersionEntity(tableVersion.Version);
+            var silo = SiloInstanceEntity.FromMembershipEntry(entry, tableVersion.Version);
+            var version = CreateClusterVersionEntity(tableVersion.Version);
             version.ETag = Utils.ParseTimestamp(tableVersion.VersionEtag);
 
-            var result = await this._instanceManager.InsertSiloEntryConditionally(silo, version);
+            var collection = this._storage.GetCollection();
+            var siloReference = collection.Document(silo.Id);
+            var versionReference = collection.Document(this._partitionId);
+            bool result;
+            try
+            {
+                result = await this._storage.ExecuteTransaction(transaction =>
+                {
+                    transaction.Create(siloReference, silo);
+                    transaction.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag.Value));
+                    return Task.FromResult(true);
+                });
+            }
+            catch (RpcException exception) when (IsContention(exception))
+            {
+                result = false;
+            }
 
             if (result == false)
                 LogInsertContention(entry, tableVersion);
@@ -116,12 +174,29 @@ internal partial class GoogleFirestoreMembershipTable : IMembershipTable
         {
             LogUpdateRow(entry, etag, tableVersion);
 
-            var silo = SiloInstanceEntity.FromMembershipEntry(entry, this._clusterId);
+            var silo = SiloInstanceEntity.FromMembershipEntry(entry, tableVersion.Version);
             silo.ETag = Utils.ParseTimestamp(etag);
-            var version = this._instanceManager.CreateClusterVersionEntity(tableVersion.Version);
+            var version = CreateClusterVersionEntity(tableVersion.Version);
             version.ETag = Utils.ParseTimestamp(tableVersion.VersionEtag);
 
-            var result = await this._instanceManager.UpdateSiloEntryConditionally(silo, version);
+            var collection = this._storage.GetCollection();
+            var siloReference = collection.Document(silo.Id);
+            var versionReference = collection.Document(this._partitionId);
+            bool result;
+            try
+            {
+                result = await this._storage.ExecuteTransaction(transaction =>
+                {
+                    transaction.Update(siloReference, silo.GetFields(), Precondition.LastUpdated(silo.ETag.Value));
+                    transaction.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag.Value));
+                    return Task.FromResult(true);
+                });
+            }
+            catch (RpcException exception) when (IsContention(exception))
+            {
+                result = false;
+            }
+
             if (result == false)
                 LogUpdateContention(entry, etag, tableVersion);
             return result;
@@ -139,15 +214,75 @@ internal partial class GoogleFirestoreMembershipTable : IMembershipTable
         {
             LogMergeEntry(entry);
 
-            var silo = SiloInstanceEntity.FromMembershipEntry(entry, this._clusterId);
+            var id = entry.SiloAddress.ToParsableString();
+            var iAmAliveTime = new DateTimeOffset(DateTime.SpecifyKind(entry.IAmAliveTime, DateTimeKind.Utc));
+            var document = this._storage.GetCollection().Document(id);
+            await this._storage.ExecuteTransaction(async transaction =>
+            {
+                var snapshot = await transaction.GetSnapshotAsync(document);
+                if (!snapshot.Exists)
+                    throw new KeyNotFoundException($"Could not find silo entry for {id}");
 
-            await this._instanceManager.MergeTableEntryAsync(silo.GetIAmAliveFields(), silo.Id);
+                if (snapshot.ConvertTo<SiloInstanceEntity>().IAmAliveTime >= iAmAliveTime)
+                {
+                    return false;
+                }
+
+                transaction.Update(document, new Dictionary<string, object?>
+                {
+                    [nameof(SiloInstanceEntity.IAmAliveTime)] = iAmAliveTime,
+                });
+                return true;
+            });
         }
         catch (Exception exc)
         {
             LogUpdateIAmAliveError(exc, entry);
             throw;
         }
+    }
+
+    private FirestoreDataManager CreateDataManager(string clusterId) => new(
+        ClusterGroup,
+        Utils.SanitizeId(clusterId),
+        this._options,
+        this._loggerFactory.CreateLogger<FirestoreDataManager>());
+
+    private ClusterVersionEntity CreateClusterVersionEntity(int version) => new()
+    {
+        Id = this._partitionId,
+        MembershipVersion = version,
+    };
+
+    private async Task<bool> TryCreateTableVersionEntry()
+    {
+        try
+        {
+            await this._storage.CreateEntity(CreateClusterVersionEntity(0));
+            return true;
+        }
+        catch (RpcException exception) when (exception.StatusCode == StatusCode.AlreadyExists)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsContention(RpcException exception) =>
+        exception.StatusCode is StatusCode.Aborted or StatusCode.AlreadyExists or StatusCode.FailedPrecondition or StatusCode.NotFound;
+
+    private static DateTimeOffset GetEffectiveUpdateTime(SiloInstanceEntity entity)
+    {
+        var result = entity.StartTime > entity.IAmAliveTime ? entity.StartTime : entity.IAmAliveTime;
+        if (entity.SuspectingTimes is { Length: > 0 })
+        {
+            var latestSuspectTime = entity.SuspectingTimes.Max();
+            if (latestSuspectTime > result)
+            {
+                result = latestSuspectTime;
+            }
+        }
+
+        return result;
     }
 
 
