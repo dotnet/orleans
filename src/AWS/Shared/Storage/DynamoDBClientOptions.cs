@@ -4,6 +4,8 @@ namespace Orleans.Clustering.DynamoDB
 namespace Orleans.Persistence.DynamoDB
 #elif REMINDERS_DYNAMODB
 namespace Orleans.Reminders.DynamoDB
+#elif TRANSACTIONS_DYNAMODB
+namespace Orleans.Transactions.DynamoDB
 #else
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
