@@ -15,7 +15,7 @@ For each instance being removed:
 
 1. Stop admitting new application traffic and report not ready.
 1. Stop application-specific background work from accepting new items.
-1. Ask the .NET host to stop and await `IHost.StopAsync` or normal host termination.
+1. Ask the .NET host to stop and await <xref:Microsoft.Extensions.Hosting.IHost.StopAsync*?displayProperty=nameWithType> or normal host termination.
 1. Allow Orleans to leave cluster membership and deactivate or transfer runtime responsibilities.
 1. Terminate the process only after the shutdown deadline expires.
 

@@ -73,8 +73,8 @@ builder.Host.UseOrleans(siloBuilder =>
 
 A **listening endpoint** is where the process binds inside its container. An **advertised endpoint** is what Orleans writes to membership for peers and clients. Binding to `0.0.0.0` doesn't discover an address to advertise. If ingress maps different exposed and target ports, configure <xref:Orleans.Configuration.EndpointOptions> directly so that:
 
-- `SiloListeningEndpoint` and `GatewayListeningEndpoint` contain the target ports.
-- `AdvertisedIPAddress`, `SiloPort`, and `GatewayPort` contain the routable ingress address and exposed ports.
+- <xref:Orleans.Configuration.EndpointOptions.SiloListeningEndpoint> and <xref:Orleans.Configuration.EndpointOptions.GatewayListeningEndpoint> contain the target ports.
+- <xref:Orleans.Configuration.EndpointOptions.AdvertisedIPAddress>, <xref:Orleans.Configuration.EndpointOptions.SiloPort>, and <xref:Orleans.Configuration.EndpointOptions.GatewayPort> contain the routable ingress address and exposed ports.
 
 Container Apps provides `CONTAINER_APP_REPLICA_NAME` to identify a replica and `CONTAINER_APP_HOSTNAME` to identify a revision host. Neither value is a supported per-replica network address. Don't advertise an app or revision host name from multiple silo replicas: a peer can be routed to a different replica than the membership entry identifies.
 
@@ -117,7 +117,7 @@ builder.Host.UseOrleans(siloBuilder =>
 
 Install `Microsoft.Orleans.Clustering.AzureStorage`, `Microsoft.Orleans.Persistence.AzureStorage`, and `Azure.Identity` for this configuration. Configure the same `ServiceId`, `ClusterId`, clustering table, and credentials on Orleans clients. Keep `ServiceId` stable for the application and use a distinct `ClusterId` for each environment or isolated blue-green cluster.
 
-Assign the silo and client identities **Storage Table Data Contributor** only on the tables or storage account they use. The Orleans Azure Table provider initializes its table with `CreateIfNotExists`, so **Storage Table Data Reader** alone isn't sufficient even for a client that subsequently reads gateway records. If grain state uses blobs or another service, grant the corresponding data-plane role at the narrowest practical scope. Disable shared-key access when every consumer supports Microsoft Entra ID.
+Assign the silo and client identities **Storage Table Data Contributor** only on the tables or storage account they use. The Orleans Azure Table provider calls <xref:Azure.Data.Tables.TableClient.CreateIfNotExistsAsync*?displayProperty=nameWithType>, so **Storage Table Data Reader** alone isn't sufficient even for a client that subsequently reads gateway records. If grain state uses blobs or another service, grant the corresponding data-plane role at the narrowest practical scope. Disable shared-key access when every consumer supports Microsoft Entra ID.
 
 ## Provision production infrastructure
 
@@ -257,7 +257,7 @@ The [in-repo sample](https://github.com/dotnet/orleans/tree/main/samples/Deploym
 - One replica per Orleans server app. The two silos and dashboard advertise the environment's private static IP with unique exposed port pairs: `11111`/`30000`, `11112`/`30001`, and `11113`/`30002`.
 - Stable Container Apps resource APIs, virtual-network integration with private DNS, explicit startup/readiness/liveness probes, a 60-second termination grace period, and nonzero replica floors.
 - A user-assigned runtime identity, managed-identity ACR pulls, disabled registry admin credentials, and disabled storage shared-key access.
-- Azure Table Storage clustering through `DefaultAzureCredential`. The runtime identity has **Storage Table Data Contributor** on the precreated membership table. The sample doesn't configure durable grain storage.
+- Azure Table Storage clustering through <xref:Azure.Identity.DefaultAzureCredential>. The runtime identity has **Storage Table Data Contributor** on the precreated membership table. The sample doesn't configure durable grain storage.
 - A separately run bootstrap template for role assignments and a routine deployment workflow that uses GitHub OIDC, SHA-pinned actions, Git-SHA image tags, and digest-pinned Container App revisions.
 - Clients that discover individual gateways through Orleans membership rather than using HTTP ingress as an Orleans transport.
 - The external-scaler gRPC service as a study component. It isn't attached to a silo scaling rule because scaling one app to multiple silo replicas would reintroduce the unsupported endpoint assumption.

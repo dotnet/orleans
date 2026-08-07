@@ -203,7 +203,7 @@ rules:
     verbs: ["get", "list", "watch", "patch"]
 ```
 
-Bind the role to the workload's dedicated service account. If you explicitly enable `KubernetesHostingOptions.DeleteDefunctSiloPods`, also grant `delete`. Keep that option disabled unless its operational consequences have been reviewed.
+Bind the role to the workload's dedicated service account. If you explicitly enable <xref:Orleans.Hosting.Kubernetes.KubernetesHostingOptions.DeleteDefunctSiloPods>, also grant `delete`. Keep that option disabled unless its operational consequences have been reviewed.
 
 ## Network requirements
 
@@ -214,7 +214,7 @@ Allow direct pod-IP TCP traffic:
 - Every silo and client to the clustering provider.
 - Silo pods to the Kubernetes API only when the optional hosting package is enabled.
 
-Don't place a Kubernetes `Service` virtual IP in `AdvertisedIPAddress`. Orleans advertises each pod IP so peers can contact that specific silo. A `Service` can expose application HTTP ingress, but it doesn't replace Orleans membership or direct silo connectivity.
+Don't place a Kubernetes `Service` virtual IP in <xref:Orleans.Configuration.EndpointOptions.AdvertisedIPAddress>. Orleans advertises each pod IP so peers can contact that specific silo. A `Service` can expose application HTTP ingress, but it doesn't replace Orleans membership or direct silo connectivity.
 
 If a service mesh intercepts TCP, validate long-lived connections, pod-address preservation, mutual TLS policy, shutdown ordering, and retries. Exclude Orleans ports from interception if the mesh can't preserve the required semantics.
 

@@ -42,8 +42,8 @@ Never advertise loopback, a host name that peers resolve differently, a load bal
 
 All silos and clients in one logical deployment must agree on:
 
-- `ServiceId`: The stable identity of the application. Grain storage providers can use it to separate applications.
-- `ClusterId`: The identity of a particular deployment environment or cluster.
+- <xref:Orleans.Configuration.ClusterOptions.ServiceId>: The stable identity of the application. Grain storage providers can use it to separate applications.
+- <xref:Orleans.Configuration.ClusterOptions.ClusterId>: The identity of a particular deployment environment or cluster.
 - The clustering provider and its provider-specific namespace, database, table, or key prefix.
 
 Don't use a shared production `ClusterId` for staging. During blue-green deployment, use different cluster IDs unless both versions are intentionally compatible members of one cluster.

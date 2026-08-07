@@ -26,12 +26,12 @@ Service Fabric and Orleans have complementary roles:
 | --- | --- |
 | Process placement, restart, service instance lifecycle, application upgrade | Service Fabric |
 | Per-instance port allocation and node address | Service Fabric service manifest and runtime context |
-| Service Fabric service endpoint publication | `ICommunicationListener.OpenAsync` and the Service Fabric Naming Service |
+| Service Fabric service endpoint publication | <xref:Microsoft.ServiceFabric.Services.Communication.Runtime.ICommunicationListener.OpenAsync*?displayProperty=nameWithType> and the Service Fabric Naming Service |
 | Silo membership, failure detection, and Orleans gateway discovery | Orleans and the selected clustering provider |
 | Grain activation and placement | Orleans |
 | Durable grain state, reminders, and streams | Configured Orleans providers |
 
-Service Fabric Naming Service isn't an Orleans clustering provider. Orleans silos and clients must use the same external clustering provider, `ServiceId`, and `ClusterId`. Don't use `UseLocalhostClustering` in a deployed service.
+Service Fabric Naming Service isn't an Orleans clustering provider. Orleans silos and clients must use the same external clustering provider, <xref:Orleans.Configuration.ClusterOptions.ServiceId>, and <xref:Orleans.Configuration.ClusterOptions.ClusterId>. Don't use <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalhostClustering*?displayProperty=nameWithType> in a deployed service.
 
 ## Implement the generic-host integration
 
@@ -47,7 +47,7 @@ The stateless service creates an <xref:Microsoft.ServiceFabric.Services.Communic
 
 :::code language="csharp" source="snippets/service-fabric/ServiceFabricSilo/OrleansStatelessService.cs":::
 
-The listener owns the Orleans generic host. `OpenAsync` starts it, `CloseAsync` requests graceful shutdown, and `Abort` disposes it without assuming graceful work can complete:
+The listener owns the Orleans generic host. <xref:Microsoft.ServiceFabric.Services.Communication.Runtime.ICommunicationListener.OpenAsync*?displayProperty=nameWithType> starts it, <xref:Microsoft.ServiceFabric.Services.Communication.Runtime.ICommunicationListener.CloseAsync*?displayProperty=nameWithType> requests graceful shutdown, and <xref:Microsoft.ServiceFabric.Services.Communication.Runtime.ICommunicationListener.Abort*?displayProperty=nameWithType> disposes it without assuming graceful work can complete:
 
 :::code language="csharp" source="snippets/service-fabric/ServiceFabricSilo/OrleansCommunicationListener.cs":::
 
@@ -86,7 +86,7 @@ Apply network controls so only trusted silos can reach the silo ports and only t
 
 ## Health and readiness
 
-Service Fabric opens the communication listener before calling the stateless service's `RunAsync`. In this integration, `OpenAsync` completes only after the Orleans host starts, so Service Fabric doesn't publish the listener address while silo startup is still in progress.
+Service Fabric opens the communication listener before calling <xref:Microsoft.ServiceFabric.Services.Runtime.StatelessService.RunAsync*?displayProperty=nameWithType>. In this integration, `OpenAsync` completes only after the Orleans host starts, so Service Fabric doesn't publish the listener address while silo startup is still in progress.
 
 That lifecycle boundary is necessary but isn't a complete application health model. Add application-authored Service Fabric [health reports](https://learn.microsoft.com/azure/service-fabric/service-fabric-health-introduction) for sustained conditions that operators or monitored upgrades must evaluate, such as:
 
@@ -109,7 +109,7 @@ Graceful shutdown isn't guaranteed:
 - Service Fabric can terminate a code package after configured timeouts.
 - The host can crash or lose network access before leaving membership.
 
-Therefore, correctness must tolerate abrupt silo loss and [unknown call outcomes](handling-failures.md). Configure Service Fabric close and upgrade timeouts to exceed the measured Orleans shutdown duration, and align them with `HostOptions.ShutdownTimeout`.
+Therefore, correctness must tolerate abrupt silo loss and [unknown call outcomes](handling-failures.md). Configure Service Fabric close and upgrade timeouts to exceed the measured Orleans shutdown duration, and align them with <xref:Microsoft.Extensions.Hosting.HostOptions.ShutdownTimeout>.
 
 Scale in one instance or update domain at a time where possible. Wait for Orleans membership and application latency to stabilize before removing more capacity.
 
