@@ -12,12 +12,12 @@ The Orleans Dashboard provides live inspection of silos, grain activations, call
 ## Secure the dashboard before exposing it
 
 > [!WARNING]
-> `MapOrleansDashboard()` doesn't require authentication by default. The dashboard can expose topology, grain type and key information, runtime properties, method activity, log messages, reminder metadata, and serialized grain state. Never expose it to the public internet or an untrusted application network without authentication, authorization, and transport security.
+> <xref:Orleans.Dashboard.ServiceCollectionExtensions.MapOrleansDashboard*?displayProperty=nameWithType> doesn't require authentication by default. The dashboard can expose topology, grain type and key information, runtime properties, method activity, log messages, reminder metadata, and serialized grain state. Never expose it to the public internet or an untrusted application network without authentication, authorization, and transport security.
 
 Use defense in depth:
 
 1. **Authenticate operators.** Integrate the ASP.NET Core host with your organization's identity provider. Don't rely on a hard-to-guess route.
-2. **Authorize the entire route group.** Apply a policy to the `RouteGroupBuilder` returned by `MapOrleansDashboard()`.
+2. **Authorize the entire route group.** Apply a policy to the <xref:Microsoft.AspNetCore.Routing.RouteGroupBuilder> returned by `MapOrleansDashboard()`.
 3. **Restrict the network path.** Bind an administrative listener or put the route behind a private ingress, VPN, firewall, or zero-trust access proxy. A route prefix isn't a security boundary.
 4. **Use HTTPS.** Protect credentials, cookies, dashboard responses, and streamed logs in transit.
 5. **Limit sensitive data.** Grain state and logs can contain secrets or personal data. Apply normal data classification, retention, and access-audit requirements.
@@ -33,7 +33,7 @@ Validate the authorization behavior with an unauthenticated request and with use
 
 Add [Microsoft.Orleans.Dashboard](https://www.nuget.org/packages/Microsoft.Orleans.Dashboard) to the web host. [Microsoft.Orleans.Dashboard.Abstractions](https://www.nuget.org/packages/Microsoft.Orleans.Dashboard.Abstractions) contains shared types such as <xref:Orleans.Dashboard.NoProfilingAttribute> and is brought in by the main package.
 
-Call `AddDashboard()` on the silo builder and map the route after building the ASP.NET Core app. A route prefix is recommended to avoid claiming the web application's root:
+Call <xref:Orleans.Dashboard.ServiceCollectionExtensions.AddDashboard*?displayProperty=nameWithType> on the silo builder and map the route after building the ASP.NET Core app. A route prefix is recommended to avoid claiming the web application's root:
 
 ```csharp
 builder.UseOrleans(siloBuilder =>
@@ -64,9 +64,9 @@ siloBuilder.AddDashboard(options =>
 
 | Option | Default | Operational effect |
 |---|---:|---|
-| `HideTrace` | `false` | Disables the live log-streaming endpoint when `true`. |
-| `CounterUpdateIntervalMs` | `1000` | Sets the counter sampling interval in milliseconds; the minimum is 1000. |
-| `HistoryLength` | `100` | Controls retained in-memory dashboard history. Larger values consume more memory. |
+| <xref:Orleans.Dashboard.DashboardOptions.HideTrace> | `false` | Disables the live log-streaming endpoint when `true`. |
+| <xref:Orleans.Dashboard.DashboardOptions.CounterUpdateIntervalMs> | `1000` | Sets the counter sampling interval in milliseconds; the minimum is 1000. |
+| <xref:Orleans.Dashboard.DashboardOptions.HistoryLength> | `100` | Controls retained in-memory dashboard history. Larger values consume more memory. |
 
 The dashboard registers a logging provider and collects runtime metrics for display. Method profiling adds an incoming grain-call filter. By default, profiling becomes inactive after one minute without dashboard queries. Continuous profiling is available but has ongoing overhead:
 
@@ -78,7 +78,7 @@ builder.Services.Configure<GrainProfilerOptions>(options =>
 });
 ```
 
-Leave `TraceAlways` disabled unless continuous method statistics justify the cost. Load test representative traffic with the dashboard configuration you plan to deploy. Use <xref:Orleans.Dashboard.NoProfilingAttribute> on a grain class or method only when omitting it from dashboard method statistics is acceptable.
+Leave <xref:Orleans.Dashboard.GrainProfilerOptions.TraceAlways> disabled unless continuous method statistics justify the cost. Load test representative traffic with the dashboard configuration you plan to deploy. Use <xref:Orleans.Dashboard.NoProfilingAttribute> on a grain class or method only when omitting it from dashboard method statistics is acceptable.
 
 ## Choose a deployment boundary
 
@@ -118,7 +118,7 @@ Confirm the dashboard host has an active Orleans client connection, can resolve/
 
 ### Profiling data is empty
 
-Generate calls to the grain method, keep the page active, and confirm neither the class nor method has <xref:Orleans.Dashboard.NoProfilingAttribute>. If `TraceAlways` is `false`, profiling stops after `DeactivationTime` without dashboard queries.
+Generate calls to the grain method, keep the page active, and confirm neither the class nor method has <xref:Orleans.Dashboard.NoProfilingAttribute>. If `TraceAlways` is `false`, profiling stops after <xref:Orleans.Dashboard.GrainProfilerOptions.DeactivationTime> without dashboard queries.
 
 ### Live logs return 403
 

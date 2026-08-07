@@ -23,7 +23,7 @@ These signals are complementary. Metrics detect a change, traces locate it in a 
 - [OpenTelemetry.Exporter.OpenTelemetryProtocol](https://www.nuget.org/packages/OpenTelemetry.Exporter.OpenTelemetryProtocol)
 - Instrumentation packages for the surrounding application, such as `OpenTelemetry.Instrumentation.AspNetCore`, `OpenTelemetry.Instrumentation.Http`, and `OpenTelemetry.Instrumentation.Runtime`
 
-The following configuration works for a silo. Apply the same OpenTelemetry configuration to an Orleans client and call `AddActivityPropagation()` on its `IClientBuilder`.
+The following configuration works for a silo. Register <xref:Orleans.Hosting.CoreHostingExtensions.AddActivityPropagation*?displayProperty=nameWithType> on silos and <xref:Orleans.Hosting.ClientBuilderExtensions.AddActivityPropagation*?displayProperty=nameWithType> on Orleans clients.
 
 :::code language="csharp" source="./snippets/observability/Program.cs" id="OpenTelemetry":::
 

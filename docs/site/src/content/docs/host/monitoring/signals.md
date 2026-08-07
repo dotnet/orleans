@@ -13,7 +13,7 @@ Start with service-level symptoms, then use Orleans telemetry to narrow the caus
 
 Orleans writes through [`Microsoft.Extensions.Logging`](https://learn.microsoft.com/dotnet/core/extensions/logging/overview). Preserve the structured fields supplied by the provider, including category, level, event ID, exception, trace ID, and span ID. Configure category levels using normal .NET logging configuration.
 
-An Orleans `EventId` is a diagnostic identifier, not a complete incident definition. Numeric ranges and event assignments can change as the runtime evolves. Instead of maintaining a copied table:
+An Orleans <xref:Microsoft.Extensions.Logging.EventId> is a diagnostic identifier, not a complete incident definition. Numeric ranges and event assignments can change as the runtime evolves. Instead of maintaining a copied table:
 
 - Query the generated <xref:Orleans.ErrorCode> API reference when investigating a known ID.
 - To inspect definitions under active development, consult the [runtime error-code source on the `main` branch](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core.Abstractions/Logging/ErrorCodes.cs).
@@ -64,7 +64,7 @@ Use application spans to follow grain calls and runtime, lifecycle, and storage 
 3. Was time spent waiting, executing application code, activating, placing, or accessing storage?
 4. Which exception or status ended the operation?
 
-If spans appear as separate traces, confirm `AddActivityPropagation()` is registered on the client and all silos on the path. Also verify that samplers honor the parent decision and that proxies preserve W3C `traceparent`.
+If spans appear as separate traces, confirm <xref:Orleans.Hosting.ClientBuilderExtensions.AddActivityPropagation*?displayProperty=nameWithType> is registered on the client and the corresponding silo registration is present on all silos in the path. Also verify that samplers honor the parent decision and that proxies preserve W3C `traceparent`.
 
 Avoid recording grain keys and state values by default. They can be high-cardinality or sensitive. If an incident requires them, use restricted, time-limited capture and remove it afterward.
 

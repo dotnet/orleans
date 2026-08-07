@@ -11,7 +11,7 @@ Use these runbooks as investigation sequences, not as automatic proof of one roo
 
 ## Client can't connect
 
-**Evidence:** no connected gateways, repeated connection failures, `ConnectionFailedException`, or a dashboard/client reporting lost cluster connectivity.
+**Evidence:** no connected gateways, repeated connection failures, <xref:Orleans.Runtime.Messaging.ConnectionFailedException>, or a dashboard/client reporting lost cluster connectivity.
 
 1. Confirm the client and silos use the same cluster and service IDs and the same clustering provider.
 2. Query the membership/gateway source from the client's network boundary. Confirm it returns active silos with reachable advertised gateway addresses.
@@ -23,7 +23,7 @@ Don't add retries around startup indefinitely. Bound startup/reconnect behavior 
 
 ## Grain calls time out
 
-**Evidence:** increased `orleans-app-requests-timedout`, high request latency, or `TimeoutException` at callers.
+**Evidence:** increased `orleans-app-requests-timedout`, high request latency, or <xref:System.TimeoutException> at callers.
 
 1. Follow a sampled trace from the caller. Determine whether the call reached a silo and whether it waited before grain execution, inside the grain, or in a dependency.
 2. Compare timeout growth with rejected/dropped messages, gateway connectivity, long-running turns, CPU, thread-pool starvation, GC pauses, and storage latency.
@@ -88,7 +88,7 @@ Don't add retries around startup indefinitely. Bound startup/reconnect behavior 
 1. Compare the host shutdown timeout with the orchestrator termination grace period. Leave time for Orleans and other hosted services to stop before forced termination.
 2. Stop accepting new external work before stopping the silo.
 3. Inspect the final lifecycle logs and traces for long-running grain calls, deactivation, membership-store updates, stream shutdown, or blocked hosted services.
-4. Ensure `StopAsync` cancellation is propagated and custom lifecycle participants complete promptly.
+4. Ensure <xref:Orleans.ILifecycleObserver.OnStop*> honors cancellation and custom lifecycle participants complete promptly.
 5. Treat repeated forced termination as an availability risk. Fix the blocking component rather than relying on process kill.
 
 ## Preserve diagnostic evidence
