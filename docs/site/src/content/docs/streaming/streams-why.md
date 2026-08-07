@@ -32,6 +32,33 @@ Orleans streams are multicast, not point-to-point work queues: every subscriptio
 
 The provider is part of the design. A durable queue can retain accepted events across process failure; a rewindable provider can start a subscription from an earlier token; neither capability is implied by the Orleans stream API itself.
 
+## Why Orleans streams are different
+
+Orleans streams complement event brokers and data-flow engines rather than replacing them. Brokers retain and transport events, while data-flow engines excel at applying a shared query or transformation pipeline to large event sets. Orleans streams are useful when each entity needs independently addressed, stateful processing expressed in ordinary grain code.
+
+### Flexible processing logic
+
+<a id="flexible-stream-processing-logic"></a>
+
+A stream consumer is application code. It can update grain state, make grain calls, publish to other streams, call external services, or choose behavior from the grain's current state. Processing can be imperative or functional, stateful or stateless, and can include side effects.
+
+Orleans streams don't provide a declarative query language or automatically compile a data-flow graph. Use a dedicated stream-processing engine when windowing, joins, aggregations, or a centrally managed query topology are the primary requirement. Use Orleans streams when events must enter fine-grained actor workflows with per-entity state and behavior.
+
+### Dynamic, fine-grained topologies
+
+<a id="support-for-dynamic-topologies"></a>
+<a id="fine-grained-stream-granularity"></a>
+
+The processing topology emerges from stream subscriptions and grain logic instead of being one deployment-wide graph. Applications can add or remove explicit subscriptions at runtime, use implicit subscriptions to activate grains from stream identities, and change how an individual grain responds as its state changes.
+
+Streams are independently addressed by provider, namespace, and key. A grain can consume or produce multiple streams, and an application can use different providers for different links according to their durability, replay, throughput, and operational requirements. This granularity supports per-user, per-device, per-tenant, and similar event flows without deploying a separate pipeline for every entity.
+
+### Distributed execution
+
+Stream consumers are grains, so their processing is distributed using the Orleans runtime. The application can scale the cluster, distribute stream identities across grains, recover grain activations after failures, and combine stream processing with Orleans placement, persistence, and messaging.
+
+These properties don't remove the need to design for provider-specific delivery guarantees, ordering, replay, backpressure, and hot keys. See [Delivery, ordering, replay, and recovery](delivery-semantics.md) and [Operate and tune Orleans streams](streaming-operations.md).
+
 ## Prefer broadcast channels for transient fan-out
 
 Broadcast channels are useful for cache invalidation hints, live configuration notifications, and similar signals where occasional loss is acceptable. A channel key maps to a subscriber grain identity for every matching subscriber grain type; it doesn't broadcast to every activation in the cluster.
