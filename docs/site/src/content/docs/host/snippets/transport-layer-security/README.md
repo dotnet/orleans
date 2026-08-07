@@ -1,14 +1,18 @@
 # Orleans transport layer security snippets
 
-This folder contains the runnable snippet projects used by `docs/orleans/host/transport-layer-security.md`.
+This folder contains the compile-checked snippet projects used by
+`docs/site/src/content/docs/host/transport-layer-security.md`.
 
-## Run the sample locally
+## Build the snippets
 
-1. Open a terminal in `docs/orleans/host/snippets/transport-layer-security/csharp/SiloExample`.
-2. Run `dotnet build` and then `dotnet run`.
-3. Open a second terminal in `docs/orleans/host/snippets/transport-layer-security/csharp/ClientExample`.
-4. Run `dotnet build` and then `dotnet run`.
+Run `dotnet build` for each project:
 
-The executable entry points create temporary self-signed certificates in memory and configure Orleans for development-only certificate validation so the sample can run locally without any certificate store setup. The generated certificate is loaded into user key storage so Windows TLS can use it for the server-side handshake.
+- `csharp/SiloExample/SiloExample.csproj`
+- `csharp/ClientExample/ClientExample.csproj`
 
-The inline snippets in each `Program.cs` file remain focused on the certificate store and certificate file configuration patterns described in the article.
+The entry points intentionally don't start a silo or client. The article examples
+require deployment-specific certificates, names, and trust stores and are
+designed to compile without embedding development-only certificate bypasses.
+
+For a locally runnable mTLS example which creates a development certificate, see
+the [Orleans Transport Layer Security sample](https://learn.microsoft.com/samples/dotnet/samples/orleans-transport-layer-security-tls/).
