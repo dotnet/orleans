@@ -75,19 +75,19 @@ token cache.
 
 ## Configure TLS and Entra authentication
 
-The sample configures mTLS, platform chain and DNS-name validation, online
-revocation checking, and an additional private-root pin. The root allowlist
-supports overlap during CA rotation. Each silo certificate therefore needs
-both the Server Authentication and Client Authentication EKUs.
+The sample configures mTLS, platform chain and DNS-name validation, and online
+revocation checking. Install only the expected public or private roots in the
+platform trust store and overlap old and new roots there during CA rotation.
+Each silo certificate therefore needs both the Server Authentication and
+Client Authentication EKUs.
 
 :::code language="csharp" source="../../../../../../samples/AuthenticatedSiloConnections/SiloAuthentication.cs" id="AuthenticatedSiloConnections":::
 
-The certificate callback accepts only `SslPolicyErrors.None`, so the configured
-`TargetHost` must match a DNS SAN and the chain must be valid and trusted. It
-then narrows trust to an explicitly configured root. Never replace this policy
-with <xref:Orleans.Connections.Security.TlsOptions.AllowAnyRemoteCertificate*>
-or an unconditional callback. `Required` mode rejects permissive certificate
-validation during startup.
+The configured `TargetHost` must match a DNS SAN and the chain must be valid
+and trusted. Never replace this policy with
+<xref:Orleans.Connections.Security.TlsOptions.AllowAnyRemoteCertificate*> or a
+custom certificate-validation callback. `Required` mode rejects custom
+certificate-validation callbacks during startup.
 
 The example deliberately bounds token bytes, exchange duration, concurrent
 handshakes, and minimum remaining token lifetime. Keep all size, duration,
@@ -104,18 +104,20 @@ snapshotted at startup. Changing it requires a silo restart.
 |---|---|
 | `Disabled` | Advertises only the baseline Orleans protocol and doesn't exchange authentication frames. |
 | `Audit` | Prefers authentication, permits baseline negotiation with an older or disabled peer, and accepts measured authentication failures. |
-| `Required` | Advertises only the authentication protocol and accepts only a successful authenticated result with a principal and finite expiration. |
+| `Required` | Advertises only the authentication protocol and accepts only a successful authenticated result with a principal and, by default, a finite expiration. |
 
 `Required` has no unauthenticated fallback. A `Required` silo and an old or
 disabled silo have no common ALPN protocol, so TLS negotiation fails. A
 `Required` outbound peer also rejects an Audit result which was accepted but
 isn't authenticated.
 
-After peers negotiate the authentication ALPN, framing, token acquisition,
-validation, authorization, acknowledgment, timeout, or provider failures abort
-the connection in every mode. `Audit` can fall back only when TLS negotiated
-the baseline ALPN with a peer which doesn't support authentication; it can't
-reinterpret a failed authentication exchange as baseline Orleans traffic.
+After peers negotiate the authentication ALPN, malformed framing,
+acknowledgment, timeout, or overload failures abort the connection in every
+mode. `Audit` can explicitly accept token acquisition, validation,
+authorization, or provider failures as unauthenticated, but it cannot
+reinterpret them as baseline Orleans traffic. Baseline fallback is permitted
+only when TLS negotiated the baseline ALPN with a peer which doesn't support
+authentication.
 
 ## Plan for token expiration
 
@@ -141,9 +143,10 @@ Define gates and ownership before changing modes:
    provider availability, latency, concurrency saturation, and metadata
    refresh.
 3. Remain in `Audit` until every expected silo pair has negotiated
-   authentication, unexpected fallback and failure rates are zero for at least
-   one configured maximum connection lifetime, and representative canaries
-   have recycled connections at token expiry.
+   authentication. Deliberately reconnect every expected peer pair and verify
+   each new connection authenticates, unexpected fallback and failure rates
+   remain zero, and representative authenticated connections recycle at token
+   expiry.
 4. Restart `Required` canaries. Verify connectivity, membership stability,
    token renewal, and provider health before proceeding through each failure
    domain.
@@ -167,8 +170,8 @@ coordinated, and the maximum accepted exposure window in `Audit`.
 
 ## Monitor authentication
 
-Export the `Microsoft.Orleans` meter. The maintained sample enables an OTLP
-exporter when `OTEL_EXPORTER_OTLP_ENDPOINT` is set:
+Export the `Microsoft.Orleans.Connections.Security` meter. The maintained
+sample enables an OTLP exporter when `OTEL_EXPORTER_OTLP_ENDPOINT` is set:
 
 :::code language="csharp" source="../../../../../../samples/AuthenticatedSiloConnections/Program.cs" id="FixedDiagnostics":::
 
