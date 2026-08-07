@@ -27,7 +27,7 @@ A canonical shopping cart sample application, built using Microsoft Orleans. Thi
 
 ## Features
 
-- [.NET 10](https://docs.microsoft.com/dotnet/core/whats-new/dotnet-10)
+- [.NET 10](https://learn.microsoft.com/dotnet/core/whats-new/dotnet-10/overview)
 - [ASP.NET Core Blazor](https://docs.microsoft.com/aspnet/core/blazor)
 - [Orleans: Grain persistence](https://docs.microsoft.com/dotnet/orleans/grains/grain-persistence)
 - [Azure Storage grain persistence](https://docs.microsoft.com/dotnet/orleans/grains/grain-persistence/azure-storage)
@@ -46,9 +46,9 @@ The app is architected as follows:
 
 ### Prerequisites
 
-- A [GitHub account](https://github.com/join)
+- A [GitHub account](https://docs.github.com/en/get-started/start-your-journey/creating-an-account-on-github)
 - The [.NET 10 SDK or later](https://dotnet.microsoft.com/download/dotnet)
-- The [Azure CLI](/cli/azure/install-azure-cli)
+- The [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli)
 - A .NET integrated development environment (IDE)
   - Feel free to use the [Visual Studio IDE](https://visualstudio.microsoft.com) or the [Visual Studio Code](https://code.visualstudio.com)
 

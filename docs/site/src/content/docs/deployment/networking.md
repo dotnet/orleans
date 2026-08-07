@@ -17,6 +17,8 @@ An Orleans deployment has three distinct network paths:
 
 HTTP ingress isn't an Orleans transport. A web API can share a process with a silo, but its HTTP port and load balancer are separate from the silo and gateway TCP endpoints.
 
+This page owns deployment configuration and operational requirements. For the membership, messaging, directory, and activation components which use these paths, see [Runtime architecture](../implementation/runtime-architecture.md).
+
 ## Listening and advertised endpoints
 
 A **listening endpoint** is the local interface and port on which a process accepts connections. An **advertised endpoint** is the address and port stored in membership so other processes can connect.
@@ -42,8 +44,8 @@ Never advertise loopback, a host name that peers resolve differently, a load bal
 
 All silos and clients in one logical deployment must agree on:
 
-- `ServiceId`: The stable identity of the application. Grain storage providers can use it to separate applications.
-- `ClusterId`: The identity of a particular deployment environment or cluster.
+- <xref:Orleans.Configuration.ClusterOptions.ServiceId>: The stable identity of the application. Grain storage providers can use it to separate applications.
+- <xref:Orleans.Configuration.ClusterOptions.ClusterId>: The identity of a particular deployment environment or cluster.
 - The clustering provider and its provider-specific namespace, database, table, or key prefix.
 
 Don't use a shared production `ClusterId` for staging. During blue-green deployment, use different cluster IDs unless both versions are intentionally compatible members of one cluster.

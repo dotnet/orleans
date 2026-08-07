@@ -83,7 +83,7 @@ public static class StreamConfiguration
         {
             siloBuilder
                 .AddAzureQueueStreams(
-                    "AzureQueue",
+                    TemperatureStreams.ProviderName,
                     streams => streams.ConfigureAzureQueue(
                         optionsBuilder => optionsBuilder.Configure(options =>
                             options.QueueServiceClient =
@@ -107,7 +107,7 @@ public static class StreamConfiguration
         {
             siloBuilder
                 .AddAzureQueueStreams(
-                    "AzureQueue",
+                    TemperatureStreams.ProviderName,
                     streams => streams.ConfigureAzureQueue(
                         optionsBuilder => optionsBuilder.Configure(options =>
                             options.QueueServiceClient =

@@ -45,7 +45,7 @@ Use <xref:Orleans.Runtime.IPersistentState`1> or another supported state model a
 - Handle storage failures explicitly. A failed write means the requested durability wasn't achieved.
 - Keep serialized types version tolerant. Use <xref:Orleans.GenerateSerializerAttribute> and stable <xref:Orleans.IdAttribute> values; don't reuse or renumber existing field IDs.
 - Keep state objects small enough for the provider's item and request limits.
-- Don't use memory storage when state must survive process loss or be shared by multiple silos.
+- Don't use memory storage when state must survive process or silo loss. It distributes records across cluster storage grains but doesn't durably replicate them.
 - Don't rely on a silo's local file system as shared production storage.
 
 Persistence doesn't replicate an activation's in-memory state. Recovery after process failure depends on state having been written to a durable, available provider.

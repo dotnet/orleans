@@ -44,7 +44,7 @@ Replace the generated contents of _Program.cs_. Begin by adding Orleans to the h
 <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*> adds a silo to the .NET host. <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalhostClustering*> configures a single-machine development cluster, and <xref:Orleans.Hosting.MemoryGrainStorageSiloBuilderExtensions.AddMemoryGrainStorage*> registers a storage provider named `urls`.
 
 > [!IMPORTANT]
-> Localhost clustering and memory storage are development settings. Memory storage is lost when the process stops and isn't shared across silos. Production deployments need a shared clustering provider and, when state must survive process loss, a durable storage provider.
+> Localhost clustering and memory storage are development settings. Memory storage is cluster-addressable but non-durable and non-replicated; records are lost when their hosting process stops. Production deployments need a shared clustering provider and, when state must survive process loss, a durable storage provider.
 
 ## Define the grain contract
 

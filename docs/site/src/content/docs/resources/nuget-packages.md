@@ -58,7 +58,7 @@ Every multi-silo production cluster needs a shared membership provider.
 | [Microsoft.Orleans.Persistence.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Redis) | Redis |
 | [Microsoft.Orleans.Persistence.Memory](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Memory) | Process memory for development and testing |
 
-Memory persistence isn't durable and isn't shared across silos. Use it only when losing state with the process is acceptable.
+Memory persistence distributes records across cluster storage grains but isn't durable or replicated. Use it only when losing records with a hosting process is acceptable.
 
 ## Reminders and durable jobs
 
@@ -105,8 +105,8 @@ These packages don't replace the cluster membership provider.
 | Package | Purpose |
 | --- | --- |
 | [Microsoft.Orleans.EventSourcing](https://www.nuget.org/packages/Microsoft.Orleans.EventSourcing) | Event-sourced grain base types and log-consistency abstractions. |
-| [Microsoft.Orleans.Journaling](https://www.nuget.org/packages/Microsoft.Orleans.Journaling) | Durable journaled collections and values. |
-| [Microsoft.Orleans.Journaling.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.AzureStorage) | Azure Blob Storage for Orleans journaling. |
+| [Microsoft.Orleans.Journaling](https://www.nuget.org/packages/Microsoft.Orleans.Journaling) | Experimental durable journaled collections and values (`ORLEANSEXP005`). |
+| [Microsoft.Orleans.Journaling.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.AzureStorage) | Experimental Azure Blob Storage provider for Orleans Journaling. |
 | [Microsoft.Orleans.Transactions](https://www.nuget.org/packages/Microsoft.Orleans.Transactions) | Distributed transaction runtime. |
 | [Microsoft.Orleans.Transactions.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Transactions.AzureStorage) | Azure Storage transaction state. |
 

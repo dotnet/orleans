@@ -81,19 +81,25 @@ conceptualContent:
         - title: Deploy Orleans apps
           links:
               - itemType: concept
-                text: Kubernetes deployment
+                text: Host on Kubernetes
                 url: deployment/kubernetes.md
               - itemType: concept
-                text: Service Fabric deployment
+                text: Production-readiness checklist
+                url: deployment/production-readiness.md
+              - itemType: concept
+                text: Topology, networking, and clustering
+                url: deployment/networking.md
+              - itemType: how-to-guide
+                text: Host on Service Fabric
                 url: deployment/service-fabric.md
-              - itemType: concept
-                text: Azure App Service on Windows
+              - itemType: tutorial
+                text: Deploy to Azure App Service on Windows
                 url: deployment/deploy-to-azure-app-service.md
-              - itemType: concept
-                text: Azure App Service on Linux
+              - itemType: tutorial
+                text: Deploy to Azure App Service on Linux
                 url: deployment/deploy-to-azure-app-service-linux.md
-              - itemType: concept
-                text: Azure Container Apps
+              - itemType: how-to-guide
+                text: Host on Azure Container Apps
                 url: deployment/deploy-to-azure-container-apps.md
         - title: Host Orleans apps
           links:
@@ -106,6 +112,9 @@ conceptualContent:
               - itemType: get-started
                 text: Observability
                 url: host/monitoring/index.md
+              - itemType: how-to-guide
+                text: Signals and alerting
+                url: host/monitoring/signals.md
               - itemType: how-to-guide
                 text: Orleans clients
                 url: host/client.md
@@ -121,23 +130,23 @@ conceptualContent:
         - title: Orleans architecture
           links:
               - itemType: architecture
-                text: Implementation details overview
+                text: Runtime architecture overview
                 url: implementation/index.md
               - itemType: architecture
-                text: Load balancing
-                url: implementation/load-balancing.md
+                text: Runtime architecture
+                url: implementation/runtime-architecture.md
               - itemType: architecture
-                text: Orleans lifecycles
-                url: implementation/orleans-lifecycle.md
+                text: Activation lifecycle and migration
+                url: implementation/activation-lifecycle.md
               - itemType: architecture
-                text: Cluster management
+                text: Cluster membership
                 url: implementation/cluster-management.md
               - itemType: architecture
-                text: Message delivery guarantees
-                url: implementation/messaging-delivery-guarantees.md
+                text: Serialization and code generation
+                url: implementation/serialization.md
               - itemType: architecture
-                text: Streaming queues
-                url: implementation/streams-implementation/index.md
+                text: Provider authoring
+                url: implementation/provider-authoring.md
         - title: Video content
           links:
             - itemType: video

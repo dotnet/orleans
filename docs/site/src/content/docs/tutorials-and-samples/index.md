@@ -63,10 +63,12 @@ The [`samples` directory](https://github.com/dotnet/orleans/tree/main/samples) i
 | Sample | Demonstrates |
 | --- | --- |
 | [Bank Account](https://github.com/dotnet/orleans/tree/main/samples/BankAccount) | ACID transactions across stateful grains. |
-| [Journaled Todo List](https://github.com/dotnet/orleans/tree/main/samples/JournaledTodoList) | Aspire and durable journaled grain state. |
-| [Journaling with Azure Blob JSON](https://github.com/dotnet/orleans/tree/main/samples/JournalingAzureBlobJson) | JSON journaling with Azure Blob Storage. |
+| [Journaled Todo List](https://github.com/dotnet/orleans/tree/main/samples/JournaledTodoList) | Experimental Journaling APIs, Aspire, and durable journaled grain state. |
+| [Journaling with Azure Blob JSON](https://github.com/dotnet/orleans/tree/main/samples/JournalingAzureBlobJson) | Experimental Journaling APIs with Azure Blob Storage. |
 | [Chat Room](https://github.com/dotnet/orleans/tree/main/samples/ChatRoom) | A terminal chat application using Orleans Streams. |
 | [Stocks](https://github.com/dotnet/orleans/tree/main/samples/Stocks) | Grain timers, HTTP calls, and temporary caching. |
+
+The Journaling samples use the experimental `Microsoft.Orleans.Journaling` package. They are separate from the supported [Orleans Event Sourcing](../grains/event-sourcing/index.md) model.
 
 ### Deployment and operations
 

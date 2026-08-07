@@ -2,10 +2,11 @@ import { access, mkdir, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import legacyPaths from '../src/data/legacy-pages.json' with { type: 'json' };
+import redirects from '../src/data/redirects.json' with { type: 'json' };
+import { compatibilityOutputPath, deploymentBase } from './lib/compatibility-paths.mjs';
 
 const siteRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const distRoot = path.join(siteRoot, 'dist');
-const deploymentBase = '/orleans';
 
 async function walk(directory) {
   const files = [];
@@ -71,22 +72,39 @@ const conceptualRoutes = [...currentRoutes].filter(
 
 let written = 0;
 let preserved = 0;
-for (const legacyPath of legacyPaths) {
+for (const [source, target] of Object.entries(redirects)) {
+  if (!source.startsWith(`${deploymentBase}/`) || source.includes('..')) {
+    throw new Error(`Unsafe redirect source '${source}'.`);
+  }
+  if (!currentRoutes.has(target)) {
+    throw new Error(`Redirect target '${target}' for '${source}' is not a current route.`);
+  }
+}
+
+for (const legacyPath of new Set([...legacyPaths, ...Object.keys(redirects)])) {
   if (!legacyPath.startsWith(`${deploymentBase}/`) || legacyPath.includes('..')) {
     throw new Error(`Unsafe legacy Pages path '${legacyPath}'.`);
   }
 
-  const relative = decodeURIComponent(legacyPath.slice(`${deploymentBase}/`.length));
-  const outputPath = path.join(distRoot, relative);
+  const outputPath = compatibilityOutputPath(legacyPath, distRoot);
+  let exists = true;
   try {
     await access(outputPath);
+  } catch (error) {
+    if (error?.code !== 'ENOENT') {
+      throw error;
+    }
+    exists = false;
+  }
+  if (exists && Object.hasOwn(redirects, legacyPath)) {
+    throw new Error(`Explicit redirect source '${legacyPath}' is still served by a current page.`);
+  }
+  if (exists) {
     preserved += 1;
     continue;
-  } catch {
-    // Generate a compatibility page when the new site does not already own this exact path.
   }
 
-  const target = targetFor(legacyPath, currentRoutes, conceptualRoutes);
+  const target = redirects[legacyPath] ?? targetFor(legacyPath, currentRoutes, conceptualRoutes);
   const document = `<!doctype html>
 <html lang="en">
   <head>

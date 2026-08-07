@@ -5,22 +5,17 @@ import {
   collectIncludeTargets,
   collectUidMap,
   convertDocfxMarkdown,
+  isSnippetSupportMarkdown,
 } from './lib/docfx.mjs';
 import { prepareGallery } from './lib/gallery.mjs';
 
 const siteRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repositoryRoot = path.resolve(siteRoot, '..', '..');
 const sourceRoot = path.join(siteRoot, 'src', 'content', 'docs');
+const contentRoot = path.dirname(sourceRoot);
+const includeRoot = path.dirname(contentRoot);
 const generatedRoot = path.join(siteRoot, '.generated');
 const imageExtensions = new Set(['.gif', '.jpeg', '.jpg', '.png', '.svg', '.webp']);
-
-function isSnippetSupportMarkdown(relativePath) {
-  const segments = relativePath.split(path.sep);
-  return (
-    path.basename(relativePath).toLowerCase() === 'readme.md' &&
-    segments.some((segment) => /^snippets(?:-v3)?$/i.test(segment))
-  );
-}
 
 async function walk(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -45,7 +40,10 @@ await Promise.all(
     .map((file) => rm(file, { force: true })),
 );
 const markdownFiles = sourceFiles.filter((file) => path.extname(file).toLowerCase() === '.md');
-const includeTargets = await collectIncludeTargets(markdownFiles);
+const includeRoots = markdownFiles.filter(
+  (file) => !isSnippetSupportMarkdown(path.relative(sourceRoot, file)),
+);
+const includeTargets = await collectIncludeTargets(includeRoots, includeRoot);
 const uidMap = await collectUidMap(markdownFiles, sourceRoot);
 let pages = 0;
 let assets = 0;
@@ -65,6 +63,7 @@ for (const sourcePath of sourceFiles) {
       source: await readFile(sourcePath, 'utf8'),
       sourcePath,
       sourceRoot,
+      includeRoot,
       uidMap,
       editUrl: `https://github.com/dotnet/orleans/edit/main/${path.relative(repositoryRoot, sourcePath).replaceAll('\\', '/')}`,
     });

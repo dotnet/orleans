@@ -10,7 +10,7 @@ ms.topic: how-to
 The `Microsoft.Orleans.Persistence.Memory` package stores grain state inside the Orleans cluster. Use it for tests, samples, and disposable local development environments.
 
 > [!WARNING]
-> Memory grain storage isn't a production durability mechanism. State doesn't survive loss or restart of the cluster.
+> Memory grain storage isn't a production durability mechanism. Records are distributed among cluster storage grains but aren't replicated. Losing or restarting a hosting silo loses records assigned to its storage partitions, and restarting the cluster loses all records.
 
 ## Configure a named provider
 

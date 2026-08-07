@@ -10,22 +10,10 @@ import { remarkVersionZones } from './src/plugins/remark-version-zones.mjs';
 const sidebar = await createSidebar(new URL('./src/content/docs/toc.yml', import.meta.url));
 const buildConcurrency = Number(process.env.ORLEANS_DOCS_BUILD_CONCURRENCY) || 4;
 sidebar.unshift({ label: 'Documentation', link: '/docs/' });
-sidebar.push({
-  label: 'Reference',
-  items: [
-    { label: 'Samples', link: '/samples/' },
-    { label: 'C# API reference', link: '/docs/api/csharp/' },
-  ],
-});
 
 export default defineConfig({
   site: 'https://dotnet.github.io/orleans/',
   base: '/orleans/',
-  redirects: {
-    '/docs/deployment/consul-deployment': '/orleans/docs/host/configuration-guide/clustering/consul/',
-    '/docs/tutorials-and-samples/overview-helloworld': '/orleans/docs/tutorials-and-samples/hello-world/',
-    '/docs/tutorials-and-samples/tutorial-1': '/orleans/docs/tutorials-and-samples/hello-world/',
-  },
   integrations: [
     starlight({
       title: 'Microsoft Orleans',

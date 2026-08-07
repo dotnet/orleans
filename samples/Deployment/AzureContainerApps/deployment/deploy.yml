@@ -8,6 +8,7 @@ on:
     paths:
       - .github/workflows/deploy-orleans-container-apps.yml
       - Directory.Build.props
+      - Directory.Build.targets
       - Directory.Packages.props
       - global.json
       - samples/Deployment/AzureContainerApps/**

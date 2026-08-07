@@ -60,6 +60,56 @@ async function pathExists(filePath) {
   }
 }
 
+function isWithinRoot(rootPath, targetPath) {
+  const relative = path.relative(rootPath, targetPath);
+  return (
+    relative.length === 0 ||
+    (!relative.startsWith(`..${path.sep}`) &&
+      relative !== '..' &&
+      !path.isAbsolute(relative))
+  );
+}
+
+async function resolveIncludePath(sourcePath, reference, includeRoot) {
+  if (
+    reference.length === 0 ||
+    reference.includes('\0') ||
+    reference.includes('\\') ||
+    reference.split('/').some((segment) => segment.includes(':')) ||
+    path.isAbsolute(reference) ||
+    path.posix.isAbsolute(reference) ||
+    path.win32.isAbsolute(reference) ||
+    /^[a-z][a-z\d+.-]*:/i.test(reference)
+  ) {
+    throw new Error(`Unsafe INCLUDE path '${reference}' in ${sourcePath}.`);
+  }
+
+  const resolvedRoot = await realpath(includeRoot);
+  const candidate = path.resolve(path.dirname(sourcePath), reference);
+  if (!isWithinRoot(resolvedRoot, candidate)) {
+    throw new Error(`INCLUDE '${reference}' in ${sourcePath} resolves outside ${resolvedRoot}.`);
+  }
+
+  let target;
+  try {
+    target = await realpath(candidate);
+  } catch {
+    throw new Error(`INCLUDE '${reference}' in ${sourcePath} does not exist (${candidate}).`);
+  }
+  if (!isWithinRoot(resolvedRoot, target)) {
+    throw new Error(`INCLUDE '${reference}' in ${sourcePath} resolves outside ${resolvedRoot}.`);
+  }
+  return target;
+}
+
+export function isSnippetSupportMarkdown(relativePath) {
+  const segments = relativePath.split(/[\\/]/);
+  return (
+    path.basename(relativePath).toLowerCase() === 'readme.md' &&
+    segments.some((segment) => /^snippets(?:-v3)?$/i.test(segment))
+  );
+}
+
 function rebaseReference(reference, fromFile, toFile) {
   if (
     reference.length === 0 ||
@@ -210,7 +260,7 @@ export function parseDirectiveAttributes(value, context) {
   return attributes;
 }
 
-async function expandIncludesInternal(source, sourcePath, stack) {
+async function expandIncludesInternal(source, sourcePath, stack, includeRoot) {
   const lines = source.replaceAll('\r\n', '\n').split('\n');
   const output = [];
 
@@ -225,10 +275,7 @@ async function expandIncludesInternal(source, sourcePath, stack) {
     }
 
     const [, indent, label, relativePath] = match;
-    const includePath = path.resolve(path.dirname(sourcePath), relativePath);
-    if (!(await pathExists(includePath))) {
-      throw new Error(`INCLUDE '${relativePath}' in ${sourcePath} does not exist (${includePath}).`);
-    }
+    const includePath = await resolveIncludePath(sourcePath, relativePath, includeRoot);
     if (stack.includes(includePath)) {
       throw new Error(`Circular INCLUDE detected: ${[...stack, includePath].join(' -> ')}`);
     }
@@ -236,7 +283,7 @@ async function expandIncludesInternal(source, sourcePath, stack) {
     const includeSource = await readFile(includePath, 'utf8');
     const { body } = splitFrontmatter(includeSource);
     const expanded = rebaseIncludedReferences(
-      await expandIncludesInternal(body, includePath, [...stack, includePath]),
+      await expandIncludesInternal(body, includePath, [...stack, includePath], includeRoot),
       includePath,
       sourcePath,
     );
@@ -254,16 +301,36 @@ async function expandIncludesInternal(source, sourcePath, stack) {
   return output.join('\n');
 }
 
-export async function expandIncludes(source, sourcePath) {
-  return expandIncludesInternal(source, path.resolve(sourcePath), [path.resolve(sourcePath)]);
+export async function expandIncludes(source, sourcePath, includeRoot = path.dirname(sourcePath)) {
+  const resolvedRoot = await realpath(includeRoot);
+  let resolvedSource;
+  try {
+    resolvedSource = await realpath(sourcePath);
+  } catch {
+    resolvedSource = path.resolve(sourcePath);
+  }
+  if (!isWithinRoot(resolvedRoot, resolvedSource)) {
+    throw new Error(`Documentation source '${resolvedSource}' is outside ${resolvedRoot}.`);
+  }
+  return expandIncludesInternal(source, resolvedSource, [resolvedSource], includeRoot);
 }
 
-export async function collectIncludeTargets(markdownFiles) {
+export async function collectIncludeTargets(
+  markdownFiles,
+  includeRoot = path.dirname(markdownFiles[0] ?? '.'),
+) {
   const targets = new Set();
   const visited = new Set();
+  const resolvedRoot = await realpath(includeRoot);
 
-  async function collect(filePath) {
-    const resolvedPath = path.resolve(filePath);
+  async function collect(filePath, stack = []) {
+    const resolvedPath = await realpath(filePath);
+    if (!isWithinRoot(resolvedRoot, resolvedPath)) {
+      throw new Error(`Documentation source '${resolvedPath}' is outside ${resolvedRoot}.`);
+    }
+    if (stack.includes(resolvedPath)) {
+      throw new Error(`Circular INCLUDE detected: ${[...stack, resolvedPath].join(' -> ')}`);
+    }
     if (visited.has(resolvedPath)) {
       return;
     }
@@ -280,12 +347,9 @@ export async function collectIncludeTargets(markdownFiles) {
         continue;
       }
 
-      const target = path.resolve(path.dirname(resolvedPath), match[1]);
-      if (!(await pathExists(target))) {
-        throw new Error(`INCLUDE '${match[1]}' in ${resolvedPath} does not exist (${target}).`);
-      }
+      const target = await resolveIncludePath(resolvedPath, match[1], resolvedRoot);
       targets.add(target);
-      await collect(target);
+      await collect(target, [...stack, resolvedPath]);
     }
   }
 
@@ -1098,12 +1162,13 @@ export async function convertDocfxMarkdown({
   source,
   sourcePath,
   sourceRoot = path.dirname(sourcePath),
+  includeRoot = path.dirname(sourceRoot),
   uidMap = new Map(),
   editUrl,
 }) {
   const { metadata, body: originalBody } = splitFrontmatter(source);
   const metadataTitle = typeof metadata.title === 'string' ? metadata.title : inferTitle(sourcePath);
-  let body = await expandIncludes(originalBody, sourcePath);
+  let body = await expandIncludes(originalBody, sourcePath, includeRoot);
   body = await convertCodeDirectives(body, sourcePath);
   body = await convertImages(body, sourcePath);
   body = convertLearnBlocks(body, sourcePath);
@@ -1159,7 +1224,7 @@ export async function collectUidMap(markdownFiles, sourceRoot) {
 }
 
 function sidebarLink(href) {
-  if (/^https?:\/\//.test(href)) {
+  if (/^https?:\/\//.test(href) || href.startsWith('/')) {
     return href;
   }
   let target = href.replaceAll('\\', '/').replace(/\.(?:md|yml)$/i, '');
@@ -1184,7 +1249,7 @@ async function sidebarItem(item, rootDirectory) {
   if (typeof item.href !== 'string') {
     throw new Error(`toc.yml item '${item.name}' has neither items nor href.`);
   }
-  if (!/^https?:\/\//.test(item.href)) {
+  if (!/^https?:\/\//.test(item.href) && !item.href.startsWith('/')) {
     const target = path.resolve(rootDirectory, item.href);
     if (!(await pathExists(target))) {
       throw new Error(`toc.yml target '${item.href}' for '${item.name}' does not exist.`);

@@ -289,23 +289,15 @@ Optionally, you can verify that the cluster and state data is stored as expected
 
 ## Scale the app
 
-Orleans is designed for distributed applications. Even an app as simple as the URL shortener can benefit from the scalability of Orleans. You can scale and test your app across multiple instances using the following steps:
+Don't increase the replica count of the single silo Container App created by this
+quickstart. Orleans requires every silo to advertise a unique, directly reachable
+endpoint pair, while Azure Container Apps doesn't provide stable per-replica
+addresses for one app.
 
-1. Navigate back to the resource group that was deployed in this quickstart.
-
-1. Navigate to the overview page of the Azure Container Apps app.
-
-1. Within the navigation, select **Scale**.
-
-1. Select **Edit and deploy**, and then switch to the **Scale** tab.
-
-1. Use the slider control to set the min and max replica values to 4. This value ensures the app is running on multiple instances.
-
-1. Select **Create** to deploy the new revision.
-
-   :::image type="content" source="media/deploy-scale-orleans-on-azure/scale-containers.png" alt-text="A screenshot showing how to scale the Azure Container Apps app.":::
-
-1. After the deployment is finished, repeat the testing steps from the previous section. The app continues to work as expected across several instances and can now handle a higher number of requests.
+To scale this topology, deploy additional one-replica silo apps with distinct
+advertised endpoints. See [Deploy Orleans to Azure Container
+Apps](../deployment/deploy-to-azure-container-apps.md) for the supported topology,
+networking requirements, and upgrade procedure.
 
 ## Related content
 

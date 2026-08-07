@@ -12,8 +12,8 @@ Complete this checklist for each production environment. Record owners, expected
 ## Identity and compatibility
 
 - [ ] Every silo and client uses the intended Orleans package versions.
-- [ ] `ClusterOptions.ServiceId` is stable for the lifetime of the application and isn't reused by an unrelated application.
-- [ ] `ClusterOptions.ClusterId` identifies this deployment environment. Production, staging, and blue/green clusters use distinct values unless they are intentionally joining the same cluster.
+- [ ] <xref:Orleans.Configuration.ClusterOptions.ServiceId> is stable for the lifetime of the application and isn't reused by an unrelated application.
+- [ ] <xref:Orleans.Configuration.ClusterOptions.ClusterId> identifies this deployment environment. Production, staging, and blue/green clusters use distinct values unless they are intentionally joining the same cluster.
 - [ ] Grain interface, serializer, and persisted-state changes are compatible with the selected [upgrade strategy](upgrades.md).
 
 ## Networking and discovery

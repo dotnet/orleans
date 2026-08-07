@@ -150,6 +150,6 @@ static void ConfigureProductionOrleans(WebApplicationBuilder builder)
 }
 
 static string GetRequiredSetting(WebApplicationBuilder builder, string name) =>
-    builder.Configuration[name] is { Length: > 0 } value
+    builder.Configuration[name] is { } value && !string.IsNullOrWhiteSpace(value)
         ? value
         : throw new InvalidOperationException($"The required setting '{name}' isn't configured.");

@@ -1,6 +1,6 @@
 # Orleans shopping cart on Azure App Service
 
-This sample deploys a multi-instance Orleans shopping cart to either Windows or Linux Azure App Service. It demonstrates:
+This sample deploys a multi-instance Orleans shopping cart to either Windows or Linux [Azure App Service](https://learn.microsoft.com/azure/app-service/overview). It demonstrates:
 
 - Three App Service workers running a cohosted ASP.NET Core app and Orleans silo.
 - Per-instance Orleans endpoints discovered from `WEBSITE_PRIVATE_IP` and `WEBSITE_PRIVATE_PORTS`.
@@ -43,7 +43,7 @@ The storefront remains available locally, but product management is unavailable 
 
 ## Configure Microsoft Entra authentication
 
-Create a Microsoft Entra app registration for App Service Authentication:
+Create a Microsoft Entra app registration for [App Service Authentication](https://learn.microsoft.com/azure/app-service/overview-authentication-authorization):
 
 1. Add an app role with value `ProductAdministrator` and allow users or groups.
 1. Create a client secret and record its value.
@@ -148,9 +148,11 @@ Managed identity role assignments can take several minutes to propagate after th
 
 ## Configure GitHub Actions
 
+Complete the [manual infrastructure deployment](#deploy-manually) once with its default `assignStorageRoles=true` before using the routine workflow. The checked-in workflow deliberately passes `assignStorageRoles=false` so its OIDC identity doesn't need permission to create role assignments; it isn't a bootstrap workflow.
+
 Copy [`infra/deploy.yml`](infra/deploy.yml) to `.github/workflows/deploy-app-service.yml`.
 
-Configure GitHub OIDC federation for the `production` environment and add these environment variables:
+Configure [GitHub OIDC federation for Azure](https://learn.microsoft.com/azure/developer/github/connect-from-azure-openid-connect) for the `production` environment and add these environment variables:
 
 | Variable | Value |
 | --- | --- |
@@ -196,8 +198,8 @@ Don't change an existing App Service plan between Windows and Linux. Deploy a se
 
 For complete platform guidance, see:
 
-- [Deploy Orleans to Azure App Service on Windows](https://aka.ms/orleans-on-app-service)
-- [Deploy Orleans to Azure App Service on Linux](https://learn.microsoft.com/dotnet/orleans/deployment/deploy-to-azure-app-service-linux)
+- [Deploy Orleans to Azure App Service on Windows](https://dotnet.github.io/orleans/docs/deployment/deploy-to-azure-app-service/)
+- [Deploy Orleans to Azure App Service on Linux](https://dotnet.github.io/orleans/docs/deployment/deploy-to-azure-app-service-linux/)
 
 ## Application model
 
