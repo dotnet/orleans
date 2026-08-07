@@ -7,25 +7,23 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Connections.Features;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans.Connections.Security
 {
-    internal partial class TlsServerConnectionMiddleware
+    internal partial class TlsServerConnectionMiddleware : IConnectionMiddleware
     {
-        private readonly ConnectionDelegate _next;
         private readonly TlsOptions _options;
         private readonly ILogger? _logger;
         private readonly X509Certificate2? _certificate;
         private readonly Func<ConnectionContext, string?, X509Certificate2>? _certificateSelector;
 
-        public TlsServerConnectionMiddleware(ConnectionDelegate next, TlsOptions options, ILoggerFactory? loggerFactory)
+        public TlsServerConnectionMiddleware(TlsOptions options, ILoggerFactory? loggerFactory)
         {
             if (options == null)
             {
                 throw new ArgumentNullException(nameof(options));
             }
-
-            _next = next;
 
             // capture the certificate now so it can't be switched after validation
             _certificate = options.LocalCertificate;
@@ -50,12 +48,12 @@ namespace Orleans.Connections.Security
             _logger = loggerFactory?.CreateLogger<TlsServerConnectionMiddleware>();
         }
 
-        public Task OnConnectionAsync(ConnectionContext context)
+        public Task OnConnectionAsync(ConnectionContext context, ConnectionDelegate next)
         {
-            return InnerOnConnectionAsync(context);
+            return InnerOnConnectionAsync(context, next);
         }
 
-        private async Task InnerOnConnectionAsync(ConnectionContext context)
+        private async Task InnerOnConnectionAsync(ConnectionContext context, ConnectionDelegate next)
         {
             bool certificateRequired;
             var feature = new TlsConnectionFeature();
@@ -222,7 +220,7 @@ namespace Orleans.Connections.Security
                 await using (sslStream)
                 await using (tlsDuplexPipe)
                 {
-                    await _next(context);
+                    await next(context);
                     // Dispose the inner stream (TlsDuplexPipe) before disposing the SslStream
                     // as the duplex pipe can hit an ODE as it still may be writing.
                 }

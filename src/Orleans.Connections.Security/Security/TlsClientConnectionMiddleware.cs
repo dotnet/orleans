@@ -8,25 +8,23 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Connections.Features;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans.Connections.Security
 {
-    internal partial class TlsClientConnectionMiddleware
+    internal partial class TlsClientConnectionMiddleware : IConnectionMiddleware
     {
-        private readonly ConnectionDelegate _next;
         private readonly TlsOptions _options;
         private readonly ILogger? _logger;
         private readonly X509Certificate2? _certificate;
         private readonly Func<object, string, X509CertificateCollection, X509Certificate?, string[], X509Certificate2?>? _certificateSelector;
 
-        public TlsClientConnectionMiddleware(ConnectionDelegate next, TlsOptions options, ILoggerFactory? loggerFactory)
+        public TlsClientConnectionMiddleware(TlsOptions options, ILoggerFactory? loggerFactory)
         {
             if (options == null)
             {
                 throw new ArgumentNullException(nameof(options));
             }
-
-            _next = next;
 
             // capture the certificate now so it can't be switched after validation
             _certificate = ValidateCertificate(options.LocalCertificate, options.ClientCertificateMode);
@@ -37,12 +35,12 @@ namespace Orleans.Connections.Security
             _logger = loggerFactory?.CreateLogger<TlsClientConnectionMiddleware>();
         }
 
-        public Task OnConnectionAsync(ConnectionContext context)
+        public Task OnConnectionAsync(ConnectionContext context, ConnectionDelegate next)
         {
-            return InnerOnConnectionAsync(context);
+            return InnerOnConnectionAsync(context, next);
         }
 
-        private async Task InnerOnConnectionAsync(ConnectionContext context)
+        private async Task InnerOnConnectionAsync(ConnectionContext context, ConnectionDelegate next)
         {
             var feature = new TlsConnectionFeature();
             context.Features.Set<ITlsConnectionFeature>(feature);
@@ -195,7 +193,7 @@ namespace Orleans.Connections.Security
                 await using (sslStream)
                 await using (tlsDuplexPipe)
                 {
-                    await _next(context);
+                    await next(context);
                     // Dispose the inner stream (tlsDuplexPipe) before disposing the SslStream
                     // as the duplex pipe can hit an ODE as it still may be writing.
                 }
