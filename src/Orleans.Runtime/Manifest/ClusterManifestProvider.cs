@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -10,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Core.Diagnostics;
 using Orleans.Internal;
 using Orleans.Metadata;
+using Orleans.Runtime.Dissemination;
 using Orleans.Runtime.Utilities;
 
 namespace Orleans.Runtime.Metadata
@@ -28,9 +30,11 @@ namespace Orleans.Runtime.Metadata
 #else
         private readonly object _currentLock = new();
 #endif
+        private readonly object _publishLock = new();
         private ClusterManifest _current;
         private IInternalGrainFactory? _grainFactory;
         private Task? _runTask;
+        private readonly ConcurrentDictionary<ManifestHash, GrainManifest> _manifestCache = new();
 
         public ClusterManifestProvider(
             ILocalSiloDetails localSiloDetails,
@@ -46,6 +50,7 @@ namespace Orleans.Runtime.Metadata
             _clusterMembershipService = clusterMembershipService;
             _fatalErrorHandler = fatalErrorHandler;
             LocalGrainManifest = siloManifestProvider.SiloManifest;
+            _manifestCache[ManifestHashCalculator.ComputeHash(LocalGrainManifest)] = LocalGrainManifest;
             _current = CreateClusterManifest(
                 MajorMinorVersion.MinValue,
                 ImmutableDictionary<SiloAddress, GrainManifest>.Empty);
@@ -60,6 +65,10 @@ namespace Orleans.Runtime.Metadata
         public IAsyncEnumerable<ClusterManifest> Updates => _updates;
 
         public GrainManifest LocalGrainManifest { get; }
+
+        internal int ManifestCacheCount => _manifestCache.Count;
+
+        internal bool IsManifestCached(ManifestHash hash) => _manifestCache.ContainsKey(hash);
 
         private ClusterManifest EnsureValidManifestForCurrentMembership(ClusterMembershipSnapshot clusterMembership)
         {
@@ -166,7 +175,7 @@ namespace Orleans.Runtime.Metadata
             var modified = false;
 
             // Fill missing entries.
-            var tasks = new List<Task<(SiloAddress Key, GrainManifest? Value, Exception? Exception)>>();
+            var missingSilos = new List<SiloAddress>();
             foreach (var entry in clusterMembership.Members)
             {
                 var member = entry.Value;
@@ -183,16 +192,28 @@ namespace Orleans.Runtime.Metadata
                     continue;
                 }
 
-                tasks.Add(GetManifest(siloAddress));
+                missingSilos.Add(siloAddress);
+            }
+
+            if (missingSilos.Count > 1 && await TryFillMissingManifestsFromPeers(clusterMembership, existingManifest.Version, builder, missingSilos))
+            {
+                modified = true;
+            }
+
+            var tasks = new List<Task<(SiloAddress Key, GrainManifest? Value, Exception? Exception)>>();
+            foreach (var siloAddress in missingSilos)
+            {
+                if (!builder.ContainsKey(siloAddress))
+                {
+                    tasks.Add(GetManifest(siloAddress));
+                }
             }
 
             async Task<(SiloAddress Key, GrainManifest? Value, Exception? Exception)> GetManifest(SiloAddress siloAddress)
             {
                 try
                 {
-                    // Get the manifest from the silo.
-                    var remoteManifestProvider = _grainFactory!.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, siloAddress);
-                    var manifest = await remoteManifestProvider.GetSiloManifest().AsTask().WaitAsync(_shutdownCts.Token);
+                    var manifest = await GetSiloManifest(siloAddress);
                     return (siloAddress, manifest, null);
                 }
                 catch (Exception exception)
@@ -236,8 +257,87 @@ namespace Orleans.Runtime.Metadata
                 var publishSuccess = TryPublishManifest(manifest);
                 return publishSuccess && fetchSuccess;
             }
-
             return fetchSuccess;
+        }
+
+        private async Task<bool> TryFillMissingManifestsFromPeers(
+            ClusterMembershipSnapshot clusterMembership,
+            MajorMinorVersion previousVersion,
+            ImmutableDictionary<SiloAddress, GrainManifest>.Builder builder,
+            List<SiloAddress> missingSilos)
+        {
+            var missing = new HashSet<SiloAddress>(missingSilos);
+            var modified = false;
+            foreach (var peer in clusterMembership.Members.Values
+                .Where(static member => member.Status == SiloStatus.Active)
+                .Select(static member => member.SiloAddress)
+                .OrderBy(static silo => silo))
+            {
+                if (missing.Count == 0)
+                {
+                    break;
+                }
+
+                if (peer == _localSiloAddress)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var remoteManifestProvider = _grainFactory!.GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, peer);
+                    var summary = await remoteManifestProvider.GetClusterManifestHashSummary().AsTask().WaitAsync(_shutdownCts.Token);
+                    FillFromCachedHashes(summary, missing, builder, ref modified);
+                    if (missing.Count == 0)
+                    {
+                        break;
+                    }
+
+                    var update = await remoteManifestProvider.GetClusterManifestUpdate(previousVersion).AsTask().WaitAsync(_shutdownCts.Token);
+                    if (update?.SiloManifests is null)
+                    {
+                        continue;
+                    }
+
+                    foreach (var silo in missing.ToArray())
+                    {
+                        if (!summary.SiloManifestHashes.TryGetValue(silo, out var expectedHash)
+                            || !update.SiloManifests.TryGetValue(silo, out var manifest)
+                            || ManifestHashCalculator.ComputeHash(manifest) != expectedHash)
+                        {
+                            continue;
+                        }
+
+                        builder[silo] = manifest;
+                        missing.Remove(silo);
+                        modified = true;
+                    }
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    LogDebugErrorRetrievingClusterManifestFromPeer(exception, peer);
+                }
+            }
+
+            return modified;
+        }
+
+        private void FillFromCachedHashes(
+            ClusterManifestHashSummary summary,
+            HashSet<SiloAddress> missing,
+            ImmutableDictionary<SiloAddress, GrainManifest>.Builder builder,
+            ref bool modified)
+        {
+            foreach (var silo in missing.ToArray())
+            {
+                if (summary.SiloManifestHashes.TryGetValue(silo, out var hash)
+                    && _manifestCache.TryGetValue(hash, out var cached))
+                {
+                    builder[silo] = cached;
+                    missing.Remove(silo);
+                    modified = true;
+                }
+            }
         }
 
         private ClusterManifest CreateClusterManifest(
@@ -249,13 +349,44 @@ namespace Orleans.Runtime.Metadata
 
         private bool TryPublishManifest(ClusterManifest manifest)
         {
-            var publishSuccess = _updates.TryPublish(manifest);
+            bool publishSuccess;
+            lock (_publishLock)
+            {
+                publishSuccess = _updates.TryPublish(manifest);
+                if (publishSuccess)
+                {
+                    SynchronizeManifestCache(manifest);
+                }
+            }
+
             if (publishSuccess)
             {
                 ManifestEvents.EmitClusterManifestUpdated(this, manifest);
             }
 
             return publishSuccess;
+        }
+
+        private void SynchronizeManifestCache(ClusterManifest manifest)
+        {
+            var retainedHashes = new HashSet<ManifestHash>
+            {
+                ManifestHashCalculator.ComputeHash(LocalGrainManifest),
+            };
+            foreach (var siloManifest in manifest.Silos.Values)
+            {
+                var hash = ManifestHashCalculator.ComputeHash(siloManifest);
+                retainedHashes.Add(hash);
+                _manifestCache[hash] = siloManifest;
+            }
+
+            foreach (var hash in _manifestCache.Keys)
+            {
+                if (!retainedHashes.Contains(hash))
+                {
+                    _manifestCache.TryRemove(hash, out _);
+                }
+            }
         }
 
         private static ImmutableDictionary<SiloAddress, GrainManifest> RemoveNonActiveSilos(
@@ -275,6 +406,31 @@ namespace Orleans.Runtime.Metadata
             }
 
             return builder?.ToImmutable() ?? silos;
+        }
+
+        private async Task<GrainManifest> GetSiloManifest(SiloAddress siloAddress)
+        {
+            try
+            {
+                var remoteManifestProvider = _grainFactory!.GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, siloAddress);
+                var hash = await remoteManifestProvider.GetSiloManifestHash().AsTask().WaitAsync(_shutdownCts.Token);
+                if (_manifestCache.TryGetValue(hash, out var cached))
+                {
+                    return cached;
+                }
+
+                var manifest = await remoteManifestProvider.GetSiloManifestByHash(hash).AsTask().WaitAsync(_shutdownCts.Token);
+                if (manifest is not null && ManifestHashCalculator.ComputeHash(manifest) == hash)
+                {
+                    return manifest;
+                }
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                LogDebugErrorRetrievingSiloManifestByHash(exception, siloAddress);
+            }
+            var legacyManifestProvider = _grainFactory!.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, siloAddress);
+            return await legacyManifestProvider.GetSiloManifest().AsTask().WaitAsync(_shutdownCts.Token);
         }
 
         [MemberNotNull(nameof(_runTask))]
@@ -338,6 +494,18 @@ namespace Orleans.Runtime.Metadata
             Message = "Error retrieving silo manifest for silo {SiloAddress}"
         )]
         private partial void LogWarningErrorRetrievingSiloManifest(Exception exception, SiloAddress siloAddress);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Error retrieving silo manifest by hash for silo {SiloAddress}. Falling back to direct manifest fetch."
+        )]
+        private partial void LogDebugErrorRetrievingSiloManifestByHash(Exception exception, SiloAddress siloAddress);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Error retrieving cluster manifest from peer {SiloAddress}. Falling back to direct manifest fetch."
+        )]
+        private partial void LogDebugErrorRetrievingClusterManifestFromPeer(Exception exception, SiloAddress siloAddress);
 
         [LoggerMessage(
             Level = LogLevel.Debug,

@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="CsCheck" />
+    <PackageReference Include="Microsoft.Accordant" Condition="'$(TargetFramework)' == 'net10.0'" PrivateAssets="all" />
     <PackageReference Include="Azure.Identity" />
   </ItemGroup>
 
