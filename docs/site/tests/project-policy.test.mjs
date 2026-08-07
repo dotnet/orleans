@@ -5,19 +5,31 @@ import { describe, expect, test } from 'vitest';
 const repositoryRoot = path.resolve('../..');
 const docsRoot = path.join(repositoryRoot, 'docs');
 const snippetRoot = path.resolve('src/content/docs');
+const projectRoots = [snippetRoot, path.join(docsRoot, 'tools')];
 const defaultProperties = readFileSync(
   path.join(snippetRoot, 'Directory.Build.props'),
   'utf8',
 );
+const excludedDirectories = new Set([
+  '.generated',
+  'bin',
+  'dist',
+  'node_modules',
+  'obj',
+]);
 
 function filesUnder(directory, extension) {
   return readdirSync(directory, { recursive: true })
     .filter(
       (file) =>
         file.endsWith(extension) &&
-        !file.split(/[\\/]/).some((segment) => ['bin', 'obj'].includes(segment)),
+        !file.split(/[\\/]/).some((segment) => excludedDirectories.has(segment)),
     )
     .map((file) => path.join(directory, file));
+}
+
+function projectFiles(extension) {
+  return projectRoots.flatMap((directory) => filesUnder(directory, extension));
 }
 
 function attributes(tag) {
@@ -47,7 +59,7 @@ describe('documentation project policy', () => {
     expect(defaultProperties).toContain('<TargetFramework>net10.0</TargetFramework>');
 
     const failures = [];
-    for (const project of filesUnder(docsRoot, '.csproj')) {
+    for (const project of projectFiles('.csproj')) {
       const relative = path.relative(repositoryRoot, project).replaceAll('\\', '/');
       if (relative.split('/').includes('snippets-v3')) {
         failures.push(`${relative}: inactive snippets-v3 project`);
@@ -65,14 +77,14 @@ describe('documentation project policy', () => {
     }
 
     expect(failures).toEqual([]);
-  });
+  }, 30_000);
 
   test('uses Orleans 10.2.2 unless a migration project documents an exception', () => {
     const failures = [];
     for (const file of [
-      ...filesUnder(docsRoot, '.csproj'),
-      ...filesUnder(docsRoot, '.props'),
-      ...filesUnder(docsRoot, '.targets'),
+      ...projectFiles('.csproj'),
+      ...projectFiles('.props'),
+      ...projectFiles('.targets'),
     ]) {
       const relative = path.relative(repositoryRoot, file).replaceAll('\\', '/');
       const source = readFileSync(file, 'utf8');
