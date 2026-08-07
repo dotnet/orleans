@@ -58,6 +58,15 @@ namespace Orleans.Connections.Security
         }
 
         /// <summary>
+        /// Gets or sets the application protocols offered by the client during TLS application-layer protocol negotiation.
+        /// </summary>
+        public List<SslApplicationProtocol>? ApplicationProtocols
+        {
+            get => Value.ApplicationProtocols;
+            set => Value.ApplicationProtocols = value;
+        }
+
+        /// <summary>
         /// Gets or sets the TLS protocol versions permitted for authentication.
         /// </summary>
         public SslProtocols EnabledSslProtocols
