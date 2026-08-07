@@ -172,6 +172,28 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
     }
 
     [SkippableFact]
+    public async Task ReschedulePersistsThroughShardReassignmentAndResetsDequeueCount()
+    {
+        await using var scope = await fixture.CreateScopeAsync();
+        var first = scope.CreateManager(scope.ActiveSilo);
+        var second = scope.CreateManager(scope.SecondActiveSilo);
+        var now = scope.Now;
+        var shard = await first.CreateShardAsync(now, now.AddMinutes(5), new Dictionary<string, string>(), CancellationToken.None);
+        var job = await ScheduleJobAsync(shard, now.AddMinutes(-1), "reschedule-job");
+        var run = await TakeOneAsync(shard);
+
+        await shard.RescheduleJobAsync(run, now.AddMinutes(-1), CancellationToken.None);
+        await first.UnregisterShardAsync(shard, CancellationToken.None);
+
+        var reassigned = Assert.Single(await second.AssignJobShardsAsync(now.AddMinutes(5), int.MaxValue, CancellationToken.None));
+        var rescheduled = await TakeOneAsync(reassigned);
+
+        Assert.Equal(job!.Id, rescheduled.Job.Id);
+        Assert.Equal(1, rescheduled.DequeueCount);
+        Assert.NotEqual(run.DequeueCount + 1, rescheduled.DequeueCount);
+    }
+
+    [SkippableFact]
     public async Task CancellationsBeforeAndDuringProcessingPersistAfterReassignment()
     {
         await using var scope = await fixture.CreateScopeAsync();

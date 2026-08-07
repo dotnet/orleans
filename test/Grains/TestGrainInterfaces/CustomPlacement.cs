@@ -35,6 +35,9 @@ namespace UnitTests.GrainInterfaces
         public static TestCustomPlacementStrategy ExcludeOne { get; } = new TestCustomPlacementStrategy(CustomPlacementScenario.ExcludeOne);
         public static TestCustomPlacementStrategy RequestContextBased { get; } = new TestCustomPlacementStrategy(CustomPlacementScenario.RequestContextBased);
 
+        /// <inheritdoc />
+        public override bool IsGrain => true;
+
         internal TestCustomPlacementStrategy(CustomPlacementScenario scenario)
         {
             Scenario = scenario;

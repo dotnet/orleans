@@ -1,4 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.DurableMessaging;
+using Orleans.Runtime;
+using Orleans.Serialization.Session;
+using System.Collections.Generic;
 
 namespace Orleans.Journaling.Tests;
 
@@ -59,3 +63,70 @@ public interface ITestDurableGrainWithComplexState : IGrainWithGuidKey
     Task<IReadOnlyList<string>> GetItems();
 }
 
+/// <summary>
+/// Test grain interface for RequestContext propagation in durable messaging.
+/// </summary>
+public interface IRequestContextTestGrain : IGrainWithGuidKey
+{
+    Task SendTestMessage(string message);
+    Task<Dictionary<string, object>?> GetCapturedRequestContext();
+}
+
+/// <summary>
+/// Test grain for RequestContext propagation in durable messaging.
+/// Implementation that captures RequestContext when messages are received.
+/// </summary>
+[GrainType("journaling-requestcontexttest")]
+public class RequestContextTestGrain(
+    [FromKeyedServices("inbox")] IDurableInbox inbox,
+    [FromKeyedServices("outbox")] IDurableOutbox outbox) : DurableGrain, IRequestContextTestGrain
+{
+    private readonly IDurableInbox _inbox = inbox;
+    private readonly IDurableOutbox _outbox = outbox;
+    private Dictionary<string, object>? _capturedContext;
+
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        // Register handler that captures RequestContext
+        _inbox.RegisterHandler("test-message", new TestMessageHandler(this));
+        return base.OnActivateAsync(cancellationToken);
+    }
+
+    public async Task SendTestMessage(string message)
+    {
+        // Send message to self to trigger handler
+        var inboxExtension = this.AsReference<IDurableInboxExtension>();
+        var sessionPool = ServiceProvider.GetRequiredService<SerializerSessionPool>();
+        
+        var builder = new DurableEnvelopeBuilder
+        {
+            SessionPool = sessionPool,
+            SenderId = this.GetGrainId()
+        };
+        
+        var envelope = builder
+            .To(this.GetGrainId(), "test-message")
+            .WithBody(message)
+            .Build();
+
+        await inboxExtension.DeliverAsync(envelope, new DeliveryOptions { PollTimeout = TimeSpan.Zero }, CancellationToken.None);
+    }
+
+    public Task<Dictionary<string, object>?> GetCapturedRequestContext()
+    {
+        return Task.FromResult(_capturedContext);
+    }
+
+    private class TestMessageHandler(RequestContextTestGrain grain) : IInboxHandler
+    {
+        public bool CanHandle(IInboxHandlerContext context) => true;
+
+        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        {
+            // Capture the current RequestContext (which should be restored from the envelope)
+            var entries = RequestContext.Entries;
+            grain._capturedContext = entries.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            return ValueTask.CompletedTask;
+        }
+    }
+}

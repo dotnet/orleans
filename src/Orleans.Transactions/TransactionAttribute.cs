@@ -332,6 +332,8 @@ namespace Orleans
             set => _response.Exception = value;
         }
 
+        public override bool IsFinal => _response.IsFinal;
+
         public Exception? GetException() => _response.Exception;
 
         public override string ToString() => _response?.ToString() ?? "[null]";

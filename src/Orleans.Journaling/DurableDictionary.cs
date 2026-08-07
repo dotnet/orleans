@@ -112,6 +112,14 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
 
     protected virtual void OnSet(K key, V value) { }
 
+    /// <summary>
+    /// Called when pending writes have been durably persisted.
+    /// Override in derived classes to receive write completion notifications.
+    /// </summary>
+    protected virtual void OnWriteCompleted() { }
+
+    void IJournaledState.OnWriteCompleted() => OnWriteCompleted();
+
     private void ApplySet(K key, V value)
     {
         _items[key] = value;

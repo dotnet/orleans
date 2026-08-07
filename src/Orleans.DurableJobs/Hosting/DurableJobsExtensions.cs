@@ -43,6 +43,8 @@ public static class DurableJobsExtensions
         services.AddSingleton<LocalDurableJobManager>();
         services.AddFromExisting<ILocalDurableJobManager, LocalDurableJobManager>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalDurableJobManager>();
+        services.TryAddScoped<DurableJobHandlerRegistry>();
+        services.TryAddScoped<IDurableJobHandlerRegistry>(sp => sp.GetRequiredService<DurableJobHandlerRegistry>());
         services.AddSingleton(sp => new DurableJobReceiverExtensionShared(
             sp.GetRequiredService<ILogger<DurableJobReceiverExtension>>(),
             sp.GetRequiredService<IOptions<DurableJobsOptions>>(),
@@ -54,7 +56,8 @@ public static class DurableJobsExtensions
             var grainContextAccessor = sp.GetRequiredService<IGrainContextAccessor>();
             return new DurableJobReceiverExtension(
                 grainContextAccessor.GrainContext,
-                sp.GetRequiredService<DurableJobReceiverExtensionShared>());
+                sp.GetRequiredService<DurableJobReceiverExtensionShared>(),
+                sp.GetRequiredService<DurableJobHandlerRegistry>());
         });
     }
 
