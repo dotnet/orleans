@@ -186,11 +186,10 @@ The sample app initially creates a localhost cluster and persists grain state in
 1. Replace the `builder` configuration with the example here, which implements these key concepts:
 
    - A conditional environment check is added to ensure the app runs properly in both local development and Azure hosted scenarios.
-   - The `UseAzureStorageClustering` method configures the Orleans cluster to use Azure Table Storage and authenticates using the <xref:Azure.Identity.DefaultAzureCredential> class.
-   - Use the `Configure` method to assign IDs for the Orleans cluster.
-   - The `ClusterID` is a unique ID for the cluster that allows clients and silos to talk to one another.
-   - The `ClusterID` can change across deployments.
-   - The `ServiceID` is a unique ID for the application that is used internally by Orleans and should remain consistent across deployments.
+   - <xref:Orleans.Hosting.AzureTableClusteringExtensions.UseAzureStorageClustering*?displayProperty=nameWithType> configures the Orleans cluster to use Azure Table Storage and authenticates using <xref:Azure.Identity.DefaultAzureCredential>.
+   - The configuration assigns <xref:Orleans.Configuration.ClusterOptions.ClusterId> and <xref:Orleans.Configuration.ClusterOptions.ServiceId>.
+   - <xref:Orleans.Configuration.ClusterOptions.ClusterId> identifies a cluster so its clients and silos can communicate. Use a different value for deployments that must remain isolated.
+   - <xref:Orleans.Configuration.ClusterOptions.ServiceId> identifies the application and should remain consistent across deployments.
 
     :::code source="snippets/deploy-scale-orleans-on-azure/azure-storage/Program.cs" id="azure-storage-configuration":::
 
@@ -205,11 +204,10 @@ The sample app initially creates a localhost cluster and persists grain state in
 1. Replace the `builder` configuration with the example here, which implements these key concepts:
 
    - A conditional environment check is added to ensure the app runs properly in both local development and Azure hosted scenarios.
-   - The `UseCosmosClustering` method configures the Orleans cluster to use Azure Cosmos DB for NoSQL and authenticates using the <xref:Azure.Identity.DefaultAzureCredential> class.
-   - Use the `Configure` method to assign IDs for the Orleans cluster.
-   - The `ClusterID` is a unique ID for the cluster that allows clients and silos to talk to one another.
-   - The `ClusterID` can change across deployments.
-   - The `ServiceID` is a unique ID for the application that is used internally by Orleans and should remain consistent across deployments.
+   - <xref:Orleans.Hosting.HostingExtensions.UseCosmosClustering*?displayProperty=nameWithType> configures the Orleans cluster to use Azure Cosmos DB for NoSQL and authenticates using <xref:Azure.Identity.DefaultAzureCredential>.
+   - The configuration assigns <xref:Orleans.Configuration.ClusterOptions.ClusterId> and <xref:Orleans.Configuration.ClusterOptions.ServiceId>.
+   - <xref:Orleans.Configuration.ClusterOptions.ClusterId> identifies a cluster so its clients and silos can communicate. Use a different value for deployments that must remain isolated.
+   - <xref:Orleans.Configuration.ClusterOptions.ServiceId> identifies the application and should remain consistent across deployments.
 
    :::code source="snippets/deploy-scale-orleans-on-azure/cosmos/Program.cs" id="cosmos-configuration":::
 

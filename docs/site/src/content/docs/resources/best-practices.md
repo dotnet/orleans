@@ -43,7 +43,7 @@ Use <xref:Orleans.Runtime.IPersistentState`1> or another supported state model a
 
 - Changing an in-memory state object doesn't write it automatically. Call the persistence API and await it before reporting success when durability is part of the operation's contract.
 - Handle storage failures explicitly. A failed write means the requested durability wasn't achieved.
-- Keep serialized types version tolerant. Use `[GenerateSerializer]` and stable `[Id]` values; don't reuse or renumber existing field IDs.
+- Keep serialized types version tolerant. Use <xref:Orleans.GenerateSerializerAttribute> and stable <xref:Orleans.IdAttribute> values; don't reuse or renumber existing field IDs.
 - Keep state objects small enough for the provider's item and request limits.
 - Don't use memory storage when state must survive process loss or be shared by multiple silos.
 - Don't rely on a silo's local file system as shared production storage.
@@ -54,7 +54,7 @@ Persistence doesn't replicate an activation's in-memory state. Recovery after pr
 
 A multi-silo deployment needs shared cluster membership. Most production applications also need deliberate choices for grain storage, reminders, streams, durable jobs, and grain directories.
 
-- Keep `ServiceId` stable for an application and use `ClusterId` to distinguish deployments which must not join each other.
+- Keep <xref:Orleans.Configuration.ClusterOptions.ServiceId> stable for an application and use <xref:Orleans.Configuration.ClusterOptions.ClusterId> to distinguish deployments which must not join each other.
 - Use separate deployment identities for development, test, staging, and production.
 - Follow the provider's authentication, encryption, backup, capacity, and high-availability guidance.
 - Test provider throttling, transient failures, and regional outages.

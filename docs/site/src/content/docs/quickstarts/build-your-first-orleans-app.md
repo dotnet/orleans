@@ -60,9 +60,9 @@ Append the grain implementation and its state type:
 
 :::code source="snippets/url-shortener/orleansurlshortener/Program.cs" id="grain":::
 
-The constructor injects <xref:Orleans.Runtime.IPersistentState`1> associated with the `urls` provider. Assigning `state.State` changes only the in-memory value. Calling <xref:Orleans.Runtime.IPersistentState`1.WriteStateAsync*> writes it to the configured provider.
+The constructor injects <xref:Orleans.Runtime.IPersistentState`1> associated with the `urls` provider. Assigning `state.State` changes only the in-memory value. Calling <xref:Orleans.Core.IStorage.WriteStateAsync*> writes it to the configured provider.
 
-The `[GenerateSerializer]` and `[Id]` attributes let Orleans generate a version-tolerant serializer for `UrlDetails`. Keep existing field IDs stable when the type evolves.
+The <xref:Orleans.GenerateSerializerAttribute> and <xref:Orleans.IdAttribute> attributes let Orleans generate a version-tolerant serializer for `UrlDetails`. Keep existing field IDs stable when the type evolves.
 
 ## Add the endpoints
 

@@ -14,7 +14,7 @@ In this tutorial, you'll walk through how to write a simple file-based grain sto
 
 ## Get started
 
-An Orleans grain storage provider is a class that implements <xref:Orleans.Storage.IGrainStorage>, included in the [Microsoft.Orleans.Core](https://www.nuget.org/packages/Microsoft.Orleans.Core) NuGet package. This sample also implements `ILifecycleParticipant<ISiloLifecycle>` so that it can initialize during the silo lifecycle. Start by creating a class named `FileGrainStorage`; the complete, compiling implementation appears at the end of the tutorial.
+An Orleans grain storage provider is a class that implements <xref:Orleans.Storage.IGrainStorage>, included in the [Microsoft.Orleans.Core](https://www.nuget.org/packages/Microsoft.Orleans.Core) NuGet package. This sample also implements <xref:Orleans.ILifecycleParticipant`1>, where the lifecycle type is <xref:Orleans.Runtime.ISiloLifecycle>, so that it can initialize during the silo lifecycle. Start by creating a class named `FileGrainStorage`; the complete, compiling implementation appears at the end of the tutorial.
 
 Each method implements the corresponding method in the <xref:Orleans.Storage.IGrainStorage> interface, accepting a generic type parameter for the underlying state type. The methods are:
 
@@ -30,7 +30,7 @@ Before starting the implementation, create an options class containing the root 
 
 With the options class created, explore the constructor parameters of the `FileGrainStorage` class:
 
-- `storageName`: Specifies which grains should use this storage provider, for example, `[StorageProvider(ProviderName = "File")]`.
+- `storageName`: Specifies which grains should use this storage provider through <xref:Orleans.Providers.StorageProviderAttribute>, for example, `[StorageProvider(ProviderName = "File")]`.
 - `options`: The options class just created.
 - `clusterOptions`: The cluster options used for retrieving the <xref:Orleans.Configuration.ClusterOptions.ServiceId>.
 
@@ -82,7 +82,7 @@ Lastly, to register the grain storage, create an extension on <xref:Orleans.Host
 
 :::code source="snippets/custom-grain-storage/FileSiloBuilderExtensions.cs":::
 
-The `FileGrainStorage` implements two interfaces, <xref:Orleans.Storage.IGrainStorage> and `ILifecycleParticipant<ISiloLifecycle>`. Therefore, register two keyed singleton services, one for each interface.
+The `FileGrainStorage` implements <xref:Orleans.Storage.IGrainStorage> and <xref:Orleans.ILifecycleParticipant`1> for <xref:Orleans.Runtime.ISiloLifecycle>. Therefore, register two keyed singleton services, one for each interface.
 
 :::code source="snippets/custom-grain-storage/FileSiloBuilderExtensions.cs" id="KeyedRegistrations":::
 
@@ -90,6 +90,6 @@ This enables adding the file storage using the extension on <xref:Orleans.Hostin
 
 :::code source="snippets/custom-grain-storage/Program.cs":::
 
-Now you can decorate your grains with the provider `[StorageProvider(ProviderName = "File")]`, and it stores the grain state in the root directory set in the options. Consider the full implementation of `FileGrainStorage`:
+Now you can select the provider using <xref:Orleans.Providers.StorageProviderAttribute>, for example, `[StorageProvider(ProviderName = "File")]`, and it stores the grain state in the root directory set in the options. Consider the full implementation of `FileGrainStorage`:
 
 :::code source="snippets/custom-grain-storage/FileGrainStorage.cs":::
