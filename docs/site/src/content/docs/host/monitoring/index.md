@@ -9,15 +9,15 @@ ms.topic: overview
 
 Orleans uses standard .NET observability APIs:
 
-- `Microsoft.Extensions.Logging` for structured logs.
-- A <xref:System.Diagnostics.Metrics.Meter> named `Microsoft.Orleans` for runtime metrics.
-- Several <xref:System.Diagnostics.ActivitySource> instances for distributed traces.
+- [Microsoft.Extensions.Logging](https://learn.microsoft.com/dotnet/core/extensions/logging/overview) for structured logs.
+- A <xref:System.Diagnostics.Metrics.Meter> named `Microsoft.Orleans` for [.NET metrics](https://learn.microsoft.com/dotnet/core/diagnostics/metrics).
+- Several <xref:System.Diagnostics.ActivitySource> instances for [.NET distributed tracing](https://learn.microsoft.com/dotnet/core/diagnostics/distributed-tracing).
 
 These signals are complementary. Metrics detect a change, traces locate it in a request path, and logs explain discrete events or failures. The [Orleans Dashboard](../../dashboard/index.md) is useful for interactive inspection, but an external telemetry backend is the durable source for alerting, retention, and cross-service correlation.
 
 ## Configure OpenTelemetry once
 
-Install these packages in the host which runs Orleans:
+[OpenTelemetry](https://opentelemetry.io/docs/) provides a vendor-neutral pipeline for logs, metrics, and traces. Install these packages in the host which runs Orleans:
 
 - [OpenTelemetry.Extensions.Hosting](https://www.nuget.org/packages/OpenTelemetry.Extensions.Hosting)
 - [OpenTelemetry.Exporter.OpenTelemetryProtocol](https://www.nuget.org/packages/OpenTelemetry.Exporter.OpenTelemetryProtocol)
@@ -27,9 +27,9 @@ The following configuration works for a silo. Apply the same OpenTelemetry confi
 
 :::code language="csharp" source="./snippets/observability/Program.cs" id="OpenTelemetry":::
 
-Set `OTEL_EXPORTER_OTLP_ENDPOINT` to the OTLP endpoint, for example `http://localhost:4317`. The OpenTelemetry .NET SDK honors standard `OTEL_*` environment variables. In a .NET Aspire application, the AppHost supplies the OTLP endpoint to referenced projects, so this configuration sends telemetry to the Aspire dashboard without an Orleans-specific exporter.
+Set `OTEL_EXPORTER_OTLP_ENDPOINT` to the [OpenTelemetry Protocol (OTLP)](https://opentelemetry.io/docs/specs/otlp/) endpoint, for example `http://localhost:4317`. The OpenTelemetry .NET SDK honors standard `OTEL_*` environment variables. In a .NET Aspire application, the AppHost supplies the OTLP endpoint to referenced projects, so this configuration sends telemetry to the Aspire dashboard without an Orleans-specific exporter.
 
-Use a collector between applications and the final backend when you need buffering, routing, redaction, or backend-specific authentication.
+Use an [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/) between applications and the final backend when you need buffering, routing, redaction, or backend-specific authentication.
 
 ## Meter versus ActivitySource
 

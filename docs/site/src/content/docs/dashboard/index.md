@@ -31,7 +31,7 @@ Validate the authorization behavior with an unauthenticated request and with use
 
 ## Install and map the dashboard
 
-Add [Microsoft.Orleans.Dashboard](https://www.nuget.org/packages/Microsoft.Orleans.Dashboard) to the web host. `Microsoft.Orleans.Dashboard.Abstractions` contains shared types such as <xref:Orleans.Dashboard.NoProfilingAttribute> and is brought in by the main package.
+Add [Microsoft.Orleans.Dashboard](https://www.nuget.org/packages/Microsoft.Orleans.Dashboard) to the web host. [Microsoft.Orleans.Dashboard.Abstractions](https://www.nuget.org/packages/Microsoft.Orleans.Dashboard.Abstractions) contains shared types such as <xref:Orleans.Dashboard.NoProfilingAttribute> and is brought in by the main package.
 
 Call `AddDashboard()` on the silo builder and map the route after building the ASP.NET Core app. A route prefix is recommended to avoid claiming the web application's root:
 

@@ -101,4 +101,7 @@ Certificate selectors are called during authentication, but certificate loading,
 
 - <xref:Orleans.Connections.Security.TlsOptions>
 - <xref:Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseTls*>
+- [Client configuration](configuration-guide/client-configuration.md)
+- [Server configuration](configuration-guide/server-configuration.md)
 - [.NET TLS/SSL best practices](https://learn.microsoft.com/dotnet/core/extensions/sslstream-best-practices)
+- [Orleans Transport Layer Security (TLS) sample](https://learn.microsoft.com/samples/dotnet/samples/orleans-transport-layer-security-tls/)

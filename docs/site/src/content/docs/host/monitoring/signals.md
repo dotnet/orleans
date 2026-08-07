@@ -11,19 +11,19 @@ Start with service-level symptoms, then use Orleans telemetry to narrow the caus
 
 ## Logs
 
-Orleans writes through `Microsoft.Extensions.Logging`. Preserve the structured fields supplied by the provider, including category, level, event ID, exception, trace ID, and span ID. Configure category levels using normal .NET logging configuration.
+Orleans writes through [`Microsoft.Extensions.Logging`](https://learn.microsoft.com/dotnet/core/extensions/logging/overview). Preserve the structured fields supplied by the provider, including category, level, event ID, exception, trace ID, and span ID. Configure category levels using normal .NET logging configuration.
 
 An Orleans `EventId` is a diagnostic identifier, not a complete incident definition. Numeric ranges and event assignments can change as the runtime evolves. Instead of maintaining a copied table:
 
 - Query the generated <xref:Orleans.ErrorCode> API reference when investigating a known ID.
-- Consult the current [runtime error-code source](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core.Abstractions/Logging/ErrorCodes.cs) for the version you deploy.
+- To inspect definitions under active development, consult the [runtime error-code source on the `main` branch](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core.Abstractions/Logging/ErrorCodes.cs).
 - Alert on a sustained symptom, exception type, or known event plus service impact, rather than every warning.
 
 Record application correlation fields in structured properties or an approved activity tag. Don't parse rendered log text when a structured field is available.
 
 ## Metrics
 
-Subscribe to the `Microsoft.Orleans` meter. Discover the exact instrument set emitted by your deployed version instead of copying a static list:
+Subscribe to the `Microsoft.Orleans` meter. Discover the exact instrument set emitted by your deployed version instead of copying a static list. For installation and command details, see the [`dotnet-counters` diagnostic tool](https://learn.microsoft.com/dotnet/core/diagnostics/dotnet-counters):
 
 ```dotnetcli
 dotnet-counters monitor -n <ProcessName> --counters Microsoft.Orleans
