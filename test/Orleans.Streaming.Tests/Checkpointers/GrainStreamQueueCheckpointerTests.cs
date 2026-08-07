@@ -200,6 +200,28 @@ public sealed class GrainStreamQueueCheckpointerTests : StreamQueueCheckpointerT
     }
 
     [Fact]
+    public async Task CheckpointersWithoutComparer_WhenOneIsStale_DoNotOverwritePersistedCheckpoint()
+    {
+        var state = new StreamCheckpointerGrainState { Checkpoint = "20" };
+        var storage = Substitute.For<IPersistentState<StreamCheckpointerGrainState>>();
+        storage.State.Returns(state);
+        var grain = CreateGrain(storage);
+        var first = new GrainStreamQueueCheckpointer(grain);
+        var second = new GrainStreamQueueCheckpointer(grain);
+        await first.Load();
+        await second.Load();
+
+        first.Update("opaque-40", DateTime.UtcNow);
+        await first.FlushAsync(CancellationToken.None);
+        second.Update("opaque-30", DateTime.UtcNow);
+        await second.FlushAsync(CancellationToken.None);
+
+        Assert.Equal("opaque-40", state.Checkpoint);
+        Assert.Equal("opaque-40", await second.Load());
+        await storage.Received(1).WriteStateAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task FlushAsync_WhenRetryFails_PropagatesFailure()
     {
         var expected = new InvalidOperationException("checkpoint write failed");

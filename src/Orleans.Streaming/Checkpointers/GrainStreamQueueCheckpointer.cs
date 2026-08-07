@@ -262,17 +262,20 @@ namespace Orleans.Streams
                         return;
                     }
 
-                    if (_options.CheckpointComparer is { } comparer)
+                    if (_options.CheckpointComparer is not { } comparer)
                     {
-                        if (comparer.Compare(_latestCheckpoint, persistedCheckpoint) <= 0)
-                        {
-                            _latestCheckpoint = persistedCheckpoint;
-                        }
+                        _latestCheckpoint = persistedCheckpoint;
+                        return;
+                    }
 
-                        if (comparer.Compare(checkpoint, persistedCheckpoint) <= 0)
-                        {
-                            return;
-                        }
+                    if (comparer.Compare(_latestCheckpoint, persistedCheckpoint) <= 0)
+                    {
+                        _latestCheckpoint = persistedCheckpoint;
+                    }
+
+                    if (comparer.Compare(checkpoint, persistedCheckpoint) <= 0)
+                    {
+                        return;
                     }
 
                     expectedCheckpoint = persistedCheckpoint;
