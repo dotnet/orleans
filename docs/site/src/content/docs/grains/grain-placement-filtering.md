@@ -31,7 +31,7 @@ External clients don't have silo metadata. Design filtered grain activation path
 
 ## Require metadata matches
 
-<xref:Orleans.Placement.RequiredMatchSiloMetadataPlacementFilterAttribute> keeps only candidates matching every configured key:
+<xref:Orleans.Runtime.Placement.Filtering.RequiredMatchSiloMetadataPlacementFilterAttribute> keeps only candidates matching every configured key:
 
 ```csharp
 #pragma warning disable ORLEANSEXP004
@@ -49,7 +49,7 @@ Placement fails if no compatible silo matches. Use this filter only for hard req
 
 ## Prefer metadata matches
 
-<xref:Orleans.Placement.PreferredMatchSiloMetadataPlacementFilterAttribute> prefers candidates matching the ordered keys and progressively falls back by dropping earlier keys:
+<xref:Orleans.Runtime.Placement.Filtering.PreferredMatchSiloMetadataPlacementFilterAttribute> prefers candidates matching the ordered keys and progressively falls back by dropping earlier keys:
 
 ```csharp
 #pragma warning disable ORLEANSEXP004
@@ -91,15 +91,15 @@ The placement strategy sees only candidates that remain after every filter. A pr
 
 ## Read metadata from a grain
 
-Inject `ISiloMetadataCache` when grain logic needs silo metadata. Use `this.GetSiloAddress()` to identify the current activation's silo. Metadata reads don't influence placement retroactively.
+Inject <xref:Orleans.Runtime.MembershipService.SiloMetadata.ISiloMetadataCache> and <xref:Orleans.Runtime.IGrainRuntime> when grain logic needs silo metadata. Use <xref:Orleans.Runtime.IGrainRuntime.SiloAddress?displayProperty=nameWithType> to identify the current activation's silo. Metadata reads don't influence placement retroactively.
 
 ## Custom filters
 
 A custom filter consists of:
 
-1. A `PlacementFilterStrategy` carrying serializable configuration and a unique order.
-1. A `PlacementFilterAttribute` that attaches the strategy to a grain class.
-1. An `IPlacementFilterDirector` that returns a subset of candidate `SiloAddress` values.
+1. A <xref:Orleans.Placement.PlacementFilterStrategy> carrying serializable configuration and a unique order.
+1. A <xref:Orleans.Placement.PlacementFilterAttribute> that attaches the strategy to a grain class.
+1. An <xref:Orleans.Placement.IPlacementFilterDirector> that returns a subset of candidate <xref:Orleans.Runtime.SiloAddress> values.
 1. Registration from the silo's service collection, including the strategy lifetime:
 
     ```csharp
@@ -109,8 +109,8 @@ A custom filter consists of:
             ServiceLifetime.Transient);
     ```
 
-    The `ServiceLifetime` argument controls the placement strategy lifetime. Orleans always registers the director as a keyed singleton.
+    The <xref:Microsoft.Extensions.DependencyInjection.ServiceLifetime> argument controls the placement strategy lifetime. Orleans always registers the director as a keyed singleton.
 
 Custom filters are part of the same `ORLEANSEXP004` API surface. Keep directors deterministic and fast, don't return silos outside the input candidate set, and define behavior for no matches. Prefer the built-in metadata filters unless custom logic is essential.
 
-During placement, read application request metadata from `PlacementTarget.RequestContextData`; the static <xref:Orleans.Runtime.RequestContext> isn't populated because no activation exists yet.
+During placement, read application request metadata from <xref:Orleans.Runtime.Placement.PlacementTarget.RequestContextData?displayProperty=nameWithType>; the static <xref:Orleans.Runtime.RequestContext> isn't populated because no activation exists yet.

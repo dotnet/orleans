@@ -95,9 +95,9 @@ public sealed class ChatRoomGrain : Grain, IChatRoomGrain
 }
 ```
 
-The current API is `Notify`, including the overload that accepts `Func<TObserver, Task>`. There is no `NotifyAsync` method.
+The current API is <xref:Orleans.Utilities.ObserverManager`2.Notify*>, including the overload that accepts <xref:System.Func`2> returning a <xref:System.Threading.Tasks.Task>. There is no `NotifyAsync` method.
 
-Subscriptions expire lazily after `ExpirationDuration`. Clients should renew before expiry. A notification exception causes `ObserverManager` to remove that observer; it doesn't fail the entire publish operation.
+Subscriptions expire lazily after <xref:Orleans.Utilities.ObserverManager`2.ExpirationDuration>. Clients should renew before expiry. A notification exception causes <xref:Orleans.Utilities.ObserverManager`1> to remove that observer; it doesn't fail the entire publish operation.
 
 Use <xref:Orleans.Utilities.ObserverManager`2> when the subscription identity should differ from the observer reference.
 
@@ -112,7 +112,7 @@ IChatObserver observer =
 await room.Subscribe(observer);
 ```
 
-Don't call `CreateObjectReference` for a grain. Grains are already addressable.
+Don't call <xref:Orleans.IGrainFactory.CreateObjectReference*> for a grain. Grains are already addressable.
 
 ## Execution and cancellation
 

@@ -100,7 +100,7 @@ public sealed class HardwareSessionGrain :
 }
 ```
 
-The attribute doesn't prevent explicit `MigrateOnIdle()` calls.
+The attribute doesn't prevent explicit <xref:Orleans.Grain.MigrateOnIdle> calls.
 
 ## Experimental automatic movement
 

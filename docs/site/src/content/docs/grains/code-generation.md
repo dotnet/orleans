@@ -23,7 +23,7 @@ These packages include the source generator and analyzers.
 
 The generator discovers grain interfaces and implementations from their Orleans base interfaces. It reports build diagnostics for unsupported signatures, inaccessible types, multiple cancellation token parameters, and other contract errors.
 
-Supported grain method return types are `Task`, `Task<T>`, `ValueTask`, and `ValueTask<T>`. The generator emits strongly typed references and invocation classes for those methods.
+Supported grain method return types are <xref:System.Threading.Tasks.Task>, <xref:System.Threading.Tasks.Task`1>, <xref:System.Threading.Tasks.ValueTask>, and <xref:System.Threading.Tasks.ValueTask`1>. The generator emits strongly typed references and invocation classes for those methods.
 
 ## Serializable types
 

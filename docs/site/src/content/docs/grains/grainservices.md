@@ -7,7 +7,7 @@ ms.topic: how-to
 
 # Grain services
 
-A grain service is a silo-resident, remotely callable service that supports grain functionality. Orleans starts one instance on every silo and keeps it for the silo lifetime. A `GrainServiceClient<T>` maps a calling grain to the service instance responsible for it.
+A grain service is a silo-resident, remotely callable service that supports grain functionality. Orleans starts one instance on every silo and keeps it for the silo lifetime. A <xref:Orleans.Runtime.Services.GrainServiceClient`1> maps a calling grain to the service instance responsible for it.
 
 Reminders are an example of this pattern. Most application workloads should use regular grains or hosted services; use grain services when a framework-level capability must be partitioned across every silo.
 
@@ -45,7 +45,7 @@ public sealed class IndexService :
 }
 ```
 
-Override `Init`, `Start`, `StartInBackground`, and `Stop` only when the service needs work at those lifecycle points. Grain services aren't ordinary grains: they don't have a stable application identity, aren't collected when idle, and don't migrate.
+Override <xref:Orleans.Runtime.GrainService.Init*>, <xref:Orleans.Runtime.GrainService.Start*>, <xref:Orleans.Runtime.GrainService.StartInBackground*>, and <xref:Orleans.Runtime.GrainService.Stop*> only when the service needs work at those lifecycle points. Grain services aren't ordinary grains: they don't have a stable application identity, aren't collected when idle, and don't migrate.
 
 ## Create the grain-facing client
 
@@ -77,7 +77,7 @@ public sealed class IndexServiceClient :
 }
 ```
 
-`GetGrainService(GrainId)` consistently maps the calling grain to a service partition. Other overloads support explicit silo or hash routing for advanced implementations.
+<xref:Orleans.Runtime.Services.GrainServiceClient`1.GetGrainService*> consistently maps the calling grain to a service partition. Other overloads support explicit silo or hash routing for advanced implementations.
 
 ## Register and consume the service
 
