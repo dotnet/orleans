@@ -7,11 +7,11 @@ ms.topic: how-to
 
 # Azure Storage grain persistence
 
-The [`Microsoft.Orleans.Persistence.AzureStorage`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AzureStorage) package contains providers for [Azure Table Storage](https://learn.microsoft.com/en-us/azure/storage/tables/table-storage-overview) and [Azure Blob Storage](https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blobs-introduction). Both implement optimistic concurrency using storage ETags.
+The [`Microsoft.Orleans.Persistence.AzureStorage`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AzureStorage) package contains providers for [Azure Table Storage](https://learn.microsoft.com/azure/storage/tables/table-storage-overview) and [Azure Blob Storage](https://learn.microsoft.com/azure/storage/blobs/storage-blobs-introduction). Both implement optimistic concurrency using storage ETags.
 
 ## Azure Table Storage
 
-Table storage keeps one state record in an entity and splits serialized state across properties when needed. [Azure Table Storage limits an entity to 1 MiB](https://learn.microsoft.com/en-us/azure/storage/tables/table-storage-overview#table-storage-concepts), so use Blob Storage or another provider for larger records.
+Table storage keeps one state record in an entity and splits serialized state across properties when needed. [Azure Table Storage limits an entity to 1 MiB](https://learn.microsoft.com/azure/storage/tables/table-storage-overview#table-storage-concepts), so use Blob Storage or another provider for larger records.
 
 Configure a named provider with <xref:Orleans.Hosting.AzureTableSiloBuilderExtensions.AddAzureTableGrainStorage*>. Token credentials are preferred over secrets:
 
@@ -54,6 +54,6 @@ Use a secret store when a connection string is unavoidable.
 ## Operational guidance
 
 - Use separate provider names when records belong in different accounts, containers, or tables.
-- Treat an `InconsistentStateException` as an optimistic-concurrency conflict, not a transient timeout.
+- Treat an <xref:Orleans.Storage.InconsistentStateException> as an optimistic-concurrency conflict, not a transient timeout.
 - Configure storage redundancy and account failover according to the application's durability requirements.
 - Test record-size limits using serialized production-shaped state.

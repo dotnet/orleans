@@ -7,11 +7,11 @@ ms.topic: concept-article
 
 # Immediate and delayed event confirmation
 
-`RaiseEvent` updates the tentative view and starts submission. Confirmation determines when the event joins the durable, ordered log.
+<xref:Orleans.EventSourcing.JournaledGrain`2.RaiseEvent*> updates the tentative view and starts submission. Confirmation determines when the event joins the durable, ordered log.
 
 ## Immediate confirmation
 
-Await `ConfirmEvents` before returning when the grain method promises a confirmed result:
+Await <xref:Orleans.EventSourcing.JournaledGrain`2.ConfirmEvents*> before returning when the grain method promises a confirmed result:
 
 ```csharp
 RaiseEvent(new Deposited(amount));
@@ -24,13 +24,13 @@ The tradeoff is availability and latency: the call waits for the selected provid
 
 ## Delayed confirmation
 
-A grain can return without awaiting `ConfirmEvents`, or permit interleaving while confirmation is pending. This can improve throughput but changes what the method guarantees.
+A grain can return without awaiting <xref:Orleans.EventSourcing.JournaledGrain`2.ConfirmEvents*>, or permit interleaving while confirmation is pending. This can improve throughput but changes what the method guarantees.
 
 Use:
 
-- `State` for the confirmed view.
-- `TentativeState` for confirmed plus locally unconfirmed events.
-- `UnconfirmedEvents` for the pending suffix.
+- <xref:Orleans.EventSourcing.JournaledGrain`2.State> for the confirmed view.
+- <xref:Orleans.EventSourcing.JournaledGrain`2.TentativeState> for confirmed plus locally unconfirmed events.
+- <xref:Orleans.EventSourcing.JournaledGrain`2.UnconfirmedEvents> for the pending suffix.
 
 Tentative state isn't a durable promise. An activation can fail before confirmation, and competing updates can change the final ordering or reject a conditional event.
 

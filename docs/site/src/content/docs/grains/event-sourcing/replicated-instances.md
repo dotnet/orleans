@@ -5,7 +5,7 @@ ms.date: 08/02/2026
 ms.topic: concept-article
 ---
 
-# `JournaledGrain` instances and conflicts
+# Journaled grain instances and conflicts
 
 Advanced Orleans deployments can encounter more than one instance representing the same logical journal. Log-consistency providers coordinate those instances around one confirmed event sequence.
 
@@ -15,7 +15,7 @@ At a given confirmed version, instances derive the same state from the same even
 
 Unconditional events are eventually ordered by the provider. An event can be confirmed later in the sequence than the tentative view expected, so transition logic must remain valid for any accepted ordering.
 
-When validity depends on the currently observed version, use a conditional event:
+When validity depends on the currently observed version, use <xref:Orleans.EventSourcing.JournaledGrain`2.RaiseConditionalEvent*>:
 
 ```csharp
 var accepted = await RaiseConditionalEvent(new Withdrawn(amount));
@@ -25,7 +25,7 @@ The provider compares the expected confirmed version with storage. If another up
 
 ## Explicit synchronization
 
-Call `RefreshNow` to confirm local submissions and refresh from the global log:
+Call <xref:Orleans.EventSourcing.JournaledGrain`2.RefreshNow*> to confirm local submissions and refresh from the global log:
 
 ```csharp
 await RefreshNow();

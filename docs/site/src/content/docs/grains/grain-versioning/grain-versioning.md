@@ -40,13 +40,13 @@ If a request reaches an existing activation whose version is incompatible, Orlea
 
 ## Configure cluster defaults
 
-<xref:Orleans.Configuration.GrainVersioningOptions> defaults to `BackwardCompatible` and `AllCompatibleVersions`:
+<xref:Orleans.Configuration.GrainVersioningOptions> defaults to <xref:Orleans.Versions.Compatibility.BackwardCompatible> and <xref:Orleans.Versions.Selector.AllCompatibleVersions>:
 
 :::code language="csharp" source="./snippets/versioning/VersioningConfiguration.cs" id="configure_versioning":::
 
 The configured strategy names resolve registered Orleans strategy services. Configure every silo consistently before a heterogeneous deployment.
 
-Orleans also exposes runtime strategy changes through <xref:Orleans.IVersionManager>, implemented by the management grain. Changes can apply cluster-wide or to a specific `GrainInterfaceType`. Runtime overrides are operational state: coordinate them carefully and reset them to configured defaults after the deployment.
+Orleans also exposes runtime strategy changes through <xref:Orleans.IVersionManager>, implemented by the management grain. Changes can apply cluster-wide or to a specific <xref:Orleans.Runtime.GrainInterfaceType>. Runtime overrides are operational state: coordinate them carefully and reset them to configured defaults after the deployment.
 
 ## Scope and limitations
 

@@ -7,11 +7,11 @@ ms.topic: how-to
 
 # Azure Cosmos DB for NoSQL grain persistence
 
-The [`Microsoft.Orleans.Persistence.Cosmos`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Cosmos) package stores grain state as items in [Azure Cosmos DB for NoSQL](https://learn.microsoft.com/en-us/azure/cosmos-db/overview). Clustering is configured separately using [`Microsoft.Orleans.Clustering.Cosmos`](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.Cosmos); installing or configuring clustering isn't required merely to use Cosmos DB for grain state.
+The [`Microsoft.Orleans.Persistence.Cosmos`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Cosmos) package stores grain state as items in [Azure Cosmos DB for NoSQL](https://learn.microsoft.com/azure/cosmos-db/overview). Clustering is configured separately using [`Microsoft.Orleans.Clustering.Cosmos`](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.Cosmos); installing or configuring clustering isn't required merely to use Cosmos DB for grain state.
 
 ## Configure storage
 
-Configure a named provider with `AddCosmosGrainStorage`. Microsoft Entra authentication avoids storing account keys:
+Configure a named provider with <xref:Orleans.Hosting.HostingExtensions.AddCosmosGrainStorage*>. Microsoft Entra authentication avoids storing account keys:
 
 ```csharp
 using Azure.Identity;
@@ -29,7 +29,7 @@ siloBuilder.AddCosmosGrainStorage(
     });
 ```
 
-The defaults are database `Orleans`, container `OrleansStorage`, and partition-key path `/PartitionKey`. Provision the database and container before startup when `IsResourceCreationEnabled` is `false`. Enabling resource creation is convenient for development but production provisioning is usually managed separately.
+<xref:Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.DatabaseName> defaults to `Orleans`, <xref:Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.ContainerName> defaults to `OrleansStorage`, and <xref:Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.PartitionKeyPath> defaults to `/PartitionKey`. Provision the database and container before startup when <xref:Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.IsResourceCreationEnabled> is `false`. Enabling resource creation is convenient for development but production provisioning is usually managed separately.
 
 ## Partitioning and indexing
 

@@ -28,6 +28,6 @@ Use <xref:Orleans.Hosting.MemoryGrainStorageSiloBuilderExtensions.AddMemoryGrain
 
 ## Storage behavior
 
-`MemoryGrainStorageOptions.NumStorageGrains` controls how many internal storage grains distribute the records. The default is 10 and the value must be greater than zero.
+<xref:Orleans.Configuration.MemoryGrainStorageOptions.NumStorageGrains> controls how many internal storage grains distribute the records. The default is 10 and the value must be greater than zero.
 
-Memory storage still serializes state through `IGrainStorageSerializer`, so it can expose serialization and schema errors during tests. It doesn't model the latency, availability, capacity, concurrency, or operational behavior of an external production store.
+Memory storage still serializes state through <xref:Orleans.Storage.IGrainStorageSerializer>, so it can expose serialization and schema errors during tests. It doesn't model the latency, availability, capacity, concurrency, or operational behavior of an external production store.

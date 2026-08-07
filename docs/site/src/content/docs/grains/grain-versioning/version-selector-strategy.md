@@ -17,21 +17,21 @@ After the compatibility strategy filters available interface versions, the selec
 
 ## All compatible versions
 
-This is the default. It returns all compatible versions, and Orleans placement selects a compatible silo. Distribution therefore follows the available compatible silos, not a guaranteed equal percentage per version.
+<xref:Orleans.Versions.Selector.AllCompatibleVersions> is the default. It returns all compatible versions, and Orleans placement selects a compatible silo. Distribution therefore follows the available compatible silos, not a guaranteed equal percentage per version.
 
-With request version 1, available versions 1 and 2, and `BackwardCompatible`, both versions are eligible.
+With request version 1, available versions 1 and 2, and <xref:Orleans.Versions.Compatibility.BackwardCompatible>, both versions are eligible.
 
 ## Latest version
 
-`LatestVersion` returns only the highest compatible version. It moves new activations toward the newest deployment while preserving the compatibility filter.
+<xref:Orleans.Versions.Selector.LatestVersion> returns only the highest compatible version. It moves new activations toward the newest deployment while preserving the compatibility filter.
 
-With request version 1, available versions 1 and 2, and `BackwardCompatible`, only version 2 is eligible. With request version 3, neither version is compatible, so placement can't satisfy the request.
+With request version 1, available versions 1 and 2, and <xref:Orleans.Versions.Compatibility.BackwardCompatible>, only version 2 is eligible. With request version 3, neither version is compatible, so placement can't satisfy the request.
 
 ## Minimum version
 
-`MinimumVersion` returns only the lowest compatible version. It can keep older compatible implementations serving older callers during staged validation.
+<xref:Orleans.Versions.Selector.MinimumVersion> returns only the lowest compatible version. It can keep older compatible implementations serving older callers during staged validation.
 
-With request version 1 and available versions 2 and 3 under `BackwardCompatible`, version 2 is selected. With request version 3, only version 3 or newer can be compatible; the selector never bypasses the compatibility rule to choose version 2.
+With request version 1 and available versions 2 and 3 under <xref:Orleans.Versions.Compatibility.BackwardCompatible>, version 2 is selected. With request version 3, only version 3 or newer can be compatible; the selector never bypasses the compatibility rule to choose version 2.
 
 ## Existing activations
 

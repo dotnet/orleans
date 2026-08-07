@@ -26,7 +26,7 @@ Officially maintained providers are available from [NuGet](https://www.nuget.org
 
 Choose based on durability, availability, latency, record-size limits, operational tooling, and cost. Memory storage isn't durable across cluster restarts. Redis expiration should only be used for state that is intentionally ephemeral.
 
-## Use `IPersistentState<TState>`
+## Use persistent state
 
 Inject <xref:Orleans.Runtime.IPersistentState`1> into the grain constructor and identify both the state record and provider with <xref:Orleans.Runtime.PersistentStateAttribute>:
 
@@ -34,17 +34,17 @@ Inject <xref:Orleans.Runtime.IPersistentState`1> into the grain constructor and 
 
 The state isn't available inside the constructor. Orleans loads it before <xref:Orleans.Grain.OnActivateAsync*>. From then on:
 
-- `State` contains the in-memory value.
-- `RecordExists` indicates whether the provider read an existing record.
-- `Etag` contains the provider's concurrency token, when supported.
-- `ReadStateAsync` replaces the in-memory value with the latest stored value.
-- `WriteStateAsync` persists the current value.
-- `ClearStateAsync` clears or deletes the record according to provider configuration.
+- <xref:Orleans.Core.IStorage`1.State> contains the in-memory value.
+- <xref:Orleans.Core.IStorage.RecordExists> indicates whether the provider read an existing record.
+- <xref:Orleans.Core.IStorage.Etag> contains the provider's concurrency token, when supported.
+- <xref:Orleans.Core.IStorage.ReadStateAsync*> replaces the in-memory value with the latest stored value.
+- <xref:Orleans.Core.IStorage.WriteStateAsync*> persists the current value.
+- <xref:Orleans.Core.IStorage.ClearStateAsync*> clears or deletes the record according to provider configuration.
 
-Each operation also has a `CancellationToken` overload. A provider can implement cancellation, but the default interface implementation delegates to the overload without a token.
+Each operation also has a <xref:System.Threading.CancellationToken> overload. A provider can implement cancellation, but the default interface implementation delegates to the overload without a token.
 
 > [!IMPORTANT]
-> Mutating `State` only changes the activation's in-memory copy. Await `WriteStateAsync` before returning when the caller must observe a durable result.
+> Mutating <xref:Orleans.Core.IStorage`1.State> only changes the activation's in-memory copy. Await <xref:Orleans.Core.IStorage.WriteStateAsync*> before returning when the caller must observe a durable result.
 
 ## Configure named state
 
@@ -56,11 +56,11 @@ The state name distinguishes records owned by the same grain. The provider name 
 
 ## Consistency and atomicity
 
-A storage operation applies to one state record. Providers use the record's `Etag` for optimistic concurrency where the backend supports it. A write or clear with a stale ETag fails with <xref:Orleans.Storage.InconsistentStateException> rather than overwriting a newer value.
+A storage operation applies to one state record. Providers use the record's <xref:Orleans.Core.IStorage.Etag> for optimistic concurrency where the backend supports it. A write or clear with a stale ETag fails with <xref:Orleans.Storage.InconsistentStateException> rather than overwriting a newer value.
 
 The following aren't one atomic operation:
 
-- Writes to two `IPersistentState<TState>` instances on the same grain.
+- Writes to two <xref:Orleans.Runtime.IPersistentState`1> instances on the same grain.
 - Writes to state owned by different grains.
 - A storage write and an external side effect, such as publishing a message.
 
@@ -70,15 +70,15 @@ If an operation requires atomic updates across multiple grain states, use [Orlea
 
 ### Activation reads
 
-If the initial read fails, activation fails and Orleans doesn't call `OnActivateAsync`. The request that caused activation receives the failure. A bad or missing provider configuration results in <xref:Orleans.Storage.BadProviderConfigException>.
+If the initial read fails, activation fails and Orleans doesn't call <xref:Orleans.Grain.OnActivateAsync*>. The request that caused activation receives the failure. A bad or missing provider configuration results in <xref:Orleans.Storage.BadProviderConfigException>.
 
 ### Explicit reads, writes, and clears
 
 Storage failures fault the returned task. Await each operation so that failures reach the grain call and its caller. After a failed write, don't assume that the stored value changed. The precise outcome depends on the provider and underlying service failure.
 
-An `InconsistentStateException` means another writer changed the record since this activation last read it. Don't blindly retry the same write with the stale state. Re-read, re-evaluate the command against the new state, and write only if the operation is still valid.
+An <xref:Orleans.Storage.InconsistentStateException> means another writer changed the record since this activation last read it. Don't blindly retry the same write with the stale state. Re-read, re-evaluate the command against the new state, and write only if the operation is still valid.
 
-For transient service failures, retries belong at an application boundary that understands idempotency. Prefer retrying the original command with an operation identifier over retrying an arbitrary storage write. Bound retries, add backoff, and preserve the exception when the retry budget is exhausted. Orleans doesn't automatically retry `IPersistentState` operations for the application.
+For transient service failures, retries belong at an application boundary that understands idempotency. Prefer retrying the original command with an operation identifier over retrying an arbitrary storage write. Bound retries, add backoff, and preserve the exception when the retry budget is exhausted. Orleans doesn't automatically retry <xref:Orleans.Runtime.IPersistentState`1> operations for the application.
 
 ## State and schema evolution
 
@@ -94,9 +94,9 @@ Storage providers expose <xref:Orleans.Storage.IGrainStorageSerializer> through 
 
 <span id="redis-grain-persistence"></span>
 
-## Legacy `Grain<TState>` model
+## Legacy grain state base class
 
-The `Grain<TState>` base class and <xref:Orleans.Providers.StorageProviderAttribute> remain supported for compatibility, but new code should use `IPersistentState<TState>`. Constructor injection supports multiple state records and makes the storage dependency explicit.
+The <xref:Orleans.Grain`1> base class and <xref:Orleans.Providers.StorageProviderAttribute> remain supported for compatibility, but new code should use <xref:Orleans.Runtime.IPersistentState`1>. Constructor injection supports multiple state records and makes the storage dependency explicit.
 
 ## Implement a storage provider
 
@@ -110,8 +110,8 @@ siloBuilder.Services.AddGrainStorage<MyGrainStorage>(
 
 Providers must:
 
-- Populate `State`, `RecordExists`, and `Etag` when reading.
-- Preserve optimistic-concurrency semantics and throw `InconsistentStateException` on an ETag conflict.
+- Populate <xref:Orleans.IGrainState`1.State>, <xref:Orleans.IGrainState`1.RecordExists>, and <xref:Orleans.IGrainState`1.ETag> when reading.
+- Preserve optimistic-concurrency semantics and throw <xref:Orleans.Storage.InconsistentStateException> on an ETag conflict.
 - Complete each returned task only when the storage operation has completed.
 - Surface backend failures instead of returning success.
-- Define and document whether `ClearStateAsync` deletes or resets a record.
+- Define and document whether <xref:Orleans.Storage.IGrainStorage.ClearStateAsync*> deletes or resets a record.

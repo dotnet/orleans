@@ -25,18 +25,18 @@ Use <xref:Orleans.Hosting.RedisSiloBuilderExtensions.AddRedisGrainStorageAsDefau
 
 ## Storage behavior
 
-`RedisStorageOptions` supports:
+<xref:Orleans.Persistence.RedisStorageOptions> supports:
 
-- `ConfigurationOptions` for the StackExchange.Redis connection.
-- `DeleteStateOnClear` to delete the Redis key instead of resetting the record.
-- `EntryExpiry` to expire records.
-- `CreateMultiplexer` to supply a shared or custom `IConnectionMultiplexer`.
-- `GetStorageKey` to customize key generation.
-- `GrainStorageSerializer` to customize the stored representation.
+- <xref:Orleans.Persistence.RedisStorageOptions.ConfigurationOptions> for the StackExchange.Redis connection.
+- <xref:Orleans.Persistence.RedisStorageOptions.DeleteStateOnClear> to delete the Redis key instead of resetting the record.
+- <xref:Orleans.Persistence.RedisStorageOptions.EntryExpiry> to expire records.
+- <xref:Orleans.Persistence.RedisStorageOptions.CreateMultiplexer> to supply a shared or custom `IConnectionMultiplexer`.
+- <xref:Orleans.Persistence.RedisStorageOptions.GetStorageKey> to customize key generation.
+- <xref:Orleans.Persistence.RedisStorageOptions.GrainStorageSerializer> to customize the stored representation.
 
 The default key format is `{ServiceId}/state/{grainId}/{grainType}`.
 
 > [!WARNING]
-> Set `EntryExpiry` only for intentionally ephemeral state, such as tests. Expiration removes state independently of the grain lifecycle and can permit duplicate activations.
+> Set <xref:Orleans.Persistence.RedisStorageOptions.EntryExpiry> only for intentionally ephemeral state, such as tests. Expiration removes state independently of the grain lifecycle and can permit duplicate activations.
 
 Changing the key function or serializer doesn't migrate existing Redis entries. Plan a data migration or retain compatibility with the previous representation.

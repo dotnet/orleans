@@ -5,7 +5,7 @@ ms.date: 08/02/2026
 ms.topic: concept-article
 ---
 
-# `JournaledGrain` diagnostics
+# Journaled grain diagnostics
 
 ## Connection issues
 
@@ -23,12 +23,12 @@ protected override void OnConnectionIssueResolved(ConnectionIssue issue)
 }
 ```
 
-`PrimaryOperationFailed` identifies failed access to the provider's primary storage. Concrete issue types include failures to read or update state storage, log storage, or custom storage. Repeated failures in one category produce repeated issue callbacks; resolution produces one corresponding resolved callback.
+<xref:Orleans.EventSourcing.Common.PrimaryOperationFailed> identifies failed access to the provider's primary storage. Concrete issue types include failures to read or update state storage, log storage, or custom storage. Repeated failures in one category produce repeated issue callbacks; resolution produces one corresponding resolved callback.
 
 These callbacks are diagnostics, not a replacement for observing failed or delayed grain calls. Avoid throwing from them; Orleans catches and logs callback exceptions.
 
 ## Per-grain statistics
 
-Enable collection with `EnableStatsCollection`, retrieve a nullable `LogConsistencyStatistics` value with `GetStats`, and stop collection with `DisableStatsCollection`.
+Enable collection with <xref:Orleans.EventSourcing.JournaledGrain`2.EnableStatsCollection*>, retrieve a nullable <xref:Orleans.EventSourcing.LogConsistencyStatistics> value with <xref:Orleans.EventSourcing.JournaledGrain`2.GetStats*>, and stop collection with <xref:Orleans.EventSourcing.JournaledGrain`2.DisableStatsCollection*>.
 
 Collection is opt-in and local to the journaled grain. Use it for focused diagnosis rather than as the sole production telemetry system. Combine it with provider metrics, storage-service metrics, Orleans logs, and call latency/error telemetry.

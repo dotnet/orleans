@@ -29,9 +29,9 @@ builder.UseOrleans(siloBuilder =>
 
 Available registration methods are:
 
-- `AddStateStorageBasedLogConsistencyProvider`
-- `AddLogStorageBasedLogConsistencyProvider`
-- `AddCustomStorageBasedLogConsistencyProvider`
+- <xref:Orleans.Hosting.StateStorageSiloBuilderExtensions.AddStateStorageBasedLogConsistencyProvider*>
+- <xref:Orleans.Hosting.LogStorageSiloBuilderExtensions.AddLogStorageBasedLogConsistencyProvider*>
+- <xref:Orleans.Hosting.CustomStorageSiloBuilderExtensions.AddCustomStorageBasedLogConsistencyProvider*>
 
 Each also has an `AsDefault` form. If a default log-consistency provider and default grain storage provider are registered, provider attributes can be omitted.
 
@@ -50,7 +50,7 @@ public sealed class AccountGrain
 
 The provider names must exactly match registrations on every silo capable of activating the grain.
 
-Custom storage doesn't use `IGrainStorage`. The grain implements `ICustomStorageInterface<TState, TEvent>` and owns the storage operations:
+Custom storage doesn't use <xref:Orleans.Storage.IGrainStorage>. The grain implements <xref:Orleans.EventSourcing.CustomStorage.ICustomStorageInterface`2> and owns the storage operations:
 
 ```csharp
 [LogConsistencyProvider(ProviderName = "custom")]

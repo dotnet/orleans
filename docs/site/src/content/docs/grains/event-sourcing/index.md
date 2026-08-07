@@ -9,7 +9,7 @@ ms.topic: overview
 
 Orleans Event Sourcing uses <xref:Orleans.EventSourcing.JournaledGrain`2> from the supported `Microsoft.Orleans.EventSourcing` package. A journaled grain represents changes as events and derives its state by applying those events in order.
 
-`JournaledGrain` separates:
+<xref:Orleans.EventSourcing.JournaledGrain`2> separates:
 
 - **State**, the aggregate view used to answer requests.
 - **Events**, the immutable changes submitted by the grain.
@@ -20,7 +20,7 @@ The built-in providers support snapshot storage, a complete event sequence store
 
 ## Consistency model
 
-The confirmed `Version` is the number of confirmed events. A confirmed state at a given version is derived from one ordered event sequence. Locally raised events can also contribute to `TentativeState` before confirmation.
+The confirmed <xref:Orleans.EventSourcing.JournaledGrain`2.Version> is the number of confirmed events. A confirmed state at a given version is derived from one ordered event sequence. Locally raised events can also contribute to <xref:Orleans.EventSourcing.JournaledGrain`2.TentativeState> before confirmation.
 
 Log-consistency providers use optimistic concurrency and protocol notifications to coordinate instances that can exist in advanced deployment topologies. This isn't automatic geographic replication: Orleans doesn't provision replicated storage, deploy multiple clusters, route users between regions, or define disaster-recovery policy. Any multi-cluster design must separately provide shared/reachable storage and Orleans multi-cluster connectivity, and must be validated for the selected provider.
 
@@ -39,6 +39,6 @@ Log-consistency providers use optimistic concurrency and protocol notifications 
 `Microsoft.Orleans.EventSourcing` and `Microsoft.Orleans.Journaling` are separate packages and programming models.
 
 - Event Sourcing uses `JournaledGrain<TState, TEvent>` and log-consistency providers.
-- Journaling uses `DurableGrain`, journaled state, and durable collections.
+- Journaling uses <xref:Orleans.Journaling.DurableGrain>, journaled state, and durable collections.
 
 `Microsoft.Orleans.Journaling` is an alpha package whose APIs are marked experimental with diagnostic `ORLEANSEXP005`. It isn't a replacement for Event Sourcing. Evaluate it as an experimental feature and expect API or storage-format changes.

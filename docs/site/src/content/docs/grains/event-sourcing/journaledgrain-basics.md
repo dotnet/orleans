@@ -5,7 +5,7 @@ ms.date: 08/02/2026
 ms.topic: concept-article
 ---
 
-# The `JournaledGrain` API
+# The journaled grain API
 
 Derive an event-sourced grain from <xref:Orleans.EventSourcing.JournaledGrain`2>:
 
@@ -22,12 +22,12 @@ The one-parameter <xref:Orleans.EventSourcing.JournaledGrain`1> form uses `objec
 
 ## Confirmed and tentative state
 
-- `State` contains only confirmed events.
-- `Version` is the number of confirmed events.
-- `TentativeState` also includes locally submitted, unconfirmed events.
-- `UnconfirmedEvents` returns the current unconfirmed suffix.
+- <xref:Orleans.EventSourcing.JournaledGrain`2.State> contains only confirmed events.
+- <xref:Orleans.EventSourcing.JournaledGrain`2.Version> is the number of confirmed events.
+- <xref:Orleans.EventSourcing.JournaledGrain`2.TentativeState> also includes locally submitted, unconfirmed events.
+- <xref:Orleans.EventSourcing.JournaledGrain`2.UnconfirmedEvents> returns the current unconfirmed suffix.
 
-Don't mutate `State` or `TentativeState` directly. Change state by raising events.
+Don't mutate <xref:Orleans.EventSourcing.JournaledGrain`2.State> or <xref:Orleans.EventSourcing.JournaledGrain`2.TentativeState> directly. Change state by raising events.
 
 ## Define transitions
 
@@ -48,20 +48,20 @@ public sealed class AccountState
 }
 ```
 
-Alternatively, override `TransitionState(TState, TEvent)`. Transition logic must be deterministic and must only mutate the supplied state. Providers can replay transitions more than once, so don't perform I/O or other side effects from transition methods.
+Alternatively, override <xref:Orleans.EventSourcing.JournaledGrain`2.TransitionState*>. Transition logic must be deterministic and must only mutate the supplied state. Providers can replay transitions more than once, so don't perform I/O or other side effects from transition methods.
 
 ## Raise and confirm events
 
-`RaiseEvent` submits an event but doesn't wait for durable confirmation:
+<xref:Orleans.EventSourcing.JournaledGrain`2.RaiseEvent*> submits an event but doesn't wait for durable confirmation:
 
 ```csharp
 RaiseEvent(new Deposited(amount));
 await ConfirmEvents();
 ```
 
-Await `ConfirmEvents` before returning when the grain method promises that its events are confirmed. If confirmation isn't awaited, Orleans continues confirmation in the background and callers can observe tentative behavior.
+Await <xref:Orleans.EventSourcing.JournaledGrain`2.ConfirmEvents*> before returning when the grain method promises that its events are confirmed. If confirmation isn't awaited, Orleans continues confirmation in the background and callers can observe tentative behavior.
 
-Submit a related sequence atomically with `RaiseEvents`:
+Submit a related sequence atomically with <xref:Orleans.EventSourcing.JournaledGrain`2.RaiseEvents*>:
 
 ```csharp
 RaiseEvents(events);
@@ -72,7 +72,7 @@ The provider submits the sequence as one log append. The confirmed version advan
 
 ## Conditional events
 
-Use `RaiseConditionalEvent` or `RaiseConditionalEvents` when an event is valid only against the version currently observed:
+Use <xref:Orleans.EventSourcing.JournaledGrain`2.RaiseConditionalEvent*> or <xref:Orleans.EventSourcing.JournaledGrain`2.RaiseConditionalEvents*> when an event is valid only against the version currently observed:
 
 ```csharp
 if (!await RaiseConditionalEvent(new Withdrawn(amount)))
@@ -85,15 +85,15 @@ The returned task completes after the conditional append is resolved. `false` me
 
 ## Synchronize and retrieve events
 
-`RefreshNow` confirms submitted events and refreshes the view from storage:
+<xref:Orleans.EventSourcing.JournaledGrain`2.RefreshNow*> confirms submitted events and refreshes the view from storage:
 
 ```csharp
 await RefreshNow();
 ```
 
-`RetrieveConfirmedEvents(fromVersion, toVersion)` returns a confirmed segment only when the provider retains and exposes it. State storage and custom storage don't expose events through this API; log storage does.
+<xref:Orleans.EventSourcing.JournaledGrain`2.RetrieveConfirmedEvents*> returns a confirmed segment only when the provider retains and exposes it. State storage and custom storage don't expose events through this API; log storage does.
 
-`ClearLogAsync` resets state and discards confirmed and unconfirmed events only when supported by the provider. Clearing a log is destructive and isn't a schema-migration mechanism.
+<xref:Orleans.EventSourcing.JournaledGrain`2.ClearLogAsync*> resets state and discards confirmed and unconfirmed events only when supported by the provider. Clearing a log is destructive and isn't a schema-migration mechanism.
 
 ## Evolve state and events
 

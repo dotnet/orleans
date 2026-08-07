@@ -42,7 +42,7 @@ Then:
 1. Drain version 1 callers, then version 1 silos.
 1. Keep the backward-compatible contract until rollback is no longer required.
 
-Use `LatestVersion` when new activations should prefer the newest compatible implementation. Use `MinimumVersion` when new activations should stay on the lowest compatible version during staged validation. Neither strategy upgrades compatible activations proactively.
+Use <xref:Orleans.Versions.Selector.LatestVersion> when new activations should prefer the newest compatible implementation. Use <xref:Orleans.Versions.Selector.MinimumVersion> when new activations should stay on the lowest compatible version during staged validation. Neither strategy upgrades compatible activations proactively.
 
 ## Rollback
 
