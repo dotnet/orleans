@@ -732,13 +732,15 @@ public class AsyncEnumerableGrainCallTests
 
             public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
             {
-                var timer = new TrackingTimer(base.CreateTimer(callback, state, dueTime, period));
-                if (state is not null)
+                var timer = base.CreateTimer(callback, state, dueTime, period);
+                if (state is null)
                 {
-                    _timers[state] = timer;
+                    return timer;
                 }
 
-                return timer;
+                var trackingTimer = new TrackingTimer(this, state, timer);
+                _timers[state] = trackingTimer;
+                return trackingTimer;
             }
 
             public int GetTimerChangeCount(object timer) => GetTimer(timer).ChangeCount;
@@ -751,9 +753,14 @@ public class AsyncEnumerableGrainCallTests
                     ? result
                     : throw new InvalidOperationException("The grain timer is not registered with the fake time provider.");
 
-            private sealed class TrackingTimer(ITimer timer) : ITimer
+            private void RemoveTimer(object state, TrackingTimer timer) =>
+                ((ICollection<KeyValuePair<object, TrackingTimer>>)_timers).Remove(KeyValuePair.Create(state, timer));
+
+            private sealed class TrackingTimer(TrackingFakeTimeProvider owner, object state, ITimer timer) : ITimer
             {
                 private readonly object _lock = new();
+                private readonly TrackingFakeTimeProvider _owner = owner;
+                private readonly object _state = state;
                 private readonly ITimer _timer = timer;
                 private TaskCompletionSource _changed = new(TaskCreationOptions.RunContinuationsAsynchronously);
                 private int _changeCount;
@@ -807,9 +814,29 @@ public class AsyncEnumerableGrainCallTests
                     }
                 }
 
-                public void Dispose() => _timer.Dispose();
+                public void Dispose()
+                {
+                    try
+                    {
+                        _timer.Dispose();
+                    }
+                    finally
+                    {
+                        _owner.RemoveTimer(_state, this);
+                    }
+                }
 
-                public ValueTask DisposeAsync() => _timer.DisposeAsync();
+                public async ValueTask DisposeAsync()
+                {
+                    try
+                    {
+                        await _timer.DisposeAsync();
+                    }
+                    finally
+                    {
+                        _owner.RemoveTimer(_state, this);
+                    }
+                }
             }
         }
     }
