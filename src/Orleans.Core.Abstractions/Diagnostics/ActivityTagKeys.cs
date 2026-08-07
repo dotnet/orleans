@@ -91,14 +91,14 @@ internal static class ActivityTagKeys
     public const string StorageStateType = "orleans.storage.state.type";
 
     /// <summary>
-    /// The RPC system tag key.
+    /// The RPC system name tag key.
     /// </summary>
-    public const string RpcSystem = "rpc.system";
+    public const string RpcSystem = "rpc.system.name";
 
     /// <summary>
-    /// The RPC service tag key.
+    /// The Orleans RPC service tag key.
     /// </summary>
-    public const string RpcService = "rpc.service";
+    public const string RpcService = "orleans.rpc.service";
 
     /// <summary>
     /// The RPC method tag key.
@@ -108,12 +108,12 @@ internal static class ActivityTagKeys
     /// <summary>
     /// The RPC Orleans target ID tag key.
     /// </summary>
-    public const string RpcOrleansTargetId = "rpc.orleans.target_id";
+    public const string RpcOrleansTargetId = "orleans.rpc.target_id";
 
     /// <summary>
     /// The RPC Orleans source ID tag key.
     /// </summary>
-    public const string RpcOrleansSourceId = "rpc.orleans.source_id";
+    public const string RpcOrleansSourceId = "orleans.rpc.source_id";
 
     /// <summary>
     /// The exception stacktrace tag key.
@@ -205,4 +205,3 @@ internal static class ActivityTagKeys
     /// </summary>
     public const string JournalStorageBatchSize = "orleans.journal.batch_size";
 }
-
