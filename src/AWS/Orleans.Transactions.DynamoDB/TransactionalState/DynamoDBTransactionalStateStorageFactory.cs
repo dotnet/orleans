@@ -27,6 +27,9 @@ using Orleans.Transactions.DynamoDB;
 
 namespace Orleans.Transactions.DynamoDB.TransactionalState;
 
+/// <summary>
+/// Creates DynamoDB-backed transactional state storage instances.
+/// </summary>
 public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalStateStorageFactory, ILifecycleParticipant<ISiloLifecycle>
 {
     private readonly string name;
@@ -36,6 +39,14 @@ public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalSt
 
     private DynamoDBStorage storage = null!;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DynamoDBTransactionalStateStorageFactory"/> class.
+    /// </summary>
+    /// <param name="name">The provider name.</param>
+    /// <param name="options">The provider options.</param>
+    /// <param name="clusterOptions">The cluster options.</param>
+    /// <param name="services">The service provider.</param>
+    /// <param name="loggerFactory">The logger factory.</param>
     public DynamoDBTransactionalStateStorageFactory(
         string name,
         DynamoDBTransactionalStorageOptions options,
@@ -49,12 +60,19 @@ public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalSt
         this.loggerFactory = loggerFactory;
     }
 
+    /// <summary>
+    /// Creates a transactional state storage factory.
+    /// </summary>
+    /// <param name="services">The service provider.</param>
+    /// <param name="name">The provider name.</param>
+    /// <returns>The transactional state storage factory.</returns>
     public static ITransactionalStateStorageFactory Create(IServiceProvider services, string name)
     {
         var optionsMonitor = services.GetRequiredService<IOptionsMonitor<DynamoDBTransactionalStorageOptions>>();
         return ActivatorUtilities.CreateInstance<DynamoDBTransactionalStateStorageFactory>(services, name, optionsMonitor.Get(name));
     }
 
+    /// <inheritdoc />
     public ITransactionalStateStorage<TState> Create<TState>(string stateName, IGrainContext context) where TState : class, new()
     {
         if (this.storage is null)
@@ -67,6 +85,7 @@ public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalSt
         return ActivatorUtilities.CreateInstance<DynamoDBTransactionalStateStorage<TState>>(context.ActivationServices, this.storage, this.options, partitionKey, logger);
     }
 
+    /// <inheritdoc />
     public void Participate(ISiloLifecycle lifecycle)
     {
         lifecycle.Subscribe(OptionFormattingUtilities.Name<DynamoDBTransactionalStateStorageFactory>(this.name), this.options.InitStage, Init);

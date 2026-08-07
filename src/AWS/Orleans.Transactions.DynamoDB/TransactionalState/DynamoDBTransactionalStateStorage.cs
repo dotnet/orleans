@@ -22,6 +22,10 @@ using Orleans.Transactions.DynamoDB;
 #endif
 namespace Orleans.Transactions.DynamoDB.TransactionalState;
 
+/// <summary>
+/// Provides DynamoDB-backed transactional state storage.
+/// </summary>
+/// <typeparam name="TState">The state type.</typeparam>
 public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalStateStorage<TState> where TState : class, new()
 {
     private readonly DynamoDBStorage storage;
@@ -34,6 +38,13 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
     private KeyEntity key = null!;
     private List<KeyValuePair<long, StateEntity>> states = null!;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DynamoDBTransactionalStateStorage{TState}"/> class.
+    /// </summary>
+    /// <param name="storage">The DynamoDB storage client.</param>
+    /// <param name="options">The provider options.</param>
+    /// <param name="partitionKey">The storage partition key.</param>
+    /// <param name="logger">The logger.</param>
     public DynamoDBTransactionalStateStorage(DynamoDBStorage storage, DynamoDBTransactionalStorageOptions options, string partitionKey, ILogger<DynamoDBTransactionalStateStorage<TState>> logger)
     {
         this.storage = storage;
@@ -43,6 +54,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
         this.logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task<TransactionalStorageLoadResponse<TState>> Load()
     {
         try
@@ -120,6 +132,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
         }
     }
 
+    /// <inheritdoc />
     public async Task<string> Store(string? expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>>? statesToPrepare, long? commitUpTo, long? abortAfter)
     {
         var batchOperation = new BatchOperation(this.storage, this.tableName, this.key, this.logger);
