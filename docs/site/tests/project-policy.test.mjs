@@ -1,127 +1,218 @@
-import { readFileSync, readdirSync } from 'node:fs';
-import path from 'node:path';
 import { describe, expect, test } from 'vitest';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  discoverMaintainedProjects,
+  normalizeProjectPath,
+  readSolutionProjects,
+  validateProjectEvaluations,
+  validateSolutionCoverage,
+} from '../scripts/lib/project-policy.mjs';
 
-const repositoryRoot = path.resolve('../..');
-const docsRoot = path.join(repositoryRoot, 'docs');
-const snippetRoot = path.resolve('src/content/docs');
-const projectRoots = [snippetRoot, path.join(docsRoot, 'tools')];
-const defaultProperties = readFileSync(
-  path.join(snippetRoot, 'Directory.Build.props'),
-  'utf8',
-);
-const excludedDirectories = new Set([
-  '.generated',
-  'bin',
-  'dist',
-  'node_modules',
-  'obj',
-]);
+const siteRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const repoRoot = path.resolve(siteRoot, '..', '..');
 
-function filesUnder(directory, extension) {
-  return readdirSync(directory, { recursive: true })
-    .filter(
-      (file) =>
-        file.endsWith(extension) &&
-        !file.split(/[\\/]/).some((segment) => excludedDirectories.has(segment)),
-    )
-    .map((file) => path.join(directory, file));
-}
-
-function projectFiles(extension) {
-  return projectRoots.flatMap((directory) => filesUnder(directory, extension));
-}
-
-function attributes(tag) {
-  return new Map(
-    [...tag.matchAll(/([A-Za-z]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)].map((match) => [
-      match[1],
-      match[2] ?? match[3],
-    ]),
-  );
+function evaluation({
+  framework = 'net10.0',
+  packages = [],
+  versionException = '',
+} = {}) {
+  return {
+    Properties: {
+      TargetFramework: framework,
+      TargetFrameworks: '',
+      OrleansDocumentationVersionException: versionException,
+    },
+    Items: {
+      PackageReference: packages.map(([Identity, Version]) => ({ Identity, Version })),
+      PackageVersion: [],
+      ProjectReference: [],
+    },
+  };
 }
 
 describe('documentation project policy', () => {
-  test('parses both XML attribute quote styles', () => {
-    expect(
-      attributes(
-        `<PackageReference Include='Microsoft.Orleans.Server' Version="10.2.2" />`,
-      ),
-    ).toEqual(
-      new Map([
-        ['Include', 'Microsoft.Orleans.Server'],
-        ['Version', '10.2.2'],
+  test('normalizes Windows and Linux project paths consistently', () => {
+    expect(normalizeProjectPath('.\\samples\\HelloWorld\\HelloWorld.csproj')).toBe(
+      'samples/HelloWorld/HelloWorld.csproj',
+    );
+    expect(normalizeProjectPath('./docs/tools/../tools/Tool.csproj')).toBe(
+      'docs/tools/Tool.csproj',
+    );
+  });
+
+  test('reports missing, duplicate, stale, and external solution entries', () => {
+    const issues = validateSolutionCoverage({
+      discoveredProjects: ['docs/a.csproj', 'samples/b.fsproj'],
+      solutionProjects: [
+        { project: 'docs/a.csproj' },
+        { project: '.\\docs\\a.csproj' },
+        { project: 'samples/stale.csproj' },
+        { project: 'src/runtime.csproj' },
+      ],
+    });
+
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ rule: 'PROJECT001', project: 'samples/b.fsproj' }),
+        expect.objectContaining({ rule: 'PROJECT002', project: 'docs/a.csproj' }),
+        expect.objectContaining({ rule: 'PROJECT003', project: 'samples/stale.csproj' }),
+        expect.objectContaining({ rule: 'PROJECT003', project: 'src/runtime.csproj' }),
       ]),
     );
   });
 
-  test('targets net10.0 without maintained v3 projects', () => {
-    expect(defaultProperties).toContain('<TargetFramework>net10.0</TargetFramework>');
-
-    const failures = [];
-    for (const project of projectFiles('.csproj')) {
-      const relative = path.relative(repositoryRoot, project).replaceAll('\\', '/');
-      if (relative.split('/').includes('snippets-v3')) {
-        failures.push(`${relative}: inactive snippets-v3 project`);
-        continue;
-      }
-
-      const source = readFileSync(project, 'utf8');
-      const target = /<TargetFramework>([^<]+)<\/TargetFramework>/.exec(source)?.[1];
-      if (target !== undefined && target !== 'net10.0') {
-        failures.push(`${relative}: TargetFramework=${target}`);
-      }
-      if (/<TargetFrameworks>/.test(source)) {
-        failures.push(`${relative}: multi-targeting is not supported`);
-      }
-    }
-
-    expect(failures).toEqual([]);
-  }, 30_000);
-
-  test('uses Orleans 10.2.2 unless a migration project documents an exception', () => {
-    const failures = [];
-    for (const file of [
-      ...projectFiles('.csproj'),
-      ...projectFiles('.props'),
-      ...projectFiles('.targets'),
-    ]) {
-      const relative = path.relative(repositoryRoot, file).replaceAll('\\', '/');
-      const source = readFileSync(file, 'utf8');
-      const properties = new Map(
-        [...source.matchAll(/<([A-Za-z]+Version)>([^<]+)<\/\1>/g)].map((match) => [
-          match[1],
-          match[2],
-        ]),
+  test('ignores commented projects and accepts single-quoted paths', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'orleans-project-policy-'));
+    try {
+      const solutionFile = path.join(directory, 'Docs.slnx');
+      await writeFile(
+        solutionFile,
+        [
+          '<Solution>',
+          "  <Project Path='project.csproj' />",
+          '  <!-- <Project Path="commented.csproj" /> -->',
+          '</Solution>',
+        ].join('\n'),
       );
-      const exceptionReason =
-        /<OrleansDocumentationVersionException>([^<]+)<\/OrleansDocumentationVersionException>/.exec(
-          source,
-        )?.[1].trim();
-      const isMigrationProject = relative.split('/').includes('migration');
-      if (exceptionReason && !isMigrationProject) {
-        failures.push(`${relative}: version exception is only allowed under migration`);
-      }
-
-      for (const match of source.matchAll(/<PackageReference\b[^>]+>/g)) {
-        const item = attributes(match[0]);
-        const packageName = item.get('Include') ?? item.get('Update');
-        if (!packageName?.startsWith('Microsoft.Orleans.')) {
-          continue;
-        }
-
-        const version = item.get('Version') ?? item.get('VersionOverride');
-        const propertyName = /^\$\(([^)]+)\)$/.exec(version ?? '')?.[1];
-        const resolvedVersion = propertyName ? properties.get(propertyName) : version;
-        if (
-          resolvedVersion !== '10.2.2' &&
-          !(isMigrationProject && exceptionReason)
-        ) {
-          failures.push(`${relative}: ${packageName}=${version ?? '<missing>'}`);
-        }
-      }
+      expect(
+        await readSolutionProjects({ repoRoot: directory, solutionFile }),
+      ).toEqual([{ solutionPath: 'project.csproj', project: 'project.csproj' }]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
     }
+  });
 
-    expect(failures).toEqual([]);
-  }, 30_000);
+  test('reports target framework and exact Orleans package drift', () => {
+    const result = validateProjectEvaluations({
+      projectEvaluations: [
+        {
+          project: 'docs/current.csproj',
+          evaluation: evaluation({
+            framework: 'net8.0',
+            packages: [['Microsoft.Orleans.Server', '10.2.1']],
+          }),
+        },
+      ],
+      targetFramework: 'net10.0',
+      orleansPackageVersion: '10.2.2',
+    });
+
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ rule: 'PROJECT004' }),
+        expect.objectContaining({ rule: 'PROJECT005' }),
+      ]),
+    );
+  });
+
+  test('uses evaluated central package versions', () => {
+    const current = evaluation();
+    current.Properties.ManagePackageVersionsCentrally = 'true';
+    current.Items.PackageReference = [{ Identity: 'Microsoft.Orleans.Client' }];
+    current.Items.PackageVersion = [
+      { Identity: 'Microsoft.Orleans.Client', Version: '10.2.2' },
+    ];
+    const result = validateProjectEvaluations({
+      projectEvaluations: [{ project: 'samples/client.csproj', evaluation: current }],
+      targetFramework: 'net10.0',
+      orleansPackageVersion: '10.2.2',
+    });
+
+    expect(result.issues).toEqual([]);
+    expect(result.orleansPackageReferences).toBe(1);
+  });
+
+  test('does not use PackageVersion items when central management is disabled', () => {
+    const current = evaluation();
+    current.Properties.ManagePackageVersionsCentrally = 'false';
+    current.Items.PackageReference = [{ Identity: 'Microsoft.Orleans.Client' }];
+    current.Items.PackageVersion = [
+      { Identity: 'Microsoft.Orleans.Client', Version: '10.2.2' },
+    ];
+    const result = validateProjectEvaluations({
+      projectEvaluations: [{ project: 'samples/client.csproj', evaluation: current }],
+      targetFramework: 'net10.0',
+      orleansPackageVersion: '10.2.2',
+    });
+
+    expect(result.issues).toEqual([
+      expect.objectContaining({
+        rule: 'PROJECT005',
+        message: expect.stringContaining("'(missing)'"),
+      }),
+    ]);
+  });
+
+  test('allows only used, reasoned migration package exceptions', () => {
+    const project = 'docs/site/src/content/docs/migration/snippets/Legacy.csproj';
+    const reason = 'Compiles the Orleans 9 source side of the migration example.';
+    const accepted = validateProjectEvaluations({
+      projectEvaluations: [
+        {
+          project,
+          evaluation: evaluation({
+            packages: [['Microsoft.Orleans.Server', '9.2.1']],
+            versionException: reason,
+          }),
+        },
+      ],
+      targetFramework: 'net10.0',
+      orleansPackageVersion: '10.2.2',
+    });
+    expect(accepted.issues).toEqual([]);
+
+    const rejected = validateProjectEvaluations({
+      projectEvaluations: [
+        {
+          project: 'docs/site/src/content/docs/host/snippets/Legacy.csproj',
+          evaluation: evaluation({
+            packages: [['Microsoft.Orleans.Server', '9.2.1']],
+            versionException: 'Too short',
+          }),
+        },
+      ],
+      targetFramework: 'net10.0',
+      orleansPackageVersion: '10.2.2',
+    });
+    expect(rejected.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ rule: 'PROJECT005' }),
+        expect.objectContaining({ rule: 'PROJECT006' }),
+      ]),
+    );
+
+    const stale = validateProjectEvaluations({
+      projectEvaluations: [
+        {
+          project,
+          evaluation: evaluation({
+            packages: [['Microsoft.Orleans.Server', '10.2.2']],
+            versionException: reason,
+          }),
+        },
+      ],
+      targetFramework: 'net10.0',
+      orleansPackageVersion: '10.2.2',
+    });
+    expect(stale.issues).toEqual([
+      expect.objectContaining({ rule: 'PROJECT006', message: expect.stringContaining('stale') }),
+    ]);
+  });
+
+  test('checked-in solution exactly covers a clean project discovery', async () => {
+    const discoveredProjects = await discoverMaintainedProjects(repoRoot);
+    const solutionProjects = await readSolutionProjects({
+      repoRoot,
+      solutionFile: path.join(repoRoot, 'docs', 'Docs.slnx'),
+    });
+    expect(
+      validateSolutionCoverage({ discoveredProjects, solutionProjects }),
+    ).toEqual([]);
+    expect(discoveredProjects).not.toContainEqual(
+      expect.stringContaining('/snippets-v3/'),
+    );
+  });
 });

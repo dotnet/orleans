@@ -10,6 +10,7 @@ on:
   pull_request:
     branches:
       - main
+      - reubenbond-reorganize-docs-navigation
   merge_group:
     types:
       - checks_requested
@@ -32,7 +33,7 @@ jobs:
     timeout-minutes: 30
     env:
       ORLEANS_DOCS_BUILD_CONCURRENCY: 4
-      ORLEANS_DOCS_SOURCE_COMMIT: ${{ github.ref == 'refs/heads/main' && github.sha || 'main' }}
+      ORLEANS_DOCS_SOURCE_COMMIT: ${{ github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -78,10 +79,10 @@ jobs:
         with:
           path: docs/site/dist
 
-  snippets:
-    name: Build documentation snippets
+  projects:
+    name: Build documentation projects and samples
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -91,34 +92,34 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Build snippets
+      - name: Validate aggregate project policy
+        working-directory: docs/site
+        run: node scripts/audit-projects.mjs
+
+      - name: Validate snippet and sample policies
         shell: pwsh
-        run: ./docs/site/src/content/docs/validate-snippets.ps1
+        run: |
+          ./docs/site/src/content/docs/validate-snippets.ps1 -PolicyOnly
+          ./samples/Validate-Samples.ps1 -NoBuild
 
-  samples:
-    name: Build samples
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - name: Checkout
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Build aggregate documentation solution
+        run: dotnet build docs/Docs.slnx --configuration Release --framework net10.0 --no-incremental -bl:docs-projects.binlog
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          global-json-file: global.json
-
-      - name: Validate and build samples
-        shell: pwsh
-        run: ./samples/Validate-Samples.ps1
+          name: documentation-project-binlog
+          path: docs-projects.binlog
+          if-no-files-found: ignore
+          retention-days: 3
 
   deploy:
     name: Deploy GitHub Pages
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
     needs:
       - site
-      - snippets
-      - samples
+      - projects
     runs-on: ubuntu-latest
     permissions:
       pages: write

@@ -7,6 +7,7 @@ import type {
   MemberKind,
   PackageApiDocument,
 } from './types';
+import unpublishedApiPackages from '../../data/unpublished-api-packages.json';
 
 export const apiRoot = '/docs/api/csharp';
 export const memberKindOrder: MemberKind[] = [
@@ -94,7 +95,10 @@ export function markdownCompanionPath(route: string): string {
   return `${route.replace(/\/$/, '')}.md`;
 }
 
-export function nugetHref(packageName: string): string {
+export function nugetHref(packageName: string): string | undefined {
+  if (Object.hasOwn(unpublishedApiPackages.packages, packageName)) {
+    return undefined;
+  }
   return `https://www.nuget.org/packages/${encodeURIComponent(packageName)}`;
 }
 

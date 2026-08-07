@@ -1,5 +1,5 @@
 <Project>
-  <!-- Centralized build properties for Orleans 10.x snippet projects -->
+  <!-- Centralized build properties for Orleans 10.2.2 snippet projects -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
@@ -12,7 +12,7 @@
     <NoWarn>$(NoWarn);CS0168;CS0219;CS8618</NoWarn>
   </PropertyGroup>
   
-  <!-- Centralized package versions for Orleans 10.x -->
+  <!-- Centralized package versions for Orleans 10.2.2 -->
   <ItemGroup>
     <PackageReference Update="Microsoft.Orleans.Sdk" Version="10.2.2" />
     <PackageReference Update="Microsoft.Orleans.Server" Version="10.2.2" />

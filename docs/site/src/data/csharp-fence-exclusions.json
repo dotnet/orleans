@@ -1,0 +1,344 @@
+{
+  "description": "Explicit opt-outs for inline C# fences which cannot yet be compiled. Hashes make additions and edits fail closed.",
+  "files": {
+    "dashboard/index.md": {
+      "reason": "Dashboard fences are partial endpoint, authorization, and host configuration fragments which depend on setup shown elsewhere in the article.",
+      "hashes": [
+        "8756c522188790ceb35be4a552a844e67fdd4ef47f60767cbb65d4bf4718d63a",
+        "4e713fcc4fed018cfba131f2c75acd5c683bd6156b3be5321913bd32d5b0f424",
+        "e8692c4234af17919d83191465fd1a15262b35f8b794093f4bae0c44ea4fcba7",
+        "cb25abb185097c7aa5fa89df0f7b869d335cd11484eb2c76eb9d76917e9753f3"
+      ]
+    },
+    "deployment/deploy-to-azure-app-service-linux.md": {
+      "reason": "The endpoint excerpt isolates the Linux deployment invariant from the surrounding production host setup in the maintained App Service sample.",
+      "hashes": [
+        "7b5ee30c5cf634bdd0a529ac9d98ba8cb64538da2b37963f6ed6d8353648f3e4"
+      ]
+    },
+    "deployment/deploy-to-azure-app-service.md": {
+      "reason": "The endpoint and grain-identity excerpts are partial call-site fragments from the restored deployment sample and omit their surrounding host and application types.",
+      "hashes": [
+        "7b5ee30c5cf634bdd0a529ac9d98ba8cb64538da2b37963f6ed6d8353648f3e4"
+      ]
+    },
+    "deployment/deploy-to-azure-container-apps.md": {
+      "reason": "These expanded endpoint and storage examples explain the platform contract; the maintained sample factors equivalent validated logic across shared Infrastructure helpers.",
+      "hashes": [
+        "036d5568ebdfa024374e266e8a2785d5754971605058171865c7cae9a603d334",
+        "332a3237e76676e7139cdfcc075beea40c1b49b5b25abf7ec1abeb2ce0537a82"
+      ]
+    },
+    "deployment/kubernetes.md": {
+      "reason": "The Kubernetes fence is a deployment bootstrap excerpt which omits the provider and project setup needed for a standalone build.",
+      "hashes": [
+        "baed4985466c7d126ae2ed383c4099585cf22d12f3489c14b7463861fdf4a2d4"
+      ]
+    },
+    "grains/cancellation-tokens.md": {
+      "reason": "Cancellation examples intentionally isolate grain contracts and call-site fragments across several types, so they lack one compilable enclosing program.",
+      "hashes": [
+        "bb44740f036d2d61be7cd9441c4bade07196429fcadb6f66d596a8a33274ceca",
+        "231f10caff94157560deff65cdcdca7d14f5ceb1519856cc6b2f5a353fc15a23",
+        "9f7983ed5fbd7b07f1b17886437ec2f72421d855e34af0c79ec0409ef2886dbc",
+        "40e8d1ebf2f35e4c9676f973e99ef89b7914c8ca36aa96276d2f43a5eb186f25"
+      ]
+    },
+    "grains/code-generation.md": {
+      "reason": "Code-generation fences demonstrate attribute shapes and project configuration separately and omit the generated declarations required by a standalone project.",
+      "hashes": [
+        "227780ded231d4d4bcf670f782ba53cb9b44fecb4ad138768161f1a05a31c7b7",
+        "47054613b1b9fbd02b450dceb49e9e98e98692aa803e81d1f30c1c4ead8b9022"
+      ]
+    },
+    "grains/event-sourcing/event-sourcing-configuration.md": {
+      "reason": "Event-sourcing configuration fences are alternative provider registration fragments which rely on grain and storage types introduced outside each excerpt.",
+      "hashes": [
+        "b6e84fa9934f83e6624855de145c96f810dc2efef6083734024b80fb7d704d4d",
+        "048edb41094adbb84200875480f518be13213b37ef04a067c82c5900bae43315",
+        "ba549c4540c86fc85270a536fd06784b5b6d6a06f56ba5bdd1f897e47b7493d5"
+      ]
+    },
+    "grains/event-sourcing/immediate-vs-delayed-confirmation.md": {
+      "reason": "The confirmation example is a method-level JournaledGrain excerpt whose containing grain state and event declarations are intentionally omitted.",
+      "hashes": [
+        "b2ec730dc41ad4980393b1dfba73b613d6f58c8a9a334cf00a952d1a257d8171"
+      ]
+    },
+    "grains/event-sourcing/journaledgrain-basics.md": {
+      "reason": "JournaledGrain basics build one conceptual grain across multiple short fences, each omitting declarations supplied by the surrounding examples.",
+      "hashes": [
+        "158f62fe3691aae43dfa01c3f96e5b6c3332ae68a6c60e10454107534f1254da",
+        "70984e752bd6f10801d24e3348b1d20d046aa0601239089c23e5951e6e114286",
+        "b2ec730dc41ad4980393b1dfba73b613d6f58c8a9a334cf00a952d1a257d8171",
+        "098259469a098dba97f6163067e3fad8e0d77b599ae2ffc079797ecfdaf028ae",
+        "0f29382eecd8070141a3eaa3dc5175d5acda81da3ad94908bb3dbe5e26d096dd",
+        "19b010e08e27aec7056ff90765d5efd3d8e1fde1fb2c946351f8dea981f19235"
+      ]
+    },
+    "grains/event-sourcing/journaledgrain-diagnostics.md": {
+      "reason": "The diagnostics fence is an override excerpt which depends on the article's JournaledGrain type and logging members.",
+      "hashes": [
+        "2d08d3c4a64f346ceb66b849f6c13b240da3711b8be71cec5953cfca67ec94ff"
+      ]
+    },
+    "grains/event-sourcing/log-consistency-providers.md": {
+      "reason": "The log-consistency provider fence is a registration fragment whose provider-specific host and storage setup is intentionally out of scope.",
+      "hashes": [
+        "4fb6abfc6420c524759df6d88de8a792a26f15460bb480c5ab7e28940504c823"
+      ]
+    },
+    "grains/event-sourcing/notifications.md": {
+      "reason": "Notification fences split observer callbacks from the journaled grain which supplies their event and state types.",
+      "hashes": [
+        "2aace76f5ddd81f46f0c9aeaa3b6a1c5bf85a01b70b9a3dea01a735dc4177231",
+        "c703178a458b9503bd7c1ca2e3d87b1378dad3c15d5b887f9501a54a6b9affdc"
+      ]
+    },
+    "grains/event-sourcing/replicated-instances.md": {
+      "reason": "Replicated-instance fences are partial log-view and grain declarations which depend on custom event types described in adjacent prose.",
+      "hashes": [
+        "c311618160e158f551db3be3a800616330109b19ac86653ba051494bb69abb51",
+        "19b010e08e27aec7056ff90765d5efd3d8e1fde1fb2c946351f8dea981f19235"
+      ]
+    },
+    "grains/external-tasks-and-grains.md": {
+      "reason": "External-task examples contrast isolated scheduling patterns and intentionally omit the enclosing grain and injected dependencies.",
+      "hashes": [
+        "76bc44fe4b850cdf8aeb9450f1f7733b6f092e8c92dde9ec9168f9261f962475",
+        "5b93022202c07fe46b214c994af0a40f88969ffc79b9f278a589d77b3bd3ab3d",
+        "075466e760e8919282604477fd78a045b81ece234adc6e62959a846578af4737"
+      ]
+    },
+    "grains/grain-extensions.md": {
+      "reason": "Grain-extension fences divide extension interfaces, implementations, and registration across contextual excerpts rather than one sample project.",
+      "hashes": [
+        "c1d2704608b20a6c4e15dcf9324496fc5fa012d8cb8caf42df5d4b9b67bbad6e",
+        "d0c2640de0f0856895f2a6a6ec93d721167cb9f41b7b016da12ed0681a6ad6b8",
+        "4a15a6f1e347775afce80257bf365c58b54f041f6e43f614678f9ec693d9f7cd"
+      ]
+    },
+    "grains/grain-identity.md": {
+      "reason": "Identity fences are independent key-access expressions and contract fragments which do not form a single executable example.",
+      "hashes": [
+        "3b0fba2805bfed4080bfd623b76f93c879e5478726b30a6cfbbb592d0a8a9a8e",
+        "ff273f878a2b83373a26578ec0877320f54641e30d34a513877a977badbfbd22",
+        "1ea58fdce41805b3534395e8b0b557312f796474818bd03f60d4732c4f315c13",
+        "ae0e558960ff76811646fb409fcaee4366a0fcb1a14a3dcf9bdc848a4f3d0106"
+      ]
+    },
+    "grains/grain-lifecycle.md": {
+      "reason": "Lifecycle fences show individual callbacks and registration points which rely on a grain class and services defined outside each fragment.",
+      "hashes": [
+        "4590c101dd8e075e9489dfe91caf9c2dbcd3aad8ccfd3560edfe86adca706fc2",
+        "22ad89ad209b2e77bcb77b7f0c20944fe9ac86e0d98f8be69762f22e57a53ab0",
+        "119bb94beb7b2c0c047ff067d0cad1b56068cc69e34b81b5bb437c608f02f777",
+        "ffc4d8f7d97b8fa2295e138ae21f36ddd9038645d2f63eedeeaf7955e17d93d5",
+        "09851aa4dc5f379e2bb5b669efb4eb8a2a0bdad75a00616a8ef522af01fe1a5e",
+        "701a51c3e69758061b702a674ba6d6238ed6273abead3e791bfcc534addd301d"
+      ]
+    },
+    "grains/grain-persistence/azure-cosmos-db.md": {
+      "reason": "The Cosmos DB fence is a provider registration fragment which intentionally omits credentials, host creation, and application contracts.",
+      "hashes": [
+        "5e0d960932a0034be1b73f3f89088c6245949fb20d0b55a95b15e6914d743e5f"
+      ]
+    },
+    "grains/grain-persistence/azure-storage.md": {
+      "reason": "Azure Storage fences present alternative authentication and provider registrations which cannot coexist in one minimal compiled setup.",
+      "hashes": [
+        "fdf8e7521097cd06b2e9274a1c69550ffef2a7112f19fbafb821e6c0c9fc8b2e",
+        "9039952ba7b7ea7944dbec8a249cab1bbf863115560aceac4b2bcd909a6a75e8"
+      ]
+    },
+    "grains/grain-persistence/dynamodb-storage.md": {
+      "reason": "The DynamoDB fence is a focused provider-options fragment which omits AWS credential and host bootstrap code.",
+      "hashes": [
+        "ba9ad2d5063b72176e7bf7dc9f8cc605bb9f52712d9cb4acfe977f8628ac4148"
+      ]
+    },
+    "grains/grain-persistence/index.md": {
+      "reason": "Persistence overview fences separate state contracts, grain constructors, and storage calls to explain the model incrementally.",
+      "hashes": [
+        "88af316fb46bcec0cb9b5f586d9d6e7d50d051e771401dbc9bb20d9fb35d19fb"
+      ]
+    },
+    "grains/grain-persistence/relational-storage.md": {
+      "reason": "Relational storage fences are database-specific registration alternatives which omit connection provisioning and host scaffolding.",
+      "hashes": [
+        "3deb2da678a10e25c38594d26d12b799fb5dd0a2598ba60cfad41b3ed99c169c",
+        "8dc5f610f4bf956d4bfa84f372225dd46341d7b9be261cca65412edfff508f75"
+      ]
+    },
+    "grains/grain-placement-filtering.md": {
+      "reason": "Placement-filter fences split attributes, filters, and registration into API-shape excerpts which depend on runtime context.",
+      "hashes": [
+        "727f2ed70b1453483892160f3b92c610b9fc74aee951ed46ada37b737e2670f4",
+        "b75a4bb4ec5a1081e85b95199a648e0ed4f93643b37730d0c2640b6401de46d5",
+        "38619342e2e76219cdd923edd7a3a3532984e5685b0136cc754fb6719ef0cb0b",
+        "4a6177b767340e95c2198d9fb96068bd5d519f51d2f612ac518a813e79dddafe",
+        "6f81e4202c4ddf6beb1d61242b04b0b2542c6eb72de2bee2e6ec91657149e947"
+      ]
+    },
+    "grains/grain-placement.md": {
+      "reason": "Placement examples show independent strategy attributes and director fragments which require Orleans runtime internals not suitable for a small sample.",
+      "hashes": [
+        "8f2e3a0a509b6f4bca73db433c88264ab89fef95d7371005dac6b9bf545ea53c",
+        "c899faa9d7cef47c7ba41c3272e303d7f2ea6b1754671aff667df4a4b23bea6c",
+        "3b596d03d91848fd770a4f7120f683ee63335012aac09256ea48794d00ab5c20",
+        "da991e30d0a73be5228d38c30f04de825d101cab611d4f7e6e5c45296e10fa67",
+        "b91d8007818cce7e0463eef3382def944507f8fcd86c8264f2511e6ca71cd5dc",
+        "dccecbc52c4040d0b2e450f3a1c6bc89982d7b8e0b2bdc4cb655866a6e6a21c3"
+      ]
+    },
+    "grains/grain-references.md": {
+      "reason": "Grain-reference fences are isolated retrieval and casting expressions whose contracts and host lifetime are supplied by surrounding text.",
+      "hashes": [
+        "d8032180f38f84236a581cb5e2252dd0b1ba9fd95b995072214ee8f3061f7872",
+        "a50612d499f68f13b78bd228d276edf3ad2f423c6ee7b47b6c9e108052e86395",
+        "b35c3ae43e24c7ce970970db0359e61ab49ab6f078f0c0b4824d0fcf220ab11c",
+        "2723e351274d7ff44ad12721a4e4d074b08e532ab78eb3e70b714f92aa96fff9",
+        "6e7690be6507b034eab2d3cff65a147dd4330f9dd2c514112928f2fbb0d0b0bb"
+      ]
+    },
+    "grains/grain-versioning/backward-compatibility-guidelines.md": {
+      "reason": "The compatibility fence intentionally juxtaposes old and new contract shapes which cannot be compiled together in one project.",
+      "hashes": [
+        "715dbc522995f9663c64077110a91be3dd9e080489cc8fea2cb40ae8c940ff5c"
+      ]
+    },
+    "grains/grain-versioning/deploying-new-versions-of-grains.md": {
+      "reason": "Deployment-versioning fences represent separate application revisions, so combining them into one compiled project would invalidate the example.",
+      "hashes": [
+        "9847c30189df8b797c2fbab999f9fd67799c7304c6b97f22dfcae47b18b95258"
+      ]
+    },
+    "grains/grain-versioning/grain-versioning.md": {
+      "reason": "Versioning fences show mutually exclusive interface revisions and compatibility attributes rather than one simultaneous codebase.",
+      "hashes": [
+        "4eea48adf4bbc08323941e0fed956ccea40e65240cd19175c0822136eb483f56"
+      ]
+    },
+    "grains/grainservices.md": {
+      "reason": "Grain-service fences split service contracts, implementation, client, and registration while omitting runtime construction details.",
+      "hashes": [
+        "1436edad169e7d4e8f07b7a7e204223c9aaf0d6569d331505dbae752c0320028",
+        "f906f5706ed985d196906b6fe24dd842af3a3601bfd13939e7f517b4d9f349b3",
+        "38af90aae43251e63a7247628efdee3f0dcbad7e9bc481291cc4b2b21b14d677",
+        "95bc22a62a4af30dfc11fadb44450daa8e5865fc38b1707283d9692572f00457",
+        "13a402bbe6056f6d21839db28edb626e25c6cd4bec47ed747493605baabf5065"
+      ]
+    },
+    "grains/index.md": {
+      "reason": "The grain overview uses short contract, implementation, and call-site excerpts to teach concepts before introducing a complete application.",
+      "hashes": [
+        "a72ed443f9f79c06ac4a60dd341d090d7c99258aa98fd2029b14b12a55e6146c",
+        "5e2bf0bc0257f83463be2af855a490ed9b8d6ad70954efebb53e6e925c909769",
+        "e663c64e6938a3b7a78f4cc4e9219a163017cc66b9f19d54e78cec15f770d204",
+        "d9661ec8230203242ce130a2d6a0ac3d34ca08550e111ab5c5b56ebefcc3ea83",
+        "c85ba13fb24d7b328107a1bde907e3d1ad950901915ebca1593dc08bfb52c1d8"
+      ]
+    },
+    "grains/observers.md": {
+      "reason": "Observer fences separate contracts, local observer objects, reference creation, and subscription across process roles.",
+      "hashes": [
+        "2520602493a23d339b077b82485f56eff1ae486849fec7b46cad55cbd3b95f3a",
+        "8eb25572b83036855783405f999d966fbbb95c4f784e98847199a96a652d4562",
+        "a06b05af4a38c9e7749f705ebe80e7e918d4ec491329655bf64cdeee8f453cec",
+        "0efb020fb7a4ab0fa941e0fed1dd02eeeba121f727d3fd91086053a556a14fe7",
+        "4475a9b9ac8287ce94af277451c9587384259bfdb5ad949fdef6b0ad0d0e8472"
+      ]
+    },
+    "grains/oneway.md": {
+      "reason": "The one-way fence is an interface-member fragment whose containing grain contract is intentionally omitted.",
+      "hashes": [
+        "668852426b0bd29899f3c6a6d6144f8da94e8c117ca8e4c3ab75c44e0a6c8b5a"
+      ]
+    },
+    "grains/request-context.md": {
+      "reason": "Request-context fences are isolated propagation expressions which depend on the caller, grain, and logging context around them.",
+      "hashes": [
+        "003d6ad330e1cf77e69ee1b55c32ce329542cc339824ce62113e67665ebc4e02",
+        "954e849ac9d5b7ba57cdf0f125b27e174da4b6569a37ca68d8a5b6b6edc92cb2",
+        "93394ef93bb19b18c2ef8906d82d8013cc4a62e45f58d92409b3daf2361c6c8d"
+      ]
+    },
+    "grains/request-scheduling.md": {
+      "reason": "Scheduling fences demonstrate mutually exclusive grain attributes and interleaving predicates which are clearer as separate type fragments.",
+      "hashes": [
+        "3d86e5dca77acd51192a667e74cc0200f3e766338871b7d8edf2520e7c7fa336",
+        "11bba2041312c42611bb72aaa1ada3ac8293dd323429fc38a58ecb2645dcdc4c",
+        "0c701789fc5e43facf90c69350153d4f9b2a6c86426867e5afe82d09318b6e5e",
+        "aefa18ac40b91bdf88b18b74e7138cd2edc64f81fedfb15190b28c04679267ce",
+        "a3cbf45a3f210fcd6e0d15f4b286b8ba10494bae18fc435017bb4463e8406c66"
+      ]
+    },
+    "grains/stateless-worker-grains.md": {
+      "reason": "Stateless-worker fences isolate attribute and call patterns while omitting the ordinary grain contract and hosting boilerplate.",
+      "hashes": [
+        "544d4b4d5f3c1ba53b971568334dcd098e5be09d5e506b57954134909e0dcca6",
+        "e993393c7f4518a96364ba1d5164aeac783d56b53f5ae11708a3755b45c12d6f",
+        "cdb58871fc8e0a01b0b0ce3053353d154179d978397b291bb5f28d6b7951cc50"
+      ]
+    },
+    "grains/timers-and-reminders.md": {
+      "reason": "Timer and reminder fences span lifecycle methods and callback fragments whose state and injected registry are defined outside each excerpt.",
+      "hashes": [
+        "a662399e116158359ae8c90f4357ab33f2ec9aad80dd1813c81be8f8da71a399",
+        "963d0261f47f4763ed40ba12be1ae1cf38e524ea6b9a6e03a229df90058cb6c3",
+        "24f8beb8aa235f9420fc771667034e6f1d581f0dfe4d83d62b691bd1f1f85ec6",
+        "ab367dc940d5919796dcc88e51fcfae45f34d2843ffe55498858e8effc1451a5"
+      ]
+    },
+    "grains/transactions.md": {
+      "reason": "Transaction fences cover alternative attributes, grain roles, and failure paths which belong to a larger multi-project sample.",
+      "hashes": [
+        "a23c01cfce9164d9fe68383d848784885367d83241a4eec1e1f854c11c991a7c",
+        "61abf073615d7723a715436d0e85002c55b7ebfdff720ab65dd1c2af13fc9a57",
+        "805a19f9649ba83508058363e6285ef919a97cb31297cba3be8e9341ffad62e0",
+        "abca5ff6e451c43bfa661035d12b30f98ba8cbb5c95689af91c244091320d471",
+        "6e315cbf6237dd2ae72becd13c6bd2e2ff77956445e1fc8018ce588cb3475495",
+        "8dc704899d571cbc44cb82b5202d80431cca94a6a50ca7de19996216689594af"
+      ]
+    },
+    "host/configuration-guide/clustering/consul.md": {
+      "reason": "The silo and client examples are complete alternative host entry points which intentionally share configuration names but cannot coexist in one top-level snippet project.",
+      "hashes": [
+        "d0925357c5ba53d00bed19d9875d707eccc8fee54963fb73b0c34b3d8948eccb",
+        "e455b3258348770397c2f59d39be16d2c4574cc17ae9f6f83a31462cc3596e6a"
+      ]
+    },
+    "host/configuration-guide/serialization-configuration.md": {
+      "reason": "Serialization-configuration fences are independent registration fragments which rely on a builder defined outside each excerpt.",
+      "hashes": [
+        "659787380d2634b81e612dd0e78e473890f704327ee33bc8d4d78208600120da",
+        "080cdfa425625ff2a8cb7eea3fa348a75c8601d874ec37e893312be9affb2e19"
+      ]
+    },
+    "host/configuration-guide/serialization-customization.md": {
+      "reason": "Customization fences assemble a serializer across partial interface implementations and registration fragments which are not one standalone program.",
+      "hashes": [
+        "88430321df72e14db0cacd16def7663023c16647681ae1cd5c8eeb9bc785157c",
+        "54e881a785e31ca59d709812e2054751fd88d94642ddf2eb512a8a0a0c30493d"
+      ]
+    },
+    "host/configuration-guide/serialization-immutability.md": {
+      "reason": "Immutability fences compare alternative annotations and wrapper shapes which intentionally reuse placeholder types.",
+      "hashes": [
+        "8dd06052e3808c2126f8c83cedd9f373c393498ed81b1be2b756e6f7c8d1a34a",
+        "000bd644968cae9d8c2399270b4fedb462df9bc619990dd0b22bf7d4f992ace3",
+        "32caff0fc3c28c1613ba6d5fa79685173e12126cc6468f5a88edeb77df405601",
+        "894d955d3e9dbef0062fdd27d5f199fe803480594d088fd17ec71e7794190f24",
+        "44b4788e98a138c430b4b771cb93ce5d000d023db833ba62a75072b0915cdcbb",
+        "a152d65de24edbf5d36be59f7afdf77dc007eb1567aa437c5787a4a0754165da",
+        "37127be5722bd99e157bae12b8a00208ab901b65903ea723afa1f322ba9ed2f3"
+      ]
+    },
+    "migration/7-to-10.md": {
+      "reason": "The migration fence intentionally shows an Orleans 7 source shape for comparison and therefore cannot compile against the Orleans 10 snippet policy.",
+      "hashes": [
+        "1c60b57580d6d50b5f4ddd33f8c74d785d8463bb071552af2bcde7dc57f874e9"
+      ]
+    }
+  }
+}
