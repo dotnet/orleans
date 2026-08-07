@@ -1,9 +1,9 @@
+using System;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Configuration.Overrides;
-using System;
-using System.Threading.Tasks;
 
 namespace Orleans.Streams
 {

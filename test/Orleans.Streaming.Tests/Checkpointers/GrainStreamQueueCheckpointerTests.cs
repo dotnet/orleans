@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Orleans.Configuration;
+using Orleans.Metadata;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -65,6 +66,25 @@ public sealed class GrainStreamQueueCheckpointerTests : StreamQueueCheckpointerT
         Assert.NotNull(typeof(StreamCheckpointerGrainState).GetCustomAttributes(typeof(GenerateSerializerAttribute), inherit: false).SingleOrDefault());
         var checkpoint = typeof(StreamCheckpointerGrainState).GetProperty(nameof(StreamCheckpointerGrainState.Checkpoint));
         Assert.NotNull(checkpoint?.GetCustomAttributes(typeof(IdAttribute), inherit: false).SingleOrDefault());
+    }
+
+    [Fact]
+    public void ConfiguredGrainInterface_UsesConfiguredGrainType()
+    {
+        var attribute = Assert.IsType<DefaultGrainTypeAttribute>(
+            Assert.Single(typeof(IConfiguredStreamCheckpointerGrain).GetCustomAttributes(
+                typeof(DefaultGrainTypeAttribute),
+                inherit: false)));
+        var properties = new Dictionary<string, string>();
+
+        ((IGrainInterfacePropertiesProviderAttribute)attribute).Populate(
+            null!,
+            typeof(IConfiguredStreamCheckpointerGrain),
+            properties);
+
+        Assert.Equal(
+            "stream.checkpoint.configured",
+            properties[WellKnownGrainInterfaceProperties.DefaultGrainType]);
     }
 
     [Fact]

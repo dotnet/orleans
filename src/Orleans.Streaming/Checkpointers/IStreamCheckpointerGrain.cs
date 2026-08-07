@@ -30,6 +30,7 @@ namespace Orleans.Streams
             CancellationToken cancellationToken);
     }
 
+    [DefaultGrainType("stream.checkpoint.configured")]
     internal interface IConfiguredStreamCheckpointerGrain : IStreamCheckpointerGrain
     {
     }
