@@ -32,11 +32,10 @@ sample-owned JWT parsing or validation.
 
 Provide a PFX whose certificate has the Server Authentication and Client
 Authentication EKUs and a DNS SAN matching `Certificate:TargetHost`. Install
-the issuing private root in the operating-system trust store, then configure
-its SHA-256 fingerprint. The sample requires successful platform chain,
-validity, EKU, and revocation checks in both directions, requires the outbound
-DNS-name check, and additionally pins the expected private root. Add the old
-and new root fingerprints during CA rotation.
+the issuing private root in the operating-system trust store. The sample
+requires successful platform chain, validity, EKU, and revocation checks in
+both directions and explicitly configures the outbound DNS-name check. Overlap
+the old and new roots in the platform trust store during CA rotation.
 
 Supply the PFX password through a secret provider or the environment variable
 `OrleansSecurity__Certificate__Password`; don't store it in `appsettings.json`.
@@ -45,13 +44,15 @@ Supply the PFX password through a secret provider or the environment variable
 
 Use environment variables or a secret-aware configuration provider to replace
 every placeholder in `appsettings.json`. Set `OTEL_EXPORTER_OTLP_ENDPOINT` to
-export the `Microsoft.Orleans` meter. Structured console logs preserve the
-runtime's fixed event IDs and bounded authentication result categories.
+export the `Microsoft.Orleans.Connections.Security` meter. Structured console
+logs preserve the runtime's fixed event IDs and bounded authentication result
+categories.
 
-Start in `Audit` mode. Proceed to `Required` only after every expected silo pair
-has used the authentication protocol, baseline fallback and unexpected failure
-rates remain zero for at least one maximum connection lifetime, and token
-expiry recycling succeeds. Changing modes requires a restart.
+Start in `Audit` mode. Before proceeding to `Required`, deliberately reconnect
+every expected silo pair and verify that each new connection authenticates,
+baseline fallback and unexpected failure rates remain zero, and token-expiry
+recycling succeeds for authenticated connections. Changing modes requires a
+restart.
 
 `Required` has no unauthenticated fallback. Roll back fleet-wide from
 `Required` to `Audit`, and only then from `Audit` to `Disabled`. Never
