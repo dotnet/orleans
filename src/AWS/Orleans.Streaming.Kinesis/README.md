@@ -78,6 +78,26 @@ siloBuilder.AddKinesisStreams("Kinesis", configurator =>
 });
 ```
 
+To persist checkpoints directly in DynamoDB without configuring grain storage, select the DynamoDB table checkpointer:
+
+```csharp
+siloBuilder.AddKinesisStreams("Kinesis", configurator =>
+{
+    configurator.ConfigureKinesis(options => options.Configure(kinesis =>
+    {
+        kinesis.StreamName = "orders";
+        kinesis.Region = "us-east-1";
+    }));
+    configurator.UseDynamoDBCheckpointer(options =>
+    {
+        options.Service = "us-east-1";
+        options.TableName = "OrleansStreamCheckpoints";
+    });
+});
+```
+
+The DynamoDB checkpointer uses on-demand billing and creates its table by default. It stores one versioned row per service, provider, and shard. Conditional writes prevent a stale silo owner from moving a checkpoint backward. Set `CreateIfNotExists` to `false` when tables are provisioned separately.
+
 To provide a different checkpoint implementation, use the configurator overload and call
 `ConfigureCheckpointer<TOptions>` with an `IStreamQueueCheckpointerFactory`.
 

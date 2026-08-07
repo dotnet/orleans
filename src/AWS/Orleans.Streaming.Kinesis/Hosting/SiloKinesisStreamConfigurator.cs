@@ -42,6 +42,29 @@ namespace Orleans.Hosting
             this.ConfigureComponent(checkpointerFactoryBuilder, configureOptions);
             return this;
         }
+
+        /// <summary>
+        /// Configures the stream provider to persist checkpoints in DynamoDB.
+        /// </summary>
+        public SiloKinesisStreamConfigurator UseDynamoDBCheckpointer(
+            Action<DynamoDBStreamQueueCheckpointerOptions> configureOptions)
+            => UseDynamoDBCheckpointer(options => options.Configure(configureOptions));
+
+        /// <summary>
+        /// Configures the stream provider to persist checkpoints in DynamoDB.
+        /// </summary>
+        public SiloKinesisStreamConfigurator UseDynamoDBCheckpointer(
+            Action<OptionsBuilder<DynamoDBStreamQueueCheckpointerOptions>>? configureOptions = null)
+        {
+            ConfigureCheckpointer<DynamoDBStreamQueueCheckpointerOptions>(
+                DynamoDBStreamQueueCheckpointerFactory.CreateFactory,
+                options => configureOptions?.Invoke(options));
+            this.ConfigureDelegate(services => services.AddTransient<IConfigurationValidator>(
+                sp => new DynamoDBStreamQueueCheckpointerOptionsValidator(
+                    sp.GetOptionsByName<DynamoDBStreamQueueCheckpointerOptions>(Name),
+                    Name)));
+            return this;
+        }
     }
 
     internal sealed class KinesisStreamCheckpointerConfigurationValidator(

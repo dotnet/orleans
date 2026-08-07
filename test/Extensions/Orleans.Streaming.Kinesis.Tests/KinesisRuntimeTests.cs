@@ -40,6 +40,31 @@ public sealed class KinesisRuntimeTests
     }
 
     [Fact]
+    public async Task GetPartitionIdsForwardsCancellationToken()
+    {
+        var client = Substitute.For<IAmazonKinesis>();
+        using var cancellation = new CancellationTokenSource();
+        client.ListShardsAsync(Arg.Any<ListShardsRequest>(), cancellation.Token)
+            .Returns(async _ =>
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellation.Token);
+                return null!;
+            });
+
+        var operation = KinesisAdapterFactory.GetPartitionIdsAsync(
+            client,
+            "stream",
+            cancellation.Token);
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        await client.Received(1).ListShardsAsync(
+            Arg.Any<ListShardsRequest>(),
+            cancellation.Token);
+    }
+
+    [Fact]
     public void RegionIsInferredFromAwsServiceUrl()
     {
         var options = new KinesisStreamOptions
@@ -89,9 +114,9 @@ public sealed class KinesisRuntimeTests
     {
         var client = Substitute.For<IAmazonKinesis>();
         var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
-        checkpointer.Load().Returns(string.Empty, "123");
+        checkpointer.Load(Arg.Any<CancellationToken>()).Returns(string.Empty, "123");
         var checkpointerFactory = Substitute.For<IStreamQueueCheckpointerFactory>();
-        checkpointerFactory.Create("shard-1").Returns(checkpointer);
+        checkpointerFactory.Create("shard-1", Arg.Any<CancellationToken>()).Returns(checkpointer);
         client.GetShardIteratorAsync(Arg.Any<GetShardIteratorRequest>(), Arg.Any<CancellationToken>())
             .Returns(
                 Task.FromResult(new GetShardIteratorResponse { ShardIterator = "iterator-1" }),
@@ -110,7 +135,7 @@ public sealed class KinesisRuntimeTests
         var records = await receiver.GetQueueMessagesAsync(10);
 
         Assert.Empty(records);
-        await checkpointer.Received(2).Load();
+        await checkpointer.Received(2).Load(Arg.Any<CancellationToken>());
         await client.Received(1).GetShardIteratorAsync(
             Arg.Is<GetShardIteratorRequest>(request =>
                 request.ShardIteratorType == ShardIteratorType.AFTER_SEQUENCE_NUMBER
@@ -124,9 +149,9 @@ public sealed class KinesisRuntimeTests
         var timeProvider = new FakeTimeProvider();
         var client = Substitute.For<IAmazonKinesis>();
         var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
-        checkpointer.Load().Returns(string.Empty);
+        checkpointer.Load(Arg.Any<CancellationToken>()).Returns(string.Empty);
         var checkpointerFactory = Substitute.For<IStreamQueueCheckpointerFactory>();
-        checkpointerFactory.Create("shard-1").Returns(checkpointer);
+        checkpointerFactory.Create("shard-1", Arg.Any<CancellationToken>()).Returns(checkpointer);
         client.GetShardIteratorAsync(Arg.Any<GetShardIteratorRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new GetShardIteratorResponse { ShardIterator = "iterator-1" }));
         client.GetRecordsAsync(Arg.Any<GetRecordsRequest>(), Arg.Any<CancellationToken>())
@@ -148,9 +173,9 @@ public sealed class KinesisRuntimeTests
     {
         var client = Substitute.For<IAmazonKinesis>();
         var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
-        checkpointer.Load().Returns(string.Empty);
+        checkpointer.Load(Arg.Any<CancellationToken>()).Returns(string.Empty);
         var checkpointerFactory = Substitute.For<IStreamQueueCheckpointerFactory>();
-        checkpointerFactory.Create("shard-1").Returns(checkpointer);
+        checkpointerFactory.Create("shard-1", Arg.Any<CancellationToken>()).Returns(checkpointer);
         client.GetShardIteratorAsync(Arg.Any<GetShardIteratorRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new GetShardIteratorResponse { ShardIterator = "iterator-1" }));
         client.GetRecordsAsync(Arg.Any<GetRecordsRequest>(), Arg.Any<CancellationToken>())
@@ -171,9 +196,9 @@ public sealed class KinesisRuntimeTests
     {
         var client = Substitute.For<IAmazonKinesis>();
         var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
-        checkpointer.Load().Returns(string.Empty);
+        checkpointer.Load(Arg.Any<CancellationToken>()).Returns(string.Empty);
         var checkpointerFactory = Substitute.For<IStreamQueueCheckpointerFactory>();
-        checkpointerFactory.Create("shard-1").Returns(checkpointer);
+        checkpointerFactory.Create("shard-1", Arg.Any<CancellationToken>()).Returns(checkpointer);
         client.GetShardIteratorAsync(Arg.Any<GetShardIteratorRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new GetShardIteratorResponse { ShardIterator = "iterator-1" }));
         var receiver = CreateReceiver(client, checkpointerFactory, new FakeTimeProvider());
@@ -183,6 +208,105 @@ public sealed class KinesisRuntimeTests
 
         await checkpointer.Received(1).FlushAsync(Arg.Any<CancellationToken>());
         client.Received(1).Dispose();
+    }
+
+    [Fact]
+    public async Task ReceiverInitializationHonorsTimeout()
+    {
+        var client = Substitute.For<IAmazonKinesis>();
+        var checkpointerFactory = Substitute.For<IStreamQueueCheckpointerFactory>();
+        var tokenObserved = new TaskCompletionSource<CancellationToken>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        checkpointerFactory.Create("shard-1", Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                var cancellationToken = call.Arg<CancellationToken>();
+                tokenObserved.SetResult(cancellationToken);
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return null!;
+            });
+        var receiver = CreateReceiver(client, checkpointerFactory, new FakeTimeProvider());
+
+        var operation = receiver.Initialize(TimeSpan.FromMilliseconds(100));
+        var initializationToken = await tokenObserved.Task;
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
+
+        Assert.True(initializationToken.CanBeCanceled);
+        Assert.Equal(initializationToken, exception.CancellationToken);
+        await client.DidNotReceive().GetShardIteratorAsync(
+            Arg.Any<GetShardIteratorRequest>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ReceiverReadRetriesAfterInitializationTimeout()
+    {
+        var client = Substitute.For<IAmazonKinesis>();
+        var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
+        checkpointer.Load(Arg.Any<CancellationToken>()).Returns(string.Empty);
+        var checkpointerFactory = Substitute.For<IStreamQueueCheckpointerFactory>();
+        var createCount = 0;
+        checkpointerFactory.Create("shard-1", Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                if (Interlocked.Increment(ref createCount) == 1)
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, call.Arg<CancellationToken>());
+                }
+
+                return checkpointer;
+            });
+        client.GetShardIteratorAsync(Arg.Any<GetShardIteratorRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new GetShardIteratorResponse { ShardIterator = "iterator-1" }));
+        client.GetRecordsAsync(Arg.Any<GetRecordsRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new GetRecordsResponse
+            {
+                NextShardIterator = "iterator-1",
+                Records = [],
+            }));
+        var receiver = CreateReceiver(client, checkpointerFactory, new FakeTimeProvider());
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => receiver.Initialize(TimeSpan.FromMilliseconds(100)));
+        var messages = await receiver.GetQueueMessagesAsync(10, CancellationToken.None);
+
+        Assert.Empty(messages);
+        Assert.Equal(2, createCount);
+        await client.Received(1).GetRecordsAsync(
+            Arg.Any<GetRecordsRequest>(),
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ReceiverReadForwardsCancellationToken()
+    {
+        var client = Substitute.For<IAmazonKinesis>();
+        var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
+        checkpointer.Load(Arg.Any<CancellationToken>()).Returns(string.Empty);
+        var checkpointerFactory = Substitute.For<IStreamQueueCheckpointerFactory>();
+        checkpointerFactory.Create("shard-1", Arg.Any<CancellationToken>()).Returns(checkpointer);
+        client.GetShardIteratorAsync(Arg.Any<GetShardIteratorRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new GetShardIteratorResponse { ShardIterator = "iterator-1" }));
+        var tokenObserved = new TaskCompletionSource<CancellationToken>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        client.GetRecordsAsync(Arg.Any<GetRecordsRequest>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                var cancellationToken = call.Arg<CancellationToken>();
+                tokenObserved.SetResult(cancellationToken);
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return null!;
+            });
+        var receiver = CreateReceiver(client, checkpointerFactory, new FakeTimeProvider());
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+        using var cancellation = new CancellationTokenSource();
+
+        var operation = receiver.GetQueueMessagesAsync(10, cancellation.Token);
+        Assert.Equal(cancellation.Token, await tokenObserved.Task);
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
     }
 
     private static KinesisAdapterReceiver CreateReceiver(
