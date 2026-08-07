@@ -13,7 +13,9 @@ These rules apply recursively to documentation, snippets, and samples under
 - Compile every affected snippet project. Don't publish pseudo-code as if it were a copyable example.
 - Maintained documentation and snippet projects target `net10.0`.
 - Every `Microsoft.Orleans.*` package reference must use the approved version `10.2.2`. Keep the Orleans package family aligned and centralize versions where the project structure supports it.
-- Use an older Orleans package only for a narrow migration example whose purpose requires that version, and document the reason next to the exception.
+- Use an older Orleans package only for a narrow migration example whose purpose
+  requires that version. Keep it under `migration` and document the reason in
+  `OrleansDocumentationVersionException` in that project.
 - Keep direct dependency versions at or above the minimums required by the selected Orleans packages.
 - Don't demonstrate an unreleased API using an older package that doesn't contain it. Link to its API reference until a compilable source- or package-based example is available.
 

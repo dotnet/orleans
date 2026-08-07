@@ -22,14 +22,27 @@ function filesUnder(directory, extension) {
 
 function attributes(tag) {
   return new Map(
-    [...tag.matchAll(/([A-Za-z]+)="([^"]+)"/g)].map((match) => [
+    [...tag.matchAll(/([A-Za-z]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)].map((match) => [
       match[1],
-      match[2],
+      match[2] ?? match[3],
     ]),
   );
 }
 
 describe('documentation project policy', () => {
+  test('parses both XML attribute quote styles', () => {
+    expect(
+      attributes(
+        `<PackageReference Include='Microsoft.Orleans.Server' Version="10.2.2" />`,
+      ),
+    ).toEqual(
+      new Map([
+        ['Include', 'Microsoft.Orleans.Server'],
+        ['Version', '10.2.2'],
+      ]),
+    );
+  });
+
   test('targets net10.0 without maintained v3 projects', () => {
     expect(defaultProperties).toContain('<TargetFramework>net10.0</TargetFramework>');
 
@@ -69,6 +82,14 @@ describe('documentation project policy', () => {
           match[2],
         ]),
       );
+      const exceptionReason =
+        /<OrleansDocumentationVersionException>([^<]+)<\/OrleansDocumentationVersionException>/.exec(
+          source,
+        )?.[1].trim();
+      const isMigrationProject = relative.split('/').includes('migration');
+      if (exceptionReason && !isMigrationProject) {
+        failures.push(`${relative}: version exception is only allowed under migration`);
+      }
 
       for (const match of source.matchAll(/<PackageReference\b[^>]+>/g)) {
         const item = attributes(match[0]);
@@ -80,7 +101,10 @@ describe('documentation project policy', () => {
         const version = item.get('Version') ?? item.get('VersionOverride');
         const propertyName = /^\$\(([^)]+)\)$/.exec(version ?? '')?.[1];
         const resolvedVersion = propertyName ? properties.get(propertyName) : version;
-        if (resolvedVersion !== '10.2.2') {
+        if (
+          resolvedVersion !== '10.2.2' &&
+          !(isMigrationProject && exceptionReason)
+        ) {
           failures.push(`${relative}: ${packageName}=${version ?? '<missing>'}`);
         }
       }
