@@ -1,36 +1,45 @@
 ---
-title: Implementation details
-description: Explore the various implementation details in .NET Orleans.
-ms.date: 05/23/2025
+title: Orleans runtime architecture
+description: An advanced guide to the protocols, invariants, and extension points inside the Orleans runtime.
+ms.date: 08/02/2026
 ms.topic: overview
 ---
 
-# Implementation details overview
+# Orleans runtime architecture
 
-## [Orleans lifecycle](orleans-lifecycle.md)
+The implementation track explains how Orleans realizes the virtual actor model. It is intended for runtime contributors, provider authors, and operators who need to reason about failure, consistency, scheduling, and extensibility. For application programming guidance, start with the conceptual and task-oriented sections of this documentation instead.
 
-Some Orleans behaviors are sufficiently complex that they need ordered startup and shutdown. To address this, Orleans introduced a general component lifecycle pattern.
+The pages in this track use Orleans source and tests as the specification. Internal types are named so that readers can follow an operation through the repository, but those types are not public compatibility contracts unless the page explicitly identifies an extension point.
 
-## [Messaging delivery guarantees](messaging-delivery-guarantees.md)
+## Runtime core
 
-Orleans messaging delivery guarantees are **at-most-once** by default. Optionally, if you configure retries upon timeout, Orleans provides at-least-once delivery instead.
+- [Runtime architecture](runtime-architecture.md) follows a call through client, messaging, placement, directory, activation, and scheduling components.
+- [Activation lifecycle and migration](activation-lifecycle.md) explains creation, activation, collection, deactivation, and state transfer.
+- [Cluster membership](cluster-management.md) describes the failure detector, membership table, ordered views, and death-vote protocol.
+- [Grain directory](grain-directory.md) distinguishes the default `LocalGrainDirectory` DHT from the experimental distributed directory.
+- [Scheduling and turn execution](scheduler.md) explains `WorkItemGroup`, continuations, interleaving, and single-threaded execution.
+- [Messaging and delivery semantics](messaging-delivery-guarantees.md) traces requests and explains why a timeout has an unknown outcome.
+- [Placement and activation balancing](load-balancing.md) covers the default resource-optimized policy and the opt-in movement protocols.
 
-## [Scheduler](scheduler.md)
+## Runtime services and extensibility
 
-The Orleans Scheduler is a component within the Orleans runtime responsible for executing application code and parts of the runtime code to ensure single-threaded execution semantics.
+- [Lifecycle implementation](orleans-lifecycle.md) describes ordered startup and shutdown.
+- [Serialization and code generation](serialization.md) covers generated codecs, proxies, manifests, wire identity, and custom components.
+- [Persistent streams](streams-implementation/index.md) explains pulling agents, queue ownership, caches, cursors, pub-sub, and recovery.
+- [Provider authoring](provider-authoring.md) describes named providers, configuration binding, lifecycle participation, and validation.
+- [TestingHost architecture](testing.md) explains the in-process cluster harness and its substitutions for production services.
 
-## [Cluster management](cluster-management.md)
+## Defaults that shape the architecture
 
-Orleans provides cluster management via a built-in membership protocol, sometimes referred to as Silo Membership. The goal of this protocol is for all silos (Orleans servers) to agree on the set of currently alive silos, detect failed silos, and allow new silos to join the cluster.
+| Concern | Default |
+| --- | --- |
+| Placement | <xref:Orleans.Runtime.ResourceOptimizedPlacement> |
+| Grain directory | `LocalGrainDirectory`, using the membership ring |
+| Experimental directory | Opt-in with <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?displayProperty=nameWithType>; warning `ORLEANSEXP003` |
+| Experimental directory partitions | <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType> defaults to 1 |
+| Membership probe timeout | 5 seconds |
+| Death-vote expiry | 2 minutes |
+| <xref:Orleans.Configuration.MessagingOptions.ResponseTimeout?displayProperty=nameWithType> | 30 seconds, or 30 minutes while a debugger is attached |
+| Automatic call retry after response timeout | None |
 
-## [Streams implementation](streams-implementation/index.md)
-
-This section provides a high-level overview of the Orleans Stream implementation. It describes concepts and details not visible at the application level.
-
-## [Load balancing](load-balancing.md)
-
-Load balancing, in a broad sense, is one of the pillars of the Orleans runtime.
-
-## [Unit testing](testing.md)
-
-This section shows how to unit test your grains to ensure they behave correctly.
+Configuration values affect failure detection and resource use. This track explains their role in protocols, while the [hosting configuration guide](../host/configuration-guide/index.md) and [deployment guidance](../deployment/index.md) own operational recommendations.

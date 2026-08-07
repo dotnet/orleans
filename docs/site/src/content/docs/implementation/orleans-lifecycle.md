@@ -1,149 +1,75 @@
 ---
-title: Orleans lifecycle
-description: Learn the various lifecycles of .NET Orleans apps.
-ms.date: 03/30/2025
+title: Lifecycle implementation
+description: Understand ordered startup and shutdown for Orleans runtime components.
+ms.date: 08/02/2026
 ms.topic: concept-article
 ---
 
-# Orleans lifecycle overview
+# Lifecycle implementation
 
-Some Orleans behaviors are sufficiently complex that they require ordered startup and shutdown. Components with such behaviors include grains, silos, and clients. To address this, Orleans introduced a general component lifecycle pattern. This pattern consists of an observable lifecycle, responsible for signaling stages of a component's startup and shutdown, and lifecycle observers, responsible for performing startup or shutdown operations at specific stages.
+Orleans composes many independently registered services into one silo or client. Some services must start only after a dependency is ready and stop before that dependency disappears. The lifecycle abstraction gives those components an ordered protocol without placing every dependency in a central start method.
 
-For more information, see [Grain lifecycle](../grains/grain-lifecycle.md) and [Silo lifecycle](../host/silo-lifecycle.md).
+## Observable and observers <a name="observable-lifecycle"></a>
 
-## Observable lifecycle
+<a name="lifecycle-observer"></a>
 
-Components needing ordered startup and shutdown can use an observable lifecycle. This allows other components to observe the lifecycle and receive notifications when a specific stage is reached during startup or shutdown.
+<xref:Orleans.ILifecycleObservable> accepts subscriptions at integer stages. During startup it visits stages in ascending order; during shutdown it visits them in descending order. Every observer at a stage completes before the lifecycle advances.
 
-```csharp
-public interface ILifecycleObservable
-{
-    IDisposable Subscribe(
-        string observerName,
-        int stage,
-        ILifecycleObserver observer);
-}
+<xref:Orleans.ILifecycleObserver> provides asynchronous <xref:Orleans.ILifecycleObserver.OnStart*> and <xref:Orleans.ILifecycleObserver.OnStop*> callbacks. <xref:Orleans.ILifecycleParticipant`1> is the discovery contract used by dependency injection: a participant receives the lifecycle and subscribes itself.
+
+```mermaid
+sequenceDiagram
+    participant Host
+    participant Lifecycle
+    participant Membership
+    participant Runtime
+    participant Application
+
+    Host->>Lifecycle: Start
+    Lifecycle->>Membership: Low stage OnStart
+    Membership-->>Lifecycle: Ready
+    Lifecycle->>Runtime: Runtime stage OnStart
+    Runtime-->>Lifecycle: Ready
+    Lifecycle->>Application: Active stage OnStart
+    Application-->>Lifecycle: Ready
+    Host->>Lifecycle: Stop
+    Lifecycle->>Application: Active stage OnStop
+    Lifecycle->>Runtime: Runtime stage OnStop
+    Lifecycle->>Membership: Low stage OnStop
 ```
 
-The subscribe call registers an observer for notification when a stage is reached during startup or shutdown. The observer's name is used for reporting purposes. The stage indicates at which point in the startup/shutdown sequence the observer receives notification. Each lifecycle stage is observable. All observers are notified when the stage is reached during startup and shutdown. Stages start in ascending order and stop in descending order. The observer can unsubscribe by disposing of the returned disposable object.
+The reverse shutdown order is the key invariant. A service can continue using dependencies which started at earlier stages until its own stop callback completes.
 
-## Lifecycle observer
+## Silo and client lifecycles
 
-Components needing to participate in another component's lifecycle must provide hooks for their startup and shutdown behaviors and subscribe to a specific stage of an observable lifecycle.
+<xref:Orleans.Runtime.SiloLifecycleSubject> drives silo startup and shutdown. Membership, messaging, grain directory, activation collection, statistics, providers, and other runtime components participate at named <xref:Orleans.ServiceLifecycleStage> values.
 
-```csharp
-public interface ILifecycleObserver
-{
-    Task OnStart(CancellationToken ct);
-    Task OnStop(CancellationToken ct);
-}
-```
+The client uses the same pattern for gateway discovery, connections, stream providers, and the outside runtime client. The generic <xref:Orleans.ILifecycleObservable> also lets providers compose a private lifecycle when the silo-specific interface is unnecessary.
 
-Both <xref:Orleans.ILifecycleObserver.OnStart*?displayProperty=nameWithType> and <xref:Orleans.ILifecycleObserver.OnStop*?displayProperty=nameWithType> are called when the subscribed stage is reached during startup or shutdown.
+The host-facing stage list and configuration examples are documented in [silo lifecycle](../host/silo-lifecycle.md). This page focuses on the protocol rather than where application startup code should be registered.
 
-## Utilities
+## Subscription rules <a name="lifecycle-participation"></a>
 
-For convenience, helper functions exist for common lifecycle usage patterns.
+A lifecycle participant should:
 
-### Extensions
+- subscribe during composition, before lifecycle start;
+- use a stable observer name for diagnostics;
+- select the latest stage whose prerequisites are guaranteed;
+- make <xref:Orleans.ILifecycleObserver.OnStop*> safe after a partial <xref:Orleans.ILifecycleObserver.OnStart*>;
+- honor the supplied cancellation token; and
+- release dependencies before their lower stage stops.
 
-Extension functions are available for subscribing to an observable lifecycle that don't require the subscribing component to implement `ILifecycleObserver`. Instead, these allow components to pass in lambdas or member functions to be called at the subscribed stages.
+Avoid creating hidden ordering by resolving and starting another participant manually. Stage dependencies should remain visible in lifecycle subscriptions.
 
-```csharp
-IDisposable Subscribe(
-    this ILifecycleObservable observable,
-    string observerName,
-    int stage,
-    Func<CancellationToken, Task> onStart,
-    Func<CancellationToken, Task> onStop);
+## Failure behavior
 
-IDisposable Subscribe(
-    this ILifecycleObservable observable,
-    string observerName,
-    int stage,
-    Func<CancellationToken, Task> onStart);
-```
+Startup does not skip a failed observer and continue to a success-shaped state. The exception aborts lifecycle progress and the host reports startup failure. Shutdown attempts to unwind initialized stages under its cancellation deadline.
 
-Similar extension functions allow using generic type arguments instead of the observer name.
+Cancellation bounds lifecycle observation; it cannot guarantee instantaneous cleanup of external resources. Provider code should keep shutdown idempotent and should not swallow failures which leave durable ownership ambiguous.
 
-```csharp
-IDisposable Subscribe<TObserver>(
-    this ILifecycleObservable observable,
-    int stage,
-    Func<CancellationToken, Task> onStart,
-    Func<CancellationToken, Task> onStop);
+## Source
 
-IDisposable Subscribe<TObserver>(
-    this ILifecycleObservable observable,
-    int stage,
-    Func<CancellationToken, Task> onStart);
-```
-
-### Lifecycle participation
-
-Some extensibility points need a way to recognize which components are interested in participating in a lifecycle. A lifecycle participant marker interface serves this purpose. More details on its usage are covered when exploring silo and grain lifecycles.
-
-```csharp
-public interface ILifecycleParticipant<TLifecycleObservable>
-    where TLifecycleObservable : ILifecycleObservable
-{
-    void Participate(TLifecycleObservable lifecycle);
-}
-```
-
-## Example
-
-From the Orleans lifecycle tests, below is an example of a component that participates in an observable lifecycle at multiple stages.
-
-```csharp
-enum TestStages
-{
-    Down,
-    Initialize,
-    Configure,
-    Run,
-};
-
-class MultiStageObserver : ILifecycleParticipant<ILifecycleObservable>
-{
-    public Dictionary<TestStages,bool> Started { get; } = new();
-    public Dictionary<TestStages, bool> Stopped { get; } = new();
-
-    private Task OnStartStage(TestStages stage)
-    {
-        Started[stage] = true;
-
-        return Task.CompletedTask;
-    }
-
-    private Task OnStopStage(TestStages stage)
-    {
-        Stopped[stage] = true;
-
-        return Task.CompletedTask;
-    }
-
-    public void Participate(ILifecycleObservable lifecycle)
-    {
-        lifecycle.Subscribe<MultiStageObserver>(
-            (int)TestStages.Down,
-            _ => OnStartStage(TestStages.Down),
-            _ => OnStopStage(TestStages.Down));
-
-        lifecycle.Subscribe<MultiStageObserver>(
-            (int)TestStages.Initialize,
-            _ => OnStartStage(TestStages.Initialize),
-            _ => OnStopStage(TestStages.Initialize));
-
-        lifecycle.Subscribe<MultiStageObserver>(
-            (int)TestStages.Configure,
-            _ => OnStartStage(TestStages.Configure),
-            _ => OnStopStage(TestStages.Configure));
-
-        lifecycle.Subscribe<MultiStageObserver>(
-            (int)TestStages.Run,
-            _ => OnStartStage(TestStages.Run),
-            _ => OnStopStage(TestStages.Run));
-    }
-}
-```
+- <xref:Orleans.LifecycleSubject> implements stage traversal; see its [implementation](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Lifecycle/LifecycleSubject.cs).
+- <xref:Orleans.Runtime.SiloLifecycleSubject> is the silo lifecycle; see its [implementation](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Lifecycle/SiloLifecycleSubject.cs).
+- [`DefaultSiloServices`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Hosting/DefaultSiloServices.cs) shows participant registration.
+- <xref:Orleans.Providers.Streams.Common.PersistentStreamProvider> is a named-provider example with separate initialize and active stages; see its [lifecycle participation implementation](https://github.com/dotnet/orleans/blob/main/src/Orleans.Streaming/PersistentStreams/PersistentStreamProvider.cs).
