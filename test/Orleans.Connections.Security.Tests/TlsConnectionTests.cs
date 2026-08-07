@@ -38,6 +38,23 @@ namespace Orleans.Connections.Security.Tests
     [TestArea("Security")]
     public class TlsConnectionTests
     {
+        [Fact]
+        public void UseGatewayTls_ThrowsWhenConfiguredMoreThanOnce()
+        {
+            var builder = Host.CreateApplicationBuilder();
+
+            builder.UseOrleans(siloBuilder =>
+            {
+                siloBuilder.UseGatewayTls(options => options.LocalServerCertificateSelector = static (_, _) => null!);
+
+                var exception = Assert.Throws<InvalidOperationException>(
+                    () => siloBuilder.UseGatewayTls(
+                        options => options.LocalServerCertificateSelector = static (_, _) => null!));
+
+                Assert.Equal("Gateway TLS has already been configured.", exception.Message);
+            });
+        }
+
         private const string CertificateSubjectName = "fakedomain.faketld";
         private const string CertificateConfigKey = "certificate";
         private const string ClientCertificateModeKey = "CertificateMode";
