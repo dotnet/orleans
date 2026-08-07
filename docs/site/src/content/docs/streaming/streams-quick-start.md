@@ -11,6 +11,8 @@ This quickstart uses the [`Microsoft.Orleans.Streaming`](https://www.nuget.org/p
 
 ## Configure the silo
 
+<a id="required-configurations"></a>
+
 Register the same provider name used by producers and consumers. `PubSubStore` stores explicit stream subscription metadata.
 
 :::code language="csharp" source="snippets/streaming/Configuration.cs" id="memory_silo":::
@@ -31,13 +33,17 @@ The stream namespace is `device-telemetry`, and the stream key is the device ID.
 
 ## Publish events
 
+<a id="produce-events"></a>
+
 The producer obtains its stream handle during activation and starts an Orleans grain timer when requested:
 
 :::code language="csharp" source="snippets/streaming/BasicStreaming.cs" id="stream_producer":::
 
-Use <xref:Orleans.GrainBaseExtensions.RegisterGrainTimer*> for grain timers. Awaiting `OnNextAsync` waits until the provider accepts responsibility according to its contract; it doesn't generally wait for every consumer to finish. See [Producer acknowledgment](delivery-semantics.md#producer-acknowledgment).
+Use <xref:Orleans.GrainBaseExtensions.RegisterGrainTimer*> for grain timers. Awaiting <xref:Orleans.Streams.IAsyncObserver`1.OnNextAsync*> waits until the provider accepts responsibility according to its contract; it doesn't generally wait for every consumer to finish. See [Producer acknowledgment](delivery-semantics.md#producer-acknowledgment).
 
 ## Consume with an implicit subscription
+
+<a id="subscribe-to-and-receive-streaming-data"></a>
 
 An implicit subscription maps the stream key to a grain key. Publishing to `device-telemetry/device-17` activates the `DeviceTelemetryGrain` whose string key is `device-17`. Implement <xref:Orleans.Streams.Core.IStreamSubscriptionObserver> to attach the observer supplied by Orleans:
 

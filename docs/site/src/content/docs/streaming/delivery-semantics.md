@@ -48,7 +48,7 @@ See the [provider matrix](stream-providers.md#provider-matrix) for provider capa
 
 1. Use a durable provider when accepted events must survive silo or cluster loss.
 1. Use a durable [`PubSubStore`](pubsub-storage.md) when explicit subscription records must survive cluster loss.
-1. Resume existing explicit handles after grain activation; don't call `SubscribeAsync` unconditionally.
+1. Resume existing explicit handles after grain activation; don't call <xref:Orleans.Streams.IAsyncObservable`1.SubscribeAsync*> unconditionally.
 1. Persist the last applied domain position when the application needs deterministic recovery.
 1. For a rewindable provider, restart from a checkpointed token and tolerate replay of the checkpoint boundary.
 1. Make effects idempotent and alert on poison events, repeated retries, and growing lag.

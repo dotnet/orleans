@@ -11,12 +11,12 @@ Broadcast channels, provided by the [`Microsoft.Orleans.BroadcastChannel`](https
 
 ## Identity and routing
 
-A broadcast writer is selected by a configured **provider name** and a <xref:Orleans.BroadcastChannel.ChannelId>. `ChannelId.Create(namespace, key)` has two distinct routing roles:
+A broadcast writer is selected by a configured **provider name** and a <xref:Orleans.BroadcastChannel.ChannelId>. <xref:Orleans.BroadcastChannel.ChannelId.Create*> creates an identifier whose namespace and key have two distinct routing roles:
 
 - The **namespace** is matched against <xref:Orleans.ImplicitChannelSubscriptionAttribute> declarations to select subscriber grain types.
 - The **key** maps to the primary key of one subscriber grain identity for each matching grain type.
 
-Publishing doesn't enumerate all current activations. It addresses the matching virtual grain identities, activating them when necessary. The default mapper interprets the channel key for each matching grain type: it uses raw text for a string-keyed grain, parses GUID text for a GUID-keyed grain, and parses decimal text for an integer-keyed grain. `ChannelId.Create(namespace, guid)` formats a GUID key; use a decimal string for an integer key. Custom <xref:Orleans.BroadcastChannel.IChannelIdMapper> implementations can change that mapping.
+Publishing doesn't enumerate all current activations. It addresses the matching virtual grain identities, activating them when necessary. <xref:Orleans.BroadcastChannel.DefaultChannelIdMapper> interprets the channel key for each matching grain type: it uses raw text for a string-keyed grain, parses GUID text for a GUID-keyed grain, and parses decimal text for an integer-keyed grain. The <xref:Orleans.BroadcastChannel.ChannelId.Create*> overload that accepts a <xref:System.Guid> formats a GUID key; use a decimal string for an integer key. Custom <xref:Orleans.BroadcastChannel.IChannelIdMapper> implementations can change that mapping.
 
 The provider name and channel namespace are independent. They can use the same string by convention, but provider registration doesn't make that string the channel namespace.
 
@@ -30,9 +30,11 @@ An Orleans client that publishes must register the same provider name and compat
 
 :::code language="csharp" source="./snippets/broadcastchannel/BroadcastChannel.Client/Program.cs":::
 
-`BroadcastChannelOptions.FireAndForgetDelivery` defaults to `true`. In that mode, `Publish` starts subscriber calls and returns without awaiting them; subscriber exceptions are logged and aren't returned to the publisher. Setting it to `false` awaits all subscriber callbacks and propagates failures as an aggregate exception. Neither mode adds persistence, retry, replay, or exactly-once processing.
+<xref:Orleans.BroadcastChannel.BroadcastChannelOptions.FireAndForgetDelivery> defaults to `true`. In that mode, <xref:Orleans.BroadcastChannel.IBroadcastChannelWriter`1.Publish*> starts subscriber calls and returns without awaiting them; subscriber exceptions are logged and aren't returned to the publisher. Setting it to `false` awaits all subscriber callbacks and propagates failures as an aggregate exception. Neither mode adds persistence, retry, replay, or exactly-once processing.
 
 ## Define a subscriber grain
+
+<a id="define-a-consumer-grain"></a>
 
 Mark the grain class with an implicit channel subscription and implement <xref:Orleans.BroadcastChannel.IOnBroadcastChannelSubscribed>. Attach a callback when Orleans supplies the channel subscription:
 
@@ -40,17 +42,23 @@ Mark the grain class with an implicit channel subscription and implement <xref:O
 
 The parameterless attribute matches all nonempty channel namespaces. Pass a namespace to match exactly, use <xref:Orleans.RegexImplicitChannelSubscriptionAttribute> for a pattern, or provide a custom namespace predicate.
 
-`Attach<T>` selects the payload type and supplies item and error callbacks. Channel subscriptions are implicit metadata bindings, so there is no `SubscribeAsync`, subscription handle, or `UnsubscribeAsync`.
+<xref:Orleans.BroadcastChannel.IBroadcastChannelSubscription.Attach*> selects the payload type and supplies item and error callbacks. Channel subscriptions are implicit metadata bindings, so there is no explicit subscribe or unsubscribe operation.
 
 ## Publish
+
+<a id="publish-messages-to-a-broadcast-channel"></a>
 
 Resolve <xref:Orleans.BroadcastChannel.IBroadcastChannelProvider> by provider name, construct a channel ID, get a typed writer, and publish:
 
 :::code language="csharp" source="./snippets/broadcastchannel/BroadcastChannel.Silo/Services/StockWorker.cs":::
 
-In this sample, the channel namespace is `live-stock-ticker` and the key is `Guid.Empty`, so each matching GUID-keyed subscriber grain type receives the message at its `Guid.Empty` grain identity. Use a customer, tenant, device, or other domain key to target the corresponding identity instead.
+In this sample, the channel namespace is `live-stock-ticker` and the key is <xref:System.Guid.Empty>, so each matching GUID-keyed subscriber grain type receives the message at that grain identity. Use a customer, tenant, device, or other domain key to target the corresponding identity instead.
 
 ## Broadcast channels compared with streams
+
+<a id="broadcast-channels-vs-streams"></a>
+<a id="when-to-use-broadcast-channels"></a>
+<a id="when-to-use-streams"></a>
 
 | Capability | Broadcast channel | Orleans stream |
 |---|---|---|

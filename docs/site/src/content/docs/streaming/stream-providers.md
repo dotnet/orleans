@@ -27,13 +27,15 @@ Kafka and Azure Service Bus aren't built-in Orleans stream providers. Integrate 
 
 ## Memory streams
 
-Register memory streams with `AddMemoryStreams`. They use silo memory for queues and cache, so events don't survive cluster loss. Rewind works only while the relevant event remains in the live in-memory cache. Use this provider for local development, tests, and workloads where loss is explicitly acceptable.
+Register memory streams with <xref:Orleans.Hosting.SiloBuilderMemoryStreamExtensions.AddMemoryStreams*>. They use silo memory for queues and cache, so events don't survive cluster loss. Rewind works only while the relevant event remains in the live in-memory cache. Use this provider for local development, tests, and workloads where loss is explicitly acceptable.
 
 ## Azure Queue Storage
 
-Register Azure Queue streams with `AddAzureQueueStreams`. The provider uses multiple [Azure Queue Storage](https://learn.microsoft.com/azure/storage/queues/storage-queues-introduction) queues and persistent-stream pulling agents. It isn't rewindable, and Azure Queue retries can produce duplicates or reorder delivery after failures.
+<a id="azure-queue-aq-stream-provider"></a>
 
-Configure the current <xref:Azure.Storage.Queues.QueueServiceClient> directly on `AzureQueueOptions`. When `QueueNames` is unset, Orleans generates names from the Orleans service ID, provider name, and queue ID. Keep the service ID and provider name stable across restarts. Set `QueueNames` explicitly only when you need to manage an existing queue topology, and keep those names unique across clusters that share a storage account.
+Register Azure Queue streams with <xref:Orleans.Hosting.SiloBuilderExtensions.AddAzureQueueStreams*>. The provider uses multiple [Azure Queue Storage](https://learn.microsoft.com/azure/storage/queues/storage-queues-introduction) queues and persistent-stream pulling agents. It isn't rewindable, and Azure Queue retries can produce duplicates or reorder delivery after failures.
+
+Configure the current <xref:Azure.Storage.Queues.QueueServiceClient> directly on <xref:Orleans.Configuration.AzureQueueOptions>. When <xref:Orleans.Configuration.AzureQueueOptions.QueueNames> is unset, Orleans generates names from the Orleans service ID, provider name, and queue ID. Keep the service ID and provider name stable across restarts. Set queue names explicitly only when you need to manage an existing queue topology, and keep those names unique across clusters that share a storage account.
 
 ### Managed identity
 
@@ -47,11 +49,13 @@ The examples use durable Azure Table Storage for `PubSubStore`; queue durability
 
 ## Azure Event Hubs
 
-Register [Azure Event Hubs](https://learn.microsoft.com/azure/event-hubs/event-hubs-about) with `AddEventHubStreams`. Event Hubs retention and partition positions make this provider rewindable. Configure a consumer group dedicated to the Orleans application and durable checkpoint storage. Partition count bounds physical read parallelism, and retention bounds how far recovery can rewind.
+<a id="azure-event-hub-stream-provider"></a>
+
+Register [Azure Event Hubs](https://learn.microsoft.com/azure/event-hubs/event-hubs-about) with <xref:Orleans.Hosting.SiloBuilderExtensions.AddEventHubStreams*>. Event Hubs retention and partition positions make this provider rewindable. Configure a consumer group dedicated to the Orleans application and durable checkpoint storage. Partition count bounds physical read parallelism, and retention bounds how far recovery can rewind.
 
 ## Amazon SQS
 
-Register [Amazon SQS](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html) with `AddSqsStreams`. Standard queues use [at-least-once delivery](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/standard-queues-at-least-once-delivery.html), and SQS redelivers after the [visibility timeout](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html) when processing isn't acknowledged. The Orleans provider isn't rewindable. Configure credentials using the deployment environment's AWS credential chain or protected connection configuration, and monitor queue age, redelivery, and dead-letter policy.
+Register [Amazon SQS](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html) with <xref:Orleans.Hosting.SiloBuilderExtensions.AddSqsStreams*>. Standard queues use [at-least-once delivery](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/standard-queues-at-least-once-delivery.html), and SQS redelivers after the [visibility timeout](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html) when processing isn't acknowledged. The Orleans provider isn't rewindable. Configure credentials using the deployment environment's AWS credential chain or protected connection configuration, and monitor queue age, redelivery, and dead-letter policy.
 
 ## ADO.NET streaming (alpha)
 
@@ -59,12 +63,14 @@ Register [ADO.NET](https://learn.microsoft.com/dotnet/framework/data/adonet/ado-
 
 ## NATS JetStream streaming (alpha)
 
-Register [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream) with `AddNatsStreams`. The provider creates or uses a JetStream stream and deterministic subject partitions. File-backed storage is the default; memory-backed JetStream storage is optional and not durable across server loss. `PartitionCount` changes require corresponding server-side stream updates. The provider isn't rewindable.
+Register [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream) with `AddNatsStreams`. The provider creates or uses a JetStream stream and deterministic subject partitions. File-backed storage is the default; memory-backed JetStream storage is optional and not durable across server loss. Changes to `NatsOptions.PartitionCount` require corresponding server-side stream updates. The provider isn't rewindable.
 
 ## Redis Streams streaming (alpha)
 
-Register [Redis Streams](https://redis.io/docs/latest/develop/data-types/streams/) with `AddRedisStreams`. The provider stores events and checkpoints in Redis and is rewindable while entries remain. Redis durability depends on its [persistence](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/) and replication configuration. `MaxStreamLength` can bound retention; without it, stream length is unbounded, so capacity planning is required.
+Register [Redis Streams](https://redis.io/docs/latest/develop/data-types/streams/) with `AddRedisStreams`. The provider stores events and checkpoints in Redis and is rewindable while entries remain. Redis durability depends on its [persistence](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/) and replication configuration. `RedisStreamingOptions.MaxStreamLength` can bound retention; without it, stream length is unbounded, so capacity planning is required.
 
 ## Custom adapters
+
+<a id="queue-adapters"></a>
 
 <xref:Orleans.Providers.Streams.Common.PersistentStreamProvider> hosts providers built on <xref:Orleans.Streams.IQueueAdapter>. A custom adapter supplies enqueue/dequeue behavior, queue mapping, rewindability, and failure handling while Orleans supplies pulling agents, subscription routing, and caches. See [stream implementation architecture](../implementation/streams-implementation/index.md) before building one.

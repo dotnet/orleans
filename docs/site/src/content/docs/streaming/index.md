@@ -7,6 +7,8 @@ ms.topic: overview
 
 # Streaming with Orleans
 
+<a id="why-should-i-care"></a>
+
 Orleans streams are typed, logical, multicast channels. Producers and consumers address a stream by provider name and <xref:Orleans.Runtime.StreamId>; they don't need references to one another. A stream can have many producers and many subscriptions, and every published item is offered to every subscription on that stream.
 
 The stream is a virtual address. Its transport, retention, retry behavior, ordering, and ability to replay are supplied by the configured [stream provider](stream-providers.md). A stream handle alone doesn't make data durable.
@@ -24,10 +26,19 @@ Use streams when events should fan out to independently managed consumers, when 
 
 ## Get started
 
+<a id="quick-start-sample"></a>
+<a id="stream-providers"></a>
+<a id="stream-semantics"></a>
+<a id="code-samples"></a>
+
 1. Follow the [streaming quickstart](streams-quick-start.md) with the in-memory provider.
 1. Learn stream [identity, production, consumption, and subscription APIs](streams-programming-apis.md).
 1. Choose a [provider](stream-providers.md) for the required durability and replay behavior.
 1. Plan for [delivery, ordering, replay, and recovery](delivery-semantics.md).
 1. Configure [PubSub storage](pubsub-storage.md) and [operations](streaming-operations.md) for production.
 
-For best-effort implicit fan-out without queueing or replay, see [broadcast channels](broadcast-channel.md). For the runtime architecture behind persistent streams, see [Orleans streams implementation](../implementation/streams-implementation/index.md).
+For best-effort implicit fan-out without queueing or replay, see [broadcast channels](broadcast-channel.md).
+
+<a id="streams-implementation"></a>
+
+For the runtime architecture behind persistent streams, see [Orleans streams implementation](../implementation/streams-implementation/index.md).

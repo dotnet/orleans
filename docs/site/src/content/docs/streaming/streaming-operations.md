@@ -11,7 +11,7 @@ Tune from measured lag, throughput, failures, and memory pressure. Provider defa
 
 ## Backpressure
 
-Persistent providers pull events into silo-side caches and deliver them to subscriptions. A consumer applies backpressure by not completing `OnNextAsync` until it has accepted responsibility for the item. Slow consumers can therefore increase retained queue data, cache pressure, and end-to-end lag.
+Persistent providers pull events into silo-side caches and deliver them to subscriptions. A consumer applies backpressure by not completing <xref:Orleans.Streams.IAsyncObserver`1.OnNextAsync*> until it has accepted responsibility for the item. Slow consumers can therefore increase retained queue data, cache pressure, and end-to-end lag.
 
 Keep consumer turns bounded:
 
@@ -31,7 +31,7 @@ Persistent providers expose common configuration through their stream configurat
 - <xref:Orleans.Configuration.StreamPullingAgentOptions.MaxEventDeliveryTime> bounds delivery attempts before the configured failure handler is involved.
 - <xref:Orleans.Configuration.SimpleQueueCacheOptions.CacheSize> controls item capacity for providers using the simple queue cache.
 
-Provider-specific controls matter as much as common controls: Azure Queue queue count, Event Hubs partitions and cache-pressure settings, Redis `ReadCount` and retention, NATS `BatchSize` and `PartitionCount`, and ADO.NET visibility, expiry, and dead-letter settings.
+Provider-specific controls matter as much as common controls: <xref:Orleans.Configuration.AzureQueueOptions.QueueNames>, Event Hubs partitions and cache-pressure settings, Redis `ReadCount` and retention, NATS `BatchSize` and `PartitionCount`, and ADO.NET visibility, expiry, and dead-letter settings.
 
 Change one bottleneck at a time. More queues can increase parallelism but also broker cost, polling load, cache memory, and rebalance work. Reducing polling delay can lower latency while increasing empty reads.
 
