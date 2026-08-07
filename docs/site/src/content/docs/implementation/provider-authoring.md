@@ -7,7 +7,7 @@ ms.topic: concept-article
 
 # Provider authoring architecture
 
-An Orleans provider adapts an external system or alternate runtime implementation to a defined contract. Storage, clustering, reminders, grain directories, and persistent streams have different data-plane interfaces, but their hosting architecture follows the same pattern:
+An Orleans provider adapts an external system or alternate runtime implementation to a defined contract. Storage, clustering, reminders, grain directories, and persistent streams have different data-plane interfaces, but their hosting architecture follows the same pattern, built on the [.NET options pattern](https://learn.microsoft.com/dotnet/core/extensions/options) and [dependency injection](https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/overview):
 
 1. bind a named configuration section;
 1. register named services and options;

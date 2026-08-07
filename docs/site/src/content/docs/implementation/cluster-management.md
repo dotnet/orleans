@@ -77,7 +77,7 @@ The defaults are defined by [`ClusterMembershipOptions`](https://github.com/dotn
 | `TableRefreshTimeout` | 1 minute | Fallback membership-table refresh period |
 | `IAmAliveTablePublishTimeout` | 30 seconds | Membership-row liveness timestamp period |
 
-These values are protocol parameters, not independent timers: indirect probing, local health, scheduling delays, and table contention all affect observed detection time. The runtime increases probe tolerance when `LocalSiloHealthMonitor` detects thread-pool delay, timer delay, or other local distress, reducing false accusations from an unhealthy observer.
+These values are protocol parameters, not independent timers: indirect probing, local health, scheduling delays, and table contention all affect observed detection time. Following [Lifeguard's local-health awareness principle](https://arxiv.org/abs/1707.00788), the runtime increases probe tolerance when `LocalSiloHealthMonitor` detects thread-pool delay, timer delay, or other local distress, reducing false accusations from an unhealthy observer.
 
 ## Membership-table contract
 

@@ -7,7 +7,7 @@ ms.topic: concept-article
 
 # TestingHost architecture
 
-`Microsoft.Orleans.TestingHost` composes real silo and client hosts with test-oriented discovery, transport, statistics, directory, and lifecycle controls. It is an integration harness, not a mock grain runtime. Grain activation, scheduling, serialization, messaging, placement, and most provider behavior execute through the same runtime components as a hosted cluster.
+The [`Microsoft.Orleans.TestingHost`](https://www.nuget.org/packages/Microsoft.Orleans.TestingHost/) package composes real silo and client hosts with test-oriented discovery, transport, statistics, directory, and lifecycle controls. It is an integration harness, not a mock grain runtime. Grain activation, scheduling, serialization, messaging, placement, and most provider behavior execute through the same runtime components as a hosted cluster.
 
 This page describes the harness internals. Test-fixture patterns and basic unit-testing guidance belong in task-oriented testing documentation.
 

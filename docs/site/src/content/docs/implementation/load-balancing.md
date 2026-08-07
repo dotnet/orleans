@@ -13,7 +13,7 @@ The default placement strategy is <xref:Orleans.Runtime.ResourceOptimizedPlaceme
 
 ## Resource-optimized placement
 
-`ResourceOptimizedPlacementDirector` receives cluster-wide `SiloRuntimeStatistics` from `DeploymentLoadPublisher`. It excludes incompatible and overloaded silos, samples approximately the square root of the available candidates, normalizes their signals, adds jitter to avoid deterministic herding, and selects the lowest utilization score.
+`ResourceOptimizedPlacementDirector` receives cluster-wide `SiloRuntimeStatistics` from `DeploymentLoadPublisher`. It excludes incompatible and overloaded silos, applies a [power-of-multiple-choices load-balancing strategy](https://www.eecs.harvard.edu/~michaelm/postscripts/handbook2001.pdf) by sampling approximately the square root of the available candidates, normalizes their signals, adds jitter to avoid deterministic herding, and selects the lowest utilization score.
 
 ```mermaid
 flowchart LR

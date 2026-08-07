@@ -7,7 +7,7 @@ ms.topic: concept-article
 
 # Azure Queue stream implementation
 
-The `Microsoft.Orleans.Streaming.AzureStorage` package implements a persistent stream adapter over Azure Queue Storage. It uses the common [persistent stream pulling architecture](index.md) and supplies Azure-specific queue mapping, encoding, receive, delete, and configuration behavior.
+The [`Microsoft.Orleans.Streaming.AzureStorage`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.AzureStorage/) package implements a persistent stream adapter over Azure Queue Storage. It uses the common [persistent stream pulling architecture](index.md) and supplies Azure-specific queue mapping, encoding, receive, delete, and configuration behavior.
 
 ## Registration APIs
 
@@ -45,7 +45,7 @@ Source: [`AzureQueueAdapter`](https://github.com/dotnet/orleans/blob/main/src/Az
 
 ## Receive and acknowledgement
 
-`AzureQueueAdapterReceiver` asks Azure Queue Storage for up to 32 visible messages at a time. Receiving makes a message temporarily invisible; it does not delete it. The pulling agent decodes and delivers the batch through its cache and cursors. Only messages reported as delivered are deleted.
+`AzureQueueAdapterReceiver` asks Azure Queue Storage for up to 32 visible messages at a time. Azure Queue Storage's [Get Messages operation](https://learn.microsoft.com/rest/api/storageservices/get-messages) makes a received message temporarily invisible; it does not delete it. The pulling agent decodes and delivers the batch through its cache and cursors. Only messages reported as delivered are removed using the [Delete Message operation](https://learn.microsoft.com/rest/api/storageservices/delete-message2).
 
 ```mermaid
 sequenceDiagram

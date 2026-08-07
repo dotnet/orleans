@@ -13,7 +13,7 @@ Orleans uses `LocalGrainDirectory` by default. `DistributedGrainDirectory` is ex
 
 ## Default: `LocalGrainDirectory`
 
-`LocalGrainDirectory` partitions registrations over the membership ring. Hashing a grain identity selects the silo whose local `LocalGrainDirectoryPartition` is authoritative for that key. Each silo also keeps non-authoritative cache entries to avoid repeated remote lookups.
+`LocalGrainDirectory` partitions registrations over the membership ring. Hashing a grain identity selects the silo whose local `LocalGrainDirectoryPartition` is authoritative for that key. This follows the broad consistent-hashing distributed-hash-table model described by [Chord](https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf), adapted to Orleans membership and activation semantics. Each silo also keeps non-authoritative cache entries to avoid repeated remote lookups.
 
 ```mermaid
 flowchart LR
@@ -63,7 +63,7 @@ siloBuilder.AddDistributedGrainDirectory();
 
 It is not the default. The experimental status allows its API and protocol to evolve.
 
-The implementation divides the hash ring into configurable ranges. `GrainDirectoryOptions.PartitionsPerSilo` defaults to **1**, not 30. A partition normally serves requests locally. During a membership view change, old and new owners coordinate range locks, snapshots, and ownership transfer.
+The implementation divides the hash ring into configurable ranges, analogous to the virtual-node partitioning described by [Dynamo](https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf). `GrainDirectoryOptions.PartitionsPerSilo` defaults to **1**, not 30. A partition normally serves requests locally. During a membership view change, old and new owners coordinate range locks, snapshots, and ownership transfer. The design applies the [virtually synchronous methodology for dynamic service replication](https://www.microsoft.com/en-us/research/publication/virtually-synchronous-methodology-for-dynamic-service-replication/) and has similarities to [Vertical Paxos and primary-backup replication](https://www.microsoft.com/en-us/research/publication/vertical-paxos-and-primary-backup-replication/).
 
 ```mermaid
 sequenceDiagram

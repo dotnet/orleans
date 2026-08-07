@@ -7,7 +7,7 @@ ms.topic: concept-article
 
 # Runtime architecture
 
-Orleans presents a location-transparent grain reference, but the runtime implements each call using several independently replaceable or failure-aware subsystems. The central invariant is that a grain identity is stable while its activation location is temporary.
+Orleans presents a location-transparent grain reference, an abstraction introduced in the [Orleans virtual actor research paper](https://www.microsoft.com/en-us/research/publication/orleans-distributed-virtual-actors-for-programmability-and-scalability/), but the runtime implements each call using several independently replaceable or failure-aware subsystems. The central invariant is that a grain identity is stable while its activation location is temporary.
 
 ```mermaid
 flowchart LR
@@ -27,7 +27,7 @@ flowchart LR
 
 ## Host composition
 
-A silo is a .NET Generic Host with Orleans services registered in dependency injection. `SiloHostedService` starts and stops the `Silo`; the `Silo` drives the ordered silo lifecycle. The default registration set composes:
+A silo is a [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensions/generic-host) with Orleans services registered through [.NET dependency injection](https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/overview). `SiloHostedService` starts and stops the `Silo`; the `Silo` drives the ordered silo lifecycle. The default registration set composes:
 
 - `MessageCenter` for network connections, routing, forwarding, gateways, and dispatch.
 - `MembershipTableManager`, `MembershipAgent`, `ClusterHealthMonitor`, and `ClusterMembershipService` for membership.
