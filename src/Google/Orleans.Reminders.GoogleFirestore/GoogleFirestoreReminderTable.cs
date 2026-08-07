@@ -46,7 +46,7 @@ internal partial class GoogleFirestoreReminderTable : IReminderTable
                 try
                 {
                     LogInitializing();
-                    await this._dataManager.Initialize();
+                    await this._dataManager.Initialize(cancellationToken);
                     this._initializationTask.TrySetResult();
                     LogInitialized(sw.ElapsedMilliseconds);
                     return;
@@ -192,9 +192,11 @@ internal partial class GoogleFirestoreReminderTable : IReminderTable
                 var results = await this._dataManager.ExecuteTransaction(async transaction =>
                 {
                     var lowerRange = await transaction.GetSnapshotAsync(
-                        collection.WhereLessThanOrEqualTo(nameof(ReminderEntity.GrainHash), end));
+                        collection.WhereLessThanOrEqualTo(nameof(ReminderEntity.GrainHash), end),
+                        transaction.CancellationToken);
                     var upperRange = await transaction.GetSnapshotAsync(
-                        collection.WhereGreaterThan(nameof(ReminderEntity.GrainHash), begin));
+                        collection.WhereGreaterThan(nameof(ReminderEntity.GrainHash), begin),
+                        transaction.CancellationToken);
                     return lowerRange.Documents
                         .Concat(upperRange.Documents)
                         .Select(document => document.ConvertTo<ReminderEntity>())

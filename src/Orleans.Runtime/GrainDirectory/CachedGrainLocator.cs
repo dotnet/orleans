@@ -60,7 +60,7 @@ namespace Orleans.Runtime.GrainDirectory
                 return cachedResult;
             }
 
-            var entry = await GetGrainDirectory(grainId.Type).Lookup(grainId);
+            var entry = await GetGrainDirectory(grainId.Type).Lookup(grainId, this.shutdownToken.Token);
 
             // Nothing found
             if (entry is null)
@@ -72,7 +72,7 @@ namespace Orleans.Runtime.GrainDirectory
             if (IsKnownDeadSilo(entry))
             {
                 // Remove it from the directory
-                await GetGrainDirectory(grainId.Type).Unregister(entry);
+                await GetGrainDirectory(grainId.Type).Unregister(entry, this.shutdownToken.Token);
                 entry = null;
             }
             else
@@ -85,7 +85,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         public Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress) =>
-            Register(address, previousAddress, CancellationToken.None);
+            Register(address, previousAddress, this.shutdownToken.Token);
 
         internal async Task<GrainAddress?> Register(
             GrainAddress address,
@@ -135,7 +135,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.cache.Remove(address);
 
             // Remove from grain directory which may take significantly longer
-            await GetGrainDirectory(address.GrainId.Type).Unregister(address);
+            await GetGrainDirectory(address.GrainId.Type).Unregister(address, this.shutdownToken.Token);
 
             // There is the potential for a lookup to race with the Unregister and add the bad entry back to the cache.
             if (this.cache.LookUp(address.GrainId, out var entry, out _) && entry.Equals(address))
@@ -190,7 +190,7 @@ namespace Orleans.Runtime.GrainDirectory
                     var tasks = new List<Task>();
                     foreach (var directory in this.grainDirectoryResolver.Directories)
                     {
-                        tasks.Add(directory.UnregisterSilos(deadSilos));
+                        tasks.Add(directory.UnregisterSilos(deadSilos, this.shutdownToken.Token));
                     }
                     await Task.WhenAll(tasks).WaitAsync(this.shutdownToken.Token);
                 }
