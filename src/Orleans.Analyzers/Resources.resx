@@ -195,4 +195,110 @@
   <data name="ConfigureAwaitCodeFixTitle" xml:space="preserve">
     <value>Use ConfigureAwait with ContinueOnCapturedContext</value>
   </data>
+  <!-- Grain Interface Version Analyzer (ORLEANS0016-0021) -->
+  <data name="GrainInterfaceNotDeclaredTitle" xml:space="preserve">
+    <value>Grain interface is not active in OrleansContracts.txt</value>
+  </data>
+  <data name="GrainInterfaceNotDeclaredMessageFormat" xml:space="preserve">
+    <value>Grain interface '{0}' does not have an active declaration in OrleansContracts.txt</value>
+  </data>
+  <data name="GrainInterfaceNotDeclaredDescription" xml:space="preserve">
+    <value>All grain interfaces should have an active declaration in OrleansContracts.txt to ensure version compatibility during rolling upgrades.</value>
+  </data>
+  <data name="GrainInterfaceVersionMismatchTitle" xml:space="preserve">
+    <value>Grain interface version mismatch</value>
+  </data>
+  <data name="GrainInterfaceVersionMismatchMessageFormat" xml:space="preserve">
+    <value>Grain interface '{0}' has [Version({1})] in OrleansContracts.txt but [Version({2})] in code</value>
+  </data>
+  <data name="GrainInterfaceVersionMismatchDescription" xml:space="preserve">
+    <value>The [Version] attribute on the grain interface must match the version declared in OrleansContracts.txt.</value>
+  </data>
+  <data name="GrainInterfaceMemberNotDeclaredTitle" xml:space="preserve">
+    <value>Grain interface member not declared in OrleansContracts.txt</value>
+  </data>
+  <data name="GrainInterfaceMemberNotDeclaredMessageFormat" xml:space="preserve">
+    <value>Grain interface member '{0}' is not declared in OrleansContracts.txt for interface '{1}'</value>
+  </data>
+  <data name="GrainInterfaceMemberNotDeclaredDescription" xml:space="preserve">
+    <value>When adding or modifying grain interface members, update OrleansContracts.txt and increment the interface version.</value>
+  </data>
+  <data name="GrainInterfaceRemovedNotRetiredTitle" xml:space="preserve">
+    <value>Removed grain interface not marked as retired</value>
+  </data>
+  <data name="GrainInterfaceRemovedNotRetiredMessageFormat" xml:space="preserve">
+    <value>Grain interface '{0}' is declared in OrleansContracts.txt but no longer exists in code - mark it as *RETIRED*</value>
+  </data>
+  <data name="GrainInterfaceRemovedNotRetiredDescription" xml:space="preserve">
+    <value>When removing a grain interface, mark it as *RETIRED* in OrleansContracts.txt to document that it has been intentionally removed.</value>
+  </data>
+  <data name="OrleansContractsFileMissingTitle" xml:space="preserve">
+    <value>OrleansContracts.txt file is missing</value>
+  </data>
+  <data name="OrleansContractsFileMissingMessageFormat" xml:space="preserve">
+    <value>The project contains grain interfaces but no {0} file to track them</value>
+  </data>
+  <data name="OrleansContractsFileMissingDescription" xml:space="preserve">
+    <value>Add an OrleansContracts.txt file to track Orleans contracts for compatibility during rolling upgrades.</value>
+  </data>
+  <data name="GrainInterfaceDuplicateDeclarationTitle" xml:space="preserve">
+    <value>Duplicate grain interface declaration</value>
+  </data>
+  <data name="GrainInterfaceDuplicateDeclarationMessageFormat" xml:space="preserve">
+    <value>Grain interface '{0}' is declared multiple times in OrleansContracts.txt</value>
+  </data>
+  <data name="GrainInterfaceDuplicateDeclarationDescription" xml:space="preserve">
+    <value>Each grain interface should only be declared once in OrleansContracts.txt.</value>
+  </data>
+  <data name="AddToOrleansContractsFileTitle" xml:space="preserve">
+    <value>Add to OrleansContracts.txt</value>
+  </data>
+  <data name="RetireGrainInterfaceTitle" xml:space="preserve">
+    <value>Mark as *RETIRED* in OrleansContracts.txt</value>
+  </data>
+  <data name="UpdateGrainInterfaceVersionTitle" xml:space="preserve">
+    <value>Update version in OrleansContracts.txt</value>
+  </data>
+  <data name="GrainClassNotDeclaredTitle" xml:space="preserve">
+    <value>Grain class is not active in OrleansContracts.txt</value>
+  </data>
+  <data name="GrainClassNotDeclaredMessageFormat" xml:space="preserve">
+    <value>Grain class '{0}' does not have an active declaration in OrleansContracts.txt</value>
+  </data>
+  <data name="GrainClassNotDeclaredDescription" xml:space="preserve">
+    <value>All concrete grain classes should have an active declaration in OrleansContracts.txt to protect grain type identities during renames.</value>
+  </data>
+  <data name="GrainClassAliasMismatchTitle" xml:space="preserve">
+    <value>Grain class alias mismatch</value>
+  </data>
+  <data name="GrainClassAliasMismatchMessageFormat" xml:space="preserve">
+    <value>Grain class '{0}' has alias '{1}' in OrleansContracts.txt but alias '{2}' in code</value>
+  </data>
+  <data name="GrainClassAliasMismatchDescription" xml:space="preserve">
+    <value>The [GrainType] attribute on a grain class must match the alias declared in OrleansContracts.txt.</value>
+  </data>
+  <data name="GrainClassRemovedNotRetiredTitle" xml:space="preserve">
+    <value>Removed grain class not marked as retired</value>
+  </data>
+  <data name="GrainClassRemovedNotRetiredMessageFormat" xml:space="preserve">
+    <value>Grain class '{0}' is declared in OrleansContracts.txt but no longer exists in code - mark it as *RETIRED*</value>
+  </data>
+  <data name="GrainClassRemovedNotRetiredDescription" xml:space="preserve">
+    <value>When removing a grain class, mark it as *RETIRED* in OrleansContracts.txt to preserve its contract history.</value>
+  </data>
+  <data name="UpdateGrainClassAliasTitle" xml:space="preserve">
+    <value>Update grain class alias in OrleansContracts.txt</value>
+  </data>
+  <data name="RetireGrainClassTitle" xml:space="preserve">
+    <value>Mark grain class as *RETIRED* in OrleansContracts.txt</value>
+  </data>
+  <data name="GrainClassDuplicateDeclarationTitle" xml:space="preserve">
+    <value>Duplicate grain class declaration</value>
+  </data>
+  <data name="GrainClassDuplicateDeclarationMessageFormat" xml:space="preserve">
+    <value>Grain class '{0}' is declared multiple times in OrleansContracts.txt</value>
+  </data>
+  <data name="GrainClassDuplicateDeclarationDescription" xml:space="preserve">
+    <value>Each grain class should only be declared once in OrleansContracts.txt.</value>
+  </data>
 </root>

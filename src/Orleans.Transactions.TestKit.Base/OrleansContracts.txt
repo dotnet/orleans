@@ -1,0 +1,121 @@
+class Orleans.Transactions.TestKit.Consistency.ConsistencyTestGrain
+
+interface Orleans.Transactions.TestKit.Consistency.IConsistencyTestGrain [Version(0)]
+  Run(Orleans.Transactions.TestKit.Consistency.ConsistencyTestOptions, int, string, int, System.DateTime) -> Task<Orleans.Transactions.TestKit.Consistency.Observation[]>
+
+# Orleans.Transactions.TestKit.Correctnesss.DoubleStateTransactionalGrain
+class [GrainType("txn-correctness-DoubleStateTransactionalGrain")] Orleans.Transactions.TestKit.Correctnesss.DoubleStateTransactionalGrain
+
+interface Orleans.Transactions.TestKit.Correctnesss.ITransactionalBitArrayGrain [Version(0)]
+  Get() -> Task<System.Collections.Generic.List<Orleans.Transactions.TestKit.Correctnesss.BitArrayState>>
+  Ping() -> Task
+  SetBit(int) -> Task
+
+# Orleans.Transactions.TestKit.Correctnesss.MaxStateTransactionalGrain
+class [GrainType("txn-correctness-MaxStateTransactionalGrain")] Orleans.Transactions.TestKit.Correctnesss.MaxStateTransactionalGrain
+
+# Orleans.Transactions.TestKit.Correctnesss.MultiStateTransactionalBitArrayGrain
+class [GrainType("txn-correctness-MultiStateTransactionalBitArrayGrain")] Orleans.Transactions.TestKit.Correctnesss.MultiStateTransactionalBitArrayGrain
+
+# Orleans.Transactions.TestKit.Correctnesss.SingleStateTransactionalGrain
+class [GrainType("txn-correctness-SingleStateTransactionalGrain")] Orleans.Transactions.TestKit.Correctnesss.SingleStateTransactionalGrain
+
+class Orleans.Transactions.TestKit.CreateAttributionGrain
+
+class Orleans.Transactions.TestKit.CreateOrJoinAttributionGrain
+
+class Orleans.Transactions.TestKit.DoubleStateTransactionalGrain
+
+class Orleans.Transactions.TestKit.ExclusiveLockCoordinatorGrain
+
+class Orleans.Transactions.TestKit.ExclusiveLockTransactionTestGrain
+
+class Orleans.Transactions.TestKit.FaultInjectionTransactionCoordinatorGrain
+
+interface Orleans.Transactions.TestKit.ICreateAttributionGrain [Version(0)]
+  GetNestedTransactionIds(int, System.Collections.Generic.List<Orleans.Transactions.TestKit.ITransactionAttributionGrain>[]) -> Task<System.Collections.Generic.List<string?>[]>
+
+interface Orleans.Transactions.TestKit.ICreateOrJoinAttributionGrain [Version(0)]
+  GetNestedTransactionIds(int, System.Collections.Generic.List<Orleans.Transactions.TestKit.ITransactionAttributionGrain>[]) -> Task<System.Collections.Generic.List<string?>[]>
+
+interface Orleans.Transactions.TestKit.IExclusiveLockCoordinatorGrain [Version(0)]
+  ReadThenWrite(Orleans.Transactions.TestKit.ITransactionTestGrain, int) -> Task
+  ReadThenWriteWithExclusiveLock(Orleans.Transactions.TestKit.IExclusiveLockTransactionTestGrain, int) -> Task
+
+interface Orleans.Transactions.TestKit.IExclusiveLockTransactionTestGrain [Version(0)]
+  Add(int) -> Task<int[]>
+  Get() -> Task<int[]>
+  Set(int) -> Task
+
+interface Orleans.Transactions.TestKit.IFaultInjectionTransactionCoordinatorGrain [Version(0)]
+  MultiGrainAddAndFaultInjection(System.Collections.Generic.List<Orleans.Transactions.TestKit.IFaultInjectionTransactionTestGrain>, int, Orleans.Transactions.TestKit.FaultInjectionControl?) -> Task
+  MultiGrainSet(System.Collections.Generic.List<Orleans.Transactions.TestKit.IFaultInjectionTransactionTestGrain>, int) -> Task
+
+interface Orleans.Transactions.TestKit.IFaultInjectionTransactionTestGrain [Version(0)]
+  Add(int, Orleans.Transactions.TestKit.FaultInjectionControl?) -> Task
+  Deactivate() -> Task
+  Get() -> Task<int>
+  Set(int) -> Task
+
+interface Orleans.Transactions.TestKit.IJoinAttributionGrain [Version(0)]
+  GetNestedTransactionIds(int, System.Collections.Generic.List<Orleans.Transactions.TestKit.ITransactionAttributionGrain>[]) -> Task<System.Collections.Generic.List<string?>[]>
+
+interface Orleans.Transactions.TestKit.INoAttributionGrain [Version(0)]
+  GetNestedTransactionIds(int, System.Collections.Generic.List<Orleans.Transactions.TestKit.ITransactionAttributionGrain>[]) -> Task<System.Collections.Generic.List<string?>[]>
+
+interface Orleans.Transactions.TestKit.INotAllowedAttributionGrain [Version(0)]
+  GetNestedTransactionIds(int, System.Collections.Generic.List<Orleans.Transactions.TestKit.ITransactionAttributionGrain>[]) -> Task<System.Collections.Generic.List<string?>[]>
+
+interface Orleans.Transactions.TestKit.ISupportedAttributionGrain [Version(0)]
+  GetNestedTransactionIds(int, System.Collections.Generic.List<Orleans.Transactions.TestKit.ITransactionAttributionGrain>[]) -> Task<System.Collections.Generic.List<string?>[]>
+
+interface Orleans.Transactions.TestKit.ISuppressAttributionGrain [Version(0)]
+  GetNestedTransactionIds(int, System.Collections.Generic.List<Orleans.Transactions.TestKit.ITransactionAttributionGrain>[]) -> Task<System.Collections.Generic.List<string?>[]>
+
+interface Orleans.Transactions.TestKit.ITransactionCommitterTestGrain [Version(0)]
+  Commit(Orleans.Transactions.Abstractions.ITransactionCommitOperation<Orleans.Transactions.TestKit.IRemoteCommitService>) -> Task
+
+interface Orleans.Transactions.TestKit.ITransactionCoordinatorGrain [Version(0)]
+  AddAndThrow(Orleans.Transactions.TestKit.ITransactionTestGrain, int) -> Task
+  MultiGrainAdd(Orleans.Transactions.TestKit.ITransactionCommitterTestGrain, Orleans.Transactions.Abstractions.ITransactionCommitOperation<Orleans.Transactions.TestKit.IRemoteCommitService>, System.Collections.Generic.List<Orleans.Transactions.TestKit.ITransactionTestGrain>, int) -> Task
+  MultiGrainAdd(System.Collections.Generic.List<Orleans.Transactions.TestKit.ITransactionTestGrain>, int) -> Task
+  MultiGrainAddAndThrow(System.Collections.Generic.List<Orleans.Transactions.TestKit.ITransactionTestGrain>, System.Collections.Generic.List<Orleans.Transactions.TestKit.ITransactionTestGrain>, int) -> Task
+  MultiGrainDouble(System.Collections.Generic.List<Orleans.Transactions.TestKit.ITransactionTestGrain>) -> Task
+  MultiGrainDoubleByRWRW(System.Collections.Generic.List<Orleans.Transactions.TestKit.ITransactionTestGrain>, int) -> Task
+  MultiGrainDoubleByWRWR(System.Collections.Generic.List<Orleans.Transactions.TestKit.ITransactionTestGrain>, int) -> Task
+  MultiGrainSet(System.Collections.Generic.List<Orleans.Transactions.TestKit.ITransactionTestGrain>, int) -> Task
+  MultiGrainSetBit(System.Collections.Generic.List<Orleans.Transactions.TestKit.Correctnesss.ITransactionalBitArrayGrain>, int) -> Task
+  OrphanCallTransaction() -> Task
+  UpdateViolated(Orleans.Transactions.TestKit.ITransactionTestGrain, int) -> Task
+
+interface Orleans.Transactions.TestKit.ITransactionTestGrain [Version(0)]
+  Add(int) -> Task<int[]>
+  AddAndThrow(int) -> Task
+  Deactivate() -> Task
+  Get() -> Task<int[]>
+  Set(int) -> Task
+  SetAndThrow(int) -> Task
+
+class Orleans.Transactions.TestKit.JoinAttributionGrain
+
+class Orleans.Transactions.TestKit.MaxStateTransactionalGrain
+
+class Orleans.Transactions.TestKit.MultiStateTransactionalGrainBaseClass
+
+class Orleans.Transactions.TestKit.NoAttributionGrain
+
+class Orleans.Transactions.TestKit.NoStateTransactionalGrain
+
+class Orleans.Transactions.TestKit.NotAllowedAttributionGrain
+
+class Orleans.Transactions.TestKit.SingleStateFaultInjectionTransactionalGrain
+
+class Orleans.Transactions.TestKit.SingleStateTransactionalGrain
+
+class Orleans.Transactions.TestKit.SupportedAttributionGrain
+
+class Orleans.Transactions.TestKit.SuppressAttributionGrain
+
+class Orleans.Transactions.TestKit.TransactionCommitterTestGrain
+
+class Orleans.Transactions.TestKit.TransactionCoordinatorGrain

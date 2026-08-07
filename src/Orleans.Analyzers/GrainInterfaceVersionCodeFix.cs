@@ -1,0 +1,1025 @@
+#nullable enable
+
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CodeActions;
+using Microsoft.CodeAnalysis.CodeFixes;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Text;
+using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Composition;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace Orleans.Analyzers;
+
+/// <summary>
+/// A code fix provider that adds grain interfaces to OrleansContracts.txt or updates their version.
+/// </summary>
+[ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(GrainInterfaceVersionCodeFix)), Shared]
+public class GrainInterfaceVersionCodeFix : CodeFixProvider
+{
+    private const string DefaultNewLine = "\n";
+
+    public sealed override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(
+        GrainInterfaceVersionAnalyzer.RuleId0016,  // Interface not declared
+        GrainInterfaceVersionAnalyzer.RuleId0017,  // Version mismatch
+        GrainInterfaceVersionAnalyzer.RuleId0018,  // Member not declared
+        GrainInterfaceVersionAnalyzer.RuleId0019,  // Removed interface not retired
+        GrainInterfaceVersionAnalyzer.RuleId0022,  // Grain class not declared
+        GrainInterfaceVersionAnalyzer.RuleId0023,  // Grain class alias mismatch
+        GrainInterfaceVersionAnalyzer.RuleId0024); // Removed grain class not retired
+
+    // Note: We don't use BatchFixer because each fix may need to coordinate updates to the same file
+    public sealed override FixAllProvider? GetFixAllProvider() => null;
+
+    public sealed override Task RegisterCodeFixesAsync(CodeFixContext context)
+    {
+        foreach (var diagnostic in context.Diagnostics)
+        {
+            switch (diagnostic.Id)
+            {
+                case GrainInterfaceVersionAnalyzer.RuleId0016:
+                    RegisterAddInterfaceCodeFix(context, diagnostic);
+                    break;
+                case GrainInterfaceVersionAnalyzer.RuleId0017:
+                    RegisterUpdateVersionCodeFix(context, diagnostic);
+                    break;
+                case GrainInterfaceVersionAnalyzer.RuleId0018:
+                    RegisterAddMemberCodeFix(context, diagnostic);
+                    break;
+                case GrainInterfaceVersionAnalyzer.RuleId0019:
+                    RegisterRetireInterfaceCodeFix(context, diagnostic);
+                    break;
+                case GrainInterfaceVersionAnalyzer.RuleId0022:
+                    RegisterAddGrainClassCodeFix(context, diagnostic);
+                    break;
+                case GrainInterfaceVersionAnalyzer.RuleId0023:
+                    RegisterUpdateGrainClassAliasCodeFix(context, diagnostic);
+                    break;
+                case GrainInterfaceVersionAnalyzer.RuleId0024:
+                    RegisterRetireGrainClassCodeFix(context, diagnostic);
+                    break;
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static void RegisterAddInterfaceCodeFix(CodeFixContext context, Diagnostic diagnostic)
+    {
+        if (!diagnostic.Properties.TryGetValue(GrainInterfaceVersionAnalyzer.InterfaceNamePropertyKey, out var interfaceName) ||
+            string.IsNullOrEmpty(interfaceName))
+        {
+            return;
+        }
+
+        diagnostic.Properties.TryGetValue(GrainInterfaceVersionAnalyzer.GrainInterfaceTypePropertyKey, out var grainInterfaceType);
+        context.RegisterCodeFix(
+            CodeAction.Create(
+                title: Resources.AddToOrleansContractsFileTitle,
+                createChangedSolution: ct => AddInterfaceToFileAsync(context.Document, interfaceName!, grainInterfaceType, ct),
+                equivalenceKey: GrainInterfaceVersionAnalyzer.RuleId0016),
+            diagnostic);
+    }
+
+    private static void RegisterUpdateVersionCodeFix(CodeFixContext context, Diagnostic diagnostic)
+    {
+        if (!diagnostic.Properties.TryGetValue(GrainInterfaceVersionAnalyzer.InterfaceNamePropertyKey, out var interfaceName) ||
+            string.IsNullOrEmpty(interfaceName))
+        {
+            return;
+        }
+
+        if (!diagnostic.Properties.TryGetValue(GrainInterfaceVersionAnalyzer.ActualVersionPropertyKey, out var actualVersion) ||
+            string.IsNullOrEmpty(actualVersion))
+        {
+            return;
+        }
+
+        diagnostic.Properties.TryGetValue(GrainInterfaceVersionAnalyzer.GrainInterfaceTypePropertyKey, out var grainInterfaceType);
+        context.RegisterCodeFix(
+            CodeAction.Create(
+                title: Resources.UpdateGrainInterfaceVersionTitle,
+                createChangedSolution: ct => UpdateVersionInFileAsync(context.Document, interfaceName!, grainInterfaceType, actualVersion!, ct),
+                equivalenceKey: GrainInterfaceVersionAnalyzer.RuleId0017),
+            diagnostic);
+    }
+
+    private static void RegisterAddMemberCodeFix(CodeFixContext context, Diagnostic diagnostic)
+    {
+        if (!diagnostic.Properties.TryGetValue(GrainInterfaceVersionAnalyzer.InterfaceNamePropertyKey, out var interfaceName) ||
+            string.IsNullOrEmpty(interfaceName))
+        {
+            return;
+        }
+
+        if (!diagnostic.Properties.TryGetValue(GrainInterfaceVersionAnalyzer.MemberNamePropertyKey, out var memberSignature) ||
+            string.IsNullOrEmpty(memberSignature))
+        {
+            return;
+        }
+
+        diagnostic.Properties.TryGetValue(GrainInterfaceVersionAnalyzer.MemberClrSignaturePropertyKey, out var memberClrSignature);
+        diagnostic.Properties.TryGetValue(GrainInterfaceVersionAnalyzer.GrainInterfaceTypePropertyKey, out var grainInterfaceType);
+
+        context.RegisterCodeFix(
+            CodeAction.Create(
+                title: Resources.AddToOrleansContractsFileTitle,
+                createChangedSolution: ct => AddMemberToFileAsync(context.Document, interfaceName!, grainInterfaceType, memberSignature!, memberClrSignature, ct),
+                equivalenceKey: GrainInterfaceVersionAnalyzer.RuleId0018),
+            diagnostic);
+    }
+
+    private static void RegisterRetireInterfaceCodeFix(CodeFixContext context, Diagnostic diagnostic)
+    {
+        if (!diagnostic.Properties.TryGetValue(GrainInterfaceVersionAnalyzer.InterfaceNamePropertyKey, out var interfaceName) ||
+            string.IsNullOrEmpty(interfaceName))
+        {
+            return;
+        }
+
+        context.RegisterCodeFix(
+            CodeAction.Create(
+                title: Resources.RetireGrainInterfaceTitle,
+                createChangedSolution: ct => RetireInterfaceInFileAsync(context.Document, interfaceName!, ct),
+                equivalenceKey: GrainInterfaceVersionAnalyzer.RuleId0019),
+            diagnostic);
+    }
+
+    private static void RegisterAddGrainClassCodeFix(CodeFixContext context, Diagnostic diagnostic)
+    {
+        if (!diagnostic.Properties.TryGetValue(GrainInterfaceVersionAnalyzer.ClassNamePropertyKey, out var className) ||
+            string.IsNullOrEmpty(className))
+        {
+            return;
+        }
+
+        context.RegisterCodeFix(
+            CodeAction.Create(
+                title: Resources.AddToOrleansContractsFileTitle,
+                createChangedSolution: ct => AddGrainClassToFileAsync(context.Document, className!, ct),
+                equivalenceKey: GrainInterfaceVersionAnalyzer.RuleId0022),
+            diagnostic);
+    }
+
+    private static void RegisterUpdateGrainClassAliasCodeFix(CodeFixContext context, Diagnostic diagnostic)
+    {
+        if (!diagnostic.Properties.TryGetValue(GrainInterfaceVersionAnalyzer.ClassNamePropertyKey, out var className) ||
+            string.IsNullOrEmpty(className))
+        {
+            return;
+        }
+
+        diagnostic.Properties.TryGetValue(GrainInterfaceVersionAnalyzer.ActualAliasPropertyKey, out var alias);
+        context.RegisterCodeFix(
+            CodeAction.Create(
+                title: Resources.UpdateGrainClassAliasTitle,
+                createChangedSolution: ct => UpdateGrainClassAliasInFileAsync(context.Document, className!, alias, ct),
+                equivalenceKey: GrainInterfaceVersionAnalyzer.RuleId0023),
+            diagnostic);
+    }
+
+    private static void RegisterRetireGrainClassCodeFix(CodeFixContext context, Diagnostic diagnostic)
+    {
+        if (!diagnostic.Properties.TryGetValue(GrainInterfaceVersionAnalyzer.ClassNamePropertyKey, out var className) ||
+            string.IsNullOrEmpty(className))
+        {
+            return;
+        }
+
+        context.RegisterCodeFix(
+            CodeAction.Create(
+                title: Resources.RetireGrainClassTitle,
+                createChangedSolution: ct => RetireGrainClassInFileAsync(context.Document, className!, ct),
+                equivalenceKey: GrainInterfaceVersionAnalyzer.RuleId0024),
+            diagnostic);
+    }
+
+    private static async Task<Solution> AddGrainClassToFileAsync(
+        Document document,
+        string className,
+        CancellationToken cancellationToken)
+    {
+        var project = document.Project;
+        var solution = project.Solution;
+        var semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+        var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+        if (semanticModel is null || root is null)
+        {
+            return solution;
+        }
+
+        var declaration = root.DescendantNodes()
+            .OfType<TypeDeclarationSyntax>()
+            .FirstOrDefault(candidate =>
+            {
+                var symbol = semanticModel.GetDeclaredSymbol(candidate, cancellationToken) as INamedTypeSymbol;
+                var fullName = symbol?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", "");
+                return symbol?.TypeKind == TypeKind.Class && string.Equals(fullName, className, StringComparison.Ordinal);
+            });
+        if (declaration is null || semanticModel.GetDeclaredSymbol(declaration, cancellationToken) is not INamedTypeSymbol classSymbol)
+        {
+            return solution;
+        }
+
+        var alias = GetGrainTypeAliasFromAttributes(classSymbol);
+        var classClrComment = GrainInterfaceVersionAnalyzer.IdentityDiffersFromClrName(alias, classSymbol) ? className : null;
+        var classLine = string.IsNullOrEmpty(alias)
+            ? $"class {className}"
+            : $"class [GrainType(\"{alias}\")] {className}";
+        var contractsFile = project.AdditionalDocuments
+            .FirstOrDefault(d => Path.GetFileName(d.FilePath ?? d.Name).Equals(Constants.OrleansContractsFileName, StringComparison.OrdinalIgnoreCase));
+        if (contractsFile is null)
+        {
+            return solution;
+        }
+
+        var text = await contractsFile.GetTextAsync(cancellationToken).ConfigureAwait(false);
+        if (text is null)
+        {
+            return solution;
+        }
+
+        var newLine = GetNewLine(text);
+        var lines = text.ToString().Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+        for (var i = 0; i < lines.Length; i++)
+        {
+            if (GrainInterfaceFileParser.TryGetGrainClassName(lines[i], out var declaredName)
+                && string.Equals(declaredName, className, StringComparison.Ordinal))
+            {
+                var updatedLines = lines.ToList();
+                i = SetClrCommentBefore(updatedLines, i, classClrComment);
+                updatedLines[i] = classLine;
+                var reactivatedContent = SortContractEntries(string.Join(newLine, updatedLines), newLine);
+                return solution.WithAdditionalDocumentText(
+                    contractsFile.Id,
+                    Microsoft.CodeAnalysis.Text.SourceText.From(reactivatedContent, Encoding.UTF8));
+            }
+        }
+
+        var content = text.ToString().TrimEnd();
+        if (content.Length > 0)
+        {
+            content += newLine + newLine;
+        }
+
+        if (classClrComment is not null)
+        {
+            content += $"# {classClrComment}{newLine}";
+        }
+        content = SortContractEntries(content + classLine, newLine);
+        return solution.WithAdditionalDocumentText(
+            contractsFile.Id,
+            Microsoft.CodeAnalysis.Text.SourceText.From(content, Encoding.UTF8));
+    }
+
+    private static async Task<Solution> UpdateGrainClassAliasInFileAsync(
+        Document document,
+        string className,
+        string? alias,
+        CancellationToken cancellationToken)
+    {
+        var project = document.Project;
+        var contractsFile = project.AdditionalDocuments
+            .FirstOrDefault(d => Path.GetFileName(d.FilePath ?? d.Name).Equals(Constants.OrleansContractsFileName, StringComparison.OrdinalIgnoreCase));
+        if (contractsFile is null)
+        {
+            return project.Solution;
+        }
+
+        var text = await contractsFile.GetTextAsync(cancellationToken).ConfigureAwait(false);
+        if (text is null)
+        {
+            return project.Solution;
+        }
+
+        var newLine = GetNewLine(text);
+        var replacement = string.IsNullOrEmpty(alias)
+            ? $"class {className}"
+            : $"class [GrainType(\"{alias}\")] {className}";
+        var lines = text.ToString().Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None).ToList();
+        for (var i = 0; i < lines.Count; i++)
+        {
+            if (GrainInterfaceFileParser.TryGetGrainClassName(lines[i], out var declaredName)
+                && string.Equals(declaredName, className, StringComparison.Ordinal))
+            {
+                var clrComment = IdentityDiffersFromClrName(alias, className) ? className : null;
+                i = SetClrCommentBefore(lines, i, clrComment);
+                lines[i] = replacement;
+                break;
+            }
+        }
+
+        var content = SortContractEntries(string.Join(newLine, lines), newLine);
+        return project.Solution.WithAdditionalDocumentText(
+            contractsFile.Id,
+            Microsoft.CodeAnalysis.Text.SourceText.From(content, Encoding.UTF8));
+    }
+
+    private static async Task<Solution> RetireGrainClassInFileAsync(
+        Document document,
+        string className,
+        CancellationToken cancellationToken)
+    {
+        var project = document.Project;
+        var contractsFile = project.AdditionalDocuments
+            .FirstOrDefault(d => Path.GetFileName(d.FilePath ?? d.Name).Equals(Constants.OrleansContractsFileName, StringComparison.OrdinalIgnoreCase));
+        if (contractsFile is null)
+        {
+            return project.Solution;
+        }
+
+        var text = await contractsFile.GetTextAsync(cancellationToken).ConfigureAwait(false);
+        if (text is null)
+        {
+            return project.Solution;
+        }
+
+        var newLine = GetNewLine(text);
+        var lines = text.ToString().Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var trimmedLine = lines[i].Trim();
+            if (GrainInterfaceFileParser.TryGetGrainClassName(trimmedLine, out var declaredName)
+                && string.Equals(declaredName, className, StringComparison.Ordinal)
+                && !trimmedLine.StartsWith(GrainInterfaceVersionAnalyzer.RetiredPrefix, StringComparison.Ordinal))
+            {
+                lines[i] = $"{GrainInterfaceVersionAnalyzer.RetiredPrefix} {trimmedLine}";
+                break;
+            }
+        }
+
+        var content = SortContractEntries(string.Join(newLine, lines), newLine);
+        return project.Solution.WithAdditionalDocumentText(
+            contractsFile.Id,
+            Microsoft.CodeAnalysis.Text.SourceText.From(content, Encoding.UTF8));
+    }
+
+    private static async Task<Solution> AddInterfaceToFileAsync(
+        Document document,
+        string interfaceName,
+        string? grainInterfaceType,
+        CancellationToken cancellationToken)
+    {
+        var project = document.Project;
+        var solution = project.Solution;
+
+        // Get version and alias from the source code
+        var semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+        var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+
+        if (semanticModel is null || root is null)
+        {
+            return solution;
+        }
+
+        var interfaceDecl = root.DescendantNodes()
+            .OfType<InterfaceDeclarationSyntax>()
+            .FirstOrDefault(i =>
+            {
+                var symbol = semanticModel.GetDeclaredSymbol(i, cancellationToken);
+                if (symbol is null) return false;
+                var fullName = symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", "");
+                return string.Equals(fullName, interfaceName, StringComparison.Ordinal);
+            });
+
+        if (interfaceDecl is null)
+        {
+            return solution;
+        }
+
+        var symbol = semanticModel.GetDeclaredSymbol(interfaceDecl, cancellationToken) as INamedTypeSymbol;
+        if (symbol is null)
+        {
+            return solution;
+        }
+
+        var version = GetVersionFromAttributes(symbol);
+        grainInterfaceType ??= GetGrainInterfaceTypeFromAttributes(symbol);
+        var interfaceClrComment = GrainInterfaceVersionAnalyzer.IdentityDiffersFromClrName(grainInterfaceType, symbol)
+            ? interfaceName
+            : null;
+
+        // Build the interface declaration line
+        var sb = new StringBuilder();
+        sb.Append("interface ");
+        if (!string.IsNullOrEmpty(grainInterfaceType))
+        {
+            sb.Append($"[GrainInterfaceType(\"{grainInterfaceType}\")] ");
+        }
+        sb.Append(interfaceName);
+        sb.Append($" [Version({version})]");
+        var interfaceLine = sb.ToString();
+
+        // Build member lines
+        var memberLines = new List<(string Signature, string? ClrSignature)>();
+        foreach (var member in symbol.GetMembers().OfType<IMethodSymbol>())
+        {
+            if (member.MethodKind != MethodKind.Ordinary || member.IsStatic)
+            {
+                continue;
+            }
+
+            var memberSignature = GrainInterfaceVersionAnalyzer.GetMethodSignature(member);
+            memberLines.Add((
+                memberSignature,
+                GrainInterfaceVersionAnalyzer.RequiresClrComment(member)
+                    ? GrainInterfaceVersionAnalyzer.GetClrMethodSignature(member)
+                    : null));
+        }
+
+        // Find or create the OrleansContracts.txt file
+        var grainInterfacesFile = project.AdditionalDocuments
+            .FirstOrDefault(d => Path.GetFileName(d.FilePath ?? d.Name).Equals(Constants.OrleansContractsFileName, StringComparison.OrdinalIgnoreCase));
+
+        if (grainInterfacesFile is not null)
+        {
+            // Append to existing file
+            var text = await grainInterfacesFile.GetTextAsync(cancellationToken).ConfigureAwait(false);
+            var existingContent = text?.ToString() ?? "";
+            var newLine = text is null ? DefaultNewLine : GetNewLine(text);
+            var lines = existingContent.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+            for (var i = 0; i < lines.Length; i++)
+            {
+                if (IsMatchingInterface(lines[i], interfaceName, grainInterfaceType))
+                {
+                    var updatedLines = lines.ToList();
+                    i = SetClrCommentBefore(updatedLines, i, interfaceClrComment);
+                    updatedLines[i] = interfaceLine;
+                    var reactivatedContent = SortContractEntries(string.Join(newLine, updatedLines), newLine);
+                    var reactivatedText = Microsoft.CodeAnalysis.Text.SourceText.From(reactivatedContent, Encoding.UTF8);
+                    return solution.WithAdditionalDocumentText(grainInterfacesFile.Id, reactivatedText);
+                }
+            }
+
+            var newContent = existingContent.TrimEnd();
+            if (!string.IsNullOrEmpty(newContent))
+            {
+                newContent += newLine + newLine;
+            }
+            if (interfaceClrComment is not null)
+            {
+                newContent += $"# {interfaceClrComment}{newLine}";
+            }
+            newContent += interfaceLine;
+            foreach (var member in memberLines)
+            {
+                if (member.ClrSignature is not null)
+                {
+                    newContent += $"{newLine}  # {member.ClrSignature}";
+                }
+                newContent += $"{newLine}  {member.Signature}";
+            }
+            newContent = SortContractEntries(newContent, newLine);
+
+            var newText = Microsoft.CodeAnalysis.Text.SourceText.From(newContent, Encoding.UTF8);
+            solution = solution.WithAdditionalDocumentText(grainInterfacesFile.Id, newText);
+        }
+        else
+        {
+            // Create new file with header
+            var content = new StringBuilder();
+            AppendLine(content, "# This file tracks grain interface versions for compatibility during rolling upgrades.", DefaultNewLine);
+            AppendLine(content, "# Format:", DefaultNewLine);
+            AppendLine(content, "#   # Namespace.GrainClass", DefaultNewLine);
+            AppendLine(content, "#   class [GrainType(\"identity\")] Namespace.GrainClass", DefaultNewLine);
+            AppendLine(content, "#   # Namespace.IInterface", DefaultNewLine);
+            AppendLine(content, "#   interface [GrainInterfaceType(\"identity\")] Namespace.IInterface [Version(N)]", DefaultNewLine);
+            AppendLine(content, "#   # Namespace.IInterface.Method(params) -> ReturnType", DefaultNewLine);
+            AppendLine(content, "#   contract-signature", DefaultNewLine);
+            AppendLine(content, "", DefaultNewLine);
+            if (interfaceClrComment is not null)
+            {
+                AppendLine(content, $"# {interfaceClrComment}", DefaultNewLine);
+            }
+            AppendLine(content, interfaceLine, DefaultNewLine);
+            foreach (var member in memberLines)
+            {
+                if (member.ClrSignature is not null)
+                {
+                    AppendLine(content, $"  # {member.ClrSignature}", DefaultNewLine);
+                }
+                AppendLine(content, $"  {member.Signature}", DefaultNewLine);
+            }
+
+            var newText = Microsoft.CodeAnalysis.Text.SourceText.From(SortContractEntries(content.ToString(), DefaultNewLine), Encoding.UTF8);
+            var projectDir = Path.GetDirectoryName(project.FilePath);
+            var filePath = projectDir is not null
+                ? Path.Combine(projectDir, Constants.OrleansContractsFileName)
+                : Constants.OrleansContractsFileName;
+
+            solution = solution.AddAdditionalDocument(
+                DocumentId.CreateNewId(project.Id),
+                Constants.OrleansContractsFileName,
+                newText,
+                filePath: filePath);
+        }
+
+        return solution;
+    }
+
+    private static async Task<Solution> UpdateVersionInFileAsync(
+        Document document,
+        string interfaceName,
+        string? grainInterfaceType,
+        string newVersion,
+        CancellationToken cancellationToken)
+    {
+        var project = document.Project;
+        var solution = project.Solution;
+
+        var grainInterfacesFile = project.AdditionalDocuments
+            .FirstOrDefault(d => Path.GetFileName(d.FilePath ?? d.Name).Equals(Constants.OrleansContractsFileName, StringComparison.OrdinalIgnoreCase));
+
+        if (grainInterfacesFile is null)
+        {
+            return solution;
+        }
+
+        var text = await grainInterfacesFile.GetTextAsync(cancellationToken).ConfigureAwait(false);
+        if (text is null)
+        {
+            return solution;
+        }
+
+        var newLine = GetNewLine(text);
+        var lines = text.ToString().Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+        var newLines = new StringBuilder();
+
+        foreach (var line in lines)
+        {
+            var trimmedLine = line.Trim();
+
+            // Check if this line contains the interface declaration
+            if (IsMatchingInterface(trimmedLine, interfaceName, grainInterfaceType))
+            {
+                // Replace the version number
+                var versionStart = trimmedLine.IndexOf("[Version(", StringComparison.Ordinal);
+                var versionEnd = trimmedLine.IndexOf(")]", versionStart, StringComparison.Ordinal);
+
+                if (versionStart >= 0 && versionEnd > versionStart)
+                {
+                    var before = trimmedLine.Substring(0, versionStart);
+                    var after = trimmedLine.Substring(versionEnd + 2);
+                    AppendLine(newLines, $"{before}[Version({newVersion})]{after}", newLine);
+                    continue;
+                }
+            }
+
+            AppendLine(newLines, line, newLine);
+        }
+
+        // Remove trailing newline added by AppendLine
+        var newContent = newLines.ToString();
+        if (newContent.EndsWith(newLine, StringComparison.Ordinal))
+        {
+            newContent = newContent.Substring(0, newContent.Length - newLine.Length);
+        }
+        newContent = SortContractEntries(newContent, newLine);
+
+        var newText = Microsoft.CodeAnalysis.Text.SourceText.From(newContent, Encoding.UTF8);
+        return solution.WithAdditionalDocumentText(grainInterfacesFile.Id, newText);
+    }
+
+    private static async Task<Solution> AddMemberToFileAsync(
+        Document document,
+        string interfaceName,
+        string? grainInterfaceType,
+        string memberSignature,
+        string? memberClrSignature,
+        CancellationToken cancellationToken)
+    {
+        var project = document.Project;
+        var solution = project.Solution;
+
+        var grainInterfacesFile = project.AdditionalDocuments
+            .FirstOrDefault(d => Path.GetFileName(d.FilePath ?? d.Name).Equals(Constants.OrleansContractsFileName, StringComparison.OrdinalIgnoreCase));
+
+        if (grainInterfacesFile is null)
+        {
+            return solution;
+        }
+
+        var text = await grainInterfacesFile.GetTextAsync(cancellationToken).ConfigureAwait(false);
+        if (text is null)
+        {
+            return solution;
+        }
+
+        var newLine = GetNewLine(text);
+        var lines = text.ToString().Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+        var newLines = new StringBuilder();
+        var foundInterface = false;
+        var insertedMember = false;
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            var trimmedLine = line.Trim();
+
+            if (foundInterface
+                && !insertedMember
+                && (string.IsNullOrEmpty(trimmedLine)
+                    || trimmedLine.StartsWith("#", StringComparison.Ordinal)
+                    || GrainInterfaceFileParser.TryGetContractName(trimmedLine, out _)))
+            {
+                AppendMember(newLines, memberSignature, memberClrSignature, newLine);
+                insertedMember = true;
+            }
+
+            // Check if this line contains the interface declaration
+            if (!foundInterface && IsMatchingInterface(trimmedLine, interfaceName, grainInterfaceType))
+            {
+                foundInterface = true;
+            }
+
+            AppendLine(newLines, line, newLine);
+        }
+
+        // If we didn't insert the member yet, append it at the end
+        if (foundInterface && !insertedMember)
+        {
+            AppendMember(newLines, memberSignature, memberClrSignature, newLine);
+        }
+
+        // Remove trailing newline added by AppendLine
+        var newContent = newLines.ToString();
+        if (newContent.EndsWith(newLine, StringComparison.Ordinal))
+        {
+            newContent = newContent.Substring(0, newContent.Length - newLine.Length);
+        }
+        newContent = SortContractEntries(newContent, newLine);
+
+        var newText = Microsoft.CodeAnalysis.Text.SourceText.From(newContent, Encoding.UTF8);
+        return solution.WithAdditionalDocumentText(grainInterfacesFile.Id, newText);
+    }
+
+    private static async Task<Solution> RetireInterfaceInFileAsync(
+        Document document,
+        string interfaceName,
+        CancellationToken cancellationToken)
+    {
+        var project = document.Project;
+        var solution = project.Solution;
+
+        var grainInterfacesFile = project.AdditionalDocuments
+            .FirstOrDefault(d => Path.GetFileName(d.FilePath ?? d.Name).Equals(Constants.OrleansContractsFileName, StringComparison.OrdinalIgnoreCase));
+
+        if (grainInterfacesFile is null)
+        {
+            return solution;
+        }
+
+        var text = await grainInterfacesFile.GetTextAsync(cancellationToken).ConfigureAwait(false);
+        if (text is null)
+        {
+            return solution;
+        }
+
+        var newLine = GetNewLine(text);
+        var lines = text.ToString().Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+        var newLines = new StringBuilder();
+
+        foreach (var line in lines)
+        {
+            var trimmedLine = line.Trim();
+
+            // Check if this line contains the interface declaration
+            if (GrainInterfaceFileParser.TryGetInterfaceName(trimmedLine, out var declaredInterfaceName)
+                && string.Equals(declaredInterfaceName, interfaceName, StringComparison.Ordinal) &&
+                !trimmedLine.StartsWith(GrainInterfaceVersionAnalyzer.RetiredPrefix, StringComparison.Ordinal))
+            {
+                // Add *RETIRED* prefix
+                AppendLine(newLines, $"{GrainInterfaceVersionAnalyzer.RetiredPrefix} {trimmedLine}", newLine);
+                continue;
+            }
+
+            AppendLine(newLines, line, newLine);
+        }
+
+        // Remove trailing newline added by AppendLine
+        var newContent = newLines.ToString();
+        if (newContent.EndsWith(newLine, StringComparison.Ordinal))
+        {
+            newContent = newContent.Substring(0, newContent.Length - newLine.Length);
+        }
+        newContent = SortContractEntries(newContent, newLine);
+
+        var newText = Microsoft.CodeAnalysis.Text.SourceText.From(newContent, Encoding.UTF8);
+        return solution.WithAdditionalDocumentText(grainInterfacesFile.Id, newText);
+    }
+
+    private static string GetNewLine(SourceText text)
+    {
+        foreach (var line in text.Lines)
+        {
+            if (line.EndIncludingLineBreak > line.End)
+            {
+                return text.ToString(TextSpan.FromBounds(line.End, line.EndIncludingLineBreak));
+            }
+        }
+
+        return DefaultNewLine;
+    }
+
+    private static bool IsMatchingInterface(string line, string interfaceName, string? grainInterfaceType)
+    {
+        if (!GrainInterfaceFileParser.TryGetInterfaceName(line, out var declaredInterfaceName))
+        {
+            return false;
+        }
+
+        if (grainInterfaceType is not null)
+        {
+            return GrainInterfaceFileParser.TryGetGrainInterfaceType(line, out var declaredGrainInterfaceType)
+                ? string.Equals(declaredGrainInterfaceType, grainInterfaceType, StringComparison.Ordinal)
+                : string.Equals(declaredInterfaceName, interfaceName, StringComparison.Ordinal);
+        }
+
+        return string.Equals(declaredInterfaceName, interfaceName, StringComparison.Ordinal);
+    }
+
+    private static bool IdentityDiffersFromClrName(string? identity, string fullName)
+    {
+        if (identity is null)
+        {
+            return false;
+        }
+
+        var simpleName = fullName.Substring(fullName.LastIndexOf('.') + 1);
+        return !string.Equals(identity, fullName, StringComparison.Ordinal)
+            && !string.Equals(identity, simpleName, StringComparison.Ordinal);
+    }
+
+    private static int SetClrCommentBefore(List<string> lines, int entryIndex, string? clrName)
+    {
+        if (entryIndex > 0 && lines[entryIndex - 1].TrimStart().StartsWith("# ", StringComparison.Ordinal))
+        {
+            if (clrName is null)
+            {
+                lines.RemoveAt(entryIndex - 1);
+                return entryIndex - 1;
+            }
+
+            lines[entryIndex - 1] = $"# {clrName}";
+            return entryIndex;
+        }
+
+        if (clrName is null)
+        {
+            return entryIndex;
+        }
+
+        lines.Insert(entryIndex, $"# {clrName}");
+        return entryIndex + 1;
+    }
+
+    private static string SortContractEntries(string content, string newLine)
+    {
+        var preamble = new List<string>();
+        var blocks = new List<ContractBlock>();
+        ContractBlock? currentBlock = null;
+        string? pendingComment = null;
+        var lines = content.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+        for (var lineIndex = 0; lineIndex < lines.Length; lineIndex++)
+        {
+            var line = lines[lineIndex];
+            var trimmedLine = line.TrimStart();
+            if (string.Equals(trimmedLine, "# OrleansContracts.txt", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (trimmedLine.StartsWith("# ", StringComparison.Ordinal)
+                && !trimmedLine.StartsWith("# This file ", StringComparison.Ordinal)
+                && !trimmedLine.StartsWith("# Format:", StringComparison.Ordinal)
+                && !trimmedLine.StartsWith("#   ", StringComparison.Ordinal)
+                && lineIndex + 1 < lines.Length
+                && (GrainInterfaceFileParser.TryGetContractName(lines[lineIndex + 1], out _)
+                    || GrainInterfaceFileParser.TryGetMemberSignature(lines[lineIndex + 1], out _)))
+            {
+                pendingComment = NormalizeComment(line);
+                continue;
+            }
+
+            if (GrainInterfaceFileParser.TryGetContractName(line, out var contractName))
+            {
+                var inlineComment = GrainInterfaceFileParser.GetClrComment(line);
+                currentBlock = new ContractBlock(
+                    contractName,
+                    NormalizeContractDeclaration(line),
+                    pendingComment ?? (inlineComment.Length > 0 ? NormalizeComment(inlineComment) : null));
+                blocks.Add(currentBlock);
+                pendingComment = null;
+            }
+            else if (currentBlock is null)
+            {
+                if (pendingComment is not null)
+                {
+                    preamble.Add(pendingComment);
+                    pendingComment = null;
+                }
+                preamble.Add(line);
+            }
+            else if (GrainInterfaceFileParser.TryGetMemberSignature(line, out var memberSignature))
+            {
+                var inlineComment = GrainInterfaceFileParser.GetClrComment(line);
+                var normalizedMemberLine = NormalizeMemberLine(memberSignature, currentBlock.Name);
+                currentBlock.Members.Add((
+                    normalizedMemberLine,
+                    normalizedMemberLine,
+                    pendingComment ?? (inlineComment.Length > 0 ? NormalizeComment(inlineComment) : null)));
+                pendingComment = null;
+            }
+            else if (!string.IsNullOrWhiteSpace(line))
+            {
+                if (pendingComment is not null)
+                {
+                    currentBlock.OtherLines.Add(pendingComment);
+                    pendingComment = null;
+                }
+                currentBlock.OtherLines.Add(line);
+            }
+        }
+
+        while (preamble.Count > 0 && string.IsNullOrWhiteSpace(preamble[preamble.Count - 1]))
+        {
+            preamble.RemoveAt(preamble.Count - 1);
+        }
+
+        var result = new List<string>(preamble);
+        if (result.Count > 0 && blocks.Count > 0)
+        {
+            result.Add("");
+        }
+
+        var orderedBlocks = blocks.OrderBy(block => block.Name, StringComparer.Ordinal).ToArray();
+        for (var i = 0; i < orderedBlocks.Length; i++)
+        {
+            if (i > 0)
+            {
+                result.Add("");
+            }
+
+            var block = orderedBlocks[i];
+            if (block.ClrComment is not null)
+            {
+                result.Add(block.ClrComment);
+            }
+            result.Add(block.Declaration);
+            foreach (var member in block.Members
+                .OrderBy(member => member.Signature, StringComparer.Ordinal)
+                .ThenBy(member => member.Line, StringComparer.Ordinal))
+            {
+                if (member.ClrComment is not null)
+                {
+                    result.Add($"  {member.ClrComment}");
+                }
+                result.Add($"  {member.Line}");
+            }
+            result.AddRange(block.OtherLines);
+        }
+
+        return string.Join(newLine, result) + newLine;
+    }
+
+    private static string NormalizeComment(string comment)
+    {
+        var result = comment.Trim();
+        return result.StartsWith("# CLR: ", StringComparison.Ordinal)
+            ? $"# {result.Substring("# CLR: ".Length)}"
+            : result;
+    }
+
+    private static string NormalizeMemberLine(string signature, string contractName)
+        => GrainInterfaceVersionAnalyzer.NormalizeStoredMemberSignature(signature, contractName);
+
+    private static string NormalizeContractDeclaration(string line)
+    {
+        var result = GrainInterfaceFileParser.StripClrComment(line);
+        if (GrainInterfaceFileParser.TryGetGrainClassName(result, out _))
+        {
+            return result;
+        }
+
+        if (result.StartsWith(GrainInterfaceVersionAnalyzer.RetiredPrefix, StringComparison.Ordinal))
+        {
+            var declaration = result.Substring(GrainInterfaceVersionAnalyzer.RetiredPrefix.Length).TrimStart();
+            return declaration.StartsWith("interface ", StringComparison.Ordinal)
+                ? result
+                : $"{GrainInterfaceVersionAnalyzer.RetiredPrefix} interface {declaration}";
+        }
+
+        return result.StartsWith("interface ", StringComparison.Ordinal) ? result : $"interface {result}";
+    }
+
+    private static void AppendLine(StringBuilder builder, string value, string newLine)
+    {
+        builder.Append(value);
+        builder.Append(newLine);
+    }
+
+    private static void AppendMember(
+        StringBuilder builder,
+        string memberSignature,
+        string? memberClrSignature,
+        string newLine)
+    {
+        if (!string.IsNullOrEmpty(memberClrSignature))
+        {
+            AppendLine(builder, $"  # {memberClrSignature}", newLine);
+        }
+
+        AppendLine(builder, $"  {memberSignature}", newLine);
+    }
+
+    private static ushort GetVersionFromAttributes(ISymbol symbol)
+    {
+        foreach (var attribute in symbol.GetAttributes())
+        {
+            if (string.Equals(attribute.AttributeClass?.ToDisplayString(), Constants.VersionAttributeFullyQualifiedName, StringComparison.Ordinal))
+            {
+                if (attribute.ConstructorArguments.Length > 0 &&
+                    attribute.ConstructorArguments[0].Value is ushort version)
+                {
+                    return version;
+                }
+            }
+        }
+
+        return 0;
+    }
+
+    private static string? GetAliasFromAttributes(ISymbol symbol)
+    {
+        foreach (var attribute in symbol.GetAttributes())
+        {
+            if (string.Equals(attribute.AttributeClass?.ToDisplayString(), Constants.AliasAttributeFullyQualifiedName, StringComparison.Ordinal))
+            {
+                if (attribute.ConstructorArguments.Length > 0 &&
+                    attribute.ConstructorArguments[0].Value is string alias)
+                {
+                    return alias;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static string? GetGrainTypeAliasFromAttributes(ISymbol symbol)
+    {
+        foreach (var attribute in symbol.GetAttributes())
+        {
+            if (string.Equals(attribute.AttributeClass?.ToDisplayString(), Constants.GrainTypeAttributeFullyQualifiedName, StringComparison.Ordinal)
+                && attribute.ConstructorArguments.Length > 0
+                && attribute.ConstructorArguments[0].Value is string alias)
+            {
+                return alias;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? GetGrainInterfaceTypeFromAttributes(ISymbol symbol)
+    {
+        foreach (var attribute in symbol.GetAttributes())
+        {
+            if (string.Equals(attribute.AttributeClass?.ToDisplayString(), Constants.GrainInterfaceTypeAttributeFullyQualifiedName, StringComparison.Ordinal)
+                && attribute.ConstructorArguments.Length > 0
+                && attribute.ConstructorArguments[0].Value is string value)
+            {
+                return value;
+            }
+        }
+
+        return null;
+    }
+
+    private sealed class ContractBlock
+    {
+        public ContractBlock(string name, string declaration, string? clrComment)
+        {
+            Name = name;
+            Declaration = declaration;
+            ClrComment = clrComment;
+        }
+
+        public string Name { get; }
+
+        public string Declaration { get; }
+
+        public string? ClrComment { get; }
+
+        public List<(string Signature, string Line, string? ClrComment)> Members { get; } = new();
+
+        public List<string> OtherLines { get; } = new();
+    }
+}

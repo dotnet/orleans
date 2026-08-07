@@ -1,0 +1,7 @@
+interface Orleans.EventSourcing.ILogConsistencyProtocolParticipant [Version(0)]
+  DeactivateProtocolParticipant() -> Task
+  PostActivateProtocolParticipant() -> Task
+  PreActivateProtocolParticipant() -> Task
+
+interface Orleans.SystemTargetInterfaces.ILogConsistencyProtocolGateway [Version(0)]
+  RelayMessage(Orleans.Runtime.GrainId, Orleans.EventSourcing.ILogConsistencyProtocolMessage) -> Task<Orleans.EventSourcing.ILogConsistencyProtocolMessage?>

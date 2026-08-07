@@ -1,0 +1,33 @@
+interface Orleans.Dashboard.Core.IDashboardGrain [Version(0)]
+  GetClusterTracing() -> Task<Orleans.Concurrency.Immutable<System.Collections.Generic.Dictionary<string, Orleans.Dashboard.Model.GrainTraceEntry>>>
+  GetCounters(string[]) -> Task<Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.DashboardCounters>>
+  GetGrainState(string?, string?) -> Task<Orleans.Concurrency.Immutable<string>>
+  GetGrainTracing(string) -> Task<Orleans.Concurrency.Immutable<System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, Orleans.Dashboard.Model.GrainTraceEntry>>>>
+  GetGrainTypes(string[]) -> Task<Orleans.Concurrency.Immutable<string[]>>
+  GetSiloTracing(string) -> Task<Orleans.Concurrency.Immutable<System.Collections.Generic.Dictionary<string, Orleans.Dashboard.Model.GrainTraceEntry>>>
+  InitializeAsync() -> Task
+  SubmitTracing(string, Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.SiloGrainTraceEntry[]>) -> Task
+  TopGrainMethods(int, string[]) -> Task<Orleans.Concurrency.Immutable<System.Collections.Generic.Dictionary<string, Orleans.Dashboard.Model.History.GrainMethodAggregate[]>>>
+
+interface Orleans.Dashboard.Core.IDashboardRemindersGrain [Version(0)]
+  GetReminders(int, int) -> Task<Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.ReminderResponse>>
+
+interface Orleans.Dashboard.Core.ISiloGrainProxy [Version(0)]
+  GetMetadata() -> Task<Orleans.Concurrency.Immutable<System.Collections.Generic.Dictionary<string, string>>>
+
+interface Orleans.Dashboard.Core.ISiloGrainService [Version(0)]
+  Enable(bool) -> Task
+  GetCounters() -> Task<Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.StatCounter[]>>
+  GetExtendedProperties() -> Task<Orleans.Concurrency.Immutable<System.Collections.Generic.Dictionary<string, string?>>>
+  GetLifecycleStages() -> Task<Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.LifecycleStageInfo[]>>
+  GetRuntimeStatistics() -> Task<Orleans.Concurrency.Immutable<Orleans.Runtime.SiloRuntimeStatistics?[]>>
+  ReportCounters(Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.StatCounter[]>) -> Task
+  SetVersion(string, string) -> Task
+
+class Orleans.Dashboard.Implementation.Grains.DashboardGrain
+
+class Orleans.Dashboard.Implementation.Grains.DashboardRemindersGrain
+
+class Orleans.Dashboard.Implementation.Grains.SiloGrainProxy
+
+class Orleans.Dashboard.Implementation.SiloGrainService
