@@ -41,6 +41,7 @@ namespace TestExtensions
         public static Uri DataBlobUri => new Uri(defaultConfiguration[nameof(DataBlobUri)]!);
         public static Uri DataQueueUri => new Uri(defaultConfiguration[nameof(DataQueueUri)]!);
         public static string? DataConnectionString => defaultConfiguration[nameof(DataConnectionString)];
+        public static bool UseAzurite => !UseAadAuthentication && string.IsNullOrWhiteSpace(DataConnectionString);
         public static string AzureStorageConnectionString
         {
             get

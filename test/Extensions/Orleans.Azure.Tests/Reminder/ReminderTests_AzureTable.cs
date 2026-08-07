@@ -6,6 +6,7 @@ using UnitTests.GrainInterfaces;
 using Xunit;
 using Microsoft.Extensions.Logging;
 using Orleans.Testing.Reminders;
+using TestExtensions;
 using UnitTests.TimerTests;
 using Orleans.Internal;
 
@@ -50,7 +51,8 @@ namespace Tester.AzureUtils.TimerTests
             }
         }
 
-        public ReminderTests_AzureTable(Fixture fixture) : base(fixture.ReminderClock, fixture.HostedCluster)
+        public ReminderTests_AzureTable(Fixture fixture)
+            : base(fixture.ReminderClock, fixture.HostedCluster, TestDefaultConfiguration.UseAzurite ? 2 : 1)
         {
             fixture.EnsurePreconditionsMet();
         }
