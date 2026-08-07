@@ -60,7 +60,7 @@ After startup, Orleans refreshes gateways and reconnects as cluster membership c
 
 External client code isn't governed by the grain turn-based concurrency model. Multiple threads can use <xref:Orleans.IClusterClient> and grain references concurrently. Protect mutable client-side state using normal .NET synchronization.
 
-Grain calls return <xref:System.Threading.Tasks.Task>, <xref:System.Threading.Tasks.Task`1>, <xref:System.Threading.Tasks.ValueTask>, or <xref:System.Threading.Tasks.ValueTask`1> according to the [grain interface rules](../grains/index.md#grain-interfaces-and-classes). Always await calls rather than blocking threads.
+Grain calls return <xref:System.Threading.Tasks.Task>, <xref:System.Threading.Tasks.Task`1>, <xref:System.Threading.Tasks.ValueTask>, or <xref:System.Threading.Tasks.ValueTask`1> according to the [grain interface rules](../grains/index.md). Always await calls rather than blocking threads.
 
 ## Receive notifications
 
