@@ -12,14 +12,23 @@ public interface IStorage<TState> : IStorage
 
 public interface IStorage
 {
-    string Etag { get; }
+    string? Etag { get; }
 
     bool RecordExists { get; }
 
     Task ClearStateAsync();
 
+    Task ClearStateAsync(CancellationToken cancellationToken) =>
+        ClearStateAsync();
+
     Task WriteStateAsync();
 
+    Task WriteStateAsync(CancellationToken cancellationToken) =>
+        WriteStateAsync();
+
     Task ReadStateAsync();
+
+    Task ReadStateAsync(CancellationToken cancellationToken) =>
+        ReadStateAsync();
 }
 // </persistent_state_interface>

@@ -1,103 +1,68 @@
 ---
 title: Event sourcing configuration
-description: Learn about event sourcing configuration in .NET Orleans.
-ms.date: 05/23/2025
+description: Configure JournaledGrain log consistency and storage in Orleans.
+ms.date: 08/02/2026
 ms.topic: how-to
 ---
 
 # Event sourcing configuration
 
-In this article, you learn about various event sourcing configuration options for .NET Orleans.
+Reference `Microsoft.Orleans.EventSourcing` from the grain implementation project. Grain interface projects don't need that package unless they expose Event Sourcing types in their contracts.
 
-## Configure project references
+## Register a log-consistency provider
 
-### Grain interfaces
-
-As before, interfaces depend only on the `Microsoft.Orleans.Core` package because the grain interface is independent of the implementation.
-
-### Grain implementations
-
-Journaled grains need to derive from <xref:Orleans.EventSourcing.JournaledGrain`2> or <xref:Orleans.EventSourcing.JournaledGrain`1>, which is defined in the `Microsoft.Orleans.EventSourcing` package.
-
-### Log-consistency providers
-
-We currently include three log-consistency providers (for state storage, log storage, and custom storage). All three are contained in the `Microsoft.Orleans.EventSourcing` package as well. Therefore, all journaled grains already have access to them. For a description of what these providers do and how they differ, see [Included log-consistency providers](log-consistency-providers.md).
-
-## Cluster configuration
-
-Configure log-consistency providers just like any other Orleans providers. For example, to include all three providers (though you probably won't need all three), add this to the `<Globals>` element of the configuration file:
-
-```xml
-<LogConsistencyProviders>
-    <Provider Name="StateStorage"
-        Type="Orleans.EventSourcing.StateStorage.LogConsistencyProvider" />
-    <Provider Name="LogStorage"
-        Type="Orleans.EventSourcing.LogStorage.LogConsistencyProvider" />
-    <Provider Name="CustomStorage"
-        Type="Orleans.EventSourcing.CustomStorage.LogConsistencyProvider" />
-</LogConsistencyProviders>
-```
-
-You can achieve the same programmatically. Starting with Orleans 2.0.0 stable, `ClientConfiguration` and `ClusterConfiguration` no longer exist. They have been replaced by <xref:Orleans.ClientBuilder> and `SiloBuilder` (note there's no cluster builder).
+Register one or more providers on the silo:
 
 ```csharp
-builder.AddLogStorageBasedLogConsistencyProvider("LogStorage")
-```
-
-## Grain class attributes
-
-Each journaled grain class must have a <xref:Orleans.Providers.LogConsistencyProviderAttribute> to specify the log-consistency provider. Some providers additionally require a <xref:Orleans.Providers.StorageProviderAttribute>, for example:
-
-```csharp
-[StorageProvider(ProviderName = "OrleansLocalStorage")]
-[LogConsistencyProvider(ProviderName = "LogStorage")]
-public class EventSourcedBankAccountGrain :
-    JournaledGrain<BankAccountState>, IEventSourcedBankAccountGrain
+builder.UseOrleans(siloBuilder =>
 {
-    //...
+    siloBuilder
+        .AddAzureBlobGrainStorage("eventStore", options =>
+        {
+            options.ConfigureBlobServiceClient(
+                builder.Configuration.GetConnectionString("eventStore"));
+        })
+        .AddStateStorageBasedLogConsistencyProvider("snapshots")
+        .AddLogStorageBasedLogConsistencyProvider("shortLogs");
+});
+```
+
+Available registration methods are:
+
+- <xref:Orleans.Hosting.StateStorageSiloBuilderExtensions.AddStateStorageBasedLogConsistencyProvider*>
+- <xref:Orleans.Hosting.LogStorageSiloBuilderExtensions.AddLogStorageBasedLogConsistencyProvider*>
+- <xref:Orleans.Hosting.CustomStorageSiloBuilderExtensions.AddCustomStorageBasedLogConsistencyProvider*>
+
+Each also has an `AsDefault` form. If a default log-consistency provider and default grain storage provider are registered, provider attributes can be omitted.
+
+## Select providers on a grain
+
+State storage and log storage use a standard grain storage provider:
+
+```csharp
+[LogConsistencyProvider(ProviderName = "snapshots")]
+[StorageProvider(ProviderName = "eventStore")]
+public sealed class AccountGrain
+    : JournaledGrain<AccountState, AccountEvent>, IAccountGrain
+{
 }
 ```
 
-So here, `"OrleansLocalStorage"` is used for storing the grain state, whereas `"LogStorage"` is the in-memory storage provider for EventSourcing events.
+The provider names must exactly match registrations on every silo capable of activating the grain.
 
-### `LogConsistencyProvider` attributes
-
-To specify the log-consistency provider, add a `[LogConsistencyProvider(ProviderName=...)]` attribute to the grain class and provide the name of the provider as configured in the cluster configuration, for example:
+Custom storage doesn't use <xref:Orleans.Storage.IGrainStorage>. The grain implements <xref:Orleans.EventSourcing.CustomStorage.ICustomStorageInterface`2> and owns the storage operations:
 
 ```csharp
-[LogConsistencyProvider(ProviderName = "CustomStorage")]
-public class ChatGrain :
-    JournaledGrain<XDocument, IChatEvent>, IChatGrain, ICustomStorage
+[LogConsistencyProvider(ProviderName = "custom")]
+public sealed class AccountGrain
+    : JournaledGrain<AccountState, AccountEvent>,
+      IAccountGrain,
+      ICustomStorageInterface<AccountState, AccountEvent>
 {
-    // ...
+    // Implement ReadStateFromStorage and ApplyUpdatesToStorage.
 }
 ```
 
-### <xref:Orleans.Providers.StorageProviderAttribute> attributes
+## Multi-cluster responsibility
 
-Some log-consistency providers (including `LogStorage` and `StateStorage`) use a standard <xref:Orleans.Providers.StorageProviderAttribute> to communicate with storage. Specify this provider using a separate <xref:Orleans.Providers.StorageProviderAttribute> attribute, as follows:
-
-```csharp
-[LogConsistencyProvider(ProviderName = "LogStorage")]
-[StorageProvider(ProviderName = "AzureBlobStorage")]
-public class ChatGrain :
-    JournaledGrain<XDocument, IChatEvent>, IChatGrain
-{
-    // ...
-}
-```
-
-## Default providers
-
-You can omit the `LogConsistencyProvider` and/or <xref:Orleans.Providers.StorageProviderAttribute> attributes if a default is specified in the configuration. Do this by using the special name `Default` for the respective provider. For example:
-
-```xml
-<LogConsistencyProviders>
-    <Provider Name="Default"
-        Type="Orleans.EventSourcing.LogStorage.LogConsistencyProvider"/>
-</LogConsistencyProviders>
-<StorageProviders>
-    <Provider Name="Default"
-        Type="Orleans.Storage.MemoryStorage" />
-</StorageProviders>
-```
+Custom storage owns the write-topology rules needed by a multi-cluster deployment. The `primaryCluster` registration argument is retained by the provider but doesn't restrict submissions, configure Orleans multi-cluster networking, replicate storage, or provide failover. Enforce any single-writer or regional-write rule in the application and storage implementation.

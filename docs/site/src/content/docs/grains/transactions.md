@@ -1,163 +1,180 @@
 ---
 title: Transactions in Orleans
-description: Learn how to use transactions in .NET Orleans.
-ms.date: 05/23/2025
+description: Use distributed ACID transactions with Orleans transactional state.
+ms.date: 08/02/2026
 ms.topic: concept-article
 ---
 
 # Orleans transactions
 
-Orleans supports distributed ACID transactions against persistent grain state. Transactions are implemented using the [Microsoft.Orleans.Transactions](https://www.nuget.org/packages/Microsoft.Orleans.Transactions) NuGet package. The source code for the sample app in this article consists of four projects:
+The [`Microsoft.Orleans.Transactions`](https://www.nuget.org/packages/Microsoft.Orleans.Transactions) package provides distributed ACID transactions across one or more grain calls and transactional state records. Transactional state is distinct from <xref:Orleans.Runtime.IPersistentState`1>: use <xref:Orleans.Transactions.Abstractions.ITransactionalState`1> for data that participates in an Orleans transaction.
 
-- **Abstractions**: A class library containing the grain interfaces and shared classes.
-- **Grains**: A class library containing the grain implementations.
-- **Server**: A console app that consumes the abstractions and grains class libraries and acts as the Orleans silo.
-- **Client**: A console app that consumes the abstractions class library that represents the Orleans client.
+## Enable transactions
 
-## Setup
-
-Orleans transactions are opt-in. Both the silo and the client must be configured to use transactions. If they aren't configured, any calls to transactional methods on a grain implementation receive an <xref:Orleans.Transactions.OrleansTransactionsDisabledException>. To enable transactions on a silo, call <xref:Orleans.Hosting.SiloBuilderExtensions.UseTransactions*?displayProperty=nameWithType> on the silo host builder:
+Enable transactions on every participating silo with <xref:Orleans.Hosting.SiloBuilderExtensions.UseTransactions*>:
 
 ```csharp
-var builder = Host.CreateDefaultBuilder(args)
-    .UseOrleans((context, siloBuilder) =>
-    {
-        siloBuilder.UseTransactions();
-    });
+var builder = Host.CreateApplicationBuilder(args);
+
+builder.UseOrleans(siloBuilder =>
+{
+    siloBuilder.UseTransactions();
+});
 ```
 
-Likewise, to enable transactions on the client, call <xref:Orleans.Hosting.ClientBuilderExtensions.UseTransactions*?displayProperty=nameWithType> on the client host builder:
+External Orleans clients that create or propagate transactions must also call <xref:Orleans.Hosting.ClientBuilderExtensions.UseTransactions*>:
 
 ```csharp
-var builder = Host.CreateDefaultBuilder(args)
-    .UseOrleansClient((context, clientBuilder) =>
-    {
-        clientBuilder.UseTransactions();
-    });
+builder.UseOrleansClient(clientBuilder =>
+{
+    clientBuilder.UseTransactions();
+});
 ```
 
-### Transactional state storage
+A transactional call without transaction services fails with <xref:Orleans.Transactions.OrleansTransactionsDisabledException>.
 
-To use transactions, you need to configure a data store. To support various data stores with transactions, Orleans uses the storage abstraction <xref:Orleans.Transactions.Abstractions.ITransactionalStateStorage`1>. This abstraction is specific to the needs of transactions, unlike generic grain storage (<xref:Orleans.Storage.IGrainStorage>). To use transaction-specific storage, configure the silo using any implementation of `ITransactionalStateStorage`, such as Azure (<xref:Orleans.Hosting.AzureTableSiloBuilderExtensions.AddAzureTableTransactionalStateStorage*>).
+## Configure transactional storage
 
-For example, consider the following host builder configuration:
+Transactional storage implements <xref:Orleans.Transactions.Abstractions.ITransactionalStateStorage`1>. The supported provider package `Microsoft.Orleans.Transactions.AzureStorage` registers Azure Table transactional storage:
 
-:::code source="snippets/transactions/Server/Program.cs":::
+```csharp
+siloBuilder
+    .AddAzureTableTransactionalStateStorage(
+        "TransactionStore",
+        options =>
+        {
+            options.ConfigureTableServiceClient(
+                builder.Configuration.GetConnectionString("transactions"));
+        })
+    .UseTransactions();
+```
 
-For development purposes, if transaction-specific storage isn't available for the datastore you need, you can use an <xref:Orleans.Storage.IGrainStorage> implementation instead. For any transactional state without a configured store, transactions attempt to fail over to the grain storage using a bridge. Accessing transactional state via a bridge to grain storage is less efficient and might not be supported in the future. Therefore, we recommend using this approach only for development purposes.
+If no named transactional provider exists, Orleans can bridge transactional state to a configured <xref:Orleans.Storage.IGrainStorage>. The bridge is less efficient and is intended for development and compatibility scenarios. Prefer a transactional provider for production workloads.
 
-## Grain interfaces
+## Declare transaction behavior
 
-For a grain to support transactions, you must mark transactional methods on its grain interface as part of a transaction using the <xref:Orleans.TransactionAttribute>. The attribute needs to indicate how the grain call behaves in a transactional environment, as detailed by the following <xref:Orleans.TransactionOption> values:
+Apply <xref:Orleans.TransactionAttribute> to grain interface methods:
 
-- <xref:Orleans.TransactionOption.Create?displayProperty=nameWithType>: Call is transactional and will always create a new transaction context (it starts a new transaction), even if called within an existing transaction context.
-- <xref:Orleans.TransactionOption.Join?displayProperty=nameWithType>: Call is transactional but can only be called within the context of an existing transaction.
-- <xref:Orleans.TransactionOption.CreateOrJoin?displayProperty=nameWithType>: Call is transactional. If called within the context of a transaction, it will use that context, else it will create a new context.
-- <xref:Orleans.TransactionOption.Suppress?displayProperty=nameWithType>: Call is not transactional but can be called from within a transaction. If called within the context of a transaction, the context will not be passed to the call.
-- <xref:Orleans.TransactionOption.Supported?displayProperty=nameWithType>: Call is not transactional but supports transactions. If called within the context of a transaction, the context will be passed to the call.
-- <xref:Orleans.TransactionOption.NotAllowed?displayProperty=nameWithType>:  Call is not transactional and cannot be called from within a transaction. If called within the context of a transaction, it will throw the <xref:System.NotSupportedException>.
-
-You can mark calls as `TransactionOption.Create`, meaning the call always starts its transaction. For example, the `Transfer` operation in the ATM grain below always starts a new transaction involving the two referenced accounts.
-
-:::code source="snippets/transactions/Abstractions/IAtmGrain.cs":::
-
-The transactional operations `Withdraw` and `Deposit` on the account grain are marked `TransactionOption.Join`. This indicates they can only be called within the context of an existing transaction, which would be the case if called during `IAtmGrain.Transfer`. The `GetBalance` call is marked `CreateOrJoin`, so you can call it either from within an existing transaction (like via `IAtmGrain.Transfer`) or on its own.
+| Option | Behavior |
+|---|---|
+| <xref:Orleans.TransactionOption.Create> | Always starts a new transaction and suppresses any ambient transaction for this call. |
+| <xref:Orleans.TransactionOption.CreateOrJoin> | Joins the ambient transaction or starts one when none exists. |
+| <xref:Orleans.TransactionOption.Join> | Requires an ambient transaction. |
+| <xref:Orleans.TransactionOption.Suppress> | Executes without the ambient transaction. |
+| <xref:Orleans.TransactionOption.Supported> | Receives an ambient transaction when one exists but doesn't require one. |
+| <xref:Orleans.TransactionOption.NotAllowed> | Fails when called in a transaction. |
 
 :::code source="snippets/transactions/Abstractions/IAccountGrain.cs":::
 
-### Important considerations
+<xref:Orleans.TransactionOption.Join> outside a transaction and <xref:Orleans.TransactionOption.NotAllowed> inside a transaction throw <xref:System.NotSupportedException>.
 
-You cannot mark <xref:Orleans.Grain.OnActivateAsync*> as transactional because any such call requires proper setup before the call. It exists only for the grain application API. This means attempting to read transactional state as part of these methods throws an exception in the runtime.
+### Read-only transactions
 
-## Grain implementations
-
-A grain implementation needs to use an <xref:Orleans.Transactions.Abstractions.ITransactionalState`1> facet to manage grain state via [ACID transactions](../overview.md#distributed-acid-transactions).
+Apply <xref:Orleans.Concurrency.ReadOnlyAttribute> to a transactional method that performs no transactional-state update:
 
 ```csharp
-public interface ITransactionalState<TState>
-    where TState : class, new()
-{
-    Task<TResult> PerformRead<TResult>(
-        Func<TState, TResult> readFunction);
-
-    Task<TResult> PerformUpdate<TResult>(
-        Func<TState, TResult> updateFunction);
-}
+[ReadOnly]
+[Transaction(TransactionOption.CreateOrJoin)]
+Task<uint> GetBalance();
 ```
 
-Perform all read or write access to the persisted state via synchronous functions passed to the transactional state facet. This allows the transaction system to perform or cancel these operations transactionally. To use transactional state within a grain, define a serializable state class to be persisted and declare the transactional state in the grain's constructor using a <xref:Orleans.Transactions.Abstractions.TransactionalStateAttribute>. This attribute declares the state name and, optionally, which transactional state storage to use. For more information, see [Setup](#setup).
+Orleans starts a read-only transaction and can use a reduced commit path. A write attempted by a read-only transaction aborts with <xref:Orleans.Transactions.OrleansReadOnlyViolatedException>. The <xref:Orleans.TransactionAttribute.ReadOnly> property is obsolete; use <xref:Orleans.Concurrency.ReadOnlyAttribute>.
+
+### Exclusive locks
+
+Transactional state normally permits concurrent readers and upgrades to an exclusive lock when a transaction writes. Competing upgrades can abort under contention. Apply <xref:Orleans.UseExclusiveLockAttribute> to acquire exclusive locks even for reads:
 
 ```csharp
-[AttributeUsage(AttributeTargets.Parameter)]
-public class TransactionalStateAttribute : Attribute
-{
-    public TransactionalStateAttribute(string stateName, string storageName = null)
-    {
-        // ...
-    }
-}
+[UseExclusiveLock]
+[Transaction(TransactionOption.CreateOrJoin)]
+Task<uint> ReserveAndGetBalance();
 ```
 
-As an example, the `Balance` state object is defined as follows:
+This avoids lock-upgrade conflicts at the cost of lower read concurrency. Use it for methods likely to write after reading or for measured contention hot spots, not as a blanket default.
 
-:::code source="snippets/transactions/Abstractions/Balance.cs":::
+## Access transactional state
 
-The preceding state object:
-
-- Is decorated with the <xref:Orleans.CodeGeneration.GenerateSerializerAttribute> to instruct the Orleans code generator to generate a serializer.
-- Has a `Value` property that's decorated with the <xref:Orleans.IdAttribute> to uniquely identify the member.
-
-The `Balance` state object is then used in the `AccountGrain` implementation as follows:
+Inject a named state facet using <xref:Orleans.Transactions.Abstractions.TransactionalStateAttribute>:
 
 :::code source="snippets/transactions/Grains/AccountGrain.cs":::
 
-> [!IMPORTANT]
-> A transactional grain must be marked with the <xref:Orleans.Concurrency.ReentrantAttribute> to ensure that the transaction context is correctly passed to the grain call.
+Read through <xref:Orleans.Transactions.Abstractions.ITransactionalState`1.PerformRead*> and update through <xref:Orleans.Transactions.Abstractions.ITransactionalState`1.PerformUpdate*>. The delegates are synchronous because Orleans controls when the state snapshot is read, committed, or discarded. Don't retain the supplied state object or mutate it outside these delegates.
 
-In the preceding example, the <xref:Orleans.Transactions.Abstractions.TransactionalStateAttribute> declares that the `balance` constructor parameter should be associated with a transactional state named `"balance"`. With this declaration, Orleans injects an <xref:Orleans.Transactions.Abstractions.ITransactionalState`1> instance with state loaded from the transactional state storage named `"TransactionStore"`. You can modify the state via <xref:Orleans.Transactions.Abstractions.ITransactionalState`1.PerformUpdate*> or read it via <xref:Orleans.Transactions.Abstractions.ITransactionalState`1.PerformRead*>. The transaction infrastructure ensures that any such changes performed as part of a transaction (even among multiple grains distributed across an Orleans cluster) are either all committed or all undone upon completion of the grain call that created the transaction (`IAtmGrain.Transfer` in the preceding example).
+> [!NOTE]
+> A transactional grain doesn't need <xref:Orleans.Concurrency.ReentrantAttribute>. Reentrancy is an independent scheduling choice. Enable it only when the grain implementation is safe for interleaved calls and the throughput benefit is understood.
 
-## Call transaction methods from a client
+Transactional state isn't available during <xref:Orleans.Grain.OnActivateAsync*>; transaction setup occurs as part of a transactional request.
 
-The recommended way to call a transactional grain method is to use the `ITransactionClient`. Orleans automatically registers `ITransactionClient` with the dependency injection service provider when you configure the Orleans client. Use `ITransactionClient` to create a transaction context and call transactional grain methods within that context. The following example shows how to use `ITransactionClient` to call transactional grain methods.
+## Start a transaction
 
-:::code source="snippets/transactions/Client/Program.cs" highlight="11-12,30-31,38-44":::
+### From a grain call
 
-In the preceding client code:
-
-- The <xref:Microsoft.Extensions.Hosting.IHostApplicationBuilder> is configured with <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*>.
-  - The <xref:Orleans.Hosting.IClientBuilder> uses localhost clustering and transactions.
-- The <xref:Orleans.IClusterClient> and <xref:Orleans.ITransactionClient> interfaces are retrieved from the service provider.
-- The `from` and `to` variables are assigned their `IAccountGrain` references.
-- The `ITransactionClient` is used to create a transaction, calling:
-  - `Withdraw` on the `from` account grain reference.
-  - `Deposit` on the `to` account grain reference.
-
-Transactions are always committed unless an exception is thrown in the `transactionDelegate` or a contradictory `transactionOption` is specified. While using `ITransactionClient` is the recommended way to call transactional grain methods, you can also call them directly from another grain.
-
-## Call transaction methods from another grain
-
-Call transactional methods on a grain interface like any other grain method. As an alternative to using `ITransactionClient`, the `AtmGrain` implementation below calls the `Transfer` method (which is transactional) on the `IAccountGrain` interface.
-
-Consider the `AtmGrain` implementation, which resolves the two referenced account grains and makes the appropriate calls to `Withdraw` and `Deposit`:
+A method marked <xref:Orleans.TransactionOption.Create> or <xref:Orleans.TransactionOption.CreateOrJoin> starts a transaction when no ambient transaction exists. Calls made from that method propagate the context according to each target method's <xref:Orleans.TransactionOption>.
 
 :::code source="snippets/transactions/Grains/AtmGrain.cs":::
 
-Your client app code can call `AtmGrain.Transfer` transactionally as follows:
+### From an external client
+
+Resolve <xref:Orleans.ITransactionClient> and run a delegate:
+
+:::code source="snippets/transactions/Client/Program.cs" highlight="11-12,30-31,38-44":::
+
+<xref:Orleans.ITransactionClient.RunTransaction*> has delegates returning <xref:System.Threading.Tasks.Task> and <xref:System.Threading.Tasks.Task`1>. The generic task form commits only when the delegate returns `true`; returning `false` aborts. An overload also accepts `useExclusiveLock`.
+
+## Commit and abort semantics
+
+The request that starts a transaction resolves it before returning:
+
+- A successful delegate commits unless it explicitly returns `false`.
+- An application exception records the failure and aborts the transaction.
+- An abort discards all transactional-state updates in that transaction.
+- The original application exception can appear as the inner exception of an <xref:Orleans.Transactions.OrleansTransactionException>.
+
+An <xref:Orleans.Transactions.OrleansTransactionAbortedException> reports a known abort and can be retried if the application command is safe to retry. <xref:Orleans.Transactions.OrleansTransactionInDoubtException> means the coordinator couldn't determine the final outcome. Don't immediately repeat a non-idempotent command after an in-doubt result; use an operation identifier and query application state after the response-timeout window.
+
+Retries must retry the entire transaction, not an individual participant update. Bound attempts and use backoff. High contention, lock-upgrade conflicts, overload, and storage outages can otherwise create a retry storm.
+
+## Contention and timeouts
+
+Transactional state uses reader/writer locks and deadlock-prevention rules. Common abort causes include:
+
+- Failure to acquire a lock before <xref:Orleans.Configuration.TransactionalStateOptions.LockAcquireTimeout>.
+- A lock held longer than <xref:Orleans.Configuration.TransactionalStateOptions.LockTimeout>.
+- A lock-upgrade conflict.
+- Failure to complete prepare before <xref:Orleans.Configuration.TransactionalStateOptions.PrepareTimeout>.
+- A participant or transaction service becoming unavailable.
+
+The default <xref:Orleans.Configuration.TransactionalStateOptions> values are:
+
+| Option | Default |
+|---|---|
+| <xref:Orleans.Configuration.TransactionalStateOptions.LockTimeout> | 8 seconds |
+| <xref:Orleans.Configuration.TransactionalStateOptions.LockAcquireTimeout> | 10 seconds |
+| <xref:Orleans.Configuration.TransactionalStateOptions.PrepareTimeout> | 20 seconds |
+| <xref:Orleans.Configuration.TransactionalStateOptions.RemoteTransactionPingFrequency> | 60 seconds |
+| <xref:Orleans.Configuration.TransactionalStateOptions.ConfirmationRetryDelay> | 30 seconds |
+| <xref:Orleans.Configuration.TransactionalStateOptions.MaxLockGroupSize> | 20 |
+
+Commit confirmation uses <xref:Orleans.Configuration.TransactionalStateOptions.ConfirmationRetryLimit>, whose default is 3. A newly started transaction uses a 10-second transaction timeout when no debugger is attached.
+
+Configure state options consistently on participating silos:
 
 ```csharp
-IAtmGrain atmOne = client.GetGrain<IAtmGrain>(0);
-
-Guid from = Guid.NewGuid();
-Guid to = Guid.NewGuid();
-
-await atmOne.Transfer(from, to, 100);
-
-uint fromBalance = await client.GetGrain<IAccountGrain>(from).GetBalance();
-uint toBalance = await client.GetGrain<IAccountGrain>(to).GetBalance();
+siloBuilder.Configure<TransactionalStateOptions>(options =>
+{
+    options.LockAcquireTimeout = TimeSpan.FromSeconds(5);
+    options.LockTimeout = TimeSpan.FromSeconds(8);
+    options.PrepareTimeout = TimeSpan.FromSeconds(20);
+});
 ```
 
-In the preceding calls, an `IAtmGrain` is used to transfer 100 units of currency from one account to another. After the transfer is complete, both accounts are queried to get their current balance. The currency transfer, as well as both account queries, are performed as ACID transactions.
+Shorter timeouts fail faster but can abort healthy work during load spikes. Longer timeouts retain locks and resources longer. Measure transaction duration and contention before changing defaults.
 
-As shown in the preceding example, transactions can return values within a <xref:System.Threading.Tasks.Task>, like other grain calls. However, upon call failure, they don't throw application exceptions but rather an <xref:Orleans.Transactions.OrleansTransactionException> or <xref:System.TimeoutException>. If the application throws an exception during the transaction, and that exception causes the transaction to fail (as opposed to failing due to other system failures), the application exception becomes the inner exception of the <xref:Orleans.Transactions.OrleansTransactionException>.
+## Design guidance
 
-If a transaction exception of type <xref:Orleans.Transactions.OrleansTransactionAbortedException> is thrown, the transaction failed and can be retried. Any other exception thrown indicates the transaction terminated with an unknown state. Since transactions are distributed operations, a transaction in an unknown state could have succeeded, failed, or still be in progress. For this reason, it's advisable to allow a call timeout period (<xref:Orleans.Configuration.SiloMessagingOptions.SystemResponseTimeout?displayProperty=nameWithType>) to pass before verifying the state or retrying the operation to avoid cascading aborts.
+- Keep transactions short and avoid unrelated remote calls while holding transactional locks.
+- Acquire resources in a stable application-level order when practical.
+- Use <xref:Orleans.Concurrency.ReadOnlyAttribute> for truly read-only operations.
+- Use <xref:Orleans.UseExclusiveLockAttribute> selectively when lock upgrades are a measured source of aborts.
+- Make the initiating command idempotent and include an operation identifier.
+- Monitor aborts, in-doubt outcomes, lock timeouts, prepare timeouts, and storage latency separately.

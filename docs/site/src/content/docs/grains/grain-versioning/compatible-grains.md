@@ -1,47 +1,44 @@
 ---
-title: Compatible grains
-description: Learn about compatible grains in .NET Orleans.
-ms.date: 05/23/2025
+title: Grain interface compatibility strategies
+description: Configure numeric compatibility rules for Orleans grain interface versions.
+ms.date: 08/02/2026
 ms.topic: concept-article
 ---
 
-# Compatible grains
+# Grain interface compatibility strategies
 
-When an existing grain activation is about to process a request, the runtime checks if the version in the request and the actual version of the grain are compatible. Orleans doesn't infer at runtime which policy to use. The default behavior for determining compatibility between two versions is defined by <xref:Orleans.Versions.Compatibility.CompatibilityStrategy?displayProperty=nameWithType>.
+A compatibility strategy answers one question:
 
-## Backward compatible (default)
+```text
+Can an activation at currentVersion process a request at requestedVersion?
+```
 
-### Definition
+The built-in strategies compare only those numeric values.
 
-A grain interface version `Vn` can be backward compatible with `Vm` if:
+| Strategy | Numeric rule | Default |
+|---|---|---|
+| <xref:Orleans.Versions.Compatibility.BackwardCompatible> | `requestedVersion <= currentVersion` | Yes |
+| <xref:Orleans.Versions.Compatibility.AllVersionsCompatible> | Always compatible | No |
+| <xref:Orleans.Versions.Compatibility.StrictVersionCompatible> | `requestedVersion == currentVersion` | No |
 
-- The name of the interface didn't change (or the overridden type code).
-- All public methods present in the `Vm` version are also present in the `Vn` version.
-    **It's important not to modify the signatures of methods inherited from `Vm`**: since Orleans uses an internal built-in serializer, modifying or renaming a field (even private) can break serialization.
+## Backward compatible
 
-Since `Vn` can have added methods compared to `Vm`, `Vm` is not compatible with `Vn`.
+With <xref:Orleans.Versions.Compatibility.BackwardCompatible>, a version 2 activation can process a version 1 request, but a version 1 activation can't process a version 2 request.
 
-### Example
+Use it when each newer implementation preserves every contract needed by older callers. Newer callers can use additions that require a newer activation, while older callers can run on either version.
 
-If you have two versions of a given interface in the cluster, V1 and V2, and V2 is backward compatible with V1:
+## All versions compatible
 
-- If the current activation is V2 and the requested version is V1, the current activation can process the request normally.
-- If the current activation is V1 and the requested version is V2, Orleans deactivates the current activation and creates a new activation compatible with V2 (see [Version selector strategy](version-selector-strategy.md)).
+<xref:Orleans.Versions.Compatibility.AllVersionsCompatible> allows any request version to use any activation version. Orleans still performs no structural check.
 
-## Fully compatible
+Use this only when deployed contracts are genuinely compatible in both directions, such as an implementation-only change with an intentionally incremented routing version. If a newer caller uses a method or payload unsupported by an older activation, this strategy can route the call to an implementation that can't honor it.
 
-### Definition
+## Strict version compatible
 
-A grain interface version `Vn` can be fully compatible with `Vm` if:
+<xref:Orleans.Versions.Compatibility.StrictVersionCompatible> requires an exact numeric match. It isolates versions but reduces placement choices and causes an incompatible existing activation to be deactivated when another version addresses the same grain identity.
 
-- `Vn` is backward compatible with `Vm`.
-- No public methods were added in the `Vn` version.
+Use it when versions must not share activations. It is usually a poor default for a gradual rolling upgrade because callers of different versions can repeatedly replace one another's activations.
 
-If `Vn` is fully compatible with `Vm`, then `Vm` is also fully compatible with `Vn`.
+## "Fully compatible" is a contract, not a strategy
 
-### Example
-
-If you have two versions of a given interface in the cluster, V1 and V2, and V2 is fully compatible with V1:
-
-- If the current activation is V2 and the requested version is V1, the current activation can process the request normally.
-- If the current activation is V1 and the requested version is V2, the current activation can also process the request normally.
+Fully compatible describes an application contract that works in both directions. It isn't the name of a built-in strategy. If the contract is truly bidirectional, <xref:Orleans.Versions.Compatibility.AllVersionsCompatible> represents that assertion to the runtime.

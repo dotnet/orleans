@@ -1,47 +1,34 @@
 ---
 title: JournaledGrain diagnostics
-description: Learn how to use JournaledGrain diagnostics in .NET Orleans.
-ms.date: 05/23/2025
+description: Monitor log-consistency connection issues and statistics.
+ms.date: 08/02/2026
 ms.topic: concept-article
 ---
 
-# JournaledGrain diagnostics
+# Journaled grain diagnostics
 
-## Monitor connection errors
+## Connection issues
 
-By design, log-consistency providers are resilient under connection errors (including connections to storage and connections between clusters). However, merely tolerating errors isn't enough. Applications usually need to monitor such issues and bring them to an operator's attention if they are serious.
-
-`JournaledGrain` subclasses can override the following methods to receive notifications when connection errors are observed and when those errors resolve:
+Override these callbacks to observe persistence or protocol failures and their recovery:
 
 ```csharp
-protected override void OnConnectionIssue(
-    ConnectionIssue issue)
+protected override void OnConnectionIssue(ConnectionIssue issue)
 {
-    /// handle the observed error described by issue
+    // Record the issue category, retry count, and exception.
 }
 
-protected override void OnConnectionIssueResolved(
-    ConnectionIssue issue)
+protected override void OnConnectionIssueResolved(ConnectionIssue issue)
 {
-    /// handle the resolution of a previously reported issue
+    // Clear or resolve the corresponding health signal.
 }
 ```
 
-<xref:Orleans.LogConsistency.ConnectionIssue> is an abstract class with several common fields describing the issue, including how many times it has been observed since the last successful connection. Subclasses define the actual type of connection issue. Connection issues are categorized into types, such as <xref:Orleans.EventSourcing.Common.PrimaryOperationFailed> or <xref:Orleans.LogConsistency.NotificationFailed>, and sometimes have extra keys (like <xref:Orleans.EventSourcing.Common.NotificationFailed.RemoteCluster>) that further narrow the category.
+<xref:Orleans.EventSourcing.Common.PrimaryOperationFailed> identifies failed access to the provider's primary storage. Concrete issue types include failures to read or update state storage, log storage, or custom storage. Repeated failures in one category produce repeated issue callbacks; resolution produces one corresponding resolved callback.
 
-If the same category of issue happens multiple times (for example, you keep getting a `NotificationFailed` targeting the same `RemoteCluster`), Orleans reports it each time via <xref:Orleans.EventSourcing.JournaledGrain`2.OnConnectionIssue*>. Once this category of issue resolves (for example, you finally succeed in sending a notification to that `RemoteCluster`), Orleans calls <xref:Orleans.EventSourcing.JournaledGrain`2.OnConnectionIssueResolved*> once, with the same `issue` object last reported by `OnConnectionIssue`. Connection issues and their resolutions for independent categories are reported independently.
+These callbacks are diagnostics, not a replacement for observing failed or delayed grain calls. Avoid throwing from them; Orleans catches and logs callback exceptions.
 
-## Simple statistics
+## Per-grain statistics
 
-We currently offer simple support for basic statistics (in the future, we'll likely replace this with a more standard telemetry mechanism). You can enable or disable statistics collection for a `JournaledGrain` by calling:
+Enable collection with <xref:Orleans.EventSourcing.JournaledGrain`2.EnableStatsCollection*>, retrieve a nullable <xref:Orleans.EventSourcing.LogConsistencyStatistics> value with <xref:Orleans.EventSourcing.JournaledGrain`2.GetStats*>, and stop collection with <xref:Orleans.EventSourcing.JournaledGrain`2.DisableStatsCollection*>.
 
-```csharp
-void EnableStatsCollection()
-void DisableStatsCollection()
-```
-
-Retrieve the statistics by calling:
-
-```csharp
-LogConsistencyStatistics GetStats()
-```
+Collection is opt-in and local to the journaled grain. Use it for focused diagnosis rather than as the sole production telemetry system. Combine it with provider metrics, storage-service metrics, Orleans logs, and call latency/error telemetry.

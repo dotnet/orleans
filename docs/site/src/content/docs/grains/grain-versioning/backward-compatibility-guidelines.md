@@ -1,166 +1,57 @@
 ---
-title: Backward compatibility guidelines
-description: Learn the backward compatibility guidelines in .NET Orleans.
-ms.date: 05/23/2025
+title: Grain contract compatibility guidelines
+description: Evolve Orleans grain interfaces safely across rolling deployments.
+ms.date: 08/02/2026
 ms.topic: concept-article
 ---
 
-# Backward compatibility guidelines
+# Grain contract compatibility guidelines
 
-Writing backward-compatible code can be hard and difficult to test. This article discusses guidelines for writing backward-compatible code in .NET Orleans. It covers the usage of <xref:Orleans.CodeGeneration.VersionAttribute> and <xref:System.ObsoleteAttribute>.
+Orleans version routing doesn't validate contracts. A newer activation is backward compatible only when it can correctly process requests produced by every older caller that may reach it.
 
-## Never change the signature of existing methods
+## Preserve existing methods
 
-Because of how the Orleans serializer works, you should never change the signature of existing methods.
+Don't remove or change the signature of a method while callers using it remain deployed. This includes parameter order, parameter and return types, generic shape, and method semantics.
 
-The following example is correct:
-
-```csharp
-[Version(1)]
-public interface IMyGrain : IGrainWithIntegerKey
-{
-    // First method
-    Task MyMethod(int arg);
-}
-```
+Add a new method instead of repurposing an existing one:
 
 ```csharp
 [Version(2)]
-public interface IMyGrain : IGrainWithIntegerKey
+public interface IInventoryGrain : IGrainWithStringKey
 {
-    // Method inherited from V1
-    Task MyMethod(int arg);
+    // Retained for version 1 callers.
+    Task<int> ReserveAsync(string sku, int quantity);
 
-    // New method added in V2
-    Task MyNewMethod(int arg, obj o);
+    // Added for version 2 callers.
+    Task<ReservationResult> ReserveWithIdAsync(
+        string operationId,
+        string sku,
+        int quantity);
 }
 ```
 
-This example is incorrect:
+Mark the old method `[Obsolete]` to stop new usage, but keep it until telemetry and deployment state show no older callers remain.
 
-```csharp
-[Version(1)]
-public interface IMyGrain : IGrainWithIntegerKey
-{
-    // First method
-    Task MyMethod(int arg);
-}
-```
+## Preserve payload contracts
 
-```csharp
-[Version(2)]
-public interface IMyGrain : IGrainWithIntegerKey
-{
-    // Method inherited from V1
-    Task MyMethod(int arg, obj o);
-}
-```
+Grain method arguments and return values are serialized contracts. Follow Orleans serializer version-tolerance rules:
 
-> [!IMPORTANT]
-> Do NOT make this change in your code, as it's an example of a bad practice that leads to very bad side effects.
+- Keep existing `[Id]` values stable.
+- Add new fields with new IDs and safe defaults.
+- Don't reuse an ID for a different meaning.
+- Don't rename or reinterpret values when older code can still observe them.
+- Keep exception and result types available to all caller versions.
 
-This is an example of what can happen if you just rename the parameter names. Assume you have the following two interface versions deployed in the cluster:
+Parameter names aren't part of dispatch, but changing their semantic order while retaining the same types can silently produce incorrect results.
 
-```csharp
-[Version(1)]
-public interface IMyGrain : IGrainWithIntegerKey
-{
-    // return a - b
-    Task<int> Subtract(int a, int b);
-}
-```
+## Preserve behavior
 
-```csharp
-[Version(2)]
-public interface IMyGrain : IGrainWithIntegerKey
-{
-    // return b - a
-    Task<int> Subtract(int b, int a);
-}
-```
+Signature compatibility isn't enough. A newer implementation serving older callers must preserve invariants, authorization behavior, idempotency, and result meaning expected by those callers.
 
-These methods seem identical. However, if the client calls with V1, and a V2 activation handles the request:
+When behavior must change incompatibly, add a new method or use strict version compatibility and accept the operational cost of version isolation.
 
-```csharp
-var grain = client.GetGrain<IMyGrain>(0);
-var result = await grain.Subtract(5, 4); // Will return "-1" instead of expected "1"
-```
+## Coordinate with persisted state
 
-This happens due to how the internal Orleans serializer works.
+Grain interface versioning doesn't version storage. During a rolling upgrade, either implementation can activate for a grain identity allowed by the routing policy. Both versions must read the persisted representation and tolerate writes from the other for as long as rollback or mixed placement is possible.
 
-## Avoid changing existing method logic
-
-It might seem obvious, but be very careful when changing the body of an existing method. Unless you're fixing a bug, it's better to add a new method if you need to modify the code.
-
-Example:
-
-```csharp
-// V1
-public interface MyGrain : IMyGrain
-{
-    // First method
-    Task MyMethod(int arg)
-    {
-        SomeSubRoutine(arg);
-    }
-}
-```
-
-```csharp
-// V2
-public interface MyGrain : IMyGrain
-{
-    // Method inherited from V1
-    // Do not change the body
-    Task MyMethod(int arg)
-    {
-        SomeSubRoutine(arg);
-    }
-
-    // New method added in V2
-    Task MyNewMethod(int arg)
-    {
-        SomeSubRoutine(arg);
-        NewRoutineAdded(arg);
-    }
-}
-```
-
-## Do not remove methods from grain interfaces
-
-Unless you're sure they're no longer used, don't remove methods from the grain interface. If you want to remove methods, do it in two steps:
-
-1. Deploy V2 grains, with the V1 method marked as `Obsolete`.
-
-    ```csharp
-    [Version(1)]
-    public interface IMyGrain : IGrainWithIntegerKey
-    {
-        // First method
-        Task MyMethod(int arg);
-    }
-    ```
-
-    ```csharp
-    [Version(2)]
-    public interface IMyGrain : IGrainWithIntegerKey
-    {
-        // Method inherited from V1
-        [Obsolete]
-        Task MyMethod(int arg);
-
-        // New method added in V2
-        Task MyNewMethod(int arg, obj o);
-    }
-    ```
-
-1. When you're sure no V1 calls are being made (effectively, V1 is no longer deployed in the running cluster), deploy V3 with the V1 method removed.
-
-    ```csharp
-    [Version(3)]
-    public interface IMyGrain : IGrainWithIntegerKey
-    {
-        // New method added in V2
-        Task MyNewMethod(int arg, obj o);
-    }
-    ```
+Use staged schema changes: compatible readers, then new writers, then cleanup after the old version is gone.

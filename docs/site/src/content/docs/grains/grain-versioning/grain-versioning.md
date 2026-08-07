@@ -1,67 +1,58 @@
 ---
 title: Grain interface versioning
-description: Learn how to use grain interface versioning in .NET Orleans.
-ms.date: 05/23/2025
+description: Route grain calls during heterogeneous Orleans deployments using numeric interface versions.
+ms.date: 08/02/2026
 ms.topic: concept-article
 ---
 
 # Grain interface versioning
 
-In this article, you learn how to use grain interface versioning. The versioning of grain state is out of scope.
+Grain interface versioning lets silos with different interface versions coexist during a deployment. It is a **numeric routing and placement policy**. It doesn't version persistent state, validate the structural compatibility of two .NET interfaces, or migrate data.
 
-## Overview
+## Assign a version
 
-On a given cluster, silos can support different versions of a grain type.
-
-![Cluster with different versions of a grain](version.png)
-
-In this example, the client and Silo{1,2,3} were compiled with grain interface `A` version 1. Silo 4 was compiled with `A` version 2.
-
-## Limitations
-
-- No versioning on stateless workers.
-- Streaming interfaces aren't versioned.
-
-## Enable versioning
-
-If you don't explicitly add the version attribute to the grain interface, the grain has a default version of 0. You can version a grain by using the `VersionAttribute` on the grain interface:
+Apply <xref:Orleans.CodeGeneration.VersionAttribute> to a grain interface:
 
 ```csharp
-[Version(X)]
-public interface IVersionUpgradeTestGrain : IGrainWithIntegerKey
+[Version(2)]
+public interface ICartGrain : IGrainWithStringKey
 {
+    Task<Cart> GetAsync();
+    Task AddAsync(Item item);
 }
 ```
 
-Where `X` is the version number of the grain interface, which is typically monotonically increasing.
+The value is an unsigned 16-bit integer. Interfaces without the attribute have version `0`. Use monotonically increasing values for successive contract revisions.
 
-## Grain version compatibility and placement
+## How routing works
 
-When a call from a versioned grain arrives in a cluster:
+Every versioned request carries the numeric interface version used by its caller. Orleans:
 
-- If no activation exists, Orleans creates a compatible activation.
-- If an activation exists:
-  - If the current activation isn't compatible, Orleans deactivates it and creates a new compatible one (see [Version selector strategy](version-selector-strategy.md)).
-  - If the current activation is compatible (see [Compatible grains](compatible-grains.md)), Orleans handles the call normally.
+1. Reads the versions supported by silos for that grain interface.
+1. Applies a [compatibility strategy](compatible-grains.md) to determine which activation versions can process the requested version.
+1. Applies a [selector strategy](version-selector-strategy.md) when a new activation needs placement.
+1. Routes the request to a silo supporting one of the selected versions.
 
-By default:
+If a request reaches an existing activation whose version is incompatible, Orleans deactivates it with reason `IncompatibleRequest`, invalidates the stale address, and retries placement for a compatible activation.
 
-- All versioned grains are assumed to be backward-compatible only (see [Backward compatibility guidelines](backward-compatibility-guidelines.md) and [Compatible grains](compatible-grains.md)). This means a v1 grain can make calls to a v2 grain, but a v2 grain cannot call a v1 grain.
-- When multiple versions exist in the cluster, Orleans randomly places the new activation on a compatible silo.
+> [!IMPORTANT]
+> The compatibility check compares version numbers only. Orleans doesn't inspect methods, parameter types, serializer contracts, or behavior to prove compatibility. The application must uphold the contract represented by the selected strategy.
 
-You can change this default behavior via <xref:Orleans.Configuration.GrainVersioningOptions>:
+## Configure cluster defaults
 
-```csharp
-var builder = Host.CreateApplicationBuilder(args);
-builder.UseOrleans(siloBuilder =>
-{
-    siloBuilder.Configure<GrainVersioningOptions>(options =>
-    {
-        options.DefaultCompatibilityStrategy = nameof(BackwardCompatible);
-        options.DefaultVersionSelectorStrategy = nameof(MinimumVersion);
-    });
-});
+<xref:Orleans.Configuration.GrainVersioningOptions> defaults to <xref:Orleans.Versions.Compatibility.BackwardCompatible> and <xref:Orleans.Versions.Selector.AllCompatibleVersions>:
 
-using var host = builder.Build();
-await host.RunAsync();
-```
+:::code language="csharp" source="./snippets/versioning/VersioningConfiguration.cs" id="configure_versioning":::
+
+The configured strategy names resolve registered Orleans strategy services. Configure every silo consistently before a heterogeneous deployment.
+
+Orleans also exposes runtime strategy changes through <xref:Orleans.IVersionManager>, implemented by the management grain. Changes can apply cluster-wide or to a specific <xref:Orleans.Runtime.GrainInterfaceType>. Runtime overrides are operational state: coordinate them carefully and reset them to configured defaults after the deployment.
+
+## Scope and limitations
+
+- Stateless worker grains aren't versioned.
+- Streaming interfaces aren't versioned.
+- State and storage schema evolution are separate responsibilities.
+- Version routing only helps while all deployed implementations honor the declared compatibility contract.
+
+See [deploying new grain versions](deploying-new-versions-of-grains.md) for a rolling-upgrade sequence.

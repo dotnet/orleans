@@ -1,35 +1,38 @@
 ---
-title: Version selector strategy
-description: Learn how to use the version selector strategy in .NET Orleans.
-ms.date: 05/23/2025
+title: Grain version selector strategies
+description: Choose an eligible grain interface version when Orleans places a new activation.
+ms.date: 08/02/2026
 ms.topic: concept-article
 ---
 
-# Version selector strategy
+# Grain version selector strategies
 
-When several versions of the same grain interface exist in the cluster and a new activation needs to be created, Orleans chooses a [compatible version](compatible-grains.md) according to the strategy defined in <xref:Orleans.Configuration.GrainVersioningOptions.DefaultVersionSelectorStrategy?displayProperty=nameWithType>.
+After the compatibility strategy filters available interface versions, the selector strategy determines which versions remain eligible for placement.
 
-Orleans supports the following strategies out of the box:
+| Strategy | Eligible versions |
+|---|---|
+| <xref:Orleans.Versions.Selector.AllCompatibleVersions> | Every compatible version |
+| <xref:Orleans.Versions.Selector.LatestVersion> | The highest compatible version |
+| <xref:Orleans.Versions.Selector.MinimumVersion> | The lowest compatible version |
 
-## All compatible versions (default)
+## All compatible versions
 
-Using this strategy, Orleans chooses the version of the new activation randomly from all compatible versions.
+<xref:Orleans.Versions.Selector.AllCompatibleVersions> is the default. It returns all compatible versions, and Orleans placement selects a compatible silo. Distribution therefore follows the available compatible silos, not a guaranteed equal percentage per version.
 
-For example, if you have two versions of a given grain interface, V1 and V2:
-
-- V2 is backward compatible with V1.
-- In the cluster, 2 silos support V2, and 8 support V1.
-- The request was made from a V1 client/silo.
-
-In this case, there's a 20% chance the new activation will be V2 and an 80% chance it will be V1.
+With request version 1, available versions 1 and 2, and <xref:Orleans.Versions.Compatibility.BackwardCompatible>, both versions are eligible.
 
 ## Latest version
 
-Using this strategy, the version of the new activation is always the latest compatible version. For example, if you have two versions of a given grain interface, V1 and V2 (where V2 is backward or fully compatible with V1), then all new activations will be V2.
+<xref:Orleans.Versions.Selector.LatestVersion> returns only the highest compatible version. It moves new activations toward the newest deployment while preserving the compatibility filter.
+
+With request version 1, available versions 1 and 2, and <xref:Orleans.Versions.Compatibility.BackwardCompatible>, only version 2 is eligible. With request version 3, neither version is compatible, so placement can't satisfy the request.
 
 ## Minimum version
 
-Using this strategy, the version of the new activation is always the requested version or the minimum compatible version. For example, if you have two versions of a given grain interface, V2 and V3, both fully compatible:
+<xref:Orleans.Versions.Selector.MinimumVersion> returns only the lowest compatible version. It can keep older compatible implementations serving older callers during staged validation.
 
-- If the request was made from a V1 client/silo, the new activation will be V2.
-- If the request was made from a V3 client/silo, the new activation will also be V2.
+With request version 1 and available versions 2 and 3 under <xref:Orleans.Versions.Compatibility.BackwardCompatible>, version 2 is selected. With request version 3, only version 3 or newer can be compatible; the selector never bypasses the compatibility rule to choose version 2.
+
+## Existing activations
+
+Changing a selector affects placement of new activations. It doesn't proactively replace compatible existing activations. An activation is replaced when it becomes incompatible with a request, is deactivated normally, or its silo leaves the cluster.
