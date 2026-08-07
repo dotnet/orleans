@@ -22,7 +22,7 @@ namespace Orleans.GrainDirectory.GoogleFirestore;
 
 internal partial class FirestoreDataManager
 {
-    public const int MAX_BATCH_ENTRIES = 500; // Batches are only allowed to have 500 operations
+    internal const int MaxBatchSize = 500;
     private readonly FirestoreOptions _options;
     private readonly FirestoreDb _db;
     private readonly string _group;
@@ -89,7 +89,7 @@ internal partial class FirestoreDataManager
 
         if (colSnapshot.Count == 0) return 0;
 
-        foreach (var chunk in colSnapshot.Documents.Chunk(MAX_BATCH_ENTRIES))
+        foreach (var chunk in colSnapshot.Documents.Chunk(MaxBatchSize))
         {
             var batch = this._db.StartBatch();
 
@@ -152,25 +152,6 @@ internal partial class FirestoreDataManager
         }
     }
 
-    public async Task<string> MergeEntity(IDictionary<string, object?> fields, string id)
-    {
-        var collection = this.GetCollection();
-        LogEntityOperation("Merging", id, this._partition);
-
-        try
-        {
-            var docRef = collection.Document(id);
-
-            var result = await docRef.UpdateAsync(fields, Precondition.MustExist);
-            return Utils.FormatTimestamp(result.UpdateTime);
-        }
-        catch (Exception ex)
-        {
-            LogOperationError(ex, nameof(this.MergeEntity), this._partition);
-            throw;
-        }
-    }
-
     /// <summary>
     /// Update an entity.
     /// </summary>
@@ -227,7 +208,7 @@ internal partial class FirestoreDataManager
     /// </summary>
     /// <param name="id">The entity's id</param>
     /// <param name="eTag">The entity's eTag</param>
-    /// <returns>Wether or not the update happened successfuly</returns>
+    /// <returns>Whether the delete completed successfully.</returns>
     public async Task<bool> DeleteEntity(string id, string? eTag = null)
     {
         var collection = this.GetCollection();
@@ -339,7 +320,8 @@ internal partial class FirestoreDataManager
 
         try
         {
-            if (entities.Length > MAX_BATCH_ENTRIES) throw new ArgumentOutOfRangeException($"Batch operation limit exceeded ({MAX_BATCH_ENTRIES})");
+            if (entities.Length > MaxBatchSize)
+                throw new ArgumentOutOfRangeException(nameof(entities), $"Batch operation limit exceeded ({MaxBatchSize}).");
 
             var batch = this._db.StartBatch();
 
@@ -401,7 +383,7 @@ internal partial class FirestoreDataManager
 
     private static void ValidateEntity<TEntity>(TEntity entity, bool updating = false) where TEntity : FirestoreEntity, new()
     {
-        if (entity.Id == default) throw new InvalidOperationException("Id is required to create or update an entity");
+        if (string.IsNullOrWhiteSpace(entity.Id)) throw new InvalidOperationException("Id is required to create or update an entity");
         if (updating)
         {
             if (!entity.ETag.HasValue) throw new InvalidOperationException("ETag is required to update an entity");

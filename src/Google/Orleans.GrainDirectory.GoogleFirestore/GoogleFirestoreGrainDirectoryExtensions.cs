@@ -20,7 +20,7 @@ public static class GoogleFirestoreGrainDirectoryExtensions
         services
             .AddTransient<IConfigurationValidator>(sp =>
                 new FirestoreOptionsValidator<FirestoreOptions>(
-                    sp.GetRequiredService<IOptionsMonitor<FirestoreOptions>>().Get(name), name))
+                    sp.GetRequiredService<IOptionsMonitor<FirestoreOptions>>().Get(name)))
             .ConfigureNamedOptionForLogging<FirestoreOptions>(name)
             .AddGrainDirectory(name,
                 (sp, name) =>

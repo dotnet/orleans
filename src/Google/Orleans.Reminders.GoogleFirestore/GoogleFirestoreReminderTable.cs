@@ -90,7 +90,7 @@ internal partial class GoogleFirestoreReminderTable : IReminderTable
 
             var entity = new ReminderEntity
             {
-                StartAt = entry.StartAt.ToUniversalTime(),
+                StartAt = DateTime.SpecifyKind(entry.StartAt, DateTimeKind.Utc),
                 Period = entry.Period.Ticks,
                 GrainHash = entry.GrainId.GetUniformHashCode(),
                 Name = entry.ReminderName,
@@ -188,17 +188,18 @@ internal partial class GoogleFirestoreReminderTable : IReminderTable
             }
             else
             {
-                var results = await this._dataManager.QueryEntities<ReminderEntity>(
-                    reminder => reminder
-                        .WhereLessThanOrEqualTo(nameof(ReminderEntity.GrainHash), end)
-                    ).ConfigureAwait(false);
-
-                entries.AddRange(results);
-
-                results = await this._dataManager.QueryEntities<ReminderEntity>(
-                    reminder => reminder
-                        .WhereGreaterThan(nameof(ReminderEntity.GrainHash), begin)
-                    ).ConfigureAwait(false);
+                var collection = this._dataManager.GetCollection();
+                var results = await this._dataManager.ExecuteTransaction(async transaction =>
+                {
+                    var lowerRange = await transaction.GetSnapshotAsync(
+                        collection.WhereLessThanOrEqualTo(nameof(ReminderEntity.GrainHash), end));
+                    var upperRange = await transaction.GetSnapshotAsync(
+                        collection.WhereGreaterThan(nameof(ReminderEntity.GrainHash), begin));
+                    return lowerRange.Documents
+                        .Concat(upperRange.Documents)
+                        .Select(document => document.ConvertTo<ReminderEntity>())
+                        .ToArray();
+                }).ConfigureAwait(false);
 
                 entries.AddRange(results);
             }

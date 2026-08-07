@@ -46,6 +46,26 @@ public class FirestoreGrainDirectoryTests : GrainDirectoryTests<GoogleFirestoreG
         }
     }
 
+    [SkippableFact]
+    public async Task UnregisterSilosToleratesConcurrentCleanup()
+    {
+        var address = new GrainAddress
+        {
+            ActivationId = ActivationId.NewId(),
+            GrainId = GrainId.Parse($"user/{Guid.NewGuid():N}"),
+            SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678"),
+            MembershipVersion = new MembershipVersion(51),
+        };
+        await GrainDirectory.Register(address);
+        var silos = new List<SiloAddress> { address.SiloAddress };
+
+        await Task.WhenAll(
+            GrainDirectory.UnregisterSilos(silos),
+            GrainDirectory.UnregisterSilos(silos));
+
+        Assert.Null(await GrainDirectory.Lookup(address.GrainId));
+    }
+
     public async Task InitializeAsync()
     {
         var clusterOptions = new ClusterOptions

@@ -29,4 +29,22 @@ public class UtilsTests
 
         Assert.Equal(grainId, FirestoreUtils.ParseGrainId(FirestoreUtils.SanitizeGrainId(grainId)));
     }
+
+    [Fact]
+    public void FirestoreOptionsRejectsRootCollectionPaths()
+    {
+        var options = new FirestoreOptions
+        {
+            ProjectId = "project",
+            RootCollectionName = "root/nested",
+        };
+
+        Assert.Throws<OrleansConfigurationException>(options.Validate);
+    }
+
+    [Fact]
+    public void ParseTimestampRejectsOutOfRangeValuesAsInvalidFormat()
+    {
+        Assert.Throws<FormatException>(() => FirestoreUtils.ParseTimestamp($"{long.MaxValue}.0"));
+    }
 }

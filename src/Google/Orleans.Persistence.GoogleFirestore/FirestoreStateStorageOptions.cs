@@ -7,41 +7,10 @@ namespace Orleans.Persistence.GoogleFirestore;
 public class FirestoreStateStorageOptions : FirestoreOptions, IStorageProviderSerializerOptions
 {
     /// <summary>
-    /// Indicates if grain data should be deleted or reset to defaults when a grain clears it's state.
+    /// Indicates if grain data should be deleted or reset to defaults when a grain clears its state.
     /// </summary>
     public bool DeleteStateOnClear { get; set; }
 
     /// <inheritdoc/>
     public IGrainStorageSerializer GrainStorageSerializer { get; set; } = default!;
-}
-
-/// <summary>
-/// Configuration validator for FirestoreStateStorageOptions
-/// </summary>
-public class FirestoreStateStorageOptionsValidator : IConfigurationValidator
-{
-    private readonly FirestoreStateStorageOptions options;
-    private readonly string name;
-
-    /// <summary>
-    /// Constructor
-    /// </summary>
-    /// <param name="options">The option to be validated.</param>
-    /// <param name="name">The option name to be validated.</param>
-    public FirestoreStateStorageOptionsValidator(FirestoreStateStorageOptions options, string name)
-    {
-        this.options = options;
-        this.name = name;
-    }
-
-    public void ValidateConfiguration()
-    {
-        if (string.IsNullOrWhiteSpace(this.options.ProjectId))
-            throw new OrleansConfigurationException(
-                $"Configuration for GoogleFirestoreStorage {this.name} is invalid. {nameof(this.options.ProjectId)} is not valid.");
-
-        if (string.IsNullOrWhiteSpace(this.options.RootCollectionName))
-            throw new OrleansConfigurationException(
-                $"Configuration for GoogleFirestoreStorage {this.name} is invalid. {nameof(this.options.RootCollectionName)} is not valid.");
-    }
 }

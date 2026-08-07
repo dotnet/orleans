@@ -21,7 +21,6 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
     {
         var filters = new LoggerFilterOptions();
         filters.AddFilter("FirestoreDataManager", LogLevel.Trace);
-        filters.AddFilter("OrleansSiloInstanceManager", LogLevel.Trace);
         filters.AddFilter("Storage", LogLevel.Trace);
         filters.AddFilter("GoogleFirestoreMembershipTable", LogLevel.Trace);
         return filters;

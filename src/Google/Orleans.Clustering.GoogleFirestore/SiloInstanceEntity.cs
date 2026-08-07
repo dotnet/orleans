@@ -1,7 +1,5 @@
 using System;
 using System.Net;
-using System.Text;
-using System.Linq;
 using System.Collections.Generic;
 using Google.Cloud.Firestore;
 using Orleans.Runtime;
@@ -9,7 +7,7 @@ using Orleans.Runtime;
 namespace Orleans.Clustering.GoogleFirestore;
 
 [FirestoreData]
-internal class SiloInstanceEntity : MembershipEntity
+internal class SiloInstanceEntity : FirestoreEntity
 {
     [FirestoreProperty("Address")]
     public string Address { get; set; } = default!;
@@ -42,7 +40,13 @@ internal class SiloInstanceEntity : MembershipEntity
     public int FaultZone { get; set; }
 
     [FirestoreProperty("SuspectingSilos")]
-    public Dictionary<string, DateTimeOffset>? SuspectingSilos { get; set; }
+    public string[]? SuspectingSilos { get; set; }
+
+    [FirestoreProperty("SuspectingTimes")]
+    public DateTimeOffset[]? SuspectingTimes { get; set; }
+
+    [FirestoreProperty("MembershipVersion")]
+    public int MembershipVersion { get; set; }
 
     [FirestoreProperty("StartTime")]
     public DateTimeOffset StartTime { get; set; } = default!;
@@ -52,52 +56,24 @@ internal class SiloInstanceEntity : MembershipEntity
 
     public override IDictionary<string, object?> GetFields()
     {
-        var fields = base.GetFields();
-        fields.Add("Address", this.Address);
-        fields.Add("Port", this.Port);
-        fields.Add("Generation", this.Generation);
-        fields.Add("HostName", this.HostName);
-        fields.Add("Status", this.Status);
-        fields.Add("ProxyPort", this.ProxyPort);
-        fields.Add("SiloName", this.SiloName);
-        fields.Add("RoleName", this.RoleName);
-        fields.Add("UpdateZone", this.UpdateZone);
-        fields.Add("FaultZone", this.FaultZone);
-        fields.Add("SuspectingSilos", this.SuspectingSilos);
-        fields.Add("StartTime", this.StartTime);
-        fields.Add("IAmAliveTime", this.IAmAliveTime);
-        return fields;
-    }
-
-    public IDictionary<string, object?> GetIAmAliveFields()
-    {
-        var fields = base.GetFields();
-        fields.Add("IAmAliveTime", this.IAmAliveTime);
-        return fields;
-    }
-
-    public override string ToString()
-    {
-        var sb = new StringBuilder();
-
-        sb.Append("OrleansSilo [");
-        sb.Append(" Deployment=").Append(this.ClusterId);
-        sb.Append(" LocalEndpoint=").Append(this.Address);
-        sb.Append(" LocalPort=").Append(this.Port);
-        sb.Append(" Generation=").Append(this.Generation);
-        sb.Append(" Host=").Append(this.HostName);
-        sb.Append(" Status=").Append((SiloStatus)this.Status);
-        sb.Append(" ProxyPort=").Append(this.ProxyPort);
-        sb.Append(" SiloName=").Append(this.SiloName);
-
-        sb.Append(" SuspectingSilos=")
-            .Append(string.Join("|", this.SuspectingSilos?.Select(s => $"({s.Key}|{Utils.FormatDateTime(s.Value)}") ?? Enumerable.Empty<string>()));
-
-        sb.Append(" StartTime=").Append(Utils.FormatDateTime(this.StartTime));
-        sb.Append(" IAmAliveTime=").Append(Utils.FormatDateTime(this.IAmAliveTime));
-        sb.Append(']');
-
-        return sb.ToString();
+        return new Dictionary<string, object?>
+        {
+            ["Address"] = this.Address,
+            ["Port"] = this.Port,
+            ["Generation"] = this.Generation,
+            ["HostName"] = this.HostName,
+            ["Status"] = this.Status,
+            ["ProxyPort"] = this.ProxyPort,
+            ["SiloName"] = this.SiloName,
+            ["RoleName"] = this.RoleName,
+            ["UpdateZone"] = this.UpdateZone,
+            ["FaultZone"] = this.FaultZone,
+            ["SuspectingSilos"] = this.SuspectingSilos,
+            ["SuspectingTimes"] = this.SuspectingTimes,
+            ["MembershipVersion"] = this.MembershipVersion,
+            ["StartTime"] = this.StartTime,
+            ["IAmAliveTime"] = this.IAmAliveTime,
+        };
     }
 
     public MembershipEntry ToMembershipEntry()
@@ -116,23 +92,31 @@ internal class SiloInstanceEntity : MembershipEntity
             IAmAliveTime = this.IAmAliveTime.UtcDateTime,
         };
 
-        if (this.SuspectingSilos is not null)
+        if (this.SuspectingSilos is not null || this.SuspectingTimes is not null)
         {
-            foreach (var silo in this.SuspectingSilos.OrderBy(t => t.Value))
+            if (this.SuspectingSilos is null
+                || this.SuspectingTimes is null
+                || this.SuspectingSilos.Length != this.SuspectingTimes.Length)
             {
-                entry.AddSuspector(SiloAddress.FromParsableString(silo.Key), silo.Value.UtcDateTime);
+                throw new OrleansException("The stored suspecting silo and timestamp lists have different lengths.");
+            }
+
+            for (var i = 0; i < this.SuspectingSilos.Length; i++)
+            {
+                entry.AddSuspector(
+                    SiloAddress.FromParsableString(this.SuspectingSilos[i]),
+                    this.SuspectingTimes[i].UtcDateTime);
             }
         }
 
         return entry;
     }
 
-    public static SiloInstanceEntity FromMembershipEntry(MembershipEntry entry, string clusterId)
+    public static SiloInstanceEntity FromMembershipEntry(MembershipEntry entry, int membershipVersion)
     {
         var siloInstance = new SiloInstanceEntity
         {
             Id = entry.SiloAddress.ToParsableString(),
-            ClusterId = clusterId,
             Address = entry.SiloAddress.Endpoint.Address.ToString(),
             Port = entry.SiloAddress.Endpoint.Port,
             Generation = entry.SiloAddress.Generation,
@@ -143,16 +127,20 @@ internal class SiloInstanceEntity : MembershipEntity
             RoleName = entry.RoleName,
             UpdateZone = entry.UpdateZone,
             FaultZone = entry.FaultZone,
-            StartTime = entry.StartTime,
-            IAmAliveTime = entry.IAmAliveTime,
+            MembershipVersion = membershipVersion,
+            StartTime = DateTime.SpecifyKind(entry.StartTime, DateTimeKind.Utc),
+            IAmAliveTime = DateTime.SpecifyKind(entry.IAmAliveTime, DateTimeKind.Utc),
         };
 
         if (entry.SuspectTimes is not null)
         {
-            siloInstance.SuspectingSilos = new Dictionary<string, DateTimeOffset>();
-            foreach (var silo in entry.SuspectTimes.OrderBy(t => t.Item2))
+            siloInstance.SuspectingSilos = new string[entry.SuspectTimes.Count];
+            siloInstance.SuspectingTimes = new DateTimeOffset[entry.SuspectTimes.Count];
+            for (var i = 0; i < entry.SuspectTimes.Count; i++)
             {
-                siloInstance.SuspectingSilos.Add(silo.Item1.ToParsableString(), silo.Item2);
+                var suspect = entry.SuspectTimes[i];
+                siloInstance.SuspectingSilos[i] = suspect.Item1.ToParsableString();
+                siloInstance.SuspectingTimes[i] = DateTime.SpecifyKind(suspect.Item2, DateTimeKind.Utc);
             }
         }
 

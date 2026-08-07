@@ -34,6 +34,15 @@ public class FirestoreDataManagerTests : IAsyncLifetime
     }
 
     [SkippableFact]
+    public async Task CreateEntryRejectsWhitespaceId()
+    {
+        var data = GetDummyEntity();
+        data.Id = " ";
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => this._manager.CreateEntity(data));
+    }
+
+    [SkippableFact]
     public async Task UpsertEntry()
     {
         var data = GetDummyEntity();
@@ -203,7 +212,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
     [SkippableFact]
     public async Task DeleteEntitiesRejectsOversizedBatch()
     {
-        var tasks = Enumerable.Range(0, 501).Select(x =>
+        var tasks = Enumerable.Range(0, FirestoreDataManager.MaxBatchSize + 1).Select(x =>
         {
             var entity = GetDummyEntity();
             return this._manager.CreateEntity(entity);
@@ -212,9 +221,10 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         await Task.WhenAll(tasks);
 
         var entities = await this._manager.ReadAllEntities<DummyFirestoreEntity>();
-        Assert.Equal(501, entities.Length);
+        Assert.Equal(FirestoreDataManager.MaxBatchSize + 1, entities.Length);
 
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this._manager.DeleteEntities(entities));
+        var exception = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this._manager.DeleteEntities(entities));
+        Assert.Equal("entities", exception.ParamName);
     }
 
     [SkippableFact]

@@ -15,14 +15,24 @@ namespace Orleans.GrainDirectory.GoogleFirestore;
 /// <summary>
 /// Google Cloud Firestore options
 /// </summary>
-public class FirestoreOptions : GoogleCloudOptions
+public class FirestoreOptions
 {
+    /// <summary>
+    /// The Google Cloud project id.
+    /// </summary>
+    public string ProjectId { get; set; } = default!;
+
+    /// <summary>
+    /// The Firestore emulator host. Leave unset to use Google Cloud Firestore.
+    /// </summary>
+    public string? EmulatorHost { get; set; }
+
     /// <summary>
     /// The Google Cloud Firestore root collection name.
     /// </summary>
     public string RootCollectionName { get; set; } = "Orleans";
 
-    internal void Validate(string? name)
+    internal void Validate()
     {
         if (string.IsNullOrWhiteSpace(this.RootCollectionName))
             throw new OrleansConfigurationException("RootCollectionName is required.");
@@ -30,6 +40,9 @@ public class FirestoreOptions : GoogleCloudOptions
         if (Utils.ForbiddenIdRegex().IsMatch(this.RootCollectionName))
             throw new OrleansConfigurationException(
                 $"The RootCollectionName '{this.RootCollectionName}' contains invalid characters.");
+
+        if (this.RootCollectionName.Contains('/', StringComparison.Ordinal))
+            throw new OrleansConfigurationException("RootCollectionName must be a single Firestore collection identifier.");
 
         if (string.IsNullOrWhiteSpace(this.ProjectId))
             throw new OrleansConfigurationException("ProjectId is required.");
@@ -39,19 +52,11 @@ public class FirestoreOptions : GoogleCloudOptions
     }
 }
 
-public class FirestoreOptionsValidator<TOptions> : IConfigurationValidator where TOptions : FirestoreOptions
+internal sealed class FirestoreOptionsValidator<TOptions> : IConfigurationValidator where TOptions : FirestoreOptions
 {
-    public FirestoreOptionsValidator(TOptions options, string? name = null)
-    {
-        Options = options;
-        Name = name;
-    }
+    private readonly TOptions _options;
 
-    public TOptions Options { get; }
-    public string? Name { get; }
+    public FirestoreOptionsValidator(TOptions options) => _options = options;
 
-    public virtual void ValidateConfiguration()
-    {
-        Options.Validate(this.Name);
-    }
+    public void ValidateConfiguration() => _options.Validate();
 }

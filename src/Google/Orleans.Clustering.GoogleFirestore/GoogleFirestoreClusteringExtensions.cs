@@ -25,17 +25,13 @@ public static class GoogleFirestoreClusteringExtensions
         this ISiloBuilder builder,
         Action<FirestoreOptions>? configureOptions)
     {
-        return builder.ConfigureServices(
-            services =>
+        return builder.UseGoogleFirestoreClustering(options =>
+        {
+            if (configureOptions is not null)
             {
-                if (configureOptions != null)
-                {
-                    services.Configure(configureOptions);
-                }
-
-                services.AddSingleton<IMembershipTable, GoogleFirestoreMembershipTable>()
-                    .ConfigureFormatter<FirestoreOptions>();
-            });
+                options.Configure(configureOptions);
+            }
+        });
     }
 
     /// <summary>
@@ -61,7 +57,7 @@ public static class GoogleFirestoreClusteringExtensions
                 services.AddTransient<IConfigurationValidator>(sp =>
                     new FirestoreOptionsValidator<FirestoreOptions>(
                         sp.GetRequiredService<IOptionsMonitor<FirestoreOptions>>()
-                            .Get(Options.DefaultName), Options.DefaultName));
+                            .Get(Options.DefaultName)));
                 services.AddSingleton<IMembershipTable, GoogleFirestoreMembershipTable>()
                     .ConfigureFormatter<FirestoreOptions>();
             });
@@ -83,17 +79,13 @@ public static class GoogleFirestoreClusteringExtensions
         this IClientBuilder builder,
         Action<FirestoreOptions>? configureOptions)
     {
-        return builder.ConfigureServices(
-            services =>
+        return builder.UseGoogleFirestoreClustering(options =>
+        {
+            if (configureOptions is not null)
             {
-                if (configureOptions != null)
-                {
-                    services.Configure(configureOptions);
-                }
-
-                services.AddSingleton<IGatewayListProvider, GoogleFirestoreGatewayListProvider>()
-                    .ConfigureFormatter<FirestoreOptions>();
-            });
+                options.Configure(configureOptions);
+            }
+        });
     }
 
     /// <summary>
@@ -118,8 +110,7 @@ public static class GoogleFirestoreClusteringExtensions
                 configureOptions?.Invoke(services.AddOptions<FirestoreOptions>());
                 services.AddTransient<IConfigurationValidator>(sp =>
                     new FirestoreOptionsValidator<FirestoreOptions>(
-                        sp.GetRequiredService<IOptionsMonitor<FirestoreOptions>>().Get(Options.DefaultName),
-                        Options.DefaultName));
+                        sp.GetRequiredService<IOptionsMonitor<FirestoreOptions>>().Get(Options.DefaultName)));
                 services.AddSingleton<IGatewayListProvider, GoogleFirestoreGatewayListProvider>()
                     .ConfigureFormatter<FirestoreOptions>();
             });

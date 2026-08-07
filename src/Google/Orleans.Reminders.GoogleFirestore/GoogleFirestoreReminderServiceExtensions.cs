@@ -23,11 +23,7 @@ public static class GoogleFirestoreReminderServiceExtensions
     public static IServiceCollection UseGoogleFirestoreReminderService(this IServiceCollection services,
         Action<FirestoreOptions> configure)
     {
-        services.AddReminders();
-        services.AddSingleton<IReminderTable, GoogleFirestoreReminderTable>();
-        services.Configure(configure);
-        services.ConfigureFormatter<FirestoreOptions>();
-        return services;
+        return services.UseGoogleFirestoreReminderService(options => options.Configure(configure));
     }
 
     /// <summary>
@@ -51,8 +47,7 @@ public static class GoogleFirestoreReminderServiceExtensions
         services.ConfigureFormatter<FirestoreOptions>();
         services.AddTransient<IConfigurationValidator>(sp =>
             new FirestoreOptionsValidator<FirestoreOptions>(
-                sp.GetRequiredService<IOptionsMonitor<FirestoreOptions>>().Get(Options.DefaultName),
-                Options.DefaultName));
+                sp.GetRequiredService<IOptionsMonitor<FirestoreOptions>>().Get(Options.DefaultName)));
         return services;
     }
 

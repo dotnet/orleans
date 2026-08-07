@@ -47,7 +47,9 @@ public static class FirestoreStorageHostingExtensions
         Action<OptionsBuilder<FirestoreStateStorageOptions>>? configureOptions = null)
     {
         configureOptions?.Invoke(services.AddOptions<FirestoreStateStorageOptions>(name));
-        services.AddTransient<IConfigurationValidator>(sp => new FirestoreStateStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<FirestoreStateStorageOptions>>().Get(name), name));
+        services.AddTransient<IConfigurationValidator>(sp =>
+            new FirestoreOptionsValidator<FirestoreStateStorageOptions>(
+                sp.GetRequiredService<IOptionsMonitor<FirestoreStateStorageOptions>>().Get(name)));
         services.AddTransient<IPostConfigureOptions<FirestoreStateStorageOptions>, DefaultStorageProviderSerializerOptionsConfigurator<FirestoreStateStorageOptions>>();
         services.ConfigureNamedOptionForLogging<FirestoreStateStorageOptions>(name);
 

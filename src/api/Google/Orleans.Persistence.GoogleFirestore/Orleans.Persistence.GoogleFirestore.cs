@@ -30,20 +30,13 @@ namespace Orleans.Hosting
 
 namespace Orleans.Persistence.GoogleFirestore
 {
-    public partial class FirestoreOptions : GoogleCloudOptions
+    public partial class FirestoreOptions
     {
+        public string? EmulatorHost { get { throw null; } set { } }
+
+        public string ProjectId { get { throw null; } set { } }
+
         public string RootCollectionName { get { throw null; } set { } }
-    }
-
-    public partial class FirestoreOptionsValidator<TOptions> : IConfigurationValidator where TOptions : FirestoreOptions
-    {
-        public FirestoreOptionsValidator(TOptions options, string? name = null) { }
-
-        public string? Name { get { throw null; } }
-
-        public TOptions Options { get { throw null; } }
-
-        public virtual void ValidateConfiguration() { }
     }
 
     public partial class FirestoreStateStorageOptions : FirestoreOptions, Storage.IStorageProviderSerializerOptions
@@ -53,17 +46,4 @@ namespace Orleans.Persistence.GoogleFirestore
         public Storage.IGrainStorageSerializer GrainStorageSerializer { get { throw null; } set { } }
     }
 
-    public partial class FirestoreStateStorageOptionsValidator : IConfigurationValidator
-    {
-        public FirestoreStateStorageOptionsValidator(FirestoreStateStorageOptions options, string name) { }
-
-        public void ValidateConfiguration() { }
-    }
-
-    public partial class GoogleCloudOptions
-    {
-        public string? EmulatorHost { get { throw null; } set { } }
-
-        public string ProjectId { get { throw null; } set { } }
-    }
 }

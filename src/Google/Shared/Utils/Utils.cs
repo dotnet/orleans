@@ -21,8 +21,6 @@ internal static partial class Utils
 {
     private const string ENCODED_ID_PREFIX = "id-";
 
-    internal static string FormatDateTime(DateTimeOffset dto) => dto.ToString("O", CultureInfo.InvariantCulture);
-
     internal static string FormatTimestamp(Timestamp ts)
     {
         var proto = ts.ToProto();
@@ -39,11 +37,18 @@ internal static partial class Utils
             throw new FormatException("The value is not a valid Firestore ETag.");
         }
 
-        return Timestamp.FromProto(new()
+        try
         {
-            Seconds = seconds,
-            Nanos = nanos,
-        });
+            return Timestamp.FromProto(new()
+            {
+                Seconds = seconds,
+                Nanos = nanos,
+            });
+        }
+        catch (ArgumentOutOfRangeException exception)
+        {
+            throw new FormatException("The value is not a valid Firestore ETag.", exception);
+        }
     }
 
     internal static string SanitizeGrainId(GrainId grainId) => SanitizeId(grainId.ToString());

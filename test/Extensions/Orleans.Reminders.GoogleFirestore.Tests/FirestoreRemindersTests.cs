@@ -105,4 +105,24 @@ public class FirestoreRemindersTests : ReminderTableTestsBase, IClassFixture<Tes
         Assert.Equal(currentETag, stored.ETag);
         Assert.Equal(new DateTime(2026, 1, 1, 0, 1, 0, DateTimeKind.Utc), stored.StartAt);
     }
+
+    [SkippableFact]
+    public async Task UnspecifiedStartTimePreservesTicks()
+    {
+        var startAt = new DateTime(2026, 1, 1, 12, 34, 56, DateTimeKind.Unspecified);
+        var reminder = new ReminderEntry
+        {
+            GrainId = GrainId.Parse($"user/{Guid.NewGuid():N}"),
+            ReminderName = "unspecified-start",
+            StartAt = startAt,
+            Period = TimeSpan.FromMinutes(1),
+        };
+
+        await RemindersTable.UpsertRow(reminder);
+
+        var stored = await RemindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
+        Assert.NotNull(stored);
+        Assert.Equal(startAt.Ticks, stored.StartAt.Ticks);
+        Assert.Equal(DateTimeKind.Utc, stored.StartAt.Kind);
+    }
 }
