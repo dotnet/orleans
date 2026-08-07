@@ -104,6 +104,25 @@ public static class StorageConfiguration
         // </configure_redis_default>
     }
 
+    public static void ConfigureMemory(ISiloBuilder siloBuilder)
+    {
+        // <configure_memory>
+        siloBuilder.AddMemoryGrainStorage(
+            name: "development",
+            configureOptions: options =>
+            {
+                options.NumStorageGrains = 10;
+            });
+        // </configure_memory>
+    }
+
+    public static void ConfigureMemoryDefault(ISiloBuilder siloBuilder)
+    {
+        // <configure_memory_default>
+        siloBuilder.AddMemoryGrainStorageAsDefault();
+        // </configure_memory_default>
+    }
+
     public static void ConfigureRedisAspireAppHost()
     {
         // Note: This is pseudo-code for Aspire AppHost - won't actually compile

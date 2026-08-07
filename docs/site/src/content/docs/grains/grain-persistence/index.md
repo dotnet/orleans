@@ -21,8 +21,8 @@ Officially maintained providers are available from [NuGet](https://www.nuget.org
 | [Azure Cosmos DB for NoSQL](azure-cosmos-db.md) | [`Microsoft.Orleans.Persistence.Cosmos`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Cosmos) | Globally distributed Azure NoSQL storage |
 | [Amazon DynamoDB](dynamodb-storage.md) | [`Microsoft.Orleans.Persistence.DynamoDB`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.DynamoDB) | AWS-hosted key-value storage |
 | [ADO.NET](relational-storage.md) | [`Microsoft.Orleans.Persistence.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AdoNet) | SQL Server, MySQL/MariaDB, PostgreSQL, Oracle, and SQLite |
-| [Redis](https://redis.io) | [`Microsoft.Orleans.Persistence.Redis`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Redis) | Low-latency state backed by Redis |
-| Memory | `Microsoft.Orleans.Persistence.Memory` | Tests and disposable development environments |
+| [Redis](redis-storage.md) | [`Microsoft.Orleans.Persistence.Redis`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Redis) | Low-latency state backed by Redis |
+| [Memory](memory-storage.md) | `Microsoft.Orleans.Persistence.Memory` | Tests and disposable development environments |
 
 Choose based on durability, availability, latency, record-size limits, operational tooling, and cost. Memory storage isn't durable across cluster restarts. Redis expiration should only be used for state that is intentionally ephemeral.
 
@@ -92,23 +92,7 @@ Persistence outlives activations and deployments. Treat the stored representatio
 
 Storage providers expose <xref:Orleans.Storage.IGrainStorageSerializer> through their options. The default provider serializer uses JSON. A custom serializer can implement explicit envelopes, version fields, or migrations, but changing serializers doesn't migrate existing records automatically.
 
-## Redis grain persistence
-
-Configure Redis with <xref:Orleans.Hosting.RedisSiloBuilderExtensions.AddRedisGrainStorage*>:
-
-:::code language="csharp" source="./snippets/persistence/StorageConfiguration.cs" id="configure_redis":::
-
-Redis uses atomic scripts and ETags to detect concurrent writes. `DeleteStateOnClear` controls whether clear deletes the key, and `EntryExpiry` configures expiration. Expiration can make durable state disappear and should only be enabled for deliberately ephemeral workloads.
-
-## Memory storage
-
-Use memory storage for tests or local development:
-
-```csharp
-siloBuilder.AddMemoryGrainStorage("development");
-```
-
-State lives in the Orleans cluster and doesn't survive loss or restart of the cluster. Don't use it as a production durability mechanism.
+<span id="redis-grain-persistence"></span>
 
 ## Legacy `Grain<TState>` model
 
