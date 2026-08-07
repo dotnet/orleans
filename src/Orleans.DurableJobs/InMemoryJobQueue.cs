@@ -144,7 +144,9 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                 DueTime = newDueTime,
                 TargetGrainId = existing.Job.TargetGrainId,
                 ShardId = existing.Job.ShardId,
-                Metadata = existing.Job.Metadata
+                Metadata = existing.Job.Metadata,
+                TraceParent = existing.Job.TraceParent,
+                TraceState = existing.Job.TraceState,
             };
 
             oldBucket.RemoveJob(jobId);
