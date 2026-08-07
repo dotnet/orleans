@@ -79,8 +79,6 @@ internal sealed class CertificateOptions
 
     public string TargetHost { get; set; } = "";
 
-    public string[] TrustedRootSha256Fingerprints { get; set; } = [];
-
     public void Validate()
     {
         SampleOptions.RequireValue(Path, "Certificate:Path");
@@ -91,15 +89,6 @@ internal sealed class CertificateOptions
             throw new InvalidOperationException(
                 "The configured silo certificate file does not exist.");
         }
-
-        if (TrustedRootSha256Fingerprints.Length == 0)
-        {
-            throw new InvalidOperationException(
-                "At least one trusted root SHA-256 fingerprint is required.");
-        }
-
-        _ = CertificatePolicy.ParseSha256Fingerprints(
-            TrustedRootSha256Fingerprints);
     }
 }
 

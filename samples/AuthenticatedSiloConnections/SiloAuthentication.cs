@@ -1,5 +1,3 @@
-using System.Net.Security;
-using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using Azure.Core;
 using Orleans.Connections.Security;
@@ -16,9 +14,6 @@ internal static class SiloAuthentication
         TokenCredential credential,
         X509Certificate2 siloCertificate)
     {
-        var trustedRoots = CertificatePolicy.ParseSha256Fingerprints(
-            options.Certificate.TrustedRootSha256Fingerprints);
-
         // <AuthenticatedSiloConnections>
         siloBuilder.UseAuthenticatedSiloConnections(
             tls =>
@@ -27,25 +22,17 @@ internal static class SiloAuthentication
                 tls.RemoteCertificateMode = RemoteCertificateMode.RequireCertificate;
                 tls.ClientCertificateMode = RemoteCertificateMode.RequireCertificate;
                 tls.CheckCertificateRevocation = true;
-                tls.OnAuthenticateAsClient = (_, sslOptions) =>
-                {
-                    sslOptions.TargetHost = options.Certificate.TargetHost;
-                    sslOptions.CertificateRevocationCheckMode =
-                        X509RevocationMode.Online;
-                };
-                tls.RemoteCertificateValidation = (certificate, chain, errors) =>
-                    CertificatePolicy.ValidateRemoteCertificate(
-                        certificate,
-                        chain,
-                        errors,
-                        trustedRoots);
             },
             authentication =>
             {
                 authentication.Mode = options.AuthenticationMode;
+                authentication.TargetHost = options.Certificate.TargetHost;
                 authentication.TokenExchangeTimeout = TimeSpan.FromSeconds(10);
                 authentication.MaxTokenSize = 16 * 1024;
-                authentication.MaxConcurrentHandshakes = 256;
+                authentication.MaxConcurrentInboundAuthentications = 256;
+                authentication.MaxConcurrentOutboundAuthentications = 256;
+                authentication.MaxPendingInboundAuthentications = 256;
+                authentication.MaxPendingOutboundAuthentications = 256;
                 authentication.MinimumRemainingTokenLifetime =
                     TimeSpan.FromMinutes(2);
 
@@ -57,6 +44,8 @@ internal static class SiloAuthentication
                         entra.TokenScope = $"{options.Entra.Audience}/.default";
                         entra.ValidAudiences.Add(options.Entra.Audience);
                         entra.ValidTenantIds.Add(options.Entra.TenantId);
+                        entra.ClusterAudienceFormat =
+                            $"api://{options.Entra.ResourceApplicationId}/{{0}}";
 
                         foreach (var clientId in options.Entra.AllowedCallerClientIds)
                         {
@@ -79,47 +68,4 @@ internal static class CertificatePolicy
             path,
             password,
             X509KeyStorageFlags.EphemeralKeySet);
-
-    public static byte[][] ParseSha256Fingerprints(IEnumerable<string> values)
-        => values.Select(value =>
-        {
-            var normalized = value.Replace(":", "", StringComparison.Ordinal);
-            if (normalized.Length != 64)
-            {
-                throw new InvalidOperationException(
-                    "Every trusted root fingerprint must contain 32 SHA-256 bytes.");
-            }
-
-            try
-            {
-                return Convert.FromHexString(normalized);
-            }
-            catch (FormatException exception)
-            {
-                throw new InvalidOperationException(
-                    "A trusted root fingerprint is not hexadecimal.",
-                    exception);
-            }
-        }).ToArray();
-
-    public static bool ValidateRemoteCertificate(
-        X509Certificate2 certificate,
-        X509Chain? chain,
-        SslPolicyErrors errors,
-        IReadOnlyList<byte[]> trustedRootFingerprints)
-    {
-        if (errors != SslPolicyErrors.None
-            || chain is null
-            || chain.ChainElements.Count == 0)
-        {
-            return false;
-        }
-
-        var root = chain.ChainElements[^1].Certificate;
-        var rootFingerprint = root.GetCertHash(HashAlgorithmName.SHA256);
-        return trustedRootFingerprints.Any(
-            expected => CryptographicOperations.FixedTimeEquals(
-                expected,
-                rootFingerprint));
-    }
 }

@@ -1,8 +1,12 @@
 using AuthenticatedSiloConnections;
 using Azure.Core;
 using Azure.Identity;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
+using Orleans.Hosting;
 
 var builder = Host.CreateApplicationBuilder(args);
 var options = SampleOptions.Load(builder.Configuration);
@@ -25,7 +29,7 @@ builder.Services.AddOpenTelemetry()
         serviceInstanceId: Environment.MachineName))
     .WithMetrics(metrics =>
     {
-        metrics.AddMeter("Microsoft.Orleans");
+        metrics.AddMeter("Microsoft.Orleans.Connections.Security");
 
         if (exportToOtlp)
         {
