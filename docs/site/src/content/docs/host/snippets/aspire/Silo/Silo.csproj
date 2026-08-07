@@ -1,20 +1,24 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
     <OutputType>Library</OutputType>
   </PropertyGroup>
 
   <!-- <silo_packages> -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Server" Version="10.2.1" />
-    <PackageReference Include="Microsoft.Orleans.Clustering.Redis" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Server" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.Redis" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Reminders.AzureStorage" Version="10.2.2" />
     <PackageReference Include="Aspire.StackExchange.Redis" Version="13.4.6" />
   </ItemGroup>
   <!-- </silo_packages> -->
 
   <ItemGroup>
     <PackageReference Include="Aspire.Azure.Data.Tables" Version="13.4.6" />
-    <PackageReference Include="Microsoft.Orleans.Persistence.Redis" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.Redis" Version="10.2.2" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
   </ItemGroup>
 

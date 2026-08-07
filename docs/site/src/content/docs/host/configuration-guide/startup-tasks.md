@@ -1,177 +1,57 @@
 ---
-title: Background Services and Startup Tasks
-description: Learn how to configure and manage background services and startup tasks in .NET Orleans.
-ms.date: 05/23/2025
+title: Background services and startup tasks
+description: Run application initialization and background work with Orleans.
+ms.date: 08/02/2026
+ms.topic: how-to
 ---
 
 # Background services and startup tasks
 
-When building Orleans applications, you often need to perform background operations or initialize components when the application starts.
+Use standard [.NET hosted services](https://learn.microsoft.com/dotnet/core/extensions/workers) for application initialization and background work. Orleans participates in the same Generic Host, so registration order can ensure Orleans is ready before a hosted service starts.
 
-Use startup tasks to perform initialization work when a silo starts, either before or after it begins accepting requests. Common use cases include:
+<a id="using-backgroundservice-recommended"></a>
 
-- Initializing grain state or preloading data
-- Setting up external service connections
-- Performing database migrations
-- Validating configuration
-- Warming up caches
+## Using <xref:Microsoft.Extensions.Hosting.BackgroundService> (Recommended)
 
-## Using `BackgroundService` (Recommended)
+Register Orleans first, then the <xref:Microsoft.Extensions.Hosting.BackgroundService>:
 
-The recommended approach is to use .NET [`BackgroundService` or `IHostedService`](/aspnet/core/fundamentals/host/hosted-services). See the [Background tasks with hosted services in ASP.NET Core](/aspnet/core/fundamentals/host/hosted-services) documentation for more information.
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="register_background_service":::
 
-Here's an example that pings a grain every 5 seconds:
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="background_service":::
 
-```csharp
-public class GrainPingService : BackgroundService
-{
-    private readonly IGrainFactory _grainFactory;
-    private readonly ILogger<GrainPingService> _logger;
-
-    public GrainPingService(
-        IGrainFactory grainFactory,
-        ILogger<GrainPingService> logger)
-    {
-        _grainFactory = grainFactory;
-        _logger = logger;
-    }
-
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        try
-        {
-            while (!stoppingToken.IsCancellationRequested)
-            {
-                try
-                {
-                    _logger.LogInformation("Pinging grain...");
-                    var grain = _grainFactory.GetGrain<IMyGrain>("ping-target");
-                    await grain.Ping();
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    // Log the error but continue running
-                    _logger.LogError(ex, "Failed to ping grain. Will retry in 5 seconds.");
-                }
-
-                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
-            }
-        }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-        {
-            // Ignore cancellation during shutdown.
-        }
-        finally
-        {
-            _logger.LogInformation("Grain ping service is shutting down.");
-        }
-    }
-}
-```
-
-Registration order is significant because services added to the host builder start one by one in the order they are registered. Register the background service as follows:
-
-```csharp
-var builder = WebApplication.CreateBuilder(args);
-
-// Configure Orleans first
-builder.UseOrleans(siloBuilder => 
-{
-    // Orleans configuration...
-});
-
-// Register the background service after calling 'UseOrleans' to make it start once Orleans has started.
-builder.Services.AddHostedService<GrainPingService>();
-
-var app = builder.Build();
-```
-
-The background service starts automatically when the application starts and gracefully shuts down when the application stops.
-
-## Using `IHostedService`
-
-For simpler scenarios where you don't need continuous background operation, implement `IHostedService` directly:
-
-```csharp
-public class GrainInitializerService : IHostedService
-{
-    private readonly IGrainFactory _grainFactory;
-    private readonly ILogger<GrainInitializerService> _logger;
-
-    public GrainInitializerService(
-        IGrainFactory grainFactory,
-        ILogger<GrainInitializerService> logger)
-    {
-        _grainFactory = grainFactory;
-        _logger = logger;
-    }
-
-    public async Task StartAsync(CancellationToken cancellationToken)
-    {
-        _logger.LogInformation("Initializing grains...");
-        var grain = _grainFactory.GetGrain<IMyGrain>("initializer");
-        await grain.Initialize();
-    }
-
-    public Task StopAsync(CancellationToken cancellationToken)
-    {
-        return Task.CompletedTask;
-    }
-}
-```
-
-Register it the same way:
-
-```csharp
-builder.Services.AddHostedService<GrainInitializerService>();
-```
+Honor `stoppingToken` so the service doesn't delay silo shutdown. Use <xref:Microsoft.Extensions.Hosting.IHostedService> directly for one-time startup and shutdown work.
 
 ## Orleans startup tasks
 
-> [!NOTE]
-> While startup tasks are still supported, we recommend using `BackgroundService` or `IHostedService` instead, as they are the standard .NET hosting mechanism for running background tasks.
-
-> [!WARNING]
-> Any exceptions thrown from a startup task are reported in the silo log and stop the silo. This fail-fast approach helps detect configuration and bootstrap issues during testing rather than causing unexpected problems later. However, it can also mean that transient failures in a startup task cause host unavailability.
-
-If you need to use the built-in startup task system, configure them as follows:
-
 ### Register a delegate
 
-Register a delegate as a startup task using the appropriate <xref:Orleans.Hosting.SiloBuilderStartupExtensions.AddStartupTask*> extension method on <xref:Orleans.Hosting.ISiloBuilder>.
+Use <xref:Orleans.Hosting.SiloBuilderStartupExtensions.AddStartupTask*> when initialization must complete at an Orleans lifecycle stage before startup can continue:
 
-```csharp
-siloBuilder.AddStartupTask(
-    async (IServiceProvider services, CancellationToken cancellation) =>
-    {
-        var grainFactory = services.GetRequiredService<IGrainFactory>();
-        var grain = grainFactory.GetGrain<IMyGrain>("startup-task-grain");
-        await grain.Initialize();
-    });
-```
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="register_startup_task":::
 
-### Register an `IStartupTask` implementation
+The default stage is <xref:Orleans.ServiceLifecycleStage.Active>. An exception fails silo startup. This is appropriate for mandatory validation or initialization, but not for optional work that can retry after the host becomes ready.
 
-Implement the <xref:Orleans.Runtime.IStartupTask> interface and register it as a startup task using the <xref:Orleans.Hosting.SiloBuilderStartupExtensions.AddStartupTask*> extension method on <xref:Orleans.Hosting.ISiloBuilder>.
+<a id="register-an-istartuptask-implementation"></a>
 
-```csharp
-public class CallGrainStartupTask : IStartupTask
-{
-    private readonly IGrainFactory _grainFactory;
+### Register an <xref:Orleans.Runtime.IStartupTask> implementation
 
-    public CallGrainStartupTask(IGrainFactory grainFactory) =>
-        _grainFactory = grainFactory;
+For reusable tasks, implement <xref:Orleans.Runtime.IStartupTask>:
 
-    public async Task Execute(CancellationToken cancellationToken)
-    {
-        var grain = _grainFactory.GetGrain<IMyGrain>("startup-task-grain");
-        await grain.Initialize();
-    }
-}
-```
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="validate_dependencies_task":::
 
-Register the startup task as follows:
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="register_validate_dependencies_task":::
 
-```csharp
-siloBuilder.AddStartupTask<CallGrainStartupTask>();
-```
+## Choose the right mechanism
+
+<a id="using-ihostedservice"></a>
+
+| Requirement | Mechanism |
+|---|---|
+| Continuous loop or scheduled application work | <xref:Microsoft.Extensions.Hosting.BackgroundService> |
+| One-time host startup and shutdown work | <xref:Microsoft.Extensions.Hosting.IHostedService> |
+| Mandatory initialization at a specific Orleans stage | <xref:Orleans.Hosting.SiloBuilderStartupExtensions.AddStartupTask*> |
+| Start and stop callbacks integrated with an Orleans subsystem | <xref:Orleans.ILifecycleParticipant`1> with <xref:Orleans.Runtime.ISiloLifecycle> |
+
+Don't use a startup task for long-running loops, database migrations that multiple replicas could race to apply, or work that needs unbounded retries. Coordinate migrations externally or make them safely single-writer.
+
+See [Orleans silo lifecycle](../silo-lifecycle.md) for lifecycle stage selection.

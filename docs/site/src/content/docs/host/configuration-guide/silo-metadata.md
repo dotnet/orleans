@@ -1,118 +1,75 @@
 ---
 title: Silo metadata
-description: Learn about silo metadata in .NET Orleans.
-ms.date: 01/21/2026
+description: Annotate Orleans silos for placement and application decisions.
+ms.date: 08/02/2026
+ms.topic: how-to
 ---
 
 # Silo metadata
 
-Silo metadata is a feature in Orleans that allows developers to assign custom metadata to silos within a cluster. This metadata provides a flexible mechanism for annotating silos with descriptive information or specific capabilities.
+<a id="key-concepts"></a>
 
-This feature is particularly useful in scenarios where different silos have distinct roles, hardware configurations, or other unique characteristics. For example, silos can be tagged based on their region, compute power, or specialized responsibilities within the system.
+Silo metadata is an immutable string-to-string map published by each silo. Use it to describe placement-relevant capabilities such as region, hardware, role, or reservation type.
 
-Silo metadata lays the groundwork for additional Orleans features, such as [Grain placement filtering](../../grains/grain-placement-filtering.md).
-
-## Key concepts
-
-Silo metadata introduces a way to attach key-value pairs to silos within an Orleans cluster. This feature allows developers to configure silo-specific characteristics that can be leveraged by Orleans components.
-
-Silo metadata is represented as an **immutable** dictionary of key-value pairs:
-
-- **Keys**: Strings that identify the metadata (for example, `"cloud.region"`, `"compute.reservation.type"`).
-- **Values**: Strings that describe the corresponding property (for example, `"us-east1"`, `"spot"`).
+Metadata supports [grain placement filtering](../../grains/grain-placement-filtering.md). Don't put credentials, frequently changing health data, or large payloads in it.
 
 ## Configuration
 
-Silo metadata in Orleans is configured using two methods, either .NET configuration or directly in code.
+### Configure silo metadata with configuration
 
-### Configure Silo metadata with configuration
+<a id="example-appsettingsjson-configuration"></a>
 
-Silo metadata can be defined in the app's configuration, such as _appsettings.json_, environment variables, or any other available configuration source.
-
-#### Example: _appsettings.json_ configuration
+<xref:Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadataHostingExtensions.UseSiloMetadata*> reads `Orleans:Metadata`:
 
 ```json
 {
   "Orleans": {
     "Metadata": {
-      "cloud.region": "us-east1",
-      "compute.reservation.type": "spot",
-      "role": "worker"
+      "cloud.region": "westus3",
+      "hardware.accelerator": "gpu",
+      "role": "recommendations"
     }
   }
 }
 ```
 
-The preceding configuration defines metadata for a Silo, tagging it with:
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="silo_metadata_from_configuration":::
 
-- `cloud.region`: `"us-east1"`
-- `compute.reservation.type`: `"spot"`
-- `role`: `"worker"`
+Environment variables can set deployment-specific values, for example:
 
-To apply this configuration, use the following setup in your silo host builder:
-
-```csharp
-Host.CreateApplicationBuilder(args).UseOrleans(siloBuilder =>
-{
-    // Configuration section Orleans:Metadata is used by default
-    siloBuilder.UseSiloMetadata();
-});
+```text
+Orleans__Metadata__cloud.region=westus3
+Orleans__Metadata__role=recommendations
 ```
-
-Alternatively, an explicit `IConfiguration` or `IConfigurationSection` can be passed in to control where in configuration the metadata is pulled from.
 
 ### Configuring silo metadata in code
 
-For scenarios requiring programmatic metadata configuration, developers can add metadata directly in the Silo host builder.
+<a id="example-direct-code-configuration"></a>
 
-#### Example: Direct Code Configuration
+You can also supply values programmatically:
 
-```csharp
-var builder = Host.CreateApplicationBuilder(args);
-builder.UseOrleans(siloBuilder =>
-{
-    siloBuilder.UseSiloMetadata(new Dictionary<string, string>
-    {
-        ["cloud.region"] = "us-east1",
-        ["compute.reservation.type"] = "spot",
-        ["role"] = "worker"
-    });
-});
-```
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="configure_silo_metadata":::
 
-The preceding example achieves the same result as the JSON configuration but allows metadata values to be computed or loaded dynamically during silo initialization.
-
-### Merge configurations
-
-If both .NET configuration and direct code configuration are used, the direct configuration overrides any conflicting metadata values from the .NET configuration. This allows developers to set defaults with configuration files and dynamically adjust specific metadata during runtime.
+Metadata is fixed for the lifetime of a silo instance. Restart the silo to publish changed values.
 
 ## Usage
 
-Developers can retrieve metadata through the `ISiloMetadataCache` interface. This interface allows for querying metadata for individual silos across the cluster. Metadata will always be returned from a local cache of metadata that gets updated in the background as cluster membership changes.
-
 ### Access metadata for a specific silo
 
-The `ISiloMetadataCache` provides a method to retrieve the metadata for a specific silo by its unique identifier (<xref:Orleans.Runtime.SiloAddress>). The `ISoloMetadataCache` implementation is registered in the `UseSiloMetadata` method and can be injected as a dependency.
+<a id="example-access-metadata-for-a-silo"></a>
 
-#### Example: Access metadata for a Silo
+Inject <xref:Orleans.Runtime.MembershipService.SiloMetadata.ISiloMetadataCache> into a silo service or Orleans component:
 
-```csharp
-var siloMetadata = siloMetadataCache.GetSiloMetadata(siloAddress);
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="read_silo_metadata":::
 
-if (siloMetadata.Metadata.TryGetValue("role", out var role))
-{
-    Console.WriteLine($"Silo Role for {siloAddress}: {role}");
-    // Execute role-specific logic
-}
-```
+The cache follows cluster membership and fetches metadata from active silos. <xref:Orleans.Runtime.MembershipService.SiloMetadata.ISiloMetadataCache.GetSiloMetadata*> returns the locally cached value, so it doesn't add a remote call to the request path.
 
-In the preceding example:
+## Define a metadata contract
 
-- `GetSiloMetadata(siloAddress)` retrieves the metadata for the specified silo.
-- Metadata keys like `"role"` can be used to influence application logic.
+- Use stable, namespaced keys such as `cloud.region` or `hardware.accelerator`.
+- Treat key names and values as an application contract.
+- Define behavior for missing or unknown values during rolling deployments.
+- Keep values low-cardinality when they feed placement or telemetry.
+- Ensure enough silos match every required placement filter.
 
-## Internal implementation
-
-Internally, the `SiloMetadataCache` monitors changes in cluster membership on `MembershipTableManager` and keeps a local cache of metadata in sync with membership changes. Metadata is immutable for a given Silo, so it's retrieved once and cached until that Silo leaves the cluster. Cached metadata for clusters that are `Dead` or have left the membership table will be cleared out of the local cache.
-
-Each silo hosts an `ISystemTarget` that provides that silo's metadata. Calls to `SiloMetadataCache : ISiloMetadataCache` return a result from the local cache.
+Metadata complements heterogeneous silo configuration: use <xref:Orleans.Configuration.GrainTypeOptions.Classes> when a silo cannot host a grain class, and metadata placement filters when it can host the class but should be selected based on capability.

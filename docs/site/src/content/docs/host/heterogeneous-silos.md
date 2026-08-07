@@ -1,59 +1,63 @@
 ---
-title: Heterogeneous silos overview
-description: Learn an overview of heterogeneous silos in .NET Orleans.
-ms.date: 05/23/2025
-ms.topic: overview
+title: Heterogeneous Orleans silos
+description: Host different Orleans grain types on different silos.
+ms.date: 08/02/2026
+ms.topic: how-to
 ---
 
-# Heterogeneous silos overview
+# Heterogeneous Orleans silos
 
-On a given cluster, silos can support different sets of grain types:
+Silos in one cluster can host different sets of grain classes. This lets you isolate workloads, use specialized hardware, or deploy grain implementations independently while retaining one Orleans cluster.
 
-:::image type="content" source="media/heterogeneous.png" alt-text="Heterogeneous silos overview diagram.":::
+:::image type="content" source="media/heterogeneous.png" alt-text="A cluster whose silos support different grain type sets.":::
 
-In this example, the cluster supports grains of type `A`, `B`, `C`, `D`, and `E`:
+All silos and clients should reference the interfaces and serialization contracts they can exchange. A silo should reference only the grain implementation assemblies it can host.
 
-- Grain types `A` and `B` can be placed on Silo 1 and 2.
-- Grain type `C` can be placed on Silo 1, 2, or 3.
-- Grain type `D` can only be placed on Silo 3.
-- Grain type `E` can only be placed on Silo 4.
+## Prefer assembly boundaries
 
-All silos should reference the interfaces of all grain types in the cluster, but grain classes should only be referenced by the silos that host them. The client doesn't know which silo supports a given grain type.
+The simplest model is to put specialized grain classes in separate projects and reference each implementation project only from the silo host that should run it. Orleans discovers supported grain classes from generated type metadata.
 
-> [!IMPORTANT]
-> A given grain type implementation must be the same on each silo that supports it.
+For example:
 
-The following scenario is _not_ valid:
+- General-purpose silos reference `Orders.Grains`.
+- GPU silos reference `Recommendations.Grains`.
+- Clients reference `Orders.Contracts` and `Recommendations.Contracts`, but neither implementation assembly.
 
-On Silo 1 and 2:
-
-```csharp
-public class C: Grain, IMyGrainInterface
-{
-   public Task SomeMethod() { /* ... */ }
-}
-```
-
-On Silo 3:
-
-```csharp
-public class C: Grain, IMyGrainInterface, IMyOtherGrainInterface
-{
-   public Task SomeMethod() { /* ... */ }
-   public Task SomeOtherMethod() { /* ... */ }
-}
-```
+The same grain implementation must be compatible across every silo that advertises support for that grain type.
 
 ## Configuration
 
-No configuration is needed; you can deploy different binaries on each silo in your cluster. However, if necessary, you can change the interval at which silos and clients check for changes in supported types using the <xref:Orleans.Configuration.TypeManagementOptions.TypeMapRefreshInterval?displayProperty=nameWithType> property.
+When one binary can run in several roles, configure <xref:Orleans.Configuration.GrainTypeOptions.Classes>:
 
-For testing purposes, you can use the <xref:Orleans.Configuration.GrainClassOptions.ExcludedGrainTypes?displayProperty=nameWithType> property, which is a list of names of the types you want to exclude on specific silos.
+:::code language="csharp" source="snippets/hosting/HostingExamples.cs" id="configure_grain_types":::
+
+<xref:Orleans.Configuration.GrainTypeOptions.Classes> is a set of <xref:System.Type> values. Use it to include the exact grain classes the process can host or remove discovered classes that a role must not host:
+
+:::code language="csharp" source="snippets/hosting/HostingExamples.cs" id="exclude_grain_type":::
+
+Don't use obsolete grain-class exclusion option names from earlier Orleans versions.
+
+## Direct placement by capability
+
+Use [silo metadata](configuration-guide/silo-metadata.md) and [grain placement filtering](../grains/grain-placement-filtering.md) when many silos load the same grain implementation but only some meet a placement requirement such as region, hardware, tenant, or reservation type.
+
+Use heterogeneous grain type registration when a silo cannot host the implementation at all. Use placement filtering when it can host the type but placement should prefer or require metadata.
+
+## Deployment rules
+
+- Keep <xref:Orleans.Configuration.ClusterOptions.ServiceId>, <xref:Orleans.Configuration.ClusterOptions.ClusterId>, clustering, and protocol configuration consistent across all roles.
+- Deploy at least one healthy silo for every supported grain type before clients invoke it.
+- Maintain capacity and redundancy independently for each specialized grain set.
+- Roll out contract changes before implementations that require them.
+- Avoid removing the last silo for a grain type while requests or durable work still target it.
+
+Clients obtain cluster type information after connecting. Handle deployments so clients don't depend on a grain type before supporting silos are available.
 
 ## Limitations
 
-- Connected clients aren't notified if the set of supported grain types changes. In the previous example:
-  - If Silo 4 leaves the cluster, the client still tries to make calls to grains of type `E`. It fails at runtime with an <xref:Orleans.Runtime.OrleansException>.
-  - If the client connected to the cluster before Silo 4 joined, the client cannot make calls to grains of type `E`. It fails with an <xref:System.ArgumentException>.
-- Stateless grains aren't supported in heterogeneous deployments: all silos in the cluster must support the same set of stateless grains.
-- <xref:Orleans.ImplicitStreamSubscriptionAttribute> isn't supported; thus, you can only use [Explicit subscriptions](../streaming/streams-programming-apis.md) in Orleans Streams with heterogeneous silos.
+- A request fails when no active silo supports its target grain type.
+- Every silo that supports one grain type must use a compatible implementation and contract.
+- Stateless worker grains should be consistently available across the cluster rather than split into incompatible heterogeneous sets.
+- Implicit stream subscriptions require compatible grain availability; use [explicit subscriptions](../streaming/streams-programming-apis.md) when heterogeneous deployment makes ownership ambiguous.
+
+Test topology changes with production-like role counts, especially the loss and replacement of the last silo supporting a type.

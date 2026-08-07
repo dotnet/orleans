@@ -56,6 +56,19 @@ public static class SiloProgram
     }
     // </silo_explicit_connection>
 
+    // <silo_azure_config>
+    public static void AzureStorageConfiguration(string[] args)
+    {
+        var builder = Host.CreateApplicationBuilder(args);
+
+        builder.AddServiceDefaults();
+        builder.AddKeyedAzureTableServiceClient("orleans-tables");
+        builder.UseOrleans();
+
+        builder.Build().Run();
+    }
+    // </silo_azure_config>
+
     // <health_checks>
     public static void ConfigureHealthChecks(IHostApplicationBuilder builder)
     {
@@ -84,7 +97,7 @@ public static class SiloProgram
         var builder = Host.CreateApplicationBuilder(args);
 
         builder.AddServiceDefaults();
-        builder.AddKeyedAzureTableClient("reminders");
+        builder.AddKeyedAzureTableServiceClient("reminders");
         builder.UseOrleans();
 
         builder.Build().Run();

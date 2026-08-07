@@ -1,142 +1,100 @@
 ---
 title: Configure ADO.NET providers
-description: Learn how to configure ADO.NET providers in .NET Orleans.
-ms.date: 01/21/2026
+description: Configure Orleans clustering, reminders, storage, and grain directories with ADO.NET.
+ms.date: 08/02/2026
 ms.topic: how-to
-zone_pivot_groups: orleans-version
 ---
 
 # Configure ADO.NET providers
 
-Any reliable deployment of Orleans requires persistent storage to keep system state, specifically the Orleans cluster membership table and reminders. One available option is using a SQL database via ADO.NET providers.
+Orleans ADO.NET providers use a relational database for one or more runtime capabilities:
 
-To use ADO.NET for persistence, clustering, or reminders, you need to configure the ADO.NET providers as part of the silo configuration and, for clustering, also as part of the client configurations.
+| Capability | Package | Configure on |
+|---|---|---|
+| Clustering | [`Microsoft.Orleans.Clustering.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.AdoNet) | Silos and external clients |
+| Grain storage | [`Microsoft.Orleans.Persistence.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AdoNet) | Silos |
+| Reminders | [`Microsoft.Orleans.Reminders.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.AdoNet) | Silos |
+| Grain directory | [`Microsoft.Orleans.GrainDirectory.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.AdoNet) | Silos |
 
-:::zone pivot="orleans-7-0,orleans-8-0,orleans-9-0,orleans-10-0"
+Install only the packages for the capabilities the application uses. Also reference the database driver package.
 
-The silo configuration code should look like this:
+## Prepare the database
 
-```csharp
-var builder = Host.CreateApplicationBuilder(args);
+Run the main script for the database first, followed by each capability script. For example, SQL Server clustering and persistence require:
 
-var invariant = "Microsoft.Data.SqlClient";
-var connectionString = "Data Source=(localdb)\\MSSQLLocalDB;" +
-    "Initial Catalog=Orleans;Integrated Security=True;" +
-    "Pooling=False;Max Pool Size=200;" +
-    "MultipleActiveResultSets=True";
+1. `src/AdoNet/Shared/SQLServer-Main.sql`
+2. `src/AdoNet/Orleans.Clustering.AdoNet/SQLServer-Clustering.sql`
+3. `src/AdoNet/Orleans.Persistence.AdoNet/SQLServer-Persistence.sql`
 
-builder.UseOrleans(siloBuilder =>
+See [ADO.NET database configuration](adonet-configuration.md) for schema script and invariant links.
+
+Apply schema changes as a controlled deployment step. Don't grant silos schema-owner permissions solely so they can create tables at runtime.
+
+## Configure SQL Server
+
+Use `Microsoft.Data.SqlClient` for SQL Server:
+
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="adonet_silo":::
+
+Configure an external client with the same clustering database:
+
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="adonet_client":::
+
+> [!IMPORTANT]
+> `System.Data.SqlClient` isn't the SQL Server invariant. Reference the `Microsoft.Data.SqlClient` package and use the `Microsoft.Data.SqlClient` invariant.
+
+## Configure another database
+
+The Orleans configuration shape is the same for PostgreSQL, MySQL/MariaDB, and Oracle. Change the driver package, invariant, connection string, and SQL scripts together:
+
+| Database | Driver package | Invariant |
+|---|---|---|
+| SQL Server | `Microsoft.Data.SqlClient` | `Microsoft.Data.SqlClient` |
+| PostgreSQL | `Npgsql` | `Npgsql` |
+| MySQL/MariaDB | `MySql.Data` | `MySql.Data.MySqlClient` |
+| Oracle | `Oracle.ManagedDataAccess.Core` | `Oracle.DataAccess.Client` |
+
+Orleans also recognizes `MySqlConnector` for the MySqlConnector driver. Verify that the selected capability has a script for the chosen database.
+
+## Configure declaratively
+
+Installed ADO.NET provider packages register `AdoNet` for declarative configuration. For example:
+
+```json
 {
-    // Use ADO.NET for clustering
-    siloBuilder.UseAdoNetClustering(options =>
-    {
-        options.Invariant = invariant;
-        options.ConnectionString = connectionString;
-    });
-    // Use ADO.NET for reminder service
-    siloBuilder.UseAdoNetReminderService(options =>
-    {
-        options.Invariant = invariant;
-        options.ConnectionString = connectionString;
-    });
-    // Use ADO.NET for persistence
-    siloBuilder.AddAdoNetGrainStorage("GrainStorageForTest", options =>
-    {
-        options.Invariant = invariant;
-        options.ConnectionString = connectionString;
-    });
-});
+  "Orleans": {
+    "ServiceId": "orders",
+    "ClusterId": "orders-production",
+    "Clustering": {
+      "ProviderType": "AdoNet",
+      "Invariant": "Microsoft.Data.SqlClient",
+      "ConnectionString": "..."
+    },
+    "Reminders": {
+      "ProviderType": "AdoNet",
+      "Invariant": "Microsoft.Data.SqlClient",
+      "ConnectionString": "..."
+    },
+    "GrainStorage": {
+      "Default": {
+        "ProviderType": "AdoNet",
+        "Invariant": "Microsoft.Data.SqlClient",
+        "ConnectionString": "..."
+      }
+    }
+  }
+}
 ```
 
-The client configuration code should look like this:
+Store connection strings in a secret provider or deployment environment, not in a committed settings file.
 
-```csharp
-var builder = Host.CreateApplicationBuilder(args);
+## Operational guidance
 
-var invariant = "Microsoft.Data.SqlClient";
-var connectionString = "Data Source=(localdb)\\MSSQLLocalDB;" +
-    "Initial Catalog=Orleans;Integrated Security=True;" +
-    "Pooling=False;Max Pool Size=200;" +
-    "MultipleActiveResultSets=True";
-
-builder.UseOrleansClient(clientBuilder =>
-{
-    // Use ADO.NET for clustering
-    clientBuilder.UseAdoNetClustering(options =>
-    {
-        options.Invariant = invariant;
-        options.ConnectionString = connectionString;
-    });
-});
-```
-
-> [!NOTE]
-> Starting with Orleans 10.0, use `Microsoft.Data.SqlClient` instead of `System.Data.SqlClient` for the ADO.NET invariant.
-
-:::zone-end
-
-:::zone pivot="orleans-3-x"
-
-The silo configuration code should look like this:
-
-```csharp
-var siloHostBuilder = new SiloHostBuilder();
-
-var invariant = "System.Data.SqlClient";
-var connectionString = "Data Source=(localdb)\\MSSQLLocalDB;" +
-    "Initial Catalog=Orleans;Integrated Security=True;" +
-    "Pooling=False;Max Pool Size=200;" +
-    "Asynchronous Processing=True;MultipleActiveResultSets=True";
-
-// Use ADO.NET for clustering
-siloHostBuilder.UseAdoNetClustering(options =>
-{
-    options.Invariant = invariant;
-    options.ConnectionString = connectionString;
-});
-// Use ADO.NET for reminder service
-siloHostBuilder.UseAdoNetReminderService(options =>
-{
-    options.Invariant = invariant;
-    options.ConnectionString = connectionString;
-});
-// Use ADO.NET for persistence
-siloHostBuilder.AddAdoNetGrainStorage("GrainStorageForTest", options =>
-{
-    options.Invariant = invariant;
-    options.ConnectionString = connectionString;
-});
-```
-
-The client configuration code should look like this:
-
-```csharp
-var clientBuilder = new ClientBuilder();
-
-var invariant = "System.Data.SqlClient";
-var connectionString = "Data Source=(localdb)\\MSSQLLocalDB;" +
-    "Initial Catalog=Orleans;Integrated Security=True;" +
-    "Pooling=False;Max Pool Size=200;" +
-    "Asynchronous Processing=True;MultipleActiveResultSets=True";
-
-// Use ADO.NET for clustering
-clientBuilder.UseAdoNetClustering(options =>
-{
-    options.Invariant = invariant;
-    options.ConnectionString = connectionString;
-});
-```
-
-:::zone-end
+- Keep <xref:Orleans.Configuration.ClusterOptions.ServiceId> stable so Orleans reads the expected application rows.
+- Size connection pools for the total number of silo and client processes.
+- Encrypt connections and use least-privilege database identities.
+- Monitor database latency, throttling, deadlocks, and pool exhaustion.
+- Test database failover and rolling deployment behavior under load.
+- Back up grain state according to application recovery objectives; membership rows are transient and don't replace state backups.
 
 [!INCLUDE [managed-identities](../../../includes/managed-identities.md)]
-
-Set the `ConnectionString` to a valid ADO.NET Server connection string.
-
-To use ADO.NET providers for persistence, reminders, or clustering, you need scripts to create database artifacts. All servers hosting Orleans silos must have access to the database defined by these scripts. You can find scripts for popular providers in [ADO.NET Database configuration](adonet-configuration.md). Lack of access to the target database is a common mistake developers make.
-
-You also need to install the `*.AdoNet` NuGet package for the features you configure. We split ADO.NET NuGets into per-feature packages:
-
-- `Microsoft.Orleans.Clustering.AdoNet`: for clustering.
-- `Microsoft.Orleans.Persistence.AdoNet`: for persistence.
-- `Microsoft.Orleans.Reminders.AdoNet`: for reminders.
