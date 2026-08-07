@@ -118,6 +118,11 @@ namespace Orleans.Streaming.EventHubs
                 this.cache = this.cacheFactory(this.settings.Partition, this.checkpointer, this.loggerFactory);
                 this.flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { this.cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.loadSheddingOptions, environmentStatisticsProvider) };
                 string offset = await this.checkpointer.Load();
+                if (!this.checkpointer.CheckpointExists)
+                {
+                    offset = EventHubConstants.StartOfStream;
+                }
+
                 this.receiver = this.eventHubReceiverFactory(this.settings, offset, this.logger);
                 watch.Stop();
                 this.monitor?.TrackInitialization(true, watch.Elapsed, null);

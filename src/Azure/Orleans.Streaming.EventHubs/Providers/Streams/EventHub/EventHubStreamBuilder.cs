@@ -43,10 +43,13 @@ namespace Orleans.Hosting
             configurator.Configure(configureOptions);
         }
 
-        public static void UseAzureTableCheckpointer(this ISiloEventHubStreamConfigurator configurator, Action<OptionsBuilder<AzureTableStreamCheckpointerOptions>> configureOptions)
+        public static void UseAzureTableCheckpointer(
+            this ISiloEventHubStreamConfigurator configurator,
+            Action<OptionsBuilder<AzureTableStreamCheckpointerOptions>> configureOptions)
         {
             configurator.ConfigureCheckpointer(EventHubCheckpointerFactory.CreateFactory, configureOptions);
         }
+
     }
 
     public class SiloEventHubStreamConfigurator : SiloRecoverableStreamConfigurator, ISiloEventHubStreamConfigurator
@@ -55,11 +58,16 @@ namespace Orleans.Hosting
             Action<Action<IServiceCollection>> configureServicesDelegate)
             : base(name, configureServicesDelegate, EventHubAdapterFactory.Create)
         {
-            this.ConfigureDelegate(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
-                .ConfigureNamedOptionForLogging<EventHubReceiverOptions>(name)
-                .ConfigureNamedOptionForLogging<EventHubStreamCachePressureOptions>(name)
-                .AddTransient<IConfigurationValidator>(sp => new EventHubOptionsValidator(sp.GetOptionsByName<EventHubOptions>(name), name))
-                .AddTransient<IConfigurationValidator>(sp => new StreamCheckpointerConfigurationValidator(sp, name)));
+            this.ConfigureDelegate(services =>
+            {
+                services.AddOptions<GrainStreamQueueCheckpointerOptions>(name)
+                    .Configure(static options => options.CheckpointComparer = StreamCheckpointComparers.Numeric);
+                services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
+                    .ConfigureNamedOptionForLogging<EventHubReceiverOptions>(name)
+                    .ConfigureNamedOptionForLogging<EventHubStreamCachePressureOptions>(name)
+                    .AddTransient<IConfigurationValidator>(sp => new EventHubOptionsValidator(sp.GetOptionsByName<EventHubOptions>(name), name))
+                    .AddTransient<IConfigurationValidator>(sp => new StreamCheckpointerConfigurationValidator(sp, name));
+            });
         }
     }
 
