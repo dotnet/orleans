@@ -1,7 +1,7 @@
 ---
 title: Archived Orleans 3.x to 7.x migration notes
 description: Historical guidance for crossing the incompatible Orleans 3-to-7 identity, hosting, and serialization boundary.
-ms.date: 08/02/2026
+ms.date: 08/07/2026
 ms.topic: how-to
 ---
 
@@ -16,10 +16,11 @@ These notes apply to an Orleans 3.x application that must first become an Orlean
 
 ## Required architectural changes
 
-- Reference `Microsoft.Orleans.Server` from silo projects, `Microsoft.Orleans.Client` from client projects, and `Microsoft.Orleans.Sdk` from shared contract projects.
+- Reference [Microsoft.Orleans.Server](https://www.nuget.org/packages/Microsoft.Orleans.Server) from silo projects, [Microsoft.Orleans.Client](https://www.nuget.org/packages/Microsoft.Orleans.Client) from client projects, and [Microsoft.Orleans.Sdk](https://www.nuget.org/packages/Microsoft.Orleans.Sdk) from shared contract projects.
 - Remove the legacy MSBuild code-generator and `Microsoft.Orleans.OrleansRuntime` packages.
+- Replace `Microsoft.Orleans.OrleansServiceBus` with [Microsoft.Orleans.Streaming.EventHubs](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.EventHubs). Add explicit [Microsoft.Orleans.Reminders](https://www.nuget.org/packages/Microsoft.Orleans.Reminders) and [Microsoft.Orleans.Streaming](https://www.nuget.org/packages/Microsoft.Orleans.Streaming) references when the application uses those features.
 - Remove Application Parts configuration. The Orleans source generator discovers application types.
-- Use the .NET generic host with `UseOrleans` and `UseOrleansClient`.
+- Use the [.NET generic host](https://learn.microsoft.com/dotnet/core/extensions/generic-host) with `UseOrleans` and `UseOrleansClient`.
 - Update `OnActivateAsync` and `OnDeactivateAsync` overrides to the Orleans 7 cancellation-token and deactivation-reason signatures.
 - Add `[GenerateSerializer]` and stable `[Id]` values to application types.
 - Replace legacy grain, interface, and stream identity assumptions with the Orleans 7 string-based identity model.
@@ -27,6 +28,8 @@ These notes apply to an Orleans 3.x application that must first become an Orlean
 - Replace legacy telemetry consumers with .NET metrics and `ActivitySource`-based tracing.
 
 The old `IServiceCollection.AddGrainCallFilter` API was removed before Orleans 7. Register incoming and outgoing filters on `ISiloBuilder` or `IClientBuilder`.
+
+For an itemized record of the Orleans samples migrated to Orleans 7, see [dotnet/orleans issue #8035](https://github.com/dotnet/orleans/issues/8035).
 
 ## State and deployment boundary
 
