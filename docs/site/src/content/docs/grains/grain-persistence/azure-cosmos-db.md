@@ -33,11 +33,11 @@ The defaults are database `Orleans`, container `OrleansStorage`, and partition-k
 
 ## Partitioning and indexing
 
-The default partition-key provider derives a key for the grain record. If an application needs another partitioning strategy, implement the Cosmos partition-key provider contract and use the generic `AddCosmosGrainStorage<TPartitionKeyProvider>` overload.
+The <xref:Orleans.Persistence.Cosmos.DefaultDocumentIdProvider> derives the document ID and partition key for each grain record. To customize either value, implement <xref:Orleans.Persistence.Cosmos.IDocumentIdProvider> and register it using the generic <xref:Orleans.Hosting.HostingExtensions.AddCosmosGrainStorage*?displayProperty=nameWithType> overload.
 
 Changing the partition-key path or partition-key algorithm after data exists is a data migration. All silos using the same provider name must agree on the database, container, partition-key path, and provider implementation.
 
-Use `StateFieldsToIndex` to opt selected serialized state fields into indexing. Index only fields used by operational queries: additional indexing increases write cost. Grain storage itself retrieves records by identity and doesn't provide a general query API.
+Use <xref:Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.StateFieldsToIndex> to opt selected serialized state fields into indexing. Index only fields used by operational queries: additional indexing increases write cost. Grain storage itself retrieves records by identity and doesn't provide a general query API.
 
 ## Concurrency and deployment
 

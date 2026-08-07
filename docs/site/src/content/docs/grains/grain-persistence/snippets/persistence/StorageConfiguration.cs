@@ -164,7 +164,9 @@ public static class StorageConfiguration
                 options.CreateMultiplexer = _ =>
                 {
                     // Resolve the IConnectionMultiplexer from DI (provided by Aspire)
-                    return Task.FromResult(sp.GetRequiredService<IConnectionMultiplexer>());
+                    return Task.FromResult((
+                        Multiplexer: sp.GetRequiredService<IConnectionMultiplexer>(),
+                        IsShared: true));
                 };
             });
         // </configure_redis_advanced>
