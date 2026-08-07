@@ -20,14 +20,14 @@ These notes apply to an Orleans 3.x application that must first become an Orlean
 - Remove the legacy MSBuild code-generator and `Microsoft.Orleans.OrleansRuntime` packages.
 - Replace `Microsoft.Orleans.OrleansServiceBus` with [Microsoft.Orleans.Streaming.EventHubs](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.EventHubs). Add explicit [Microsoft.Orleans.Reminders](https://www.nuget.org/packages/Microsoft.Orleans.Reminders) and [Microsoft.Orleans.Streaming](https://www.nuget.org/packages/Microsoft.Orleans.Streaming) references when the application uses those features.
 - Remove Application Parts configuration. The Orleans source generator discovers application types.
-- Use the [.NET generic host](https://learn.microsoft.com/dotnet/core/extensions/generic-host) with `UseOrleans` and `UseOrleansClient`.
-- Update `OnActivateAsync` and `OnDeactivateAsync` overrides to the Orleans 7 cancellation-token and deactivation-reason signatures.
-- Add `[GenerateSerializer]` and stable `[Id]` values to application types.
+- Use the [.NET generic host](https://learn.microsoft.com/dotnet/core/extensions/generic-host) with <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*> and <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*>.
+- Update <xref:Orleans.Grain.OnActivateAsync*> and <xref:Orleans.Grain.OnDeactivateAsync*> overrides to the Orleans 7 cancellation-token and deactivation-reason signatures.
+- Add <xref:Orleans.GenerateSerializerAttribute> and stable <xref:Orleans.IdAttribute> values to application types.
 - Replace legacy grain, interface, and stream identity assumptions with the Orleans 7 string-based identity model.
 - Replace Simple Message Streams with broadcast channels or a persistent stream provider.
-- Replace legacy telemetry consumers with .NET metrics and `ActivitySource`-based tracing.
+- Replace legacy telemetry consumers with .NET metrics and <xref:System.Diagnostics.ActivitySource>-based tracing.
 
-The old `IServiceCollection.AddGrainCallFilter` API was removed before Orleans 7. Register incoming and outgoing filters on `ISiloBuilder` or `IClientBuilder`.
+The old <xref:Orleans.Hosting.GrainCallFilterServiceCollectionExtensions.AddGrainCallFilter*> API was removed before Orleans 7. Register incoming and outgoing filters on <xref:Orleans.Hosting.ISiloBuilder> or <xref:Orleans.IClientBuilder>.
 
 For an itemized record of the Orleans samples migrated to Orleans 7, see [dotnet/orleans issue #8035](https://github.com/dotnet/orleans/issues/8035).
 

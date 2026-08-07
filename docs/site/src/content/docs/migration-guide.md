@@ -1,7 +1,7 @@
 ---
 title: Orleans migration guides
 description: Plan and execute an upgrade to Orleans 10 from Orleans 9, 8, 7, or an older release.
-ms.date: 08/02/2026
+ms.date: 08/07/2026
 ms.topic: how-to
 ms.custom: migration-guide
 ---
@@ -33,7 +33,7 @@ Before changing packages, record the following compatibility contract:
 
 See [Upgrade deployment and rollback](migration/deployment-and-rollback.md) before choosing a deployment strategy.
 
-## POCO grains and `IGrainBase` <a name="poco-grains-and-igrainbase"></a>
+## POCO grains and <xref:Orleans.IGrainBase> <a name="poco-grains-and-igrainbase"></a>
 
 POCO grains remain supported. A grain that doesn't inherit from <xref:Orleans.Grain> implements <xref:Orleans.IGrainBase> and receives its <xref:Orleans.Runtime.IGrainContext> through dependency injection. This also enables grain extension methods such as timers, reminders, streaming, deactivation, and migration.
 
