@@ -12,6 +12,8 @@ namespace Orleans.Configuration
     {
         public static readonly System.TimeSpan DEFAULT_CHECKPOINT_PERSIST_INTERVAL;
         public const string DEFAULT_TABLE_NAME = "Checkpoint";
+        public System.Collections.Generic.IComparer<string>? CheckpointComparer { get { throw null; } set { } }
+
         public System.TimeSpan PersistInterval { get { throw null; } set { } }
 
         public override string TableName { get { throw null; } set { } }
@@ -80,6 +82,11 @@ namespace Orleans.Configuration
 
 namespace Orleans.Hosting
 {
+    public static partial class AzureTableStreamConfiguratorExtensions
+    {
+        public static void UseAzureTableCheckpointer(this ISiloPersistentStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureTableStreamCheckpointerOptions>> configureOptions) { }
+    }
+
     public static partial class ClientBuilderExtensions
     {
         public static IClientBuilder AddEventHubStreams(this IClientBuilder builder, string name, System.Action<Configuration.EventHubOptions> configureEventHub) { throw null; }
@@ -132,7 +139,7 @@ namespace Orleans.Hosting
 
         public static void ConfigurePartitionReceiver(this ISiloEventHubStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.EventHubReceiverOptions>> configureOptions) { }
 
-        public static void UseAzureTableCheckpointer(this ISiloEventHubStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureTableStreamCheckpointerOptions>> configureOptions) { }
+        public static void UseAzureTableCheckpointer(ISiloEventHubStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureTableStreamCheckpointerOptions>> configureOptions) { }
     }
 }
 
@@ -719,6 +726,33 @@ namespace Orleans.Streaming.EventHubs.Testing
         public static System.Func<Runtime.StreamId, IStreamDataGenerator<Azure.Messaging.EventHubs.EventData>> CreateFactory(System.IServiceProvider services) { throw null; }
 
         public bool TryReadEvents(int maxCount, out System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData>? events) { throw null; }
+    }
+}
+
+namespace Orleans.Streams
+{
+    public partial class AzureTableStreamQueueCheckpointer : IStreamQueueCheckpointer<string>
+    {
+        internal AzureTableStreamQueueCheckpointer() { }
+
+        public bool CheckpointExists { get { throw null; } }
+
+        public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(Configuration.AzureTableStreamCheckpointerOptions options, string streamProviderName, string partition, string serviceId, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { throw null; }
+
+        public System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.Task<string> Load() { throw null; }
+
+        public void Update(string offset, System.DateTime utcNow) { }
+    }
+
+    public partial class AzureTableStreamQueueCheckpointerFactory : IStreamQueueCheckpointerFactory
+    {
+        public AzureTableStreamQueueCheckpointerFactory(string providerName, Configuration.AzureTableStreamCheckpointerOptions options, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
+
+        public System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string partition) { throw null; }
+
+        public static IStreamQueueCheckpointerFactory CreateFactory(System.IServiceProvider services, string providerName) { throw null; }
     }
 }
 

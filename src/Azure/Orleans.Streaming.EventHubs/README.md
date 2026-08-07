@@ -72,7 +72,7 @@ siloBuilder
 The grain checkpointer applies numeric ordering to Event Hubs offsets so that an older offset cannot overwrite a newer checkpoint. Configure a durable `PubSubStore` provider in production; in-memory grain storage does not preserve checkpoints across cluster restarts. Switching checkpoint stores does not migrate existing offsets and can cause events to be replayed.
 Set `GrainStreamQueueCheckpointerOptions.StorageProviderName` to use another registered grain storage provider.
 
-`UseGrainCheckpointer` extends `ISiloPersistentStreamConfigurator`, so it can also be used with other persistent stream providers. Event Hubs configures numeric checkpoint ordering by default; other providers can set `GrainStreamQueueCheckpointerOptions.CheckpointComparer` for their checkpoint format.
+Both `UseGrainCheckpointer` and `UseAzureTableCheckpointer` extend `ISiloPersistentStreamConfigurator`, so they can also be used with other persistent stream providers. Event Hubs configures numeric checkpoint ordering by default; other providers can set the corresponding `CheckpointComparer` option for their checkpoint format.
 
 ## Example - Using Event Hub Streams in a Grain
 

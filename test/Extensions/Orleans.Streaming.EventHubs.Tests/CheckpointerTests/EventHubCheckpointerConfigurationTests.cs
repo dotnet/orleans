@@ -51,8 +51,59 @@ public sealed class EventHubCheckpointerConfigurationTests
                     configureDefaultCheckpointer: _ => { }))
             .Build();
 
-        Assert.IsType<EventHubCheckpointerFactory>(
+        Assert.IsType<AzureTableStreamQueueCheckpointerFactory>(
             host.Services.GetRequiredKeyedService<IStreamQueueCheckpointerFactory>(providerName));
+        var options = host.Services
+            .GetRequiredService<IOptionsMonitor<AzureTableStreamCheckpointerOptions>>()
+            .Get(providerName);
+        Assert.Same(StreamCheckpointComparers.Numeric, options.CheckpointComparer);
+    }
+
+    [Fact]
+    public void GenericUseAzureTableCheckpointer_CanConfigureAnotherStreamProvider()
+    {
+        const string providerName = "memory-with-azure-table-checkpointer";
+        using var host = new HostBuilder()
+            .UseOrleans(builder => builder
+                .UseLocalhostClustering()
+                .AddMemoryStreams(providerName, stream =>
+                    stream.UseAzureTableCheckpointer(options => options.Configure(value =>
+                    {
+                        value.TableServiceClient = new("UseDevelopmentStorage=true");
+                        value.CheckpointComparer = StringComparer.Ordinal;
+                    }))))
+            .Build();
+
+        Assert.IsType<AzureTableStreamQueueCheckpointerFactory>(
+            host.Services.GetRequiredKeyedService<IStreamQueueCheckpointerFactory>(providerName));
+        var options = host.Services
+            .GetRequiredService<IOptionsMonitor<AzureTableStreamCheckpointerOptions>>()
+            .Get(providerName);
+        Assert.Same(StringComparer.Ordinal, options.CheckpointComparer);
+    }
+
+    [Fact]
+    public void GenericUseAzureTableCheckpointer_CustomComparerOverridesEventHubDefault()
+    {
+        const string providerName = "event-hubs-with-custom-table-checkpointer";
+        using var host = new HostBuilder()
+            .UseOrleans(builder => builder
+                .UseLocalhostClustering()
+                .AddEventHubStreams(providerName, stream =>
+                {
+                    stream.ConfigureEventHub(options => options.Configure(_ => { }));
+                    stream.UseAzureTableCheckpointer(options => options.Configure(value =>
+                    {
+                        value.TableServiceClient = new("UseDevelopmentStorage=true");
+                        value.CheckpointComparer = StringComparer.Ordinal;
+                    }));
+                }))
+            .Build();
+
+        var options = host.Services
+            .GetRequiredService<IOptionsMonitor<AzureTableStreamCheckpointerOptions>>()
+            .Get(providerName);
+        Assert.Same(StringComparer.Ordinal, options.CheckpointComparer);
     }
 
     [Fact]
