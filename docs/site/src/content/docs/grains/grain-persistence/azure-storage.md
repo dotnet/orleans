@@ -7,11 +7,11 @@ ms.topic: how-to
 
 # Azure Storage grain persistence
 
-The `Microsoft.Orleans.Persistence.AzureStorage` package contains providers for Azure Table Storage and Azure Blob Storage. Both implement optimistic concurrency using storage ETags.
+The [`Microsoft.Orleans.Persistence.AzureStorage`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AzureStorage) package contains providers for [Azure Table Storage](/azure/storage/tables/table-storage-overview) and [Azure Blob Storage](/azure/storage/blobs/storage-blobs-introduction). Both implement optimistic concurrency using storage ETags.
 
 ## Azure Table Storage
 
-Table storage keeps one state record in an entity and splits serialized state across properties when needed. The Azure Table service limits an entity to 1 MiB, so use Blob Storage or another provider for larger records.
+Table storage keeps one state record in an entity and splits serialized state across properties when needed. [Azure Table Storage limits an entity to 1 MiB](/azure/storage/tables/table-storage-overview#table-storage-concepts), so use Blob Storage or another provider for larger records.
 
 Configure a named provider with <xref:Orleans.Hosting.AzureTableSiloBuilderExtensions.AddAzureTableGrainStorage*>. Token credentials are preferred over secrets:
 

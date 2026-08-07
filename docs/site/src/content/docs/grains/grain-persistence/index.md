@@ -13,15 +13,15 @@ Persistence is intentionally a record-oriented abstraction, not an object-relati
 
 ## Choose a provider
 
-Officially maintained providers include:
+Officially maintained providers are available from [NuGet](https://www.nuget.org/packages?q=Orleans+Persistence) and include:
 
 | Provider | Package | Typical use |
 |---|---|---|
-| [Azure Table and Blob Storage](azure-storage.md) | `Microsoft.Orleans.Persistence.AzureStorage` | Azure-hosted state records |
-| [Azure Cosmos DB for NoSQL](azure-cosmos-db.md) | `Microsoft.Orleans.Persistence.Cosmos` | Globally distributed Azure NoSQL storage |
-| [Amazon DynamoDB](dynamodb-storage.md) | `Microsoft.Orleans.Persistence.DynamoDB` | AWS-hosted key-value storage |
-| [ADO.NET](relational-storage.md) | `Microsoft.Orleans.Persistence.AdoNet` | SQL Server, MySQL/MariaDB, PostgreSQL, Oracle, and SQLite |
-| Redis | `Microsoft.Orleans.Persistence.Redis` | Low-latency state backed by Redis |
+| [Azure Table and Blob Storage](azure-storage.md) | [`Microsoft.Orleans.Persistence.AzureStorage`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AzureStorage) | Azure-hosted state records |
+| [Azure Cosmos DB for NoSQL](azure-cosmos-db.md) | [`Microsoft.Orleans.Persistence.Cosmos`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Cosmos) | Globally distributed Azure NoSQL storage |
+| [Amazon DynamoDB](dynamodb-storage.md) | [`Microsoft.Orleans.Persistence.DynamoDB`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.DynamoDB) | AWS-hosted key-value storage |
+| [ADO.NET](relational-storage.md) | [`Microsoft.Orleans.Persistence.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AdoNet) | SQL Server, MySQL/MariaDB, PostgreSQL, Oracle, and SQLite |
+| [Redis](https://redis.io) | [`Microsoft.Orleans.Persistence.Redis`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Redis) | Low-latency state backed by Redis |
 | Memory | `Microsoft.Orleans.Persistence.Memory` | Tests and disposable development environments |
 
 Choose based on durability, availability, latency, record-size limits, operational tooling, and cost. Memory storage isn't durable across cluster restarts. Redis expiration should only be used for state that is intentionally ephemeral.

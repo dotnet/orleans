@@ -7,7 +7,7 @@ ms.topic: how-to
 
 # ADO.NET grain persistence
 
-The `Microsoft.Orleans.Persistence.AdoNet` package stores grain state using database-specific queries exposed through ADO.NET. Orleans includes persistence scripts for:
+The [`Microsoft.Orleans.Persistence.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AdoNet) package stores grain state using database-specific queries exposed through ADO.NET. Orleans includes persistence scripts for:
 
 | Database | Driver package | `Invariant` | Script |
 |---|---|---|---|
@@ -67,4 +67,6 @@ Provider queries must preserve the parameter names, result names, and types expe
 
 ## Customize queries
 
-The `OrleansQuery` table contains vendor-specific statements used by the provider. Administrators can tune those statements while preserving the Orleans query contract. Keep customized scripts under source control, apply them through the normal database deployment process, and test reads, writes, clears, first-write races, and ETag conflicts after every change.
+The `OrleansQuery` table contains vendor-specific statements used by the provider. Administrators can tune those statements while preserving the Orleans query contract. Keep customized scripts under source control, apply them through the normal database deployment process—for example, using a [data-tier application (DACPAC)](/sql/tools/sql-database-projects/concepts/data-tier-applications/overview)—and test reads, writes, clears, first-write races, and ETag conflicts after every change.
+
+Database-specific customization can use features such as [partitioned tables and indexes](/sql/relational-databases/partitions/partitioned-tables-and-indexes), [memory-optimized tables](/sql/relational-databases/in-memory-oltp/overview-and-usage-scenarios), [natively compiled modules](/sql/relational-databases/in-memory-oltp/native-compilation-of-tables-and-stored-procedures), [PolyBase](/sql/relational-databases/polybase/overview), or [linked servers](/sql/relational-databases/linked-servers/linked-servers-database-engine) when those capabilities fit the deployment.

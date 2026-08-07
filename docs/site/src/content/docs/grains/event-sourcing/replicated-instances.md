@@ -43,3 +43,5 @@ The protocol contains cluster-aware notification and concurrency mechanisms, but
 - Application decisions for write regions, failover, latency, and conflict handling.
 
 The custom provider's `primaryCluster` registration argument doesn't restrict submissions. Don't rely on it as a write-region, replication, access-control, or failover mechanism.
+
+For the protocol model and its design background, see the Microsoft Research papers [Geo-Distribution of Actor-Based Services](https://www.microsoft.com/research/publication/geo-distribution-actor-based-services/) and [Global Sequence Protocol](https://www.microsoft.com/research/publication/global-sequence-protocol-a-robust-abstraction-for-replicated-shared-state-extended-version/).

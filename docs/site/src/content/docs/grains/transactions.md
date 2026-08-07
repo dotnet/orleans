@@ -7,7 +7,7 @@ ms.topic: concept-article
 
 # Orleans transactions
 
-The `Microsoft.Orleans.Transactions` package provides distributed ACID transactions across one or more grain calls and transactional state records. Transactional state is distinct from <xref:Orleans.Runtime.IPersistentState`1>: use <xref:Orleans.Transactions.Abstractions.ITransactionalState`1> for data that participates in an Orleans transaction.
+The [`Microsoft.Orleans.Transactions`](https://www.nuget.org/packages/Microsoft.Orleans.Transactions) package provides distributed ACID transactions across one or more grain calls and transactional state records. Transactional state is distinct from <xref:Orleans.Runtime.IPersistentState`1>: use <xref:Orleans.Transactions.Abstractions.ITransactionalState`1> for data that participates in an Orleans transaction.
 
 ## Enable transactions
 

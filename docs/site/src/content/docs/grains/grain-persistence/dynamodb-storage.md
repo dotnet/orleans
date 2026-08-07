@@ -7,7 +7,7 @@ ms.topic: how-to
 
 # Amazon DynamoDB grain persistence
 
-Install the `Microsoft.Orleans.Persistence.DynamoDB` package and configure a named provider with <xref:Orleans.Hosting.DynamoDBSiloBuilderExtensions.AddDynamoDBGrainStorage*>:
+Install the [`Microsoft.Orleans.Persistence.DynamoDB`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.DynamoDB) package and configure a named provider with <xref:Orleans.Hosting.DynamoDBSiloBuilderExtensions.AddDynamoDBGrainStorage*>:
 
 ```csharp
 siloBuilder.AddDynamoDBGrainStorage(
@@ -21,7 +21,7 @@ siloBuilder.AddDynamoDBGrainStorage(
     });
 ```
 
-The AWS SDK credential chain supplies credentials when `AccessKey` and `SecretKey` aren't set. In production, prefer workload credentials such as an IAM role over long-lived keys. `ProfileName`, `AccessKey`, `SecretKey`, and `Token` are available when the deployment environment requires explicit SDK configuration.
+The [AWS SDK for .NET credential and profile resolution chain](https://docs.aws.amazon.com/sdk-for-net/v4/developer-guide/creds-assign.html) supplies credentials when `AccessKey` and `SecretKey` aren't set. In production, prefer workload credentials such as an IAM role over long-lived keys. [`ProfileName`](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html) and the `AccessKey`, `SecretKey`, and `Token` options are available when the deployment environment requires explicit SDK configuration.
 
 ## Capacity and lifecycle
 
