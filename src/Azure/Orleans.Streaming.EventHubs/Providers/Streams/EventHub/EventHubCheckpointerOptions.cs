@@ -20,6 +20,11 @@ namespace Orleans.Configuration
         public static readonly TimeSpan DEFAULT_CHECKPOINT_PERSIST_INTERVAL = TimeSpan.FromMinutes(1);
 
         /// <summary>
+        /// Gets or sets the prefix applied to checkpoint partition keys.
+        /// </summary>
+        public string PartitionKeyPrefix { get; set; } = string.Empty;
+
+        /// <summary>
         /// Gets or sets the comparer used to prevent a checkpoint from moving backwards.
         /// </summary>
         /// <remarks>

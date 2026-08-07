@@ -70,7 +70,11 @@ namespace Orleans.Hosting
                 services.AddOptions<GrainStreamQueueCheckpointerOptions>(name)
                     .Configure(static options => options.CheckpointComparer = StreamCheckpointComparers.Numeric);
                 services.AddOptions<AzureTableStreamCheckpointerOptions>(name)
-                    .Configure(static options => options.CheckpointComparer = StreamCheckpointComparers.Numeric);
+                    .Configure(static options =>
+                    {
+                        options.CheckpointComparer = StreamCheckpointComparers.Numeric;
+                        options.PartitionKeyPrefix = StreamQueueCheckpointEntity.EventHubPartitionKeyPrefix;
+                    });
                 services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
                     .ConfigureNamedOptionForLogging<EventHubReceiverOptions>(name)
                     .ConfigureNamedOptionForLogging<EventHubStreamCachePressureOptions>(name)

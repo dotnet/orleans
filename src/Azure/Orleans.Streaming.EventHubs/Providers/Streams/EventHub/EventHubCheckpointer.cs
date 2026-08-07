@@ -67,7 +67,8 @@ namespace Orleans.Streaming.EventHubs
                 partition,
                 serviceId,
                 loggerFactory,
-                StreamCheckpointComparers.Numeric);
+                StreamCheckpointComparers.Numeric,
+                StreamQueueCheckpointEntity.EventHubPartitionKeyPrefix);
             return new EventHubCheckpointer(inner);
         }
 

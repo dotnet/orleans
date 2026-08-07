@@ -352,6 +352,16 @@ public class EventHubCheckpointerTests
         Assert.Equal("opaque-checkpoint", GetEntityOffset(checkpointer));
     }
 
+    [Theory, TestCategory("BVT")]
+    [InlineData("", "provider_service")]
+    [InlineData("EventHubCheckpoints_", "EventHubCheckpoints_provider_service")]
+    public void PartitionKeyPrefix_IsAppliedPerCheckpointer(string partitionKeyPrefix, string expected)
+    {
+        var checkpointer = CreateUninitializedCheckpointer(partitionKeyPrefix: partitionKeyPrefix);
+
+        Assert.Equal(expected, GetEntityPartitionKey(checkpointer));
+    }
+
     [Fact, TestCategory("BVT")]
     public async Task SingleSubscription_CheckpointsProcessedOffset()
     {
@@ -490,7 +500,8 @@ public class EventHubCheckpointerTests
 
     private static AzureTableStreamQueueCheckpointer CreateUninitializedCheckpointer(
         IComparer<string>? checkpointComparer = null,
-        bool useNumericComparer = true)
+        bool useNumericComparer = true,
+        string? partitionKeyPrefix = null)
     {
         var constructor = typeof(AzureTableStreamQueueCheckpointer).GetConstructor(
             BindingFlags.Instance | BindingFlags.NonPublic,
@@ -502,6 +513,7 @@ public class EventHubCheckpointerTests
                 typeof(string),
                 typeof(Microsoft.Extensions.Logging.ILoggerFactory),
                 typeof(IComparer<string>),
+                typeof(string),
             ],
             modifiers: null);
         Assert.NotNull(constructor);
@@ -517,6 +529,7 @@ public class EventHubCheckpointerTests
             "service",
             Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
             null,
+            partitionKeyPrefix,
         ]);
     }
 
@@ -534,6 +547,12 @@ public class EventHubCheckpointerTests
         => (string)GetField(checkpointer, "_entity")
             .GetType()
             .GetProperty("Offset")!
+            .GetValue(GetField(checkpointer, "_entity"))!;
+
+    private static string GetEntityPartitionKey(AzureTableStreamQueueCheckpointer checkpointer)
+        => (string)GetField(checkpointer, "_entity")
+            .GetType()
+            .GetProperty("PartitionKey")!
             .GetValue(GetField(checkpointer, "_entity"))!;
 
     private static void SetEntityOffset(AzureTableStreamQueueCheckpointer checkpointer, string offset)

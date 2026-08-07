@@ -14,6 +14,8 @@ namespace Orleans.Configuration
         public const string DEFAULT_TABLE_NAME = "Checkpoint";
         public System.Collections.Generic.IComparer<string>? CheckpointComparer { get { throw null; } set { } }
 
+        public string PartitionKeyPrefix { get { throw null; } set { } }
+
         public System.TimeSpan PersistInterval { get { throw null; } set { } }
 
         public override string TableName { get { throw null; } set { } }

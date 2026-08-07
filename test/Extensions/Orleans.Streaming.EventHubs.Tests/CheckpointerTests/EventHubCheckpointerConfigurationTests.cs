@@ -57,6 +57,7 @@ public sealed class EventHubCheckpointerConfigurationTests
             .GetRequiredService<IOptionsMonitor<AzureTableStreamCheckpointerOptions>>()
             .Get(providerName);
         Assert.Same(StreamCheckpointComparers.Numeric, options.CheckpointComparer);
+        Assert.Equal("EventHubCheckpoints_", options.PartitionKeyPrefix);
     }
 
     [Fact]
@@ -80,6 +81,7 @@ public sealed class EventHubCheckpointerConfigurationTests
             .GetRequiredService<IOptionsMonitor<AzureTableStreamCheckpointerOptions>>()
             .Get(providerName);
         Assert.Same(StringComparer.Ordinal, options.CheckpointComparer);
+        Assert.Equal(string.Empty, options.PartitionKeyPrefix);
     }
 
     [Fact]
@@ -104,6 +106,7 @@ public sealed class EventHubCheckpointerConfigurationTests
             .GetRequiredService<IOptionsMonitor<AzureTableStreamCheckpointerOptions>>()
             .Get(providerName);
         Assert.Same(StringComparer.Ordinal, options.CheckpointComparer);
+        Assert.Equal("EventHubCheckpoints_", options.PartitionKeyPrefix);
     }
 
     [Fact]

@@ -30,7 +30,8 @@ namespace Orleans.Streams
             string partition,
             string serviceId,
             ILoggerFactory loggerFactory,
-            IComparer<string>? defaultComparer = null)
+            IComparer<string>? defaultComparer = null,
+            string? partitionKeyPrefix = null)
         {
             ArgumentNullException.ThrowIfNull(options);
             ArgumentException.ThrowIfNullOrWhiteSpace(streamProviderName);
@@ -49,7 +50,11 @@ namespace Orleans.Streams
             _dataManager = new AzureTableDataManager<StreamQueueCheckpointEntity>(
                 options,
                 loggerFactory.CreateLogger<StreamQueueCheckpointEntity>());
-            _entity = StreamQueueCheckpointEntity.Create(streamProviderName, serviceId, partition);
+            _entity = StreamQueueCheckpointEntity.Create(
+                partitionKeyPrefix ?? options.PartitionKeyPrefix,
+                streamProviderName,
+                serviceId,
+                partition);
             LogCreatingCheckpointer(
                 loggerFactory.CreateLogger<AzureTableStreamQueueCheckpointer>(),
                 partition,
@@ -88,7 +93,8 @@ namespace Orleans.Streams
             string partition,
             string serviceId,
             ILoggerFactory loggerFactory,
-            IComparer<string>? defaultComparer)
+            IComparer<string>? defaultComparer,
+            string? partitionKeyPrefix = null)
         {
             var checkpointer = new AzureTableStreamQueueCheckpointer(
                 options,
@@ -96,7 +102,8 @@ namespace Orleans.Streams
                 partition,
                 serviceId,
                 loggerFactory,
-                defaultComparer);
+                defaultComparer,
+                partitionKeyPrefix);
             await checkpointer._dataManager.InitTableAsync();
             return checkpointer;
         }
