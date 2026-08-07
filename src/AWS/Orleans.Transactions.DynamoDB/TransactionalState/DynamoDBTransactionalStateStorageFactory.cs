@@ -72,7 +72,7 @@ public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalSt
         lifecycle.Subscribe(OptionFormattingUtilities.Name<DynamoDBTransactionalStateStorageFactory>(this.name), this.options.InitStage, Init);
     }
 
-    private async Task Initialize()
+    private async Task Initialize(CancellationToken cancellationToken)
     {
         var stopWatch = Stopwatch.StartNew();
         var logger = this.loggerFactory.CreateLogger<DynamoDBStorage>();
@@ -108,10 +108,15 @@ public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalSt
                     new AttributeDefinition { AttributeName = DynamoDBTransactionalStateConstants.ROW_KEY_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
                 },
                 secondaryIndexes: null,
-                null);
+                ttlAttributeName: null,
+                cancellationToken: cancellationToken);
 
             stopWatch.Stop();
             LogInformationProviderInitialized(logger, this.name, this.GetType().Name, this.options.InitStage, stopWatch.ElapsedMilliseconds);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exc)
         {
@@ -129,7 +134,7 @@ public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalSt
 
     private Task Init(CancellationToken cancellationToken)
     {
-        return Initialize();
+        return Initialize(cancellationToken);
     }
 
     [LoggerMessage(
