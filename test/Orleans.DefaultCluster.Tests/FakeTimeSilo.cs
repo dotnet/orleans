@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Time.Testing;
@@ -91,5 +92,119 @@ internal static class FakeTimeSilo
             "Advance. Ensure infrastructure timers use TimeProvider.System (see FakeTimeSilo.UseFakeTimeProviderForGrainTimers).");
 
         public void Dispose() => _timer.Dispose();
+    }
+}
+
+internal sealed class TrackingFakeTimeProvider(DateTimeOffset startDateTime) : FakeTimeProvider(startDateTime)
+{
+    private readonly ConcurrentDictionary<object, TrackingTimer> _timers = new(ReferenceEqualityComparer.Instance);
+
+    public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+    {
+        var timer = base.CreateTimer(callback, state, dueTime, period);
+        if (state is null)
+        {
+            return timer;
+        }
+
+        var trackingTimer = new TrackingTimer(this, state, timer);
+        _timers[state] = trackingTimer;
+        return trackingTimer;
+    }
+
+    public int GetTimerChangeCount(object timer) => GetTimer(timer).ChangeCount;
+
+    public Task WaitForTimerChangeAsync(object timer, int changeCount, CancellationToken cancellationToken) =>
+        GetTimer(timer).WaitForChangeCountAsync(changeCount, cancellationToken);
+
+    private TrackingTimer GetTimer(object timer) =>
+        _timers.TryGetValue(timer, out var result)
+            ? result
+            : throw new InvalidOperationException("The grain timer is not registered with the fake time provider.");
+
+    private void RemoveTimer(object state, TrackingTimer timer) =>
+        ((ICollection<KeyValuePair<object, TrackingTimer>>)_timers).Remove(KeyValuePair.Create(state, timer));
+
+    private sealed class TrackingTimer(TrackingFakeTimeProvider owner, object state, ITimer timer) : ITimer
+    {
+        private readonly object _lock = new();
+        private readonly TrackingFakeTimeProvider _owner = owner;
+        private readonly object _state = state;
+        private readonly ITimer _timer = timer;
+        private TaskCompletionSource _changed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _changeCount;
+
+        public int ChangeCount
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _changeCount;
+                }
+            }
+        }
+
+        public bool Change(TimeSpan dueTime, TimeSpan period)
+        {
+            if (!_timer.Change(dueTime, period))
+            {
+                return false;
+            }
+
+            TaskCompletionSource changed;
+            lock (_lock)
+            {
+                ++_changeCount;
+                changed = _changed;
+                _changed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+
+            changed.TrySetResult();
+            return true;
+        }
+
+        public async Task WaitForChangeCountAsync(int changeCount, CancellationToken cancellationToken)
+        {
+            while (true)
+            {
+                Task changedTask;
+                lock (_lock)
+                {
+                    if (_changeCount >= changeCount)
+                    {
+                        return;
+                    }
+
+                    changedTask = _changed.Task;
+                }
+
+                await changedTask.WaitAsync(cancellationToken);
+            }
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                _timer.Dispose();
+            }
+            finally
+            {
+                _owner.RemoveTimer(_state, this);
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            try
+            {
+                await _timer.DisposeAsync();
+            }
+            finally
+            {
+                _owner.RemoveTimer(_state, this);
+            }
+        }
     }
 }

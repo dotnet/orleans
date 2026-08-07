@@ -686,8 +686,13 @@ public class AsyncEnumerableGrainCallTests
     private async Task AdvanceToNextCleanupAsync(AsyncEnumerableGrainExtensionListener listener, CancellationToken cancellationToken)
     {
         var cleanupCount = listener.CleanupCount + 1;
+        var timer = listener.Timer;
+        var timerChangeCount = _fixture.GetTimerChangeCount(timer);
         _fixture.AdvanceTimeByResponseTimeout();
         await listener.WaitForCleanupCountAsync(cleanupCount, cancellationToken);
+
+        // Cleanup is reported from inside the callback, before the one-shot timer is rearmed.
+        await _fixture.WaitForTimerChangeAsync(timer, timerChangeCount + 1, cancellationToken);
     }
 
     /// <summary>
@@ -695,7 +700,7 @@ public class AsyncEnumerableGrainCallTests
     /// </summary>
     public sealed class Fixture : BaseInProcessTestClusterFixture
     {
-        private readonly FakeTimeProvider _timeProvider = new(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        private readonly TrackingFakeTimeProvider _timeProvider = new(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
 
         protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
@@ -714,6 +719,12 @@ public class AsyncEnumerableGrainCallTests
 
         public void AdvanceTimeByResponseTimeout() =>
             FakeTimeSilo.Advance(_timeProvider, HostedCluster.GetSiloServiceProvider().GetRequiredService<IOptions<SiloMessagingOptions>>().Value.ResponseTimeout);
+
+        public int GetTimerChangeCount(object timer) => _timeProvider.GetTimerChangeCount(timer);
+
+        public Task WaitForTimerChangeAsync(object timer, int changeCount, CancellationToken cancellationToken) =>
+            _timeProvider.WaitForTimerChangeAsync(timer, changeCount, cancellationToken);
+
     }
 
     /// <summary>
@@ -728,6 +739,7 @@ public class AsyncEnumerableGrainCallTests
         private readonly GrainId _targetGrainId;
         private IDisposable? _instanceSubscription;
         private TaskCompletionSource? _cleanupCompleted;
+        private object? _timer;
         private int _cleanupCount;
 
         public AsyncEnumerableGrainExtensionListener(GrainId targetGrainId)
@@ -743,6 +755,17 @@ public class AsyncEnumerableGrainCallTests
                 lock (_lock)
                 {
                     return _cleanupCount;
+                }
+            }
+        }
+
+        public object Timer
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _timer ?? throw new InvalidOperationException("The async enumerable grain extension has not been created.");
                 }
             }
         }
@@ -782,6 +805,11 @@ public class AsyncEnumerableGrainCallTests
             if (extension.GrainContext.GrainId != _targetGrainId)
             {
                 return;
+            }
+
+            lock (_lock)
+            {
+                _timer ??= extension.Timer;
             }
 
             if (value.Key == "OnEnumeratorCleanupCompleted")
