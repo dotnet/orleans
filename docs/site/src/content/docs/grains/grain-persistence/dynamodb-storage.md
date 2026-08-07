@@ -7,7 +7,7 @@ ms.topic: how-to
 
 # Amazon DynamoDB grain persistence
 
-Install the [`Microsoft.Orleans.Persistence.DynamoDB`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.DynamoDB) package and configure a named provider with <xref:Orleans.Hosting.DynamoDBSiloBuilderExtensions.AddDynamoDBGrainStorage*>:
+Install the [`Microsoft.Orleans.Persistence.DynamoDB`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.DynamoDB) package and configure a named provider with <xref:Orleans.Hosting.DynamoDBGrainStorageSiloBuilderExtensions.AddDynamoDBGrainStorage*>:
 
 ```csharp
 siloBuilder.AddDynamoDBGrainStorage(

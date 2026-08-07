@@ -27,7 +27,7 @@ These notes apply to an Orleans 3.x application that must first become an Orlean
 - Replace Simple Message Streams with broadcast channels or a persistent stream provider.
 - Replace legacy telemetry consumers with .NET metrics and <xref:System.Diagnostics.ActivitySource>-based tracing.
 
-The old <xref:Orleans.Hosting.GrainCallFilterServiceCollectionExtensions.AddGrainCallFilter*> API was removed before Orleans 7. Register incoming and outgoing filters on <xref:Orleans.Hosting.ISiloBuilder> or <xref:Orleans.IClientBuilder>.
+The old <xref:Orleans.Hosting.GrainCallFilterServiceCollectionExtensions.AddGrainCallFilter*> API was removed before Orleans 7. Register incoming and outgoing filters on <xref:Orleans.Hosting.ISiloBuilder> or <xref:Orleans.Hosting.IClientBuilder>.
 
 For an itemized record of the Orleans samples migrated to Orleans 7, see [dotnet/orleans issue #8035](https://github.com/dotnet/orleans/issues/8035).
 

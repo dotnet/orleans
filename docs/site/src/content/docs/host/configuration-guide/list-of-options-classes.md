@@ -16,7 +16,6 @@ This page is a curated starting point, not an exhaustive property catalog. <xref
 | Option type | Use it for |
 |---|---|
 | <xref:Orleans.Configuration.ClusterOptions> | <xref:Orleans.Configuration.ClusterOptions.ServiceId> and <xref:Orleans.Configuration.ClusterOptions.ClusterId> shared by silos and clients |
-| <xref:Orleans.Configuration.NetworkingOptions> | Shared socket and connection settings |
 
 <a id="iclientbuilder-specific-options"></a>
 
@@ -41,7 +40,6 @@ This page is a curated starting point, not an exhaustive property catalog. <xref
 | <xref:Orleans.Configuration.GrainDirectoryOptions> | Built-in grain directory cache and partition behavior |
 | <xref:Orleans.Configuration.LoadSheddingOptions> | Request rejection under host load |
 | <xref:Orleans.Configuration.SchedulingOptions> | Grain scheduling limits and diagnostics |
-| <xref:Orleans.Configuration.ProcessExitHandlingOptions> | Process-exit behavior |
 | <xref:Orleans.Configuration.GrainTypeOptions> | Grain classes and interfaces supported by the process |
 
 ## Feature-specific options

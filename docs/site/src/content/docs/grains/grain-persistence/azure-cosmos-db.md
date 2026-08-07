@@ -29,7 +29,7 @@ siloBuilder.AddCosmosGrainStorage(
     });
 ```
 
-<xref:Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.DatabaseName> defaults to `Orleans`, <xref:Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.ContainerName> defaults to `OrleansStorage`, and <xref:Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.PartitionKeyPath> defaults to `/PartitionKey`. Provision the database and container before startup when <xref:Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.IsResourceCreationEnabled> is `false`. Enabling resource creation is convenient for development but production provisioning is usually managed separately.
+<xref:Orleans.Persistence.Cosmos.CosmosOptions.DatabaseName> defaults to `Orleans`, <xref:Orleans.Persistence.Cosmos.CosmosOptions.ContainerName> defaults to `OrleansStorage`, and <xref:Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.PartitionKeyPath> defaults to `/PartitionKey`. Provision the database and container before startup when <xref:Orleans.Persistence.Cosmos.CosmosOptions.IsResourceCreationEnabled> is `false`. Enabling resource creation is convenient for development but production provisioning is usually managed separately.
 
 ## Partitioning and indexing
 

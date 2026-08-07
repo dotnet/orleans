@@ -23,11 +23,11 @@ Note that all three processes—copying, serializing, and deserializing—respec
 
 In many cases, deep copying is unnecessary. For instance, consider a scenario where a web front-end receives a byte array from its client and passes that request, including the byte array, to a grain for processing. The front-end process does nothing with the array after passing it to the grain; specifically, it doesn't reuse the array for future requests. Inside the grain, the byte array is parsed to fetch input data but isn't modified. The grain returns another byte array it created back to the web client and discards the array immediately after returning it. The web front-end passes the result byte array back to its client without modification.
 
-In such a scenario, there's no need to copy either the request or response byte arrays. Unfortunately, the Orleans runtime can't figure this out automatically, as it can't determine whether the web front-end or the grain modifies the arrays later. Ideally, a .NET mechanism would indicate that a value is no longer modified. Lacking that, we've added Orleans-specific mechanisms: the <xref:Orleans.Concurrency.Immutable`1> wrapper class and the <xref:Orleans.Concurrency.ImmutableAttribute>.
+In such a scenario, there's no need to copy either the request or response byte arrays. Unfortunately, the Orleans runtime can't figure this out automatically, as it can't determine whether the web front-end or the grain modifies the arrays later. Ideally, a .NET mechanism would indicate that a value is no longer modified. Lacking that, we've added Orleans-specific mechanisms: the <xref:Orleans.Concurrency.Immutable`1> wrapper class and the <xref:Orleans.ImmutableAttribute>.
 
-### Use the <xref:Orleans.Concurrency.ImmutableAttribute> attribute to mark a type, parameter, property, or field as immutable
+### Use the <xref:Orleans.ImmutableAttribute> attribute to mark a type, parameter, property, or field as immutable
 
-For user-defined types, you can add the <xref:Orleans.Concurrency.ImmutableAttribute> to the type. This instructs the Orleans serializer to avoid copying instances of this type. The following code snippet demonstrates using <xref:Orleans.Concurrency.ImmutableAttribute> to denote an immutable type. This type won't be copied during transmission.
+For user-defined types, you can add the <xref:Orleans.ImmutableAttribute> to the type. This instructs the Orleans serializer to avoid copying instances of this type. The following code snippet demonstrates using <xref:Orleans.ImmutableAttribute> to denote an immutable type. This type won't be copied during transmission.
 
 ```csharp
 [Immutable]
