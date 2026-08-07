@@ -3,6 +3,7 @@ using Azure.Messaging.EventHubs;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Streaming.EventHubs.Testing
@@ -23,16 +24,23 @@ namespace Orleans.Streaming.EventHubs.Testing
         }
         /// <inheritdoc />
         public async Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
+            => await ReceiveAsync(maxCount, waitTime, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<IEnumerable<EventData>> ReceiveAsync(
+            int maxCount,
+            TimeSpan waitTime,
+            CancellationToken cancellationToken)
         {
             IEnumerable<EventData>? events;
             //mimic real life response time
-            await Task.Delay(TimeSpan.FromMilliseconds(30));
+            await Task.Delay(TimeSpan.FromMilliseconds(30), cancellationToken);
             if (generator.TryReadEvents(maxCount, out events))
             {
                 return events;
             }
             //if no events generated, wait for waitTime to pass
-            await Task.Delay(waitTime);
+            await Task.Delay(waitTime, cancellationToken);
             return new List<EventData>().AsEnumerable();
         }
 

@@ -24,6 +24,22 @@ namespace Orleans.Streaming.EventHubs
         Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime);
 
         /// <summary>
+        /// Sends an asynchronous request for more messages from the partition.
+        /// </summary>
+        /// <param name="maxCount">The maximum number of messages to return.</param>
+        /// <param name="waitTime">The maximum wait time.</param>
+        /// <param name="cancellationToken">The token used to cancel the operation.</param>
+        /// <returns>The received messages.</returns>
+        Task<IEnumerable<EventData>> ReceiveAsync(
+            int maxCount,
+            TimeSpan waitTime,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ReceiveAsync(maxCount, waitTime).WaitAsync(cancellationToken);
+        }
+
+        /// <summary>
         /// Send a clean up message
         /// </summary>
         /// <returns></returns>
@@ -85,8 +101,14 @@ namespace Orleans.Streaming.EventHubs
         }
 
         public async Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
+            => await ReceiveAsync(maxCount, waitTime, CancellationToken.None);
+
+        public async Task<IEnumerable<EventData>> ReceiveAsync(
+            int maxCount,
+            TimeSpan waitTime,
+            CancellationToken cancellationToken)
         {
-            return await client.ReceiveBatchAsync(maxCount, waitTime);
+            return await client.ReceiveBatchAsync(maxCount, waitTime, cancellationToken);
         }
 
         public Task CloseAsync() => CloseAsync(CancellationToken.None);

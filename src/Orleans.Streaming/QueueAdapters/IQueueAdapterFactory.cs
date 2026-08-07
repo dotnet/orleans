@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Streams
@@ -12,6 +13,17 @@ namespace Orleans.Streams
         /// </summary>
         /// <returns>The queue adapter</returns>
         Task<IQueueAdapter> CreateAdapter();
+
+        /// <summary>
+        /// Creates a queue adapter.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>The queue adapter.</returns>
+        Task<IQueueAdapter> CreateAdapter(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return CreateAdapter().WaitAsync(cancellationToken);
+        }
 
         /// <summary>
         /// Creates queue message cache adapter.

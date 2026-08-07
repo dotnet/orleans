@@ -91,10 +91,13 @@ namespace Orleans.Streaming.Kinesis
         }
 
         public async Task<IQueueAdapter> CreateAdapter()
+            => await CreateAdapter(CancellationToken.None);
+
+        public async Task<IQueueAdapter> CreateAdapter(CancellationToken cancellationToken)
         {
             if (_streamQueueMapper is null)
             {
-                var kinesisStreams = await GetPartitionIdsAsync();
+                var kinesisStreams = await GetPartitionIdsAsync(cancellationToken);
                 _streamQueueMapper = _queueMapperFactory(kinesisStreams);
                 _topologyMonitor = new(
                     _client,
@@ -204,9 +207,18 @@ namespace Orleans.Streaming.Kinesis
         }
 
         internal async Task<string[]> GetPartitionIdsAsync()
-            => await GetPartitionIdsAsync(_client, _options.StreamName);
+            => await GetPartitionIdsAsync(CancellationToken.None);
 
-        internal static async Task<string[]> GetPartitionIdsAsync(IAmazonKinesis client, string streamName)
+        internal async Task<string[]> GetPartitionIdsAsync(CancellationToken cancellationToken)
+            => await GetPartitionIdsAsync(_client, _options.StreamName, cancellationToken);
+
+        internal static Task<string[]> GetPartitionIdsAsync(IAmazonKinesis client, string streamName)
+            => GetPartitionIdsAsync(client, streamName, CancellationToken.None);
+
+        internal static async Task<string[]> GetPartitionIdsAsync(
+            IAmazonKinesis client,
+            string streamName,
+            CancellationToken cancellationToken)
         {
             var partitions = new HashSet<string>(StringComparer.Ordinal);
             string? nextToken = null;
@@ -216,7 +228,7 @@ namespace Orleans.Streaming.Kinesis
                     ? new ListShardsRequest { StreamName = streamName }
                     : new ListShardsRequest { NextToken = nextToken };
 
-                var response = await client.ListShardsAsync(request);
+                var response = await client.ListShardsAsync(request, cancellationToken);
                 foreach (var shard in response.Shards ?? [])
                 {
                     partitions.Add(shard.ShardId);

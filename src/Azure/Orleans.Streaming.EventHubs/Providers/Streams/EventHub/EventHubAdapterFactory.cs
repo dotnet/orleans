@@ -288,7 +288,7 @@ namespace Orleans.Streaming.EventHubs
             return new EventHubAdapterReceiver(
                 config,
                 this.CacheFactory,
-                this.checkpointerFactory.Create,
+                (partition, cancellationToken) => this.checkpointerFactory.Create(partition, cancellationToken),
                 this.loggerFactory,
                 this.ReceiverMonitorFactory(receiverMonitorDimensions, this.loggerFactory),
                 this.serviceProvider.GetRequiredService<IOptions<LoadSheddingOptions>>().Value,

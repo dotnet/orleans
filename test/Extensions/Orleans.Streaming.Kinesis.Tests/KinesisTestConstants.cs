@@ -12,11 +12,21 @@ internal static class KinesisTestConstants
 
     public static bool IsAvailable => !string.IsNullOrWhiteSpace(ConnectionString);
 
+    public static bool IsDynamoDbAvailable => !string.IsNullOrWhiteSpace(DynamoDbService);
+
     public static void CheckPreconditionsOrThrow()
     {
         if (!IsAvailable)
         {
             throw new SkipException("Empty connection string");
+        }
+    }
+
+    public static void CheckDynamoDbPreconditionsOrThrow()
+    {
+        if (!IsDynamoDbAvailable)
+        {
+            throw new SkipException("DynamoDB service is not configured");
         }
     }
 }

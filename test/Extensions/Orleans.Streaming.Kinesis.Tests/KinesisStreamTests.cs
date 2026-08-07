@@ -31,17 +31,29 @@ namespace Orleans.Streaming.Kinesis.Tests
         }
 
         protected override void CheckPreconditionsOrThrow()
-            => KinesisTestConstants.CheckPreconditionsOrThrow();
+        {
+            KinesisTestConstants.CheckPreconditionsOrThrow();
+            KinesisTestConstants.CheckDynamoDbPreconditionsOrThrow();
+        }
 
         private class MySiloBuilderConfigurator : ISiloConfigurator
         {
             public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddKinesisStreams("KinesisProvider", options =>
+                    .AddKinesisStreams("KinesisProvider", stream =>
                     {
-                        options.ConnectionString = KinesisTestConstants.ConnectionString;
-                        options.StreamName = KinesisStreamName;
+                        stream.ConfigureKinesis(options =>
+                        {
+                            options.ConnectionString = KinesisTestConstants.ConnectionString;
+                            options.StreamName = KinesisStreamName;
+                        });
+                        stream.UseDynamoDBCheckpointer(options =>
+                        {
+                            options.Service = KinesisTestConstants.DynamoDbService;
+                            options.SecretKey = KinesisTestConstants.DynamoDbSecretKey;
+                            options.AccessKey = KinesisTestConstants.DynamoDbAccessKey;
+                        });
                     })
                     .AddKinesisStreams("KinesisProvider2", options =>
                     {

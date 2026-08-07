@@ -75,13 +75,25 @@ namespace Orleans.Streams
         /// Creates and initializes a grain-based checkpointer with default options.
         /// </summary>
         public static async Task<IStreamQueueCheckpointer<string>> Create(string providerName, string partition, string serviceId, IClusterClient clusterClient)
+            => await Create(providerName, partition, serviceId, clusterClient, CancellationToken.None);
+
+        /// <summary>
+        /// Creates and initializes a grain-based checkpointer with default options.
+        /// </summary>
+        public static async Task<IStreamQueueCheckpointer<string>> Create(
+            string providerName,
+            string partition,
+            string serviceId,
+            IClusterClient clusterClient,
+            CancellationToken cancellationToken)
         {
             return await Create(
                 providerName,
                 partition,
                 serviceId,
                 clusterClient,
-                new GrainStreamQueueCheckpointerOptions());
+                new GrainStreamQueueCheckpointerOptions(),
+                cancellationToken);
         }
 
         /// <summary>
@@ -93,6 +105,18 @@ namespace Orleans.Streams
             string serviceId,
             IClusterClient clusterClient,
             GrainStreamQueueCheckpointerOptions options)
+            => await Create(providerName, partition, serviceId, clusterClient, options, CancellationToken.None);
+
+        /// <summary>
+        /// Creates and initializes a grain-based checkpointer.
+        /// </summary>
+        public static async Task<IStreamQueueCheckpointer<string>> Create(
+            string providerName,
+            string partition,
+            string serviceId,
+            IClusterClient clusterClient,
+            GrainStreamQueueCheckpointerOptions options,
+            CancellationToken cancellationToken)
         {
             var grainKey = GetGrainKey(providerName, serviceId, partition, options.StorageProviderName);
             IStreamCheckpointerGrain grain = string.Equals(
@@ -103,7 +127,7 @@ namespace Orleans.Streams
                     : clusterClient.GetGrain<IConfiguredStreamCheckpointerGrain>(grainKey);
 
             var checkpoint = new GrainStreamQueueCheckpointer(grain, options);
-            _ = await checkpoint.Load();
+            _ = await checkpoint.Load(cancellationToken);
 
             return checkpoint;
         }
@@ -152,9 +176,12 @@ namespace Orleans.Streams
         }
 
         /// <inheritdoc />
-        public async Task<string> Load()
+        public Task<string> Load() => Load(CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<string> Load(CancellationToken cancellationToken)
         {
-            var checkpoint = await _grain.Load(CancellationToken.None);
+            var checkpoint = await _grain.Load(cancellationToken);
             lock (_lock)
             {
                 _latestCheckpoint = checkpoint;
@@ -166,8 +193,13 @@ namespace Orleans.Streams
 
         /// <inheritdoc />
         public void Update(string offset, DateTime utcNow)
+            => Update(offset, utcNow, CancellationToken.None);
+
+        /// <inheritdoc />
+        public void Update(string offset, DateTime utcNow, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(offset);
+            cancellationToken.ThrowIfCancellationRequested();
 
             lock (_lock)
             {
@@ -186,7 +218,7 @@ namespace Orleans.Streams
                 }
 
                 _throttleSavesUntilUtc = utcNow + _options.PersistInterval;
-                _inProgressSave = Save(offset, CancellationToken.None);
+                _inProgressSave = Save(offset, cancellationToken);
                 _inProgressSave.Ignore();
             }
         }

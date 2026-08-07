@@ -1373,13 +1373,21 @@ namespace Orleans.Streams
 
         public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string providerName, string partition, string serviceId, IClusterClient clusterClient, Configuration.GrainStreamQueueCheckpointerOptions options) { throw null; }
 
+        public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string providerName, string partition, string serviceId, IClusterClient clusterClient, Configuration.GrainStreamQueueCheckpointerOptions options, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string providerName, string partition, string serviceId, IClusterClient clusterClient) { throw null; }
+
+        public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string providerName, string partition, string serviceId, IClusterClient clusterClient, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task<string> Load() { throw null; }
 
+        public System.Threading.Tasks.Task<string> Load(System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public void Update(string offset, System.DateTime utcNow) { }
+
+        public void Update(string offset, System.DateTime utcNow, System.Threading.CancellationToken cancellationToken) { }
     }
 
     public partial class GrainStreamQueueCheckpointerFactory : IStreamQueueCheckpointerFactory
@@ -1389,6 +1397,8 @@ namespace Orleans.Streams
         public GrainStreamQueueCheckpointerFactory(string providerName, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, IClusterClient clusterClient) { }
 
         public System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string partition) { throw null; }
+
+        public System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string partition, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public static IStreamQueueCheckpointerFactory CreateFactory(System.IServiceProvider services, string providerName) { throw null; }
     }
@@ -1508,6 +1518,7 @@ namespace Orleans.Streams
     public partial interface IQueueAdapterFactory
     {
         System.Threading.Tasks.Task<IQueueAdapter> CreateAdapter();
+        System.Threading.Tasks.Task<IQueueAdapter> CreateAdapter(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId);
         IQueueAdapterCache GetQueueAdapterCache();
         IStreamQueueMapper GetStreamQueueMapper();
@@ -1516,8 +1527,10 @@ namespace Orleans.Streams
     public partial interface IQueueAdapterReceiver
     {
         System.Threading.Tasks.Task<System.Collections.Generic.IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount);
+        System.Threading.Tasks.Task<System.Collections.Generic.IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task Initialize(System.TimeSpan timeout);
         System.Threading.Tasks.Task MessagesDeliveredAsync(System.Collections.Generic.IList<IBatchContainer> messages);
+        System.Threading.Tasks.Task MessagesDeliveredAsync(System.Collections.Generic.IList<IBatchContainer> messages, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task Shutdown(System.TimeSpan timeout);
     }
 
@@ -1631,6 +1644,7 @@ namespace Orleans.Streams
     public partial interface IStreamQueueCheckpointerFactory
     {
         System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string partition);
+        System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string partition, System.Threading.CancellationToken cancellationToken);
     }
 
     public partial interface IStreamQueueCheckpointer<TCheckpoint>
@@ -1639,7 +1653,9 @@ namespace Orleans.Streams
 
         System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<TCheckpoint> Load();
+        System.Threading.Tasks.Task<TCheckpoint> Load(System.Threading.CancellationToken cancellationToken);
         void Update(TCheckpoint offset, System.DateTime utcNow);
+        void Update(TCheckpoint offset, System.DateTime utcNow, System.Threading.CancellationToken cancellationToken);
     }
 
     public partial interface IStreamQueueMapper

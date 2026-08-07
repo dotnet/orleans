@@ -38,7 +38,9 @@ namespace Orleans.Streaming.Kinesis
             _nextCheckUtc = timeProvider.GetUtcNow() + checkInterval;
         }
 
-        public async Task<bool> CheckTopology(bool force = false)
+        public async Task<bool> CheckTopology(
+            bool force = false,
+            CancellationToken cancellationToken = default)
         {
             if (!_healthy)
             {
@@ -50,7 +52,7 @@ namespace Orleans.Streaming.Kinesis
                 return true;
             }
 
-            await _lock.WaitAsync();
+            await _lock.WaitAsync(cancellationToken);
             try
             {
                 if (!_healthy)
@@ -63,7 +65,10 @@ namespace Orleans.Streaming.Kinesis
                     return true;
                 }
 
-                var currentShards = await KinesisAdapterFactory.GetPartitionIdsAsync(_client, _streamName);
+                var currentShards = await KinesisAdapterFactory.GetPartitionIdsAsync(
+                    _client,
+                    _streamName,
+                    cancellationToken);
                 if (!_initialShards.SetEquals(currentShards))
                 {
                     _healthy = false;

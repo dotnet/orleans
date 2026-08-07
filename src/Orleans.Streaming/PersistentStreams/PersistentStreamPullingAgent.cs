@@ -456,6 +456,10 @@ namespace Orleans.Streams
                         return;
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                receiverInitTask = null;
+            }
             catch (Exception exc)
             {
                 receiverInitTask = null;
@@ -505,7 +509,11 @@ namespace Orleans.Streams
                 {
                     try
                     {
-                        await rcvr.MessagesDeliveredAsync(purgedItems);
+                        await rcvr.MessagesDeliveredAsync(purgedItems, cancellationToken);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        return false;
                     }
                     catch (Exception exc)
                     {
@@ -527,7 +535,7 @@ namespace Orleans.Streams
             }
 
             // Retrieve one multiBatch from the queue. Every multiBatch has an IEnumerable of IBatchContainers, each IBatchContainer may have multiple events.
-            IList<IBatchContainer>? multiBatch = await rcvr.GetQueueMessagesAsync(maxCacheAddCount);
+            IList<IBatchContainer>? multiBatch = await rcvr.GetQueueMessagesAsync(maxCacheAddCount, cancellationToken);
 
             if (IsShutdown || cancellationToken.IsCancellationRequested)
             {

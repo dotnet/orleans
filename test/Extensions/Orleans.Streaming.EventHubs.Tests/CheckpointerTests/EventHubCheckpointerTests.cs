@@ -147,6 +147,27 @@ public class EventHubCheckpointerTests
         public Task CloseAsync() => Task.CompletedTask;
     }
 
+    private sealed class CancellableEventHubReceiver : IEventHubReceiver
+    {
+        public TaskCompletionSource<CancellationToken> ReceiveStarted { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
+            => Task.FromResult<IEnumerable<EventData>>([]);
+
+        public async Task<IEnumerable<EventData>> ReceiveAsync(
+            int maxCount,
+            TimeSpan waitTime,
+            CancellationToken cancellationToken)
+        {
+            ReceiveStarted.SetResult(cancellationToken);
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return [];
+        }
+
+        public Task CloseAsync() => Task.CompletedTask;
+    }
+
     private sealed class BlockingEventHubReceiver : IEventHubReceiver
     {
         public int CloseCount { get; private set; }
@@ -252,6 +273,23 @@ public class EventHubCheckpointerTests
         Assert.Empty(messages);
         Assert.Equal(1, eventHubReceiver.ReceiveCount);
         Assert.Equal(0, cache.AddCount);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task GetQueueMessagesAsync_ForwardsCancellationToken()
+    {
+        var eventHubReceiver = new CancellableEventHubReceiver();
+        var receiver = await CreateReceiver(
+            new TestCheckpointer(),
+            eventHubReceiver: eventHubReceiver);
+        using var cancellation = new CancellationTokenSource();
+
+        var operation = receiver.GetQueueMessagesAsync(10, cancellation.Token);
+        Assert.Equal(cancellation.Token, await eventHubReceiver.ReceiveStarted.Task);
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
     }
 
     [Fact, TestCategory("BVT")]

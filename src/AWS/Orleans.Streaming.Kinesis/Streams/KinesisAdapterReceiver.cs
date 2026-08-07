@@ -56,14 +56,25 @@ namespace Orleans.Streaming.Kinesis
 
         public async Task Initialize(TimeSpan timeout)
         {
-            _checkpointer = await _checkpointerFactory.Create(_partition);
-            await ResetShardIterator();
+            using var cancellation = new CancellationTokenSource(timeout);
+            await Initialize(cancellation.Token);
+        }
+
+        private async Task Initialize(CancellationToken cancellationToken)
+        {
+            if (_initialized)
+            {
+                return;
+            }
+
+            _checkpointer = await _checkpointerFactory.Create(_partition, cancellationToken);
+            await ResetShardIterator(cancellationToken);
             _initialized = true;
         }
 
-        private async Task ResetShardIterator()
+        private async Task ResetShardIterator(CancellationToken cancellationToken)
         {
-            var checkpointOffset = await _checkpointer.Load();
+            var checkpointOffset = await _checkpointer.Load(cancellationToken);
 
             var getShardIteratorRequest = new GetShardIteratorRequest
             {
@@ -81,14 +92,26 @@ namespace Orleans.Streaming.Kinesis
                 getShardIteratorRequest.StartingSequenceNumber = checkpointOffset;
             }
 
-            var getShardIteratorResponse = await _client.GetShardIteratorAsync(getShardIteratorRequest);
+            var getShardIteratorResponse = await _client.GetShardIteratorAsync(
+                getShardIteratorRequest,
+                cancellationToken);
             _shardIterator = getShardIteratorResponse.ShardIterator;
             _shardExhausted = string.IsNullOrEmpty(_shardIterator);
         }
 
         public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
+            => await GetQueueMessagesAsync(maxCount, CancellationToken.None);
+
+        public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(
+            int maxCount,
+            CancellationToken cancellationToken)
         {
-            if (!await _topologyMonitor.CheckTopology(_topologyCheckRequired))
+            if (!_initialized)
+            {
+                await Initialize(cancellationToken);
+            }
+
+            if (!await _topologyMonitor.CheckTopology(_topologyCheckRequired, cancellationToken))
             {
                 return Array.Empty<IBatchContainer>();
             }
@@ -99,7 +122,7 @@ namespace Orleans.Streaming.Kinesis
                 return Array.Empty<IBatchContainer>();
             }
 
-            await WaitForGetRecordsInterval();
+            await WaitForGetRecordsInterval(cancellationToken);
             var getRecordsRequest = new GetRecordsRequest
             {
                 Limit = maxCount,
@@ -109,19 +132,19 @@ namespace Orleans.Streaming.Kinesis
             GetRecordsResponse getRecordsResponse;
             try
             {
-                getRecordsResponse = await _client.GetRecordsAsync(getRecordsRequest);
+                getRecordsResponse = await _client.GetRecordsAsync(getRecordsRequest, cancellationToken);
             }
             catch (ExpiredIteratorException)
             {
-                await ResetShardIterator();
+                await ResetShardIterator(cancellationToken);
                 if (_shardExhausted)
                 {
                     return Array.Empty<IBatchContainer>();
                 }
 
-                await WaitForGetRecordsInterval();
+                await WaitForGetRecordsInterval(cancellationToken);
                 getRecordsRequest.ShardIterator = _shardIterator;
-                getRecordsResponse = await _client.GetRecordsAsync(getRecordsRequest);
+                getRecordsResponse = await _client.GetRecordsAsync(getRecordsRequest, cancellationToken);
             }
 
             _shardIterator = getRecordsResponse.NextShardIterator;
@@ -147,19 +170,25 @@ namespace Orleans.Streaming.Kinesis
             return batch;
         }
 
-        private async Task WaitForGetRecordsInterval()
+        private async Task WaitForGetRecordsInterval(CancellationToken cancellationToken)
         {
             var delay = _nextGetRecordsUtc - _timeProvider.GetUtcNow();
             if (delay > TimeSpan.Zero)
             {
-                await Task.Delay(delay, _timeProvider);
+                await Task.Delay(delay, _timeProvider, cancellationToken);
             }
 
             _nextGetRecordsUtc = _timeProvider.GetUtcNow() + _getRecordsInterval;
         }
 
         public Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
+            => MessagesDeliveredAsync(messages, CancellationToken.None);
+
+        public Task MessagesDeliveredAsync(
+            IList<IBatchContainer> messages,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             KinesisBatchContainer? batchWithHighestOffset = null;
 
             try
@@ -171,7 +200,10 @@ namespace Orleans.Streaming.Kinesis
                     .Cast<KinesisBatchContainer>()
                     .Max() ?? throw new InvalidOperationException("Delivered messages contained no Kinesis batches.");
 
-                _checkpointer.Update(batchWithHighestOffset.Token.ShardSequence, DateTime.UtcNow);
+                _checkpointer.Update(
+                    batchWithHighestOffset.Token.ShardSequence,
+                    DateTime.UtcNow,
+                    cancellationToken);
             }
             catch (Exception ex)
             {
