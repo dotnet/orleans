@@ -58,6 +58,7 @@ public sealed class EventHubCheckpointerConfigurationTests
             .Get(providerName);
         Assert.Same(StreamCheckpointComparers.Numeric, options.CheckpointComparer);
         Assert.Equal("EventHubCheckpoints_", options.PartitionKeyPrefix);
+        Assert.Equal("Checkpoint", options.TableName);
     }
 
     [Fact]
