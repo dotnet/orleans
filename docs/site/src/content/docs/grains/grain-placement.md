@@ -141,7 +141,7 @@ First, define the strategy and its attribute:
 
 :::code language="csharp" source="snippets/placement/CustomPlacement.cs" id="custom_placement_strategy":::
 
-Placement strategy instances can cross runtime serialization boundaries. Follow the built-in strategies by combining `[Serializable]` with `[GenerateSerializer]`; if the strategy adds serializable state, assign stable `[Id(n)]` values to its members. The strategy in this example is immutable and has no serialized members.
+Placement strategy instances can cross runtime serialization boundaries. Use `[GenerateSerializer]`; if the strategy adds serializable state, assign stable `[Id(n)]` values to its members. The strategy in this example is immutable and has no serialized members.
 
 Next, implement the director:
 

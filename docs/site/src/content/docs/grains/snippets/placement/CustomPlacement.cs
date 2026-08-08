@@ -7,7 +7,7 @@ using Orleans.Runtime.Placement;
 namespace GrainPlacement;
 
 // <custom_placement_strategy>
-[Serializable, GenerateSerializer, Immutable, SuppressReferenceTracking]
+[GenerateSerializer, Immutable, SuppressReferenceTracking]
 public sealed class CommonKeyPlacementStrategy : PlacementStrategy
 {
 }
