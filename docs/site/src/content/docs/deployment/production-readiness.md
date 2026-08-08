@@ -1,7 +1,7 @@
 ---
 title: Production-readiness checklist
 description: Review an Orleans deployment before it receives production traffic.
-ms.date: 08/02/2026
+ms.date: 08/07/2026
 ms.topic: checklist
 ---
 
@@ -44,10 +44,13 @@ Complete this checklist for each production environment. Record owners, expected
 ## Security and access
 
 - [ ] Only trusted workloads can reach silo and gateway ports.
-- [ ] Orleans transport security is configured when the network isn't already a trusted, isolated boundary. See [Orleans Transport Layer Security](../host/transport-layer-security.md).
+- [ ] TLS protects silo-to-silo and client-to-gateway traffic, with platform chain, DNS-name, EKU, and revocation validation. See [Secure Orleans connections with TLS](../host/transport-layer-security.md).
+- [ ] Workload authentication uses cluster-specific audiences, separate silo and client roles, explicit caller allowlists, and fail-closed enforcement. See [Authenticate Orleans connections](../host/authenticated-silo-connections.md).
+- [ ] Membership, storage, reminder, and stream providers independently use encrypted transport, workload identity, and least-privilege permissions.
 - [ ] Administrative endpoints, health details, metrics, and logs don't expose secrets or tenant data.
 - [ ] Provider identities have least privilege for membership, state, reminders, and streams.
 - [ ] Certificates and credentials have rotation and expiry alerts.
+- [ ] Negative connection tests prove that wrong certificates, tenants, audiences, roles, caller IDs, and baseline-only peers are rejected.
 
 ## Observability and operations
 
