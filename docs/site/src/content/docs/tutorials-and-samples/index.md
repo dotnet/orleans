@@ -24,6 +24,7 @@ For the smallest complete grain call, see the maintained [Hello World sample](ht
 
 | Tutorial | What it teaches |
 | --- | --- |
+| [Create a multi-project Orleans application](tutorial-1.md) | Separate grain contracts, implementations, a silo, and an external client. |
 | [Custom grain storage](custom-grain-storage.md) | Implement and register an <xref:Orleans.Storage.IGrainStorage> provider. |
 | [Deploy and scale on Azure](../quickstarts/deploy-scale-orleans-on-azure.md) | Deploy an Orleans app to Azure Container Apps and configure shared providers. |
 
