@@ -3,15 +3,50 @@ using System.Net.Security;
 
 namespace Orleans.Connections.Security;
 
-internal sealed class SiloConnectionAuthenticationRegistration
+internal abstract class ConnectionAuthenticationRegistration
 {
-    public required SiloConnectionAuthenticationOptions Options { get; init; }
+    protected ConnectionAuthenticationRegistration(
+        string name,
+        object serviceKey,
+        SiloConnectionAuthenticationTarget target,
+        SiloConnectionAuthenticationOptions options,
+        TlsOptions tlsOptions,
+        bool hasTokenProvider,
+        bool hasTokenValidator,
+        bool requiresTokenProvider,
+        bool requiresTokenValidator)
+    {
+        Name = name;
+        ServiceKey = serviceKey;
+        Target = target;
+        Options = options;
+        TlsOptions = tlsOptions;
+        HasTokenProvider = hasTokenProvider;
+        HasTokenValidator = hasTokenValidator;
+        RequiresTokenProvider = requiresTokenProvider;
+        RequiresTokenValidator = requiresTokenValidator;
+        WorkLimiter = new AuthenticationWorkLimiter(options);
+    }
 
-    public required TlsOptions TlsOptions { get; init; }
+    public string Name { get; }
 
-    public required bool HasTokenProvider { get; init; }
+    public object ServiceKey { get; }
 
-    public required bool HasTokenValidator { get; init; }
+    public SiloConnectionAuthenticationTarget Target { get; }
+
+    public SiloConnectionAuthenticationOptions Options { get; }
+
+    public TlsOptions TlsOptions { get; }
+
+    public bool HasTokenProvider { get; }
+
+    public bool HasTokenValidator { get; }
+
+    public bool RequiresTokenProvider { get; }
+
+    public bool RequiresTokenValidator { get; }
+
+    public AuthenticationWorkLimiter WorkLimiter { get; }
 
     public static SiloConnectionAuthenticationOptions CloneOptions(SiloConnectionAuthenticationOptions source)
     {
@@ -64,6 +99,14 @@ internal sealed class SiloConnectionAuthenticationRegistration
         SiloConnectionAuthenticationOptions authenticationOptions)
     {
         var serverCallback = tlsOptions.OnAuthenticateAsServer;
+        var clientCallback = tlsOptions.OnAuthenticateAsClient;
+        if (authenticationOptions.Mode == SiloConnectionAuthenticationMode.Required
+            && (serverCallback is not null || clientCallback is not null))
+        {
+            throw new InvalidOperationException(
+                "Required mode does not permit direct per-connection TLS authentication callbacks.");
+        }
+
         tlsOptions.OnAuthenticateAsServer = (context, options) =>
         {
             serverCallback?.Invoke(context, options);
@@ -71,7 +114,6 @@ internal sealed class SiloConnectionAuthenticationRegistration
             sslOptions.ApplicationProtocols = CreateApplicationProtocols(authenticationOptions.Mode);
         };
 
-        var clientCallback = tlsOptions.OnAuthenticateAsClient;
         tlsOptions.OnAuthenticateAsClient = (context, options) =>
         {
             clientCallback?.Invoke(context, options);
@@ -93,6 +135,69 @@ internal sealed class SiloConnectionAuthenticationRegistration
     };
 }
 
+internal sealed class SiloConnectionAuthenticationRegistration(
+    string name,
+    object serviceKey,
+    SiloConnectionAuthenticationOptions options,
+    TlsOptions tlsOptions,
+    bool hasTokenProvider,
+    bool hasTokenValidator)
+    : ConnectionAuthenticationRegistration(
+        name,
+        serviceKey,
+        SiloConnectionAuthenticationTarget.Silo,
+        options,
+        tlsOptions,
+        hasTokenProvider,
+        hasTokenValidator,
+        requiresTokenProvider: true,
+        requiresTokenValidator: true);
+
+internal sealed class GatewayConnectionAuthenticationRegistration(
+    string name,
+    object serviceKey,
+    SiloConnectionAuthenticationOptions options,
+    TlsOptions tlsOptions,
+    bool hasTokenProvider,
+    bool hasTokenValidator)
+    : ConnectionAuthenticationRegistration(
+        name,
+        serviceKey,
+        SiloConnectionAuthenticationTarget.Client,
+        options,
+        tlsOptions,
+        hasTokenProvider,
+        hasTokenValidator,
+        requiresTokenProvider: false,
+        requiresTokenValidator: true);
+
+internal sealed class ClientConnectionAuthenticationRegistration(
+    string name,
+    object serviceKey,
+    SiloConnectionAuthenticationOptions options,
+    TlsOptions tlsOptions,
+    bool hasTokenProvider,
+    bool hasTokenValidator)
+    : ConnectionAuthenticationRegistration(
+        name,
+        serviceKey,
+        SiloConnectionAuthenticationTarget.Client,
+        options,
+        tlsOptions,
+        hasTokenProvider,
+        hasTokenValidator,
+        requiresTokenProvider: true,
+        requiresTokenValidator: false);
+
+internal static class ConnectionAuthenticationServiceKeys
+{
+    public static readonly object Silo = new();
+    public static readonly object Gateway = new();
+    public static readonly object Client = new();
+}
+
 internal sealed class SiloTlsRegistrationMarker;
 
 internal sealed class GatewayTlsRegistrationMarker;
+
+internal sealed class ClientTlsRegistrationMarker;

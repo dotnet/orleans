@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <Compile Include="$(RepositoryRoot)samples\AuthenticatedSiloConnections\Program.cs" Link="Program.cs" />
+    <Compile Include="$(RepositoryRoot)samples\AuthenticatedSiloConnections\ClientAuthentication.cs" Link="ClientAuthentication.cs" />
     <Compile Include="$(RepositoryRoot)samples\AuthenticatedSiloConnections\SampleOptions.cs" Link="SampleOptions.cs" />
     <Compile Include="$(RepositoryRoot)samples\AuthenticatedSiloConnections\SiloAuthentication.cs" Link="SiloAuthentication.cs" />
   </ItemGroup>

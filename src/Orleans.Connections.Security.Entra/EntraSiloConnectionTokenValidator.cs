@@ -1,17 +1,29 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Configuration;
 
 namespace Orleans.Connections.Security.Entra;
 
-internal sealed class EntraSiloConnectionTokenValidator : ISiloConnectionTokenValidator
+internal sealed class EntraSiloConnectionTokenValidator : ISiloConnectionTokenValidator, IDisposable
 {
     private readonly EntraJwtValidator _validator;
+    private readonly EntraOpenIdConfigurationProvider? _metadata;
 
     public EntraSiloConnectionTokenValidator(EntraJwtValidator validator)
+        : this(validator, metadata: null)
+    {
+    }
+
+    public EntraSiloConnectionTokenValidator(
+        EntraJwtValidator validator,
+        EntraOpenIdConfigurationProvider? metadata)
     {
         _validator = validator;
+        _metadata = metadata;
     }
+
+    public void Dispose() => _metadata?.Dispose();
 
     public async ValueTask<SiloConnectionTokenValidationResult> ValidateTokenAsync(
         string token,

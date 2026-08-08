@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -54,14 +55,16 @@ internal abstract class SiloConnectionAuthenticationMiddleware
     private readonly IHostApplicationLifetime _applicationLifetime;
 
     protected SiloConnectionAuthenticationMiddleware(
-        IOptions<SiloConnectionAuthenticationOptions> options,
-        IOptions<ClusterOptions> clusterOptions,
+        SiloConnectionAuthenticationOptions options,
+        string clusterId,
+        SiloConnectionAuthenticationTarget target,
         AuthenticationWorkLimiter workLimiter,
         IHostApplicationLifetime applicationLifetime,
         ILogger logger)
     {
-        Options = CloneOptions(options.Value);
-        ClusterId = clusterOptions.Value.ClusterId;
+        Options = CloneOptions(options);
+        ClusterId = clusterId;
+        Target = target;
         WorkLimiter = workLimiter;
         _applicationLifetime = applicationLifetime;
         Logger = logger;
@@ -70,6 +73,8 @@ internal abstract class SiloConnectionAuthenticationMiddleware
     protected SiloConnectionAuthenticationOptions Options { get; }
 
     protected string ClusterId { get; }
+
+    protected SiloConnectionAuthenticationTarget Target { get; }
 
     protected AuthenticationWorkLimiter WorkLimiter { get; }
 
@@ -121,12 +126,14 @@ internal abstract class SiloConnectionAuthenticationMiddleware
         context.Features.Set<ISiloConnectionAuthenticationFeature>(feature);
         SiloConnectionAuthenticationTelemetry.RecordAttempt(
             started,
+            Target,
             direction,
             Options.Mode,
             feature.Protocol,
             result);
         SiloConnectionAuthenticationTelemetry.LogCompleted(
             Logger,
+            GetTargetName(Target),
             GetDirectionName(direction),
             Options.Mode.ToString(),
             SiloConnectionAuthenticationTelemetry.GetResultName(result));
@@ -137,7 +144,7 @@ internal abstract class SiloConnectionAuthenticationMiddleware
             return;
         }
 
-        SiloConnectionAuthenticationTelemetry.AddActive(1, direction, Options.Mode, feature.Protocol);
+        SiloConnectionAuthenticationTelemetry.AddActive(1, Target, direction, Options.Mode, feature.Protocol);
         try
         {
             if (feature.ExpiresAt is not { } expiresAt)
@@ -164,7 +171,7 @@ internal abstract class SiloConnectionAuthenticationMiddleware
         }
         finally
         {
-            SiloConnectionAuthenticationTelemetry.AddActive(-1, direction, Options.Mode, feature.Protocol);
+            SiloConnectionAuthenticationTelemetry.AddActive(-1, Target, direction, Options.Mode, feature.Protocol);
         }
     }
 
@@ -178,6 +185,7 @@ internal abstract class SiloConnectionAuthenticationMiddleware
         {
             SiloConnectionAuthenticationTelemetry.RecordAttempt(
                 start,
+                Target,
                 direction,
                 Options.Mode,
                 SiloConnectionAuthenticationProtocol.Version2,
@@ -186,6 +194,7 @@ internal abstract class SiloConnectionAuthenticationMiddleware
         else
         {
             SiloConnectionAuthenticationTelemetry.RecordEvent(
+                Target,
                 direction,
                 Options.Mode,
                 SiloConnectionAuthenticationProtocol.Version2,
@@ -194,15 +203,19 @@ internal abstract class SiloConnectionAuthenticationMiddleware
 
         SiloConnectionAuthenticationTelemetry.LogFailure(
             Logger,
+            GetTargetName(Target),
             GetDirectionName(direction),
             Options.Mode.ToString(),
             SiloConnectionAuthenticationTelemetry.GetResultName(category));
         context.Abort(new ConnectionAbortedException(
-            $"Silo connection authentication failed ({SiloConnectionAuthenticationTelemetry.GetResultName(category)})."));
+            $"Orleans connection authentication failed ({SiloConnectionAuthenticationTelemetry.GetResultName(category)})."));
     }
 
     protected static string GetDirectionName(SiloConnectionAuthenticationDirection direction) =>
         direction == SiloConnectionAuthenticationDirection.Inbound ? "inbound" : "outbound";
+
+    protected static string GetTargetName(SiloConnectionAuthenticationTarget target) =>
+        target == SiloConnectionAuthenticationTarget.Silo ? "silo" : "client";
 
     private static SiloConnectionAuthenticationOptions CloneOptions(SiloConnectionAuthenticationOptions source) => new()
     {
@@ -323,21 +336,41 @@ internal abstract class SiloConnectionAuthenticationMiddleware
     }
 }
 
-internal sealed class InboundSiloConnectionAuthenticationMiddleware : SiloConnectionAuthenticationMiddleware, IConnectionMiddleware
+internal class InboundSiloConnectionAuthenticationMiddleware : SiloConnectionAuthenticationMiddleware, IConnectionMiddleware
 {
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private readonly ISiloConnectionTokenValidator? _validator;
 
     public InboundSiloConnectionAuthenticationMiddleware(
-        IEnumerable<ISiloConnectionTokenValidator> validators,
-        IOptions<SiloConnectionAuthenticationOptions> options,
+        IServiceProvider serviceProvider,
+        SiloConnectionAuthenticationRegistration registration,
         IOptions<ClusterOptions> clusterOptions,
-        AuthenticationWorkLimiter workLimiter,
         IHostApplicationLifetime applicationLifetime,
         ILogger<InboundSiloConnectionAuthenticationMiddleware> logger)
-        : base(options, clusterOptions, workLimiter, applicationLifetime, logger)
+        : this(
+            serviceProvider.GetServices<ISiloConnectionTokenValidator>().SingleOrDefault(),
+            registration,
+            clusterOptions.Value.ClusterId,
+            applicationLifetime,
+            logger)
     {
-        _validator = validators.SingleOrDefault();
+    }
+
+    protected InboundSiloConnectionAuthenticationMiddleware(
+        ISiloConnectionTokenValidator? validator,
+        ConnectionAuthenticationRegistration registration,
+        string clusterId,
+        IHostApplicationLifetime applicationLifetime,
+        ILogger logger)
+        : base(
+            registration.Options,
+            clusterId,
+            registration.Target,
+            registration.WorkLimiter,
+            applicationLifetime,
+            logger)
+    {
+        _validator = validator;
     }
 
     public async Task OnConnectionAsync(ConnectionContext context, ConnectionDelegate next)
@@ -359,8 +392,8 @@ internal sealed class InboundSiloConnectionAuthenticationMiddleware : SiloConnec
                 null,
                 SiloConnectionAuthenticationFailure.None,
                 "Orleans1"));
-            SiloConnectionAuthenticationTelemetry.RecordFallback(direction, Options.Mode);
-            SiloConnectionAuthenticationTelemetry.LogFallback(Logger, GetDirectionName(direction));
+            SiloConnectionAuthenticationTelemetry.RecordFallback(Target, direction, Options.Mode);
+            SiloConnectionAuthenticationTelemetry.LogFallback(Logger, GetTargetName(Target), GetDirectionName(direction));
             await next(context);
             return;
         }
@@ -489,7 +522,11 @@ internal sealed class InboundSiloConnectionAuthenticationMiddleware : SiloConnec
         {
             return await _validator.ValidateTokenAsync(
                 token,
-                new SiloConnectionTokenValidationContext(ClusterId, context.LocalEndPoint, context.RemoteEndPoint),
+                new SiloConnectionTokenValidationContext(
+                    ClusterId,
+                    Target,
+                    context.LocalEndPoint,
+                    context.RemoteEndPoint),
                 cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -563,21 +600,59 @@ internal sealed class InboundSiloConnectionAuthenticationMiddleware : SiloConnec
     };
 }
 
-internal sealed class OutboundSiloConnectionAuthenticationMiddleware : SiloConnectionAuthenticationMiddleware, IConnectionMiddleware
+internal sealed class InboundGatewayConnectionAuthenticationMiddleware : InboundSiloConnectionAuthenticationMiddleware
+{
+    public InboundGatewayConnectionAuthenticationMiddleware(
+        IServiceProvider serviceProvider,
+        GatewayConnectionAuthenticationRegistration registration,
+        IOptions<ClusterOptions> clusterOptions,
+        IHostApplicationLifetime applicationLifetime,
+        ILogger<InboundGatewayConnectionAuthenticationMiddleware> logger)
+        : base(
+            serviceProvider.GetKeyedService<ISiloConnectionTokenValidator>(registration.ServiceKey),
+            registration,
+            clusterOptions.Value.ClusterId,
+            applicationLifetime,
+            logger)
+    {
+    }
+}
+
+internal class OutboundSiloConnectionAuthenticationMiddleware : SiloConnectionAuthenticationMiddleware, IConnectionMiddleware
 {
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private readonly ISiloConnectionTokenProvider? _provider;
 
     public OutboundSiloConnectionAuthenticationMiddleware(
-        IEnumerable<ISiloConnectionTokenProvider> providers,
-        IOptions<SiloConnectionAuthenticationOptions> options,
+        IServiceProvider serviceProvider,
+        SiloConnectionAuthenticationRegistration registration,
         IOptions<ClusterOptions> clusterOptions,
-        AuthenticationWorkLimiter workLimiter,
         IHostApplicationLifetime applicationLifetime,
         ILogger<OutboundSiloConnectionAuthenticationMiddleware> logger)
-        : base(options, clusterOptions, workLimiter, applicationLifetime, logger)
+        : this(
+            serviceProvider.GetServices<ISiloConnectionTokenProvider>().SingleOrDefault(),
+            registration,
+            clusterOptions.Value.ClusterId,
+            applicationLifetime,
+            logger)
     {
-        _provider = providers.SingleOrDefault();
+    }
+
+    protected OutboundSiloConnectionAuthenticationMiddleware(
+        ISiloConnectionTokenProvider? provider,
+        ConnectionAuthenticationRegistration registration,
+        string clusterId,
+        IHostApplicationLifetime applicationLifetime,
+        ILogger logger)
+        : base(
+            registration.Options,
+            clusterId,
+            registration.Target,
+            registration.WorkLimiter,
+            applicationLifetime,
+            logger)
+    {
+        _provider = provider;
     }
 
     public async Task OnConnectionAsync(ConnectionContext context, ConnectionDelegate next)
@@ -599,8 +674,8 @@ internal sealed class OutboundSiloConnectionAuthenticationMiddleware : SiloConne
                 null,
                 SiloConnectionAuthenticationFailure.None,
                 "Orleans1"));
-            SiloConnectionAuthenticationTelemetry.RecordFallback(direction, Options.Mode);
-            SiloConnectionAuthenticationTelemetry.LogFallback(Logger, GetDirectionName(direction));
+            SiloConnectionAuthenticationTelemetry.RecordFallback(Target, direction, Options.Mode);
+            SiloConnectionAuthenticationTelemetry.LogFallback(Logger, GetTargetName(Target), GetDirectionName(direction));
             await next(context);
             return;
         }
@@ -731,9 +806,14 @@ internal sealed class OutboundSiloConnectionAuthenticationMiddleware : SiloConne
         try
         {
             token = await _provider.GetTokenAsync(
-                new SiloConnectionTokenRequestContext(ClusterId, context.LocalEndPoint, context.RemoteEndPoint),
+                new SiloConnectionTokenRequestContext(
+                    ClusterId,
+                    Target,
+                    context.LocalEndPoint,
+                    context.RemoteEndPoint),
                 cancellationToken);
         }
+
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
@@ -794,4 +874,22 @@ internal sealed class OutboundSiloConnectionAuthenticationMiddleware : SiloConne
         failure == SiloConnectionAuthenticationFailure.ExpiredToken
             ? AuthenticationResultCategory.Expiration
             : AuthenticationResultCategory.AcquisitionFailure;
+}
+
+internal sealed class OutboundClientConnectionAuthenticationMiddleware : OutboundSiloConnectionAuthenticationMiddleware
+{
+    public OutboundClientConnectionAuthenticationMiddleware(
+        IServiceProvider serviceProvider,
+        ClientConnectionAuthenticationRegistration registration,
+        IOptions<ClusterOptions> clusterOptions,
+        IHostApplicationLifetime applicationLifetime,
+        ILogger<OutboundClientConnectionAuthenticationMiddleware> logger)
+        : base(
+            serviceProvider.GetKeyedService<ISiloConnectionTokenProvider>(registration.ServiceKey),
+            registration,
+            clusterOptions.Value.ClusterId,
+            applicationLifetime,
+            logger)
+    {
+    }
 }

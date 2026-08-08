@@ -33,43 +33,48 @@ internal static partial class SiloConnectionAuthenticationTelemetry
 
     public static void RecordAttempt(
         long started,
+        SiloConnectionAuthenticationTarget target,
         SiloConnectionAuthenticationDirection direction,
         SiloConnectionAuthenticationMode mode,
         string protocol,
         AuthenticationResultCategory result)
     {
-        var tags = CreateTags(direction, mode, protocol, result);
+        var tags = CreateTags(target, direction, mode, protocol, result);
         Attempts.Add(1, tags);
         Duration.Record(Stopwatch.GetElapsedTime(started).TotalMilliseconds, tags);
     }
 
     public static void RecordFallback(
+        SiloConnectionAuthenticationTarget target,
         SiloConnectionAuthenticationDirection direction,
         SiloConnectionAuthenticationMode mode)
     {
-        var tags = CreateTags(direction, mode, "Orleans1", AuthenticationResultCategory.BaselineFallback);
+        var tags = CreateTags(target, direction, mode, "Orleans1", AuthenticationResultCategory.BaselineFallback);
         ProtocolFallbacks.Add(1, tags);
     }
 
     public static void RecordEvent(
+        SiloConnectionAuthenticationTarget target,
         SiloConnectionAuthenticationDirection direction,
         SiloConnectionAuthenticationMode mode,
         string protocol,
         AuthenticationResultCategory result)
     {
-        Attempts.Add(1, CreateTags(direction, mode, protocol, result));
+        Attempts.Add(1, CreateTags(target, direction, mode, protocol, result));
     }
 
     public static void AddActive(
         long value,
+        SiloConnectionAuthenticationTarget target,
         SiloConnectionAuthenticationDirection direction,
         SiloConnectionAuthenticationMode mode,
         string protocol)
     {
-        Active.Add(value, CreateTags(direction, mode, protocol, AuthenticationResultCategory.Authenticated));
+        Active.Add(value, CreateTags(target, direction, mode, protocol, AuthenticationResultCategory.Authenticated));
     }
 
     private static TagList CreateTags(
+        SiloConnectionAuthenticationTarget target,
         SiloConnectionAuthenticationDirection direction,
         SiloConnectionAuthenticationMode mode,
         string protocol,
@@ -77,6 +82,7 @@ internal static partial class SiloConnectionAuthenticationTelemetry
     {
         return new TagList
         {
+            { "connection.type", target == SiloConnectionAuthenticationTarget.Silo ? "silo" : "client" },
             { "direction", direction == SiloConnectionAuthenticationDirection.Inbound ? "inbound" : "outbound" },
             { "mode", mode.ToString() },
             { "protocol.version", protocol },
@@ -104,18 +110,28 @@ internal static partial class SiloConnectionAuthenticationTelemetry
     [LoggerMessage(
         EventId = 9200,
         Level = LogLevel.Warning,
-        Message = "Silo connection authentication failed. Direction: {Direction}; Mode: {Mode}; Category: {Category}.")]
-    public static partial void LogFailure(ILogger logger, string direction, string mode, string category);
+        Message = "Orleans connection authentication failed. Connection type: {ConnectionType}; Direction: {Direction}; Mode: {Mode}; Category: {Category}.")]
+    public static partial void LogFailure(
+        ILogger logger,
+        string connectionType,
+        string direction,
+        string mode,
+        string category);
 
     [LoggerMessage(
         EventId = 9201,
         Level = LogLevel.Information,
-        Message = "Silo connection authentication completed. Direction: {Direction}; Mode: {Mode}; Result: {Result}.")]
-    public static partial void LogCompleted(ILogger logger, string direction, string mode, string result);
+        Message = "Orleans connection authentication completed. Connection type: {ConnectionType}; Direction: {Direction}; Mode: {Mode}; Result: {Result}.")]
+    public static partial void LogCompleted(
+        ILogger logger,
+        string connectionType,
+        string direction,
+        string mode,
+        string result);
 
     [LoggerMessage(
         EventId = 9202,
         Level = LogLevel.Information,
-        Message = "Silo connection authentication used the baseline protocol in Audit mode. Direction: {Direction}.")]
-    public static partial void LogFallback(ILogger logger, string direction);
+        Message = "Orleans connection authentication used the baseline protocol in Audit mode. Connection type: {ConnectionType}; Direction: {Direction}.")]
+    public static partial void LogFallback(ILogger logger, string connectionType, string direction);
 }

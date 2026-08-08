@@ -1,21 +1,24 @@
 ---
-title: Authenticate Orleans silo connections
-description: Authenticate silo-to-silo connections with TLS and Microsoft Entra workload identities.
+title: Authenticate Orleans connections
+description: Authenticate silo and external client connections with TLS and Microsoft Entra workload identities.
 ms.date: 08/07/2026
 ms.topic: how-to
 ---
 
-# Authenticate Orleans silo connections
+# Authenticate Orleans connections
 
-Authenticated silo connections verify the workload identity of a connecting
-silo before Orleans reads its connection preamble or application messages. Use
+Authenticated connections verify the workload identity of a connecting silo or
+external Orleans client before Orleans reads its connection preamble or
+application messages. Use
 <xref:Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseAuthenticatedSiloConnections*?displayProperty=nameWithType>
-to configure TLS and bearer-token authentication as one ordered policy.
+for silo traffic and
+<xref:Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseAuthenticatedClientConnections*?displayProperty=nameWithType>
+on gateways and external clients. Each method configures TLS and bearer-token
+authentication as one ordered policy.
 
 > [!IMPORTANT]
-> This feature applies only to silo-to-silo connections. Client-to-gateway
-> behavior is unchanged. Secure gateway traffic with the existing
-> [TLS](transport-layer-security.md) and application authentication mechanisms.
+> Silo and client connections are configured independently. Enabling
+> authentication for one path doesn't silently change the other.
 
 Install `Microsoft.Orleans.Connections.Security` and
 `Microsoft.Orleans.Connections.Security.Entra` in every silo. The Entra package
@@ -56,8 +59,10 @@ following:
 1. A tenant-specific authority.
 2. A dedicated audience for one cluster and deployment environment, such as
    `api://<resource-application-id>/contoso-prod-westus`.
-3. The application role `Orleans.Silo.Connect`.
-4. An explicit allowlist of caller application IDs.
+3. A path-specific application role, such as `Orleans.Silo.Connect` or
+   `Orleans.Client.Connect`.
+4. A separate explicit caller application-ID allowlist for silos and external
+   clients.
 
 The audience must exactly match the resource identifier registered in Microsoft
 Entra. Don't remove the `api://` prefix or share a general-purpose silo audience
@@ -87,7 +92,8 @@ The configured `TargetHost` must match a DNS SAN and the chain must be valid
 and trusted. Never replace this policy with
 <xref:Orleans.Connections.Security.TlsOptions.AllowAnyRemoteCertificate*> or a
 custom certificate-validation callback. `Required` mode rejects custom
-certificate-validation callbacks during startup.
+certificate-validation callbacks and direct per-connection TLS authentication
+callbacks during startup.
 
 The example deliberately bounds token bytes, exchange duration, concurrent
 handshakes, and minimum remaining token lifetime. Keep all size, duration,
@@ -95,10 +101,31 @@ queue, concurrency, metadata-refresh, and token-lifetime limits finite.
 Configuration is validated at startup; invalid middleware ordering, missing
 TLS/provider registrations, and conflicting TLS policies fail closed.
 
+### Authenticate external clients
+
+Configure the gateway side on every silo. It validates client tokens before the
+gateway reads the Orleans connection preamble:
+
+:::code language="csharp" source="../../../../../../samples/AuthenticatedSiloConnections/SiloAuthentication.cs" id="AuthenticatedClientGateway":::
+
+Configure each external Orleans client with the corresponding outbound policy:
+
+:::code language="csharp" source="../../../../../../samples/AuthenticatedSiloConnections/ClientAuthentication.cs" id="AuthenticatedClient":::
+
+The client and gateway must use compatible enforcement modes and the same Entra
+audience, tenant, cluster binding, client role, and caller authorization. Keep
+the external-client role and allowlist separate from the silo policy. The
+<xref:Orleans.Connections.Security.SiloConnectionTokenRequestContext.Target> and
+<xref:Orleans.Connections.Security.SiloConnectionTokenValidationContext.Target>
+properties distinguish
+client-to-gateway traffic from silo-to-silo traffic for custom providers.
+Gateway authentication does not authorize individual grain calls or propagate
+the authenticated principal into grain requests.
+
 ## Choose an enforcement mode
 
 <xref:Orleans.Connections.Security.SiloConnectionAuthenticationMode> is
-snapshotted at startup. Changing it requires a silo restart.
+snapshotted at startup. Changing it requires a silo or client process restart.
 
 | Mode | Negotiation and acceptance behavior |
 |---|---|
@@ -121,7 +148,7 @@ authentication.
 
 ## Plan for token expiration
 
-Authentication occurs once per connection, but a silo connection can otherwise
+Authentication occurs once per connection, but an Orleans connection can otherwise
 outlive its access token. In `Required` mode, Orleans uses the validator's
 finite expiration and recycles the connection before expiry using a safety
 margin and bounded jitter. Reconnection acquires a new token through the
@@ -138,15 +165,15 @@ doesn't surface only when many connections approach expiration.
 Define gates and ownership before changing modes:
 
 1. Deploy the code everywhere with `Disabled` and restart the fleet.
-2. Restart by failure domain with `Audit`. Retain canaries and monitor baseline
+2. Restart silos and clients by failure domain with `Audit`. Retain canaries and monitor baseline
    fallback, acquisition and validation failures, authorization denials,
    provider availability, latency, concurrency saturation, and metadata
    refresh.
-3. Remain in `Audit` until every expected silo pair has negotiated
-   authentication. Deliberately reconnect every expected peer pair and verify
-   each new connection authenticates, unexpected fallback and failure rates
-   remain zero, and representative authenticated connections recycle at token
-   expiry.
+   3. Remain in `Audit` until every expected silo pair and external client path
+      has negotiated authentication. Deliberately reconnect expected peers and
+      representative clients, then verify each new connection authenticates,
+      unexpected fallback and failure rates remain zero, and representative
+      authenticated connections recycle at token expiry.
 4. Restart `Required` canaries. Verify connectivity, membership stability,
    token renewal, and provider health before proceeding through each failure
    domain.
@@ -185,13 +212,14 @@ Alert on rates and latency for these instruments:
 | `orleans.connections.authentication.protocol_fallbacks` | Identify peers which haven't negotiated authentication in `Audit`. |
 
 Keep dimensions bounded to direction, mode, protocol version, and fixed result
-category. Never add token, tenant, client, object, issuer, endpoint, or arbitrary
+category. The `connection.type` dimension distinguishes `silo` and `client`
+connections. Never add token, tenant, client, object, issuer, endpoint, or arbitrary
 exception values as metric tags.
 
 Authentication logs use fixed event IDs and bounded categories such as
 overload, timeout, protocol error, TLS policy error, acquisition failure,
 validation failure, authorization failure, and expiration. Preserve event ID,
-category, direction, and mode in the log pipeline. Tokens must never appear in
+connection type, category, direction, and mode in the log pipeline. Tokens must never appear in
 logs, traces, metrics, activities, exceptions, or connection features.
 
 ## Production checklist

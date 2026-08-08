@@ -102,7 +102,9 @@ internal sealed class EntraOptions
 
     public string FederatedTokenFile { get; set; } = "";
 
-    public string[] AllowedCallerClientIds { get; set; } = [];
+    public string[] AllowedSiloCallerClientIds { get; set; } = [];
+
+    public string[] AllowedClientCallerClientIds { get; set; } = [];
 
     public Uri Authority
         => new($"https://login.microsoftonline.com/{TenantId}/v2.0");
@@ -126,23 +128,29 @@ internal sealed class EntraOptions
                 "The configured workload identity token file does not exist.");
         }
 
-        if (AllowedCallerClientIds.Length == 0)
+        if (AllowedSiloCallerClientIds.Length == 0)
         {
             throw new InvalidOperationException(
-                "At least one allowed caller application ID is required.");
+                "At least one allowed silo caller application ID is required.");
         }
 
-        foreach (var clientId in AllowedCallerClientIds)
-        {
-            RequireGuid(clientId, nameof(AllowedCallerClientIds));
-        }
-
-        if (!AllowedCallerClientIds.Contains(
-            WorkloadClientId,
-            StringComparer.OrdinalIgnoreCase))
+        if (AllowedClientCallerClientIds.Length == 0)
         {
             throw new InvalidOperationException(
-                "This silo's workload client ID must be in the allowed caller list.");
+                "At least one allowed external client application ID is required.");
+        }
+
+        foreach (var clientId in AllowedSiloCallerClientIds.Concat(AllowedClientCallerClientIds))
+        {
+            RequireGuid(clientId, "AllowedCallerClientIds");
+        }
+
+        if (!AllowedSiloCallerClientIds
+                .Concat(AllowedClientCallerClientIds)
+                .Contains(WorkloadClientId, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "This process's workload client ID must be in an allowed caller list.");
         }
     }
 
