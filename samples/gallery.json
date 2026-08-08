@@ -88,6 +88,17 @@
     "featured": true
   },
   {
+    "slug": "google-firestore",
+    "title": "Google Cloud Firestore",
+    "description": "An Orleans application using Firestore for clustering, grain directories, persistence, and reminders.",
+    "path": "GoogleFirestore",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "image": null,
+    "languages": ["C#"],
+    "tags": ["google-cloud", "firestore", "clustering", "persistence", "reminders"],
+    "featured": false
+  },
+  {
     "slug": "hello-world",
     "title": "Hello World",
     "description": "The smallest complete Orleans application for defining and calling a grain.",
