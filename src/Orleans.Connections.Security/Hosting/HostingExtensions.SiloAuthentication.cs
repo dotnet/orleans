@@ -48,30 +48,27 @@ public static partial class OrleansConnectionSecurityHostingExtensions
                 $"{nameof(TlsOptions)}.{nameof(TlsOptions.LocalCertificate)}");
         }
 
+        const string registrationName = "Orleans.SiloConnections";
         var authenticationOptions = new SiloConnectionAuthenticationOptions();
-        var authenticationBuilder = new SiloConnectionAuthenticationBuilder(authenticationOptions, builder.Services);
+        var authenticationBuilder = new SiloConnectionAuthenticationBuilder(
+            registrationName,
+            ConnectionAuthenticationServiceKeys.Silo,
+            authenticationOptions,
+            builder.Services);
         configureAuthentication(authenticationBuilder);
         var tlsSnapshot = SiloConnectionAuthenticationRegistration.CloneTlsOptions(tlsOptions);
         var authenticationSnapshot = SiloConnectionAuthenticationRegistration.CloneOptions(authenticationOptions);
         SiloConnectionAuthenticationRegistration.ConfigureApplicationProtocols(tlsSnapshot, authenticationSnapshot);
 
-        var registration = new SiloConnectionAuthenticationRegistration
-        {
-            Options = authenticationSnapshot,
-            TlsOptions = tlsSnapshot,
-            HasTokenProvider = authenticationBuilder.HasTokenProvider,
-            HasTokenValidator = authenticationBuilder.HasTokenValidator,
-        };
+        var registration = new SiloConnectionAuthenticationRegistration(
+            registrationName,
+            ConnectionAuthenticationServiceKeys.Silo,
+            authenticationSnapshot,
+            tlsSnapshot,
+            authenticationBuilder.HasTokenProvider,
+            authenticationBuilder.HasTokenValidator);
 
-        builder.Services.AddSingleton(registration);
-        builder.Services.AddSingleton<IValidateOptions<SiloConnectionAuthenticationOptions>>(
-            new SiloConnectionAuthenticationOptionsValidator(registration));
-        builder.Services
-            .AddOptions<SiloConnectionAuthenticationOptions>()
-            .Configure(registration.CopyOptionsTo)
-            .ValidateOnStart();
-        builder.Services.AddSingleton(serviceProvider =>
-            new AuthenticationWorkLimiter(serviceProvider.GetRequiredService<IOptions<SiloConnectionAuthenticationOptions>>().Value));
+        RegisterAuthentication(builder.Services, registration);
         builder.Services.AddSingleton<InboundSiloConnectionAuthenticationMiddleware>();
         builder.Services.AddSingleton<OutboundSiloConnectionAuthenticationMiddleware>();
 
