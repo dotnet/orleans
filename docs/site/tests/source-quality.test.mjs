@@ -507,14 +507,16 @@ describe('documentation source quality', () => {
     ]);
   });
 
-  test('does not open a compatibility exemption from an HTML comment', () => {
+  test.each(['-->', '--!>'])(
+    'does not open a compatibility exemption from an HTML comment closed by %s',
+    (commentClose) => {
     const source = [
       '---',
       'zone_pivot_groups: orleans-version',
       '---',
       '<!--',
       ':::zone target="docs" pivot="orleans-9-0"',
-      '-->',
+      commentClose,
       'Orleans 9 is current prose.',
       ':::zone-end',
     ].join('\n');
@@ -531,7 +533,8 @@ describe('documentation source quality', () => {
         message: expect.stringContaining("'Orleans 9'"),
       }),
     );
-  });
+    },
+  );
 
   test('ignores a fake close in fenced code while reporting rendered releases', () => {
     const source = [

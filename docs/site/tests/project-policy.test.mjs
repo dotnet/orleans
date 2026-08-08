@@ -1,6 +1,4 @@
 import { describe, expect, test } from 'vitest';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -64,25 +62,24 @@ describe('documentation project policy', () => {
     );
   });
 
-  test('ignores commented projects and accepts single-quoted paths', async () => {
-    const directory = await mkdtemp(path.join(os.tmpdir(), 'orleans-project-policy-'));
-    try {
-      const solutionFile = path.join(directory, 'Docs.slnx');
-      await writeFile(
+  test('normalizes project paths returned by dotnet solution tooling', async () => {
+    const solutionFile = path.join(repoRoot, 'docs', 'Docs.slnx');
+    expect(
+      await readSolutionProjects({
+        repoRoot,
         solutionFile,
-        [
-          '<Solution>',
-          "  <Project Path='project.csproj' />",
-          '  <!-- <Project Path="commented.csproj" /> -->',
-          '</Solution>',
-        ].join('\n'),
-      );
-      expect(
-        await readSolutionProjects({ repoRoot: directory, solutionFile }),
-      ).toEqual([{ solutionPath: 'project.csproj', project: 'project.csproj' }]);
-    } finally {
-      await rm(directory, { recursive: true, force: true });
-    }
+        listProjects: async (requestedSolution) => {
+          expect(requestedSolution).toBe(solutionFile);
+          return ['site\\Tool.csproj', '../samples/App/App.csproj'];
+        },
+      }),
+    ).toEqual([
+      { solutionPath: 'site\\Tool.csproj', project: 'docs/site/Tool.csproj' },
+      {
+        solutionPath: '../samples/App/App.csproj',
+        project: 'samples/App/App.csproj',
+      },
+    ]);
   });
 
   test('reports target framework and exact Orleans package drift', () => {
