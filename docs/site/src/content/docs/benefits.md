@@ -17,7 +17,7 @@ Application code addresses grains by interface and key. Orleans maps that logica
 
 Because identity is independent of activation, Orleans can activate grains on demand and remove idle activations from memory. Applications can represent far more logical entities than fit in memory at once.
 
-The [Orleans virtual actor research](https://www.microsoft.com/research/project/orleans-virtual-actors/) compares this to virtual memory: application code can address a large logical space of grains while the runtime decides which activations are currently resident and where. The analogy applies to identity, indirection, and residency, not to state preservation.
+The [Orleans virtual actor research](https://www.microsoft.com/research/project/orleans-virtual-actors/) compares this to virtual memory: application code can address a large logical space of grains while the runtime decides which activations are currently resident and where.
 
 ## Isolated, turn-based execution
 

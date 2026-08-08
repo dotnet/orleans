@@ -55,7 +55,7 @@ No. An ordinary stateful grain normally has one activation in the cluster. Volat
 
 ### How do I avoid hot grains?
 
-An ordinary grain activation processes one turn at a time by default, so a single key can become a bottleneck even when the rest of the cluster has capacity. Partition work across keys, use staged or hierarchical aggregation, batch calls, or use stateless workers for suitable stateless operations. Changing placement can move a hot activation but doesn't increase the throughput of that activation.
+An ordinary grain activation processes one turn at a time by default, so a single key can become a bottleneck even when the rest of the cluster has capacity. Partition work across keys, use staged or hierarchical aggregation, batch calls, or use stateless workers for suitable stateless operations. Moving an activation to a less-loaded host or closer to the grains it calls can improve throughput by reducing contention, RPC overhead, and latency, but placement alone doesn't partition a hot key or add concurrency to an ordinary grain activation.
 
 For example, if many grains regularly report counters or statistics, hash each reporter's stable key across a controlled set of intermediate aggregator grains. Each intermediate grain combines updates and periodically sends partial results to a final aggregator. This distributes the reporting load and reduces the number of turns at the central grain; add another level if one stage still receives too much fan-in. Choose the shard count and reporting cadence from load tests, and design persistence, idempotency, or reconciliation when losing or repeating an update would matter.
 
