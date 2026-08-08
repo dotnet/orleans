@@ -1,7 +1,7 @@
 ---
 title: Orleans streaming APIs
 description: Work with stream identities, producers, consumers, and explicit or implicit subscriptions in Orleans.
-ms.date: 08/02/2026
+ms.date: 08/08/2026
 ms.topic: concept-article
 ---
 
@@ -75,6 +75,14 @@ Implicit subscriptions are declared in grain metadata. They aren't created throu
 <a id="configuration"></a>
 
 Clients can produce and explicitly consume streams after the provider is configured on <xref:Orleans.Hosting.IClientBuilder>. Client subscriptions are tied to the connected client process and must be re-established after reconnecting or restarting. Implicit subscriptions target grains, not clients.
+
+## Stateless worker grains
+
+Grains marked with <xref:Orleans.Concurrency.StatelessWorkerAttribute> can publish stream events, but they can't subscribe to streams. A stream consumer uses a grain extension which must bind to one activation, while a stateless worker grain identity can have multiple activations. Orleans therefore rejects a subscription attempt from a stateless worker grain with an <xref:System.InvalidOperationException>.
+
+Use a regular grain as the stream consumer so that the stream-to-grain binding has a stable virtual identity which can own state and the subscription lifecycle. If processing after delivery is stateless and parallelizable, have that grain call stateless worker grains and await the required work before its consumer task completes. This keeps stream acknowledgment and recovery at the regular grain boundary instead of treating a multicast subscription as a competing-consumer work queue.
+
+Support for subscribing directly from stateless worker grains is tracked by [dotnet/orleans#433](https://github.com/dotnet/orleans/issues/433).
 
 <a id="stream-order-and-sequence-tokens"></a>
 <a id="rewindable-streams"></a>
