@@ -1,7 +1,7 @@
 ---
 title: Configure Consul clustering
 description: Configure Orleans silos and clients to use Consul for cluster membership and gateway discovery.
-ms.date: 08/05/2026
+ms.date: 08/08/2026
 ms.topic: how-to
 ---
 
@@ -74,6 +74,36 @@ builder.UseOrleansClient(clientBuilder =>
 
 await builder.Build().RunAsync();
 ```
+
+## Inspect membership data
+
+The provider stores each cluster beneath one Consul key/value prefix:
+
+- `<KvRootFolder>/orleans/<ClusterId>` when <xref:Orleans.Configuration.ConsulClusteringOptions.KvRootFolder?displayProperty=nameWithType> is configured.
+- `orleans/<ClusterId>` when `KvRootFolder` isn't configured.
+
+`ServiceId` isn't part of this prefix. Don't reuse the same `KvRootFolder` and `ClusterId` for different services, because their membership records would share one keyspace.
+
+Under the cluster prefix, the provider maintains:
+
+| Key | Purpose |
+| --- | --- |
+| `version` | The integer membership table version. Consul's `ModifyIndex` for this key is the compare-and-set ETag. |
+| `<silo-address>` | The silo registration, including its host name, gateway port, start time, status, silo name, and failure-detector votes. |
+| `<silo-address>/iamalive` | The silo's periodic `IAmAlive` timestamp. |
+
+Membership-row changes and the corresponding version change use a [Consul transaction](https://developer.hashicorp.com/consul/api-docs/txn) with compare-and-set operations. An `IAmAlive` update writes only its separate timestamp key and doesn't advance the table version. This value supports diagnostics and startup recovery; it isn't the direct heartbeat used to detect a failed silo. Silos probe one another for failure detection, as described in [Cluster membership](../../../implementation/cluster-management.md).
+
+Orleans clients list the cluster prefix and select active registrations with a nonzero gateway port. If a client discovers no gateways, inspect the exact prefix used by the client and silos, then compare registration status, gateway ports, and advertised-address reachability.
+
+Use the [Consul KV command](https://developer.hashicorp.com/consul/commands/kv/get) to list or inspect the records:
+
+```bash
+consul kv get -keys -recurse <cluster-prefix>
+consul kv get -detailed -recurse <cluster-prefix>
+```
+
+The detailed output includes each key's value and `ModifyIndex`. Treat the layout as a diagnostic implementation detail. Don't manually edit or delete membership keys while any silo from that cluster might still be running.
 
 ## Production considerations
 
