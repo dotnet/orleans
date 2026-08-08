@@ -16,15 +16,12 @@ Use this page to choose the right kind of learning material:
 
 ## Start here
 
-New to Orleans? [Build your first Orleans app](../quickstarts/build-your-first-orleans-app.md), a single-project ASP.NET Core URL shortener.
-
-For a compact grain call that you can clone and run, see the [Hello World sample](https://github.com/dotnet/orleans/tree/main/samples/HelloWorld).
+New to Orleans? [Build your first Orleans app](../quickstarts/build-your-first-orleans-app.md), a multi-project Hello World application with a silo and external client.
 
 ## Tutorials
 
 | Tutorial | What it teaches |
 | --- | --- |
-| [Create a multi-project Orleans application](multi-project-orleans-application.md) | Separate grain contracts, implementations, a silo, and an external client. |
 | [Custom grain storage](custom-grain-storage.md) | Implement and register an <xref:Orleans.Storage.IGrainStorage> provider. |
 | [Deploy and scale on Azure](../quickstarts/deploy-scale-orleans-on-azure.md) | Deploy an Orleans app to Azure Container Apps and configure shared providers. |
 

@@ -16,8 +16,6 @@ items:
         href: quickstarts/deploy-scale-orleans-on-azure.md
   - name: Tutorials
     items:
-      - name: Create a multi-project app
-        href: tutorials-and-samples/multi-project-orleans-application.md
       - name: Model an adventure game
         href: tutorials-and-samples/adventure.md
       - name: Build custom grain storage

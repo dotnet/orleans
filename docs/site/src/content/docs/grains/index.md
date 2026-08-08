@@ -9,7 +9,7 @@ ms.topic: article
 
 A grain is an application object with a stable logical identity. Orleans activates it on demand, routes calls to its current activation, and removes idle activations from memory. Application code works with grain references instead of constructing grain classes or locating activations.
 
-Projects defining grain contracts or implementations reference [Microsoft.Orleans.Sdk](https://www.nuget.org/packages/Microsoft.Orleans.Sdk). For host and project setup, see [Create a multi-project Orleans application](../tutorials-and-samples/multi-project-orleans-application.md#create-the-solution).
+Projects defining grain contracts or implementations reference [Microsoft.Orleans.Sdk](https://www.nuget.org/packages/Microsoft.Orleans.Sdk). For host and project setup, see [Build your first Orleans app](../quickstarts/build-your-first-orleans-app.md#create-the-solution).
 
 ## Define a grain contract
 
