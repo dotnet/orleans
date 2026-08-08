@@ -252,6 +252,12 @@ namespace Orleans.Connections.Security.Tests
                 Assert.Contains(OrleansProtocol, recorder.GetProtocols(ConnectionPath.ClientOutbound));
                 Assert.DoesNotContain(AuthenticatedSiloProtocol, recorder.GetProtocols(ConnectionPath.GatewayInbound));
                 Assert.DoesNotContain(AuthenticatedSiloProtocol, recorder.GetProtocols(ConnectionPath.ClientOutbound));
+                Assert.Contains(
+                    System.Security.Cryptography.X509Certificates.X509RevocationMode.Online,
+                    recorder.GetRevocationModes(ConnectionPath.SiloOutbound));
+                Assert.Contains(
+                    System.Security.Cryptography.X509Certificates.X509RevocationMode.Online,
+                    recorder.GetRevocationModes(ConnectionPath.ClientOutbound));
             }
             finally
             {
@@ -279,6 +285,11 @@ namespace Orleans.Connections.Security.Tests
                         ConfigureTls(options, certificate);
                         options.OnAuthenticateAsClient = (_, authenticationOptions) =>
                         {
+                            recorder.RecordRevocationMode(
+                                ConnectionPath.SiloOutbound,
+                                authenticationOptions.CertificateRevocationCheckMode);
+                            authenticationOptions.CertificateRevocationCheckMode =
+                                System.Security.Cryptography.X509Certificates.X509RevocationMode.NoCheck;
                             authenticationOptions.TargetHost = CertificateSubjectName;
                             authenticationOptions.ApplicationProtocols =
                             [
@@ -323,8 +334,14 @@ namespace Orleans.Connections.Security.Tests
                 clientBuilder.UseTls(options =>
                 {
                     options.AllowAnyRemoteCertificate();
+                    options.CheckCertificateRevocation = true;
                     options.OnAuthenticateAsClient = (_, authenticationOptions) =>
                     {
+                        recorder.RecordRevocationMode(
+                            ConnectionPath.ClientOutbound,
+                            authenticationOptions.CertificateRevocationCheckMode);
+                        authenticationOptions.CertificateRevocationCheckMode =
+                            System.Security.Cryptography.X509Certificates.X509RevocationMode.NoCheck;
                         authenticationOptions.TargetHost = CertificateSubjectName;
                     };
                 });
@@ -341,6 +358,7 @@ namespace Orleans.Connections.Security.Tests
             options.SslProtocols = System.Security.Authentication.SslProtocols.Tls12;
             options.AllowAnyRemoteCertificate();
             options.RemoteCertificateMode = RemoteCertificateMode.AllowCertificate;
+            options.CheckCertificateRevocation = true;
         }
 
         private sealed class ProtocolRecordingMiddleware(ProtocolRecorder recorder, ConnectionPath path) : IConnectionMiddleware
@@ -356,6 +374,9 @@ namespace Orleans.Connections.Security.Tests
         private sealed class ProtocolRecorder
         {
             private readonly ConcurrentDictionary<ConnectionPath, ConcurrentBag<string>> _protocols = new();
+            private readonly ConcurrentDictionary<
+                ConnectionPath,
+                ConcurrentBag<System.Security.Cryptography.X509Certificates.X509RevocationMode>> _revocationModes = new();
 
             public void Record(ConnectionPath path, string? protocol)
             {
@@ -365,6 +386,19 @@ namespace Orleans.Connections.Security.Tests
             public string[] GetProtocols(ConnectionPath path)
             {
                 return _protocols.TryGetValue(path, out var protocols) ? protocols.ToArray() : [];
+            }
+
+            public void RecordRevocationMode(
+                ConnectionPath path,
+                System.Security.Cryptography.X509Certificates.X509RevocationMode mode)
+            {
+                _revocationModes.GetOrAdd(path, static _ => []).Add(mode);
+            }
+
+            public System.Security.Cryptography.X509Certificates.X509RevocationMode[] GetRevocationModes(
+                ConnectionPath path)
+            {
+                return _revocationModes.TryGetValue(path, out var modes) ? modes.ToArray() : [];
             }
         }
 

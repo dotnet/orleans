@@ -93,7 +93,11 @@ Keep trust stores narrow. Don't place unrelated public or corporate roots in a w
 
 <xref:Orleans.Connections.Security.TlsOptions.SslProtocols> defaults to TLS 1.2 and TLS 1.3. Retain those defaults unless an interoperability or policy requirement calls for a narrower set. Orleans doesn't enable TLS 1.0 or TLS 1.1 by default.
 
-Set <xref:Orleans.Connections.Security.TlsOptions.CheckCertificateRevocation> to check remote certificates on inbound silo connections. For outbound connections, set <xref:Orleans.Connections.Security.TlsClientAuthenticationOptions.CertificateRevocationCheckMode> in <xref:Orleans.Connections.Security.TlsOptions.OnAuthenticateAsClient>. Before enabling revocation checks, verify that every workload can reach the certificate revocation list (CRL) or Online Certificate Status Protocol (OCSP) service and decide how outages should affect availability.
+Set <xref:Orleans.Connections.Security.TlsOptions.CheckCertificateRevocation> to
+check remote certificates on both inbound and outbound connections. Before
+enabling it, verify that every workload can reach the certificate revocation
+list (CRL) or Online Certificate Status Protocol (OCSP) service and decide how
+outages should affect availability.
 
 ## Rotate certificates
 
@@ -123,7 +127,7 @@ Certificate selectors are called during authentication, but certificate loading,
 
 - <xref:Orleans.Connections.Security.TlsOptions>
 - <xref:Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseTls*>
-- [Authenticate Orleans silo connections](authenticated-silo-connections.md)
+- [Authenticate Orleans connections](authenticated-silo-connections.md)
 - [Client configuration](configuration-guide/client-configuration.md)
 - [Server configuration](configuration-guide/server-configuration.md)
 - [.NET TLS/SSL best practices](https://learn.microsoft.com/dotnet/core/extensions/sslstream-best-practices)
