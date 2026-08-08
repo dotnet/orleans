@@ -40,6 +40,8 @@ items:
             href: grains/observers.md
           - name: Cancellation
             href: grains/cancellation-tokens.md
+          - name: Response streaming
+            href: grains/response-streaming.md
           - name: Request scheduling
             href: grains/request-scheduling.md
           - name: Request context
