@@ -1,4 +1,4 @@
-namespace GoogleFirestore;
+namespace FirestoreSample;
 
 public interface ICounterGrain : IGrainWithStringKey
 {

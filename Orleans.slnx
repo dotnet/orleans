@@ -102,10 +102,10 @@
     <Project Path="src/Cassandra/Orleans.Clustering.Cassandra/Orleans.Clustering.Cassandra.csproj" />
   </Folder>
   <Folder Name="/src/Extensions/Google/">
-    <Project Path="src/Google/Orleans.Clustering.GoogleFirestore/Orleans.Clustering.GoogleFirestore.csproj" />
-    <Project Path="src/Google/Orleans.GrainDirectory.GoogleFirestore/Orleans.GrainDirectory.GoogleFirestore.csproj" />
-    <Project Path="src/Google/Orleans.Persistence.GoogleFirestore/Orleans.Persistence.GoogleFirestore.csproj" />
-    <Project Path="src/Google/Orleans.Reminders.GoogleFirestore/Orleans.Reminders.GoogleFirestore.csproj" />
+    <Project Path="src/Google/Orleans.Clustering.Firestore/Orleans.Clustering.Firestore.csproj" />
+    <Project Path="src/Google/Orleans.GrainDirectory.Firestore/Orleans.GrainDirectory.Firestore.csproj" />
+    <Project Path="src/Google/Orleans.Persistence.Firestore/Orleans.Persistence.Firestore.csproj" />
+    <Project Path="src/Google/Orleans.Reminders.Firestore/Orleans.Reminders.Firestore.csproj" />
   </Folder>
   <Folder Name="/src/Extensions/NATS/">
     <Project Path="src\Orleans.Streaming.NATS\Orleans.Streaming.NATS.csproj" />
@@ -167,10 +167,10 @@
     <Project Path="test/Extensions/Orleans.Clustering.Cassandra.Tests/Orleans.Clustering.Cassandra.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Cosmos.Tests/Orleans.Cosmos.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Redis.Tests/Orleans.Redis.Tests.csproj" />
-    <Project Path="test/Extensions/Orleans.Clustering.GoogleFirestore.Tests/Orleans.Clustering.GoogleFirestore.Tests.csproj" />
-    <Project Path="test/Extensions/Orleans.GrainDirectory.GoogleFirestore.Tests/Orleans.GrainDirectory.GoogleFirestore.Tests.csproj" />
-    <Project Path="test/Extensions/Orleans.Persistence.GoogleFirestore.Tests/Orleans.Persistence.GoogleFirestore.Tests.csproj" />
-    <Project Path="test/Extensions/Orleans.Reminders.GoogleFirestore.Tests/Orleans.Reminders.GoogleFirestore.Tests.csproj" />
+    <Project Path="test/Extensions/Orleans.Clustering.Firestore.Tests/Orleans.Clustering.Firestore.Tests.csproj" />
+    <Project Path="test/Extensions/Orleans.GrainDirectory.Firestore.Tests/Orleans.GrainDirectory.Firestore.Tests.csproj" />
+    <Project Path="test/Extensions/Orleans.Persistence.Firestore.Tests/Orleans.Persistence.Firestore.Tests.csproj" />
+    <Project Path="test/Extensions/Orleans.Reminders.Firestore.Tests/Orleans.Reminders.Firestore.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.AdoNet.Tests/Orleans.AdoNet.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Azure.Tests/Orleans.Azure.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.DurableJobs.AzureStorage.Tests/Orleans.DurableJobs.AzureStorage.Tests.csproj" />

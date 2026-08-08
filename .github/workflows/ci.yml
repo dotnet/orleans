@@ -1018,7 +1018,7 @@ jobs:
         distribution: temurin
         java-version: '21'
     - name: Setup Google Emulators
-      working-directory: test/Extensions/GoogleFirestore/Emulators
+      working-directory: test/Extensions/Google/Emulators
       run: |
         set -euo pipefail
 

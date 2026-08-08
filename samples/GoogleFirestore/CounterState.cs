@@ -1,4 +1,4 @@
-namespace GoogleFirestore;
+namespace FirestoreSample;
 
 [GenerateSerializer]
 public sealed class CounterState

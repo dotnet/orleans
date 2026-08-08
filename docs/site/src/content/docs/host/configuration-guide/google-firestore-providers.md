@@ -11,10 +11,10 @@ Orleans provides the following Google Cloud Firestore integrations:
 
 | Capability | Package |
 |---|---|
-| Cluster membership and client gateway discovery | [`Microsoft.Orleans.Clustering.GoogleFirestore`](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.GoogleFirestore) |
-| Grain directory | [`Microsoft.Orleans.GrainDirectory.GoogleFirestore`](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.GoogleFirestore) |
-| Grain persistence | [`Microsoft.Orleans.Persistence.GoogleFirestore`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.GoogleFirestore) |
-| Reminders | [`Microsoft.Orleans.Reminders.GoogleFirestore`](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.GoogleFirestore) |
+| Cluster membership and client gateway discovery | [`Microsoft.Orleans.Clustering.Firestore`](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.Firestore) |
+| Grain directory | [`Microsoft.Orleans.GrainDirectory.Firestore`](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.Firestore) |
+| Grain persistence | [`Microsoft.Orleans.Persistence.Firestore`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Firestore) |
+| Reminders | [`Microsoft.Orleans.Reminders.Firestore`](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Firestore) |
 
 Create the [`(default)` Firestore database in Native mode](https://cloud.google.com/firestore/docs/create-database-server-client-library) before starting the cluster. The providers use the Google Cloud .NET client library and therefore use [Application Default Credentials (ADC)](https://cloud.google.com/docs/authentication/provide-credentials-adc) when connecting to Google Cloud. Prefer workload identity or an attached service account over long-lived service-account keys.
 
@@ -24,7 +24,7 @@ Grant the application's identity only the [Firestore IAM permissions](https://cl
 
 Configure every installed Firestore provider with the same Google Cloud project and root collection. The following example configures all four providers:
 
-:::code language="csharp" source="../snippets/google-firestore/GoogleFirestoreConfiguration.cs" id="google_firestore_silo":::
+:::code language="csharp" source="../snippets/google-firestore/FirestoreConfiguration.cs" id="google_firestore_silo":::
 
 The configuration uses:
 
@@ -34,7 +34,7 @@ The configuration uses:
 
 Keep `ClusterId` and `ServiceId` stable for the lifetime of a deployment. Use different values when deployments must not share membership, grain locations, reminders, or state.
 
-<xref:Orleans.Hosting.GoogleFirestoreGrainDirectoryExtensions.UseGoogleFirestoreGrainDirectoryAsDefault*> replaces the built-in directory for every grain type which doesn't explicitly select another directory. External directories add a Firestore request to directory operations, so benchmark activation-heavy workloads before using one as the default.
+<xref:Orleans.Hosting.FirestoreGrainDirectoryExtensions.UseFirestoreGrainDirectoryAsDefault*> replaces the built-in directory for every grain type which doesn't explicitly select another directory. External directories add a Firestore request to directory operations, so benchmark activation-heavy workloads before using one as the default.
 
 For details about state records, serializers, and clear behavior, see [Google Cloud Firestore grain persistence](../../grains/grain-persistence/google-firestore-storage.md).
 
@@ -42,7 +42,7 @@ For details about state records, serializers, and clear behavior, see [Google Cl
 
 External clients use the clustering package to discover active Orleans gateways:
 
-:::code language="csharp" source="../snippets/google-firestore/GoogleFirestoreConfiguration.cs" id="google_firestore_client":::
+:::code language="csharp" source="../snippets/google-firestore/FirestoreConfiguration.cs" id="google_firestore_client":::
 
 The client's `ClusterId`, `ServiceId`, `ProjectId`, and `RootCollectionName` must match the silo configuration.
 
