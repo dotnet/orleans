@@ -45,7 +45,7 @@ Orleans supports these grain method return types:
 - <xref:System.Threading.Tasks.ValueTask`1>
 - <xref:System.Collections.Generic.IAsyncEnumerable`1>
 
-Use <xref:System.Threading.Tasks.Task> or <xref:System.Threading.Tasks.ValueTask> for methods without a result, and their generic forms for methods returning a result. Use <xref:System.Collections.Generic.IAsyncEnumerable`1> to [stream one call's results](async-enumerable-results.md) progressively. Don't use `void`, `async void`, or synchronous return types in grain contracts. A <xref:System.Threading.CancellationToken> can be included as a method parameter for cooperative cancellation. For the underlying C# model, see [Asynchronous programming](https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/).
+Use <xref:System.Threading.Tasks.Task> or <xref:System.Threading.Tasks.ValueTask> for methods without a result, and their generic forms for methods returning a result. Use <xref:System.Collections.Generic.IAsyncEnumerable`1> for [response streaming](response-streaming.md). Don't use `void`, `async void`, or synchronous return types in grain contracts. A <xref:System.Threading.CancellationToken> can be included as a method parameter for cooperative cancellation. For the underlying C# model, see [Asynchronous programming](https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/).
 
 Arguments, return values, and exceptions cross process boundaries. Make application data serializable by Orleans, normally using <xref:Orleans.GenerateSerializerAttribute> and stable <xref:Orleans.IdAttribute> values. Grain references are already serializable and can be passed in calls or stored as part of grain state.
 
@@ -146,7 +146,7 @@ See [Grain lifecycle](grain-lifecycle.md) for collection, lifecycle participatio
 Most grains only need a contract, an implementation, a stable key, and regular request-response calls. Add specialized behavior only when the workload requires it:
 
 - [Request scheduling and reentrancy](request-scheduling.md)
-- [Stream grain results with IAsyncEnumerable](async-enumerable-results.md)
+- [Response streaming with IAsyncEnumerable](response-streaming.md)
 - [Timers and reminders](timers-and-reminders.md)
 - [Observers](observers.md)
 - [Grain placement](grain-placement.md)

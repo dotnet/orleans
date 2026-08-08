@@ -1,6 +1,6 @@
 ---
 title: Choose an Orleans messaging abstraction
-description: Choose among grain calls, streamed grain results, observers, Orleans streams, and broadcast channels.
+description: Choose among grain calls, response streaming, observers, Orleans streams, and broadcast channels.
 ms.date: 08/08/2026
 ms.topic: concept-article
 ---
@@ -12,7 +12,7 @@ Start from the relationship between sender and receiver and from the failure beh
 | Use | Best fit | Important behavior |
 |---|---|---|
 | Invoke a known grain and await a result | **Grain call** | Addressed request/response with Orleans call semantics. The caller knows the target grain identity. |
-| Return one grain call's results progressively | **`IAsyncEnumerable<T>` grain method** | Pull-based, single-caller enumeration. It isn't multicast, retained, or durable. |
+| Return one grain call's results progressively | **Response streaming (`IAsyncEnumerable<T>`)** | Pull-based, single-caller enumeration. It isn't multicast, retained, or durable. |
 | Push transient notifications from grains to a connected client | **Grain observer** | Ephemeral client callback. The application registers and removes observer references and handles disconnects. |
 | Publish typed events to multiple independent subscriptions | **Orleans stream** | Multicast pub/sub. Provider selection controls durability, retries, ordering, and replay. Explicit subscriptions can survive activation changes. |
 | Send best-effort notifications to grains selected from a channel identity | **Broadcast channel** | Implicit, nonpersistent fan-out. No queue, history, replay, or durable subscription registry. |
@@ -21,7 +21,7 @@ Start from the relationship between sender and receiver and from the failure beh
 
 Use a grain call when the sender knows which grain owns the operation, needs a return value, or needs failure to propagate through the call. Grain calls make ownership and control flow explicit. Don't introduce a stream merely to avoid calling a known grain.
 
-When one call produces many results, a grain method can return <xref:System.Collections.Generic.IAsyncEnumerable`1> so the caller processes them incrementally. See [Stream grain results with IAsyncEnumerable](../grains/async-enumerable-results.md).
+Use **response streaming** when one call produces many results: the grain method returns <xref:System.Collections.Generic.IAsyncEnumerable`1> so the caller can process the response incrementally. See [Response streaming with IAsyncEnumerable](../grains/response-streaming.md).
 
 ## Prefer observers for client callbacks
 

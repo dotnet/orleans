@@ -1,17 +1,17 @@
 ---
-title: Stream grain results with IAsyncEnumerable
-description: Return IAsyncEnumerable<T> from an Orleans grain method to stream one call's results.
+title: Response streaming with IAsyncEnumerable
+description: Stream a grain call's response incrementally using IAsyncEnumerable<T>.
 ms.date: 08/08/2026
 ms.topic: concept-article
 ---
 
-# Stream grain results with IAsyncEnumerable
+# Response streaming with IAsyncEnumerable
 
-A grain method can return <xref:System.Collections.Generic.IAsyncEnumerable`1> to deliver a sequence to one caller without materializing the full result first. The caller addresses a grain as for any other grain call, and then pulls results as they're produced.
+**Response streaming** lets a grain method return <xref:System.Collections.Generic.IAsyncEnumerable`1> so one caller can consume a logically single grain call's response incrementally. The caller addresses a grain as for any other grain call, and then pulls results as they're produced.
 
-Use this pattern for a query or command whose results are naturally incremental. It remains a single live grain call: it doesn't create a durable subscription, retain results, or multicast them to other consumers. For those capabilities, consider [Orleans streams](../streaming/index.md).
+Use response streaming for a query or command whose results are naturally incremental. A response stream doesn't create a durable subscription, retain results, or multicast them to other consumers. For those capabilities, consider [Orleans Streams](../streaming/index.md).
 
-## Define and implement a streaming method
+## Define and implement a response-streaming method
 
 Declare <xref:System.Collections.Generic.IAsyncEnumerable`1> directly on the grain interface. A cancellation token is optional, as with other grain methods:
 
@@ -21,15 +21,15 @@ An async iterator can produce each result with `yield return`. Apply <xref:Syste
 
 :::code language="csharp" source="snippets/async-enumerable-results/StreamingGrain.cs" id="streaming_implementation":::
 
-## Consume the results
+## Consume a streamed response
 
-Use `await foreach` to process each result. The remote enumeration starts when the caller requests the first element, not when the grain method returns the enumerable:
+Use `await foreach` to process each result. The response stream starts when the caller requests the first element, not when the grain method returns the enumerable:
 
 :::code language="csharp" source="snippets/async-enumerable-results/StreamingConsumer.cs" id="consume_stream":::
 
 Leaving an `await foreach` loop disposes its enumerator, including when the loop exits with `break` or an exception.
 
-## Control batching
+## Control response batching
 
 Orleans batches synchronously available elements to reduce network round trips, up to 100 elements by default. Use <xref:Orleans.Runtime.AsyncEnumerableExtensions.WithBatchSize*> to change that limit:
 
@@ -39,27 +39,27 @@ Call `WithBatchSize` directly on the value returned by the grain method and befo
 
 Batching doesn't cause Orleans to read an unbounded number of elements ahead. The caller's next `MoveNextAsync` request drives production, and a batch contains only elements that become synchronously available, up to the configured limit.
 
-## Cancel enumeration
+## Cancel response streaming
 
 Supply a token as a grain method argument, through `WithCancellation`, or both. Orleans links distinct tokens so cancellation of either stops the enumeration. Call `WithBatchSize` first when using both extensions:
 
 :::code language="csharp" source="snippets/async-enumerable-results/StreamingConsumer.cs" id="cancel_stream":::
 
-Cancellation is cooperative and surfaces to the caller as <xref:System.OperationCanceledException>. The iterator must observe its token and pass it to cancellation-aware operations. See [Cancel Orleans grain calls](cancellation-tokens.md) for delivery and failure semantics.
+Cancellation is cooperative and surfaces to the caller as <xref:System.OperationCanceledException>. The response-streaming method must observe its token and pass it to cancellation-aware operations. See [Cancel Orleans grain calls](cancellation-tokens.md) for delivery and failure semantics.
 
-## Handle interrupted enumeration
+## Handle an interrupted response stream
 
-An exception thrown by the iterator propagates to the caller with its original exception type. The caller instead receives <xref:Orleans.Runtime.EnumerationAbortedException> if the grain deactivates during enumeration or the silo removes an enumerator which the caller left idle:
+An exception thrown while producing the response stream propagates to the caller with its original exception type. The caller instead receives <xref:Orleans.Runtime.EnumerationAbortedException> if the grain deactivates during enumeration or the silo removes an enumerator which the caller left idle:
 
 :::code language="csharp" source="snippets/async-enumerable-results/StreamingConsumer.cs" id="handle_interruption":::
 
 Idle-enumerator cleanup runs periodically using <xref:Orleans.Configuration.MessagingOptions.ResponseTimeout> as its interval. Don't hold an enumerator open while doing unrelated long-running work. If processing an element can take a long time, decouple that work from pulling the next element or use a messaging abstraction with a lifetime independent of one grain call.
 
-## Choose between IAsyncEnumerable and Orleans streams
+## Choose between response streaming and Orleans Streams
 
-| Concern | `IAsyncEnumerable<T>` grain method | Orleans stream |
+| Concern | Response streaming with `IAsyncEnumerable<T>` | Orleans Streams |
 |---|---|---|
-| Communication shape | One grain call, one producer, and one caller | Multicast pub/sub with independent producers and subscribers |
+| Communication shape | Logically one grain call, one producer, and one caller | Multicast pub/sub with independent producers and subscribers |
 | Lifetime | One live enumeration, ending on completion, disposal, cancellation, deactivation, or idle cleanup | Independent of any one grain call; subscriptions can survive activation changes |
 | Flow control | Pull-based; `MoveNextAsync` drives production, with bounded batching | Provider-dependent delivery and buffering |
 | Persistence and replay | None | Optional and provider-dependent |
