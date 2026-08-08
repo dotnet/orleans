@@ -5,6 +5,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import { markdownDirectiveProtectedLineRanges } from '../scripts/lib/markdown-ranges.mjs';
 import {
   auditDocumentationContent,
+  collectPackageProjects,
   collectCsharpFences,
   createCsharpFenceManifest,
   findReleaseVersionIssues,
@@ -32,6 +33,45 @@ afterEach(async () => {
 });
 
 describe('documentation source quality', () => {
+  test('uses evaluated package metadata instead of raw conditional XML', async () => {
+    const repositoryRoot = await mkdtemp(path.join(os.tmpdir(), 'orleans-package-policy-'));
+    temporaryDirectories.push(repositoryRoot);
+    const projectRoot = path.join(repositoryRoot, 'src', 'Conditional');
+    await mkdir(projectRoot, { recursive: true });
+    const project = path.join(projectRoot, 'Conditional.csproj');
+    await writeFile(
+      project,
+      [
+        '<Project Sdk="Microsoft.NET.Sdk">',
+        '  <!-- <IsPackable>false</IsPackable> -->',
+        '  <PropertyGroup Condition="\'$(Ignored)\' == \'true\'">',
+        '    <PackageId>Wrong.Package</PackageId>',
+        '  </PropertyGroup>',
+        '</Project>',
+      ].join('\n'),
+    );
+
+    const packages = await collectPackageProjects(repositoryRoot, {
+      evaluate: async (file) => {
+        expect(file).toBe(project);
+        return {
+          IsPackable: 'true',
+          PackageId: 'Microsoft.Orleans.Conditional',
+          VersionSuffix: 'alpha.1',
+        };
+      },
+    });
+
+    expect(packages).toEqual(
+      new Map([
+        [
+          'Microsoft.Orleans.Conditional',
+          { file: project, alpha: true },
+        ],
+      ]),
+    );
+  });
+
   test('allows explicit releases only in migration or upgrade paths and links', () => {
     expect(
       findReleaseVersionIssues({

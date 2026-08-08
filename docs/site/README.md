@@ -64,7 +64,7 @@ with a used, meaningful `OrleansDocumentationVersionException` property. To
 compile the complete aggregate locally, run:
 
 ```powershell
-dotnet build ../Docs.slnx --framework net10.0
+dotnet build ../Docs.slnx --configuration Release -p:BuildExternalAssets=false
 ```
 
 To compile only the 38 checked-in documentation snippet projects sequentially,
