@@ -8,7 +8,7 @@ ms.topic: concept-article
 # Grain placement filters
 
 > [!WARNING]
-> The built-in <xref:Orleans.Runtime.Placement.Filtering.RequiredMatchSiloMetadataPlacementFilterAttribute> and <xref:Orleans.Runtime.Placement.Filtering.PreferredMatchSiloMetadataPlacementFilterAttribute> are experimental. These attributes are annotated with `Experimental("ORLEANSEXP004")` and can change without notice.
+> The built-in <xref:Orleans.Runtime.Placement.Filtering.RequiredMatchSiloMetadataPlacementFilterAttribute> and <xref:Orleans.Runtime.Placement.Filtering.PreferredMatchSiloMetadataPlacementFilterAttribute> are experimental and annotated with `Experimental("ORLEANSEXP004")`. This diagnostic doesn't apply to the custom filter APIs described below.
 
 Placement first determines which silos are compatible with a grain type. Filters then reduce that candidate set, in order, before the grain's [placement strategy](grain-placement.md) selects a target.
 
