@@ -43,11 +43,18 @@ namespace Orleans.Hosting
             configurator.Configure(configureOptions);
         }
 
+        /// <summary>
+        /// Configures the stream provider to persist checkpoints using Azure Table Storage.
+        /// </summary>
+        /// <remarks>
+        /// This compatibility method is not an extension method. Use
+        /// <see cref="AzureTableStreamConfiguratorExtensions.UseAzureTableCheckpointer"/> instead.
+        /// </remarks>
         public static void UseAzureTableCheckpointer(
-            this ISiloEventHubStreamConfigurator configurator,
+            ISiloEventHubStreamConfigurator configurator,
             Action<OptionsBuilder<AzureTableStreamCheckpointerOptions>> configureOptions)
         {
-            configurator.ConfigureCheckpointer(EventHubCheckpointerFactory.CreateFactory, configureOptions);
+            AzureTableStreamConfiguratorExtensions.UseAzureTableCheckpointer(configurator, configureOptions);
         }
 
     }
@@ -62,6 +69,12 @@ namespace Orleans.Hosting
             {
                 services.AddOptions<GrainStreamQueueCheckpointerOptions>(name)
                     .Configure(static options => options.CheckpointComparer = StreamCheckpointComparers.Numeric);
+                services.AddOptions<AzureTableStreamCheckpointerOptions>(name)
+                    .Configure(static options =>
+                    {
+                        options.CheckpointComparer = StreamCheckpointComparers.Numeric;
+                        options.PartitionKeyPrefix = StreamQueueCheckpointEntity.EventHubPartitionKeyPrefix;
+                    });
                 services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
                     .ConfigureNamedOptionForLogging<EventHubReceiverOptions>(name)
                     .ConfigureNamedOptionForLogging<EventHubStreamCachePressureOptions>(name)
