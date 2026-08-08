@@ -1,4 +1,4 @@
-﻿namespace Tests;
+namespace Tests;
 
 public interface IHelloGrain : IGrainWithGuidKey
 {
