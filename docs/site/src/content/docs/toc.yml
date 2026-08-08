@@ -10,6 +10,8 @@ items:
         href: benefits.md
   - name: Get started
     items:
+      - name: Hello World
+        href: tutorials-and-samples/hello-world.md
       - name: Build your first Orleans app
         href: quickstarts/build-your-first-orleans-app.md
       - name: Deploy and scale on Azure

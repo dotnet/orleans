@@ -1,21 +1,21 @@
 ---
-title: 'Quickstart: Build your first Orleans app'
-description: Build Orleans Hello World applications using single- and multi-project structures.
+title: 'Tutorial: Build your first Orleans app'
+description: Build a multi-project Orleans application with a silo and external client.
 ms.date: 08/08/2026
-ms.topic: quickstart
+ms.topic: tutorial
 ms.devlang: csharp
 ---
 
-# Quickstart: Build your first Orleans app
+# Tutorial: Build your first Orleans app
 
-In this quickstart, you build a Hello World application and run your first grain call. Start with one project that hosts Orleans and calls a grain in the same process. Then build a version that separates grain contracts, implementations, the silo, and an external client.
+In this tutorial, you build a small Orleans application using project boundaries typical of larger applications. Grain contracts, grain implementations, the silo, and an external client are separate projects with distinct dependencies and deployment roles.
 
 You learn how to:
 
-- Add Orleans to a .NET application.
 - Define and implement a grain.
-- Host a silo and call a grain in the same process.
+- Host grains in a silo.
 - Connect an external client to a silo.
+- Obtain a grain reference and call it.
 - Structure project references so that clients depend on contracts, not implementations.
 
 The example uses localhost clustering and omits production concerns such as durable storage, authentication, observability, and application-level retry policies.
@@ -24,66 +24,9 @@ The example uses localhost clustering and omits production concerns such as dura
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - An editor such as [Visual Studio](https://visualstudio.microsoft.com/) or [Visual Studio Code](https://code.visualstudio.com/)
-- Two terminals for the multi-project version
+- Two terminals so that the silo and client can run at the same time
 
-## Build a single-project app
-
-The single-project version hosts a silo and calls its grain using the client that Orleans provides inside every silo.
-
-### Create the project
-
-Run the following commands in an empty directory:
-
-```dotnetcli
-dotnet new console --name HelloWorld --framework net10.0
-cd HelloWorld
-dotnet package add Microsoft.Orleans.Server --version 10.2.2
-dotnet package add Microsoft.Extensions.Hosting --version 10.0.9
-```
-
-[`Microsoft.Orleans.Server`](https://www.nuget.org/packages/Microsoft.Orleans.Server) includes the Orleans runtime, client APIs, and SDK build tooling.
-
-### Define the grain contract
-
-Create _IHello.cs_ and define a grain interface:
-
-:::code source="snippets/hello-world/single-project/IHello.cs":::
-
-<xref:Orleans.IGrainWithStringKey> identifies the grain by a string key. Grain contracts use asynchronous return types because calls can cross process and network boundaries.
-
-### Implement the grain
-
-Create _HelloGrain.cs_ and implement the grain interface:
-
-:::code source="snippets/hello-world/single-project/HelloGrain.cs":::
-
-### Configure Orleans and call the grain
-
-Replace _Program.cs_ with the following code:
-
-:::code source="snippets/hello-world/single-project/Program.cs":::
-
-<xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*> adds a silo and its in-process client to the [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensions/generic-host). <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalhostClustering*> configures development-only clustering on the local machine.
-
-After the host starts, resolve <xref:Orleans.IGrainFactory>, obtain a logical reference to the grain identified by `friend`, and call it.
-
-### Run the app
-
-```dotnetcli
-dotnet run
-```
-
-The app prints:
-
-```output
-Hello, Hi friend!
-```
-
-## Build a multi-project app
-
-Use separate projects when grain contracts, implementations, silos, and clients need different dependencies or deployment boundaries.
-
-### Create the solution
+## Create the solution
 
 Create a solution with four projects:
 
@@ -120,7 +63,7 @@ dotnet package add Microsoft.Extensions.Hosting --version 10.0.9 --project Clien
 
 The client references only **GrainInterfaces**. It doesn't need the grain implementation assembly. The silo references **Grains**, which in turn references **GrainInterfaces**.
 
-### Define the grain contract
+## Define the grain contract
 
 Delete _GrainInterfaces/Class1.cs_, create _GrainInterfaces/IHello.cs_, and add the following grain interface:
 
@@ -128,7 +71,7 @@ Delete _GrainInterfaces/Class1.cs_, create _GrainInterfaces/IHello.cs_, and add 
 
 <xref:Orleans.IGrainWithStringKey> identifies the grain by a string key. Grain contracts use asynchronous return types because calls can cross process and network boundaries.
 
-### Implement the grain
+## Implement the grain
 
 Delete _Grains/Class1.cs_, create _Grains/HelloGrain.cs_, and add the following implementation:
 
@@ -136,7 +79,7 @@ Delete _Grains/Class1.cs_, create _Grains/HelloGrain.cs_, and add the following 
 
 The implementation inherits from <xref:Orleans.Grain> and implements `IHello`. Orleans source generators discover the grain contract and implementation at build time, so you don't need to register application parts manually.
 
-### Configure the silo
+## Configure the silo
 
 Replace _Silo/Program.cs_ with the following code:
 
@@ -146,7 +89,7 @@ Replace _Silo/Program.cs_ with the following code:
 
 The silo project references **Grains**, so the runtime can discover and activate `HelloGrain`.
 
-### Configure the external client
+## Configure the external client
 
 Replace _Client/Program.cs_ with the following code:
 
@@ -154,7 +97,7 @@ Replace _Client/Program.cs_ with the following code:
 
 <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*> adds an external Orleans client to the Generic Host. The client uses the same localhost clustering configuration as the silo. After the host starts, the client resolves <xref:Orleans.IGrainFactory> from dependency injection, obtains a grain reference, and invokes the grain.
 
-### Build and run the application
+## Build and run the application
 
 Build the solution:
 

@@ -21,8 +21,8 @@ highlightedContent:
           title: Deploy Orleans apps
           url: deployment/index.md
         - itemType: quickstart
-          title: Build your first Orleans app
-          url: quickstarts/build-your-first-orleans-app.md
+          title: Orleans Hello World
+          url: tutorials-and-samples/hello-world.md
         - itemType: whats-new
           title: Migration guide
           url: migration-guide.md

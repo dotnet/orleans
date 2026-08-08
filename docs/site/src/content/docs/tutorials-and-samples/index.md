@@ -16,7 +16,9 @@ Use this page to choose the right kind of learning material:
 
 ## Start here
 
-New to Orleans? [Build your first Orleans app](../quickstarts/build-your-first-orleans-app.md), starting with a single-project Hello World app and progressing to a silo with an external client.
+For the bare minimum application, start with [Orleans Hello World](hello-world.md). It hosts a silo and calls a grain from one process.
+
+For a more typical project structure, [Build your first Orleans app](../quickstarts/build-your-first-orleans-app.md) using separate grain contract, implementation, silo, and external-client projects.
 
 ## Tutorials
 
