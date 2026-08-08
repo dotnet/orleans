@@ -3,7 +3,7 @@
     <PackageId>Microsoft.Orleans.Reminders.GoogleFirestore</PackageId>
     <Title>Microsoft Orleans Google Cloud Firestore Reminders Provider</Title>
     <Description>Microsoft Orleans reminders provider backed by Google Cloud Firestore</Description>
-    <PackageTags>$(PackageTags) Google Cloud Firestore</PackageTags>
+    <PackageTags>$(PackageTags) Google Cloud GCP Firestore</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.Reminders.GoogleFirestore</AssemblyName>
     <RootNamespace>Orleans.Reminders.GoogleFirestore</RootNamespace>
