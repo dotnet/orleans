@@ -109,6 +109,7 @@ These packages don't replace the cluster membership provider.
 | [Microsoft.Orleans.Journaling.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.AzureStorage) | Experimental Azure Blob Storage provider for Orleans Journaling. |
 | [Microsoft.Orleans.Transactions](https://www.nuget.org/packages/Microsoft.Orleans.Transactions) | Distributed transaction runtime. |
 | [Microsoft.Orleans.Transactions.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Transactions.AzureStorage) | Azure Storage transaction state. |
+| [Microsoft.Orleans.Transactions.DynamoDB](https://www.nuget.org/packages/Microsoft.Orleans.Transactions.DynamoDB) | Amazon DynamoDB transaction state. |
 
 ## Serialization
 

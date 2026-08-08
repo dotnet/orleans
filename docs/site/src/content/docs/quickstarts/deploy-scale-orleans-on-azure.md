@@ -295,9 +295,8 @@ endpoint pair, while Azure Container Apps doesn't provide stable per-replica
 addresses for one app.
 
 To scale this topology, deploy additional one-replica silo apps with distinct
-advertised endpoints. See [Deploy Orleans to Azure Container
-Apps](../deployment/deploy-to-azure-container-apps.md) for the supported topology,
-networking requirements, and upgrade procedure.
+advertised endpoints. See [Deploy Orleans to Azure Container Apps](../deployment/deploy-to-azure-container-apps.md)
+for the supported topology, networking requirements, and upgrade procedure.
 
 ## Related content
 

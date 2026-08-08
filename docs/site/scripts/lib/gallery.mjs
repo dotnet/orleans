@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, lstat, mkdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 function assertString(value, field, index) {
@@ -108,7 +108,40 @@ async function readGallery(galleryPath, allowMissing) {
   return { missing: false, items: validateGallery(parsed) };
 }
 
-async function resolveLocalImage(sample, repositoryRoot) {
+function isWithin(root, target) {
+  const relative = path.relative(root, target);
+  return (
+    relative === '' ||
+    (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
+  );
+}
+
+async function physicalSamplesRoot(repositoryRoot) {
+  const physicalRepositoryRoot = await realpath(repositoryRoot);
+  const logicalSamplesRoot = path.join(repositoryRoot, 'samples');
+  await lstat(logicalSamplesRoot);
+  const samplesRoot = await realpath(logicalSamplesRoot);
+  if (!isWithin(physicalRepositoryRoot, samplesRoot)) {
+    throw new Error(
+      `The repository samples directory '${logicalSamplesRoot}' resolves outside the repository root ('${samplesRoot}').`,
+    );
+  }
+  return samplesRoot;
+}
+
+async function resolveExistingCandidate(candidate) {
+  try {
+    await lstat(candidate);
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      return undefined;
+    }
+    throw error;
+  }
+  return realpath(candidate);
+}
+
+async function resolveLocalImage(sample, repositoryRoot, samplesRoot, sampleDirectory) {
   if (!sample.image) {
     return undefined;
   }
@@ -119,26 +152,57 @@ async function resolveLocalImage(sample, repositoryRoot) {
   const candidates = [
     path.resolve(repositoryRoot, sample.image),
     path.resolve(repositoryRoot, 'samples', sample.image),
-    path.resolve(repositoryRoot, 'samples', sample.path, sample.image),
+    path.resolve(sampleDirectory, sample.image),
   ];
   for (const candidate of candidates) {
-    const relative = path.relative(repositoryRoot, candidate);
-    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    const physicalCandidate = await resolveExistingCandidate(candidate);
+    if (!physicalCandidate) {
       continue;
     }
-    try {
-      await readFile(candidate);
-      return candidate;
-    } catch (error) {
-      if (error?.code !== 'ENOENT') {
-        throw error;
-      }
+    if (!isWithin(samplesRoot, physicalCandidate)) {
+      throw new Error(
+        `Sample '${sample.slug}' image '${sample.image}' resolves outside the samples root ('${physicalCandidate}').`,
+      );
     }
+    if (!(await stat(physicalCandidate)).isFile()) {
+      throw new Error(
+        `Sample '${sample.slug}' image '${sample.image}' does not resolve to a regular file ('${physicalCandidate}').`,
+      );
+    }
+    return physicalCandidate;
   }
 
   throw new Error(
     `Sample '${sample.slug}' references missing image '${sample.image}'. Checked ${candidates.join(' and ')}.`,
   );
+}
+
+async function validateSamplePath(sample, repositoryRoot, samplesRoot) {
+  const samplePath = path.resolve(repositoryRoot, 'samples', sample.path);
+  try {
+    await lstat(samplePath);
+    const physicalSamplePath = await realpath(samplePath);
+    if (!isWithin(samplesRoot, physicalSamplePath)) {
+      throw new Error(
+        `Sample '${sample.slug}' directory 'samples/${sample.path}' resolves outside the samples root ('${physicalSamplePath}').`,
+      );
+    }
+    if (!(await stat(physicalSamplePath)).isDirectory()) {
+      throw new Error('not a directory');
+    }
+    return physicalSamplePath;
+  } catch (error) {
+    if (
+      error?.code !== 'ENOENT' &&
+      error?.message !== 'not a directory'
+    ) {
+      throw error;
+    }
+    throw new Error(
+      `Sample '${sample.slug}' references missing directory 'samples/${sample.path}'. Update samples/gallery.json or restore the sample.`,
+      { cause: error },
+    );
+  }
 }
 
 export async function prepareGallery({
@@ -150,10 +214,18 @@ export async function prepareGallery({
   const galleryPath = path.join(repositoryRoot, 'samples', 'gallery.json');
   const gallery = await readGallery(galleryPath, allowMissing);
   await rm(publicImageDirectory, { recursive: true, force: true });
+  const samplesRoot =
+    gallery.items.length > 0 ? await physicalSamplesRoot(repositoryRoot) : undefined;
 
   const items = [];
   for (const sample of gallery.items) {
-    const sourceImage = await resolveLocalImage(sample, repositoryRoot);
+    const sampleDirectory = await validateSamplePath(sample, repositoryRoot, samplesRoot);
+    const sourceImage = await resolveLocalImage(
+      sample,
+      repositoryRoot,
+      samplesRoot,
+      sampleDirectory,
+    );
     let image = null;
     if (sourceImage && /^https?:\/\//.test(sourceImage)) {
       image = sourceImage;

@@ -63,6 +63,7 @@ export function renderPackageMarkdown(
 ): string {
   const namespaces = groupTypesByNamespace(pkg.types);
   const context = { packages, packageName: pkg.package.name, base };
+  const nuget = nugetHref(pkg.package.name);
   const groups = [...namespaces.entries()].map(([namespace, types]) =>
     section(
       namespace,
@@ -77,7 +78,7 @@ export function renderPackageMarkdown(
   return finalizeMarkdown([
     `# ${pkg.package.name}`,
     `${pkg.package.version} | ${pkg.package.targetFramework}`,
-    `[NuGet package](${nugetHref(pkg.package.name)})`,
+    nuget ? `[NuGet package](${nuget})` : '',
     ...groups,
   ]);
 }
@@ -90,6 +91,7 @@ export function renderTypeMarkdown(
 ): string {
   const context = { packages, packageName: pkg.package.name, base };
   const source = sourceHref(pkg.package, type.sourceFile, type.sourceLines);
+  const nuget = nugetHref(pkg.package.name);
   const memberGroups = [...groupMembersByKind(type.members).entries()].map(([kind, members]) =>
     section(
       memberKindLabels[kind],
@@ -115,7 +117,7 @@ export function renderTypeMarkdown(
   return finalizeMarkdown([
     `# ${markdownText(typeDisplayName(type))}`,
     `Package: [${pkg.package.name}](${withBase(base, packagePath(pkg.package.name))}) ${pkg.package.version}`,
-    `[NuGet package](${nugetHref(pkg.package.name)})${source ? ` | [Source](${source})` : ''}`,
+    `${nuget ? `[NuGet package](${nuget})` : ''}${nuget && source ? ' | ' : ''}${source ? `[Source](${source})` : ''}`,
     codeBlock(buildTypeSignature(type), 'csharp'),
     renderDocumentation(type.docs, context),
     enumMembers,
