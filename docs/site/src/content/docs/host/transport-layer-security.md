@@ -1,7 +1,7 @@
 ---
 title: Secure Orleans connections with TLS
 description: Configure server-authenticated TLS or mutual TLS for Orleans silo and client connections.
-ms.date: 08/02/2026
+ms.date: 08/08/2026
 ms.topic: how-to
 ---
 
@@ -31,6 +31,28 @@ The two similarly named options apply at different stages:
 Every silo both accepts and initiates connections. For mTLS, a silo certificate therefore needs the Server Authentication extended key usage (EKU) for inbound connections and the Client Authentication EKU for outbound connections. For server-authenticated TLS, the silo certificate only needs Server Authentication. An Orleans client certificate used for mTLS needs Client Authentication. Certificate identity, issuance, and trust should reflect workload roles rather than reusing one certificate and private key across the cluster.
 
 TLS provides confidentiality, integrity, and certificate-based peer authentication for the Orleans transport. It doesn't authorize grain calls, isolate tenants, protect data after either process receives it, or secure membership/storage provider traffic unless those providers are separately configured. Compromise of a trusted certificate or private key can let an attacker impersonate that workload.
+
+## Load the local certificate
+
+The `UseTls` overloads accept an <xref:System.Security.Cryptography.X509Certificates.X509Certificate2> with an accessible private key. Load it from the certificate source supported by your deployment, and keep it undisposed for the lifetime of the Orleans host.
+
+### Operating system certificate store
+
+When the workload certificate is installed in an operating system certificate store, Orleans can load it by subject name. The following silo example searches the current user's Personal (`My`) store, requires the certificate to be currently valid, and configures server-authenticated TLS:
+
+:::code language="csharp" source="./snippets/transport-layer-security/csharp/SiloExample/Program.cs" id="CertificateStore":::
+
+Set `allowInvalid` to `false` outside isolated development environments. The store overload requires an accessible private key and selects a certificate suitable for the workload role. Ensure the selected certificate has every EKU required by the authentication model; in particular, a silo certificate used for mTLS needs both Server Authentication and Client Authentication.
+
+Choose <xref:System.Security.Cryptography.X509Certificates.StoreLocation.CurrentUser> or <xref:System.Security.Cryptography.X509Certificates.StoreLocation.LocalMachine> according to the identity which runs the process, and grant that identity access to the private key. If a subject name can match more than one deployment certificate, load the intended certificate explicitly or use a certificate selector with an issuer, thumbprint, or other deployment-specific identity check.
+
+### PKCS#12/PFX file
+
+For a PKCS#12/PFX file, use <xref:System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadPkcs12FromFile*>:
+
+:::code language="csharp" source="./snippets/transport-layer-security/csharp/SiloExample/Program.cs" id="LoadPkcs12Certificate":::
+
+Obtain the path and password from protected configuration or a secret provider rather than source code or ordinary configuration files. Restrict access to the file and its private key to the workload identity. Pass the returned certificate to the appropriate silo or client `UseTls` configuration shown in the following sections, keep it alive while the host runs, and dispose it after the host stops.
 
 ## Configure server-authenticated TLS
 

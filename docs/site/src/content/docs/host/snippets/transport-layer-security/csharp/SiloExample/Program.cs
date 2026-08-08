@@ -7,6 +7,50 @@ Console.WriteLine("TLS configuration examples");
 
 internal static class TlsExamples
 {
+    // <CertificateStore>
+    public static IHost CreateServerAuthenticatedSiloFromStore()
+    {
+        var builder = Host.CreateApplicationBuilder();
+
+        builder.UseOrleans(siloBuilder =>
+        {
+            siloBuilder
+                .UseLocalhostClustering()
+                .UseTls(
+                    StoreName.My,
+                    "orleans.example.net",
+                    allowInvalid: false,
+                    StoreLocation.CurrentUser,
+                    options =>
+                    {
+                        options.RemoteCertificateMode =
+                            RemoteCertificateMode.NoCertificate;
+                        options.ClientCertificateMode =
+                            RemoteCertificateMode.NoCertificate;
+                        options.OnAuthenticateAsClient = (_, sslOptions) =>
+                        {
+                            sslOptions.TargetHost = "orleans.example.net";
+                            sslOptions.CertificateRevocationCheckMode =
+                                X509RevocationMode.Online;
+                        };
+                    });
+        });
+
+        return builder.Build();
+    }
+    // </CertificateStore>
+
+    // <LoadPkcs12Certificate>
+    public static X509Certificate2 LoadPkcs12Certificate(
+        string certificatePath,
+        ReadOnlySpan<char> certificatePassword)
+    {
+        return X509CertificateLoader.LoadPkcs12FromFile(
+            certificatePath,
+            certificatePassword);
+    }
+    // </LoadPkcs12Certificate>
+
     public static IHost CreateServerAuthenticatedSilo(X509Certificate2 serverCertificate)
     {
         // <ServerAuthenticatedTls>
