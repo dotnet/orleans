@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Server\Orleans.Server.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Sdk\Orleans.Sdk.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Clustering.Firestore\Orleans.Clustering.Firestore.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.GrainDirectory.Firestore\Orleans.GrainDirectory.Firestore.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Persistence.Firestore\Orleans.Persistence.Firestore.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Reminders.Firestore\Orleans.Reminders.Firestore.csproj" />
+  </ItemGroup>
+
+</Project>

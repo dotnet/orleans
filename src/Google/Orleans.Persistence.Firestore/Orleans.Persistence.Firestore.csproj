@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Persistence.Firestore</PackageId>
+    <Title>Microsoft Orleans Google Cloud Firestore Persistence Provider</Title>
+    <Description>Microsoft Orleans persistence provider backed by Google Cloud Firestore</Description>
+    <PackageTags>$(PackageTags) Google Cloud GCP Firestore</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <AssemblyName>Orleans.Persistence.Firestore</AssemblyName>
+    <RootNamespace>Orleans.Persistence.Firestore</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants>$(DefineConstants);ORLEANS_PERSISTENCE</DefineConstants>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Storage\FirestoreDataManager.cs" Link="Storage\FirestoreDataManager.cs" />
+    <Compile Include="..\Shared\Storage\FirestoreEntity.cs" Link="Storage\FirestoreEntity.cs" />
+    <Compile Include="..\Shared\Storage\FirestoreOptions.cs" Link="Storage\FirestoreOptions.cs" />
+    <Compile Include="..\Shared\Utils\Utils.cs" Link="Utils\Utils.cs" />
+    <Compile Remove="FirestoreGrainStorageExtensions.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <PackageReference Include="Google.Cloud.Firestore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Persistence.Firestore.Tests" />
+  </ItemGroup>
+
+</Project>

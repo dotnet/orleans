@@ -2,13 +2,13 @@ using System.Collections.Generic;
 using Google.Cloud.Firestore;
 
 #if ORLEANS_CLUSTERING
-namespace Orleans.Clustering.GoogleFirestore;
+namespace Orleans.Clustering.Firestore;
 #elif ORLEANS_PERSISTENCE
-namespace Orleans.Persistence.GoogleFirestore;
+namespace Orleans.Persistence.Firestore;
 #elif ORLEANS_REMINDERS
-namespace Orleans.Reminders.GoogleFirestore;
+namespace Orleans.Reminders.Firestore;
 #elif ORLEANS_DIRECTORY
-namespace Orleans.GrainDirectory.GoogleFirestore;
+namespace Orleans.GrainDirectory.Firestore;
 #else
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif

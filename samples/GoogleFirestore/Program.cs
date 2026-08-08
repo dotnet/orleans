@@ -1,5 +1,5 @@
 using System.Net;
-using GoogleFirestore;
+using FirestoreSample;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -30,28 +30,28 @@ builder.UseOrleans(siloBuilder =>
 
     siloBuilder.Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback);
 
-    siloBuilder.UseGoogleFirestoreClustering(options =>
+    siloBuilder.UseFirestoreClustering(options =>
     {
         options.ProjectId = projectId;
         options.RootCollectionName = rootCollectionName;
         options.EmulatorHost = emulatorHost;
     });
 
-    siloBuilder.UseGoogleFirestoreGrainDirectoryAsDefault(options =>
+    siloBuilder.UseFirestoreGrainDirectoryAsDefault(options =>
     {
         options.ProjectId = projectId;
         options.RootCollectionName = rootCollectionName;
         options.EmulatorHost = emulatorHost;
     });
 
-    siloBuilder.AddGoogleFirestoreGrainStorage("firestore", options =>
+    siloBuilder.AddFirestoreGrainStorage("firestore", options =>
     {
         options.ProjectId = projectId;
         options.RootCollectionName = rootCollectionName;
         options.EmulatorHost = emulatorHost;
     });
 
-    siloBuilder.UseGoogleFirestoreReminderService(options =>
+    siloBuilder.UseFirestoreReminderService(options =>
     {
         options.ProjectId = projectId;
         options.RootCollectionName = rootCollectionName;

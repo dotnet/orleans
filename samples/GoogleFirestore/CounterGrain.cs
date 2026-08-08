@@ -1,6 +1,6 @@
 using Orleans.Runtime;
 
-namespace GoogleFirestore;
+namespace FirestoreSample;
 
 public sealed class CounterGrain(
     [PersistentState("counter", "firestore")] IPersistentState<CounterState> state)

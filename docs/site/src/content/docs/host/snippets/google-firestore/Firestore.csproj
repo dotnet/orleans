@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\..\'))</RepositoryRoot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Server\Orleans.Server.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Google\Orleans.Clustering.Firestore\Orleans.Clustering.Firestore.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Google\Orleans.GrainDirectory.Firestore\Orleans.GrainDirectory.Firestore.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Google\Orleans.Persistence.Firestore\Orleans.Persistence.Firestore.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Google\Orleans.Reminders.Firestore\Orleans.Reminders.Firestore.csproj" />
+  </ItemGroup>
+
+</Project>

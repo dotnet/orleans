@@ -14,7 +14,7 @@ Each run increments a persisted counter and creates or updates a reminder.
 Install Java 21 and the Firebase CLI, then start Firestore from the repository root:
 
 ```powershell
-npx firebase-tools@15.24.0 emulators:start --only firestore --project orleans-sample --config test/Extensions/GoogleFirestore/Emulators/firebase.json
+npx firebase-tools@15.24.0 emulators:start --only firestore --project orleans-sample --config test/Extensions/Google/Emulators/firebase.json
 ```
 
 In another terminal:
