@@ -1,7 +1,7 @@
 ---
 title: Frequently asked questions
 description: Answers to common questions about Orleans.
-ms.date: 08/02/2026
+ms.date: 08/08/2026
 ms.topic: faq
 ---
 
@@ -55,7 +55,9 @@ No. An ordinary stateful grain normally has one activation in the cluster. Volat
 
 ### How do I avoid hot grains?
 
-Partition work across keys, use hierarchical aggregation, batch calls, or use stateless workers for suitable stateless operations. Changing placement can move a hot activation but doesn't increase the throughput of that single activation.
+An ordinary grain activation processes one turn at a time by default, so a single key can become a bottleneck even when the rest of the cluster has capacity. Partition work across keys, use staged or hierarchical aggregation, batch calls, or use stateless workers for suitable stateless operations. Changing placement can move a hot activation but doesn't increase the throughput of that activation.
+
+For example, if many grains regularly report counters or statistics, hash each reporter's stable key across a controlled set of intermediate aggregator grains. Each intermediate grain combines updates and periodically sends partial results to a final aggregator. This distributes the reporting load and reduces the number of turns at the central grain; add another level if one stage still receives too much fan-in. Choose the shard count and reporting cadence from load tests, and design persistence, idempotency, or reconciliation when losing or repeating an update would matter.
 
 ### Can I choose where a grain activates?
 
