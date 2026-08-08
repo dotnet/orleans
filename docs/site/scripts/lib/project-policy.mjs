@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { readFile, readdir } from 'node:fs/promises';
+import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
@@ -50,20 +50,35 @@ export async function discoverMaintainedProjects(repoRoot) {
     .sort();
 }
 
-function decodeXmlAttribute(value) {
-  return value
-    .replaceAll('&quot;', '"')
-    .replaceAll('&apos;', "'")
-    .replaceAll('&lt;', '<')
-    .replaceAll('&gt;', '>')
-    .replaceAll('&amp;', '&');
+async function listSolutionProjectPaths(solutionFile) {
+  const { stdout } = await execFileAsync(
+    'dotnet',
+    ['sln', solutionFile, 'list'],
+    {
+      maxBuffer: 4 * 1024 * 1024,
+      windowsHide: true,
+      env: {
+        ...process.env,
+        DOTNET_NOLOGO: 'true',
+        DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1',
+      },
+    },
+  );
+  const lines = stdout.replaceAll('\r\n', '\n').split('\n');
+  const separator = lines.findIndex((line) => /^-+$/.test(line.trim()));
+  if (separator < 0) {
+    throw new Error(`dotnet sln did not return a project-list separator for '${solutionFile}'.`);
+  }
+  return lines.slice(separator + 1).map((line) => line.trim()).filter(Boolean);
 }
 
-export async function readSolutionProjects({ repoRoot, solutionFile }) {
-  const source = (await readFile(solutionFile, 'utf8')).replaceAll(/<!--[\s\S]*?-->/g, '');
+export async function readSolutionProjects({
+  repoRoot,
+  solutionFile,
+  listProjects = listSolutionProjectPaths,
+}) {
   const solutionDirectory = path.dirname(solutionFile);
-  return [...source.matchAll(/<Project\b[^>]*\bPath\s*=\s*(["'])(.*?)\1/g)].map((match) => {
-    const solutionPath = decodeXmlAttribute(match[2]);
+  return (await listProjects(solutionFile)).map((solutionPath) => {
     return {
       solutionPath,
       project: normalizeProjectPath(

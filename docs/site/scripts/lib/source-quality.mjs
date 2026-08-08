@@ -125,6 +125,16 @@ function htmlTagEnd(source, start, end) {
   return end - 1;
 }
 
+function htmlCommentEnd(source, start, end) {
+  const standard = source.indexOf('-->', start);
+  const bang = source.indexOf('--!>', start);
+  if (standard < 0 && bang < 0) return { index: end, length: 0 };
+  if (bang >= 0 && (standard < 0 || bang < standard)) {
+    return { index: bang, length: 4 };
+  }
+  return { index: standard, length: 3 };
+}
+
 function visibleHtmlText(node, source) {
   const value = [];
   const offsets = [];
@@ -133,8 +143,8 @@ function visibleHtmlText(node, source) {
   const hiddenElements = new Set(['code', 'pre', 'script', 'style']);
   for (let index = start; index < end; ) {
     if (source.startsWith('<!--', index)) {
-      const commentEnd = source.indexOf('-->', index + 4);
-      index = commentEnd < 0 ? end : commentEnd + 3;
+      const commentEnd = htmlCommentEnd(source, index + 4, end);
+      index = commentEnd.index + commentEnd.length;
       continue;
     }
     if (source[index] === '<') {
