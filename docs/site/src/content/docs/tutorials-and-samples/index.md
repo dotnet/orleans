@@ -16,9 +16,9 @@ Use this page to choose the right kind of learning material:
 
 ## Start here
 
-New to Orleans? Complete [Build your first Orleans app](../quickstarts/build-your-first-orleans-app.md). It is the canonical beginner path and builds a single-project ASP.NET Core URL shortener.
+For the bare minimum application, start with [Orleans Hello World](hello-world.md). It hosts a silo and calls a grain from one process.
 
-For the smallest complete grain call, see the maintained [Hello World sample](https://github.com/dotnet/orleans/tree/main/samples/HelloWorld). Unlike the quickstart, the sample is intended primarily as compact source code to clone and run.
+For a more typical project structure, [Build your first Orleans app](../quickstarts/build-your-first-orleans-app.md) using separate grain contract, implementation, silo, and external-client projects.
 
 ## Tutorials
 
@@ -37,7 +37,7 @@ For the smallest complete grain call, see the maintained [Hello World sample](ht
 
 ## Maintained samples
 
-The [`samples` directory](https://github.com/dotnet/orleans/tree/main/samples) in the Orleans repository is the canonical home of official samples. Its [sample catalog](https://github.com/dotnet/orleans/blob/main/samples/README.md) is generated from the repository manifest and is validated together with the sample projects.
+The [`samples` directory](https://github.com/dotnet/orleans/tree/main/samples) contains the official Orleans samples. Its [sample catalog](https://github.com/dotnet/orleans/blob/main/samples/README.md) is generated from the repository manifest and is validated together with the sample projects.
 
 ### Fundamentals
 

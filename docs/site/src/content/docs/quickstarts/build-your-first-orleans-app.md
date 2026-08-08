@@ -1,113 +1,135 @@
 ---
-title: 'Quickstart: Build your first Orleans app'
-description: Build an Orleans URL shortener with ASP.NET Core.
-ms.date: 08/02/2026
-ms.topic: quickstart
+title: 'Tutorial: Build your first Orleans app'
+description: Build a multi-project Orleans application with a silo and external client.
+ms.date: 08/08/2026
+ms.topic: tutorial
 ms.devlang: csharp
 ---
 
-# Quickstart: Build your first Orleans app
+# Tutorial: Build your first Orleans app
 
-This quickstart is the canonical beginner path for Orleans. You build a URL shortener in one ASP.NET Core process, define a grain, persist its state in memory for local development, and call it from [Minimal API](https://learn.microsoft.com/aspnet/core/fundamentals/minimal-apis) endpoints.
+In this tutorial, you build a small Orleans application using project boundaries typical of larger applications. Grain contracts, grain implementations, the silo, and an external client are separate projects with distinct dependencies and deployment roles.
 
 You learn how to:
 
-- Add Orleans to an ASP.NET Core application.
-- Configure a local silo.
 - Define and implement a grain.
+- Host grains in a silo.
+- Connect an external client to a silo.
 - Obtain a grain reference and call it.
-- Persist grain state using a named provider.
+- Structure project references so that clients depend on contracts, not implementations.
+
+The example uses localhost clustering and omits production concerns such as durable storage, authentication, observability, and application-level retry policies.
 
 ## Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - An editor such as [Visual Studio](https://visualstudio.microsoft.com/) or [Visual Studio Code](https://code.visualstudio.com/)
+- Two terminals so that the silo and client can run at the same time
 
-## Create the application
+## Create the solution
 
-Run these [.NET CLI](https://learn.microsoft.com/dotnet/core/tools/) commands in a terminal:
+Create a solution with four projects:
+
+- **GrainInterfaces** contains grain contracts shared by callers and implementations.
+- **Grains** contains the grain implementations.
+- **Silo** hosts the Orleans runtime and grain activations.
+- **Client** is an external process that connects to the silo and calls grains.
+
+Run the following commands in an empty directory:
 
 ```dotnetcli
-dotnet new web -n OrleansURLShortener -f net10.0
-cd OrleansURLShortener
-dotnet package add Microsoft.Orleans.Server
+dotnet new sln --name OrleansHelloWorld --format slnx
+dotnet new classlib --name GrainInterfaces --framework net10.0
+dotnet new classlib --name Grains --framework net10.0
+dotnet new console --name Silo --framework net10.0
+dotnet new console --name Client --framework net10.0
+
+dotnet solution OrleansHelloWorld.slnx add GrainInterfaces/GrainInterfaces.csproj
+dotnet solution OrleansHelloWorld.slnx add Grains/Grains.csproj
+dotnet solution OrleansHelloWorld.slnx add Silo/Silo.csproj
+dotnet solution OrleansHelloWorld.slnx add Client/Client.csproj
+
+dotnet reference add GrainInterfaces/GrainInterfaces.csproj --project Grains/Grains.csproj
+dotnet reference add Grains/Grains.csproj --project Silo/Silo.csproj
+dotnet reference add GrainInterfaces/GrainInterfaces.csproj --project Client/Client.csproj
+
+dotnet package add Microsoft.Orleans.Sdk --version 10.2.2 --project GrainInterfaces/GrainInterfaces.csproj
+dotnet package add Microsoft.Orleans.Sdk --version 10.2.2 --project Grains/Grains.csproj
+dotnet package add Microsoft.Orleans.Server --version 10.2.2 --project Silo/Silo.csproj
+dotnet package add Microsoft.Orleans.Client --version 10.2.2 --project Client/Client.csproj
+dotnet package add Microsoft.Extensions.Hosting --version 10.0.9 --project Silo/Silo.csproj
+dotnet package add Microsoft.Extensions.Hosting --version 10.0.9 --project Client/Client.csproj
 ```
 
-[`Microsoft.Orleans.Server`](https://www.nuget.org/packages/Microsoft.Orleans.Server) is the metapackage for an application that hosts a silo. It also includes the Orleans SDK and client APIs, so this single-project application can define grains and call them. For details about the commands, see [`dotnet new`](https://learn.microsoft.com/dotnet/core/tools/dotnet-new) and [`dotnet package add`](https://learn.microsoft.com/dotnet/core/tools/dotnet-package-add).
-
-## Configure Orleans
-
-Replace the generated contents of _Program.cs_. Begin by adding Orleans to the host before `builder.Build()`:
-
-:::code source="snippets/url-shortener/orleansurlshortener/Program.cs" id="configuration":::
-
-<xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*> adds a silo to the .NET host. <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalhostClustering*> configures a single-machine development cluster, and <xref:Orleans.Hosting.MemoryGrainStorageSiloBuilderExtensions.AddMemoryGrainStorage*> registers a storage provider named `urls`.
-
-> [!IMPORTANT]
-> Localhost clustering and memory storage are development settings. Memory storage is cluster-addressable but non-durable and non-replicated; records are lost when their hosting process stops. Production deployments need a shared clustering provider and, when state must survive process loss, a durable storage provider.
+The client references only **GrainInterfaces**. It doesn't need the grain implementation assembly. The silo references **Grains**, which in turn references **GrainInterfaces**.
 
 ## Define the grain contract
 
-A grain contract is an interface whose methods are asynchronous and which identifies the grain's key type. Append this interface to _Program.cs_:
+Delete _GrainInterfaces/Class1.cs_, create _GrainInterfaces/IHello.cs_, and add the following grain interface:
 
-:::code source="snippets/url-shortener/orleansurlshortener/Program.cs" id="graininterface":::
+:::code source="snippets/hello-world/GrainInterfaces/IHello.cs" id="grain-interface":::
 
-Each short code is the string key of one `IUrlShortenerGrain`.
+<xref:Orleans.IGrainWithStringKey> identifies the grain by a string key. Grain contracts use asynchronous return types because calls can cross process and network boundaries.
 
 ## Implement the grain
 
-Append the grain implementation and its state type:
+Delete _Grains/Class1.cs_, create _Grains/HelloGrain.cs_, and add the following implementation:
 
-:::code source="snippets/url-shortener/orleansurlshortener/Program.cs" id="grain":::
+:::code source="snippets/hello-world/Grains/HelloGrain.cs" id="grain-implementation":::
 
-The constructor injects <xref:Orleans.Runtime.IPersistentState`1> associated with the `urls` provider. Assigning `state.State` changes only the in-memory value. Calling <xref:Orleans.Core.IStorage.WriteStateAsync*> writes it to the configured provider.
+The implementation inherits from <xref:Orleans.Grain> and implements `IHello`. Orleans source generators discover the grain contract and implementation at build time, so you don't need to register application parts manually.
 
-The <xref:Orleans.GenerateSerializerAttribute> and <xref:Orleans.IdAttribute> attributes let Orleans generate a version-tolerant serializer for `UrlDetails`. Keep existing field IDs stable when the type evolves.
+## Configure the silo
 
-## Add the endpoints
+Replace _Silo/Program.cs_ with the following code:
 
-Add the endpoints before `app.Run()`:
+:::code source="snippets/hello-world/Silo/Program.cs":::
 
-:::code source="snippets/url-shortener/orleansurlshortener/Program.cs" id="endpoints":::
+<xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*> adds the Orleans silo to the [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensions/generic-host). <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalhostClustering*> configures development-only clustering and gateway endpoints on the local machine.
 
-The `/shorten` endpoint:
+The silo project references **Grains**, so the runtime can discover and activate `HelloGrain`.
 
-1. Validates the destination URL.
-1. Creates a short code.
-1. Gets a grain reference using that code as its identity.
-1. Calls the grain to store the destination.
+## Configure the external client
 
-The `/go/{shortenedRouteSegment}` endpoint gets the same logical grain by key, reads its state, and redirects the caller.
+Replace _Client/Program.cs_ with the following code:
 
-## Run the application
+:::code source="snippets/hello-world/Client/Program.cs":::
 
-The completed _Program.cs_ should match the maintained documentation sample:
+<xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*> adds an external Orleans client to the Generic Host. The client uses the same localhost clustering configuration as the silo. After the host starts, the client resolves <xref:Orleans.IGrainFactory> from dependency injection, obtains a grain reference, and invokes the grain.
 
-:::code source="snippets/url-shortener/orleansurlshortener/Program.cs":::
+## Build and run the application
 
-Start the app:
+Build the solution:
 
 ```dotnetcli
-dotnet run
+dotnet build OrleansHelloWorld.slnx
 ```
 
-Use the address printed by ASP.NET Core to create a short URL:
+Start the silo in the first terminal:
 
-```text
-http://localhost:<port>/shorten?url=https://learn.microsoft.com/dotnet/orleans
+```dotnetcli
+dotnet run --project Silo
 ```
 
-Open the returned `/go/...` URL and verify that it redirects to the Orleans documentation.
+Wait until the silo prints `Application started`, then start the client in the second terminal:
 
-## What happened
+```dotnetcli
+dotnet run --project Client
+```
 
-The first call to a short-code grain caused Orleans to activate it. Orleans routed later calls with the same key to that activation. The grain explicitly wrote its state through the named provider.
+The client prints the grain response:
 
-This application runs as one process, but its contracts don't encode a server location. Moving to multiple silos is primarily a hosting and provider configuration task; the grain still uses the same identity and interface.
+```output
+Hello, Hi friend!
+```
+
+The client never creates or locates a `HelloGrain` object directly. `GetGrain<IHello>("friend")` returns a logical reference. When the client invokes `SayHello`, Orleans routes the call through a silo gateway and activates the grain if it isn't already active.
+
+Stop the silo by pressing <kbd>Ctrl</kbd>+<kbd>C</kbd> in its terminal.
 
 ## Next steps
 
-- [Understand Orleans concepts](../overview.md)
-- [Choose Orleans packages](../resources/nuget-packages.md)
+- [Choose between a co-hosted and external client](../host/client.md)
 - [Configure Orleans for production](../host/configuration-guide/index.md)
+- [Learn more about grain identity](../grains/grain-identity.md)
 - [Browse maintained samples](../tutorials-and-samples/index.md)

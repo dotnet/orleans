@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Client/Client.csproj" />
+  <Project Path="GrainInterfaces/GrainInterfaces.csproj" />
+  <Project Path="Grains/Grains.csproj" />
+  <Project Path="Silo/Silo.csproj" />
+</Solution>

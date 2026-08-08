@@ -133,4 +133,4 @@ Orleans source-generates serializers for annotated application types. Add an int
 | [Microsoft.Orleans.Transactions.TestKit.Base](https://www.nuget.org/packages/Microsoft.Orleans.Transactions.TestKit.Base) | Shared transaction test kit. |
 | [Microsoft.Orleans.Transactions.TestKit.xUnit](https://www.nuget.org/packages/Microsoft.Orleans.Transactions.TestKit.xUnit) | xUnit integration for the transaction test kit. |
 
-For installation commands and the smallest recommended dependency set, see [Build your first Orleans app](../quickstarts/build-your-first-orleans-app.md).
+For package installation commands in a multi-project application, see [Build your first Orleans app](../quickstarts/build-your-first-orleans-app.md).

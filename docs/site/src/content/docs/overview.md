@@ -84,4 +84,4 @@ Orleans can run in a single process during development and scale to a cluster wi
 ## Next step
 
 > [!div class="nextstepaction"]
-> [Build your first Orleans app](quickstarts/build-your-first-orleans-app.md)
+> [Orleans Hello World](tutorials-and-samples/hello-world.md)
