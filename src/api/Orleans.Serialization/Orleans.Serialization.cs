@@ -3341,10 +3341,6 @@ namespace Orleans.Serialization.Configuration
 
     public sealed partial class TypeManifestOptions
     {
-        public void AddAllowedAssembly(System.Reflection.Assembly assembly) { }
-
-        public void AddAllowedType(System.Type type) { }
-
         public System.Collections.Generic.HashSet<System.Type> Activators { get { throw null; } }
 
         public bool AllowAllTypes { get { throw null; } set { } }
@@ -3374,6 +3370,10 @@ namespace Orleans.Serialization.Configuration
         public System.Collections.Generic.Dictionary<string, System.Type> WellKnownTypeAliases { get { throw null; } }
 
         public System.Collections.Generic.Dictionary<uint, System.Type> WellKnownTypeIds { get { throw null; } }
+
+        public void AddAllowedAssembly(System.Reflection.Assembly assembly) { }
+
+        public void AddAllowedType(System.Type type) { }
     }
 
     [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = true)]

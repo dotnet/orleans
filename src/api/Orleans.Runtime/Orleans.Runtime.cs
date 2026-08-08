@@ -174,6 +174,7 @@ namespace Orleans.Configuration
         public static readonly System.TimeSpan DEFAULT_INITIAL_CACHE_TTL;
         public static readonly System.TimeSpan DEFAULT_MAXIMUM_CACHE_TTL;
         public const int DEFAULT_PARTITIONS_PER_SILO = 1;
+        public static readonly System.TimeSpan DEFAULT_RANGE_LEASE_DURATION;
         [System.Obsolete("DEFAULT_TTL_EXTENSION_FACTOR is deprecated and will be removed in a future version.")]
         public const double DEFAULT_TTL_EXTENSION_FACTOR = 2D;
         public static readonly System.TimeSpan DEFAULT_UNREGISTER_RACE_DELAY;
@@ -192,6 +193,8 @@ namespace Orleans.Configuration
         public System.TimeSpan MaximumCacheTTL { get { throw null; } set { } }
 
         public int PartitionsPerSilo { get { throw null; } set { } }
+
+        public System.TimeSpan RangeLeaseDuration { get { throw null; } set { } }
 
         public enum CachingStrategyType
         {

@@ -519,6 +519,8 @@ namespace Orleans.Transactions.TestKit
 
         public static Hosting.ISiloBuilder AddFaultInjectionAzureTableTransactionalStateStorage(this Hosting.ISiloBuilder builder, string name, System.Action<Configuration.AzureTableTransactionalStateOptions> configureOptions) { throw null; }
 
+        public static Hosting.ISiloBuilder AddFaultInjectionDynamoDBTransactionalStateStorage(this Hosting.ISiloBuilder builder, string name, System.Action<Configuration.DynamoDBTransactionalStorageOptions> configureOptions) { throw null; }
+
         public static Hosting.ISiloBuilder UseControlledFaultInjectionTransactionState(this Hosting.ISiloBuilder builder) { throw null; }
     }
 
@@ -838,6 +840,30 @@ namespace Orleans.Transactions.TestKit
 
         protected virtual TGrainInterface TestGrain<TGrainInterface>(string transactionTestGrainClassName, System.Guid id)
             where TGrainInterface : IGrainWithGuidKey { throw null; }
+    }
+}
+
+namespace Orleans.Transactions.TestKit.Base.FaultInjection.ControlledInjection
+{
+    public partial class FaultInjectionDynamoDBTransactionStateStorageFactory : Abstractions.ITransactionalStateStorageFactory, ILifecycleParticipant<Runtime.ISiloLifecycle>
+    {
+        public FaultInjectionDynamoDBTransactionStateStorageFactory(DynamoDB.TransactionalState.DynamoDBTransactionalStateStorageFactory factory) { }
+
+        public static Abstractions.ITransactionalStateStorageFactory Create(System.IServiceProvider services, string name) { throw null; }
+
+        public Abstractions.ITransactionalStateStorage<TState> Create<TState>(string stateName, Runtime.IGrainContext context)
+            where TState : class, new() { throw null; }
+
+        public void Participate(Runtime.ISiloLifecycle lifecycle) { }
+    }
+
+    public partial class FaultInjectionDynamoDBTransactionStateStorage<TState> : Abstractions.ITransactionalStateStorage<TState> where TState : class, new()
+    {
+        public FaultInjectionDynamoDBTransactionStateStorage(ITransactionFaultInjector faultInjector, DynamoDB.TransactionalState.DynamoDBTransactionalStateStorage<TState> dynamodbStateStorage) { }
+
+        public System.Threading.Tasks.Task<Abstractions.TransactionalStorageLoadResponse<TState>> Load() { throw null; }
+
+        public System.Threading.Tasks.Task<string> Store(string? expectedETag, Abstractions.TransactionalStateMetaData metadata, System.Collections.Generic.List<Abstractions.PendingTransactionState<TState>>? statesToPrepare, long? commitUpTo, long? abortAfter) { throw null; }
     }
 }
 
