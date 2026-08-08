@@ -68,7 +68,9 @@ public class GrainStorageBenchmark : IDisposable
         {
             hostBuilder.AddAzureTableGrainStorageAsDefault(options =>
             {
-                options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+                options.TableServiceClient = TestDefaultConfiguration.UseAadAuthentication
+                    ? new(TestDefaultConfiguration.TableEndpoint, TestDefaultConfiguration.TokenCredential)
+                    : new(TestDefaultConfiguration.AzureStorageConnectionString);
             });
         }
     }
@@ -79,7 +81,9 @@ public class GrainStorageBenchmark : IDisposable
         {
             hostBuilder.AddAzureBlobGrainStorageAsDefault(options =>
             {
-                options.BlobServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+                options.BlobServiceClient = TestDefaultConfiguration.UseAadAuthentication
+                    ? new(TestDefaultConfiguration.DataBlobUri, TestDefaultConfiguration.TokenCredential)
+                    : new(TestDefaultConfiguration.AzureStorageConnectionString);
             });
         }
     }

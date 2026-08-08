@@ -26,8 +26,8 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
 {
     protected InProcessTestCluster HostedCluster { get; }
     protected static readonly TimeSpan LEEWAY = TimeSpan.FromMilliseconds(500);
-    protected static readonly TimeSpan ENDWAIT = TimeSpan.FromMinutes(2);
-    protected static readonly TimeSpan CHURN_ENDWAIT = TimeSpan.FromMinutes(5);
+    protected readonly TimeSpan ENDWAIT;
+    protected readonly TimeSpan CHURN_ENDWAIT;
 
     protected const string DR = "DEFAULT_REMINDER";
     protected const string R1 = "REMINDER_1";
@@ -41,10 +41,11 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
     protected ReminderDiagnosticObserver observer;
     private ReminderTestClock ReminderClock { get; }
 
-    public ReminderTestsBase(ReminderTestClock reminderClock, InProcessTestCluster hostedCluster)
+    public ReminderTestsBase(ReminderTestClock reminderClock, InProcessTestCluster hostedCluster, int timeoutMultiplier = 1)
     {
         ArgumentNullException.ThrowIfNull(reminderClock);
         ArgumentNullException.ThrowIfNull(hostedCluster);
+        ArgumentOutOfRangeException.ThrowIfLessThan(timeoutMultiplier, 1);
 
         var grainFactory = hostedCluster.Client;
         if (grainFactory is null)
@@ -55,6 +56,8 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         HostedCluster = hostedCluster;
         GrainFactory = grainFactory;
         ReminderClock = reminderClock;
+        ENDWAIT = TimeSpan.FromMinutes(2 * timeoutMultiplier);
+        CHURN_ENDWAIT = TimeSpan.FromMinutes(5 * timeoutMultiplier);
 
         var filters = new LoggerFilterOptions();
 #if DEBUG

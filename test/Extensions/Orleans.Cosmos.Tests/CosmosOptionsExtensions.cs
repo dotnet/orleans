@@ -1,4 +1,3 @@
-using Azure.Identity;
 using Microsoft.Azure.Cosmos;
 using Orleans.Clustering.Cosmos;
 using Orleans.Persistence.Cosmos;
@@ -19,7 +18,6 @@ public static class CosmosOptionsExtensions
         {
             options.ConfigureCosmosClient(GetCosmosClientUsingAccountKey());
         }
-
         options.IsResourceCreationEnabled = true;
     }
 
@@ -33,7 +31,6 @@ public static class CosmosOptionsExtensions
         {
             options.ConfigureCosmosClient(GetCosmosClientUsingAccountKey());
         }
-
         options.IsResourceCreationEnabled = true;
     }
 
@@ -47,7 +44,6 @@ public static class CosmosOptionsExtensions
         {
             options.ConfigureCosmosClient(GetCosmosClientUsingAccountKey());
         }
-
         options.IsResourceCreationEnabled = true;
     }
 

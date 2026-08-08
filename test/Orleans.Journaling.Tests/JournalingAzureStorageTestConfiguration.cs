@@ -9,11 +9,11 @@ internal static class JournalingAzureStorageTestConfiguration
     {
         if (TestDefaultConfiguration.UseAadAuthentication)
         {
-            Skip.If(string.IsNullOrEmpty(TestDefaultConfiguration.DataBlobUri.ToString()), "DataBlobUri is not set. Skipping test.");
+            Skip.If(!TestDefaultConfiguration.GetValue(nameof(TestDefaultConfiguration.DataBlobUri), out _), "DataBlobUri is not set. Skipping test.");
         }
         else
         {
-            Skip.If(string.IsNullOrEmpty(TestDefaultConfiguration.DataConnectionString), "DataConnectionString is not set. Skipping test.");
+            _ = TestDefaultConfiguration.AzureStorageConnectionString;
         }
     }
 
@@ -25,7 +25,7 @@ internal static class JournalingAzureStorageTestConfiguration
         }
         else
         {
-            options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataConnectionString!); // The Azure Storage test setup supplies the connection string.
+            options.ConfigureBlobServiceClient(TestDefaultConfiguration.AzureStorageConnectionString);
         }
 
         return options;
@@ -39,7 +39,7 @@ internal static class JournalingAzureStorageTestConfiguration
         }
         else
         {
-            options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString!);
+            options.ConfigureTableServiceClient(TestDefaultConfiguration.AzureStorageConnectionString);
         }
 
         return options;

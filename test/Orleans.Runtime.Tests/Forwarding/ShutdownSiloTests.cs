@@ -16,6 +16,7 @@ namespace Tester.Forwarding
     /// <summary>
     /// Tests for silo shutdown scenarios including request forwarding, timer handling, and stuck activations.
     /// </summary>
+    [TestCategory("AzureStorage")]
     public class ShutdownSiloTests : TestClusterPerTest
     {
         public const int NumberOfSilos = 2;
@@ -56,7 +57,7 @@ namespace Tester.Forwarding
             {
                 return TestDefaultConfiguration.UseAadAuthentication
                     ? new(TestDefaultConfiguration.TableEndpoint, TestDefaultConfiguration.TokenCredential)
-                    : new(TestDefaultConfiguration.DataConnectionString);
+                    : new(TestDefaultConfiguration.AzureStorageConnectionString);
             }
         }
 

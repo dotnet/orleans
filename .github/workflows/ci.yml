@@ -373,23 +373,6 @@ jobs:
         provider: ["AzureStorage"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-    - name: Start Azurite
-      run: |
-        set -euo pipefail
-
-        bash .github/scripts/docker-pull-with-retry.sh "$AZURITE_IMAGE"
-
-        docker run -d --pull=never --name azurite \
-          -p 10000:10000 \
-          -p 10001:10001 \
-          -p 10002:10002 \
-          "$AZURITE_IMAGE" \
-          azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck
-    - name: Wait for Azurite
-      run: |
-        echo "Waiting for Azurite to be ready..."
-        timeout 60 bash -c 'until nc -z localhost 10000 && nc -z localhost 10001 && nc -z localhost 10002; do sleep 1; done'
-        echo "Azurite is ready"
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
@@ -404,14 +387,6 @@ jobs:
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --
         -parallel none -noshadow
-      env:
-# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
-# [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
-# [SuppressMessage("Microsoft.Security", "CSCAN0220:DefaultPasswordContexts", Justification="Not a secret")]
-        ORLEANSDATACONNECTIONSTRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
-    - name: Clean up Azurite
-      if: always()
-      run: docker rm -f azurite || true
     - name: Archive Test Results
       if: always()
       continue-on-error: true
@@ -489,8 +464,6 @@ jobs:
 # [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0220:DefaultPasswordContexts", Justification="Not a secret")]
         ORLEANSEVENTHUBCONNECTIONSTRING: "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
-# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
-        ORLEANSDATACONNECTIONSTRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
     - name: Clean up Event Hubs emulator
       if: always()
       run: docker rm -f eventhubs-emulator || true
@@ -940,7 +913,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.suite }}&Category!=Consul"
+        --filter "Category=${{ matrix.suite }}&Category!=Consul&Category!=AzureStorage"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full

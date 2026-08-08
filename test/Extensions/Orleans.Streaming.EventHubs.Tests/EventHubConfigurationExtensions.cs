@@ -1,4 +1,3 @@
-using Azure.Identity;
 using Orleans.Configuration;
 using Tester.AzureUtils;
 using TestExtensions;
