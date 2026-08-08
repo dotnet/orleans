@@ -80,7 +80,7 @@ namespace Orleans.Connections.Security
         public SslProtocols SslProtocols { get; set; } = SslProtocols.Tls13 | SslProtocols.Tls12;
 
         /// <summary>
-        /// Specifies whether the certificate revocation list is checked during authentication.
+        /// Specifies whether remote certificate revocation is checked during client and server authentication.
         /// </summary>
         public bool CheckCertificateRevocation { get; set; }
 
