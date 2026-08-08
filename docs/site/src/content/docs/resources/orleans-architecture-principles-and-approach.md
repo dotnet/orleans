@@ -1,7 +1,7 @@
 ---
 title: Orleans architecture design principles
 description: Understand the design principles behind Orleans.
-ms.date: 08/02/2026
+ms.date: 08/08/2026
 ms.topic: conceptual
 ---
 
@@ -29,7 +29,9 @@ Orleans provides scalable building blocks, not automatic scalability for every m
 
 ## Recovery-oriented operation
 
-Processes and networks fail. Orleans detects membership changes and can reactivate grains on healthy silos after failures. In-flight calls can still fail, and volatile state is lost with its process.
+Detect and repair problems; don't assume they can be prevented completely. At cloud scale, bad things happen often, and seemingly impossible things happen, only less often. Prevention and fault-tolerance mechanisms remain valuable, but they cannot cover every failure in hardware, software, dependencies, or operations. Orleans therefore complements them with an approach often called *recovery-oriented computing*: expect failures to escape prevention, detect them, and restore service.
+
+In practice, Orleans detects membership changes and can reactivate grains on healthy silos after failures. In-flight calls can still fail, and volatile state is lost with its process.
 
 Applications therefore need explicit durability, idempotency, bounded retries, observability, and operational procedures. The runtime handles common mechanics but doesn't invent application-level recovery semantics.
 

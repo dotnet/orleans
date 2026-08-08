@@ -1,7 +1,7 @@
 ---
 title: Why Orleans
 description: Understand the benefits and tradeoffs of the Orleans virtual actor model.
-ms.date: 08/02/2026
+ms.date: 08/08/2026
 ms.topic: overview
 ---
 
@@ -16,6 +16,8 @@ Its main benefit is not that distribution becomes invisible. Network calls can f
 Application code addresses grains by interface and key. Orleans maps that logical identity to an activation and routes calls to it. Callers don't maintain a server registry or recreate references when placement changes.
 
 Because identity is independent of activation, Orleans can activate grains on demand and remove idle activations from memory. Applications can represent far more logical entities than fit in memory at once.
+
+The [Orleans virtual actor research](https://www.microsoft.com/research/project/orleans-virtual-actors/) compares this to virtual memory: application code can address a large logical space of grains while the runtime decides which activations are currently resident and where.
 
 ## Isolated, turn-based execution
 
