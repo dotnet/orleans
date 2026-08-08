@@ -1,7 +1,7 @@
 ---
 title: Grain placement and migration
 description: Understand placement, resource-optimized defaults, and activation movement in Orleans.
-ms.date: 08/07/2026
+ms.date: 08/08/2026
 ms.topic: concept-article
 ---
 
@@ -73,7 +73,7 @@ Per-grain attributes still take precedence.
 
 ## Placement filters
 
-Placement filters reduce the compatible candidate set before the placement strategy selects a silo. They can express requirements or preferences based on [silo metadata](../host/configuration-guide/silo-metadata.md). Placement filters are experimental and produce diagnostic `ORLEANSEXP004`.
+Placement filters reduce the compatible candidate set before the placement strategy selects a silo. They can express requirements or preferences based on [silo metadata](../host/configuration-guide/silo-metadata.md). The built-in metadata filter attributes are experimental and produce diagnostic `ORLEANSEXP004`.
 
 See [Placement filters](grain-placement-filtering.md) for the built-in filters and experimental status.
 
@@ -127,8 +127,38 @@ siloBuilder.AddActivationRebalancer();
 
 Both features migrate eligible activations and can operate together. They add cluster coordination and state-transfer costs, so benchmark representative workloads before production use. Stateless workers, system targets, grain services, client objects, and immovable activations aren't candidates.
 
-## Custom placement
+## Implement custom placement
 
-Custom placement strategies and directors are advanced runtime extensions. Implement them only when built-in strategies plus placement filters can't express the requirement. A director must handle membership changes, empty candidate sets, overloaded silos, and deterministic testing.
+Custom placement strategies and directors are advanced runtime extensions. Implement them only when built-in strategies plus [placement filters](grain-placement-filtering.md) can't express the requirement. A custom implementation has three parts:
 
-For implementation details and examples, inspect the built-in directors under [`src/Orleans.Runtime/Placement`](https://github.com/dotnet/orleans/tree/main/src/Orleans.Runtime/Placement), including [`PreferLocalPlacementDirector`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Placement/PreferLocalPlacementDirector.cs).
+1. A <xref:Orleans.Runtime.PlacementStrategy> that identifies the policy.
+1. A <xref:Orleans.Placement.PlacementAttribute> that applies the policy to a grain class.
+1. An <xref:Orleans.Runtime.Placement.IPlacementDirector> that selects one candidate silo.
+
+The following example gives related grain types an affinity for the same silo when they use the same grain key. This differs from <xref:Orleans.Runtime.HashBasedPlacement>, which hashes the complete grain ID, including its grain type.
+
+First, define the strategy and its attribute:
+
+:::code language="csharp" source="snippets/placement/CustomPlacement.cs" id="custom_placement_strategy":::
+
+Placement strategy instances can cross runtime serialization boundaries. Use `[GenerateSerializer]`; if the strategy adds serializable state, assign stable `[Id(n)]` values to its members. The strategy in this example is immutable and has no serialized members.
+
+Next, implement the director:
+
+:::code language="csharp" source="snippets/placement/CustomPlacement.cs" id="custom_placement_director":::
+
+Call <xref:Orleans.Runtime.Placement.IPlacementContext.GetCompatibleSilos*> instead of reconstructing cluster membership. It returns active silos which can host the grain type and satisfy interface-version compatibility, after placement filters have run. The current runtime throws if that process leaves no candidates; the explicit empty-set check also protects the modulo operation in tests or alternate context implementations. <xref:Orleans.Runtime.Placement.IPlacementDirector.GetPlacementHint*> accepts a request hint only when it names one of those candidates, so the example honors valid hints before applying its own policy.
+
+The director sorts the candidate addresses before indexing them and uses the grain key's stable, uniform hash. Therefore, two grain types with the same key select the same silo only when they see the same candidate set:
+
+:::code language="csharp" source="snippets/placement/CustomPlacement.cs" id="apply_custom_placement":::
+
+This is an affinity, not durable pinning. Membership changes, silo restarts, or different compatibility and filter results can change the mapping. Existing activations don't move merely because a later placement decision maps elsewhere. The uniform hash is deterministic across cluster nodes but isn't cryptographic, so don't use placement as an authorization or isolation boundary.
+
+Finally, register the strategy and director on every silo:
+
+:::code language="csharp" source="snippets/placement/CustomPlacement.cs" id="register_custom_placement":::
+
+This overload registers the stateless strategy and the director as keyed singletons. Other overloads can change the strategy lifetime, but the director remains a keyed singleton. Directors must therefore be thread-safe and use singleton-safe dependencies. If a strategy carries attribute configuration, preserve it through <xref:Orleans.Runtime.PlacementStrategy.PopulateGrainProperties*> and <xref:Orleans.Runtime.PlacementStrategy.Initialize*> and use a lifetime which doesn't share mutable configuration between grain types.
+
+This example deliberately trades resource-aware balancing for affinity. If load is the primary concern, prefer <xref:Orleans.Runtime.ResourceOptimizedPlacement> or apply a filter and let a built-in placement strategy choose from the remaining candidates. For more implementations, inspect the built-in directors under [`src/Orleans.Runtime/Placement`](https://github.com/dotnet/orleans/tree/main/src/Orleans.Runtime/Placement), including [`HashBasedPlacementDirector`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Placement/HashBasedPlacementDirector.cs).
