@@ -212,6 +212,7 @@ describe('DocFX conversion', () => {
         '<xref:Orleans.Example`1.RunAsync``1(System.String)>',
         '<xref:Orleans.Mode.Active>',
         '<xref:System.String>',
+        '<xref:System.Linq.Enumerable.Select``2(System.Collections.Generic.IEnumerable{``0},System.Func{``0,``1})>',
       ].join('\n'),
       sourcePath,
       sourceRoot: directory,
@@ -232,6 +233,9 @@ describe('DocFX conversion', () => {
     );
     expect(converted).toContain(
       '[String](https://learn.microsoft.com/dotnet/api/system.string)',
+    );
+    expect(converted).toContain(
+      '](https://learn.microsoft.com/dotnet/api/system.linq.enumerable.select)',
     );
   });
 

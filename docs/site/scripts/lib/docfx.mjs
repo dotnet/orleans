@@ -941,7 +941,7 @@ function xrefUrl(uid, uidMap) {
       return uidMap.get(candidate);
     }
   }
-  const slug = withoutSignature.replace(/`(\d+)/g, '-$1').toLowerCase();
+  const slug = withoutMethodArity.replace(/`(\d+)/g, '-$1').toLowerCase();
   return `https://learn.microsoft.com/dotnet/api/${encodeURI(slug)}`;
 }
 
