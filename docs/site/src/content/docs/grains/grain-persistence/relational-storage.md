@@ -1,7 +1,7 @@
 ---
 title: ADO.NET grain persistence
 description: Configure relational databases, including SQLite, for Orleans grain persistence.
-ms.date: 08/02/2026
+ms.date: 08/08/2026
 ms.topic: how-to
 ---
 
@@ -68,5 +68,13 @@ Provider queries must preserve the parameter names, result names, and types expe
 ## Customize queries
 
 The `OrleansQuery` table contains vendor-specific statements used by the provider. Administrators can tune those statements while preserving the Orleans query contract. Keep customized scripts under source control, apply them through the normal database deployment process—for example, using a [data-tier application (DACPAC)](https://learn.microsoft.com/sql/tools/sql-database-projects/concepts/data-tier-applications/overview)—and test reads, writes, clears, first-write races, and ETag conflicts after every change.
+
+### Operational query shape
+
+The provider supplies the common identity parameters `GrainIdHash`, `GrainIdN0`, `GrainIdN1`, `GrainTypeHash`, `GrainTypeString`, `GrainIdExtensionString`, and `ServiceId`. `WriteToStorageKey` also receives `GrainStateVersion` and `PayloadBinary`; `ClearStorageKey` and the optional `DeleteStorageKey` receive `GrainStateVersion`.
+
+`ReadFromStorageKey` must return columns named `PayloadBinary` and `Version`. `WriteToStorageKey` must return the resulting version as `NewGrainStateVersion`. Clear and delete queries return one version value in their first result column; its name is ignored. A successful operation returns an advanced version, while an unchanged or missing value signals an ETag conflict. Versions must be representable as a signed 32-bit integer.
+
+Each provider instance reads `OrleansQuery` during silo startup and doesn't poll it afterward. Changing the table therefore affects newly initialized providers only. A rolling silo restart is appropriate when old and new queries and schemas can coexist; coordinate an outage or staged migration when they can't.
 
 Database-specific customization can use features such as [partitioned tables and indexes](https://learn.microsoft.com/sql/relational-databases/partitions/partitioned-tables-and-indexes), [memory-optimized tables](https://learn.microsoft.com/sql/relational-databases/in-memory-oltp/overview-and-usage-scenarios), [natively compiled modules](https://learn.microsoft.com/sql/relational-databases/in-memory-oltp/native-compilation-of-tables-and-stored-procedures), [PolyBase](https://learn.microsoft.com/sql/relational-databases/polybase/overview), or [linked servers](https://learn.microsoft.com/sql/relational-databases/linked-servers/linked-servers-database-engine) when those capabilities fit the deployment.

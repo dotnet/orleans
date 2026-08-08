@@ -1,7 +1,7 @@
 ---
 title: The JournaledGrain API
 description: Define state transitions and confirm events using JournaledGrain.
-ms.date: 08/02/2026
+ms.date: 08/08/2026
 ms.topic: concept-article
 ---
 
@@ -49,6 +49,9 @@ public sealed class AccountState
 ```
 
 Alternatively, override <xref:Orleans.EventSourcing.JournaledGrain`2.TransitionState*>. Transition logic must be deterministic and must only mutate the supplied state. Providers can replay transitions more than once, so don't perform I/O or other side effects from transition methods.
+
+> [!CAUTION]
+> Don't throw from <xref:Orleans.EventSourcing.JournaledGrain`2.TransitionState*> to reject an event. When transition code invoked by the Event Sourcing runtime throws, the built-in providers catch and log the exception; it doesn't cancel the submission. If storage accepts the update, <xref:Orleans.EventSourcing.JournaledGrain`2.ConfirmEvents*> can complete, <xref:Orleans.EventSourcing.JournaledGrain`2.RaiseConditionalEvent*> can return `true`, and <xref:Orleans.EventSourcing.JournaledGrain`2.Version> can advance even though the transition didn't complete. Orleans doesn't roll back mutations made before the exception, so in-memory state—and, with state storage, the persisted snapshot—can contain a partial transition. Validate commands before raising events and keep transition methods nonthrowing.
 
 ## Raise and confirm events
 
