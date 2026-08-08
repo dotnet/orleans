@@ -1,31 +1,19 @@
-using Orleans.Runtime;
-
 namespace Orleans.Docs.Snippets.Interceptors;
 
 // <grain_factory_injection>
-public class CustomCallFilter : Orleans.IIncomingGrainCallFilter
+public sealed class AuditCallFilter(IGrainFactory grainFactory)
+    : IIncomingGrainCallFilter
 {
-    private readonly IGrainFactory _grainFactory;
-
-    public CustomCallFilter(IGrainFactory grainFactory)
+    public async Task Invoke(IIncomingGrainCallContext context)
     {
-        _grainFactory = grainFactory;
-    }
-
-    public async Task Invoke(Orleans.IIncomingGrainCallContext context)
-    {
-        // Hook calls to any grain other than ICustomFilterGrain implementations.
-        // This avoids potential infinite recursion when calling OnReceivedCall() below.
-        if (context.Grain is not ICustomFilterGrain)
+        // Exclude the audit grain so its call doesn't reenter this filter recursively.
+        if (context.Grain is not ICallAuditGrain)
         {
-            var filterGrain = _grainFactory.GetGrain<ICustomFilterGrain>(
-                ((IAddressable)context.Grain).GetPrimaryKeyLong());
-
-            // Perform some grain call here.
-            await filterGrain.OnReceivedCall();
+            var auditGrain = grainFactory.GetGrain<ICallAuditGrain>(
+                context.TargetId.ToString());
+            await auditGrain.OnReceivedCall(context.MethodName);
         }
 
-        // Continue invoking the call on the target grain.
         await context.Invoke();
     }
 }

@@ -46,6 +46,13 @@ public static class IncomingFilterConfiguration
             .AddSingleton<IIncomingGrainCallFilter, LoggingCallFilter>();
         // </register_incoming_filter_di>
     }
+
+    public static void RegisterGrainFactoryFilter(ISiloBuilder siloHostBuilder)
+    {
+        // <register_grain_factory_filter>
+        siloHostBuilder.AddIncomingGrainCallFilter<AuditCallFilter>();
+        // </register_grain_factory_filter>
+    }
 }
 
 public static class OutgoingFilterConfiguration

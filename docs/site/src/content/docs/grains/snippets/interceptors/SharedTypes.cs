@@ -13,15 +13,9 @@ public interface IMyFilteredGrain : IGrainWithIntegerKey
     Task<int> GetFavoriteNumber();
 }
 
-public interface ICustomFilterGrain : IGrainWithIntegerKey
+public interface ICallAuditGrain : IGrainWithStringKey
 {
-    Task OnReceivedCall();
-}
-
-// Custom exception for access control example
-public class AccessDeniedException : Exception
-{
-    public AccessDeniedException(string message) : base(message) { }
+    Task OnReceivedCall(string methodName);
 }
 
 // Logger factory placeholder (matches legacy Orleans Logger pattern used in docs)
