@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Sdk" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Server" Version="10.2.2" />
+  </ItemGroup>
+
+</Project>
