@@ -1,7 +1,7 @@
 ---
 title: Activation collection and resource management
 description: Manage idle Orleans activations and memory pressure.
-ms.date: 08/02/2026
+ms.date: 08/08/2026
 ms.topic: concept-article
 ---
 
@@ -41,7 +41,26 @@ Call <xref:Orleans.Grain.DelayDeactivation*> to keep an activation from idle col
 
 :::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="delay_deactivation":::
 
-A negative duration cancels the previous delay. Delaying deactivation is an optimization, not a durability or placement guarantee. Failures, shutdown, migration, and resource pressure can still remove an activation.
+The delay combines with the configured collection age; it doesn't replace it. An activation becomes eligible for idle collection only after both the delay has elapsed and the activation has been idle for its collection age. Collection occurs on a later scan, so these times are lower bounds rather than schedules.
+
+Each call sets a new deadline from the time of the call:
+
+| Argument | Effect |
+|---|---|
+| A positive duration | Prevent idle collection until at least that duration has elapsed. |
+| <xref:System.TimeSpan.Zero> | Cancel the previous delay and return to the configured collection age. |
+| <xref:System.Threading.Timeout.InfiniteTimeSpan> or <xref:System.TimeSpan.MaxValue> | Delay idle collection indefinitely. |
+
+For example, assume a 10-minute collection age and ignore scan latency:
+
+| Activity | Earliest eligibility |
+|---|---|
+| Call `DelayDeactivation` with 20 minutes at minute 0, then make no calls. | Minute 20. |
+| Call `DelayDeactivation` with 5 minutes at minute 0, then make no calls. | Minute 10, because a delay can't shorten the configured collection age. |
+| Call `DelayDeactivation` with 20 minutes at minute 0, then receive an ordinary grain call at minute 7. | Minute 20. The delay doesn't slide when other calls arrive. |
+| Call `DelayDeactivation` with 5 minutes at minute 0, then receive an ordinary grain call at minute 7. | No earlier than minute 17, after the new 10-minute idle period. |
+
+<xref:Orleans.Grain.DeactivateOnIdle*> takes priority over a delay. Delaying deactivation is an optimization, not a durability or placement guarantee. It doesn't pin an activation to a silo, and failures, shutdown, migration, explicit deactivation, and memory pressure can still remove the activation.
 
 ### Keep alive
 
