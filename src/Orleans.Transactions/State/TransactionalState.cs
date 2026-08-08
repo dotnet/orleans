@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
+using Orleans.Transactions.Diagnostics;
 using Orleans.Transactions.State;
 using Orleans.Configuration;
 using Orleans.Timers.Internal;
@@ -201,7 +202,19 @@ namespace Orleans.Transactions
             var options = this.context.ActivationServices.GetRequiredService<IOptions<TransactionalStateOptions>>();
             var clock = this.context.ActivationServices.GetRequiredService<IClock>();
             var timerManager = this.context.ActivationServices.GetRequiredService<ITimerManager>();
-            this.queue = new TransactionQueue<TState>(options, this.participantId, deactivate, storage, clock, logger, timerManager, this.activationLifetime);
+            var diagnosticIdentity = new TransactionDiagnosticEvents.TransactionDiagnosticIdentity(
+                this.context.Address.SiloAddress,
+                this.context.ActivationId);
+            this.queue = new TransactionQueue<TState>(
+                options,
+                this.participantId,
+                deactivate,
+                storage,
+                clock,
+                logger,
+                timerManager,
+                this.activationLifetime,
+                diagnosticIdentity);
 
             setupResourceFactory(this.context, this.config.StateName, queue);
 

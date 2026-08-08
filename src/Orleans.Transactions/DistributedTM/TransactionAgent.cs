@@ -15,13 +15,25 @@ namespace Orleans.Transactions
         private readonly CausalClock clock;
         private readonly ITransactionAgentStatistics statistics;
         private readonly ITransactionOverloadDetector overloadDetector;
+        private readonly ITransactionAgentProtocol protocol;
 
         public TransactionAgent(IClock clock, ILogger<TransactionAgent> logger, ITransactionAgentStatistics statistics, ITransactionOverloadDetector overloadDetector)
+            : this(clock, logger, statistics, overloadDetector, TransactionAgentProtocol.Instance)
+        {
+        }
+
+        internal TransactionAgent(
+            IClock clock,
+            ILogger<TransactionAgent> logger,
+            ITransactionAgentStatistics statistics,
+            ITransactionOverloadDetector overloadDetector,
+            ITransactionAgentProtocol protocol)
         {
             this.clock = new CausalClock(clock);
             this.logger = logger;
             this.statistics = statistics;
             this.overloadDetector = overloadDetector;
+            this.protocol = protocol;
         }
 
         public Task<TransactionInfo> StartTransaction(bool readOnly, TimeSpan timeout)
@@ -140,6 +152,7 @@ namespace Orleans.Transactions
         {
             TransactionalStatus status = TransactionalStatus.Ok;
             Exception? exception;
+            var cancelNotificationOwner = CancelNotificationOwner.TransactionAgent;
 
             try
             {
@@ -148,14 +161,23 @@ namespace Orleans.Transactions
                     if (p.Key.Equals(manager.Key))
                         continue;
                     // one-way prepare message
-                    p.Key.Reference.AsReference<ITransactionalResourceExtension>()
-                            .Prepare(p.Key.Name, transactionInfo.TransactionId, p.Value, transactionInfo.TimeStamp, manager.Key)
-                            .Ignore();
+                    protocol.Prepare(
+                        p.Key,
+                        transactionInfo.TransactionId,
+                        p.Value,
+                        transactionInfo.TimeStamp,
+                        manager.Key);
                 }
 
                 // wait for the TM to commit the transaction
-                status = await manager.Key.Reference.AsReference<ITransactionManagerExtension>()
-                    .PrepareAndCommit(manager.Key.Name, transactionInfo.TransactionId, manager.Value, transactionInfo.TimeStamp, writeResources, resources.Count);
+                status = await protocol.PrepareAndCommit(
+                    manager.Key,
+                    transactionInfo.TransactionId,
+                    manager.Value,
+                    transactionInfo.TimeStamp,
+                    writeResources,
+                    resources.Count);
+                cancelNotificationOwner = CancelNotificationOwner.TransactionManager;
                 exception = null;
             }
             catch (TimeoutException ex)
@@ -178,13 +200,12 @@ namespace Orleans.Transactions
                 {
                     LogDebugCommitTransactionFailure(new(stopwatch), transactionInfo.TransactionId, status);
 
-                    // notify participants
-                    if (status.DefinitelyAborted())
+                    // A returned status is a durable manager decision. Its queue owns participant notification.
+                    if (status.DefinitelyAborted() && cancelNotificationOwner == CancelNotificationOwner.TransactionAgent)
                     {
                         await Task.WhenAll(writeResources
                             .Where(p => !p.Equals(manager.Key))
-                            .Select(p => p.Reference.AsReference<ITransactionalResourceExtension>()
-                                    .Cancel(p.Name, transactionInfo.TransactionId, transactionInfo.TimeStamp, status)));
+                            .Select(p => protocol.Cancel(p, transactionInfo.TransactionId, transactionInfo.TimeStamp, status)));
                     }
                 }
                 catch (Exception ex)
@@ -196,6 +217,12 @@ namespace Orleans.Transactions
 
             LogTraceFinishTransaction(new(stopwatch), transactionInfo.TransactionId);
             return (status, exception);
+        }
+
+        private enum CancelNotificationOwner
+        {
+            TransactionAgent,
+            TransactionManager,
         }
 
         public async Task Abort(TransactionInfo transactionInfo)
@@ -368,5 +395,68 @@ namespace Orleans.Transactions
             Message = "Abort {TransactionInfo} {Participants}"
         )]
         private partial void LogTraceAbortTransaction(TransactionInfo transactionInfo, ParticipantsLogRecord participants);
+    }
+
+    internal interface ITransactionAgentProtocol
+    {
+        void Prepare(
+            ParticipantId participant,
+            Guid transactionId,
+            AccessCounter accessCount,
+            DateTime timeStamp,
+            ParticipantId transactionManager);
+
+        Task<TransactionalStatus> PrepareAndCommit(
+            ParticipantId transactionManager,
+            Guid transactionId,
+            AccessCounter accessCount,
+            DateTime timeStamp,
+            List<ParticipantId> writeResources,
+            int totalParticipants);
+
+        Task Cancel(
+            ParticipantId participant,
+            Guid transactionId,
+            DateTime timeStamp,
+            TransactionalStatus status);
+    }
+
+    internal sealed class TransactionAgentProtocol : ITransactionAgentProtocol
+    {
+        public static TransactionAgentProtocol Instance { get; } = new();
+
+        public void Prepare(
+            ParticipantId participant,
+            Guid transactionId,
+            AccessCounter accessCount,
+            DateTime timeStamp,
+            ParticipantId transactionManager)
+            => participant.Reference.AsReference<ITransactionalResourceExtension>()
+                .Prepare(participant.Name, transactionId, accessCount, timeStamp, transactionManager)
+                .Ignore();
+
+        public Task<TransactionalStatus> PrepareAndCommit(
+            ParticipantId transactionManager,
+            Guid transactionId,
+            AccessCounter accessCount,
+            DateTime timeStamp,
+            List<ParticipantId> writeResources,
+            int totalParticipants)
+            => transactionManager.Reference.AsReference<ITransactionManagerExtension>()
+                .PrepareAndCommit(
+                    transactionManager.Name,
+                    transactionId,
+                    accessCount,
+                    timeStamp,
+                    writeResources,
+                    totalParticipants);
+
+        public Task Cancel(
+            ParticipantId participant,
+            Guid transactionId,
+            DateTime timeStamp,
+            TransactionalStatus status)
+            => participant.Reference.AsReference<ITransactionalResourceExtension>()
+                .Cancel(participant.Name, transactionId, timeStamp, status);
     }
 }

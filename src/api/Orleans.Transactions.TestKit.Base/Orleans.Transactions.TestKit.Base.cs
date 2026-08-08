@@ -806,9 +806,15 @@ namespace Orleans.Transactions.TestKit
 
         protected virtual System.Threading.Tasks.Task TransactionWillRecoverAfterRandomSiloFailure(string transactionTestGrainClassName, int concurrent, bool gracefulShutdown) { throw null; }
 
+        public System.Threading.Tasks.Task TransactionWillRecoverAfterLocalCommitStored(string transactionTestGrainClassName) { throw null; }
+
+        public System.Threading.Tasks.Task TransactionWillRecoverAfterManagerWait(string transactionTestGrainClassName) { throw null; }
+
         public virtual System.Threading.Tasks.Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent) { throw null; }
 
         public virtual System.Threading.Tasks.Task TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(string transactionTestGrainClassName, int concurrent) { throw null; }
+
+        public System.Threading.Tasks.Task TransactionWillRecoverAfterRemotePreparePersisted(string transactionTestGrainClassName) { throw null; }
     }
 
     public static partial class TransactionTestConstants

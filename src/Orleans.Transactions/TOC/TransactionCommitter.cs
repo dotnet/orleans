@@ -8,6 +8,7 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Timers.Internal;
 using Orleans.Transactions.Abstractions;
+using Orleans.Transactions.Diagnostics;
 using Orleans.Transactions.State;
 using Orleans.Transactions.TOC;
 
@@ -129,7 +130,20 @@ namespace Orleans.Transactions
             var clock = this.context.ActivationServices.GetRequiredService<IClock>();
             TService service = this.context.ActivationServices.GetRequiredKeyedService<TService>(this.config.ServiceName);
             var timerManager = this.context.ActivationServices.GetRequiredService<ITimerManager>();
-            this.queue = new TocTransactionQueue<TService>(service, options, this.participantId, deactivate, storage, clock, logger, timerManager, this.activationLifetime);
+            var diagnosticIdentity = new TransactionDiagnosticEvents.TransactionDiagnosticIdentity(
+                this.context.Address.SiloAddress,
+                this.context.ActivationId);
+            this.queue = new TocTransactionQueue<TService>(
+                service,
+                options,
+                this.participantId,
+                deactivate,
+                storage,
+                clock,
+                logger,
+                timerManager,
+                this.activationLifetime,
+                diagnosticIdentity);
 
             // Add transaction manager factory to the grain context
             this.context.RegisterResourceFactory<ITransactionManager>(this.config.ServiceName, () => new TransactionManager<OperationState>(this.queue));

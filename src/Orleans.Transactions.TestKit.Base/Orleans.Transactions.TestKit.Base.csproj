@@ -26,4 +26,8 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Transactions\Orleans.Transactions.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Transactions.Tests" />
+  </ItemGroup>
+
 </Project>

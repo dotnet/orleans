@@ -39,7 +39,7 @@ namespace Orleans.Transactions.State
 
         public async Task Abort(Guid transactionId)
         {
-            await this.queue.Ready();
+            await this.queue.Ready(transactionId);
             // release the lock
             this.queue.RWLock.Rollback(transactionId);
 
@@ -48,13 +48,13 @@ namespace Orleans.Transactions.State
 
         public async Task Cancel(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
         {
-            await this.queue.Ready();
+            await this.queue.Ready(transactionId);
             await this.queue.NotifyOfCancel(transactionId, timeStamp, status);
         }
 
         public async Task Confirm(Guid transactionId, DateTime timeStamp)
         {
-            await this.queue.Ready();
+            await this.queue.Ready(transactionId);
             await this.queue.NotifyOfConfirm(transactionId, timeStamp);
         }
 
