@@ -30,6 +30,12 @@ application ID, and application role are validated by
 `Microsoft.Orleans.Connections.Security.Entra`. Don't replace that package with
 sample-owned JWT parsing or validation.
 
+An authenticated silo or external Orleans client is inside the Orleans trust
+boundary. Orleans doesn't apply per-grain or per-method authorization to that
+connection. Admit only trusted application workloads, and authenticate and
+authorize untrusted end users before their requests reach an Orleans client.
+Configured storage and other providers are trusted cluster infrastructure.
+
 The sample uses one resource application but separate application roles and
 caller allowlists for silo and external-client traffic. Use distinct resource
 applications or audiences as well if those paths have different administrators
