@@ -16,7 +16,7 @@ Use this page to choose the right kind of learning material:
 
 ## Start here
 
-New to Orleans? [Build your first Orleans app](../quickstarts/build-your-first-orleans-app.md), a multi-project Hello World application with a silo and external client.
+New to Orleans? [Build your first Orleans app](../quickstarts/build-your-first-orleans-app.md), starting with a single-project Hello World app and progressing to a silo with an external client.
 
 ## Tutorials
 
