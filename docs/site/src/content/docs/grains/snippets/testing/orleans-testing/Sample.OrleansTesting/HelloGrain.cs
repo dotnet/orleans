@@ -1,4 +1,4 @@
-﻿namespace Tests;
+namespace Tests;
 
 public sealed class HelloGrain : Grain, IHelloGrain
 {

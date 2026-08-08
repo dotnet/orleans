@@ -60,6 +60,8 @@ items:
             href: grains/grain-lifecycle.md
           - name: Code generation
             href: grains/code-generation.md
+      - name: Test Orleans applications
+        href: grains/testing.md
       - name: Placement and versioning
         items:
           - name: Grain placement and migration
