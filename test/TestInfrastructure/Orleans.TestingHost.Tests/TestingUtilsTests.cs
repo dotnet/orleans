@@ -73,12 +73,12 @@ public class TestingUtilsTests
     }
 
     [Fact]
-    public async Task WaitUntilAsync_DoesNotMakeFinalPredicateCall()
+    public async Task WaitUntilAsync_LegacyOverloadDoesNotMakeFinalPredicateCall()
     {
         var calls = 0;
 
         var exception = await Assert.ThrowsAsync<TimeoutException>(() => TestingUtils.WaitUntilAsync(
-            async _ =>
+            async (bool _) =>
             {
                 calls++;
                 await Task.Delay(TimeSpan.FromMilliseconds(100));
@@ -90,6 +90,24 @@ public class TestingUtilsTests
         Assert.Equal(1, calls);
         Assert.Contains(nameof(TestingUtilsTests), exception.Message);
         Assert.Contains("not invoked again after the deadline", exception.Message);
+    }
+
+    [Fact]
+    public async Task WaitUntilAsync_PropagatesDeadlineCancellationAndReportsPredicateExpression()
+    {
+        var calls = 0;
+
+        var exception = await Assert.ThrowsAsync<TimeoutException>(() => TestingUtils.WaitUntilAsync(
+            async cancellationToken =>
+            {
+                calls++;
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return false;
+            },
+            TimeSpan.FromMilliseconds(25)));
+
+        Assert.Equal(1, calls);
+        Assert.Contains("async cancellationToken =>", exception.Message);
     }
 
     [Fact]

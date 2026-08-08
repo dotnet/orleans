@@ -85,14 +85,14 @@ namespace ServiceBus.Tests.SlowConsumingTests
             await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
                 (int)EventDataGeneratorAdapterFactory.Commands.Randomly_Place_Stream_To_Queue, randomStreamPlacementArg);
             //since there's an extreme slow consumer, so the back pressure algorithm should be triggered
-            await TestingUtils.WaitUntilAsync(lastTry => AssertCacheBackPressureTriggered(true, lastTry), timeout);
+            await TestingUtils.WaitUntilAsync((CancellationToken _) => AssertCacheBackPressureTriggered(true, false), timeout);
 
             //make slow consumer stop consuming
             await slowConsumer.StopConsuming();
 
             //slowConsumer stopped consuming, back pressure algorithm should be cleared in next check period.
             await Task.Delay(monitorPressureWindowSize);
-            await TestingUtils.WaitUntilAsync(lastTry => AssertCacheBackPressureTriggered(false, lastTry), timeout);
+            await TestingUtils.WaitUntilAsync((CancellationToken _) => AssertCacheBackPressureTriggered(false, false), timeout);
 
             //clean up test
             await StopHealthyConsumerGrainComing(healthyConsumers);

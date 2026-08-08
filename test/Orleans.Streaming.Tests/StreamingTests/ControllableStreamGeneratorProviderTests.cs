@@ -92,7 +92,7 @@ namespace UnitTests.StreamingTests
                     Assert.True(controlCommandResult);
                 }
 
-                await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(generatorConfig, assertIsTrue), Timeout);
+                await TestingUtils.WaitUntilAsync((CancellationToken _) => CheckCounters(generatorConfig, false), Timeout);
             }
             finally
             {
@@ -126,7 +126,7 @@ namespace UnitTests.StreamingTests
         {
             var reporter = this.fixture.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
             await reporter.Reset();
-            await TestingUtils.WaitUntilAsync(assertIsTrue => CheckReporterIsEmpty(reporter, streamNamespace, assertIsTrue), Timeout);
+            await TestingUtils.WaitUntilAsync((CancellationToken _) => CheckReporterIsEmpty(reporter, streamNamespace, false), Timeout);
         }
 
         private static async Task<bool> CheckReporterIsEmpty(IGeneratedEventReporterGrain reporter, string streamNamespace, bool assertIsTrue)

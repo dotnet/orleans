@@ -63,7 +63,7 @@ namespace UnitTests.StreamingTests
             await stream.OnNextAsync(value);
 
             var consumer = fixture.GrainFactory.GetGrain<IImplicitSubscriptionLongKeyGrain>(grainId);
-            await TestingUtils.WaitUntilAsync(lastTry => CheckValue(consumer, value, lastTry), TimeSpan.FromSeconds(30));
+            await TestingUtils.WaitUntilAsync((CancellationToken _) => CheckValue(consumer, value, false), TimeSpan.FromSeconds(30));
         }
 
         private async Task<bool> CheckValue(IImplicitSubscriptionKeyTypeGrain consumer, int expectedValue, bool assertIsTrue)

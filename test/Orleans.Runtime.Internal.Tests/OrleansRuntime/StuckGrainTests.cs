@@ -117,14 +117,9 @@ namespace UnitTests.StuckGrainTests
             }
 
             await TestingUtils.WaitUntilAsync(
-                async lastTry =>
+                async (CancellationToken _) =>
                 {
                     var count = await stuckGrain.GetNonBlockingCallCounter();
-                    if (lastTry)
-                    {
-                        Assert.Equal(3, count);
-                    }
-
                     return count == 3;
                 },
                 TimeSpan.FromSeconds(10),

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -77,15 +78,35 @@ namespace Orleans.TestingHost.Utils
         /// <param name="delayOnFail">The time to delay next call upon failure</param>
         /// <returns>A task representing the operation.</returns>
         /// <exception cref="TimeoutException">The predicate did not succeed before the timeout elapsed.</exception>
-        public static async Task WaitUntilAsync(Func<bool,Task<bool>> predicate, TimeSpan timeout, TimeSpan? delayOnFail = null)
+        public static Task WaitUntilAsync(Func<bool,Task<bool>> predicate, TimeSpan timeout, TimeSpan? delayOnFail = null)
         {
             ArgumentNullException.ThrowIfNull(predicate);
 
-            if (!await WaitUntilSucceededAsync(_ => predicate(false), timeout, delayOnFail))
+            var predicateName = $"{predicate.Method.DeclaringType?.FullName ?? "<unknown>"}.{predicate.Method.Name}";
+            return WaitUntilAsync(_ => predicate(false), timeout, delayOnFail, default, predicateName);
+        }
+
+        /// <summary>Run the predicate until it succeeds or times out.</summary>
+        /// <param name="predicate">The predicate to run. The token is cancelled when the deadline expires or cancellation is requested.</param>
+        /// <param name="timeout">The timeout value.</param>
+        /// <param name="delayOnFail">The delay before retrying after an unsuccessful attempt.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <param name="predicateExpression">The expression supplied for <paramref name="predicate"/>.</param>
+        /// <returns>A task representing the operation.</returns>
+        /// <exception cref="TimeoutException">The predicate did not succeed before the timeout elapsed.</exception>
+        public static async Task WaitUntilAsync(
+            Func<CancellationToken, Task<bool>> predicate,
+            TimeSpan timeout,
+            TimeSpan? delayOnFail = null,
+            CancellationToken cancellationToken = default,
+            [CallerArgumentExpression(nameof(predicate))] string? predicateExpression = null)
+        {
+            ArgumentNullException.ThrowIfNull(predicate);
+
+            if (!await WaitUntilSucceededAsync(predicate, timeout, delayOnFail, cancellationToken))
             {
-                var predicateName = $"{predicate.Method.DeclaringType?.FullName ?? "<unknown>"}.{predicate.Method.Name}";
                 throw new TimeoutException(
-                    $"The condition evaluated by '{predicateName}' was not satisfied within {timeout} "
+                    $"The condition evaluated by '{predicateExpression ?? "<unknown>"}' was not satisfied within {timeout} "
                     + $"using a retry delay of {delayOnFail ?? TimeSpan.FromSeconds(1)}. "
                     + "The predicate was not invoked again after the deadline.");
             }

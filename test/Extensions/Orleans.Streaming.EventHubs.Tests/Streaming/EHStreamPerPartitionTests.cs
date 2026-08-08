@@ -100,7 +100,7 @@ namespace ServiceBus.Tests.StreamingTests
             await Task.WhenAll(becomeConsumersTasks);
 
             await GenerateEvents(streamCount, eventsInStream);
-            await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(consumers, streamCount * eventsInStream, assertIsTrue), TimeSpan.FromSeconds(30));
+            await TestingUtils.WaitUntilAsync((CancellationToken _) => CheckCounters(consumers, streamCount * eventsInStream, false), TimeSpan.FromSeconds(30));
         }
 
         private async Task GenerateEvents(int streamCount, int eventsInStream)

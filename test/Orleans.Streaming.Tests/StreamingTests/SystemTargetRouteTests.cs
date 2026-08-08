@@ -88,7 +88,7 @@ namespace Tester.StreamingTests
             int[] counts = await Task.WhenAll(Enumerable.Range(0, streamCount).Select(i => producers[i].GetNumberProduced()));
 
             // make sure all went well
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(counts.Sum(), lastTry), Timeout);
+            await TestingUtils.WaitUntilAsync((CancellationToken _) => CheckCounters(counts.Sum(), false), Timeout);
         }
 
         private Task OnNextAsync(int e, StreamSequenceToken? token)

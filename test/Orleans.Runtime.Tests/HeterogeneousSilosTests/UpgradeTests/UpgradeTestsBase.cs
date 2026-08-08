@@ -245,15 +245,10 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         {
             var expectedSiloCount = this.deployedSilos.Count;
             var timeout = TestCluster.GetLivenessStabilizationTime(new ClusterMembershipOptions(), didKill: false);
-            return TestingUtils.WaitUntilAsync(async assertIsTrue =>
+            return TestingUtils.WaitUntilAsync(async (CancellationToken _) =>
             {
                 var hosts = await ManagementGrain.GetHosts(false);
                 var activeSiloCount = hosts.Count(host => host.Value == SiloStatus.Active);
-                if (assertIsTrue)
-                {
-                    Assert.Equal(expectedSiloCount, activeSiloCount);
-                }
-
                 return activeSiloCount == expectedSiloCount;
             },
             timeout,

@@ -303,8 +303,8 @@ public class SingleStreamTestRunner
         await consumer.DeactivateOnIdle();
         await producer.DeactivateOnIdle();
 
-        await TestingUtils.WaitUntilAsync(lastTry => CheckGrainsDeactivated(null, consumer, false), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
-        await TestingUtils.WaitUntilAsync(lastTry => CheckGrainsDeactivated(producer, null, false), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
+        await TestingUtils.WaitUntilAsync((CancellationToken _) => CheckGrainsDeactivated(null, consumer, false), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
+        await TestingUtils.WaitUntilAsync((CancellationToken _) => CheckGrainsDeactivated(producer, null, false), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
 
         logger.LogInformation("\n\n\n*******************************************************************\n\n\n");
 

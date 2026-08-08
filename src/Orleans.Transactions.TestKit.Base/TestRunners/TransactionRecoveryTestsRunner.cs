@@ -109,7 +109,7 @@ namespace Orleans.Transactions.TestKit
 
             this.Log($"Waiting for system to recover. Performed {index[0]} transactions on each group.");
             List<ExpectedGrainActivity>[]?[] transactionGroupsRef = new[] { transactionGroups };
-            await TestingUtils.WaitUntilAsync(lastTry => CheckTxResult(transactionGroupsRef, getIndex, lastTry), RecoveryTimeout, RetryDelay);
+            await TestingUtils.WaitUntilAsync((CancellationToken _) => CheckTxResult(transactionGroupsRef, getIndex, false), RecoveryTimeout, RetryDelay);
             this.Log($"Recovery completed. Performed {index[0]} transactions on each group. Validating results.");
             await ValidateResults(txGrains, transactionGroups);
         }
