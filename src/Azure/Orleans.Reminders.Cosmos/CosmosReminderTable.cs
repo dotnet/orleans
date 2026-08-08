@@ -73,26 +73,11 @@ internal partial class CosmosReminderTable : IReminderTable
         {
             var pk = new PartitionKey(ReminderEntity.ConstructPartitionKey(_clusterOptions.ServiceId, grainId));
             var requestOptions = new QueryRequestOptions { PartitionKey = pk };
-            var response = await _executor.ExecuteOperation(static async args =>
+            var response = await _executor.ExecuteOperation(static args =>
             {
                 var (self, grainId, requestOptions) = args;
-                var query = self._container.GetItemLinqQueryable<ReminderEntity>(requestOptions: requestOptions).ToFeedIterator();
-
-                var reminders = new List<ReminderEntity>();
-                do
-                {
-                    var queryResponse = await query.ReadNextAsync().ConfigureAwait(false);
-                    if (queryResponse != null && queryResponse.Count > 0)
-                    {
-                        reminders.AddRange(queryResponse);
-                    }
-                    else
-                    {
-                        break;
-                    }
-                } while (query.HasMoreResults);
-
-                return reminders;
+                var iterator = self._container.GetItemLinqQueryable<ReminderEntity>(requestOptions: requestOptions).ToFeedIterator();
+                return iterator.DrainAsync();
             },
             (this, grainId, requestOptions)).ConfigureAwait(false);
 
@@ -110,7 +95,7 @@ internal partial class CosmosReminderTable : IReminderTable
     {
         try
         {
-            var response = await _executor.ExecuteOperation(static async args =>
+            var response = await _executor.ExecuteOperation(static args =>
             {
                 var (self, begin, end) = args;
                 var query = self._container.GetItemLinqQueryable<ReminderEntity>()
@@ -120,22 +105,7 @@ internal partial class CosmosReminderTable : IReminderTable
                     ? query.Where(r => r.GrainHash > begin && r.GrainHash <= end)
                     : query.Where(r => r.GrainHash > begin || r.GrainHash <= end);
 
-                var iterator = query.ToFeedIterator();
-                var reminders = new List<ReminderEntity>();
-                do
-                {
-                    var queryResponse = await iterator.ReadNextAsync().ConfigureAwait(false);
-                    if (queryResponse != null && queryResponse.Count > 0)
-                    {
-                        reminders.AddRange(queryResponse);
-                    }
-                    else
-                    {
-                        break;
-                    }
-                } while (iterator.HasMoreResults);
-
-                return reminders;
+                return query.ToFeedIterator().DrainAsync();
             },
             (this, begin, end)).ConfigureAwait(false);
 
@@ -238,26 +208,12 @@ internal partial class CosmosReminderTable : IReminderTable
     {
         try
         {
-            var entities = await _executor.ExecuteOperation(static async self =>
+            var entities = await _executor.ExecuteOperation(static self =>
             {
-                var query = self._container.GetItemLinqQueryable<ReminderEntity>()
+                var iterator = self._container.GetItemLinqQueryable<ReminderEntity>()
                     .Where(entity => entity.ServiceId == self._clusterOptions.ServiceId)
                     .ToFeedIterator();
-                var reminders = new List<ReminderEntity>();
-                do
-                {
-                    var queryResponse = await query.ReadNextAsync().ConfigureAwait(false);
-                    if (queryResponse != null && queryResponse.Count > 0)
-                    {
-                        reminders.AddRange(queryResponse);
-                    }
-                    else
-                    {
-                        break;
-                    }
-                } while (query.HasMoreResults);
-
-                return reminders;
+                return iterator.DrainAsync();
             }, this).ConfigureAwait(false);
 
             var deleteTasks = new List<Task>();
