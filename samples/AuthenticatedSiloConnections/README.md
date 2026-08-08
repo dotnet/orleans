@@ -1,9 +1,10 @@
 # Authenticated silo connections
 
 This sample configures mutual TLS (mTLS) and Microsoft Entra workload
-authentication for silo-to-silo and external client-to-gateway connections. It uses an explicit
-`WorkloadIdentityCredential`; it doesn't construct `DefaultAzureCredential` or
-copy JWT validation logic into the application.
+authentication for silo-to-silo connections, plus server-authenticated TLS and
+Entra authentication for external client-to-gateway connections. It uses an
+explicit `WorkloadIdentityCredential`; it doesn't construct
+`DefaultAzureCredential` or copy JWT validation logic into the application.
 
 The sample is a two-process localhost cluster. Start one process with the
 default ports, then start another with
@@ -28,6 +29,11 @@ The exact audience, tenant, application-token classification, caller
 application ID, and application role are validated by
 `Microsoft.Orleans.Connections.Security.Entra`. Don't replace that package with
 sample-owned JWT parsing or validation.
+
+The sample uses one resource application but separate application roles and
+caller allowlists for silo and external-client traffic. Use distinct resource
+applications or audiences as well if those paths have different administrators
+or compromise boundaries.
 
 ## Configure TLS
 
@@ -55,6 +61,12 @@ baseline fallback and unexpected failure rates remain zero, and token-expiry
 recycling succeeds for authenticated connections. Changing modes requires a
 restart.
 
+Before production, also verify that connections fail for an untrusted
+certificate, wrong DNS SAN, wrong tenant or audience, missing role, unlisted
+caller application ID, expired token, and a peer which supports only the
+baseline Orleans ALPN. Repeat the checks after certificate and identity
+rotation.
+
 `Required` has no unauthenticated fallback. Roll back fleet-wide from
 `Required` to `Audit`, and only then from `Audit` to `Disabled`. Never
 automatically weaken the mode because Microsoft Entra or metadata is
@@ -64,3 +76,8 @@ The gateway validates external client bearer tokens using a distinct
 `Orleans.Client.Connect` role and caller allowlist. External clients must call
 `UseAuthenticatedClientConnections` with a token provider and the same exact
 audience, tenant, client role, and cluster binding.
+
+See the maintained [authenticated Orleans connections
+guide](../../docs/site/src/content/docs/host/authenticated-silo-connections.md)
+for the complete production setup, rollout, validation, monitoring, rotation,
+and incident-response guidance.
