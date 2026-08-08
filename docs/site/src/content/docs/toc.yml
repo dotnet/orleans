@@ -16,9 +16,7 @@ items:
         href: quickstarts/deploy-scale-orleans-on-azure.md
   - name: Tutorials
     items:
-      - name: Hello World
-        href: tutorials-and-samples/hello-world.md
-      - name: Build a multi-project app
+      - name: Create a multi-project app
         href: tutorials-and-samples/multi-project-orleans-application.md
       - name: Model an adventure game
         href: tutorials-and-samples/adventure.md

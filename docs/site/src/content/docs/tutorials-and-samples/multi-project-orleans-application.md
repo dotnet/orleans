@@ -7,7 +7,7 @@ ms.topic: tutorial
 
 # Tutorial: Create a multi-project Orleans application
 
-In this tutorial, you create the foundational parts of an Orleans application and run your first grain call. Unlike the single-project [beginner quickstart](../quickstarts/build-your-first-orleans-app.md), this tutorial separates the grain contracts, grain implementations, silo, and external client so that their dependency and deployment boundaries are visible.
+In this tutorial, you create the foundational parts of an Orleans application and run your first grain call. The solution separates the grain contracts, grain implementations, silo, and external client so that their dependency and deployment boundaries are visible.
 
 The example uses localhost clustering and omits production concerns such as durable storage, authentication, observability, and application-level retry policies. Its purpose is to show how the parts of a multi-project Orleans application fit together.
 

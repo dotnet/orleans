@@ -8,7 +8,7 @@ ms.devlang: csharp
 
 # Quickstart: Build your first Orleans app
 
-This quickstart is the canonical beginner path for Orleans. You build a URL shortener in one ASP.NET Core process, define a grain, persist its state in memory for local development, and call it from [Minimal API](https://learn.microsoft.com/aspnet/core/fundamentals/minimal-apis) endpoints.
+In this quickstart, you build a URL shortener in one ASP.NET Core process, define a grain, persist its state in memory for local development, and call it from [Minimal API](https://learn.microsoft.com/aspnet/core/fundamentals/minimal-apis) endpoints.
 
 You learn how to:
 

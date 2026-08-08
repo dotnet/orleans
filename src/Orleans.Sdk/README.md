@@ -67,7 +67,7 @@ await host.WaitForShutdownAsync();
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Getting started with Orleans](https://dotnet.github.io/orleans/docs/tutorials-and-samples/hello-world/)
+- [Getting started with Orleans](https://dotnet.github.io/orleans/docs/quickstarts/build-your-first-orleans-app/)
 - [Grains](https://learn.microsoft.com/en-us/dotnet/orleans/grains/)
 - [Hosting Orleans](https://learn.microsoft.com/en-us/dotnet/orleans/host/)
 
