@@ -4,6 +4,7 @@ using UnitTests.MembershipTests;
 using Xunit;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Internal;
 using Orleans.Configuration;
 using Orleans.TestingHost.Utils;
 
@@ -66,9 +67,12 @@ namespace UnitTests.RemindersTest
         {
             var upserts = await Task.WhenAll(Enumerable.Range(0, 5).Select(i =>
             {
-                var reminder = CreateReminder(MakeTestGrainReference(), i.ToString());
+                var grainId = MakeTestGrainReference();
+                var startAt = DateTime.UtcNow;
                 return Task.WhenAll(Enumerable.Range(1, 5).Select(j =>
                 {
+                    var reminder = CreateReminder(grainId, i.ToString());
+                    reminder.StartAt = startAt.AddMilliseconds(j);
                     return RetryHelper.RetryOnExceptionAsync(5, RetryOperation.Sigmoid, async () =>
                     {
                         return await remindersTable.UpsertRow(reminder);
@@ -95,7 +99,7 @@ namespace UnitTests.RemindersTest
             Assert.Equal(readReminder.StartAt, reminder.StartAt);
             Assert.NotNull(etagTemp);
 
-            reminder.StartAt = reminder.StartAt.AddSeconds(1);
+            reminder.StartAt = DateTime.UtcNow;
             reminder.ETag = await remindersTable.UpsertRow(reminder);
             Assert.NotNull(reminder.ETag);
 
@@ -163,7 +167,7 @@ namespace UnitTests.RemindersTest
         private static ReminderEntry CreateReminder(GrainId grainId, string reminderName)
         {
             var now = DateTime.UtcNow;
-            now = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second);
+            now = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second, DateTimeKind.Utc);
             return new ReminderEntry
             {
                 GrainId = grainId,
@@ -173,6 +177,7 @@ namespace UnitTests.RemindersTest
             };
         }
 
-        private static GrainId MakeTestGrainReference() => LegacyGrainId.GetGrainId(12345, Guid.NewGuid(), "foo/bar\\#baz?");
+        private static GrainId MakeTestGrainReference() => 
+            GrainId.Create(GrainType.Create("my-remindable-grain"), GrainIdKeyExtensions.CreateGuidKey(Guid.NewGuid(), "foo/bar\\#baz?"));
     }
 }

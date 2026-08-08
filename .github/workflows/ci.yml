@@ -237,6 +237,10 @@ jobs:
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Setup Node.js
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      with:
+        node-version: '24.x'
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
@@ -987,6 +991,83 @@ jobs:
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.os }}_${{ matrix.framework }}
+        retention-days: 1
+        path: |
+          **/TestResults/*
+          **/logs/*
+  test-google:
+    name: Google Cloud providers tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        provider: ["GoogleCloud"]
+        framework: ["net8.0", "net10.0"]
+    steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Setup Node.js
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      with:
+        node-version: '24.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+      with:
+        global-json-file: global.json
+    - name: Setup Java
+      uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+      with:
+        distribution: temurin
+        java-version: '21'
+    - name: Setup Google Emulators
+      working-directory: test/Extensions/Google/Emulators
+      run: |
+        set -euo pipefail
+
+        npm install --global firebase-tools@15.24.0
+        firebase setup:emulators:storage
+        firebase setup:emulators:firestore
+        firebase setup:emulators:pubsub
+        firebase emulators:start --only firestore,pubsub,storage --project orleans-test > firebase-emulators.log 2>&1 &
+        emulator_pid=$!
+
+        for attempt in {1..60}; do
+          if ! kill -0 "$emulator_pid" 2>/dev/null; then
+            cat firebase-emulators.log
+            exit 1
+          fi
+
+          ready=true
+          for port in 8080 8085 9199; do
+            if ! (echo > /dev/tcp/127.0.0.1/$port) 2>/dev/null; then
+              ready=false
+              break
+            fi
+          done
+
+          if $ready; then
+            exit 0
+          fi
+
+          sleep 1
+        done
+
+        cat firebase-emulators.log
+        exit 1
+    - name: Test
+      run: dotnet test
+        --framework ${{ matrix.framework }}
+        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
+        --
+        -parallel none -noshadow
+    - name: Archive Test Results
+      if: always()
+      continue-on-error: true
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      with:
+        name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
         path: |
           **/TestResults/*

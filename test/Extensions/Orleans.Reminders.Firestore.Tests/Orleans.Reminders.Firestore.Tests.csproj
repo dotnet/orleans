@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Reminders.Firestore\Orleans.Reminders.Firestore.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="$(SourceRoot)test\Extensions\Google\GoogleEmulatorHost.cs" Link="GoogleEmulatorHost.cs" />
+    <Compile Include="$(SourceRoot)test\Extensions\Google\Usings.cs" Link="Usings.cs" />
+  </ItemGroup>
+</Project>
