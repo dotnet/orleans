@@ -25,15 +25,28 @@ authentication as one ordered policy.
 Start with a path-by-path policy. Don't treat "inside the cluster network" as a
 single trust decision.
 
-| Path | Listener | Allowed callers | Recommended controls |
-|---|---|---|---|
-| Silo to silo | Silo port | Workload identities for this cluster only | Private network policy, TLS or mTLS, `Orleans.Silo.Connect`, cluster-specific audience, silo caller allowlist |
-| External client to gateway | Gateway port | Explicit application workloads | Private network policy, server-authenticated TLS or mTLS, `Orleans.Client.Connect`, client caller allowlist |
-| Public user traffic | Application ingress | End users or upstream services | Application protocol authentication and authorization; don't expose an Orleans port as public ingress |
-| Membership, storage, reminders, and streams | Provider endpoints | Silo provider identity | Provider-native TLS, workload identity, and least-privilege data-plane permissions |
+| Component or path | Trust requirement | Recommended controls |
+|---|---|---|
+| Silo-to-silo connection | Every admitted silo is trusted as part of this cluster | Private network policy, TLS or mTLS, `Orleans.Silo.Connect`, cluster-specific audience, silo caller allowlist |
+| External client-to-gateway connection | Every admitted client is trusted to access the Orleans cluster | Private network policy, server-authenticated TLS or mTLS, `Orleans.Client.Connect`, client caller allowlist |
+| Public user traffic | End users and arbitrary upstream callers aren't inside the Orleans trust boundary | Authenticate and authorize at application ingress; don't expose an Orleans port as public ingress |
+| Membership, storage, reminders, and streams | Configured providers and the data they return are trusted cluster infrastructure | Provider-native TLS, workload identity, least-privilege data-plane permissions, and administrative access controls |
 
-Connection authentication protects the first two paths only. It doesn't secure
-provider traffic or replace authorization at your application's public API.
+Orleans has a coarse-grained trust boundary. If a silo or external Orleans
+client can connect and authenticate, Orleans treats it as trusted. An admitted
+client can invoke any grain interface available to it; Orleans connection
+authentication isn't a per-grain or per-method authorization system. Therefore,
+only admit application workloads which belong inside the same trust boundary as
+the cluster. Authenticate and authorize untrusted end users before they reach an
+Orleans client, and expose only application-specific operations through that
+trusted client.
+
+Configured storage, membership, reminder, and stream providers are trusted too.
+Orleans assumes that provider responses and persisted data are authentic and
+authorized for the cluster. Protect provider credentials, transport, data, and
+administrative access accordingly. A malicious or compromised provider is
+outside this connection-authentication threat model.
+
 Don't expose the silo or gateway port to the public internet.
 
 Install `Microsoft.Orleans.Connections.Security` in every silo and external
@@ -66,18 +79,20 @@ TCP
 ```
 
 TLS protects the bearer token in transit and authenticates the TLS server. The
-token authenticates and authorizes the connecting workload. Membership still
-determines which silos make up the cluster; connection authentication doesn't
-replace membership, authorize individual grain calls, propagate end-user
-identity, or prove that a workload owns the exact `SiloAddress` it claims.
+token decides whether the connecting workload is admitted to the Orleans trust
+boundary. Membership still determines which silos make up the cluster.
+Connection authentication doesn't propagate end-user identity, enforce
+per-grain or per-method authorization, or prove that a workload owns the exact
+`SiloAddress` it claims.
 
 The design protects against network peers without an authorized workload
 credential, unauthenticated downgrade in enforcement mode, cross-cluster token
 reuse, and malformed or excessively concurrent authentication exchanges. It
-doesn't protect against compromise of an authorized silo, theft and replay of a
-bearer token before expiration, or compromise of a trusted CA, identity
-provider, signing key, or host. Use short-lived tokens, workload isolation,
-network policy, and optionally mTLS to reduce the remaining risk.
+doesn't protect against compromise of an admitted silo or client, malicious or
+corrupted trusted storage, theft and replay of a bearer token before expiration,
+or compromise of a trusted CA, identity provider, signing key, or host. Use
+short-lived tokens, workload isolation, network policy, and optionally mTLS to
+reduce the remaining risk.
 
 ## Provision Entra authorization
 
@@ -201,8 +216,11 @@ the external-client role and allowlist separate from the silo policy. The
 <xref:Orleans.Connections.Security.SiloConnectionTokenValidationContext.Target>
 properties distinguish
 client-to-gateway traffic from silo-to-silo traffic for custom providers.
-Gateway authentication does not authorize individual grain calls or propagate
-the authenticated principal into grain requests.
+After gateway authentication succeeds, Orleans trusts that client connection.
+The authenticated principal isn't propagated into grain requests, and Orleans
+doesn't apply per-grain or per-method authorization. If callers require
+different permissions, enforce them before they enter the Orleans client or
+implement an explicit application-level authorization design.
 
 Call
 <xref:Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseAuthenticatedClientConnections*>
@@ -371,6 +389,10 @@ Maintain runbooks for these events:
 - Bound token, timeout, concurrency, queue, metadata refresh, and token lifetime
   settings.
 - Restrict silo and gateway ports with network policy.
+- Admit only silos and clients which belong inside the cluster trust boundary;
+  don't use a direct Orleans client as an untrusted public endpoint.
+- Treat configured storage and providers as trusted infrastructure, and protect
+  their credentials, transport, data, and administrative access.
 - Synchronize clocks and exercise certificate, key, and identity rotation.
 - Treat unexpected baseline fallback in `Audit` and every authentication
   failure in `Required` as an operational event.
