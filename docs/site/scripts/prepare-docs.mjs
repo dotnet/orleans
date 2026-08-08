@@ -45,7 +45,11 @@ const includeRoots = markdownFiles.filter(
   (file) => !isSnippetSupportMarkdown(path.relative(sourceRoot, file)),
 );
 const includeTargets = await collectIncludeTargets(includeRoots, { allowedRoot: includeRoot });
-const uidMap = await collectUidMap(markdownFiles, sourceRoot);
+const uidMap = await collectUidMap(
+  markdownFiles,
+  sourceRoot,
+  path.join(siteRoot, 'src', 'data', 'pkgs'),
+);
 let pages = 0;
 let assets = 0;
 

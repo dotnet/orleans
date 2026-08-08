@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
   collectIncludeTargets,
+  collectUidMap,
   convertDocfxMarkdown,
   convertHubYaml,
   createSidebar,
@@ -167,6 +168,67 @@ describe('DocFX conversion', () => {
     );
     expect(converted).toContain('::::version{versions="Orleans 9.0, Orleans 10.0"}');
     expect(converted).not.toContain('# Test guide');
+  });
+
+  test('maps public Orleans xrefs to generated native API routes', async () => {
+    const directory = await temporaryDirectory();
+    const apiRoot = path.join(directory, 'pkgs');
+    await mkdir(apiRoot);
+    await writeFile(
+      path.join(apiRoot, 'Example.json'),
+      JSON.stringify({
+        package: { name: 'Microsoft.Orleans.Example' },
+        types: [
+          {
+            name: 'Example',
+            fullName: 'Orleans.Example<T>',
+            genericParameters: [{ name: 'T' }],
+            members: [
+              {
+                name: 'RunAsync',
+                kind: 'method',
+                signature: 'public Task Example<T>.RunAsync()',
+              },
+            ],
+          },
+          {
+            name: 'Mode',
+            fullName: 'Orleans.Mode',
+            enumMembers: [{ name: 'Active', value: '1' }],
+          },
+        ],
+      }),
+    );
+    const sourcePath = path.join(directory, 'guide.md');
+    await writeFile(sourcePath, '# Guide\n');
+    const uidMap = await collectUidMap([sourcePath], directory, apiRoot);
+    const converted = await convertDocfxMarkdown({
+      source: [
+        '---',
+        'title: Native API xrefs',
+        '---',
+        '<xref:Orleans.Example`1>',
+        '<xref:Orleans.Example`1.RunAsync*>',
+        '<xref:Orleans.Mode.Active>',
+        '<xref:System.String>',
+      ].join('\n'),
+      sourcePath,
+      sourceRoot: directory,
+      uidMap,
+    });
+
+    expect(converted).toContain(
+      '[Example&lt;T&gt;](/orleans/docs/api/csharp/microsoft.orleans.example/orleans.example-1/)',
+    );
+    expect(converted).toContain(
+      '[RunAsync](/orleans/docs/api/csharp/microsoft.orleans.example/orleans.example-1/methods/)',
+    );
+    expect(converted).toContain(
+      '[Active](/orleans/docs/api/csharp/microsoft.orleans.example/orleans.mode/#fields)',
+    );
+    expect(converted).toContain(
+      '[String](https://learn.microsoft.com/dotnet/api/system.string)',
+    );
   });
 
   test('preserves triple-backtick content inside a four-backtick fence', async () => {

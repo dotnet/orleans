@@ -93,7 +93,7 @@ await RefreshNow();
 
 <xref:Orleans.EventSourcing.JournaledGrain`2.RetrieveConfirmedEvents*> returns a confirmed segment only when the provider retains and exposes it. State storage and custom storage don't expose events through this API; log storage does.
 
-<xref:Orleans.EventSourcing.JournaledGrain`2.ClearLogAsync*> resets state and discards confirmed and unconfirmed events only when supported by the provider. Clearing a log is destructive and isn't a schema-migration mechanism.
+`ClearLogAsync` resets state and discards confirmed and unconfirmed events only when supported by the provider. Clearing a log is destructive and isn't a schema-migration mechanism.
 
 ## Evolve state and events
 

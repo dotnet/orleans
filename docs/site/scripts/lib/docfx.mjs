@@ -1,4 +1,4 @@
-import { access, readFile, realpath } from 'node:fs/promises';
+import { access, readFile, readdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
@@ -1393,7 +1393,38 @@ export function routeFromSourcePath(sourcePath, sourceRoot) {
   return `${siteBase}/${route}${route ? '/' : ''}`.replace(/\/{2,}/g, '/');
 }
 
-export async function collectUidMap(markdownFiles, sourceRoot) {
+function apiTypeUid(type) {
+  const arity = type.genericParameters?.length ?? 0;
+  let identity = type.fullName ?? type.name;
+  while (/<[^<>]*>/.test(identity)) {
+    identity = identity.replace(/<[^<>]*>/g, '');
+  }
+  return arity > 0 ? `${identity}\`${arity}` : identity;
+}
+
+function apiTypeSlug(type) {
+  const arity = type.genericParameters?.length ?? 0;
+  let identity = type.fullName ?? type.name;
+  while (/<[^<>]*>/.test(identity)) {
+    identity = identity.replace(/<[^<>]*>/g, '');
+  }
+  const slug = identity
+    .toLowerCase()
+    .replace(/[^a-z0-9.]+/g, '-')
+    .replace(/^-|-$/g, '');
+  return arity > 0 ? `${slug}-${arity}` : slug;
+}
+
+const apiMemberKindSlugs = {
+  constructor: 'constructors',
+  event: 'events',
+  field: 'fields',
+  indexer: 'indexers',
+  method: 'methods',
+  property: 'properties',
+};
+
+export async function collectUidMap(markdownFiles, sourceRoot, apiPackageRoot) {
   const result = new Map();
   for (const file of markdownFiles) {
     const { metadata } = splitFrontmatter(await readFile(file, 'utf8'));
@@ -1404,6 +1435,42 @@ export async function collectUidMap(markdownFiles, sourceRoot) {
       throw new Error(`Duplicate DocFX uid '${metadata.uid}'.`);
     }
     result.set(metadata.uid, routeFromSourcePath(file, sourceRoot));
+  }
+  if (apiPackageRoot && (await pathExists(apiPackageRoot))) {
+    const entries = await readdir(apiPackageRoot, { withFileTypes: true });
+    for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+      if (!entry.isFile() || path.extname(entry.name).toLowerCase() !== '.json') continue;
+      const packageDocument = JSON.parse(
+        await readFile(path.join(apiPackageRoot, entry.name), 'utf8'),
+      );
+      const packageSlug = String(packageDocument.package?.name ?? '').toLowerCase();
+      if (!packageSlug) continue;
+      for (const type of packageDocument.types ?? []) {
+        const uid = apiTypeUid(type);
+        const typeRoute = `${deploymentBase}/docs/api/csharp/${packageSlug}/${apiTypeSlug(type)}/`;
+        if (!result.has(uid)) result.set(uid, typeRoute);
+
+        const kindsByName = new Map();
+        for (const member of type.members ?? []) {
+          const name = member.name === '.ctor' ? '#ctor' : member.name;
+          const kinds = kindsByName.get(name) ?? new Set();
+          kinds.add(member.kind);
+          kindsByName.set(name, kinds);
+        }
+        for (const [name, kinds] of kindsByName) {
+          if (kinds.size !== 1) continue;
+          const [kind] = kinds;
+          const kindSlug = apiMemberKindSlugs[kind];
+          if (!kindSlug) continue;
+          const route = `${typeRoute}${kindSlug}/`;
+          result.set(`${uid}.${name}`, route);
+          result.set(`${uid}.${name}*`, route);
+        }
+        for (const member of type.enumMembers ?? []) {
+          result.set(`${uid}.${member.name}`, `${typeRoute}#fields`);
+        }
+      }
+    }
   }
   return result;
 }
