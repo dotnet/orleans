@@ -1,20 +1,21 @@
 using System.Reflection;
-using Orleans.Runtime;
+using System.Security.Claims;
 
 namespace Orleans.Docs.Snippets.Interceptors;
 
 // <per_grain_filter>
-public class MyFilteredGrain
-    : Grain, IMyFilteredGrain, Orleans.IIncomingGrainCallFilter
+public sealed class MyFilteredGrain
+    : Grain, IMyFilteredGrain, IIncomingGrainCallFilter
 {
-    public async Task Invoke(Orleans.IIncomingGrainCallContext context)
+    async Task IIncomingGrainCallFilter.Invoke(
+        IIncomingGrainCallContext context)
     {
         await context.Invoke();
 
         // Change the result of the call from 7 to 38.
         if (string.Equals(
             context.InterfaceMethod.Name,
-            nameof(this.GetFavoriteNumber)))
+            nameof(IMyFilteredGrain.GetFavoriteNumber)))
         {
             context.Result = 38;
         }
@@ -24,30 +25,65 @@ public class MyFilteredGrain
 }
 // </per_grain_filter>
 
-// <access_control_attribute>
+// <access_control_contract>
 [AttributeUsage(AttributeTargets.Method)]
-public class AdminOnlyAttribute : Attribute { }
-// </access_control_attribute>
+public sealed class AuthorizeGrainCallAttribute(string policy) : Attribute
+{
+    public string Policy { get; } = policy;
+}
+
+public interface ITrustedCallerIdentityAccessor
+{
+    // Implement this using identity established by trusted host/filter infrastructure.
+    ClaimsPrincipal? Caller { get; }
+}
+
+public sealed class ApplicationAuthorizationService
+{
+    public const string AdministratorPolicy = "Administrator";
+
+    public ValueTask<bool> AuthorizeAsync(
+        ClaimsPrincipal? caller,
+        string policy)
+    {
+        var isAuthorized = policy switch
+        {
+            AdministratorPolicy =>
+                caller?.Identity?.IsAuthenticated == true
+                && caller.IsInRole("Administrator"),
+            _ => false,
+        };
+
+        return ValueTask.FromResult(isAuthorized);
+    }
+}
+// </access_control_contract>
 
 // <access_control_grain>
-public class MyAccessControlledGrain
-    : Grain, IMyFilteredGrain, Orleans.IIncomingGrainCallFilter
+public sealed class MyAccessControlledGrain(
+    ITrustedCallerIdentityAccessor callerIdentity,
+    ApplicationAuthorizationService authorizationService)
+    : Grain, IAccessControlledGrain, IIncomingGrainCallFilter
 {
-    public Task Invoke(Orleans.IIncomingGrainCallContext context)
+    async Task IIncomingGrainCallFilter.Invoke(
+        IIncomingGrainCallContext context)
     {
-        // Check access conditions.
-        var isAdminMethod =
-            context.ImplementationMethod.GetCustomAttribute<AdminOnlyAttribute>();
-        if (isAdminMethod is not null && RequestContext.Get("isAdmin") is not true)
+        var authorization = context.ImplementationMethod
+            .GetCustomAttribute<AuthorizeGrainCallAttribute>();
+
+        if (authorization is not null
+            && !await authorizationService.AuthorizeAsync(
+                callerIdentity.Caller,
+                authorization.Policy))
         {
-            throw new AccessDeniedException(
-                $"Only admins can access {context.ImplementationMethod.Name}!");
+            throw new UnauthorizedAccessException(
+                "The caller isn't authorized to invoke this operation.");
         }
 
-        return context.Invoke();
+        await context.Invoke();
     }
 
-    [AdminOnly]
+    [AuthorizeGrainCall(ApplicationAuthorizationService.AdministratorPolicy)]
     public Task<int> GetFavoriteNumber() => Task.FromResult(7);
 }
 // </access_control_grain>
