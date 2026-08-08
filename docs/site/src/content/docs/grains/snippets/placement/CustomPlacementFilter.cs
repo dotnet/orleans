@@ -10,7 +10,6 @@ using Orleans.Runtime.Placement;
 namespace GrainPlacement;
 
 // <custom_placement_filter_strategy>
-#pragma warning disable ORLEANSEXP004
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
 public sealed class MinimumSiloCoresPlacementFilterAttribute(
     int minimumCores,
@@ -71,11 +70,9 @@ public sealed class MinimumSiloCoresPlacementFilterStrategy(
                 nameof(value),
                 "The minimum core count must be positive.");
 }
-#pragma warning restore ORLEANSEXP004
 // </custom_placement_filter_strategy>
 
 // <custom_placement_filter_director>
-#pragma warning disable ORLEANSEXP004
 public sealed class MinimumSiloCoresPlacementFilterDirector(
     ISiloMetadataCache siloMetadataCache)
     : IPlacementFilterDirector
@@ -110,7 +107,6 @@ public sealed class MinimumSiloCoresPlacementFilterDirector(
         });
     }
 }
-#pragma warning restore ORLEANSEXP004
 // </custom_placement_filter_director>
 
 public static class CustomPlacementFilterConfiguration
@@ -118,12 +114,10 @@ public static class CustomPlacementFilterConfiguration
     // <register_custom_placement_filter>
     public static void AddCustomPlacementFilter(ISiloBuilder siloBuilder)
     {
-#pragma warning disable ORLEANSEXP004
         siloBuilder.Services.AddPlacementFilter<
             MinimumSiloCoresPlacementFilterStrategy,
             MinimumSiloCoresPlacementFilterDirector>(
                 ServiceLifetime.Transient);
-#pragma warning restore ORLEANSEXP004
     }
     // </register_custom_placement_filter>
 }
@@ -134,12 +128,10 @@ public interface IComputeGrain : IGrainWithStringKey
 }
 
 // <apply_custom_placement_filter>
-#pragma warning disable ORLEANSEXP004
 [MinimumSiloCoresPlacementFilter(minimumCores: 16)]
 [ResourceOptimizedPlacement]
 public sealed class ComputeGrain : Grain, IComputeGrain
 {
     public Task Ping() => Task.CompletedTask;
 }
-#pragma warning restore ORLEANSEXP004
 // </apply_custom_placement_filter>

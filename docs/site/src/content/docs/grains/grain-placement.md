@@ -73,7 +73,7 @@ Per-grain attributes still take precedence.
 
 ## Placement filters
 
-Placement filters reduce the compatible candidate set before the placement strategy selects a silo. They can express requirements or preferences based on [silo metadata](../host/configuration-guide/silo-metadata.md). Placement filters are experimental and produce diagnostic `ORLEANSEXP004`.
+Placement filters reduce the compatible candidate set before the placement strategy selects a silo. They can express requirements or preferences based on [silo metadata](../host/configuration-guide/silo-metadata.md). The built-in metadata filter attributes are experimental and produce diagnostic `ORLEANSEXP004`.
 
 See [Placement filters](grain-placement-filtering.md) for the built-in filters and experimental status.
 

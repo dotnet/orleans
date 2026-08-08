@@ -8,7 +8,7 @@ ms.topic: concept-article
 # Grain placement filters
 
 > [!WARNING]
-> Placement filtering is experimental. Its APIs are annotated with `Experimental("ORLEANSEXP004")` and can change without notice.
+> The built-in <xref:Orleans.Runtime.Placement.Filtering.RequiredMatchSiloMetadataPlacementFilterAttribute> and <xref:Orleans.Runtime.Placement.Filtering.PreferredMatchSiloMetadataPlacementFilterAttribute> are experimental. These attributes are annotated with `Experimental("ORLEANSEXP004")` and can change without notice.
 
 Placement first determines which silos are compatible with a grain type. Filters then reduce that candidate set, in order, before the grain's [placement strategy](grain-placement.md) selects a target.
 
@@ -123,6 +123,6 @@ Finally, register the filter on every silo:
 
 <xref:Orleans.Placement.PlacementFilterExtensions.AddPlacementFilter*> requires a <xref:Microsoft.Extensions.DependencyInjection.ServiceLifetime> for the strategy. This example uses `Transient` because initialization mutates the strategy with grain-type-specific configuration. Orleans caches the resulting strategy per grain type. The director is always registered as a keyed singleton, regardless of the strategy lifetime, so it must be thread-safe and use singleton-safe dependencies.
 
-Custom filters are part of the `ORLEANSEXP004` API surface. Return only candidates from the input sequence, keep filtering fast and deterministic for the supplied data, and monitor placement failures caused by hard requirements. Silo metadata is operator-provided scheduling information, not live utilization data or a security boundary. Use resource-optimized placement for live load signals and enforce authorization independently.
+Return only candidates from the input sequence, keep filtering fast and deterministic for the supplied data, and monitor placement failures caused by hard requirements. Silo metadata is operator-provided scheduling information, not live utilization data or a security boundary. Use resource-optimized placement for live load signals and enforce authorization independently.
 
 During placement, read application request metadata from <xref:Orleans.Runtime.Placement.PlacementTarget.RequestContextData?displayProperty=nameWithType>; the static <xref:Orleans.Runtime.RequestContext> isn't populated because no activation exists yet.
