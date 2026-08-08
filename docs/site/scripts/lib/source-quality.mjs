@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
+import { execFile } from 'node:child_process';
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { fromMarkdown } from 'mdast-util-from-markdown';
 import { gfmTableFromMarkdown } from 'mdast-util-gfm-table';
 import { gfmTable } from 'micromark-extension-gfm-table';
@@ -18,6 +20,7 @@ const namedOrleansPivotPattern = /\borleans-(\d+)-(?:\d+|x)\b/gi;
 const versionSpecificPathPattern =
   /(?:^|\/)(?:migration(?:\/|-guide(?:\.md)?$)|upgrades?(?:\/|\.md$))/i;
 const missingFenceReason = 'REQUIRED: explain why this page cannot use compiled :::code snippets.';
+const execFileAsync = promisify(execFile);
 
 function toPosix(value) {
   return value.split(path.sep).join('/');
@@ -515,24 +518,70 @@ function extractTableCodeValues(source, column) {
   return values;
 }
 
-function projectPackageId(file, source) {
-  const explicit = /<PackageId>([^<]+)<\/PackageId>/.exec(source)?.[1];
-  const projectName = path.basename(file, '.csproj');
-  return explicit ?? (projectName.startsWith('Microsoft.') ? projectName : `Microsoft.${projectName}`);
+async function evaluatePackageProject(file) {
+  const { stdout } = await execFileAsync(
+    'dotnet',
+    [
+      'msbuild',
+      file,
+      '-nologo',
+      '-getProperty:IsPackable',
+      '-getProperty:PackageId',
+      '-getProperty:VersionSuffix',
+    ],
+    {
+      maxBuffer: 4 * 1024 * 1024,
+      windowsHide: true,
+      env: {
+        ...process.env,
+        DOTNET_NOLOGO: 'true',
+        DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1',
+      },
+    },
+  );
+  return JSON.parse(stdout).Properties;
 }
 
-async function collectPackageProjects(repositoryRoot) {
+export async function collectPackageProjects(
+  repositoryRoot,
+  { evaluate = evaluatePackageProject, concurrency = 8 } = {},
+) {
+  const files = await walk(
+    path.join(repositoryRoot, 'src'),
+    (item) => item.endsWith('.csproj'),
+  );
+  const evaluations = new Array(files.length);
+  let next = 0;
+  async function worker() {
+    while (next < files.length) {
+      const index = next;
+      next += 1;
+      evaluations[index] = await evaluate(files[index]);
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, files.length || 1) }, () => worker()),
+  );
+
   const projects = new Map();
-  for (const file of await walk(path.join(repositoryRoot, 'src'), (item) => item.endsWith('.csproj'))) {
-    const source = await readFile(file, 'utf8');
-    if (/<IsPackable>\s*false\s*<\/IsPackable>/i.test(source)) {
+  for (let index = 0; index < files.length; index += 1) {
+    const file = files[index];
+    const properties = evaluations[index];
+    if (String(properties.IsPackable).toLowerCase() !== 'true') {
       continue;
     }
-    const packageId = projectPackageId(file, source);
+    const packageId = String(properties.PackageId);
+    if (!packageId) {
+      throw new Error(`Packable project '${file}' evaluates to an empty PackageId.`);
+    }
+    if (projects.has(packageId)) {
+      throw new Error(
+        `Packable projects '${projects.get(packageId).file}' and '${file}' share PackageId '${packageId}'.`,
+      );
+    }
     projects.set(packageId, {
       file,
-      source,
-      alpha: /<VersionSuffix\b[^>]*>[^<]*alpha\./.test(source),
+      alpha: String(properties.VersionSuffix).startsWith('alpha.'),
     });
   }
   return projects;

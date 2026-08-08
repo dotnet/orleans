@@ -228,6 +228,7 @@ describe('DocFX conversion', () => {
         '---',
         '<xref:Orleans.Example`1>',
         '<xref:Orleans.Example`1.RunAsync*>',
+        '<xref:Orleans.Example`1.RunAsync``1(System.String)>',
         '<xref:Orleans.Mode.Active>',
         '<xref:System.String>',
       ].join('\n'),
@@ -241,6 +242,9 @@ describe('DocFX conversion', () => {
     );
     expect(converted).toContain(
       '[RunAsync](/orleans/docs/api/csharp/microsoft.orleans.example/orleans.example-1/methods/)',
+    );
+    expect(converted).toContain(
+      '[RunAsync&lt;T&gt;](/orleans/docs/api/csharp/microsoft.orleans.example/orleans.example-1/methods/)',
     );
     expect(converted).toContain(
       '[Active](/orleans/docs/api/csharp/microsoft.orleans.example/orleans.mode/#fields)',

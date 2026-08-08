@@ -1020,7 +1020,7 @@ function humanizeXref(uid, displayProperty) {
         ? parts.slice(-2).join('.')
         : parts.at(-1);
   }
-  return display.replace(/`(\d+)/g, (_, count) => {
+  return display.replace(/`{1,2}(\d+)/g, (_, count) => {
     const arity = Number(count);
     const conventionalNames = ['T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
     const names = Array.from(
@@ -1032,10 +1032,20 @@ function humanizeXref(uid, displayProperty) {
 }
 
 function xrefUrl(uid, uidMap) {
-  if (uidMap.has(uid)) {
-    return uidMap.get(uid);
+  const withoutWildcard = uid.replace(/\*$/, '');
+  const withoutSignature = withoutWildcard.replace(/\(.*$/, '');
+  const withoutMethodArity = withoutSignature.replace(/``\d+$/, '');
+  for (const candidate of [
+    uid,
+    withoutWildcard,
+    withoutSignature,
+    withoutMethodArity,
+    `${withoutMethodArity}*`,
+  ]) {
+    if (uidMap.has(candidate)) {
+      return uidMap.get(candidate);
+    }
   }
-  const withoutSignature = uid.replace(/\*$/, '').replace(/\(.*$/, '');
   const slug = withoutSignature.replace(/`(\d+)/g, '-$1').toLowerCase();
   return `https://learn.microsoft.com/dotnet/api/${encodeURI(slug)}`;
 }

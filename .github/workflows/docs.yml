@@ -106,7 +106,7 @@ jobs:
           ./samples/Validate-Samples.ps1 -NoBuild
 
       - name: Build aggregate documentation solution
-        run: dotnet build docs/Docs.slnx --configuration Release --framework net10.0 --no-incremental -bl:docs-projects.binlog
+        run: dotnet build docs/Docs.slnx --configuration Release --no-incremental -p:BuildExternalAssets=false -bl:docs-projects.binlog
 
       - name: Upload build diagnostics
         if: always()
