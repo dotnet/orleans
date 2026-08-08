@@ -18,6 +18,8 @@ items:
     items:
       - name: Hello World
         href: tutorials-and-samples/hello-world.md
+      - name: Build a multi-project app
+        href: tutorials-and-samples/tutorial-1.md
       - name: Model an adventure game
         href: tutorials-and-samples/adventure.md
       - name: Build custom grain storage
