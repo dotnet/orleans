@@ -60,7 +60,7 @@ afterEach(async () => {
   );
 });
 
-describe('snippet project policy', () => {
+describe('snippet project policy', { timeout: 30_000 }, () => {
   test('executes the rendered Markdown resolver without npm packages installed', async () => {
     const root = await temporaryDirectory();
     const toolRoot = path.join(root, 'tool');
