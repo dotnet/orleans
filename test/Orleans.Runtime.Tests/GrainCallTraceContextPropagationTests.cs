@@ -99,6 +99,30 @@ namespace UnitTests.General
             }
         }
 
+        [Fact]
+        [TestCategory("BVT")]
+        public async Task GrainCallUsesCurrentRpcSemanticConventionKeys()
+        {
+            Started.Clear();
+
+            var grain = _fixture.GrainFactory.GetGrain<ITraceContextPropagationGrain>(Random.Shared.Next());
+            await grain.GetTraceContextInfo();
+
+            var activity = Started.FirstOrDefault(
+                a => a.Source.Name == ActivitySources.ApplicationGrainActivitySourceName
+                    && a.GetTagItem("rpc.system.name") is not null);
+
+            Assert.NotNull(activity);
+            Assert.Equal("orleans", activity.GetTagItem("rpc.system.name"));
+            Assert.Equal(typeof(ITraceContextPropagationGrain).FullName, activity.GetTagItem("orleans.rpc.service"));
+            Assert.Equal(
+                $"{typeof(ITraceContextPropagationGrain).FullName}/{nameof(ITraceContextPropagationGrain.GetTraceContextInfo)}",
+                activity.GetTagItem("rpc.method"));
+            Assert.Null(activity.GetTagItem("rpc.system"));
+            Assert.Null(activity.GetTagItem("rpc.service"));
+            Assert.NotNull(activity.GetTagItem("orleans.rpc.target_id"));
+        }
+
         /// <summary>
         /// Verifies that the server-side activity is a Server kind and has a remote parent.
         /// This confirms proper W3C trace context handling.

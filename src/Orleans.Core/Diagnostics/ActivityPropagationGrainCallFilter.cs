@@ -49,10 +49,10 @@ namespace Orleans.Runtime
         {
             if (activity is not null)
             {
-                // rpc attributes from https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/rpc.md
+                // RPC attributes from https://opentelemetry.io/docs/specs/semconv/rpc/
                 activity.SetTag(ActivityTagKeys.RpcSystem, RpcSystem);
                 activity.SetTag(ActivityTagKeys.RpcService, context.InterfaceName);
-                activity.SetTag(ActivityTagKeys.RpcMethod, context.MethodName);
+                activity.SetTag(ActivityTagKeys.RpcMethod, $"{context.InterfaceName}/{context.MethodName}");
 
                 if (activity.IsAllDataRequested)
                 {
