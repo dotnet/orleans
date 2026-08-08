@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace Orleans.Connections.Security;
 
 /// <summary>
-/// Controls enforcement of silo-to-silo connection authentication.
+/// Controls enforcement of Orleans connection authentication.
 /// </summary>
 public enum SiloConnectionAuthenticationMode
 {
@@ -17,8 +17,20 @@ public enum SiloConnectionAuthenticationMode
     /// <summary>Attempts authentication when supported and records failures without rejecting policy failures.</summary>
     Audit,
 
-    /// <summary>Requires every silo connection to be authenticated.</summary>
+    /// <summary>Requires every configured connection to be authenticated.</summary>
     Required,
+}
+
+/// <summary>
+/// Identifies the kind of Orleans connection being authenticated.
+/// </summary>
+public enum SiloConnectionAuthenticationTarget
+{
+    /// <summary>A connection between silos.</summary>
+    Silo,
+
+    /// <summary>A connection between an external Orleans client and a silo gateway.</summary>
+    Client,
 }
 /// <summary>
 /// Identifies the direction of a silo connection.
@@ -60,29 +72,29 @@ public enum SiloConnectionAuthenticationFailure
 }
 
 /// <summary>
-/// A bearer token used to authenticate an outbound silo connection.
+/// A bearer token used to authenticate an outbound Orleans connection.
 /// </summary>
 /// <param name="Value">The token value.</param>
 /// <param name="ExpiresAt">The token expiration time.</param>
 public readonly record struct SiloConnectionToken(string Value, DateTimeOffset? ExpiresAt);
 
 /// <summary>
-/// Supplies bearer tokens for outbound silo connections.
+/// Supplies bearer tokens for outbound Orleans connections.
 /// </summary>
 public interface ISiloConnectionTokenProvider
 {
-    /// <summary>Gets a token for an outbound silo connection.</summary>
+    /// <summary>Gets a token for an outbound Orleans connection.</summary>
     ValueTask<SiloConnectionToken> GetTokenAsync(
         SiloConnectionTokenRequestContext context,
         CancellationToken cancellationToken);
 }
 
 /// <summary>
-/// Validates bearer tokens received on inbound silo connections.
+/// Validates bearer tokens received on inbound Orleans connections.
 /// </summary>
 public interface ISiloConnectionTokenValidator
 {
-    /// <summary>Validates a token for an inbound silo connection.</summary>
+    /// <summary>Validates a token for an inbound Orleans connection.</summary>
     ValueTask<SiloConnectionTokenValidationResult> ValidateTokenAsync(
         string token,
         SiloConnectionTokenValidationContext context,
@@ -94,15 +106,23 @@ public interface ISiloConnectionTokenValidator
 /// </summary>
 public sealed class SiloConnectionTokenRequestContext
 {
-    internal SiloConnectionTokenRequestContext(string clusterId, EndPoint? localEndPoint, EndPoint? remoteEndPoint)
+    internal SiloConnectionTokenRequestContext(
+        string clusterId,
+        SiloConnectionAuthenticationTarget target,
+        EndPoint? localEndPoint,
+        EndPoint? remoteEndPoint)
     {
         ClusterId = clusterId;
+        Target = target;
         LocalEndPoint = localEndPoint;
         RemoteEndPoint = remoteEndPoint;
     }
 
     /// <summary>Gets the expected Orleans cluster identifier.</summary>
     public string ClusterId { get; }
+
+    /// <summary>Gets the kind of connection being authenticated.</summary>
+    public SiloConnectionAuthenticationTarget Target { get; }
 
     /// <summary>Gets the connection direction.</summary>
     public SiloConnectionAuthenticationDirection Direction => SiloConnectionAuthenticationDirection.Outbound;
@@ -119,15 +139,23 @@ public sealed class SiloConnectionTokenRequestContext
 /// </summary>
 public sealed class SiloConnectionTokenValidationContext
 {
-    internal SiloConnectionTokenValidationContext(string clusterId, EndPoint? localEndPoint, EndPoint? remoteEndPoint)
+    internal SiloConnectionTokenValidationContext(
+        string clusterId,
+        SiloConnectionAuthenticationTarget target,
+        EndPoint? localEndPoint,
+        EndPoint? remoteEndPoint)
     {
         ClusterId = clusterId;
+        Target = target;
         LocalEndPoint = localEndPoint;
         RemoteEndPoint = remoteEndPoint;
     }
 
     /// <summary>Gets the expected Orleans cluster identifier.</summary>
     public string ClusterId { get; }
+
+    /// <summary>Gets the kind of connection being authenticated.</summary>
+    public SiloConnectionAuthenticationTarget Target { get; }
 
     /// <summary>Gets the connection direction.</summary>
     public SiloConnectionAuthenticationDirection Direction => SiloConnectionAuthenticationDirection.Inbound;

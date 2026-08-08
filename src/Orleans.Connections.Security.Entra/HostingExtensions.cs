@@ -31,33 +31,34 @@ public static class EntraSiloConnectionAuthenticationExtensions
         ArgumentNullException.ThrowIfNull(configureOptions);
 
         var services = builder.Services;
-        services.AddSingleton(new EntraCredentialRegistration(credential));
-        services.AddSingleton(new EntraTimeProviderAccessor(() => builder.TimeProvider));
+        var optionsName = builder.Name;
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IValidateOptions<EntraSiloConnectionOptions>, EntraSiloConnectionOptionsValidator>());
-        services.AddOptions<EntraSiloConnectionOptions>()
+        services.AddOptions<EntraSiloConnectionOptions>(optionsName)
             .Configure(configureOptions)
             .ValidateOnStart();
-        services.TryAddSingleton(
-            static serviceProvider =>
-            {
-                var options = serviceProvider.GetRequiredService<IOptions<EntraSiloConnectionOptions>>().Value;
-                return new EntraOpenIdConfigurationProvider(
-                    options,
-                    serviceProvider.GetRequiredService<EntraTimeProviderAccessor>().Value);
-            });
-        services.TryAddSingleton(
-            static serviceProvider =>
-            {
-                var options = serviceProvider.GetRequiredService<IOptions<EntraSiloConnectionOptions>>().Value;
-                return new EntraJwtValidator(
-                    options,
-                    serviceProvider.GetRequiredService<EntraOpenIdConfigurationProvider>(),
-                    serviceProvider.GetRequiredService<EntraTimeProviderAccessor>().Value);
-            });
-
         return builder
-            .UseTokenProvider<EntraSiloConnectionTokenProvider>()
-            .UseTokenValidator<EntraSiloConnectionTokenValidator>();
+            .UseTokenProvider(serviceProvider =>
+            {
+                var options = serviceProvider
+                    .GetRequiredService<IOptionsMonitor<EntraSiloConnectionOptions>>()
+                    .Get(optionsName);
+                return new EntraSiloConnectionTokenProvider(
+                    credential,
+                    options,
+                    builder.TimeProvider);
+            })
+            .UseTokenValidator(serviceProvider =>
+            {
+                var options = serviceProvider
+                    .GetRequiredService<IOptionsMonitor<EntraSiloConnectionOptions>>()
+                    .Get(optionsName);
+                var metadata = new EntraOpenIdConfigurationProvider(options, builder.TimeProvider);
+                var validator = new EntraJwtValidator(
+                    options,
+                    metadata,
+                    builder.TimeProvider);
+                return new EntraSiloConnectionTokenValidator(validator, metadata);
+            });
     }
 }

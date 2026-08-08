@@ -3,7 +3,7 @@
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Connections.Security</PackageId>
     <Title>Microsoft Orleans connection security</Title>
-    <Description>Support for secure communication using TLS and authenticated silo connections in Microsoft Orleans.</Description>
+    <Description>Support for secure communication using TLS and authenticated silo and client connections in Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) TLS SSL authentication</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>

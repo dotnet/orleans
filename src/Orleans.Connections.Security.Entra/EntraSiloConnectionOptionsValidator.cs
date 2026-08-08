@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using Microsoft.Extensions.Options;
-using Orleans.Connections.Security.Entra;
 
 namespace Orleans.Configuration;
 
@@ -13,26 +11,10 @@ internal sealed class EntraSiloConnectionOptionsValidator : IValidateOptions<Ent
     private static readonly TimeSpan MaximumTokenDuration = TimeSpan.FromDays(1);
     private static readonly TimeSpan MaximumClockSkew = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan MaximumRetrievalTimeout = TimeSpan.FromMinutes(5);
-    private readonly IEnumerable<EntraCredentialRegistration>? _credentialRegistrations;
-
-    public EntraSiloConnectionOptionsValidator()
-    {
-    }
-
-    public EntraSiloConnectionOptionsValidator(IEnumerable<EntraCredentialRegistration> credentialRegistrations)
-    {
-        _credentialRegistrations = credentialRegistrations;
-    }
-
     public ValidateOptionsResult Validate(string? name, EntraSiloConnectionOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
         var errors = new List<string>();
-
-        if (_credentialRegistrations is not null && _credentialRegistrations.Count() != 1)
-        {
-            errors.Add("Exactly one caller-supplied TokenCredential must be configured.");
-        }
 
         if (options.Authority is not { IsAbsoluteUri: true } authority
             || !string.Equals(authority.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)

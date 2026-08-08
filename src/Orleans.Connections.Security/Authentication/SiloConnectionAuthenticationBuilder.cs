@@ -1,21 +1,25 @@
 using System;
-using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Connections.Security;
 
 /// <summary>
-/// Configures providers and policy for authenticated silo connections.
+/// Configures providers and policy for authenticated Orleans connections.
 /// </summary>
 public sealed class SiloConnectionAuthenticationBuilder
 {
     private readonly SiloConnectionAuthenticationOptions _options;
     private readonly IServiceCollection _services;
+    private readonly object _serviceKey;
 
     internal SiloConnectionAuthenticationBuilder(
+        string name,
+        object serviceKey,
         SiloConnectionAuthenticationOptions options,
         IServiceCollection services)
     {
+        Name = name;
+        _serviceKey = serviceKey;
         _options = options;
         _services = services;
     }
@@ -26,6 +30,9 @@ public sealed class SiloConnectionAuthenticationBuilder
 
     /// <summary>Gets the service collection used to configure authentication providers.</summary>
     public IServiceCollection Services => _services;
+
+    /// <summary>Gets the unique name of this connection authentication registration.</summary>
+    public string Name { get; }
 
     /// <summary>Gets or sets the authentication enforcement mode.</summary>
     public SiloConnectionAuthenticationMode Mode { get => _options.Mode; set => _options.Mode = value; }
@@ -103,7 +110,15 @@ public sealed class SiloConnectionAuthenticationBuilder
         where TProvider : class, ISiloConnectionTokenProvider
     {
         EnsureProviderCanBeRegistered();
-        _services.AddSingleton<ISiloConnectionTokenProvider, TProvider>();
+        if (PreserveUnkeyedRegistrations)
+        {
+            _services.AddSingleton<ISiloConnectionTokenProvider, TProvider>();
+        }
+        else
+        {
+            _services.AddKeyedSingleton<ISiloConnectionTokenProvider, TProvider>(_serviceKey);
+        }
+
         HasTokenProvider = true;
         return this;
     }
@@ -113,7 +128,36 @@ public sealed class SiloConnectionAuthenticationBuilder
     {
         ArgumentNullException.ThrowIfNull(provider);
         EnsureProviderCanBeRegistered();
-        _services.AddSingleton(provider);
+        if (PreserveUnkeyedRegistrations)
+        {
+            _services.AddSingleton(provider);
+        }
+        else
+        {
+            _services.AddKeyedSingleton(_serviceKey, provider);
+        }
+
+        HasTokenProvider = true;
+        return this;
+    }
+
+    /// <summary>Registers a singleton token provider factory.</summary>
+    public SiloConnectionAuthenticationBuilder UseTokenProvider(
+        Func<IServiceProvider, ISiloConnectionTokenProvider> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        EnsureProviderCanBeRegistered();
+        if (PreserveUnkeyedRegistrations)
+        {
+            _services.AddSingleton<ISiloConnectionTokenProvider>(factory);
+        }
+        else
+        {
+            _services.AddKeyedSingleton<ISiloConnectionTokenProvider>(
+                _serviceKey,
+                (serviceProvider, _) => factory(serviceProvider));
+        }
+
         HasTokenProvider = true;
         return this;
     }
@@ -123,7 +167,15 @@ public sealed class SiloConnectionAuthenticationBuilder
         where TValidator : class, ISiloConnectionTokenValidator
     {
         EnsureValidatorCanBeRegistered();
-        _services.AddSingleton<ISiloConnectionTokenValidator, TValidator>();
+        if (PreserveUnkeyedRegistrations)
+        {
+            _services.AddSingleton<ISiloConnectionTokenValidator, TValidator>();
+        }
+        else
+        {
+            _services.AddKeyedSingleton<ISiloConnectionTokenValidator, TValidator>(_serviceKey);
+        }
+
         HasTokenValidator = true;
         return this;
     }
@@ -133,14 +185,50 @@ public sealed class SiloConnectionAuthenticationBuilder
     {
         ArgumentNullException.ThrowIfNull(validator);
         EnsureValidatorCanBeRegistered();
-        _services.AddSingleton(validator);
+        if (PreserveUnkeyedRegistrations)
+        {
+            _services.AddSingleton(validator);
+        }
+        else
+        {
+            _services.AddKeyedSingleton(_serviceKey, validator);
+        }
+
         HasTokenValidator = true;
         return this;
     }
 
+    /// <summary>Registers a singleton token validator factory.</summary>
+    public SiloConnectionAuthenticationBuilder UseTokenValidator(
+        Func<IServiceProvider, ISiloConnectionTokenValidator> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        EnsureValidatorCanBeRegistered();
+        if (PreserveUnkeyedRegistrations)
+        {
+            _services.AddSingleton<ISiloConnectionTokenValidator>(factory);
+        }
+        else
+        {
+            _services.AddKeyedSingleton<ISiloConnectionTokenValidator>(
+                _serviceKey,
+                (serviceProvider, _) => factory(serviceProvider));
+        }
+
+        HasTokenValidator = true;
+        return this;
+    }
+
+    private bool PreserveUnkeyedRegistrations =>
+        ReferenceEquals(_serviceKey, ConnectionAuthenticationServiceKeys.Silo);
+
     private void EnsureProviderCanBeRegistered()
     {
-        if (HasTokenProvider || _services.Any(descriptor => descriptor.ServiceType == typeof(ISiloConnectionTokenProvider)))
+        if (HasTokenProvider
+            || (PreserveUnkeyedRegistrations
+                && _services.Any(descriptor =>
+                    descriptor.ServiceType == typeof(ISiloConnectionTokenProvider)
+                    && !descriptor.IsKeyedService)))
         {
             throw new InvalidOperationException("A silo connection token provider is already registered.");
         }
@@ -148,7 +236,11 @@ public sealed class SiloConnectionAuthenticationBuilder
 
     private void EnsureValidatorCanBeRegistered()
     {
-        if (HasTokenValidator || _services.Any(descriptor => descriptor.ServiceType == typeof(ISiloConnectionTokenValidator)))
+        if (HasTokenValidator
+            || (PreserveUnkeyedRegistrations
+                && _services.Any(descriptor =>
+                    descriptor.ServiceType == typeof(ISiloConnectionTokenValidator)
+                    && !descriptor.IsKeyedService)))
         {
             throw new InvalidOperationException("A silo connection token validator is already registered.");
         }

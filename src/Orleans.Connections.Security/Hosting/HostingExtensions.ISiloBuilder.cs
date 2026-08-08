@@ -171,6 +171,11 @@ namespace Orleans.Hosting
                 throw new InvalidOperationException("Gateway TLS has already been configured.");
             }
 
+            if (builder.Services.Any(descriptor => descriptor.ServiceType == typeof(GatewayConnectionAuthenticationRegistration)))
+            {
+                throw new InvalidOperationException("Gateway TLS or client connection authentication has already been configured.");
+            }
+
             builder.Services.AddSingleton<GatewayTlsRegistrationMarker>();
 
             return builder.Configure<SiloConnectionOptions>(connectionOptions =>

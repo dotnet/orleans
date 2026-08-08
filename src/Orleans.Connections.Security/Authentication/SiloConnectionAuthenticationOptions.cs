@@ -3,7 +3,7 @@ using System;
 namespace Orleans.Connections.Security;
 
 /// <summary>
-/// Configures silo-to-silo connection authentication.
+/// Configures Orleans connection authentication.
 /// </summary>
 public sealed class SiloConnectionAuthenticationOptions
 {

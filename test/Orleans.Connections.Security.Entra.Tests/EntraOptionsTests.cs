@@ -79,17 +79,4 @@ public sealed class EntraOptionsTests
         Assert.False(result.Succeeded);
     }
 
-    [Fact]
-    public void TimeProviderAccessorReadsCurrentAuthenticationClock()
-    {
-        TimeProvider current = TimeProvider.System;
-        var accessor = new EntraTimeProviderAccessor(() => current);
-        var expected = new TestTimeProvider();
-
-        current = expected;
-
-        Assert.Same(expected, accessor.Value);
-    }
-
-    private sealed class TestTimeProvider : TimeProvider;
 }

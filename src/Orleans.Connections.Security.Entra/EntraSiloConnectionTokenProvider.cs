@@ -1,9 +1,6 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
 namespace Orleans.Connections.Security.Entra;
@@ -13,12 +10,11 @@ internal sealed class EntraSiloConnectionTokenProvider : ISiloConnectionTokenPro
     private readonly EntraTokenProvider _provider;
 
     public EntraSiloConnectionTokenProvider(
-        IEnumerable<EntraCredentialRegistration> credentialRegistrations,
-        IOptions<EntraSiloConnectionOptions> options,
-        EntraTimeProviderAccessor timeProvider)
+        Azure.Core.TokenCredential credential,
+        EntraSiloConnectionOptions options,
+        TimeProvider timeProvider)
     {
-        var registration = credentialRegistrations.Single();
-        _provider = new EntraTokenProvider(registration.Credential, options.Value, timeProvider.Value);
+        _provider = new EntraTokenProvider(credential, options, timeProvider);
     }
 
     public async ValueTask<SiloConnectionToken> GetTokenAsync(
