@@ -1,7 +1,7 @@
 # Authenticated silo connections
 
 This sample configures mutual TLS (mTLS) and Microsoft Entra workload
-authentication for silo-to-silo connections. It uses an explicit
+authentication for silo-to-silo and external client-to-gateway connections. It uses an explicit
 `WorkloadIdentityCredential`; it doesn't construct `DefaultAzureCredential` or
 copy JWT validation logic into the application.
 
@@ -17,11 +17,12 @@ default ports, then start another with
 2. Configure the identifier URI
    `api://<resource-application-id>/<cluster-id>`. The cluster ID includes the
    deployment environment, for example `contoso-prod-westus`.
-3. Define the application role `Orleans.Silo.Connect` and allow applications
-   as members.
-4. Assign the role to each authorized silo workload identity.
-5. Configure a federated identity credential for each workload and set its
-   application ID in `AllowedCallerClientIds`.
+3. Define the application roles `Orleans.Silo.Connect` and
+   `Orleans.Client.Connect`, and allow applications as members.
+4. Assign only the matching role to each authorized silo or client workload
+   identity.
+5. Configure a federated identity credential for each workload and place its
+   application ID in the matching silo or external-client allowlist.
 
 The exact audience, tenant, application-token classification, caller
 application ID, and application role are validated by
@@ -59,5 +60,7 @@ restart.
 automatically weaken the mode because Microsoft Entra or metadata is
 unavailable.
 
-Client-to-gateway authentication is unchanged. Secure gateway traffic
-separately with the existing TLS and application authentication mechanisms.
+The gateway validates external client bearer tokens using a distinct
+`Orleans.Client.Connect` role and caller allowlist. External clients must call
+`UseAuthenticatedClientConnections` with a token provider and the same exact
+audience, tenant, client role, and cluster binding.

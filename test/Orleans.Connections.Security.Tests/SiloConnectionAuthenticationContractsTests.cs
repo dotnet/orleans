@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Orleans.Connections.Security.Tests;
@@ -149,5 +150,130 @@ public class SiloConnectionAuthenticationProtocolTests
             "Orleans1+TokenAuth2",
             SiloConnectionAuthenticationProtocol.Version2,
             StringComparer.Ordinal);
+    }
+
+    public class SiloConnectionAuthenticationContextTests
+    {
+        [Theory]
+        [InlineData(SiloConnectionAuthenticationTarget.Silo)]
+        [InlineData(SiloConnectionAuthenticationTarget.Client)]
+        public void Contexts_PreserveConnectionTarget(SiloConnectionAuthenticationTarget target)
+        {
+            var request = new SiloConnectionTokenRequestContext("cluster", target, null, null);
+            var validation = new SiloConnectionTokenValidationContext("cluster", target, null, null);
+
+            Assert.Equal(target, request.Target);
+            Assert.Equal(target, validation.Target);
+        }
+
+        public class SiloConnectionAuthenticationRegistrationTests
+        {
+            [Fact]
+            public void Providers_AreIsolatedByConnectionPath()
+            {
+                var services = new ServiceCollection();
+                var siloKey = ConnectionAuthenticationServiceKeys.Silo;
+                var clientKey = new object();
+                var siloProvider = new TestTokenProvider("silo");
+                var clientProvider = new TestTokenProvider("client");
+
+                new SiloConnectionAuthenticationBuilder(
+                        "silo",
+                        siloKey,
+                        new SiloConnectionAuthenticationOptions(),
+                        services)
+                    .UseTokenProvider(siloProvider);
+                new SiloConnectionAuthenticationBuilder(
+                        "client",
+                        clientKey,
+                        new SiloConnectionAuthenticationOptions(),
+                        services)
+                    .UseTokenProvider(clientProvider);
+
+                using var serviceProvider = services.BuildServiceProvider();
+                Assert.Same(clientProvider, serviceProvider.GetRequiredKeyedService<ISiloConnectionTokenProvider>(clientKey));
+                Assert.Same(siloProvider, serviceProvider.GetRequiredService<ISiloConnectionTokenProvider>());
+                Assert.Null(serviceProvider.GetKeyedService<ISiloConnectionTokenProvider>(siloKey));
+            }
+
+            [Fact]
+            public void SiloProviderRegistration_RejectsExistingUnkeyedProvider()
+            {
+                var services = new ServiceCollection();
+                services.AddSingleton<ISiloConnectionTokenProvider>(new TestTokenProvider("existing"));
+                var builder = new SiloConnectionAuthenticationBuilder(
+                    "silo",
+                    ConnectionAuthenticationServiceKeys.Silo,
+                    new SiloConnectionAuthenticationOptions(),
+                    services);
+
+                Assert.Throws<InvalidOperationException>(
+                    () => builder.UseTokenProvider(new TestTokenProvider("replacement")));
+            }
+
+            [Theory]
+            [InlineData(false, true)]
+            [InlineData(true, false)]
+            [InlineData(true, true)]
+            public void RequiredMode_RejectsDirectTlsAuthenticationCallbacks(
+                bool configureClientCallback,
+                bool configureServerCallback)
+            {
+                var tlsOptions = new TlsOptions();
+                if (configureClientCallback)
+                {
+                    tlsOptions.OnAuthenticateAsClient = static (_, _) => { };
+                }
+
+                if (configureServerCallback)
+                {
+                    tlsOptions.OnAuthenticateAsServer = static (_, _) => { };
+                }
+
+                var exception = Assert.Throws<InvalidOperationException>(() =>
+                    ConnectionAuthenticationRegistration.ConfigureApplicationProtocols(
+                        tlsOptions,
+                        new SiloConnectionAuthenticationOptions
+                        {
+                            Mode = SiloConnectionAuthenticationMode.Required,
+                        }));
+
+                Assert.Contains("does not permit", exception.Message, StringComparison.Ordinal);
+            }
+
+            [Fact]
+            public void RequiredMode_RequiresOnlyServicesUsedByConnectionDirection()
+            {
+                var clientOptions = new SiloConnectionAuthenticationOptions { TargetHost = "gateway.test" };
+                var clientRegistration = new ClientConnectionAuthenticationRegistration(
+                    "client",
+                    new object(),
+                    clientOptions,
+                    new TlsOptions(),
+                    hasTokenProvider: true,
+                    hasTokenValidator: false);
+                var gatewayOptions = new SiloConnectionAuthenticationOptions();
+                var gatewayRegistration = new GatewayConnectionAuthenticationRegistration(
+                    "gateway",
+                    new object(),
+                    gatewayOptions,
+                    new TlsOptions(),
+                    hasTokenProvider: false,
+                    hasTokenValidator: true);
+
+                Assert.True(new SiloConnectionAuthenticationOptionsValidator(clientRegistration)
+                    .Validate("client", clientOptions).Succeeded);
+                Assert.True(new SiloConnectionAuthenticationOptionsValidator(gatewayRegistration)
+                    .Validate("gateway", gatewayOptions).Succeeded);
+            }
+
+            private sealed class TestTokenProvider(string value) : ISiloConnectionTokenProvider
+            {
+                public ValueTask<SiloConnectionToken> GetTokenAsync(
+                    SiloConnectionTokenRequestContext context,
+                    CancellationToken cancellationToken) =>
+                    ValueTask.FromResult(new SiloConnectionToken(value, DateTimeOffset.UtcNow.AddMinutes(5)));
+            }
+        }
     }
 }

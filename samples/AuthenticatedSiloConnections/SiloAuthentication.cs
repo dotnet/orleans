@@ -25,37 +25,69 @@ internal static class SiloAuthentication
             },
             authentication =>
             {
-                authentication.Mode = options.AuthenticationMode;
-                authentication.TargetHost = options.Certificate.TargetHost;
-                authentication.TokenExchangeTimeout = TimeSpan.FromSeconds(10);
-                authentication.MaxTokenSize = 16 * 1024;
-                authentication.MaxConcurrentInboundAuthentications = 256;
-                authentication.MaxConcurrentOutboundAuthentications = 256;
-                authentication.MaxPendingInboundAuthentications = 256;
-                authentication.MaxPendingOutboundAuthentications = 256;
-                authentication.MinimumRemainingTokenLifetime =
-                    TimeSpan.FromMinutes(2);
-
-                authentication.UseEntra(
+                ConfigureAuthentication(
+                    authentication,
+                    options,
                     credential,
-                    entra =>
-                    {
-                        entra.Authority = options.Entra.Authority;
-                        entra.TokenScope = $"{options.Entra.Audience}/.default";
-                        entra.ValidAudiences.Add(options.Entra.Audience);
-                        entra.ValidTenantIds.Add(options.Entra.TenantId);
-                        entra.ClusterAudienceFormat =
-                            $"api://{options.Entra.ResourceApplicationId}/{{0}}";
-
-                        foreach (var clientId in options.Entra.AllowedCallerClientIds)
-                        {
-                            entra.AllowedClientIds.Add(clientId);
-                        }
-
-                        entra.RequiredRoles.Add("Orleans.Silo.Connect");
-                    });
+                    options.Entra.AllowedSiloCallerClientIds,
+                    "Orleans.Silo.Connect");
             });
         // </AuthenticatedSiloConnections>
+
+        // <AuthenticatedClientGateway>
+        siloBuilder.UseAuthenticatedClientConnections(
+            tls =>
+            {
+                tls.LocalCertificate = siloCertificate;
+                tls.RemoteCertificateMode = RemoteCertificateMode.NoCertificate;
+            },
+            authentication =>
+            {
+                ConfigureAuthentication(
+                    authentication,
+                    options,
+                    credential,
+                    options.Entra.AllowedClientCallerClientIds,
+                    "Orleans.Client.Connect");
+            });
+        // </AuthenticatedClientGateway>
+    }
+
+    internal static void ConfigureAuthentication(
+        SiloConnectionAuthenticationBuilder authentication,
+        SampleOptions options,
+        TokenCredential credential,
+        IEnumerable<string> allowedCallerClientIds,
+        string requiredRole)
+    {
+        authentication.Mode = options.AuthenticationMode;
+        authentication.TargetHost = options.Certificate.TargetHost;
+        authentication.TokenExchangeTimeout = TimeSpan.FromSeconds(10);
+        authentication.MaxTokenSize = 16 * 1024;
+        authentication.MaxConcurrentInboundAuthentications = 256;
+        authentication.MaxConcurrentOutboundAuthentications = 256;
+        authentication.MaxPendingInboundAuthentications = 256;
+        authentication.MaxPendingOutboundAuthentications = 256;
+        authentication.MinimumRemainingTokenLifetime = TimeSpan.FromMinutes(2);
+
+        authentication.UseEntra(
+            credential,
+            entra =>
+            {
+                entra.Authority = options.Entra.Authority;
+                entra.TokenScope = $"{options.Entra.Audience}/.default";
+                entra.ValidAudiences.Add(options.Entra.Audience);
+                entra.ValidTenantIds.Add(options.Entra.TenantId);
+                entra.ClusterAudienceFormat =
+                    $"api://{options.Entra.ResourceApplicationId}/{{0}}";
+
+                foreach (var clientId in allowedCallerClientIds)
+                {
+                    entra.AllowedClientIds.Add(clientId);
+                }
+
+                entra.RequiredRoles.Add(requiredRole);
+            });
     }
 }
 
