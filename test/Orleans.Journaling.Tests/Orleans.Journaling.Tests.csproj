@@ -16,7 +16,9 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Testcontainers" />
     <PackageReference Include="Verify.Xunit" />
+    <PackageReference Include="Xunit.SkippableFact" />
     <Compile Remove="snapshots\**\*" />
     <None Include="snapshots\**\*" />
   </ItemGroup>
@@ -25,6 +27,7 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Journaling\Orleans.Journaling.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Server\Orleans.Server.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Sdk\Orleans.Sdk.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Journaling.S3\Orleans.Journaling.S3.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Journaling.AzureStorage\Orleans.Journaling.AzureStorage.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Extensions\Orleans.Azure.Tests\Orleans.Azure.Tests.csproj" />
