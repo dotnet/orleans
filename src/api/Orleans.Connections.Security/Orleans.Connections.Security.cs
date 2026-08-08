@@ -115,6 +115,8 @@ namespace Orleans.Connections.Security
 
         public SiloConnectionAuthenticationMode Mode { get { throw null; } set { } }
 
+        public string Name { get { throw null; } }
+
         public Microsoft.Extensions.DependencyInjection.IServiceCollection Services { get { throw null; } }
 
         public string? TargetHost { get { throw null; } set { } }
@@ -125,10 +127,14 @@ namespace Orleans.Connections.Security
 
         public SiloConnectionAuthenticationBuilder UseTokenProvider(ISiloConnectionTokenProvider provider) { throw null; }
 
+        public SiloConnectionAuthenticationBuilder UseTokenProvider(System.Func<System.IServiceProvider, ISiloConnectionTokenProvider> factory) { throw null; }
+
         public SiloConnectionAuthenticationBuilder UseTokenProvider<TProvider>()
             where TProvider : class, ISiloConnectionTokenProvider { throw null; }
 
         public SiloConnectionAuthenticationBuilder UseTokenValidator(ISiloConnectionTokenValidator validator) { throw null; }
+
+        public SiloConnectionAuthenticationBuilder UseTokenValidator(System.Func<System.IServiceProvider, ISiloConnectionTokenValidator> factory) { throw null; }
 
         public SiloConnectionAuthenticationBuilder UseTokenValidator<TValidator>()
             where TValidator : class, ISiloConnectionTokenValidator { throw null; }
@@ -156,6 +162,12 @@ namespace Orleans.Connections.Security
         Disabled = 0,
         Audit = 1,
         Required = 2
+    }
+
+    public enum SiloConnectionAuthenticationTarget
+    {
+        Silo = 0,
+        Client = 1
     }
 
     public sealed partial class SiloConnectionAuthenticationOptions
@@ -235,6 +247,8 @@ namespace Orleans.Connections.Security
         public System.Net.EndPoint? LocalEndPoint { get { throw null; } }
 
         public System.Net.EndPoint? RemoteEndPoint { get { throw null; } }
+
+        public SiloConnectionAuthenticationTarget Target { get { throw null; } }
     }
 
     public sealed partial class SiloConnectionTokenValidationContext
@@ -248,6 +262,8 @@ namespace Orleans.Connections.Security
         public System.Net.EndPoint? LocalEndPoint { get { throw null; } }
 
         public System.Net.EndPoint? RemoteEndPoint { get { throw null; } }
+
+        public SiloConnectionAuthenticationTarget Target { get { throw null; } }
     }
 
     public sealed partial class SiloConnectionTokenValidationResult
@@ -338,6 +354,10 @@ namespace Orleans.Hosting
         public static ISiloBuilder UseSiloTls(this ISiloBuilder builder, System.Action<Connections.Security.TlsOptions> configureOptions) { throw null; }
 
         public static ISiloBuilder UseAuthenticatedSiloConnections(this ISiloBuilder builder, System.Action<Connections.Security.TlsOptions> configureTls, System.Action<Connections.Security.SiloConnectionAuthenticationBuilder> configureAuthentication) { throw null; }
+
+        public static IClientBuilder UseAuthenticatedClientConnections(this IClientBuilder builder, System.Action<Connections.Security.TlsOptions> configureTls, System.Action<Connections.Security.SiloConnectionAuthenticationBuilder> configureAuthentication) { throw null; }
+
+        public static ISiloBuilder UseAuthenticatedClientConnections(this ISiloBuilder builder, System.Action<Connections.Security.TlsOptions> configureTls, System.Action<Connections.Security.SiloConnectionAuthenticationBuilder> configureAuthentication) { throw null; }
 
         public static IClientBuilder UseTls(this IClientBuilder builder, System.Action<Connections.Security.TlsOptions> configureOptions) { throw null; }
 

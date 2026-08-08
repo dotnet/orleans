@@ -7,15 +7,20 @@ namespace Orleans.Connections.Security;
 internal sealed class SiloConnectionAuthenticationOptionsValidator : IValidateOptions<SiloConnectionAuthenticationOptions>
 {
     private static readonly TimeSpan MaxDuration = TimeSpan.FromDays(1);
-    private readonly SiloConnectionAuthenticationRegistration _registration;
+    private readonly ConnectionAuthenticationRegistration _registration;
 
-    public SiloConnectionAuthenticationOptionsValidator(SiloConnectionAuthenticationRegistration registration)
+    public SiloConnectionAuthenticationOptionsValidator(ConnectionAuthenticationRegistration registration)
     {
         _registration = registration;
     }
 
     public ValidateOptionsResult Validate(string? name, SiloConnectionAuthenticationOptions options)
     {
+        if (!string.Equals(name, _registration.Name, StringComparison.Ordinal))
+        {
+            return ValidateOptionsResult.Skip;
+        }
+
         var failures = new List<string>();
 
         if (!Enum.IsDefined(options.Mode))
@@ -40,12 +45,12 @@ internal sealed class SiloConnectionAuthenticationOptionsValidator : IValidateOp
 
         if (options.Mode == SiloConnectionAuthenticationMode.Required)
         {
-            if (!_registration.HasTokenProvider)
+            if (_registration.RequiresTokenProvider && !_registration.HasTokenProvider)
             {
                 failures.Add("Required mode needs exactly one token provider.");
             }
 
-            if (!_registration.HasTokenValidator)
+            if (_registration.RequiresTokenValidator && !_registration.HasTokenValidator)
             {
                 failures.Add("Required mode needs exactly one token validator.");
             }
@@ -55,7 +60,7 @@ internal sealed class SiloConnectionAuthenticationOptionsValidator : IValidateOp
                 failures.Add("Required mode does not permit custom remote-certificate validation callbacks.");
             }
 
-            if (string.IsNullOrWhiteSpace(options.TargetHost))
+            if (_registration.RequiresTokenProvider && string.IsNullOrWhiteSpace(options.TargetHost))
             {
                 failures.Add($"Required mode needs a non-empty {nameof(options.TargetHost)} for TLS endpoint-identity validation.");
             }
