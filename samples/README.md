@@ -14,7 +14,7 @@ From the repository root, run:
 pwsh ./samples/Validate-Samples.ps1
 ```
 
-The command checks the gallery manifest and builds every project in `Samples.slnx`. Azure services are required only when running samples which use them, not when compiling.
+The command checks the gallery manifest and builds every project in `Samples.slnx`. External cloud services are required only when running samples which use them, not when compiling.
 
 ## Featured samples
 
@@ -35,6 +35,7 @@ The command checks the gallery manifest and builds every project in `Samples.sln
 | Sample | Description | Languages | Tags | Original source |
 | --- | --- | --- | --- | --- |
 | [Adventure](Adventure) | A text adventure game demonstrating grains, external clients, and application modeling. | C# | games, clients, grains | [dotnet/samples](https://github.com/dotnet/samples) |
+| [AWS Kinesis and DynamoDB](AWS/KinesisDynamoDB) | An AWS-hosted Orleans application using DynamoDB for clustering, persistence, reminders, and Kinesis checkpoints. | C# | aws, kinesis, dynamodb, streaming | [dotnet/orleans](https://github.com/dotnet/orleans) |
 | [Bank Account](BankAccount) | A bank transfer simulation demonstrating ACID transactions across stateful grains. | C# | transactions, persistence | [dotnet/samples](https://github.com/dotnet/samples) |
 | [Blazor Server](Blazor/BlazorServer) | An interactive Blazor Server application backed by Orleans grains. | C#, Razor | blazor, aspnet-core, web | [dotnet/samples](https://github.com/dotnet/samples) |
 | [Blazor WebAssembly](Blazor/BlazorWasm) | A hosted Blazor WebAssembly application with an Orleans-backed server. | C#, Razor | blazor, webassembly, web | [dotnet/samples](https://github.com/dotnet/samples) |
