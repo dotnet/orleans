@@ -6,6 +6,12 @@ namespace Orleans.TestingHost.Tests;
 public class TestingUtilsTests
 {
     [Fact]
+    public async Task WaitUntilAsync_UntypedSingleParameterLambdaBindsLegacyOverload()
+    {
+        await TestingUtils.WaitUntilAsync(_ => Task.FromResult(true), TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
     public async Task WaitUntilSucceededAsync_ReturnsImmediatelyOnSuccess()
     {
         var calls = 0;
@@ -121,7 +127,7 @@ public class TestingUtilsTests
         var calls = 0;
 
         var exception = await Assert.ThrowsAsync<TimeoutException>(() => TestingUtils.WaitUntilAsync(
-            async cancellationToken =>
+            async (_, cancellationToken) =>
             {
                 calls++;
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
@@ -130,7 +136,7 @@ public class TestingUtilsTests
             TimeSpan.FromMilliseconds(25)));
 
         Assert.Equal(1, calls);
-        Assert.Contains("async cancellationToken =>", exception.Message);
+        Assert.Contains("async (_, cancellationToken) =>", exception.Message);
     }
 
     [Fact]

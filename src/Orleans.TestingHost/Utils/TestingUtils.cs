@@ -87,32 +87,6 @@ namespace Orleans.TestingHost.Utils
         }
 
         /// <summary>Run the predicate until it succeeds or times out.</summary>
-        /// <param name="predicate">The predicate to run. The token is cancelled when the deadline expires or cancellation is requested.</param>
-        /// <param name="timeout">The timeout value.</param>
-        /// <param name="delayOnFail">The delay before retrying after an unsuccessful attempt.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
-        /// <param name="predicateExpression">The expression supplied for <paramref name="predicate"/>.</param>
-        /// <returns>A task representing the operation.</returns>
-        /// <exception cref="TimeoutException">The predicate did not succeed before the timeout elapsed.</exception>
-        public static async Task WaitUntilAsync(
-            Func<CancellationToken, Task<bool>> predicate,
-            TimeSpan timeout,
-            TimeSpan? delayOnFail = null,
-            CancellationToken cancellationToken = default,
-            [CallerArgumentExpression(nameof(predicate))] string? predicateExpression = null)
-        {
-            ArgumentNullException.ThrowIfNull(predicate);
-
-            if (!await WaitUntilSucceededAsync((_, token) => predicate(token), timeout, delayOnFail, cancellationToken, invokeFinalAttempt: false))
-            {
-                throw new TimeoutException(
-                    $"The condition evaluated by '{predicateExpression ?? "<unknown>"}' was not satisfied within {timeout} "
-                    + $"using a retry delay of {delayOnFail ?? TimeSpan.FromSeconds(1)}. "
-                    + "The predicate was not invoked again after the deadline.");
-            }
-        }
-
-        /// <summary>Run the predicate until it succeeds or times out.</summary>
         /// <param name="predicate">
         /// The predicate to run. The first argument indicates the final attempt, allowing the predicate to throw a detailed assertion failure.
         /// The token is cancelled when the deadline expires or cancellation is requested.

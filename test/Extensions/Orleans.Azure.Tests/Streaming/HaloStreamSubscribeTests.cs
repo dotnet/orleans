@@ -140,7 +140,7 @@ namespace UnitTests.HaloTests.Streaming
             var streamId = Orleans.Runtime.StreamId.Create("HaloStreamingNamespace", _streamId);
             await observer.WaitForMessageDeliveredAsync(streamId, _streamProvider, cts.Token);
 
-            await TestingUtils.WaitUntilAsync(cancellationToken => CheckCounters(producer, consumer, cancellationToken), Timeout);
+            await TestingUtils.WaitUntilAsync((_, cancellationToken) => CheckCounters(producer, consumer, cancellationToken), Timeout);
 
             await consumer.StopConsuming();
         }
@@ -162,7 +162,7 @@ namespace UnitTests.HaloTests.Streaming
             var streamId = Orleans.Runtime.StreamId.Create("HaloStreamingNamespace", _streamId);
             await observer.WaitForMessageDeliveredAsync(streamId, _streamProvider, cts.Token);
 
-            await TestingUtils.WaitUntilAsync(cancellationToken => CheckCounters(producer, consumer, cancellationToken), Timeout);
+            await TestingUtils.WaitUntilAsync((_, cancellationToken) => CheckCounters(producer, consumer, cancellationToken), Timeout);
 
             await consumer.StopConsuming();
         }

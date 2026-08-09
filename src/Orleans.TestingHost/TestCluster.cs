@@ -904,7 +904,13 @@ namespace Orleans.TestingHost
         public static async Task<SiloHandle> StartSiloAsync(TestCluster cluster, int instanceNumber, TestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource>? configurationOverrides = null, bool startSiloOnNewPort = false)
         {
             if (cluster == null) throw new ArgumentNullException(nameof(cluster));
-            return await cluster.StartSiloAsync(instanceNumber, clusterOptions, configurationOverrides, startSiloOnNewPort);
+            var silo = await cluster.StartSiloAsync(instanceNumber, clusterOptions, configurationOverrides, startSiloOnNewPort);
+            lock (cluster.additionalSilos)
+            {
+                cluster.additionalSilos.Add(silo);
+            }
+
+            return silo;
         }
 
         /// <summary>
