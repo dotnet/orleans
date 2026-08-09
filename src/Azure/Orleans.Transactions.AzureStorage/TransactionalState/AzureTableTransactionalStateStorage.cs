@@ -15,6 +15,12 @@ namespace Orleans.Transactions.AzureStorage
     public partial class AzureTableTransactionalStateStorage<TState> : ITransactionalStateStorage<TState>
         where TState : class, new()
     {
+        private const int MaxSnapshotLoadAttempts = 5;
+        private const string LowerBoundaryRowKey = "!";
+        private const string UpperBoundaryRowKey = "~";
+        private const string BoundaryVersionPropertyName = "SnapshotVersion";
+        private const int BoundaryRowCount = 2;
+
         private readonly TableClient table;
         private readonly string partition;
         private readonly JsonSerializerSettings jsonSettings;
@@ -22,6 +28,7 @@ namespace Orleans.Transactions.AzureStorage
 
         private KeyEntity key = null!;
         private List<KeyValuePair<long, StateEntity>> states = null!;
+        private bool _storeRequiresLoad;
 
         public AzureTableTransactionalStateStorage(TableClient table, string partition, JsonSerializerSettings JsonSettings, ILogger<AzureTableTransactionalStateStorage<TState>> logger)
         {
@@ -40,16 +47,14 @@ namespace Orleans.Transactions.AzureStorage
         {
             try
             {
-                var keyTask = ReadKey();
-                var statesTask = ReadStates();
-                key = await keyTask.ConfigureAwait(false);
-                states = await statesTask.ConfigureAwait(false);
+                (key, states) = await LoadSnapshot().ConfigureAwait(false);
 
                 if (string.IsNullOrEmpty(key.ETag.ToString()))
                 {
                     LogDebugLoadedV0Fresh(partition);
 
                     // first time load
+                    _storeRequiresLoad = false;
                     return new TransactionalStorageLoadResponse<TState>();
                 }
                 else
@@ -105,7 +110,9 @@ namespace Orleans.Transactions.AzureStorage
                     LogDebugLoadedPartitionKeyRows(partition, this.key.CommittedSequenceId, new(states));
 
                     TransactionalStateMetaData metadata = JsonConvert.DeserializeObject<TransactionalStateMetaData>(this.key.Metadata!, this.jsonSettings)!;
-                    return new TransactionalStorageLoadResponse<TState>(this.key.ETag.ToString(), committedState, this.key.CommittedSequenceId, metadata, PrepareRecordsToRecover);
+                    var result = new TransactionalStorageLoadResponse<TState>(this.key.ETag.ToString(), committedState, this.key.CommittedSequenceId, metadata, PrepareRecordsToRecover);
+                    _storeRequiresLoad = false;
+                    return result;
                 }
             }
             catch (Exception ex)
@@ -117,10 +124,35 @@ namespace Orleans.Transactions.AzureStorage
 
         public async Task<string> Store(string? expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>>? statesToPrepare, long? commitUpTo, long? abortAfter)
         {
+            if (_storeRequiresLoad)
+            {
+                throw new InvalidOperationException("Load must complete successfully before Store can be called again after a failed Store operation.");
+            }
+
             var keyETag = key.ETag.ToString();
             if ((!string.IsNullOrWhiteSpace(keyETag) || !string.IsNullOrWhiteSpace(expectedETag)) && keyETag != expectedETag)
             {
                 throw new ArgumentException(nameof(expectedETag), "Etag does not match");
+            }
+
+            try
+            {
+                return await StoreCore(metadata, statesToPrepare, commitUpTo, abortAfter).ConfigureAwait(false);
+            }
+            catch
+            {
+                _storeRequiresLoad = true;
+                throw;
+            }
+        }
+
+        private async Task<string> StoreCore(TransactionalStateMetaData metadata, List<PendingTransactionState<TState>>? statesToPrepare, long? commitUpTo, long? abortAfter)
+        {
+            if (string.IsNullOrEmpty(key.ETag.ToString()) && string.IsNullOrEmpty(key.Metadata))
+            {
+                // A split prepare can persist the fresh key before phase three publishes the incoming metadata.
+                // Until then, the key must represent the valid previous (empty) committed state.
+                key.Metadata = JsonConvert.SerializeObject(new TransactionalStateMetaData(), this.jsonSettings);
             }
 
             // assemble all storage operations into a single batch
@@ -138,7 +170,7 @@ namespace Orleans.Transactions.AzureStorage
                     key.ETag = batchOperation.KeyETag;
                     states.RemoveAt(states.Count - 1);
 
-                    LogTraceDeleteTransaction(partition, entity.RowKey, entity.TransactionId);
+                    LogTraceDeleteTransaction(partition, entity.RowKey);
                 }
             }
 
@@ -159,7 +191,7 @@ namespace Orleans.Transactions.AzureStorage
                             await batchOperation.Add(new TableTransactionAction(TableTransactionActionType.UpdateReplace, existing.Entity, existing.ETag)).ConfigureAwait(false);
                             key.ETag = batchOperation.KeyETag;
 
-                            LogTraceUpdateTransaction(partition, existing.RowKey, existing.TransactionId);
+                            LogTraceUpdateTransaction(partition, existing.RowKey);
                         }
                         else
                         {
@@ -168,7 +200,7 @@ namespace Orleans.Transactions.AzureStorage
                             key.ETag = batchOperation.KeyETag;
                             states.Insert(pos, new KeyValuePair<long, StateEntity>(s.SequenceId, entity));
 
-                            LogTraceInsertTransaction(partition, entity.RowKey, entity.TransactionId);
+                            LogTraceInsertTransaction(partition, entity.RowKey);
                         }
                     }
 
@@ -202,7 +234,7 @@ namespace Orleans.Transactions.AzureStorage
                     await batchOperation.Add(new TableTransactionAction(TableTransactionActionType.Delete, states[i].Value.Entity, states[i].Value.ETag)).ConfigureAwait(false);
                     key.ETag = batchOperation.KeyETag;
 
-                    LogTraceDeleteTransaction(partition, states[i].Value.RowKey, states[i].Value.TransactionId);
+                    LogTraceDeleteTransaction(partition, states[i].Value.RowKey);
                 }
                 states.RemoveRange(0, pos);
             }
@@ -233,33 +265,96 @@ namespace Orleans.Transactions.AzureStorage
             return false;
         }
 
-        private async Task<KeyEntity> ReadKey()
+        private async Task<(KeyEntity Key, List<KeyValuePair<long, StateEntity>> States)> LoadSnapshot()
         {
-            var queryResult = table.QueryAsync<KeyEntity>(AzureTableUtils.PointQuery(this.partition, KeyEntity.RK)).ConfigureAwait(false);
-            await foreach (var result in queryResult)
+            KeyEntity keyBefore = null!;
+            string? versionBefore = null;
+            string? versionAfter = null;
+            for (var attempt = 0; attempt < MaxSnapshotLoadAttempts; attempt++)
             {
-                return result;
+                (keyBefore, var loadedStates, var isPaginated, versionBefore, versionAfter) = await ReadSnapshot().ConfigureAwait(false);
+                if (!isPaginated)
+                {
+                    // A single Query Entities response is one strongly consistent storage operation.
+                    return (keyBefore, loadedStates);
+                }
+
+                if (versionBefore is null && versionAfter is null)
+                {
+                    // Legacy partitions do not have boundary rows. During rolling upgrades, older
+                    // writers also leave existing boundaries stale, so torn reads remain allowed
+                    // until every writer is upgraded to advance them.
+                    return (keyBefore, loadedStates);
+                }
+
+                if (versionBefore is not null
+                    && string.Equals(versionBefore, versionAfter, StringComparison.Ordinal))
+                {
+                    return (keyBefore, loadedStates);
+                }
             }
 
-            return new KeyEntity()
+            throw new InconsistentStateException(
+                "Could not load a consistent Azure Table transactional state snapshot.",
+                storedEtag: versionBefore ?? "null",
+                currentEtag: versionAfter ?? "null");
+        }
+
+        private async Task<(
+            KeyEntity Key,
+            List<KeyValuePair<long, StateEntity>> States,
+            bool IsPaginated,
+            string? LowerBoundaryVersion,
+            string? UpperBoundaryVersion)> ReadSnapshot()
+        {
+            var query = AzureTableUtils.RangeQuery(this.partition, LowerBoundaryRowKey, UpperBoundaryRowKey);
+            var key = CreateFreshKey();
+            var states = new List<KeyValuePair<long, StateEntity>>();
+            var pageCount = 0;
+            string? lowerBoundaryVersion = null;
+            string? upperBoundaryVersion = null;
+            await foreach (var page in table.QueryAsync<TableEntity>(query).AsPages().ConfigureAwait(false))
+            {
+                pageCount++;
+                foreach (var entity in page.Values)
+                {
+                    if (entity.RowKey == KeyEntity.RK)
+                    {
+                        key = new KeyEntity
+                        {
+                            PartitionKey = entity.PartitionKey,
+                            RowKey = entity.RowKey,
+                            Timestamp = entity.Timestamp,
+                            ETag = entity.ETag,
+                            CommittedSequenceId = entity.GetInt64(nameof(KeyEntity.CommittedSequenceId)).GetValueOrDefault(),
+                            Metadata = entity.GetString(nameof(KeyEntity.Metadata))
+                        };
+                    }
+                    else if (entity.RowKey.StartsWith(StateEntity.RK_PREFIX, StringComparison.Ordinal))
+                    {
+                        var state = new StateEntity(entity);
+                        states.Add(new KeyValuePair<long, StateEntity>(state.SequenceId, state));
+                    }
+                    else if (entity.RowKey == LowerBoundaryRowKey)
+                    {
+                        lowerBoundaryVersion = entity.GetString(BoundaryVersionPropertyName);
+                    }
+                    else if (entity.RowKey == UpperBoundaryRowKey)
+                    {
+                        upperBoundaryVersion = entity.GetString(BoundaryVersionPropertyName);
+                    }
+                }
+            }
+
+            return (key, states, pageCount > 1, lowerBoundaryVersion, upperBoundaryVersion);
+        }
+
+        private KeyEntity CreateFreshKey()
+            => new()
             {
                 PartitionKey = partition,
                 RowKey = KeyEntity.RK
             };
-        }
-
-        private async Task<List<KeyValuePair<long, StateEntity>>> ReadStates()
-        {
-            var query = AzureTableUtils.RangeQuery(this.partition, StateEntity.RK_MIN, StateEntity.RK_MAX);
-            var results = new List<KeyValuePair<long, StateEntity>>();
-            var queryResult = table.QueryAsync<TableEntity>(query).ConfigureAwait(false);
-            await foreach (var entity in queryResult)
-            {
-                var state = new StateEntity(entity);
-                results.Add(new KeyValuePair<long, StateEntity>(state.SequenceId, state));
-            };
-            return results;
-        }
 
         private class BatchOperation
         {
@@ -291,12 +386,18 @@ namespace Orleans.Transactions.AzureStorage
 
                 batchOperation.Add(operation);
 
-                if (batchOperation.Count == AzureTableConstants.MaxBatchSize - (BatchHasKey ? 0 : 1))
+                if (batchOperation.Count == AzureTableConstants.MaxBatchSize - BoundaryRowCount - (BatchHasKey ? 0 : 1))
                 {
                     // the key serves as a synchronizer, to prevent modification by multiple grains under edge conditions,
-                    // like duplicate activations or deployments.Every batch write needs to include the key,
-                    // even if the key values don't change.
+                    // like duplicate activations or deployments. The boundary rows fence paginated reads.
+                    await Flush().ConfigureAwait(false);
+                }
+            }
 
+            public async Task Flush()
+            {
+                if (batchOperation.Count > 0)
+                {
                     if (!BatchHasKey)
                     {
                         keyIndex = batchOperation.Count;
@@ -310,20 +411,20 @@ namespace Orleans.Transactions.AzureStorage
                         }
                     }
 
-                    await Flush().ConfigureAwait(false);
-                }
-            }
+                    var boundaryVersion = Guid.NewGuid().ToString("N");
+                    batchOperation.Add(new TableTransactionAction(
+                        TableTransactionActionType.UpsertReplace,
+                        CreateBoundaryEntity(key.PartitionKey, LowerBoundaryRowKey, boundaryVersion)));
+                    batchOperation.Add(new TableTransactionAction(
+                        TableTransactionActionType.UpsertReplace,
+                        CreateBoundaryEntity(key.PartitionKey, UpperBoundaryRowKey, boundaryVersion)));
 
-            public async Task Flush()
-            {
-                if (batchOperation.Count > 0)
-                {
                     try
                     {
                         var batchResponse = await table.SubmitTransactionAsync(batchOperation).ConfigureAwait(false);
                         if (batchResponse?.Value is { Count: > 0 } responses)
                         {
-                            if (BatchHasKey && responses.Count >= keyIndex && responses[keyIndex].Headers.ETag is { } etag)
+                            if (BatchHasKey && responses.Count > keyIndex && responses[keyIndex].Headers.ETag is { } etag)
                             {
                                 key.ETag = etag;
                             }
@@ -342,20 +443,50 @@ namespace Orleans.Transactions.AzureStorage
                     }
                     catch (Exception ex) when (IsStorageConflict(ex))
                     {
+                        var requestFailedException = GetStorageConflict(ex)!;
+                        var failedOperationIndex = requestFailedException is TableTransactionFailedException transactionFailedException
+                            ? transactionFailedException.FailedTransactionActionIndex
+                            : null;
+                        var actionIndex = failedOperationIndex is >= 0 && failedOperationIndex < batchOperation.Count
+                            ? failedOperationIndex
+                            : batchOperation.Count == 1 ? 0 : null;
+                        var action = actionIndex.HasValue ? batchOperation[actionIndex.Value] : null;
+                        var actionIndexText = actionIndex?.ToString() ?? "Unavailable";
+                        var actionType = action?.ActionType.ToString() ?? "Unavailable";
+                        var rowKey = action?.Entity.RowKey ?? "Unavailable";
+                        var errorCode = requestFailedException.ErrorCode ?? "Unavailable";
+                        var failedOperationIndexText = failedOperationIndex?.ToString() ?? "Unavailable";
+
                         if (logger.IsEnabled(LogLevel.Trace))
                         {
                             for (int i = 0; i < batchOperation.Count; i++)
                             {
-                                LogTraceBatchOpFailed(logger, batchOperation[i].Entity.PartitionKey, batchOperation[i].Entity.RowKey, i);
+                                LogTraceBatchOpFailed(
+                                    logger,
+                                    batchOperation[i].Entity.PartitionKey,
+                                    batchOperation[i].Entity.RowKey,
+                                    i,
+                                    batchOperation[i].ActionType,
+                                    requestFailedException.Status,
+                                    errorCode,
+                                    failedOperationIndexText);
                             }
                         }
 
-                        LogErrorTransactionalStateStoreFailed(logger, ex);
+                        LogErrorTransactionalStateStoreConflict(
+                            logger,
+                            key.PartitionKey,
+                            actionIndexText,
+                            actionType,
+                            rowKey,
+                            requestFailedException.Status,
+                            errorCode,
+                            failedOperationIndexText);
+
                         throw new InconsistentStateException(
-                            "Azure Table transactional state storage conflict.",
+                            $"Azure Table transactional state storage conflict. Partition={key.PartitionKey} ActionIndex={actionIndexText} ActionType={actionType} RowKey={rowKey} HttpStatus={requestFailedException.Status} ErrorCode={errorCode} FailedOperationIndex={failedOperationIndexText}",
                             "Unknown",
-                            key.ETag.ToString(),
-                            ex);
+                            key.ETag.ToString());
                     }
                     catch (Exception ex)
                     {
@@ -363,7 +494,15 @@ namespace Orleans.Transactions.AzureStorage
                         {
                             for (int i = 0; i < batchOperation.Count; i++)
                             {
-                                LogTraceBatchOpFailed(logger, batchOperation[i].Entity.PartitionKey, batchOperation[i].Entity.RowKey, i);
+                                LogTraceBatchOpFailed(
+                                    logger,
+                                    batchOperation[i].Entity.PartitionKey,
+                                    batchOperation[i].Entity.RowKey,
+                                    i,
+                                    batchOperation[i].ActionType,
+                                    ex is RequestFailedException requestFailedException ? requestFailedException.Status : 0,
+                                    ex is RequestFailedException { ErrorCode: { } errorCode } ? errorCode : "Unavailable",
+                                    "Unavailable");
                             }
                         }
 
@@ -373,20 +512,34 @@ namespace Orleans.Transactions.AzureStorage
                 }
             }
 
+            private static TableEntity CreateBoundaryEntity(string partitionKey, string rowKey, string version)
+                => new(partitionKey, rowKey)
+                {
+                    [BoundaryVersionPropertyName] = version
+                };
+
             private static bool IsStorageConflict(Exception? exception)
+                => GetStorageConflict(exception) is not null;
+
+            private static RequestFailedException? GetStorageConflict(Exception? exception)
             {
+                RequestFailedException? result = null;
                 while (exception is not null)
                 {
                     if (exception is RequestFailedException requestFailedException
                         && requestFailedException.Status is (int)HttpStatusCode.Conflict or (int)HttpStatusCode.PreconditionFailed)
                     {
-                        return true;
+                        result = requestFailedException;
+                        if (requestFailedException is TableTransactionFailedException)
+                        {
+                            break;
+                        }
                     }
 
                     exception = exception.InnerException;
                 }
 
-                return false;
+                return result;
             }
         }
 
@@ -421,21 +574,21 @@ namespace Orleans.Transactions.AzureStorage
 
         [LoggerMessage(
             Level = LogLevel.Trace,
-            Message = "{PartitionKey}.{RowKey} Delete {TransactionId}"
+            Message = "{PartitionKey}.{RowKey} Delete"
         )]
-        private partial void LogTraceDeleteTransaction(string partitionKey, string rowKey, string? transactionId);
+        private partial void LogTraceDeleteTransaction(string partitionKey, string rowKey);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
-            Message = "{PartitionKey}.{RowKey} Update {TransactionId}"
+            Message = "{PartitionKey}.{RowKey} Update"
         )]
-        private partial void LogTraceUpdateTransaction(string partitionKey, string rowKey, string? transactionId);
+        private partial void LogTraceUpdateTransaction(string partitionKey, string rowKey);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
-            Message = "{PartitionKey}.{RowKey} Insert {TransactionId}"
+            Message = "{PartitionKey}.{RowKey} Insert"
         )]
-        private partial void LogTraceInsertTransaction(string partitionKey, string rowKey, string? transactionId);
+        private partial void LogTraceInsertTransaction(string partitionKey, string rowKey);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
@@ -463,9 +616,31 @@ namespace Orleans.Transactions.AzureStorage
 
         [LoggerMessage(
             Level = LogLevel.Trace,
-            Message = "{PartitionKey}.{RowKey} batch-op failed {BatchCount}"
+            Message = "{PartitionKey}.{RowKey} batch-op failed {BatchCount} ActionType={ActionType} HttpStatus={HttpStatus} ErrorCode={ErrorCode} FailedOperationIndex={FailedOperationIndex}"
         )]
-        private static partial void LogTraceBatchOpFailed(ILogger logger, string partitionKey, string rowKey, int batchCount);
+        private static partial void LogTraceBatchOpFailed(
+            ILogger logger,
+            string partitionKey,
+            string rowKey,
+            int batchCount,
+            TableTransactionActionType actionType,
+            int httpStatus,
+            string errorCode,
+            string failedOperationIndex);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Azure Table transactional state storage conflict. Partition={PartitionKey} ActionIndex={ActionIndex} ActionType={ActionType} RowKey={RowKey} HttpStatus={HttpStatus} ErrorCode={ErrorCode} FailedOperationIndex={FailedOperationIndex}"
+        )]
+        private static partial void LogErrorTransactionalStateStoreConflict(
+            ILogger logger,
+            string partitionKey,
+            string actionIndex,
+            string actionType,
+            string rowKey,
+            int httpStatus,
+            string errorCode,
+            string failedOperationIndex);
 
         [LoggerMessage(
             Level = LogLevel.Error,
