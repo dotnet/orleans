@@ -273,42 +273,24 @@ namespace Orleans.AzureUtils
         internal async Task<List<(SiloInstanceTableEntry Entity, string ETag)>> FindAllSiloEntries(
             CancellationToken cancellationToken = default)
         {
-            var initialRead = await membershipTableReadStorage.ReadAllTableEntriesForPartitionAsync(this.DeploymentId, cancellationToken);
-            if (!initialRead.IsPaginated)
-            {
-                ValidateAllSiloEntries(initialRead.Entries);
-                return RemoveBoundaryVersionRows(initialRead.Entries);
-            }
-
-            if (TryAcceptBoundaryFencedSnapshot(initialRead.Entries, out var beforeVersion, out var afterVersion))
-            {
-                return initialRead.Entries;
-            }
-
-            if (HasNoBoundaryVersionRows(initialRead.Entries))
-            {
-                ValidateAllSiloEntries(initialRead.Entries);
-                return RemoveBoundaryVersionRows(initialRead.Entries);
-            }
-
-            for (var attempt = 1; attempt < MaxMembershipSnapshotAttempts; attempt++)
+            string? beforeVersion = null;
+            string? afterVersion = null;
+            for (var attempt = 0; attempt < MaxMembershipSnapshotAttempts; attempt++)
             {
                 var query = await membershipTableReadStorage.ReadAllTableEntriesForPartitionAsync(DeploymentId, cancellationToken);
-                if (!query.IsPaginated)
+                var tableVersion = ValidateAllSiloEntries(query.Entries);
+                if (!query.IsPaginated || HasNoBoundaryVersionRows(query.Entries))
                 {
-                    ValidateAllSiloEntries(query.Entries);
                     return RemoveBoundaryVersionRows(query.Entries);
                 }
 
-                if (TryAcceptBoundaryFencedSnapshot(query.Entries, out beforeVersion, out afterVersion))
+                if (TryAcceptBoundaryFencedSnapshot(
+                    query.Entries,
+                    tableVersion,
+                    out beforeVersion,
+                    out afterVersion))
                 {
                     return query.Entries;
-                }
-
-                if (HasNoBoundaryVersionRows(query.Entries))
-                {
-                    ValidateAllSiloEntries(query.Entries);
-                    return RemoveBoundaryVersionRows(query.Entries);
                 }
             }
 
@@ -320,11 +302,10 @@ namespace Orleans.AzureUtils
 
         private static bool TryAcceptBoundaryFencedSnapshot(
             List<(SiloInstanceTableEntry Entity, string ETag)> queryResults,
+            string? tableVersion,
             out string? beforeVersion,
             out string? afterVersion)
         {
-            var tableVersion = ValidateAllSiloEntries(queryResults);
-
             // Boundary-aware membership updates write both rows in the same transaction. Matching
             // values prove that none committed while the paginated query was being read.
             var first = queryResults[0].Entity;
