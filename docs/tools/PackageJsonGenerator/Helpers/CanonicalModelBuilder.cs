@@ -125,8 +125,7 @@ internal sealed class CanonicalModelBuilder(Compilation compilation)
 
         foreach (var member in type.GetMembers().OrderBy(m => m.Name))
         {
-            if (member.DeclaredAccessibility != Accessibility.Public ||
-                member.IsImplicitlyDeclared)
+            if (!IsExternallyVisible(member.DeclaredAccessibility) || member.IsImplicitlyDeclared)
             {
                 continue;
             }
@@ -157,6 +156,9 @@ internal sealed class CanonicalModelBuilder(Compilation compilation)
 
         return members;
     }
+
+    private static bool IsExternallyVisible(Accessibility accessibility) =>
+        accessibility is Accessibility.Public or Accessibility.Protected or Accessibility.ProtectedOrInternal;
 
     private CanonicalMember BuildMethod(IMethodSymbol method) => new()
     {

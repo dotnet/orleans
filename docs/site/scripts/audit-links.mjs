@@ -9,6 +9,7 @@ import {
 import allowlist from '../src/data/external-link-allowlist.json' with { type: 'json' };
 
 const siteRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const repositoryRoot = path.resolve(siteRoot, '..', '..');
 const sourceRoot = path.join(siteRoot, 'src', 'content', 'docs');
 const includeRoot = path.join(siteRoot, 'src');
 const distRoot = path.join(siteRoot, 'dist');
@@ -17,6 +18,7 @@ const documents = await collectLinkAuditDocuments({ sourceRoot, allowedRoot: inc
 const sourceAudit = await auditSourceLinks({ documents, sourceRoot });
 const renderedIssues = await auditRenderedInternalLinks({
   distRoot,
+  repositoryRoot,
   internalProvenance: sourceAudit.internalProvenance,
   externalTargets: sourceAudit.externalTargets,
 });

@@ -17,6 +17,13 @@ const contentRoute = `${deploymentBase}/docs`;
 const learnContentRoot = '/dotnet/orleans';
 const redirectStatuses = new Set([301, 302, 303, 307, 308]);
 const transientStatuses = new Set([408, 425, 429, 500, 502, 503, 504]);
+const headFallbackStatuses = new Set([405, 501]);
+const headFallbackStatusesByHost = new Map([
+  ['azure.microsoft.com', new Set([404])],
+  ['nuget.org', new Set([404])],
+  ['twitter.com', new Set([403])],
+  ['www.nuget.org', new Set([404])],
+]);
 
 function toPosix(value) {
   return value.split(path.sep).join('/');
@@ -425,6 +432,14 @@ export async function auditSourceLinks({ documents, sourceRoot }) {
       continue;
     }
     if (/^[a-z][a-z\d+.-]*:/i.test(raw) || raw.startsWith('//')) {
+      issues.push({
+        rule: 'LINK001',
+        file: reference.relativeFile,
+        line: reference.line,
+        message: `Unsupported URL scheme in '${raw}'.`,
+        remediation:
+          'Use http(s), mailto, tel, sms, xref, or a valid internal link.',
+      });
       continue;
     }
     if (raw.startsWith('/')) {
@@ -600,8 +615,35 @@ function outputCandidates(pathname) {
   return [relative, path.posix.join(relative, 'index.html')];
 }
 
+function repositorySourceTarget(url, repositoryRoot) {
+  if (!repositoryRoot || url.hostname.toLowerCase() !== 'github.com' || url.search) {
+    return undefined;
+  }
+  const match =
+    /^\/dotnet\/orleans\/blob\/(?:main|[a-f\d]{40})\/(.+)$/i.exec(url.pathname);
+  if (!match || (url.hash && !/^#L\d+(?:-L\d+)?$/i.test(url.hash))) {
+    return undefined;
+  }
+  let relative;
+  try {
+    relative = decodeURIComponent(match[1]);
+  } catch {
+    return { error: `malformed encoded repository path in '${url.href}'` };
+  }
+  const target = path.resolve(repositoryRoot, relative.replaceAll('/', path.sep));
+  if (!isWithin(repositoryRoot, target)) {
+    return { error: `repository source link '${url.href}' escapes the repository root` };
+  }
+  const lineMatch = /^#L(\d+)(?:-L(\d+))?$/i.exec(url.hash);
+  return {
+    target,
+    lastLine: lineMatch ? Number(lineMatch[2] ?? lineMatch[1]) : undefined,
+  };
+}
+
 export async function auditRenderedInternalLinks({
   distRoot,
+  repositoryRoot,
   internalProvenance = new Map(),
   externalTargets,
 }) {
@@ -619,6 +661,18 @@ export async function auditRenderedInternalLinks({
     return documentCache.get(relativeFile);
   }
   const issues = [];
+  const sourceLineCounts = new Map();
+  async function sourceLineCount(target) {
+    if (!sourceLineCounts.has(target)) {
+      sourceLineCounts.set(
+        target,
+        pathExists(target).then(async (exists) =>
+          exists ? (await readFile(target, 'utf8')).split(/\r?\n/).length : 0,
+        ),
+      );
+    }
+    return sourceLineCounts.get(target);
+  }
   function provenance(route, targetUrl) {
     const key = `${route}\0${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`;
     const references = internalProvenance.get(key);
@@ -632,10 +686,7 @@ export async function auditRenderedInternalLinks({
     const document = await getDocument(relativeFile);
     for (const link of document.links) {
       const href = link.url;
-      if (
-        href.length === 0 ||
-        /^(?:mailto|tel|sms|javascript|data):/i.test(href)
-      ) {
+      if (href.length === 0 || /^(?:mailto|tel|sms):/i.test(href)) {
         continue;
       }
       let targetUrl;
@@ -645,10 +696,37 @@ export async function auditRenderedInternalLinks({
         issues.push(`${route}: malformed href '${href}'.`);
         continue;
       }
+      if (targetUrl.protocol === 'data:' && !link.navigational) {
+        continue;
+      }
+      if (!['http:', 'https:'].includes(targetUrl.protocol)) {
+        issues.push(
+          `${route}: unsupported URL protocol '${targetUrl.protocol}' in '${href}'.`,
+        );
+        continue;
+      }
       if (
         targetUrl.origin !== 'https://dotnet.github.io' &&
         targetUrl.origin !== 'https://docs.invalid'
       ) {
+        const sourceTarget = repositorySourceTarget(targetUrl, repositoryRoot);
+        if (sourceTarget) {
+          if (sourceTarget.error) {
+            issues.push(`${route}: ${sourceTarget.error}.`);
+          } else {
+            const lines = await sourceLineCount(sourceTarget.target);
+            if (lines === 0) {
+              issues.push(
+                `${route}: repository source link '${href}' targets a missing file.`,
+              );
+            } else if (sourceTarget.lastLine && sourceTarget.lastLine > lines) {
+              issues.push(
+                `${route}: repository source link '${href}' targets line ${sourceTarget.lastLine}, but the file has ${lines} lines.`,
+              );
+            }
+          }
+          continue;
+        }
         if (['http:', 'https:'].includes(targetUrl.protocol) && externalTargets) {
           const normalized = new URL(targetUrl);
           normalized.hash = '';
@@ -976,7 +1054,16 @@ async function probeOnce(url, options) {
   if (head.response.status >= 200 && head.response.status < 400) {
     return head;
   }
-  return requestWithRedirects(url, { ...options, method: 'GET' });
+  const hostFallbacks = headFallbackStatusesByHost.get(
+    new URL(url).hostname.toLowerCase(),
+  );
+  if (
+    headFallbackStatuses.has(head.response.status) ||
+    hostFallbacks?.has(head.response.status)
+  ) {
+    return requestWithRedirects(url, { ...options, method: 'GET' });
+  }
+  return head;
 }
 
 export async function probeExternalTargets({

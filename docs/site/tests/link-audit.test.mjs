@@ -237,6 +237,35 @@ describe('source link audit', () => {
     ]);
   });
 
+  test('rejects unsafe, unknown, and protocol-relative URL schemes', async () => {
+    const sourceRoot = await temporaryDirectory();
+    const file = path.join(sourceRoot, 'guide.md');
+    const result = await auditSourceLinks({
+      sourceRoot,
+      documents: [
+        {
+          file,
+          source: [
+            '[Typo](htps://example.com)',
+            '<a href="javascript:alert(1)">Script</a>',
+            '<a href="data:text/html,unsafe">Data</a>',
+            '[Protocol relative](//example.com/path)',
+          ].join('\n'),
+        },
+      ],
+    });
+
+    expect(result.issues).toHaveLength(4);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ message: expect.stringContaining('htps:') }),
+        expect.objectContaining({ message: expect.stringContaining('javascript:') }),
+        expect.objectContaining({ message: expect.stringContaining('data:') }),
+        expect.objectContaining({ message: expect.stringContaining('//example.com/path') }),
+      ]),
+    );
+  });
+
   test('fails a broken YAML URL with source provenance', async () => {
     const sourceRoot = path.join('content', 'docs');
     const file = path.join(sourceRoot, 'index.yml');
@@ -311,6 +340,60 @@ describe('rendered internal link audit', () => {
     );
 
     expect(await auditRenderedInternalLinks({ distRoot })).toEqual([]);
+  });
+
+  test('rejects unsafe and unknown rendered navigation schemes', async () => {
+    const distRoot = await temporaryDirectory();
+    await writePage(
+      distRoot,
+      'docs/a/index.html',
+      [
+        '<a href="javascript:alert(1)">script</a>',
+        '<a href="data:text/html,unsafe">data</a>',
+        '<a href="htps://example.com">typo</a>',
+        '<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==">',
+      ].join(''),
+    );
+
+    expect(await auditRenderedInternalLinks({ distRoot })).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("unsupported URL protocol 'javascript:'"),
+        expect.stringContaining("unsupported URL protocol 'data:'"),
+        expect.stringContaining("unsupported URL protocol 'htps:'"),
+      ]),
+    );
+  });
+
+  test('validates generated repository source links locally', async () => {
+    const repositoryRoot = await temporaryDirectory();
+    const distRoot = path.join(repositoryRoot, 'dist');
+    await mkdir(path.join(repositoryRoot, 'src'));
+    await writeFile(path.join(repositoryRoot, 'src', 'Widget.cs'), 'line 1\nline 2\n');
+    const commit = 'a'.repeat(40);
+    await writePage(
+      distRoot,
+      'docs/a/index.html',
+      [
+        `<a href="https://github.com/dotnet/orleans/blob/${commit}/src/Widget.cs#L2">valid</a>`,
+        `<a href="https://github.com/dotnet/orleans/blob/${commit}/src/Missing.cs#L1">missing</a>`,
+        `<a href="https://github.com/dotnet/orleans/blob/${commit}/src/Widget.cs#L4">line</a>`,
+      ].join(''),
+    );
+    const externalTargets = new Map();
+
+    const issues = await auditRenderedInternalLinks({
+      distRoot,
+      repositoryRoot,
+      externalTargets,
+    });
+
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('targets a missing file'),
+        expect.stringContaining('targets line 4'),
+      ]),
+    );
+    expect(externalTargets.size).toBe(0);
   });
 
   test('rejects missing pages, anchors, malformed encodings, and base escapes', async () => {
@@ -435,7 +518,7 @@ describe('rendered internal link audit', () => {
     });
 
     expect(result.probed).toBe(1);
-    expect(requests).toBe(2);
+    expect(requests).toBe(1);
     expect(result.failures).toEqual([
       expect.stringContaining('guide.md:5, includes/shared.md:2'),
     ]);
@@ -452,7 +535,7 @@ describe('external link audit', () => {
     },
   });
 
-  test('deduplicates, follows redirects, and falls back from HEAD to GET', async () => {
+  test('deduplicates, follows redirects, and falls back when HEAD is unsupported', async () => {
     const counts = new Map();
     const target = 'https://public.example/head-rejected';
     const externalTargets = new Map([
@@ -490,6 +573,38 @@ describe('external link audit', () => {
     expect(counts.get('GET /head-rejected')).toBe(1);
     expect(counts.get('HEAD /redirect')).toBe(1);
     expect(counts.get('HEAD /ok')).toBe(1);
+  });
+
+  test('falls back when known hosts reject HEAD requests', async () => {
+    const counts = new Map();
+    const headStatuses = new Map([
+      ['azure.microsoft.com', 404],
+      ['twitter.com', 403],
+      ['www.nuget.org', 404],
+    ]);
+    const result = await probeExternalTargets({
+      externalTargets: new Map(
+        [...headStatuses.keys()].map((host) => [
+          `https://${host}/resource`,
+          [{ relativeFile: 'guide.md', line: 1 }],
+        ]),
+      ),
+      retries: 0,
+      lookupImpl: publicLookup,
+      requestImpl: async (url, options) => {
+        const key = `${url.hostname} ${options.method}`;
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+        return response(
+          options.method === 'HEAD' ? headStatuses.get(url.hostname) : 200,
+        );
+      },
+    });
+
+    expect(result.failures).toEqual([]);
+    for (const host of headStatuses.keys()) {
+      expect(counts.get(`${host} HEAD`)).toBe(1);
+      expect(counts.get(`${host} GET`)).toBe(1);
+    }
   });
 
   test('fails definitive missing statuses and redirect loops', async () => {
@@ -545,13 +660,17 @@ describe('external link audit', () => {
       ]),
     );
 
+    let rateRequests = 0;
     const result = await probeExternalTargets({
       externalTargets,
       timeoutMs: 20,
       retries: 1,
       lookupImpl: publicLookup,
       requestImpl: async (url) => {
-        if (url.pathname === '/rate') return response(429);
+        if (url.pathname === '/rate') {
+          rateRequests += 1;
+          return response(429);
+        }
         const error = new Error('timed out');
         error.name = 'TimeoutError';
         error.code = 'ETIMEDOUT';
@@ -565,6 +684,7 @@ describe('external link audit', () => {
         expect.stringContaining('Transient external link failure'),
       ]),
     );
+    expect(rateRequests).toBe(2);
   });
 
   test('fails permanent DNS or TLS-style network errors', async () => {

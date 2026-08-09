@@ -53,8 +53,9 @@ The source audit reports a rule ID, file, line, and remediation. It enforces:
   links must use canonical `https://learn.microsoft.com/...` URLs; rendered
   routes, encoded paths, redirects, and anchors must resolve under `/orleans/`.
   Source diagnostics include file/line provenance.
-- Deduplicated external HTTP(S) validation with bounded concurrency, redirects,
-  timeouts, retries, and HEAD-to-GET fallback. Definitive broken targets fail.
+- Generated links to this repository are checked against the local checkout.
+  Remaining external HTTP(S) validation uses bounded concurrency, redirects,
+  timeouts, retries, and host-specific HEAD-to-GET fallback. Definitive broken targets fail.
   Rate limits and transient network failures are reported explicitly without
   making CI nondeterministic. Pull-request content is untrusted: the probe rejects
   credentials, non-default ports, and any hostname/IP which can reach private,
@@ -74,8 +75,7 @@ compile the complete aggregate locally, run:
 dotnet build ../Docs.slnx --configuration Release -p:BuildExternalAssets=false
 ```
 
-To compile only the 38 checked-in documentation snippet projects sequentially,
-run:
+To compile only the checked-in documentation snippet projects sequentially, run:
 
 ```powershell
 pwsh src/content/docs/validate-snippets.ps1
