@@ -124,9 +124,9 @@ namespace ServiceBus.Tests.StreamingTests
         private static async Task<bool> CheckCounters(List<ISampleStreaming_ConsumerGrain> consumers, int totalEventCount, bool assertIsTrue, CancellationToken cancellationToken)
         {
             List<Task<int>> becomeConsumersTasks = consumers
-                .Select((consumer, i) => consumer.GetNumberConsumed())
+                .Select((consumer, i) => consumer.GetNumberConsumed(cancellationToken))
                 .ToList();
-            int[] counts = await Task.WhenAll(becomeConsumersTasks).WaitAsync(cancellationToken);
+            int[] counts = await Task.WhenAll(becomeConsumersTasks);
 
             if (assertIsTrue)
             {

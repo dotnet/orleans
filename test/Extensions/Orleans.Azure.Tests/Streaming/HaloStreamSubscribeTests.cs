@@ -169,8 +169,8 @@ namespace UnitTests.HaloTests.Streaming
 
         private async Task<bool> CheckCounters(IProducerEventCountingGrain producer, IConsumerEventCountingGrain consumer, CancellationToken cancellationToken)
         {
-            var numProduced = await producer.GetNumberProduced().WaitAsync(cancellationToken);
-            var numConsumed = await consumer.GetNumberConsumed().WaitAsync(cancellationToken);
+            var numProduced = await producer.GetNumberProduced(cancellationToken);
+            var numConsumed = await consumer.GetNumberConsumed(cancellationToken);
             this.fixture.Logger.LogInformation("CheckCounters: numProduced = {ProducedCount}, numConsumed = {ConsumedCount}", numProduced, numConsumed);
             return numProduced == numConsumed;
         }

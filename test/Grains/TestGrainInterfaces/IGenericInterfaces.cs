@@ -184,7 +184,7 @@ namespace UnitTests.GrainInterfaces
         Task<T> PingSelf(T t);
         Task<T> PingOther(IGenericPingSelf<T> target, T t);
         Task<T> PingSelfThroughOther(IGenericPingSelf<T> target, T t);
-        Task<T> GetLastValue();
+        Task<T> GetLastValue(CancellationToken cancellationToken = default);
         Task ScheduleDelayedPing(IGenericPingSelf<T> target, T t, TimeSpan delay);
         Task ScheduleDelayedPingToSelfAndDeactivate(IGenericPingSelf<T> target, T t, TimeSpan delay);
     }

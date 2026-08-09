@@ -28,7 +28,7 @@ namespace Tester.StreamingTests
 
         private async Task<bool> CheckLeases(ILeaseManagerGrain leaseManager, int siloCount, int expectedResponsibilityPerBalancer, bool lastTry, CancellationToken cancellationToken)
         {
-            Dictionary<string,int> responsibilityMap = await leaseManager.GetResponsibilityMap().WaitAsync(cancellationToken);
+            Dictionary<string,int> responsibilityMap = await leaseManager.GetResponsibilityMap(cancellationToken);
             if(lastTry)
             {
                 //there should be one StreamQueueBalancer per silo

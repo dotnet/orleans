@@ -153,7 +153,7 @@ namespace Tester.StreamingTests
             return TestingUtils.WaitUntilAsync(
                 async cancellationToken =>
                 {
-                    var actual = await grain.GetEventCounter().WaitAsync(cancellationToken);
+                    var actual = await grain.GetEventCounter(cancellationToken);
                     return actual == expected;
                 },
                 TimeSpan.FromSeconds(30),

@@ -104,7 +104,7 @@ namespace UnitTests.StreamingTests
         {
             var reporter = this.fixture.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
 
-            var report = await reporter.GetReport(GeneratedStreamTestConstants.StreamProviderName, generatorConfig.StreamNamespace).WaitAsync(cancellationToken);
+            var report = await reporter.GetReport(GeneratedStreamTestConstants.StreamProviderName, generatorConfig.StreamNamespace, cancellationToken);
             if (assertIsTrue)
             {
                 // one stream per queue
@@ -131,7 +131,7 @@ namespace UnitTests.StreamingTests
 
         private static async Task<bool> CheckReporterIsEmpty(IGeneratedEventReporterGrain reporter, string streamNamespace, bool assertIsTrue, CancellationToken cancellationToken)
         {
-            var report = await reporter.GetReport(GeneratedStreamTestConstants.StreamProviderName, streamNamespace).WaitAsync(cancellationToken);
+            var report = await reporter.GetReport(GeneratedStreamTestConstants.StreamProviderName, streamNamespace, cancellationToken);
             if (assertIsTrue)
             {
                 Assert.Empty(report);

@@ -528,12 +528,12 @@ public class SingleStreamTestRunner
         if (producer != null)
         {
             str = "Producer";
-            activationCount = await producer.GetNumActivations(this.client).WaitAsync(cancellationToken);
+            activationCount = await producer.GetNumActivations(this.client, cancellationToken);
         }
         else if (consumer != null)
         {
             str = "Consumer";
-            activationCount = await consumer.GetNumActivations(this.client).WaitAsync(cancellationToken);
+            activationCount = await consumer.GetNumActivations(this.client, cancellationToken);
         }
         var expectActivationCount = 0;
         logger.LogInformation(

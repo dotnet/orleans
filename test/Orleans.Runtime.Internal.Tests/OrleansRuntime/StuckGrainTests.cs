@@ -119,7 +119,7 @@ namespace UnitTests.StuckGrainTests
             await TestingUtils.WaitUntilAsync(
                 async cancellationToken =>
                 {
-                    var count = await stuckGrain.GetNonBlockingCallCounter().WaitAsync(cancellationToken);
+                    var count = await stuckGrain.GetNonBlockingCallCounter(cancellationToken);
                     return count == 3;
                 },
                 TimeSpan.FromSeconds(10),

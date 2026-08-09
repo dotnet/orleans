@@ -736,7 +736,7 @@ namespace DefaultCluster.Tests.General
             await TestingUtils.WaitUntilAsync(
                 async cancellationToken =>
                 {
-                    s2 = await grain.GetLastValue().WaitAsync(cancellationToken);
+                    s2 = await grain.GetLastValue(cancellationToken);
                     if (s2 == s1)
                     {
                         return true;

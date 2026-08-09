@@ -148,7 +148,7 @@ public abstract class StreamingResumeTests : TestClusterPerTest
 
         async Task<bool> CheckFastCounter(int expected, bool lastTry, CancellationToken cancellationToken)
         {
-            var actual = await fastGrain.GetEventCounter().WaitAsync(cancellationToken);
+            var actual = await fastGrain.GetEventCounter(cancellationToken);
             if (lastTry)
             {
                 Assert.Equal(expected, actual);
@@ -163,7 +163,7 @@ public abstract class StreamingResumeTests : TestClusterPerTest
         return TestingUtils.WaitUntilAsync(
             async cancellationToken =>
             {
-                var actual = await grain.GetEventCounter().WaitAsync(cancellationToken);
+                var actual = await grain.GetEventCounter(cancellationToken);
                 return actual == expected;
             },
             TimeSpan.FromSeconds(30),

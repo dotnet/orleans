@@ -79,8 +79,9 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<int> GetNumberProduced()
+        public Task<int> GetNumberProduced(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             logger.LogInformation("GetNumberProduced {Count}", numProducedItems);
             return Task.FromResult(numProducedItems);
         }
@@ -156,8 +157,9 @@ namespace UnitTests.Grains
             }
         }
 
-        public Task<int> GetNumberConsumed()
+        public Task<int> GetNumberConsumed(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(numConsumedItems);
         }
 
@@ -207,8 +209,9 @@ namespace UnitTests.Grains
             }
         }
 
-        public Task<int> GetNumberConsumed()
+        public Task<int> GetNumberConsumed(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult( numConsumedItems );
         }
 

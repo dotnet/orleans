@@ -41,7 +41,11 @@ namespace UnitTests.Grains
 
         public Task<int> GetErrorCounter() => Task.FromResult(this.State.ErrorCounter);
 
-        public Task<int> GetEventCounter() => Task.FromResult(this.State.EventCounter);
+        public Task<int> GetEventCounter(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(this.State.EventCounter);
+        }
 
         public Task Deactivate()
         {

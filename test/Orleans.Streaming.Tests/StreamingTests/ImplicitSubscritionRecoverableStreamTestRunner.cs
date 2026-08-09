@@ -49,7 +49,7 @@ namespace Tester.StreamingTests
         {
             var reporter = grainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
 
-            var report = await reporter.GetReport(streamProviderName, streamNamespace).WaitAsync(cancellationToken);
+            var report = await reporter.GetReport(streamProviderName, streamNamespace, cancellationToken);
             if (assertIsTrue)
             {
                 // one stream per queue

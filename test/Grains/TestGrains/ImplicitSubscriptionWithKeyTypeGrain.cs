@@ -32,6 +32,10 @@ namespace UnitTests.Grains
                 });
         }
 
-        public Task<int> GetValue() => Task.FromResult(value);
+        public Task<int> GetValue(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(value);
+        }
     }
 }

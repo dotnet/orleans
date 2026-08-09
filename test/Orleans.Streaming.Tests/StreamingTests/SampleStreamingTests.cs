@@ -126,8 +126,8 @@ namespace UnitTests.StreamingTests
         /// </summary>
         private async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, ISampleStreaming_ConsumerGrain consumer, bool assertIsTrue, CancellationToken cancellationToken)
         {
-            var numProduced = await producer.GetNumberProduced().WaitAsync(cancellationToken);
-            var numConsumed = await consumer.GetNumberConsumed().WaitAsync(cancellationToken);
+            var numProduced = await producer.GetNumberProduced(cancellationToken);
+            var numConsumed = await consumer.GetNumberConsumed(cancellationToken);
             this.logger.LogInformation("CheckCounters: numProduced = {ProducedCount}, numConsumed = {ConsumedCount}", numProduced, numConsumed);
             if (assertIsTrue)
             {

@@ -8,7 +8,7 @@ namespace UnitTests.GrainInterfaces
 
         Task StopPeriodicProducing();
 
-        Task<int> GetNumberProduced();
+        Task<int> GetNumberProduced(CancellationToken cancellationToken = default);
 
         Task ClearNumberProduced();
         Task Produce();
@@ -20,7 +20,7 @@ namespace UnitTests.GrainInterfaces
 
         Task StopConsuming();
 
-        Task<int> GetNumberConsumed();
+        Task<int> GetNumberConsumed(CancellationToken cancellationToken = default);
     }
 
     public interface ISampleStreaming_InlineConsumerGrain : ISampleStreaming_ConsumerGrain

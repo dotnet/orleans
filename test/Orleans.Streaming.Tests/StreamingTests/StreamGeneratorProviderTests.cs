@@ -78,7 +78,7 @@ namespace UnitTests.StreamingTests
         {
             var reporter = this.fixture.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
 
-            var report = await reporter.GetReport(Fixture.StreamProviderName, Fixture.StreamNamespace).WaitAsync(cancellationToken);
+            var report = await reporter.GetReport(Fixture.StreamProviderName, Fixture.StreamNamespace, cancellationToken);
             if (assertIsTrue)
             {
                 // one stream per queue

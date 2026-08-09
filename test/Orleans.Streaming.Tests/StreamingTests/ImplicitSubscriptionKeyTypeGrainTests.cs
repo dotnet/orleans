@@ -68,7 +68,7 @@ namespace UnitTests.StreamingTests
 
         private async Task<bool> CheckValue(IImplicitSubscriptionKeyTypeGrain consumer, int expectedValue, bool assertIsTrue, CancellationToken cancellationToken)
         {
-            int value = await consumer.GetValue().WaitAsync(cancellationToken);
+            int value = await consumer.GetValue(cancellationToken);
 
             if (assertIsTrue)
             {

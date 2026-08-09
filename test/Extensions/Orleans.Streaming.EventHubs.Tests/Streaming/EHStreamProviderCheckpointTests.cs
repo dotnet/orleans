@@ -141,7 +141,7 @@ namespace ServiceBus.Tests.StreamingTests
         {
             var reporter = this.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
 
-            var report = await reporter.GetReport(StreamProviderName, streamNamespace).WaitAsync(cancellationToken);
+            var report = await reporter.GetReport(StreamProviderName, streamNamespace, cancellationToken);
             if (assertIsTrue)
             {
                 // one stream per queue

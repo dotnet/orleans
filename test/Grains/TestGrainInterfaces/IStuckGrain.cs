@@ -8,7 +8,7 @@ namespace UnitTests.GrainInterfaces
 
         Task NonBlockingCall();
 
-        Task<int> GetNonBlockingCallCounter();
+        Task<int> GetNonBlockingCallCounter(CancellationToken cancellationToken = default);
 
         Task<bool> DidActivationTryToStart(GrainId id);
 
