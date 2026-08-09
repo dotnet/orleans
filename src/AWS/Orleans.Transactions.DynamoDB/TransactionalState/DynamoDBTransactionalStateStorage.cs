@@ -410,11 +410,9 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
         }
         catch (Exception exc)
         {
-            var message = $"Unable to convert from storage format GrainStateEntity.Data={entity.State}";
-            if (dataValue is not null)
-            {
-                message += $"Data Value={dataValue} Type={dataValue.GetType()}";
-            }
+            var message = dataValue is not null
+                ? $"Unable to convert from storage format GrainStateEntity.Data={entity.State}Data Value={dataValue} Type={dataValue.GetType()}"
+                : $"Unable to convert from storage format GrainStateEntity.Data={entity.State}";
 
             LogError(logger, message);
             throw new AggregateException(message, exc);
