@@ -217,7 +217,7 @@ namespace Tester.AzureUtils
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task AzureTableDataManager_InsertTwoTableEntriesConditionallyAsync()
+        public async Task AzureTableDataManager_CreateAndUpdateTableEntriesAsync()
         {
             StorageEmulatorUtilities.EnsureEmulatorIsNotUsed();
 
@@ -225,7 +225,7 @@ namespace Tester.AzureUtils
             var data2 = GenerateNewData();
             try
             {
-                await manager.InsertTwoTableEntriesConditionallyAsync(data1, data2, AzureTableUtils.ANY_ETAG);
+                await manager.CreateAndUpdateTableEntriesAsync(data1, (data2, AzureTableUtils.ANY_ETAG));
             }
             catch (RequestFailedException exc)
             {
@@ -238,10 +238,12 @@ namespace Tester.AzureUtils
             }
 
             string etag = await manager.CreateTableEntryAsync(data2.Clone());
-            var tuple = await manager.InsertTwoTableEntriesConditionallyAsync(data1, data2, etag);
+            var result = await manager.CreateAndUpdateTableEntriesAsync(data1, (data2, etag));
             try
             {
-                await manager.InsertTwoTableEntriesConditionallyAsync(data1.Clone(), data2.Clone(), tuple.Item2);
+                await manager.CreateAndUpdateTableEntriesAsync(
+                    data1.Clone(),
+                    (data2.Clone(), result.UpdatedEntryETag));
                 Assert.Fail("Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
@@ -256,7 +258,9 @@ namespace Tester.AzureUtils
 
             try
             {
-                await manager.InsertTwoTableEntriesConditionallyAsync(data1.Clone(), data2.Clone(), AzureTableUtils.ANY_ETAG);
+                await manager.CreateAndUpdateTableEntriesAsync(
+                    data1.Clone(),
+                    (data2.Clone(), AzureTableUtils.ANY_ETAG));
                 Assert.Fail("Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
@@ -271,7 +275,7 @@ namespace Tester.AzureUtils
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task AzureTableDataManager_UpdateTwoTableEntriesConditionallyAsync()
+        public async Task AzureTableDataManager_UpdateTableEntriesAsync()
         {
             StorageEmulatorUtilities.EnsureEmulatorIsNotUsed();
 
@@ -279,7 +283,9 @@ namespace Tester.AzureUtils
             var data2 = GenerateNewData();
             try
             {
-                await manager.UpdateTwoTableEntriesConditionallyAsync(data1, AzureTableUtils.ANY_ETAG, data2, AzureTableUtils.ANY_ETAG);
+                await manager.UpdateTableEntriesAsync(
+                    (data1, AzureTableUtils.ANY_ETAG),
+                    (data2, AzureTableUtils.ANY_ETAG));
                 Assert.Fail("Update should have failed since the data has not been created yet");
             }
             catch (RequestFailedException exc)
@@ -293,12 +299,16 @@ namespace Tester.AzureUtils
             }
 
             string etag = await manager.CreateTableEntryAsync(data2.Clone());
-            var tuple1 = await manager.InsertTwoTableEntriesConditionallyAsync(data1, data2, etag);
-            _ = await manager.UpdateTwoTableEntriesConditionallyAsync(data1, tuple1.Item1, data2, tuple1.Item2);
+            var createResult = await manager.CreateAndUpdateTableEntriesAsync(data1, (data2, etag));
+            _ = await manager.UpdateTableEntriesAsync(
+                (data1, createResult.CreatedEntryETag),
+                (data2, createResult.UpdatedEntryETag));
 
             try
             {
-                await manager.UpdateTwoTableEntriesConditionallyAsync(data1, tuple1.Item1, data2, tuple1.Item2);
+                await manager.UpdateTableEntriesAsync(
+                    (data1, createResult.CreatedEntryETag),
+                    (data2, createResult.UpdatedEntryETag));
                 Assert.Fail("Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)

@@ -30,15 +30,21 @@ namespace Orleans.AzureUtils
 
         public string? StartTime       { get; set; }          // Time this silo was started. For diagnostics.
         public string? IAmAliveTime    { get; set; }           // Time this silo updated it was alive. For diagnostics.
-        public string? MembershipVersion      { get; set; }               // Special version row (for serializing table updates). // We'll have a designated row with only MembershipVersion column.
+        public string? MembershipVersion { get; set; }
 
         public string PartitionKey { get; set; } = null!;
         public string RowKey { get; set; } = null!;
         public DateTimeOffset? Timestamp { get; set; }
         public ETag ETag { get; set; }
 
-        internal const string TABLE_VERSION_ROW = "VersionRow"; // Row key for version row.
+        internal const string TABLE_VERSION_ROW = "VersionRow";
+        // Azure Table queries sort by RowKey. These values sort around every IPv4 and IPv6 address string.
+        internal const string TABLE_VERSION_ROW_MIN = "!Start";
+        internal const string TABLE_VERSION_ROW_MAX = "~End";
         internal const char Seperator = '-';
+
+        internal static bool IsVersionRow(string rowKey)
+            => rowKey is TABLE_VERSION_ROW or TABLE_VERSION_ROW_MIN or TABLE_VERSION_ROW_MAX;
 
         public static string ConstructRowKey(SiloAddress silo)
         {
@@ -82,9 +88,9 @@ namespace Orleans.AzureUtils
         public override string ToString()
         {
             var sb = new StringBuilder();
-            if (RowKey.Equals(TABLE_VERSION_ROW))
+            if (IsVersionRow(RowKey))
             {
-                sb.Append("VersionRow [").Append(DeploymentId);
+                sb.Append("VersionRow [").Append(RowKey);
                 sb.Append(" Deployment=").Append(DeploymentId);
                 sb.Append(" MembershipVersion=").Append(MembershipVersion);
                 sb.Append("]");
