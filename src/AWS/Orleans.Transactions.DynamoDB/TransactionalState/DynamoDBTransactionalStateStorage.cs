@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Amazon.DynamoDBv2.Model;
 using Microsoft.Extensions.Logging;
@@ -42,6 +41,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
     // Caches loaded data for this storage instance
     private KeyEntity key = null!;
     private List<KeyValuePair<long, StateEntity>> states = null!;
+    private bool requiresReload;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DynamoDBTransactionalStateStorage{TState}"/> class.
@@ -69,6 +69,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
             if (string.IsNullOrEmpty(key.ETag.ToString()))
             {
                 LogDebugLoadedV0Fresh(this.partitionKey);
+                this.requiresReload = false;
 
                 // first time load
                 return new TransactionalStorageLoadResponse<TState>();
@@ -128,6 +129,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
             var metadata = this.key.Metadata is { Length: > 0 }
                 ? this.ConvertFromStorageFormat<TransactionalStateMetaData>(this.key.Metadata)
                 : new TransactionalStateMetaData();
+            this.requiresReload = false;
             return new TransactionalStorageLoadResponse<TState>(this.key.ETag.ToString(), committedState, this.key.CommittedSequenceId, metadata, PrepareRecordsToRecover);
         }
         catch (Exception ex)
@@ -140,6 +142,11 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
     /// <inheritdoc />
     public async Task<string> Store(string? expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>>? statesToPrepare, long? commitUpTo, long? abortAfter)
     {
+        if (this.requiresReload)
+        {
+            throw new InvalidOperationException("Load must be called after a failed Store before this storage instance can be reused.");
+        }
+
         var batchOperation = new BatchOperation(this.storage, this.tableName, this.key, this.logger);
         var keyWasNew = !this.key.ETag.HasValue;
 
@@ -158,6 +165,10 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                 ? commitUpTo.Value
                 : key.CommittedSequenceId;
             this.ValidateKeyItemSize(serializedMetadata, timestamp, committedSequenceId);
+
+            // Store mutates the cached entities while constructing the transaction. If any operation
+            // fails, Load must restore the cache before this instance can be used again.
+            this.requiresReload = true;
 
             // assemble all storage operations into a single batch
             // these operations must commit in sequence, but not necessarily atomically
@@ -294,8 +305,13 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
 
             await batchOperation.Flush().ConfigureAwait(false);
 
+            this.requiresReload = false;
             LogDebugStoredETag(this.partitionKey, this.key.CommittedSequenceId, this.key.ETag);
             return key.ETag!.Value.ToString();
+        }
+        catch (InconsistentStateException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -394,15 +410,10 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
         }
         catch (Exception exc)
         {
-            var sb = new StringBuilder();
-            sb.AppendFormat("Unable to convert from storage format GrainStateEntity.Data={0}", entity.State);
+            var message = dataValue is not null
+                ? $"Unable to convert from storage format GrainStateEntity.Data={entity.State}Data Value={dataValue} Type={dataValue.GetType()}"
+                : $"Unable to convert from storage format GrainStateEntity.Data={entity.State}";
 
-            if (dataValue is not null)
-            {
-                sb.Append($"Data Value={dataValue} Type={dataValue.GetType()}");
-            }
-
-            var message = sb.ToString();
             LogError(logger, message);
             throw new AggregateException(message, exc);
         }
@@ -575,8 +586,10 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
             catch (TransactionCanceledException exception) when (IsStorageConflict(exception))
             {
                 LogFailures();
+                var conflictMessage = GetConflictMessage(exception, keyPut);
+                LogWarningTransactionalStateConflict(logger, conflictMessage);
                 throw new InconsistentStateException(
-                    "DynamoDB transactional state storage conflict.",
+                    conflictMessage,
                     storedEtag: "Unknown",
                     currentEtag: currentETag?.ToString() ?? "null",
                     exception);
@@ -602,6 +615,55 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
             }
 
             LogTraceBatchOpFailed(logger, key.PartitionKey, key.RowKey, this.operations.Count);
+        }
+
+        private string GetConflictMessage(TransactionCanceledException exception, Put keyPut)
+        {
+            var operations = new string[this.operations.Count + 1];
+
+            for (var index = 0; index < this.operations.Count; index++)
+            {
+                operations[index] = FormatOperationDiagnostic(
+                    index,
+                    this.operations[index].Item,
+                    this.operations[index].RowKey,
+                    "Data",
+                    exception);
+            }
+
+            operations[^1] = FormatOperationDiagnostic(
+                this.operations.Count,
+                new TransactWriteItem { Put = keyPut },
+                key.RowKey,
+                "KeySynchronizer",
+                exception);
+            return $"DynamoDB transactional state storage conflict. PartitionKey={key.PartitionKey}. {string.Join(' ', operations)}";
+        }
+
+        private static string FormatOperationDiagnostic(
+            int index,
+            TransactWriteItem operation,
+            string rowKey,
+            string role,
+            TransactionCanceledException exception)
+        {
+            var (operationType, conditionExpression, expressionAttributeValues) = operation.Put is { } put
+                ? ("Put", put.ConditionExpression, put.ExpressionAttributeValues)
+                : ("Delete", operation.Delete?.ConditionExpression, operation.Delete?.ExpressionAttributeValues);
+            var reason = exception.CancellationReasons is { Count: > 0 } reasons && index < reasons.Count
+                ? reasons[index]
+                : null;
+            var condition = string.IsNullOrEmpty(conditionExpression)
+                ? string.Empty
+                : $" Condition={conditionExpression}";
+            var expectedETag = expressionAttributeValues?.TryGetValue(
+                DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS,
+                out var value) is true
+                    ? $" ExpectedETag={value.N}"
+                    : string.Empty;
+            return $"TransactWriteItems[{index}] Operation={operationType} Role={role} RowKey={rowKey}"
+                + $"{condition}{expectedETag} CancellationReasonCode={reason?.Code ?? "Unavailable"}"
+                + $" CancellationReasonMessage={reason?.Message ?? "Unavailable"}.";
         }
 
         private static bool IsStorageConflict(TransactionCanceledException exception)
@@ -702,6 +764,12 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
         Message = "{PartitionKey}.{RowKey} batch-op failed {BatchCount}"
     )]
     private static partial void LogTraceBatchOpFailed(ILogger logger, string partitionKey, string rowKey, int batchCount);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "{ConflictMessage}"
+    )]
+    private static partial void LogWarningTransactionalStateConflict(ILogger logger, string conflictMessage);
 
     [LoggerMessage(
         Level = LogLevel.Error,
