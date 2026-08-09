@@ -39,8 +39,8 @@ namespace Orleans.AzureUtils
 
         internal const string TABLE_VERSION_ROW = "VersionRow";
         // Azure Table queries sort by RowKey. These values sort around every IPv4 and IPv6 address string.
-        internal const string TABLE_VERSION_ROW_MIN = "!VersionRow";
-        internal const string TABLE_VERSION_ROW_MAX = "~VersionRow";
+        internal const string TABLE_VERSION_ROW_MIN = "!Start";
+        internal const string TABLE_VERSION_ROW_MAX = "~End";
         internal const char Seperator = '-';
 
         internal static bool IsVersionRow(string rowKey)

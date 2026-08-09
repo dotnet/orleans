@@ -642,37 +642,31 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
-        internal async Task<(string, string)> InsertTwoTableEntriesConditionallyAsync(
-            T data1,
-            T data2,
-            string data2Etag,
-            T? additionalEntry1 = null,
-            T? additionalEntry2 = null)
+        internal async Task<(string CreatedEntryETag, string UpdatedEntryETag)> CreateAndUpdateTableEntriesAsync(
+            T entryToCreate,
+            (T Entity, string ETag) entryToUpdate,
+            (T First, T Second)? entriesToUpsert = null)
         {
-            const string operation = "InsertTableEntryConditionally";
-            ArgumentNullException.ThrowIfNull(data2);
-            string? data2Str = data2.ToString();
+            const string operation = "CreateAndUpdateTableEntries";
+            ArgumentNullException.ThrowIfNull(entryToUpdate.Entity);
+            string? entryToUpdateString = entryToUpdate.Entity.ToString();
             var startTime = DateTime.UtcNow;
 
-            LogTraceTableEntries(Logger, operation, data1, data2Str, TableName);
+            LogTraceTableEntries(Logger, operation, entryToCreate, entryToUpdateString, TableName);
             try
             {
                 try
                 {
-                    data2.ETag = new ETag(data2Etag);
-                    var transaction = new List<TableTransactionAction>(4)
+                    entryToUpdate.Entity.ETag = new ETag(entryToUpdate.ETag);
+                    var transaction = new List<TableTransactionAction>(entriesToUpsert.HasValue ? 4 : 2)
                     {
-                        new TableTransactionAction(TableTransactionActionType.Add, data1),
-                        new TableTransactionAction(TableTransactionActionType.UpdateReplace, data2, data2.ETag)
+                        new(TableTransactionActionType.Add, entryToCreate),
+                        new(TableTransactionActionType.UpdateReplace, entryToUpdate.Entity, entryToUpdate.Entity.ETag)
                     };
-                    if (additionalEntry1 is not null)
+                    if (entriesToUpsert is { } upserts)
                     {
-                        transaction.Add(new TableTransactionAction(TableTransactionActionType.UpsertReplace, additionalEntry1));
-                    }
-
-                    if (additionalEntry2 is not null)
-                    {
-                        transaction.Add(new TableTransactionAction(TableTransactionActionType.UpsertReplace, additionalEntry2));
+                        transaction.Add(new TableTransactionAction(TableTransactionActionType.UpsertReplace, upserts.First));
+                        transaction.Add(new TableTransactionAction(TableTransactionActionType.UpsertReplace, upserts.Second));
                     }
 
                     var opResults = await Table.SubmitTransactionAsync(transaction);
@@ -686,7 +680,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 catch (Exception exc)
                 {
-                    CheckAlertWriteError(operation, data1, data2Str, exc);
+                    CheckAlertWriteError(operation, entryToCreate, entryToUpdateString, exc);
                     throw;
                 }
             }
@@ -696,39 +690,38 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
-        internal async Task<(string, string)> UpdateTwoTableEntriesConditionallyAsync(
-            T data1,
-            string data1Etag,
-            T data2,
-            string data2Etag,
-            T? additionalEntry1 = null,
-            T? additionalEntry2 = null)
+        internal async Task<(string FirstEntryETag, string SecondEntryETag)> UpdateTableEntriesAsync(
+            (T Entity, string ETag) firstEntry,
+            (T Entity, string ETag) secondEntry,
+            (T First, T Second)? entriesToUpsert = null)
         {
-            const string operation = "UpdateTableEntryConditionally";
-            ArgumentNullException.ThrowIfNull(data2);
-            string? data2Str = data2.ToString();
+            const string operation = "UpdateTableEntries";
+            ArgumentNullException.ThrowIfNull(firstEntry.Entity);
+            ArgumentNullException.ThrowIfNull(secondEntry.Entity);
+            string? secondEntryString = secondEntry.Entity.ToString();
             var startTime = DateTime.UtcNow;
-            LogTraceTableEntries(Logger, operation, data1, data2Str, TableName);
+            LogTraceTableEntries(Logger, operation, firstEntry.Entity, secondEntryString, TableName);
 
             try
             {
                 try
                 {
-                    data1.ETag = new ETag(data1Etag);
-                    var entityBatch = new List<TableTransactionAction>(4);
-                    entityBatch.Add(new TableTransactionAction(TableTransactionActionType.UpdateReplace, data1, data1.ETag));
-
-                    data2.ETag = new ETag(data2Etag);
-                    entityBatch.Add(new TableTransactionAction(TableTransactionActionType.UpdateReplace, data2, data2.ETag));
-
-                    if (additionalEntry1 is not null)
+                    firstEntry.Entity.ETag = new ETag(firstEntry.ETag);
+                    var entityBatch = new List<TableTransactionAction>(entriesToUpsert.HasValue ? 4 : 2)
                     {
-                        entityBatch.Add(new TableTransactionAction(TableTransactionActionType.UpsertReplace, additionalEntry1));
-                    }
+                        new(TableTransactionActionType.UpdateReplace, firstEntry.Entity, firstEntry.Entity.ETag)
+                    };
 
-                    if (additionalEntry2 is not null)
+                    secondEntry.Entity.ETag = new ETag(secondEntry.ETag);
+                    entityBatch.Add(new TableTransactionAction(
+                        TableTransactionActionType.UpdateReplace,
+                        secondEntry.Entity,
+                        secondEntry.Entity.ETag));
+
+                    if (entriesToUpsert is { } upserts)
                     {
-                        entityBatch.Add(new TableTransactionAction(TableTransactionActionType.UpsertReplace, additionalEntry2));
+                        entityBatch.Add(new TableTransactionAction(TableTransactionActionType.UpsertReplace, upserts.First));
+                        entityBatch.Add(new TableTransactionAction(TableTransactionActionType.UpsertReplace, upserts.Second));
                     }
 
                     var opResults = await Table.SubmitTransactionAsync(entityBatch);
@@ -742,7 +735,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 catch (Exception exc)
                 {
-                    CheckAlertWriteError(operation, data1, data2Str, exc);
+                    CheckAlertWriteError(operation, firstEntry.Entity, secondEntryString, exc);
                     throw;
                 }
             }

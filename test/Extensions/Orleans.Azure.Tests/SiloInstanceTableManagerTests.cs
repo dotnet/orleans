@@ -147,8 +147,6 @@ namespace Tester.AzureUtils
             Assert.Equal("0", after.Entity?.MembershipVersion);
             Assert.Equal(SiloInstanceTableTestConstants.INSTANCE_STATUS_ACTIVE, before.Entity?.Status);
             Assert.Equal(SiloInstanceTableTestConstants.INSTANCE_STATUS_ACTIVE, after.Entity?.Status);
-            Assert.Equal("0", before.Entity?.ProxyPort);
-            Assert.Equal("0", after.Entity?.ProxyPort);
         }
 
         [SkippableFact, TestCategory("Functional")]

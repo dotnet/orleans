@@ -100,12 +100,9 @@ namespace Orleans.AzureUtils
             var min = CreateTableVersionEntry(SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN, membershipVersion);
             var max = CreateTableVersionEntry(SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX, membershipVersion);
 
-            // Prevent older cleanup agents from treating boundary rows as defunct silo entries
-            // while ensuring that gateway discovery does not treat them as gateways.
+            // Prevent older cleanup agents from treating boundary rows as defunct silo entries.
             min.Status = INSTANCE_STATUS_ACTIVE;
-            min.ProxyPort = "0";
             max.Status = INSTANCE_STATUS_ACTIVE;
-            max.ProxyPort = "0";
             return (min, max);
         }
 
@@ -456,12 +453,10 @@ namespace Orleans.AzureUtils
             try
             {
                 var boundaryEntries = CreateBoundaryVersionEntries(tableVersionEntry);
-                await storage.InsertTwoTableEntriesConditionallyAsync(
+                await storage.CreateAndUpdateTableEntriesAsync(
                     siloEntry,
-                    tableVersionEntry,
-                    tableVersionEtag,
-                    boundaryEntries.Min,
-                    boundaryEntries.Max);
+                    (tableVersionEntry, tableVersionEtag),
+                    (boundaryEntries.Min, boundaryEntries.Max));
                 return true;
             }
             catch (Exception exc)
@@ -488,13 +483,10 @@ namespace Orleans.AzureUtils
             try
             {
                 var boundaryEntries = CreateBoundaryVersionEntries(tableVersionEntry);
-                await storage.UpdateTwoTableEntriesConditionallyAsync(
-                    siloEntry,
-                    entryEtag,
-                    tableVersionEntry,
-                    versionEtag,
-                    boundaryEntries.Min,
-                    boundaryEntries.Max);
+                await storage.UpdateTableEntriesAsync(
+                    (siloEntry, entryEtag),
+                    (tableVersionEntry, versionEtag),
+                    (boundaryEntries.Min, boundaryEntries.Max));
                 return true;
             }
             catch (Exception exc)
