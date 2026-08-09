@@ -273,57 +273,59 @@ namespace Orleans.AzureUtils
         internal async Task<List<(SiloInstanceTableEntry Entity, string ETag)>> FindAllSiloEntries(
             CancellationToken cancellationToken = default)
         {
-            string? beforeVersion = null;
-            string? afterVersion = null;
-            for (var attempt = 0; attempt < MaxMembershipSnapshotAttempts; attempt++)
+            for (var attempt = 1; ; attempt++)
             {
                 var query = await membershipTableReadStorage.ReadAllTableEntriesForPartitionAsync(DeploymentId, cancellationToken);
                 var tableVersion = ValidateAllSiloEntries(query.Entries);
-                if (!query.IsPaginated)
-                {
-                    return RemoveBoundaryVersionRows(query.Entries);
-                }
-
-                var first = query.Entries[0].Entity;
-                var last = query.Entries[^1].Entity;
-                beforeVersion = first.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN
-                    ? first.MembershipVersion
-                    : null;
-                afterVersion = last.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX
-                    ? last.MembershipVersion
-                    : null;
-                if (CanAcceptSnapshot(tableVersion, beforeVersion, afterVersion))
+                if (CanAcceptSnapshot(query, tableVersion, attempt))
                 {
                     return RemoveBoundaryVersionRows(query.Entries);
                 }
             }
-
-            throw new InconsistentStateException(
-                $"Unable to read a consistent membership snapshot for cluster '{DeploymentId}' from table '{TableName}' after {MaxMembershipSnapshotAttempts} attempts.",
-                beforeVersion,
-                afterVersion);
         }
 
-        private static bool CanAcceptSnapshot(
+        private bool CanAcceptSnapshot(
+            MembershipTableQueryResult query,
             string? tableVersion,
-            string? beforeVersion,
-            string? afterVersion)
+            int attempt)
         {
+            if (!query.IsPaginated)
+            {
+                return true;
+            }
+
             // Boundary-aware membership updates write both rows in the same transaction. Matching
             // values prove that none committed while the paginated query was being read.
+            var first = query.Entries[0].Entity;
+            var last = query.Entries[^1].Entity;
+            var beforeVersion = first.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN
+                ? first.MembershipVersion
+                : null;
+            var afterVersion = last.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX
+                ? last.MembershipVersion
+                : null;
             if (beforeVersion is null && afterVersion is null)
             {
                 return true;
             }
 
-            if (beforeVersion is null
-                || afterVersion is null)
+            if (beforeVersion is not null
+                && afterVersion is not null
+                && (string.Equals(beforeVersion, afterVersion, StringComparison.Ordinal)
+                    || IsLegacyTableVersionAhead(tableVersion, beforeVersion, afterVersion)))
             {
-                return false;
+                return true;
             }
 
-            return string.Equals(beforeVersion, afterVersion, StringComparison.Ordinal)
-                || IsLegacyTableVersionAhead(tableVersion, beforeVersion, afterVersion);
+            if (attempt >= MaxMembershipSnapshotAttempts)
+            {
+                throw new InconsistentStateException(
+                    $"Unable to read a consistent membership snapshot for cluster '{DeploymentId}' from table '{TableName}' after {MaxMembershipSnapshotAttempts} attempts.",
+                    beforeVersion,
+                    afterVersion);
+            }
+
+            return false;
         }
 
         private static bool IsLegacyTableVersionAhead(
