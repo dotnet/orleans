@@ -119,6 +119,14 @@ namespace Tester.AzureUtils
             var entries = await manager.FindAllSiloEntries();
             Assert.Equal(5, entries.Count);
             Assert.All(entries, e => Assert.NotEqual(SiloInstanceTableTestConstants.INSTANCE_STATUS_DEAD, e.Item1.Status));
+            var before = await manager.ReadSingleTableEntryAsync(
+                clusterId,
+                SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN);
+            var after = await manager.ReadSingleTableEntryAsync(
+                clusterId,
+                SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX);
+            Assert.NotNull(before.Entity);
+            Assert.NotNull(after.Entity);
         }
 
 
@@ -137,6 +145,10 @@ namespace Tester.AzureUtils
                 SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX);
             Assert.Equal("0", before.Entity?.MembershipVersion);
             Assert.Equal("0", after.Entity?.MembershipVersion);
+            Assert.Equal(SiloInstanceTableTestConstants.INSTANCE_STATUS_ACTIVE, before.Entity?.Status);
+            Assert.Equal(SiloInstanceTableTestConstants.INSTANCE_STATUS_ACTIVE, after.Entity?.Status);
+            Assert.Equal("0", before.Entity?.ProxyPort);
+            Assert.Equal("0", after.Entity?.ProxyPort);
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -203,6 +215,7 @@ namespace Tester.AzureUtils
         [SkippableFact, TestCategory("Functional")]
         public async Task SiloInstanceTable_FindAllGatewayProxyEndpoints()
         {
+            await manager.TryCreateTableVersionEntryAsync();
             RegisterSiloInstance();
 
             var gateways = await manager.FindAllGatewayProxyEndpoints();

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Net;
@@ -98,9 +97,16 @@ namespace Orleans.AzureUtils
         {
             var membershipVersion = tableVersionEntry.MembershipVersion
                 ?? throw new ArgumentException("The table version entry must have a membership version.", nameof(tableVersionEntry));
-            return (
-                CreateTableVersionEntry(SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN, membershipVersion),
-                CreateTableVersionEntry(SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX, membershipVersion));
+            var min = CreateTableVersionEntry(SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN, membershipVersion);
+            var max = CreateTableVersionEntry(SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX, membershipVersion);
+
+            // Prevent older cleanup agents from treating boundary rows as defunct silo entries
+            // while ensuring that gateway discovery does not treat them as gateways.
+            min.Status = INSTANCE_STATUS_ACTIVE;
+            min.ProxyPort = "0";
+            max.Status = INSTANCE_STATUS_ACTIVE;
+            max.ProxyPort = "0";
+            return (min, max);
         }
 
         public void RegisterSiloInstance(SiloInstanceTableEntry entry)
@@ -219,6 +225,7 @@ namespace Orleans.AzureUtils
                     && entry.Item1.Timestamp < beforeDate)
                 .ToList();
 
+            // Defunct-row cleanup intentionally does not advance the membership snapshot fence.
             await DeleteEntriesBatch(entriesList);
         }
 
@@ -248,7 +255,15 @@ namespace Orleans.AzureUtils
             if (queryResults.Count < 1 || queryResults.Count > 2)
                 throw new KeyNotFoundException(string.Format("Could not find table version row or found too many entries. Was looking for key {0}, found = {1}", siloAddress, Utils.EnumerableToString(queryResults)));
 
-            int numTableVersionRows = queryResults.Count(tuple => tuple.Item1.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW);
+            var numTableVersionRows = 0;
+            foreach (var entry in queryResults)
+            {
+                if (entry.Item1.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW)
+                {
+                    numTableVersionRows++;
+                }
+            }
+
             if (numTableVersionRows < 1)
                 throw new KeyNotFoundException(string.Format("Did not read table version row. Read = {0}", Utils.EnumerableToString(queryResults)));
 
@@ -268,9 +283,9 @@ namespace Orleans.AzureUtils
                 return RemoveBoundaryVersionRows(initialRead.Entries);
             }
 
-            if (TryAcceptBoundaryFencedSnapshot(initialRead.Entries, out var accepted, out var beforeVersion, out var afterVersion))
+            if (TryAcceptBoundaryFencedSnapshot(initialRead.Entries, out var beforeVersion, out var afterVersion))
             {
-                return accepted;
+                return initialRead.Entries;
             }
 
             if (HasNoBoundaryVersionRows(initialRead.Entries))
@@ -288,9 +303,9 @@ namespace Orleans.AzureUtils
                     return RemoveBoundaryVersionRows(query.Entries);
                 }
 
-                if (TryAcceptBoundaryFencedSnapshot(query.Entries, out accepted, out beforeVersion, out afterVersion))
+                if (TryAcceptBoundaryFencedSnapshot(query.Entries, out beforeVersion, out afterVersion))
                 {
-                    return accepted;
+                    return query.Entries;
                 }
 
                 if (HasNoBoundaryVersionRows(query.Entries))
@@ -308,58 +323,97 @@ namespace Orleans.AzureUtils
 
         private static bool TryAcceptBoundaryFencedSnapshot(
             List<(SiloInstanceTableEntry Entity, string ETag)> queryResults,
-            [NotNullWhen(true)] out List<(SiloInstanceTableEntry Entity, string ETag)>? accepted,
             out string? beforeVersion,
             out string? afterVersion)
         {
-            accepted = null;
-            ValidateAllSiloEntries(queryResults);
+            var tableVersion = ValidateAllSiloEntries(queryResults);
 
             // Boundary-aware membership updates write both rows in the same transaction. Matching
             // values prove that none committed while the paginated query was being read.
-            var beforeRows = queryResults
-                .Where(tuple => tuple.Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN)
-                .ToList();
-            var afterRows = queryResults
-                .Where(tuple => tuple.Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX)
-                .ToList();
-
-            beforeVersion = beforeRows.Count == 1 ? beforeRows[0].Entity.MembershipVersion : null;
-            afterVersion = afterRows.Count == 1 ? afterRows[0].Entity.MembershipVersion : null;
-            if (beforeRows.Count != 1
-                || afterRows.Count != 1
-                || beforeVersion is null
-                || !string.Equals(beforeVersion, afterVersion, StringComparison.Ordinal))
+            var first = queryResults[0].Entity;
+            var last = queryResults[^1].Entity;
+            beforeVersion = first.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN
+                ? first.MembershipVersion
+                : null;
+            afterVersion = last.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX
+                ? last.MembershipVersion
+                : null;
+            if (beforeVersion is null
+                || afterVersion is null)
             {
                 return false;
             }
 
-            accepted = RemoveBoundaryVersionRows(queryResults);
+            if (!string.Equals(beforeVersion, afterVersion, StringComparison.Ordinal)
+                && !IsLegacyTableVersionAhead(tableVersion, beforeVersion, afterVersion))
+            {
+                return false;
+            }
+
+            RemoveBoundaryVersionRows(queryResults);
             return true;
+        }
+
+        private static bool IsLegacyTableVersionAhead(
+            string? tableVersion,
+            string beforeVersion,
+            string afterVersion)
+        {
+            // Older silos only advance VersionRow. During a rolling upgrade, prefer availability
+            // over snapshot consistency when that row proves that the boundary fence is stale.
+            return int.TryParse(tableVersion, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedTableVersion)
+                && int.TryParse(beforeVersion, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedBeforeVersion)
+                && int.TryParse(afterVersion, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedAfterVersion)
+                && parsedTableVersion > parsedBeforeVersion
+                && parsedTableVersion > parsedAfterVersion;
         }
 
         private static List<(SiloInstanceTableEntry Entity, string ETag)> RemoveBoundaryVersionRows(
             List<(SiloInstanceTableEntry Entity, string ETag)> queryResults)
-            => queryResults
-                .Where(tuple => tuple.Entity.RowKey is not (
-                    SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN or SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX))
-                .ToList();
+        {
+            if (queryResults.Count > 0
+                && queryResults[^1].Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX)
+            {
+                queryResults.RemoveAt(queryResults.Count - 1);
+            }
+
+            if (queryResults.Count > 0
+                && queryResults[0].Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN)
+            {
+                queryResults.RemoveAt(0);
+            }
+
+            return queryResults;
+        }
 
         private static bool HasNoBoundaryVersionRows(List<(SiloInstanceTableEntry Entity, string ETag)> queryResults)
-            => queryResults.All(tuple => tuple.Entity.RowKey is not (
-                SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN or SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX));
+        {
+            return queryResults[0].Entity.RowKey != SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN
+                && queryResults[^1].Entity.RowKey != SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX;
+        }
 
-        private static void ValidateAllSiloEntries(List<(SiloInstanceTableEntry Entity, string ETag)> queryResults)
+        private static string? ValidateAllSiloEntries(List<(SiloInstanceTableEntry Entity, string ETag)> queryResults)
         {
             if (queryResults.Count < 1)
                 throw new KeyNotFoundException(string.Format("Could not find enough rows in the FindAllSiloEntries call. Found = {0}", Utils.EnumerableToString(queryResults)));
 
-            int numTableVersionRows = queryResults.Count(tuple => tuple.Item1.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW);
+            var numTableVersionRows = 0;
+            string? tableVersion = null;
+            foreach (var entry in queryResults)
+            {
+                if (entry.Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW)
+                {
+                    numTableVersionRows++;
+                    tableVersion = entry.Entity.MembershipVersion;
+                }
+            }
+
             if (numTableVersionRows < 1)
                 throw new KeyNotFoundException(string.Format("Did not find table version row. Read = {0}", Utils.EnumerableToString(queryResults)));
             if (numTableVersionRows > 1)
                 throw new KeyNotFoundException(string.Format("Read {0} table version rows, while was expecting only 1. Read = {1}", numTableVersionRows, Utils.EnumerableToString(queryResults)));
 
+            return tableVersion;
         }
 
         /// <summary>

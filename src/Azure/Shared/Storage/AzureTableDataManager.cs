@@ -533,6 +533,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 await foreach (var page in Table.QueryAsync<T>(filter, cancellationToken: cancellationToken).AsPages())
                 {
                     pageCount++;
+                    results.EnsureCapacity(results.Count + page.Values.Count);
                     foreach (var value in page.Values)
                     {
                         results.Add((value, value.ETag.ToString()));
@@ -621,9 +622,12 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 try
                 {
-                    var transaction = collection
-                        .Select(entry => new TableTransactionAction(TableTransactionActionType.Add, entry))
-                        .ToList();
+                    var transaction = new List<TableTransactionAction>(collection.Count);
+                    foreach (var entry in collection)
+                    {
+                        transaction.Add(new TableTransactionAction(TableTransactionActionType.Add, entry));
+                    }
+
                     await Table.SubmitTransactionAsync(transaction);
                 }
                 catch (Exception exception)

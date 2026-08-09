@@ -56,6 +56,23 @@ public class AzureMembershipPaginationTests
     }
 
     [Fact]
+    public async Task LegacyVersionAheadAllowsTornReadDuringRollingUpgrade()
+    {
+        var storage = new ScriptedMembershipTableReadStorage();
+        storage.AddQuery(Query(
+            true,
+            BoundaryVersion(SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN, 9, "before-9"),
+            Silo("silo-1", "stale"),
+            Version(11, "legacy-11"),
+            BoundaryVersion(SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX, 10, "after-10")));
+
+        var result = await CreateManager(storage).FindAllSiloEntries();
+
+        Assert.Equal("stale", result.Single(entry => entry.Entity.RowKey == "silo-1").ETag);
+        Assert.Equal(1, storage.QueryCount);
+    }
+
+    [Fact]
     public async Task MultipleWritesDuringReadAreDetected()
     {
         var storage = new ScriptedMembershipTableReadStorage();
@@ -194,12 +211,12 @@ public class AzureMembershipPaginationTests
 
     private sealed class ScriptedMembershipTableReadStorage : IMembershipTableReadStorage
     {
-    private readonly Queue<Func<MembershipTableQueryResult>> queries = new();
-    private readonly List<CancellationToken> cancellationTokens = new();
+        private readonly Queue<Func<MembershipTableQueryResult>> queries = new();
+        private readonly List<CancellationToken> cancellationTokens = new();
 
-    public int QueryCount { get; private set; }
+        public int QueryCount { get; private set; }
 
-    public IReadOnlyList<CancellationToken> CancellationTokens => cancellationTokens;
+        public IReadOnlyList<CancellationToken> CancellationTokens => cancellationTokens;
 
         public void AddQuery(MembershipTableQueryResult result) => AddQuery(() => result);
 

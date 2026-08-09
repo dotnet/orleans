@@ -166,14 +166,18 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                var memEntries = new List<Tuple<MembershipEntry, string>>();
+                var memEntries = new List<Tuple<MembershipEntry, string>>(Math.Max(0, entries.Count - 1));
                 TableVersion? tableVersion = null;
                 foreach (var tuple in entries)
                 {
                     var tableEntry = tuple.Entity;
                     if (tableEntry.RowKey.Equals(SiloInstanceTableEntry.TABLE_VERSION_ROW))
                     {
-                        tableVersion = new TableVersion(int.Parse(tableEntry.MembershipVersion!), tuple.ETag);
+                        var membershipVersion = tableEntry.MembershipVersion
+                            ?? throw new InvalidOperationException("The table version row does not contain a membership version.");
+                        tableVersion = new TableVersion(
+                            int.Parse(membershipVersion, CultureInfo.InvariantCulture),
+                            tuple.ETag);
                     }
                     else if (SiloInstanceTableEntry.IsVersionRow(tableEntry.RowKey))
                     {
@@ -193,7 +197,9 @@ namespace Orleans.Runtime.MembershipService
                         }
                     }
                 }
-                var data = new MembershipTableData(memEntries, tableVersion!);
+                var data = new MembershipTableData(
+                    memEntries,
+                    tableVersion ?? throw new InvalidOperationException("The membership table does not contain a version row."));
                 return data;
             }
             catch (Exception exc)
