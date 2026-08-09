@@ -124,7 +124,7 @@ namespace Orleans.Transactions.State
                 // Now we can remove the commit record.
                 StorageBatch<TState> storageBatch = getStorageBatch();
                 storageBatch.Collect(transactionId);
-                storageBatch.CompletionAction(success =>
+                storageBatch.FollowUpAction(success =>
                 {
                     if (success)
                     {

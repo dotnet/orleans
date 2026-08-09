@@ -49,7 +49,6 @@ public class ConfirmationWorkerTests
             else if (cycle == 2)
             {
                 Assert.Same(restoredBatch, batch);
-                batch.RunFollowUpActions();
                 batch.Complete(success: true);
                 secondAttempt.TrySetResult(null);
             }
@@ -110,7 +109,6 @@ public class ConfirmationWorkerTests
             else if (cycle == 2)
             {
                 Assert.DoesNotContain(transactionId, batch.MetaData.CommitRecords.Keys);
-                batch.RunFollowUpActions();
                 batch.Complete(success: true);
                 secondAttempt.TrySetResult(null);
             }
@@ -140,7 +138,7 @@ public class ConfirmationWorkerTests
     }
 
     [Fact]
-    public void StorageBatch_CompletionRunsExactlyOnce()
+    public void StorageBatch_FollowUpRunsExactlyOnce()
     {
         var transactionId = Guid.NewGuid();
         var timestamp = DateTime.UtcNow;
@@ -148,7 +146,7 @@ public class ConfirmationWorkerTests
         var batch = CreateBatch(transactionId, timestamp, participant, includeCommitRecord: true);
         var callbacks = 0;
 
-        batch.CompletionAction(_ => callbacks++);
+        batch.FollowUpAction(_ => callbacks++);
 
         batch.Complete(success: false);
         batch.Complete(success: false);

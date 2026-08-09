@@ -130,8 +130,13 @@ namespace Orleans.Transactions.State
                                 this.storageBatch.Read(record.Timestamp);
                             }
 
-                            this.storageBatch.FollowUpAction(() =>
+                            this.storageBatch.FollowUpAction(success =>
                             {
+                                if (!success)
+                                {
+                                    return;
+                                }
+
                                 LogTracePersisted(record);
                                 record.PrepareIsPersisted = true;
 
@@ -610,7 +615,6 @@ namespace Orleans.Transactions.State
 
                     if (batchBeingSentToStorage != null)
                     {
-                        batchBeingSentToStorage.RunFollowUpActions();
                         batchBeingSentToStorage.Complete(success: true);
                         batchCompletedSuccessfully = true;
                         storageWorker.Notify();  // we have to re-check for work
@@ -809,8 +813,13 @@ namespace Orleans.Transactions.State
                             {
                                 // we must confirm in storage, and then respond to TM so it can collect
                                 this.storageBatch.Confirm(entry.SequenceNumber);
-                                this.storageBatch.FollowUpAction(() =>
+                                this.storageBatch.FollowUpAction(success =>
                                 {
+                                    if (!success)
+                                    {
+                                        return;
+                                    }
+
                                     entry.ConfirmationResponsePromise.TrySetResult(true);
                                     LogTraceConfirmedRemoteCommit(entry.SequenceNumber, entry.TransactionId, new(entry.Timestamp), entry.TransactionManager);
                                 });
@@ -823,8 +832,13 @@ namespace Orleans.Transactions.State
                         {
                             // we are a participant of a read-only transaction. Must store timestamp and then respond.
                             this.storageBatch.Read(entry.Timestamp);
-                            this.storageBatch.FollowUpAction(() =>
+                            this.storageBatch.FollowUpAction(success =>
                             {
+                                if (!success)
+                                {
+                                    return;
+                                }
+
                                 entry.PromiseForTA.TrySetResult(TransactionalStatus.Ok);
                             });
 
@@ -847,8 +861,13 @@ namespace Orleans.Transactions.State
             this.storageBatch.Confirm(entry.SequenceNumber);
 
             // after store, send response back to TA
-            this.storageBatch.FollowUpAction(() =>
+            this.storageBatch.FollowUpAction(success =>
             {
+                if (!success)
+                {
+                    return;
+                }
+
                 LogTraceLocallyCommitted(entry.TransactionId, new(entry.Timestamp));
                 entry.PromiseForTA.TrySetResult(TransactionalStatus.Ok);
             });
@@ -856,8 +875,13 @@ namespace Orleans.Transactions.State
             if (entry.WriteParticipants.Count > 1)
             {
                 // after committing, we need to run a task to confirm and collect
-                this.storageBatch.FollowUpAction(() =>
+                this.storageBatch.FollowUpAction(success =>
                 {
+                    if (!success)
+                    {
+                        return;
+                    }
+
                     LogTraceAddingConfirmationToWorker(entry.TransactionId, new(entry.Timestamp));
                     this.confirmationWorker.Add(entry.TransactionId, entry.Timestamp, entry.WriteParticipants);
                 });

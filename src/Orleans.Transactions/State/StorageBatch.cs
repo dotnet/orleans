@@ -40,9 +40,8 @@ namespace Orleans.Transactions
         // prepare records
         private readonly SortedDictionary<long, PendingTransactionState<TState>> prepares;
 
-        // follow-up actions, to be executed after storing this batch
-        private readonly List<Action> followUpActions;
-        private readonly List<Action<bool>> completionActions;
+        // follow-up actions, to be executed when this batch completes
+        private readonly List<Action<bool>> followUpActions;
         private readonly List<Func<Task<bool>>> storeConditions;
         private int completionInvoked;
         
@@ -75,8 +74,7 @@ namespace Orleans.Transactions
             this.confirmUpTo = confirmUpTo;
             this.cancelAbove = cancelAbove;
             this.cancelAboveStart = cancelAbove;
-            this.followUpActions = new List<Action>();
-            this.completionActions = new List<Action<bool>>();
+            this.followUpActions = new List<Action<bool>>();
             this.storeConditions = new List<Func<Task<bool>>>();
             this.prepares = new SortedDictionary<long, PendingTransactionState<TState>>();
         }
@@ -99,14 +97,6 @@ namespace Orleans.Transactions
                 (cancelAbove < cancelAboveStart) ? cancelAbove : (long?)null);
         }
 
-        public void RunFollowUpActions()
-        {
-            foreach (var action in followUpActions)
-            {
-                action();
-            }
-        }
-
         public void Complete(bool success)
         {
             if (Interlocked.Exchange(ref this.completionInvoked, 1) != 0)
@@ -114,7 +104,7 @@ namespace Orleans.Transactions
                 return;
             }
 
-            foreach (var action in completionActions)
+            foreach (var action in followUpActions)
             {
                 action(success);
             }
@@ -211,14 +201,9 @@ namespace Orleans.Transactions
             MetaData.CommitRecords.Remove(transactionId);
         }
 
-        public void FollowUpAction(Action action)
+        public void FollowUpAction(Action<bool> action)
         {
             followUpActions.Add(action);
-        }
-
-        public void CompletionAction(Action<bool> action)
-        {
-            completionActions.Add(action);
         }
 
         public void AddStorePreCondition(Func<Task<bool>> action)

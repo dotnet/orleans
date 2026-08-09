@@ -195,7 +195,7 @@ public class TransactionQueueStorageWorkTests
         Assert.NotSame(initialBatch, replacementBatch);
 
         var replacementCompleted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        replacementBatch.CompletionAction(success => replacementCompleted.TrySetResult(success));
+        replacementBatch.FollowUpAction(success => replacementCompleted.TrySetResult(success));
 
         queue.AddConfirmation(transactionId, timestamp, new List<ParticipantId> { participant });
 
@@ -217,7 +217,7 @@ public class TransactionQueueStorageWorkTests
         Assert.Equal("restored-etag", restoredBatch.ETag);
 
         var restoredCompleted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        restoredBatch.CompletionAction(success => restoredCompleted.TrySetResult(success));
+        restoredBatch.FollowUpAction(success => restoredCompleted.TrySetResult(success));
 
         await timerManager.WaitForDelayAsync();
         timerManager.ReleaseNextDelay();
@@ -268,7 +268,7 @@ public class TransactionQueueStorageWorkTests
         Assert.NotSame(initialBatch, replacementBatch);
 
         var replacementCompleted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        replacementBatch.CompletionAction(success => replacementCompleted.TrySetResult(success));
+        replacementBatch.FollowUpAction(success => replacementCompleted.TrySetResult(success));
 
         failFirstStore.TrySetResult(null);
         await firstRestoreStarted.Task;
