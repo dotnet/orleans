@@ -175,6 +175,10 @@ namespace Orleans.Runtime.MembershipService
                     {
                         tableVersion = new TableVersion(int.Parse(tableEntry.MembershipVersion!), tuple.ETag);
                     }
+                    else if (SiloInstanceTableEntry.IsVersionRow(tableEntry.RowKey))
+                    {
+                        continue;
+                    }
                     else
                     {
                         try

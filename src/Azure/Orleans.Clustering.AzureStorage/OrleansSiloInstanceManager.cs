@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
@@ -75,13 +77,30 @@ namespace Orleans.AzureUtils
 
         public SiloInstanceTableEntry CreateTableVersionEntry(int tableVersion)
         {
-            return new SiloInstanceTableEntry
+            return CreateTableVersionEntry(
+                SiloInstanceTableEntry.TABLE_VERSION_ROW,
+                tableVersion.ToString(CultureInfo.InvariantCulture));
+        }
+
+        private SiloInstanceTableEntry CreateTableVersionEntry(string rowKey, string membershipVersion)
+        {
+            return new()
             {
                 DeploymentId = DeploymentId,
                 PartitionKey = DeploymentId,
-                RowKey = SiloInstanceTableEntry.TABLE_VERSION_ROW,
-                MembershipVersion = tableVersion.ToString(CultureInfo.InvariantCulture)
+                RowKey = rowKey,
+                MembershipVersion = membershipVersion
             };
+        }
+
+        private (SiloInstanceTableEntry Min, SiloInstanceTableEntry Max) CreateBoundaryVersionEntries(
+            SiloInstanceTableEntry tableVersionEntry)
+        {
+            var membershipVersion = tableVersionEntry.MembershipVersion
+                ?? throw new ArgumentException("The table version entry must have a membership version.", nameof(tableVersionEntry));
+            return (
+                CreateTableVersionEntry(SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN, membershipVersion),
+                CreateTableVersionEntry(SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX, membershipVersion));
         }
 
         public void RegisterSiloInstance(SiloInstanceTableEntry entry)
@@ -195,7 +214,7 @@ namespace Orleans.AzureUtils
         public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
             var entriesList = (await FindAllSiloEntries())
-                .Where(entry => !string.Equals(SiloInstanceTableEntry.TABLE_VERSION_ROW, entry.Item1.RowKey)
+                .Where(entry => !SiloInstanceTableEntry.IsVersionRow(entry.Entity.RowKey)
                     && entry.Item1.Status != INSTANCE_STATUS_ACTIVE
                     && entry.Item1.Timestamp < beforeDate)
                 .ToList();
@@ -239,79 +258,96 @@ namespace Orleans.AzureUtils
             return queryResults;
         }
 
-        internal async Task<List<(SiloInstanceTableEntry Entity, string ETag)>> FindAllSiloEntries()
+        internal async Task<List<(SiloInstanceTableEntry Entity, string ETag)>> FindAllSiloEntries(
+            CancellationToken cancellationToken = default)
         {
-            var initialRead = await membershipTableReadStorage.ReadAllTableEntriesForPartitionAsync(this.DeploymentId);
+            var initialRead = await membershipTableReadStorage.ReadAllTableEntriesForPartitionAsync(this.DeploymentId, cancellationToken);
             if (!initialRead.IsPaginated)
             {
                 ValidateAllSiloEntries(initialRead.Entries);
-                return initialRead.Entries;
+                return RemoveBoundaryVersionRows(initialRead.Entries);
             }
 
-            string? beforeEtag = null;
-            string? afterEtag = null;
-            for (var attempt = 0; attempt < MaxMembershipSnapshotAttempts; attempt++)
+            if (TryAcceptBoundaryFencedSnapshot(initialRead.Entries, out var accepted, out var beforeVersion, out var afterVersion))
             {
-                var before = await membershipTableReadStorage.ReadTableVersionAsync(
-                    DeploymentId,
-                    SiloInstanceTableEntry.TABLE_VERSION_ROW);
-                beforeEtag = before.ETag;
+                return accepted;
+            }
 
-                var query = await membershipTableReadStorage.ReadAllTableEntriesForPartitionAsync(DeploymentId);
+            if (HasNoBoundaryVersionRows(initialRead.Entries))
+            {
+                ValidateAllSiloEntries(initialRead.Entries);
+                return RemoveBoundaryVersionRows(initialRead.Entries);
+            }
 
-                var after = await membershipTableReadStorage.ReadTableVersionAsync(
-                    DeploymentId,
-                    SiloInstanceTableEntry.TABLE_VERSION_ROW);
-                afterEtag = after.ETag;
+            for (var attempt = 1; attempt < MaxMembershipSnapshotAttempts; attempt++)
+            {
+                var query = await membershipTableReadStorage.ReadAllTableEntriesForPartitionAsync(DeploymentId, cancellationToken);
+                if (!query.IsPaginated)
+                {
+                    ValidateAllSiloEntries(query.Entries);
+                    return RemoveBoundaryVersionRows(query.Entries);
+                }
 
-                if (TryAcceptMembershipSnapshot(before, query.Entries, after, out var accepted))
+                if (TryAcceptBoundaryFencedSnapshot(query.Entries, out accepted, out beforeVersion, out afterVersion))
                 {
                     return accepted;
+                }
+
+                if (HasNoBoundaryVersionRows(query.Entries))
+                {
+                    ValidateAllSiloEntries(query.Entries);
+                    return RemoveBoundaryVersionRows(query.Entries);
                 }
             }
 
             throw new InconsistentStateException(
                 $"Unable to read a consistent membership snapshot for cluster '{DeploymentId}' from table '{TableName}' after {MaxMembershipSnapshotAttempts} attempts.",
-                beforeEtag,
-                afterEtag);
+                beforeVersion,
+                afterVersion);
         }
 
-        private static bool TryAcceptMembershipSnapshot(
-            (SiloInstanceTableEntry? Entity, string? ETag) before,
+        private static bool TryAcceptBoundaryFencedSnapshot(
             List<(SiloInstanceTableEntry Entity, string ETag)> queryResults,
-            (SiloInstanceTableEntry? Entity, string? ETag) after,
-            out List<(SiloInstanceTableEntry Entity, string ETag)> accepted)
+            [NotNullWhen(true)] out List<(SiloInstanceTableEntry Entity, string ETag)>? accepted,
+            out string? beforeVersion,
+            out string? afterVersion)
         {
-            accepted = null!;
-            if (before.Entity is null
-                || after.Entity is null
-                || before.ETag is null
-                || after.ETag is null
-                || !string.Equals(before.ETag, after.ETag, StringComparison.Ordinal)
-                || !string.Equals(before.Entity.MembershipVersion, after.Entity.MembershipVersion, StringComparison.Ordinal))
+            accepted = null;
+            ValidateAllSiloEntries(queryResults);
+
+            // Boundary-aware membership updates write both rows in the same transaction. Matching
+            // values prove that none committed while the paginated query was being read.
+            var beforeRows = queryResults
+                .Where(tuple => tuple.Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN)
+                .ToList();
+            var afterRows = queryResults
+                .Where(tuple => tuple.Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX)
+                .ToList();
+
+            beforeVersion = beforeRows.Count == 1 ? beforeRows[0].Entity.MembershipVersion : null;
+            afterVersion = afterRows.Count == 1 ? afterRows[0].Entity.MembershipVersion : null;
+            if (beforeRows.Count != 1
+                || afterRows.Count != 1
+                || beforeVersion is null
+                || !string.Equals(beforeVersion, afterVersion, StringComparison.Ordinal))
             {
                 return false;
             }
 
-            var versionRows = queryResults
-                .Where(tuple => tuple.Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW)
-                .ToList();
-            if (versionRows.Count != 1
-                || !string.Equals(versionRows[0].ETag, after.ETag, StringComparison.Ordinal)
-                || !string.Equals(versionRows[0].Entity.MembershipVersion, after.Entity.MembershipVersion, StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            // TableVersion fences topology changes, which are written with the silo row in one EGT.
-            // UpdateIAmAlive is intentionally a dirty, version-neutral update and may race this read.
-            accepted = queryResults
-                .Where(tuple => tuple.Entity.RowKey != SiloInstanceTableEntry.TABLE_VERSION_ROW)
-                .Append((after.Entity, after.ETag))
-                .ToList();
-            ValidateAllSiloEntries(accepted);
+            accepted = RemoveBoundaryVersionRows(queryResults);
             return true;
         }
+
+        private static List<(SiloInstanceTableEntry Entity, string ETag)> RemoveBoundaryVersionRows(
+            List<(SiloInstanceTableEntry Entity, string ETag)> queryResults)
+            => queryResults
+                .Where(tuple => tuple.Entity.RowKey is not (
+                    SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN or SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX))
+                .ToList();
+
+        private static bool HasNoBoundaryVersionRows(List<(SiloInstanceTableEntry Entity, string ETag)> queryResults)
+            => queryResults.All(tuple => tuple.Entity.RowKey is not (
+                SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN or SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX));
 
         private static void ValidateAllSiloEntries(List<(SiloInstanceTableEntry Entity, string ETag)> queryResults)
         {
@@ -339,8 +375,9 @@ namespace Orleans.AzureUtils
                     return false;
                 }
 
-                SiloInstanceTableEntry entry = CreateTableVersionEntry(0);
-                await storage.CreateTableEntryAsync(entry);
+                var entry = CreateTableVersionEntry(0);
+                var boundaryEntries = CreateBoundaryVersionEntries(entry);
+                await storage.CreateTableEntriesAsync([entry, boundaryEntries.Min, boundaryEntries.Max]);
                 return true;
             }
             catch (Exception exc)
@@ -364,7 +401,13 @@ namespace Orleans.AzureUtils
         {
             try
             {
-                await storage.InsertTwoTableEntriesConditionallyAsync(siloEntry, tableVersionEntry, tableVersionEtag);
+                var boundaryEntries = CreateBoundaryVersionEntries(tableVersionEntry);
+                await storage.InsertTwoTableEntriesConditionallyAsync(
+                    siloEntry,
+                    tableVersionEntry,
+                    tableVersionEtag,
+                    boundaryEntries.Min,
+                    boundaryEntries.Max);
                 return true;
             }
             catch (Exception exc)
@@ -390,7 +433,14 @@ namespace Orleans.AzureUtils
         {
             try
             {
-                await storage.UpdateTwoTableEntriesConditionallyAsync(siloEntry, entryEtag, tableVersionEntry, versionEtag);
+                var boundaryEntries = CreateBoundaryVersionEntries(tableVersionEntry);
+                await storage.UpdateTwoTableEntriesConditionallyAsync(
+                    siloEntry,
+                    entryEtag,
+                    tableVersionEntry,
+                    versionEtag,
+                    boundaryEntries.Min,
+                    boundaryEntries.Max);
                 return true;
             }
             catch (Exception exc)
@@ -472,21 +522,20 @@ namespace Orleans.AzureUtils
 
     internal interface IMembershipTableReadStorage
     {
-        Task<MembershipTableQueryResult> ReadAllTableEntriesForPartitionAsync(string partitionKey);
-
-        Task<(SiloInstanceTableEntry? Entity, string? ETag)> ReadTableVersionAsync(string partitionKey, string rowKey);
+        Task<MembershipTableQueryResult> ReadAllTableEntriesForPartitionAsync(
+            string partitionKey,
+            CancellationToken cancellationToken = default);
     }
 
     internal sealed class AzureMembershipTableReadStorage(AzureTableDataManager<SiloInstanceTableEntry> storage)
         : IMembershipTableReadStorage
     {
-        public async Task<MembershipTableQueryResult> ReadAllTableEntriesForPartitionAsync(string partitionKey)
+        public async Task<MembershipTableQueryResult> ReadAllTableEntriesForPartitionAsync(
+            string partitionKey,
+            CancellationToken cancellationToken = default)
         {
-            var result = await storage.ReadAllTableEntriesForPartitionWithPaginationAsync(partitionKey);
+            var result = await storage.ReadAllTableEntriesForPartitionWithPaginationAsync(partitionKey, cancellationToken);
             return new(result.Entries, result.IsPaginated);
         }
-
-        public Task<(SiloInstanceTableEntry? Entity, string? ETag)> ReadTableVersionAsync(string partitionKey, string rowKey)
-            => storage.ReadSingleTableEntryAsync(partitionKey, rowKey);
     }
 }

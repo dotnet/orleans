@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure;
 using Azure.Data.Tables;
@@ -371,8 +372,12 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         /// <param name="partitionKey">The partition key for the entry.</param>
         /// <param name="rowKey">The row key for the entry.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Value promise for tuple containing the data entry and its corresponding etag.</returns>
-        public async Task<(T? Entity, string? ETag)> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
+        public async Task<(T? Entity, string? ETag)> ReadSingleTableEntryAsync(
+            string partitionKey,
+            string rowKey,
+            CancellationToken cancellationToken = default)
         {
             const string operation = "ReadSingleTableEntryAsync";
             var startTime = DateTime.UtcNow;
@@ -381,7 +386,10 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 try
                 {
-                    var result = await Table.GetEntityIfExistsAsync<T>(partitionKey, rowKey);
+                    var result = await Table.GetEntityIfExistsAsync<T>(
+                        partitionKey,
+                        rowKey,
+                        cancellationToken: cancellationToken);
                     if (result.HasValue)
                     {
                         //The ETag of data is needed in further operations.
@@ -410,32 +418,40 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// NOTE: This could be an expensive and slow operation for large table partitions!
         /// </summary>
         /// <param name="partitionKey">The key for the partition to be searched.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Enumeration of all entries in the specified table partition.</returns>
-        public Task<List<(T Entity, string ETag)>> ReadAllTableEntriesForPartitionAsync(string partitionKey)
+        public Task<List<(T Entity, string ETag)>> ReadAllTableEntriesForPartitionAsync(
+            string partitionKey,
+            CancellationToken cancellationToken = default)
         {
             string query = TableClient.CreateQueryFilter($"PartitionKey eq {partitionKey}");
-            return ReadTableEntriesAndEtagsAsync(query);
+            return ReadTableEntriesAndEtagsAsync(query, cancellationToken);
         }
 
         /// <summary>
         /// Read all entries in one partition of the storage table, preserving whether the query required multiple pages.
         /// </summary>
         /// <param name="partitionKey">The key for the partition to be searched.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>The entries in the partition and whether more than one response page was required.</returns>
-        public Task<(List<(T Entity, string ETag)> Entries, bool IsPaginated)> ReadAllTableEntriesForPartitionWithPaginationAsync(string partitionKey)
+        public Task<(List<(T Entity, string ETag)> Entries, bool IsPaginated)> ReadAllTableEntriesForPartitionWithPaginationAsync(
+            string partitionKey,
+            CancellationToken cancellationToken = default)
         {
             string query = TableClient.CreateQueryFilter($"PartitionKey eq {partitionKey}");
-            return ReadTableEntriesAndEtagsWithPaginationAsync(query);
+            return ReadTableEntriesAndEtagsWithPaginationAsync(query, cancellationToken);
         }
 
         /// <summary>
         /// Read all entries in the table.
         /// NOTE: This could be a very expensive and slow operation for large tables!
         /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Enumeration of all entries in the table.</returns>
-        public Task<List<(T Entity, string ETag)>> ReadAllTableEntriesAsync()
+        public Task<List<(T Entity, string ETag)>> ReadAllTableEntriesAsync(
+            CancellationToken cancellationToken = default)
         {
-            return ReadTableEntriesAndEtagsAsync(null);
+            return ReadTableEntriesAndEtagsAsync(null, cancellationToken);
         }
 
         /// <summary>
@@ -493,14 +509,19 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// Read data entries and their corresponding eTags from the Azure table.
         /// </summary>
         /// <param name="filter">Filter string to use for querying the table and filtering the results.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Enumeration of entries in the table which match the query condition.</returns>
-        public async Task<List<(T Entity, string ETag)>> ReadTableEntriesAndEtagsAsync(string? filter)
+        public async Task<List<(T Entity, string ETag)>> ReadTableEntriesAndEtagsAsync(
+            string? filter,
+            CancellationToken cancellationToken = default)
         {
-            var result = await ReadTableEntriesAndEtagsWithPaginationAsync(filter);
+            var result = await ReadTableEntriesAndEtagsWithPaginationAsync(filter, cancellationToken);
             return result.Entries;
         }
 
-        private async Task<(List<(T Entity, string ETag)> Entries, bool IsPaginated)> ReadTableEntriesAndEtagsWithPaginationAsync(string? filter)
+        private async Task<(List<(T Entity, string ETag)> Entries, bool IsPaginated)> ReadTableEntriesAndEtagsWithPaginationAsync(
+            string? filter,
+            CancellationToken cancellationToken)
         {
             const string operation = "ReadTableEntriesAndEtags";
             var startTime = DateTime.UtcNow;
@@ -509,7 +530,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 var results = new List<(T, string)>();
                 var pageCount = 0;
-                await foreach (var page in Table.QueryAsync<T>(filter).AsPages())
+                await foreach (var page in Table.QueryAsync<T>(filter, cancellationToken: cancellationToken).AsPages())
                 {
                     pageCount++;
                     foreach (var value in page.Values)
@@ -520,7 +541,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
                 return (results, pageCount > 1);
             }
-            catch (Exception exc)
+            catch (Exception exc) when (exc is not OperationCanceledException)
             {
                 if (!AzureTableUtils.TableStorageDataNotFound(exc))
                 {
@@ -581,10 +602,52 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
-        internal async Task<(string, string)> InsertTwoTableEntriesConditionallyAsync(T data1, T data2, string data2Etag)
+        internal async Task CreateTableEntriesAsync(IReadOnlyCollection<T> collection)
+        {
+            const string operation = "CreateTableEntries";
+            const int maxTransactionSize = 100;
+            ArgumentNullException.ThrowIfNull(collection);
+            if (collection.Count is 0 or > maxTransactionSize)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(collection),
+                    collection.Count,
+                    $"The collection must contain between 1 and {maxTransactionSize} rows.");
+            }
+
+            var startTime = DateTime.UtcNow;
+            LogTraceTableEntriesCount(Logger, operation, collection.Count, TableName);
+            try
+            {
+                try
+                {
+                    var transaction = collection
+                        .Select(entry => new TableTransactionAction(TableTransactionActionType.Add, entry))
+                        .ToList();
+                    await Table.SubmitTransactionAsync(transaction);
+                }
+                catch (Exception exception)
+                {
+                    CheckAlertWriteError(operation, collection, null, exception);
+                    throw;
+                }
+            }
+            finally
+            {
+                CheckAlertSlowAccess(startTime, operation);
+            }
+        }
+
+        internal async Task<(string, string)> InsertTwoTableEntriesConditionallyAsync(
+            T data1,
+            T data2,
+            string data2Etag,
+            T? additionalEntry1 = null,
+            T? additionalEntry2 = null)
         {
             const string operation = "InsertTableEntryConditionally";
-            string? data2Str = data2 == null ? "null" : data2.ToString();
+            ArgumentNullException.ThrowIfNull(data2);
+            string? data2Str = data2.ToString();
             var startTime = DateTime.UtcNow;
 
             LogTraceTableEntries(Logger, operation, data1, data2Str, TableName);
@@ -592,12 +655,23 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 try
                 {
-                    data2!.ETag = new ETag(data2Etag);
-                    var opResults = await Table.SubmitTransactionAsync(new TableTransactionAction[]
+                    data2.ETag = new ETag(data2Etag);
+                    var transaction = new List<TableTransactionAction>(4)
                     {
                         new TableTransactionAction(TableTransactionActionType.Add, data1),
                         new TableTransactionAction(TableTransactionActionType.UpdateReplace, data2, data2.ETag)
-                    });
+                    };
+                    if (additionalEntry1 is not null)
+                    {
+                        transaction.Add(new TableTransactionAction(TableTransactionActionType.UpsertReplace, additionalEntry1));
+                    }
+
+                    if (additionalEntry2 is not null)
+                    {
+                        transaction.Add(new TableTransactionAction(TableTransactionActionType.UpsertReplace, additionalEntry2));
+                    }
+
+                    var opResults = await Table.SubmitTransactionAsync(transaction);
 
                     //The batch results are returned in order of execution,
                     //see reference at https://msdn.microsoft.com/en-us/library/microsoft.windowsazure.storage.table.cloudtable.executebatch.aspx.
@@ -618,10 +692,17 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
-        internal async Task<(string, string)> UpdateTwoTableEntriesConditionallyAsync(T data1, string data1Etag, T? data2, string? data2Etag)
+        internal async Task<(string, string)> UpdateTwoTableEntriesConditionallyAsync(
+            T data1,
+            string data1Etag,
+            T data2,
+            string data2Etag,
+            T? additionalEntry1 = null,
+            T? additionalEntry2 = null)
         {
             const string operation = "UpdateTableEntryConditionally";
-            string? data2Str = data2 == null ? "null" : data2.ToString();
+            ArgumentNullException.ThrowIfNull(data2);
+            string? data2Str = data2.ToString();
             var startTime = DateTime.UtcNow;
             LogTraceTableEntries(Logger, operation, data1, data2Str, TableName);
 
@@ -630,13 +711,20 @@ namespace Orleans.GrainDirectory.AzureStorage
                 try
                 {
                     data1.ETag = new ETag(data1Etag);
-                    var entityBatch = new List<TableTransactionAction>(2);
+                    var entityBatch = new List<TableTransactionAction>(4);
                     entityBatch.Add(new TableTransactionAction(TableTransactionActionType.UpdateReplace, data1, data1.ETag));
 
-                    if (data2 != null && data2Etag != null)
+                    data2.ETag = new ETag(data2Etag);
+                    entityBatch.Add(new TableTransactionAction(TableTransactionActionType.UpdateReplace, data2, data2.ETag));
+
+                    if (additionalEntry1 is not null)
                     {
-                        data2.ETag = new ETag(data2Etag);
-                        entityBatch.Add(new TableTransactionAction(TableTransactionActionType.UpdateReplace, data2, data2.ETag));
+                        entityBatch.Add(new TableTransactionAction(TableTransactionActionType.UpsertReplace, additionalEntry1));
+                    }
+
+                    if (additionalEntry2 is not null)
+                    {
+                        entityBatch.Add(new TableTransactionAction(TableTransactionActionType.UpsertReplace, additionalEntry2));
                     }
 
                     var opResults = await Table.SubmitTransactionAsync(entityBatch);

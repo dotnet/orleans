@@ -129,6 +129,14 @@ namespace Tester.AzureUtils
                 .WaitAsync(new AzureStoragePolicyOptions().OperationTimeout);
 
             Assert.True(didInsert, "Did insert");
+            var before = await manager.ReadSingleTableEntryAsync(
+                clusterId,
+                SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN);
+            var after = await manager.ReadSingleTableEntryAsync(
+                clusterId,
+                SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX);
+            Assert.Equal("0", before.Entity?.MembershipVersion);
+            Assert.Equal("0", after.Entity?.MembershipVersion);
         }
 
         [SkippableFact, TestCategory("Functional")]
