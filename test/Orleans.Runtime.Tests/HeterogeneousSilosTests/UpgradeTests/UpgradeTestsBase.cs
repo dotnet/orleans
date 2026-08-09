@@ -241,11 +241,12 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             await WaitForActiveSilosAsync();
         }
 
-        private Task WaitForActiveSilosAsync()
+        private async Task WaitForActiveSilosAsync()
         {
             var expectedSiloCount = this.deployedSilos.Count;
             var timeout = TestCluster.GetLivenessStabilizationTime(new ClusterMembershipOptions(), didKill: false);
-            return TestingUtils.WaitUntilAsync(async (lastTry, cancellationToken) =>
+            await Task.Delay(RefreshInterval);
+            await TestingUtils.WaitUntilAsync(async (lastTry, cancellationToken) =>
             {
                 var hosts = await ManagementGrain.GetHosts(false).WaitAsync(cancellationToken);
                 var activeSiloCount = hosts.Count(host => host.Value == SiloStatus.Active);
