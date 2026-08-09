@@ -3,7 +3,6 @@ using Microsoft.Extensions.Configuration.Memory;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.TestingHost;
-using Orleans.TestingHost.Utils;
 using System.Runtime.InteropServices;
 using TestExtensions;
 using TestVersionGrainInterfaces;
@@ -244,21 +243,11 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         private async Task WaitForActiveSilosAsync()
         {
             var expectedSiloCount = this.deployedSilos.Count;
-            var timeout = TestCluster.GetLivenessStabilizationTime(new ClusterMembershipOptions(), didKill: false);
-            await Task.Delay(RefreshInterval);
-            await TestingUtils.WaitUntilAsync(async (lastTry, cancellationToken) =>
-            {
-                var hosts = await ManagementGrain.GetHosts(false).WaitAsync(cancellationToken);
-                var activeSiloCount = hosts.Count(host => host.Value == SiloStatus.Active);
-                if (lastTry)
-                {
-                    Assert.Equal(expectedSiloCount, activeSiloCount);
-                }
+            await cluster.WaitForLivenessToStabilizeAsync();
+            await cluster.WaitForClusterManifestToStabilizeAsync();
 
-                return activeSiloCount == expectedSiloCount;
-            },
-            timeout,
-            RefreshInterval);
+            var hosts = await ManagementGrain.GetHosts(false);
+            Assert.Equal(expectedSiloCount, hosts.Count(host => host.Value == SiloStatus.Active));
         }
 
         public void Dispose()
