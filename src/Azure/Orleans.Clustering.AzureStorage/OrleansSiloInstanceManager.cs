@@ -279,18 +279,22 @@ namespace Orleans.AzureUtils
             {
                 var query = await membershipTableReadStorage.ReadAllTableEntriesForPartitionAsync(DeploymentId, cancellationToken);
                 var tableVersion = ValidateAllSiloEntries(query.Entries);
-                if (!query.IsPaginated || HasNoBoundaryVersionRows(query.Entries))
+                if (!query.IsPaginated)
                 {
                     return RemoveBoundaryVersionRows(query.Entries);
                 }
 
-                if (TryAcceptBoundaryFencedSnapshot(
-                    query.Entries,
-                    tableVersion,
-                    out beforeVersion,
-                    out afterVersion))
+                var first = query.Entries[0].Entity;
+                var last = query.Entries[^1].Entity;
+                beforeVersion = first.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN
+                    ? first.MembershipVersion
+                    : null;
+                afterVersion = last.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX
+                    ? last.MembershipVersion
+                    : null;
+                if (CanAcceptSnapshot(tableVersion, beforeVersion, afterVersion))
                 {
-                    return query.Entries;
+                    return RemoveBoundaryVersionRows(query.Entries);
                 }
             }
 
@@ -300,36 +304,26 @@ namespace Orleans.AzureUtils
                 afterVersion);
         }
 
-        private static bool TryAcceptBoundaryFencedSnapshot(
-            List<(SiloInstanceTableEntry Entity, string ETag)> queryResults,
+        private static bool CanAcceptSnapshot(
             string? tableVersion,
-            out string? beforeVersion,
-            out string? afterVersion)
+            string? beforeVersion,
+            string? afterVersion)
         {
             // Boundary-aware membership updates write both rows in the same transaction. Matching
             // values prove that none committed while the paginated query was being read.
-            var first = queryResults[0].Entity;
-            var last = queryResults[^1].Entity;
-            beforeVersion = first.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN
-                ? first.MembershipVersion
-                : null;
-            afterVersion = last.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX
-                ? last.MembershipVersion
-                : null;
+            if (beforeVersion is null && afterVersion is null)
+            {
+                return true;
+            }
+
             if (beforeVersion is null
                 || afterVersion is null)
             {
                 return false;
             }
 
-            if (!string.Equals(beforeVersion, afterVersion, StringComparison.Ordinal)
-                && !IsLegacyTableVersionAhead(tableVersion, beforeVersion, afterVersion))
-            {
-                return false;
-            }
-
-            RemoveBoundaryVersionRows(queryResults);
-            return true;
+            return string.Equals(beforeVersion, afterVersion, StringComparison.Ordinal)
+                || IsLegacyTableVersionAhead(tableVersion, beforeVersion, afterVersion);
         }
 
         private static bool IsLegacyTableVersionAhead(
@@ -362,12 +356,6 @@ namespace Orleans.AzureUtils
             }
 
             return queryResults;
-        }
-
-        private static bool HasNoBoundaryVersionRows(List<(SiloInstanceTableEntry Entity, string ETag)> queryResults)
-        {
-            return queryResults[0].Entity.RowKey != SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN
-                && queryResults[^1].Entity.RowKey != SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX;
         }
 
         private static string? ValidateAllSiloEntries(List<(SiloInstanceTableEntry Entity, string ETag)> queryResults)
