@@ -15,7 +15,7 @@ namespace Tester.StreamingTests
         {
             var leaseManager = fixture.GrainFactory.GetGrain<ILeaseManagerGrain>(streamProviderName);
             var expectedResponsibilityPerBalancer = totalQueueCount / siloCount;
-            await TestingUtils.WaitUntilAsync(cancellationToken => CheckLeases(leaseManager, siloCount, expectedResponsibilityPerBalancer, false, cancellationToken), Timeout);
+            await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckLeases(leaseManager, siloCount, expectedResponsibilityPerBalancer, lastTry, cancellationToken), Timeout);
         }
 
         public class SiloBuilderConfigurator : ISiloConfigurator
@@ -32,7 +32,7 @@ namespace Tester.StreamingTests
             if(lastTry)
             {
                 //there should be one StreamQueueBalancer per silo
-                Assert.Equal(responsibilityMap.Count, siloCount);
+                Assert.Equal(siloCount, responsibilityMap.Count);
                 foreach (int responsibility in responsibilityMap.Values)
                 {
                     Assert.Equal(expectedResponsibilityPerBalancer, responsibility);

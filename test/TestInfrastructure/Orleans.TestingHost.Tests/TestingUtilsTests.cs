@@ -73,7 +73,7 @@ public class TestingUtilsTests
     }
 
     [Fact]
-    public async Task WaitUntilAsync_LegacyOverloadDoesNotMakeFinalPredicateCall()
+    public async Task WaitUntilAsync_LegacyOverloadDoesNotInvokePredicateAfterDeadline()
     {
         var calls = 0;
 
@@ -93,6 +93,29 @@ public class TestingUtilsTests
     }
 
     [Fact]
+    public async Task WaitUntilAsync_LegacyOverloadInvokesFinalAttemptBeforeDeadline()
+    {
+        var calls = 0;
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => TestingUtils.WaitUntilAsync(
+            (bool lastTry) =>
+            {
+                calls++;
+                if (lastTry)
+                {
+                    throw new InvalidOperationException("Expected legacy detailed failure");
+                }
+
+                return Task.FromResult(false);
+            },
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromMilliseconds(200)));
+
+        Assert.Equal("Expected legacy detailed failure", exception.Message);
+        Assert.True(calls > 1);
+    }
+
+    [Fact]
     public async Task WaitUntilAsync_PropagatesDeadlineCancellationAndReportsPredicateExpression()
     {
         var calls = 0;
@@ -108,6 +131,29 @@ public class TestingUtilsTests
 
         Assert.Equal(1, calls);
         Assert.Contains("async cancellationToken =>", exception.Message);
+    }
+
+    [Fact]
+    public async Task WaitUntilAsync_InvokesFinalAttemptBeforeDeadline()
+    {
+        var calls = 0;
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => TestingUtils.WaitUntilAsync(
+            (lastTry, _) =>
+            {
+                calls++;
+                if (lastTry)
+                {
+                    throw new InvalidOperationException("Expected detailed failure");
+                }
+
+                return Task.FromResult(false);
+            },
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromMilliseconds(200)));
+
+        Assert.Equal("Expected detailed failure", exception.Message);
+        Assert.True(calls > 1);
     }
 
     [Fact]

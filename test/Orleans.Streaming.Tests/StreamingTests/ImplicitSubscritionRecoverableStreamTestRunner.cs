@@ -21,7 +21,7 @@ namespace Tester.StreamingTests
             try
             {
                 await generateFn(streamNamespace, streamCount, eventsInStream);
-                await TestingUtils.WaitUntilAsync(cancellationToken => this.CheckCounters(streamNamespace, streamCount, eventsInStream, false, cancellationToken), TimeSpan.FromSeconds(30));
+                await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => this.CheckCounters(streamNamespace, streamCount, eventsInStream, lastTry, cancellationToken), TimeSpan.FromSeconds(30));
             }
             finally
             {
@@ -36,7 +36,7 @@ namespace Tester.StreamingTests
             {
                 await generateFn(streamNamespace, streamCount, eventsInStream);
                 // should eventually skip the faulted event, so event count should be one (faulted event) less that number of events in stream.
-                await TestingUtils.WaitUntilAsync(cancellationToken => this.CheckCounters(streamNamespace, streamCount, eventsInStream - 1, false, cancellationToken), TimeSpan.FromSeconds(90));
+                await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => this.CheckCounters(streamNamespace, streamCount, eventsInStream - 1, lastTry, cancellationToken), TimeSpan.FromSeconds(90));
             }
             finally
             {

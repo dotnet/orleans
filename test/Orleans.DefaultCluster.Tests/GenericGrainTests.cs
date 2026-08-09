@@ -734,12 +734,17 @@ namespace DefaultCluster.Tests.General
             await grain.ScheduleDelayedPingToSelfAndDeactivate(target, s1, TimeSpan.FromSeconds(5));
             string? s2 = null;
             await TestingUtils.WaitUntilAsync(
-                async cancellationToken =>
+                async (lastTry, cancellationToken) =>
                 {
                     s2 = await grain.GetLastValue(cancellationToken);
                     if (s2 == s1)
                     {
                         return true;
+                    }
+
+                    if (lastTry)
+                    {
+                        Assert.Fail($"Expected delayed ping to set value '{s1}', but saw '{s2 ?? "null"}'.");
                     }
 
                     return false;

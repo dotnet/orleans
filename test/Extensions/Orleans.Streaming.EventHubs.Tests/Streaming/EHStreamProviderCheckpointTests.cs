@@ -102,12 +102,12 @@ namespace ServiceBus.Tests.StreamingTests
             try
             {
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 4096);
-                await TestingUtils.WaitUntilAsync(cancellationToken => CheckCounters(streamNamespace, streamCount, eventsInStream, false, cancellationToken), TimeSpan.FromSeconds(60));
+                await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckCounters(streamNamespace, streamCount, eventsInStream, lastTry, cancellationToken), TimeSpan.FromSeconds(60));
 
                 await RestartAgents();
 
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 4096);
-                await TestingUtils.WaitUntilAsync(cancellationToken => CheckCounters(streamNamespace, streamCount, eventsInStream * 2, false, cancellationToken), TimeSpan.FromSeconds(90));
+                await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckCounters(streamNamespace, streamCount, eventsInStream * 2, lastTry, cancellationToken), TimeSpan.FromSeconds(90));
             }
             finally
             {
@@ -122,13 +122,13 @@ namespace ServiceBus.Tests.StreamingTests
             try
             {
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 0);
-                await TestingUtils.WaitUntilAsync(cancellationToken => CheckCounters(streamNamespace, streamCount, eventsInStream, false, cancellationToken), TimeSpan.FromSeconds(60));
+                await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckCounters(streamNamespace, streamCount, eventsInStream, lastTry, cancellationToken), TimeSpan.FromSeconds(60));
 
                 await HostedCluster.RestartSiloAsync(HostedCluster.SecondarySilos[0]);
                 await HostedCluster.WaitForLivenessToStabilizeAsync();
 
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 0);
-                await TestingUtils.WaitUntilAsync(cancellationToken => CheckCounters(streamNamespace, streamCount, eventsInStream * 2, false, cancellationToken), TimeSpan.FromSeconds(90));
+                await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckCounters(streamNamespace, streamCount, eventsInStream * 2, lastTry, cancellationToken), TimeSpan.FromSeconds(90));
             }
             finally
             {

@@ -56,7 +56,7 @@ namespace UnitTests.StreamingTests
 
             await producer.StopPeriodicProducing();
 
-            await TestingUtils.WaitUntilAsync(cancellationToken => CheckCounters(producer, consumer, false, cancellationToken), _timeout);
+            await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckCounters(producer, consumer, lastTry, cancellationToken), _timeout);
 
             await consumer.StopConsuming();
         }
@@ -84,7 +84,7 @@ namespace UnitTests.StreamingTests
             await producer.StopPeriodicProducing();
             //int numProduced = await producer.NumberProduced;
 
-            await TestingUtils.WaitUntilAsync(cancellationToken => CheckCounters(producer, consumer, false, cancellationToken), _timeout);
+            await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckCounters(producer, consumer, lastTry, cancellationToken), _timeout);
 
             await consumer.StopConsuming();
         }
@@ -112,7 +112,7 @@ namespace UnitTests.StreamingTests
             await producer.StopPeriodicProducing();
             //int numProduced = await producer.NumberProduced;
 
-            await TestingUtils.WaitUntilAsync(cancellationToken => CheckCounters(producer, consumer, false, cancellationToken), _timeout);
+            await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckCounters(producer, consumer, lastTry, cancellationToken), _timeout);
 
             await consumer.StopConsuming();
         }
