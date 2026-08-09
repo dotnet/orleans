@@ -507,6 +507,10 @@ namespace Orleans.Transactions.State
             // Stop if this activation is stopping/stopped.
             if (this.activationLifetime.OnDeactivating.IsCancellationRequested) return;
 
+            StorageBatch<TState>? batchBeingSentToStorage = null;
+            var batchCompletedSuccessfully = false;
+            var recoveryInitiated = false;
+
             using (this.activationLifetime.BlockDeactivation())
             {
                 var writeAttempted = false;
@@ -534,7 +538,6 @@ namespace Orleans.Transactions.State
                     }
 
                     // store the current storage batch, if it is not empty
-                    StorageBatch<TState>? batchBeingSentToStorage = null;
                     if (this.storageBatch.BatchSize > 0)
                     {
                         // get the next batch in place so it can be filled while we store the old one
@@ -556,12 +559,18 @@ namespace Orleans.Transactions.State
                             else
                             {
                                 LogWarningStorePreConditionsNotMet();
+                                recoveryInitiated = true;
                                 await AbortAndRestore(TransactionalStatus.CommitFailure, exception: null, storageOutcomeInDoubt: false);
                                 return;
                             }
                         }
                         catch (Exception exception)
                         {
+                            if (recoveryInitiated)
+                            {
+                                throw;
+                            }
+
                             TransactionalStatus status;
                             if (exception is InconsistentStateException)
                             {
@@ -574,6 +583,7 @@ namespace Orleans.Transactions.State
                                 LogWarningStorageExceptionInStorageWorker(exception);
                             }
 
+                            recoveryInitiated = true;
                             await AbortAndRestore(status, exception, storageOutcomeInDoubt: writeAttempted);
                             return;
                         }
@@ -601,6 +611,8 @@ namespace Orleans.Transactions.State
                     if (batchBeingSentToStorage != null)
                     {
                         batchBeingSentToStorage.RunFollowUpActions();
+                        batchBeingSentToStorage.Complete(success: true);
+                        batchCompletedSuccessfully = true;
                         storageWorker.Notify();  // we have to re-check for work
                     }
                 }
@@ -608,8 +620,21 @@ namespace Orleans.Transactions.State
                 {
                     LogWarningExceptionInStorageWorker(failCounter, exception);
 
+                    if (recoveryInitiated)
+                    {
+                        throw;
+                    }
+
                     // If a write was attempted, the durable outcome is unknown and recovery must resolve it.
+                    recoveryInitiated = true;
                     await AbortAndRestore(TransactionalStatus.UnknownException, exception, storageOutcomeInDoubt: writeAttempted);
+                }
+                finally
+                {
+                    if (batchBeingSentToStorage != null && !batchCompletedSuccessfully)
+                    {
+                        batchBeingSentToStorage.Complete(success: false);
+                    }
                 }
             }
         }
@@ -647,7 +672,12 @@ namespace Orleans.Transactions.State
                     LogDebugStorageWorkerTriggeringGrainDeactivation();
                     this.deactivate();
                 }
+                StorageBatch<TState>? discardedBatch = this.storageBatch;
                 await this.Restore();
+                if (discardedBatch is not null && !ReferenceEquals(discardedBatch, this.storageBatch))
+                {
+                    discardedBatch.Complete(success: false);
+                }
             }
         }
 

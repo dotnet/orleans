@@ -108,6 +108,7 @@ namespace Orleans.Transactions.State
                 using (this.activationLifetime.BlockDeactivation())
                 {
                     if (await TryCollect(transactionId)) break;
+                    if (ct.IsCancellationRequested) break;
 
                     await this.timerManager.Delay(this.options.ConfirmationRetryDelay, ct);
                 }
@@ -123,17 +124,25 @@ namespace Orleans.Transactions.State
                 // Now we can remove the commit record.
                 StorageBatch<TState> storageBatch = getStorageBatch();
                 storageBatch.Collect(transactionId);
-                storageBatch.FollowUpAction(() =>
+                storageBatch.CompletionAction(success =>
                 {
-                    LogTraceCollectionCompleted(transactionId);
-                    this.pending.Remove(transactionId);
-                    storeComplete.TrySetResult(true);
+                    if (success)
+                    {
+                        LogTraceCollectionCompleted(transactionId);
+                        this.pending.Remove(transactionId);
+                    }
+
+                    storeComplete.TrySetResult(success);
                 });
 
                 storageWorker.Notify();
 
                 // wait for storage call, so we don't free spin
-                return await storeComplete.Task;
+                return await storeComplete.Task.WaitAsync(this.activationLifetime.OnDeactivating);
+            }
+            catch (OperationCanceledException) when (this.activationLifetime.OnDeactivating.IsCancellationRequested)
+            {
+                return false;
             }
             catch(Exception ex)
             {
