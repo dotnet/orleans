@@ -34,6 +34,18 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.FirstTime_Load_ShouldReturnEmptyLoadResponse();
         }
 
+        [Fact]
+        public override Task StoreWithoutChanges()
+        {
+            return base.StoreWithoutChanges();
+        }
+
+        [Fact]
+        public override Task WrongEtags()
+        {
+            return base.WrongEtags();
+        }
+
         [Theory]
         [InlineData(true)]
         [InlineData(false)]

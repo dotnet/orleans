@@ -98,14 +98,15 @@ namespace Orleans.Transactions.TestKit
             var loadresponse = await stateStorage.Load();
 
             // store with wrong e-tag, must fail
-            try
-            {
-                var etag1 = await stateStorage.Store("wrong-etag", loadresponse.Metadata, emptyPendingStates, null, null);
-                throw new Exception("storage did not catch e-tag mismatch");
-            }
-            catch (Exception) { }
+            Func<Task> storeWithWrongETag = () => stateStorage.Store(
+                "wrong-etag",
+                loadresponse.Metadata,
+                emptyPendingStates,
+                null,
+                null);
+            await storeWithWrongETag.Should().ThrowAsync<Exception>("the ETag does not identify the loaded version");
 
-            // load again
+            // load again and verify that the rejected write made no changes
             loadresponse = await stateStorage.Load();
             loadresponse.Should().NotBeNull();
             loadresponse.Metadata.TimeStamp.Should().Be(default);
@@ -113,6 +114,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.ETag.Should().BeNull();
             loadresponse.CommittedSequenceId.Should().Be(0);
             loadresponse.PendingStates.Should().BeEmpty();
+            AssertTState(loadresponse.CommittedState, new TState());
 
             // update timestamp in metadata, then write back with correct e-tag
             var now = DateTime.UtcNow;
@@ -121,25 +123,36 @@ namespace Orleans.Transactions.TestKit
             var etag2 = await stateStorage.Store(null, metadata, emptyPendingStates, null, null);
             etag2.Should().NotBeNullOrEmpty();
 
-            // update timestamp in metadata, then write back with wrong e-tag, must fail
-            try
-            {
-                var now2 = DateTime.UtcNow;
-                var metadata2 = new TransactionalStateMetaData() { TimeStamp = now2, CommitRecords = MakeCommitRecords(3,3) };
-                await stateStorage.Store(null, metadata, emptyPendingStates, null, null);
-                throw new Exception("storage did not catch e-tag mismatch");
-            }
-            catch (Exception) { }
+            var storedResponse = await stateStorage.Load();
+            storedResponse.ETag.Should().Be(etag2);
+            storedResponse.Metadata.Should().BeEquivalentTo(metadata);
+            storedResponse.CommittedSequenceId.Should().Be(0);
+            storedResponse.PendingStates.Should().BeEmpty();
+            AssertTState(storedResponse.CommittedState, new TState());
 
-            // load again, check content
+            // update timestamp in metadata, then write back with wrong e-tag, must fail
+            var metadata2 = new TransactionalStateMetaData()
+            {
+                TimeStamp = now.AddSeconds(1),
+                CommitRecords = MakeCommitRecords(3, 3)
+            };
+            Func<Task> storeWithStaleETag = () => stateStorage.Store(
+                null,
+                metadata2,
+                emptyPendingStates,
+                null,
+                null);
+            await storeWithStaleETag.Should().ThrowAsync<Exception>("the ETag is stale");
+
+            // load again and verify that the rejected write made no changes
             loadresponse = await stateStorage.Load();
             loadresponse.Should().NotBeNull();
             loadresponse.Metadata.Should().NotBeNull();
-            loadresponse.Metadata.TimeStamp.Should().Be(now);
-            loadresponse.Metadata.CommitRecords.Count.Should().Be(cr.Count);
-            loadresponse.ETag.Should().Be(etag2);
-            loadresponse.CommittedSequenceId.Should().Be(0);
-            loadresponse.PendingStates.Should().BeEmpty();
+            loadresponse.ETag.Should().Be(storedResponse.ETag);
+            loadresponse.Metadata.Should().BeEquivalentTo(storedResponse.Metadata);
+            loadresponse.CommittedSequenceId.Should().Be(storedResponse.CommittedSequenceId);
+            loadresponse.PendingStates.Should().BeEquivalentTo(storedResponse.PendingStates);
+            AssertTState(loadresponse.CommittedState, storedResponse.CommittedState);
         }
 
         private void AssertTState(TState actual, TState expected)
