@@ -102,12 +102,12 @@ namespace ServiceBus.Tests.StreamingTests
             try
             {
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 4096);
-                await TestingUtils.WaitUntilAsync((CancellationToken _) => CheckCounters(streamNamespace, streamCount, eventsInStream, false), TimeSpan.FromSeconds(60));
+                await TestingUtils.WaitUntilAsync(cancellationToken => CheckCounters(streamNamespace, streamCount, eventsInStream, false, cancellationToken), TimeSpan.FromSeconds(60));
 
                 await RestartAgents();
 
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 4096);
-                await TestingUtils.WaitUntilAsync((CancellationToken _) => CheckCounters(streamNamespace, streamCount, eventsInStream * 2, false), TimeSpan.FromSeconds(90));
+                await TestingUtils.WaitUntilAsync(cancellationToken => CheckCounters(streamNamespace, streamCount, eventsInStream * 2, false, cancellationToken), TimeSpan.FromSeconds(90));
             }
             finally
             {
@@ -122,13 +122,13 @@ namespace ServiceBus.Tests.StreamingTests
             try
             {
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 0);
-                await TestingUtils.WaitUntilAsync((CancellationToken _) => CheckCounters(streamNamespace, streamCount, eventsInStream, false), TimeSpan.FromSeconds(60));
+                await TestingUtils.WaitUntilAsync(cancellationToken => CheckCounters(streamNamespace, streamCount, eventsInStream, false, cancellationToken), TimeSpan.FromSeconds(60));
 
                 await HostedCluster.RestartSiloAsync(HostedCluster.SecondarySilos[0]);
                 await HostedCluster.WaitForLivenessToStabilizeAsync();
 
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 0);
-                await TestingUtils.WaitUntilAsync((CancellationToken _) => CheckCounters(streamNamespace, streamCount, eventsInStream * 2, false), TimeSpan.FromSeconds(90));
+                await TestingUtils.WaitUntilAsync(cancellationToken => CheckCounters(streamNamespace, streamCount, eventsInStream * 2, false, cancellationToken), TimeSpan.FromSeconds(90));
             }
             finally
             {
@@ -137,11 +137,11 @@ namespace ServiceBus.Tests.StreamingTests
             }
         }
 
-        private async Task<bool> CheckCounters(string streamNamespace, int streamCount, int eventsInStream, bool assertIsTrue)
+        private async Task<bool> CheckCounters(string streamNamespace, int streamCount, int eventsInStream, bool assertIsTrue, CancellationToken cancellationToken)
         {
             var reporter = this.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
 
-            var report = await reporter.GetReport(StreamProviderName, streamNamespace);
+            var report = await reporter.GetReport(StreamProviderName, streamNamespace).WaitAsync(cancellationToken);
             if (assertIsTrue)
             {
                 // one stream per queue

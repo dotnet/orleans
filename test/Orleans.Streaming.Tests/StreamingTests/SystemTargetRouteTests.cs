@@ -88,7 +88,7 @@ namespace Tester.StreamingTests
             int[] counts = await Task.WhenAll(Enumerable.Range(0, streamCount).Select(i => producers[i].GetNumberProduced()));
 
             // make sure all went well
-            await TestingUtils.WaitUntilAsync((CancellationToken _) => CheckCounters(counts.Sum(), false), Timeout);
+            await TestingUtils.WaitUntilAsync(cancellationToken => CheckCounters(counts.Sum(), false, cancellationToken), Timeout);
         }
 
         private Task OnNextAsync(int e, StreamSequenceToken? token)
@@ -97,8 +97,9 @@ namespace Tester.StreamingTests
             return Task.CompletedTask;
         }
 
-        private Task<bool> CheckCounters(int eventsProduced, bool assertIsTrue)
+        private Task<bool> CheckCounters(int eventsProduced, bool assertIsTrue, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             int numConsumed = this.eventsConsumed;
             if (!assertIsTrue) return Task.FromResult(eventsProduced == numConsumed);
             Assert.Equal(eventsProduced, numConsumed);

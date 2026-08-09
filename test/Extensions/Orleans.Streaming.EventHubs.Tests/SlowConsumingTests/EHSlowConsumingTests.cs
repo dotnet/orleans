@@ -85,14 +85,14 @@ namespace ServiceBus.Tests.SlowConsumingTests
             await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
                 (int)EventDataGeneratorAdapterFactory.Commands.Randomly_Place_Stream_To_Queue, randomStreamPlacementArg);
             //since there's an extreme slow consumer, so the back pressure algorithm should be triggered
-            await TestingUtils.WaitUntilAsync((CancellationToken _) => AssertCacheBackPressureTriggered(true, false), timeout);
+            await TestingUtils.WaitUntilAsync(cancellationToken => AssertCacheBackPressureTriggered(true, false, cancellationToken), timeout);
 
             //make slow consumer stop consuming
             await slowConsumer.StopConsuming();
 
             //slowConsumer stopped consuming, back pressure algorithm should be cleared in next check period.
             await Task.Delay(monitorPressureWindowSize);
-            await TestingUtils.WaitUntilAsync((CancellationToken _) => AssertCacheBackPressureTriggered(false, false), timeout);
+            await TestingUtils.WaitUntilAsync(cancellationToken => AssertCacheBackPressureTriggered(false, false, cancellationToken), timeout);
 
             //clean up test
             await StopHealthyConsumerGrainComing(healthyConsumers);
@@ -125,25 +125,25 @@ namespace ServiceBus.Tests.SlowConsumingTests
             await Task.WhenAll(tasks);
         }
 
-        private async Task<bool> AssertCacheBackPressureTriggered(bool expectedResult, bool assertIsTrue)
+        private async Task<bool> AssertCacheBackPressureTriggered(bool expectedResult, bool assertIsTrue, CancellationToken cancellationToken)
         {
             if (assertIsTrue)
             {
-                bool actualResult = await IsBackPressureTriggered();
+                bool actualResult = await IsBackPressureTriggered(cancellationToken);
                 Assert.True(expectedResult == actualResult, $"Back pressure algorithm should be triggered? expected: {expectedResult}, actual: {actualResult}");
                 return true;
             }
             else
             {
-                return (await IsBackPressureTriggered()) == expectedResult;
+                return (await IsBackPressureTriggered(cancellationToken)) == expectedResult;
             }
         }
 
-        private async Task<bool> IsBackPressureTriggered()
+        private async Task<bool> IsBackPressureTriggered(CancellationToken cancellationToken)
         {
             IManagementGrain mgmtGrain = this.fixture.HostedCluster.GrainFactory!.GetGrain<IManagementGrain>(0); // The fixture deploys the client.
             object?[] replies = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(
-                             StreamProviderName, EHStreamProviderWithCreatedCacheListAdapterFactory.IsCacheBackPressureTriggeredCommand, null);
+                             StreamProviderName, EHStreamProviderWithCreatedCacheListAdapterFactory.IsCacheBackPressureTriggeredCommand, null).WaitAsync(cancellationToken);
             foreach (var re in replies)
             {
                 if ((bool)re!) // The command returns a Boolean result from each silo.

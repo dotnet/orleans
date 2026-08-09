@@ -734,9 +734,9 @@ namespace DefaultCluster.Tests.General
             await grain.ScheduleDelayedPingToSelfAndDeactivate(target, s1, TimeSpan.FromSeconds(5));
             string? s2 = null;
             await TestingUtils.WaitUntilAsync(
-                async (CancellationToken _) =>
+                async cancellationToken =>
                 {
-                    s2 = await grain.GetLastValue();
+                    s2 = await grain.GetLastValue().WaitAsync(cancellationToken);
                     if (s2 == s1)
                     {
                         return true;

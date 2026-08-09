@@ -71,14 +71,14 @@ namespace UnitTests.StreamingTests
         public async Task ValidateGeneratedStreamsTest()
         {
             this.fixture.Logger.LogInformation("************************ ValidateGeneratedStreamsTest *********************************");
-            await TestingUtils.WaitUntilAsync((CancellationToken _) => CheckCounters(false), Timeout);
+            await TestingUtils.WaitUntilAsync(cancellationToken => CheckCounters(false, cancellationToken), Timeout);
         }
 
-        private async Task<bool> CheckCounters(bool assertIsTrue)
+        private async Task<bool> CheckCounters(bool assertIsTrue, CancellationToken cancellationToken)
         {
             var reporter = this.fixture.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
 
-            var report = await reporter.GetReport(Fixture.StreamProviderName, Fixture.StreamNamespace);
+            var report = await reporter.GetReport(Fixture.StreamProviderName, Fixture.StreamNamespace).WaitAsync(cancellationToken);
             if (assertIsTrue)
             {
                 // one stream per queue

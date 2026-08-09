@@ -303,8 +303,8 @@ public class SingleStreamTestRunner
         await consumer.DeactivateOnIdle();
         await producer.DeactivateOnIdle();
 
-        await TestingUtils.WaitUntilAsync((CancellationToken _) => CheckGrainsDeactivated(null, consumer, false), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
-        await TestingUtils.WaitUntilAsync((CancellationToken _) => CheckGrainsDeactivated(producer, null, false), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
+        await TestingUtils.WaitUntilAsync(cancellationToken => CheckGrainsDeactivated(null, consumer, false, cancellationToken), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
+        await TestingUtils.WaitUntilAsync(cancellationToken => CheckGrainsDeactivated(producer, null, false, cancellationToken), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
 
         logger.LogInformation("\n\n\n*******************************************************************\n\n\n");
 
@@ -521,19 +521,19 @@ public class SingleStreamTestRunner
         return rendez.Validate();
     }
 
-    private async Task<bool> CheckGrainsDeactivated(ProducerProxy? producer, ConsumerProxy? consumer, bool assertAreEqual = true)
+    private async Task<bool> CheckGrainsDeactivated(ProducerProxy? producer, ConsumerProxy? consumer, bool assertAreEqual, CancellationToken cancellationToken)
     {
         var activationCount = 0;
         string str = "";
         if (producer != null)
         {
             str = "Producer";
-            activationCount = await producer.GetNumActivations(this.client);
+            activationCount = await producer.GetNumActivations(this.client).WaitAsync(cancellationToken);
         }
         else if (consumer != null)
         {
             str = "Consumer";
-            activationCount = await consumer.GetNumActivations(this.client);
+            activationCount = await consumer.GetNumActivations(this.client).WaitAsync(cancellationToken);
         }
         var expectActivationCount = 0;
         logger.LogInformation(

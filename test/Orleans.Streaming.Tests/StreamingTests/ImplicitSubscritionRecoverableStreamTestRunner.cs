@@ -21,7 +21,7 @@ namespace Tester.StreamingTests
             try
             {
                 await generateFn(streamNamespace, streamCount, eventsInStream);
-                await TestingUtils.WaitUntilAsync((CancellationToken _) => this.CheckCounters(streamNamespace, streamCount, eventsInStream, false), TimeSpan.FromSeconds(30));
+                await TestingUtils.WaitUntilAsync(cancellationToken => this.CheckCounters(streamNamespace, streamCount, eventsInStream, false, cancellationToken), TimeSpan.FromSeconds(30));
             }
             finally
             {
@@ -36,7 +36,7 @@ namespace Tester.StreamingTests
             {
                 await generateFn(streamNamespace, streamCount, eventsInStream);
                 // should eventually skip the faulted event, so event count should be one (faulted event) less that number of events in stream.
-                await TestingUtils.WaitUntilAsync((CancellationToken _) => this.CheckCounters(streamNamespace, streamCount, eventsInStream - 1, false), TimeSpan.FromSeconds(90));
+                await TestingUtils.WaitUntilAsync(cancellationToken => this.CheckCounters(streamNamespace, streamCount, eventsInStream - 1, false, cancellationToken), TimeSpan.FromSeconds(90));
             }
             finally
             {
@@ -45,11 +45,11 @@ namespace Tester.StreamingTests
             }
         }
 
-        private async Task<bool> CheckCounters(string streamNamespace, int streamCount, int eventsInStream, bool assertIsTrue)
+        private async Task<bool> CheckCounters(string streamNamespace, int streamCount, int eventsInStream, bool assertIsTrue, CancellationToken cancellationToken)
         {
             var reporter = grainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
 
-            var report = await reporter.GetReport(streamProviderName, streamNamespace);
+            var report = await reporter.GetReport(streamProviderName, streamNamespace).WaitAsync(cancellationToken);
             if (assertIsTrue)
             {
                 // one stream per queue
