@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Transactions.Abstractions;
 
@@ -41,7 +42,9 @@ namespace Orleans.Transactions
 
         // follow-up actions, to be executed after storing this batch
         private readonly List<Action> followUpActions;
+        private readonly List<Action<bool>> completionActions;
         private readonly List<Func<Task<bool>>> storeConditions;
+        private int completionInvoked;
         
         // counters for each type of event
         private int total = 0;
@@ -73,6 +76,7 @@ namespace Orleans.Transactions
             this.cancelAbove = cancelAbove;
             this.cancelAboveStart = cancelAbove;
             this.followUpActions = new List<Action>();
+            this.completionActions = new List<Action<bool>>();
             this.storeConditions = new List<Func<Task<bool>>>();
             this.prepares = new SortedDictionary<long, PendingTransactionState<TState>>();
         }
@@ -100,6 +104,19 @@ namespace Orleans.Transactions
             foreach (var action in followUpActions)
             {
                 action();
+            }
+        }
+
+        public void Complete(bool success)
+        {
+            if (Interlocked.Exchange(ref this.completionInvoked, 1) != 0)
+            {
+                return;
+            }
+
+            foreach (var action in completionActions)
+            {
+                action(success);
             }
         }
 
@@ -197,6 +214,11 @@ namespace Orleans.Transactions
         public void FollowUpAction(Action action)
         {
             followUpActions.Add(action);
+        }
+
+        public void CompletionAction(Action<bool> action)
+        {
+            completionActions.Add(action);
         }
 
         public void AddStorePreCondition(Func<Task<bool>> action)
