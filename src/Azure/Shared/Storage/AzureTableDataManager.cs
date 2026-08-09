@@ -418,6 +418,17 @@ namespace Orleans.GrainDirectory.AzureStorage
         }
 
         /// <summary>
+        /// Read all entries in one partition of the storage table, preserving whether the query required multiple pages.
+        /// </summary>
+        /// <param name="partitionKey">The key for the partition to be searched.</param>
+        /// <returns>The entries in the partition and whether more than one response page was required.</returns>
+        public Task<(List<(T Entity, string ETag)> Entries, bool IsPaginated)> ReadAllTableEntriesForPartitionWithPaginationAsync(string partitionKey)
+        {
+            string query = TableClient.CreateQueryFilter($"PartitionKey eq {partitionKey}");
+            return ReadTableEntriesAndEtagsWithPaginationAsync(query);
+        }
+
+        /// <summary>
         /// Read all entries in the table.
         /// NOTE: This could be a very expensive and slow operation for large tables!
         /// </summary>
@@ -485,18 +496,29 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <returns>Enumeration of entries in the table which match the query condition.</returns>
         public async Task<List<(T Entity, string ETag)>> ReadTableEntriesAndEtagsAsync(string? filter)
         {
+            var result = await ReadTableEntriesAndEtagsWithPaginationAsync(filter);
+            return result.Entries;
+        }
+
+        private async Task<(List<(T Entity, string ETag)> Entries, bool IsPaginated)> ReadTableEntriesAndEtagsWithPaginationAsync(string? filter)
+        {
             const string operation = "ReadTableEntriesAndEtags";
             var startTime = DateTime.UtcNow;
 
             try
             {
                 var results = new List<(T, string)>();
-                await foreach (var value in Table.QueryAsync<T>(filter))
+                var pageCount = 0;
+                await foreach (var page in Table.QueryAsync<T>(filter).AsPages())
                 {
-                    results.Add((value, value.ETag.ToString()));
+                    pageCount++;
+                    foreach (var value in page.Values)
+                    {
+                        results.Add((value, value.ETag.ToString()));
+                    }
                 }
 
-                return results;
+                return (results, pageCount > 1);
             }
             catch (Exception exc)
             {
