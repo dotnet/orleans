@@ -305,6 +305,7 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
         {
             TransactionDiagnosticEvents.TransactionEvent transactionEvent => ImmutableArray.Create(transactionEvent.TransactionId),
             TransactionDiagnosticEvents.StorageWriteCompleted completedWrite => completedWrite.TransactionIds,
+            TransactionDiagnosticEvents.LockExpired lockExpired => ImmutableArray.Create(lockExpired.TransactionId),
             TransactionDiagnosticEvents.LockBroken lockBroken => ImmutableArray.Create(lockBroken.TransactionId),
             TransactionDiagnosticEvents.StorageConflictDetected conflict => conflict.TransactionIds,
             TransactionDiagnosticEvents.AbortAndRestoreCompleted restored => restored.TransactionIds,

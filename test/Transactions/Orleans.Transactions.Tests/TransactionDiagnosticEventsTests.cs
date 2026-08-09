@@ -416,6 +416,29 @@ public class TransactionDiagnosticEventsTests
     }
 
     [Fact]
+    public async Task RecoveryObserverLockExpiredTransitionContainsTransactionId()
+    {
+        var resource = CreateParticipant("resource", ParticipantId.Role.Resource);
+        var transactionId = Guid.NewGuid();
+        var deadline = DateTime.UtcNow;
+        using var observer = new TransactionRecoveryEventObserver(candidate => candidate.Name == resource.Name);
+
+        TransactionDiagnosticEvents.EmitLockExpired(
+            resource,
+            transactionId,
+            deadline,
+            deadline.AddMilliseconds(1),
+            TransactionDiagnosticEvents.LockExpirationKind.HeldLock);
+
+        var transition = await observer.WaitForNextTransitionAsync(
+            afterSequence: 0,
+            GetDeadline(TimeSpan.FromSeconds(1)));
+
+        Assert.Equal(TransactionRecoveryEventObserver.RecoveryTransitionKind.LockExpired, transition.Kind);
+        Assert.Equal(transactionId, transition.TransactionId);
+    }
+
+    [Fact]
     public void StorageWriteCompletedFaultScopeOnlyInjectsForMatchingCommittedTransactions()
     {
         var target = CreateGrainReference("fault-target");
