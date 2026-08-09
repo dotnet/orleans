@@ -11,24 +11,66 @@ namespace Orleans.Transactions.Abstractions
     public interface ITransactionalStateStorage<TState>
         where TState : class, new()
     {
+        /// <summary>
+        /// Loads the authoritative transactional state from durable storage.
+        /// </summary>
+        /// <returns>
+        /// A task whose result is a coherent snapshot containing the current ETag, committed state and sequence number,
+        /// transaction metadata, and pending prepare records in sequence-number order.
+        /// </returns>
+        /// <remarks>
+        /// The returned snapshot must be suitable for transaction recovery. In particular, it must represent one
+        /// recoverable durable state and must not combine values from incompatible storage versions.
+        /// <para>
+        /// A call to <see cref="Store"/> can fail after zero, some, or all of its requested changes become durable.
+        /// Therefore, <see cref="Load"/> must read the authoritative durable state and replace any provider-local state
+        /// cached for subsequent calls to <see cref="Store"/>. Callers use this operation after a failed
+        /// <see cref="Store"/> to resolve the outcome before issuing another update.
+        /// </para>
+        /// </remarks>
         Task<TransactionalStorageLoadResponse<TState>> Load();
 
         /// <summary>
         /// Stores transactional state changes.
         /// </summary>
-        /// <returns>A task whose result is the ETag assigned to the stored state.</returns>
+        /// <param name="expectedETag">
+        /// The ETag from the most recent <see cref="Load"/> or successful <see cref="Store"/>, identifying the durable
+        /// version to update.
+        /// </param>
+        /// <param name="metadata">The transaction metadata which replaces the currently stored metadata.</param>
+        /// <param name="statesToPrepare">
+        /// Prepare records to add or replace, keyed by their sequence numbers. A record replaces an existing record
+        /// with the same sequence number. A <see langword="null"/> or empty list adds no prepare records.
+        /// </param>
+        /// <param name="commitUpTo">
+        /// When non-null, advances the committed state through the prepared state with this sequence number and makes
+        /// prepare records at or below that sequence obsolete.
+        /// </param>
+        /// <param name="abortAfter">
+        /// When non-null, removes pending prepare records whose sequence numbers are strictly greater than this value.
+        /// </param>
+        /// <returns>
+        /// A task whose result is the ETag of the durable state produced by the completed operation. The returned ETag
+        /// is used as <paramref name="expectedETag"/> for the next update.
+        /// </returns>
+        /// <remarks>
+        /// Implementations must use <paramref name="expectedETag"/> for optimistic concurrency and fail the operation
+        /// rather than silently overwrite a different durable version. The exception type used to report a mismatch is
+        /// provider-specific.
+        /// <para>
+        /// Implementations may split an operation into provider-sized atomic batches. Those batches are applied in an
+        /// order which preserves recoverability, but the <see cref="Store"/> call as a whole is not required to be
+        /// atomic: if it throws, zero, some, or all requested changes may already be durable, including changes from
+        /// batches completed before the failing batch. An exception therefore does not prove that no durable change
+        /// occurred. The caller must not blindly retry using its cached state or ETag; it must call <see cref="Load"/>
+        /// and recover from the authoritative snapshot first.
+        /// </para>
+        /// </remarks>
         Task<string> Store(
-
             string? expectedETag,
             TransactionalStateMetaData metadata,
-
-            // a list of transactions to prepare.
             List<PendingTransactionState<TState>>? statesToPrepare,
-
-            // if non-null, commit all pending transaction up to and including this sequence number.
             long? commitUpTo,
-
-            // if non-null, abort all pending transactions with sequence numbers strictly larger than this one.
             long? abortAfter
         );
     }
