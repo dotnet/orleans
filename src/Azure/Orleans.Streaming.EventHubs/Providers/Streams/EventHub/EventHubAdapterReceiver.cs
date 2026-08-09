@@ -43,7 +43,7 @@ namespace Orleans.Streaming.EventHubs
 
         private readonly EventHubPartitionSettings settings;
         private readonly Func<string, IStreamQueueCheckpointer<string>, ILoggerFactory, IEventHubQueueCache> cacheFactory;
-        private readonly Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory;
+        private readonly Func<string, CancellationToken, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory;
         private readonly ILoggerFactory loggerFactory;
         private readonly ILogger logger;
         private readonly IQueueAdapterReceiverMonitor monitor;
@@ -77,6 +77,26 @@ namespace Orleans.Streaming.EventHubs
             LoadSheddingOptions loadSheddingOptions,
             IEnvironmentStatisticsProvider environmentStatisticsProvider,
             Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver>? eventHubReceiverFactory = null)
+            : this(
+                settings,
+                cacheFactory,
+                (partition, _) => checkpointerFactory(partition),
+                loggerFactory,
+                monitor,
+                loadSheddingOptions,
+                environmentStatisticsProvider,
+                eventHubReceiverFactory)
+        {
+        }
+
+        public EventHubAdapterReceiver(EventHubPartitionSettings settings,
+            Func<string, IStreamQueueCheckpointer<string>, ILoggerFactory, IEventHubQueueCache> cacheFactory,
+            Func<string, CancellationToken, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory,
+            ILoggerFactory loggerFactory,
+            IQueueAdapterReceiverMonitor monitor,
+            LoadSheddingOptions loadSheddingOptions,
+            IEnvironmentStatisticsProvider environmentStatisticsProvider,
+            Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver>? eventHubReceiverFactory = null)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             this.cacheFactory = cacheFactory ?? throw new ArgumentNullException(nameof(cacheFactory));
@@ -89,14 +109,18 @@ namespace Orleans.Streaming.EventHubs
             this.eventHubReceiverFactory = eventHubReceiverFactory == null ? EventHubAdapterReceiver.CreateReceiver : eventHubReceiverFactory;
         }
 
-        public Task Initialize(TimeSpan timeout)
+        public async Task Initialize(TimeSpan timeout)
         {
             LogInfoInitializingEventHubPartition(this.settings.Hub.EventHubName, this.settings.Partition);
 
             // if receiver was already running, do nothing
-            return ReceiverRunning == Interlocked.Exchange(ref this.receiverState, ReceiverRunning)
-                ? Task.CompletedTask
-                : Initialize();
+            if (ReceiverRunning == Interlocked.Exchange(ref this.receiverState, ReceiverRunning))
+            {
+                return;
+            }
+
+            using var cancellation = new CancellationTokenSource(timeout);
+            await Initialize(cancellation.Token);
         }
 
         /// <summary>
@@ -104,12 +128,14 @@ namespace Orleans.Streaming.EventHubs
         ///  it will be retried when messages are requested
         /// </summary>
         /// <returns></returns>
-        private async Task Initialize()
+        private async Task Initialize(CancellationToken cancellationToken)
         {
             var watch = Stopwatch.StartNew();
             try
             {
-                this.checkpointer = await this.checkpointerFactory(this.settings.Partition);
+                this.checkpointer = await this.checkpointerFactory(
+                    this.settings.Partition,
+                    cancellationToken);
                 if(this.cache != null)
                 {
                     this.cache.Dispose();
@@ -117,7 +143,7 @@ namespace Orleans.Streaming.EventHubs
                 }
                 this.cache = this.cacheFactory(this.settings.Partition, this.checkpointer, this.loggerFactory);
                 this.flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { this.cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.loadSheddingOptions, environmentStatisticsProvider) };
-                string offset = await this.checkpointer.Load();
+                string offset = await this.checkpointer.Load(cancellationToken);
                 if (!this.checkpointer.CheckpointExists)
                 {
                     offset = EventHubConstants.StartOfStream;
@@ -135,8 +161,14 @@ namespace Orleans.Streaming.EventHubs
             }
         }
 
-        public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
+        public Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
+            => GetQueueMessagesAsync(maxCount, CancellationToken.None);
+
+        public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(
+            int maxCount,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (this.receiverState == ReceiverShutdown || maxCount <= 0)
             {
                 return new List<IBatchContainer>();
@@ -146,7 +178,7 @@ namespace Orleans.Streaming.EventHubs
             if (this.receiver == null)
             {
                 LogWarningRetryingInitializationOfEventHubPartition(this.settings.Hub.EventHubName, this.settings.Partition);
-                await Initialize();
+                await Initialize(cancellationToken);
                 if (this.receiver == null)
                 {
                     // should not get here, should throw instead, but just incase.
@@ -159,7 +191,10 @@ namespace Orleans.Streaming.EventHubs
             {
 
                 // Receivers built against older Orleans versions can still return null.
-                messages = (await this.receiver.ReceiveAsync(maxCount, ReceiveTimeout))?.ToList();
+                messages = (await this.receiver.ReceiveAsync(
+                    maxCount,
+                    ReceiveTimeout,
+                    cancellationToken))?.ToList();
                 watch.Stop();
 
                 this.monitor?.TrackRead(true, watch.Elapsed, null);

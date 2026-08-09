@@ -108,6 +108,68 @@ public sealed class GrainStreamQueueCheckpointerTests : StreamQueueCheckpointerT
     }
 
     [Fact]
+    public async Task Update_ForwardsCancellationTokenToGrainWrite()
+    {
+        var grain = Substitute.For<IStreamCheckpointerGrain>();
+        grain.Load(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult("10"));
+        grain.Update(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => ValueTask.FromResult(call.ArgAt<string>(0)));
+        var checkpointer = new GrainStreamQueueCheckpointer(grain);
+        await checkpointer.Load();
+        using var cancellation = new CancellationTokenSource();
+
+        checkpointer.Update("20", DateTime.UtcNow, cancellation.Token);
+        await checkpointer.FlushAsync(CancellationToken.None);
+
+        await grain.Received(1).Update("20", "10", cancellation.Token);
+    }
+
+    [Fact]
+    public async Task FlushAsync_RetriesSaveCanceledByUpdateToken()
+    {
+        var grain = Substitute.For<IStreamCheckpointerGrain>();
+        grain.Load(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult("10"));
+        using var updateCancellation = new CancellationTokenSource();
+        using var flushCancellation = new CancellationTokenSource();
+        var writeStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstWrite = new TaskCompletionSource<string>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var cancellationRegistration = updateCancellation.Token.Register(
+            () => firstWrite.TrySetCanceled(updateCancellation.Token));
+        grain.Update("20", "10", updateCancellation.Token)
+            .Returns(_ =>
+            {
+                writeStarted.SetResult();
+                return new ValueTask<string>(firstWrite.Task);
+            });
+        grain.Update("20", "10", flushCancellation.Token).Returns(ValueTask.FromResult("20"));
+        var checkpointer = new GrainStreamQueueCheckpointer(grain);
+        await checkpointer.Load();
+        checkpointer.Update("20", DateTime.UtcNow, updateCancellation.Token);
+        await writeStarted.Task;
+
+        updateCancellation.Cancel();
+        await checkpointer.FlushAsync(flushCancellation.Token);
+
+        await grain.Received(1).Update("20", "10", updateCancellation.Token);
+        await grain.Received(1).Update("20", "10", flushCancellation.Token);
+    }
+
+    [Fact]
+    public async Task Load_ForwardsCancellationTokenToGrain()
+    {
+        var grain = Substitute.For<IStreamCheckpointerGrain>();
+        grain.Load(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult("10"));
+        var checkpointer = new GrainStreamQueueCheckpointer(grain);
+        using var cancellation = new CancellationTokenSource();
+
+        Assert.Equal("10", await checkpointer.Load(cancellation.Token));
+
+        _ = await grain.Received(1).Load(cancellation.Token);
+    }
+
+    [Fact]
     public async Task GrainMethods_WhenCanceled_DoNotReadOrWriteState()
     {
         var state = new StreamCheckpointerGrainState { Checkpoint = "10" };
@@ -317,13 +379,15 @@ public sealed class GrainStreamQueueCheckpointerTests : StreamQueueCheckpointerT
         clusterClient
             .GetGrain<IStreamCheckpointerGrain>(Arg.Any<string>())
             .Returns(grain);
+        using var cancellation = new CancellationTokenSource();
 
         _ = await GrainStreamQueueCheckpointer.Create(
             providerName,
             "partition",
             "service",
             clusterClient,
-            new GrainStreamQueueCheckpointerOptions());
+            new GrainStreamQueueCheckpointerOptions(),
+            cancellation.Token);
 
         _ = clusterClient.Received(1).GetGrain<IStreamCheckpointerGrain>(
             GrainStreamQueueCheckpointer.GetGrainKey(
@@ -331,6 +395,7 @@ public sealed class GrainStreamQueueCheckpointerTests : StreamQueueCheckpointerT
                 "service",
                 "partition",
                 ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME));
+        _ = await grain.Received(1).Load(cancellation.Token);
     }
 
     [Fact]
