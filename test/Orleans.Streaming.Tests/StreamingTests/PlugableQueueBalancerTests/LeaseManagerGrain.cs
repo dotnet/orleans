@@ -14,7 +14,7 @@ namespace Tester.StreamingTests
         Task SetQueuesAsLeases(IEnumerable<QueueId> queues);
         //methods used in test asserts
         Task RecordBalancerResponsibility(string balancerId, int ownedQueues);
-        Task<Dictionary<string, int>> GetResponsibilityMap();
+        Task<Dictionary<string, int>> GetResponsibilityMap(CancellationToken cancellationToken = default);
 
     }
 
@@ -90,8 +90,9 @@ namespace Tester.StreamingTests
             return Task.CompletedTask;
         }
 
-        public Task<Dictionary<string, int>> GetResponsibilityMap()
+        public Task<Dictionary<string, int>> GetResponsibilityMap(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(responsibilityMap);
         }
     }

@@ -303,8 +303,8 @@ public class SingleStreamTestRunner
         await consumer.DeactivateOnIdle();
         await producer.DeactivateOnIdle();
 
-        await TestingUtils.WaitUntilAsync(lastTry => CheckGrainsDeactivated(null, consumer, false), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
-        await TestingUtils.WaitUntilAsync(lastTry => CheckGrainsDeactivated(producer, null, false), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
+        await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckGrainsDeactivated(null, consumer, lastTry, cancellationToken), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
+        await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckGrainsDeactivated(producer, null, lastTry, cancellationToken), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
 
         logger.LogInformation("\n\n\n*******************************************************************\n\n\n");
 
@@ -521,19 +521,19 @@ public class SingleStreamTestRunner
         return rendez.Validate();
     }
 
-    private async Task<bool> CheckGrainsDeactivated(ProducerProxy? producer, ConsumerProxy? consumer, bool assertAreEqual = true)
+    private async Task<bool> CheckGrainsDeactivated(ProducerProxy? producer, ConsumerProxy? consumer, bool assertAreEqual, CancellationToken cancellationToken)
     {
         var activationCount = 0;
         string str = "";
         if (producer != null)
         {
             str = "Producer";
-            activationCount = await producer.GetNumActivations(this.client);
+            activationCount = await producer.GetNumActivations(this.client, cancellationToken);
         }
         else if (consumer != null)
         {
             str = "Consumer";
-            activationCount = await consumer.GetNumActivations(this.client);
+            activationCount = await consumer.GetNumActivations(this.client, cancellationToken);
         }
         var expectActivationCount = 0;
         logger.LogInformation(

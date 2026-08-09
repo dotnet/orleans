@@ -89,8 +89,9 @@ namespace UnitTests.Grains
             }
         }
 
-        public Task<int> GetNumberConsumed()
+        public Task<int> GetNumberConsumed(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(_numConsumedItems);
         }
     }

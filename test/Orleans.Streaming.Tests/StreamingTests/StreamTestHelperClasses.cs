@@ -342,17 +342,17 @@ namespace UnitTests.StreamingTests
             await Task.WhenAll(tasks);
         }
 
-        public Task<int> GetNumActivations(IInternalGrainFactory grainFactory)
+        public Task<int> GetNumActivations(IInternalGrainFactory grainFactory, CancellationToken cancellationToken)
         {
-            return GetNumActivations(_targets.Distinct(), grainFactory);
-    }
+            return GetNumActivations(_targets.Distinct(), grainFactory, cancellationToken);
+        }
 
-        public static async Task<int> GetNumActivations(IEnumerable<IGrain> targets, IInternalGrainFactory grainFactory)
+        public static async Task<int> GetNumActivations(IEnumerable<IGrain> targets, IInternalGrainFactory grainFactory, CancellationToken cancellationToken)
         {
             var grainIds = targets.Distinct().Where(t => t is GrainReference).Select(t => ((GrainReference)t).GrainId).ToArray();
             IManagementGrain systemManagement = grainFactory.GetGrain<IManagementGrain>(0);
             var tasks = grainIds.Select(g => systemManagement.GetGrainActivationCount((GrainReference)grainFactory.GetGrain(g))).ToArray();
-            await Task.WhenAll(tasks);
+            await Task.WhenAll(tasks).WaitAsync(cancellationToken);
             return tasks.Sum(t => t.Result);
         }
     }
@@ -568,9 +568,9 @@ namespace UnitTests.StreamingTests
             return Task.WhenAll(tasks);
         }
 
-        public Task<int> GetNumActivations(IInternalGrainFactory grainFactory)
+        public Task<int> GetNumActivations(IInternalGrainFactory grainFactory, CancellationToken cancellationToken)
         {
-            return ConsumerProxy.GetNumActivations(_targets.Distinct(), grainFactory);
+            return ConsumerProxy.GetNumActivations(_targets.Distinct(), grainFactory, cancellationToken);
         }
     }
 }

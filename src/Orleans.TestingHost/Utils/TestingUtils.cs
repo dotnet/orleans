@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -71,40 +72,169 @@ namespace Orleans.TestingHost.Utils
             return factory;
         }
 
-        /// <summary> Run the predicate until it succeed or times out </summary>
+        /// <summary>Run the predicate until it succeeds or times out.</summary>
         /// <param name="predicate">The predicate to run</param>
         /// <param name="timeout">The timeout value</param>
         /// <param name="delayOnFail">The time to delay next call upon failure</param>
-        /// <returns>True if the predicate succeed, false otherwise</returns>
-        public static async Task WaitUntilAsync(Func<bool,Task<bool>> predicate, TimeSpan timeout, TimeSpan? delayOnFail = null)
+        /// <returns>A task representing the operation.</returns>
+        /// <exception cref="TimeoutException">The predicate did not succeed before the timeout elapsed.</exception>
+        public static Task WaitUntilAsync(Func<bool,Task<bool>> predicate, TimeSpan timeout, TimeSpan? delayOnFail = null)
         {
-            delayOnFail = delayOnFail ?? TimeSpan.FromSeconds(1);
-            var keepGoing = new[] { true };
-            async Task loop()
+            ArgumentNullException.ThrowIfNull(predicate);
+
+            var predicateName = $"{predicate.Method.DeclaringType?.FullName ?? "<unknown>"}.{predicate.Method.Name}";
+            return WaitUntilAsync((lastTry, _) => predicate(lastTry), timeout, delayOnFail, default, predicateName);
+        }
+
+        /// <summary>Run the predicate until it succeeds or times out.</summary>
+        /// <param name="predicate">
+        /// The predicate to run. The first argument indicates the final attempt, allowing the predicate to throw a detailed assertion failure.
+        /// The token is cancelled when the deadline expires or cancellation is requested.
+        /// </param>
+        /// <param name="timeout">The timeout value.</param>
+        /// <param name="delayOnFail">The delay before retrying after an unsuccessful attempt.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <param name="predicateExpression">The expression supplied for <paramref name="predicate"/>.</param>
+        /// <returns>A task representing the operation.</returns>
+        /// <exception cref="TimeoutException">The predicate did not succeed before the timeout elapsed.</exception>
+        public static async Task WaitUntilAsync(
+            Func<bool, CancellationToken, Task<bool>> predicate,
+            TimeSpan timeout,
+            TimeSpan? delayOnFail = null,
+            CancellationToken cancellationToken = default,
+            [CallerArgumentExpression(nameof(predicate))] string? predicateExpression = null)
+        {
+            ArgumentNullException.ThrowIfNull(predicate);
+
+            if (!await WaitUntilSucceededAsync(predicate, timeout, delayOnFail, cancellationToken, invokeFinalAttempt: true))
             {
-                bool passed;
-                do
+                throw new TimeoutException(
+                    $"The condition evaluated by '{predicateExpression ?? "<unknown>"}' was not satisfied within {timeout} "
+                    + $"using a retry delay of {delayOnFail ?? TimeSpan.FromSeconds(1)}. "
+                    + "The predicate was not invoked again after the deadline.");
+            }
+        }
+
+        /// <summary>Runs the predicate until it succeeds or the monotonic deadline expires.</summary>
+        /// <param name="predicate">The predicate to run. The token is cancelled when the deadline expires or cancellation is requested.</param>
+        /// <param name="timeout">The timeout value.</param>
+        /// <param name="delayOnFail">The delay before retrying after an unsuccessful attempt.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns><see langword="true"/> if the predicate succeeded before the deadline; otherwise, <see langword="false"/>.</returns>
+        public static async Task<bool> WaitUntilSucceededAsync(
+            Func<CancellationToken, Task<bool>> predicate,
+            TimeSpan timeout,
+            TimeSpan? delayOnFail = null,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(predicate);
+            return await WaitUntilSucceededAsync((_, token) => predicate(token), timeout, delayOnFail, cancellationToken, invokeFinalAttempt: false);
+        }
+
+        private static async Task<bool> WaitUntilSucceededAsync(
+            Func<bool, CancellationToken, Task<bool>> predicate,
+            TimeSpan timeout,
+            TimeSpan? delayOnFail,
+            CancellationToken cancellationToken,
+            bool invokeFinalAttempt)
+        {
+            ArgumentNullException.ThrowIfNull(predicate);
+            ArgumentOutOfRangeException.ThrowIfLessThan(timeout, TimeSpan.Zero);
+
+            var retryDelay = delayOnFail ?? TimeSpan.FromSeconds(1);
+            ArgumentOutOfRangeException.ThrowIfLessThan(retryDelay, TimeSpan.Zero);
+
+            cancellationToken.ThrowIfCancellationRequested();
+            var startedAt = Stopwatch.GetTimestamp();
+            using var deadlineCancellation = new CancellationTokenSource(timeout);
+            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadlineCancellation.Token);
+            var finalAttempt = false;
+            var lastAttemptDuration = TimeSpan.Zero;
+
+            while (Stopwatch.GetElapsedTime(startedAt) < timeout)
+            {
+                if (deadlineCancellation.IsCancellationRequested || Stopwatch.GetElapsedTime(startedAt) >= timeout)
                 {
-                    // need to wait a bit to before re-checking the condition.
-                    await Task.Delay(delayOnFail.Value);
-                    passed = await predicate(false);
+                    return false;
                 }
-                while (!passed && keepGoing[0]);
-                if (!passed)
-                    await predicate(true);
+
+                bool succeeded;
+                var attemptStartedAt = Stopwatch.GetTimestamp();
+                try
+                {
+                    succeeded = await predicate(finalAttempt, linkedCancellation.Token);
+                }
+                catch (OperationCanceledException) when (deadlineCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                {
+                    return false;
+                }
+
+                lastAttemptDuration = Stopwatch.GetElapsedTime(attemptStartedAt);
+                cancellationToken.ThrowIfCancellationRequested();
+                var elapsed = Stopwatch.GetElapsedTime(startedAt);
+                if (elapsed >= timeout)
+                {
+                    return false;
+                }
+
+                if (succeeded)
+                {
+                    return true;
+                }
+
+                var remaining = timeout - elapsed;
+                if (finalAttempt)
+                {
+                    try
+                    {
+                        await Task.Delay(remaining, linkedCancellation.Token);
+                    }
+                    catch (OperationCanceledException) when (deadlineCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                    {
+                        return false;
+                    }
+
+                    continue;
+                }
+
+                var finalAttemptWindow = retryDelay > TimeSpan.Zero ? retryDelay : TimeSpan.FromMilliseconds(10);
+                if (invokeFinalAttempt && remaining <= finalAttemptWindow)
+                {
+                    var minimumBudget = TimeSpan.FromMilliseconds(100);
+                    var finalAttemptBudget = lastAttemptDuration > minimumBudget
+                        ? lastAttemptDuration.Ticks >= remaining.Ticks / 2
+                            ? remaining
+                            : TimeSpan.FromTicks(lastAttemptDuration.Ticks * 2)
+                        : minimumBudget;
+                    var delayBeforeFinalAttempt = remaining - finalAttemptBudget;
+                    if (delayBeforeFinalAttempt > TimeSpan.Zero)
+                    {
+                        try
+                        {
+                            await Task.Delay(delayBeforeFinalAttempt, linkedCancellation.Token);
+                        }
+                        catch (OperationCanceledException) when (deadlineCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                        {
+                            return false;
+                        }
+                    }
+
+                    finalAttempt = true;
+                    continue;
+                }
+
+                var delay = retryDelay < remaining ? retryDelay : remaining;
+                try
+                {
+                    await Task.Delay(delay, linkedCancellation.Token);
+                }
+                catch (OperationCanceledException) when (deadlineCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                {
+                    return false;
+                }
             }
 
-            var task = loop();
-            try
-            {
-                await Task.WhenAny(task, Task.Delay(timeout));
-            }
-            finally
-            {
-                keepGoing[0] = false;
-            }
-
-            await task;
+            return false;
         }
 
         /// <summary>

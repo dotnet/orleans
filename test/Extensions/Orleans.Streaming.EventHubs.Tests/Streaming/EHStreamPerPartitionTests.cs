@@ -100,7 +100,7 @@ namespace ServiceBus.Tests.StreamingTests
             await Task.WhenAll(becomeConsumersTasks);
 
             await GenerateEvents(streamCount, eventsInStream);
-            await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(consumers, streamCount * eventsInStream, assertIsTrue), TimeSpan.FromSeconds(30));
+            await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckCounters(consumers, streamCount * eventsInStream, lastTry, cancellationToken), TimeSpan.FromSeconds(30));
         }
 
         private async Task GenerateEvents(int streamCount, int eventsInStream)
@@ -121,10 +121,10 @@ namespace ServiceBus.Tests.StreamingTests
             }
         }
 
-        private static async Task<bool> CheckCounters(List<ISampleStreaming_ConsumerGrain> consumers, int totalEventCount, bool assertIsTrue)
+        private static async Task<bool> CheckCounters(List<ISampleStreaming_ConsumerGrain> consumers, int totalEventCount, bool assertIsTrue, CancellationToken cancellationToken)
         {
             List<Task<int>> becomeConsumersTasks = consumers
-                .Select((consumer, i) => consumer.GetNumberConsumed())
+                .Select((consumer, i) => consumer.GetNumberConsumed(cancellationToken))
                 .ToList();
             int[] counts = await Task.WhenAll(becomeConsumersTasks);
 

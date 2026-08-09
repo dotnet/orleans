@@ -43,8 +43,9 @@ namespace TestGrains
             return Task.CompletedTask;
         }
 
-        public Task<IDictionary<Guid, int>> GetReport(string streamProvider, string streamNamespace)
+        public Task<IDictionary<Guid, int>> GetReport(string streamProvider, string streamNamespace, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             Dictionary<Guid, int>? counts;
             Tuple<string, string> key = Tuple.Create(streamProvider, streamNamespace);
             if (!reports.TryGetValue(key, out counts))

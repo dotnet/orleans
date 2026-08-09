@@ -608,8 +608,9 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<T> GetLastValue()
+        public Task<T> GetLastValue(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(_lastValue!);
         }
 

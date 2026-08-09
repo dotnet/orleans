@@ -42,8 +42,9 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<int> GetNumberProduced()
+        public Task<int> GetNumberProduced(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(_numProducedItems);
         }
 

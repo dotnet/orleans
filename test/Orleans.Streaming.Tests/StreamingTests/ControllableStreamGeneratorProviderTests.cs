@@ -92,7 +92,7 @@ namespace UnitTests.StreamingTests
                     Assert.True(controlCommandResult);
                 }
 
-                await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(generatorConfig, assertIsTrue), Timeout);
+                await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckCounters(generatorConfig, lastTry, cancellationToken), Timeout);
             }
             finally
             {
@@ -100,11 +100,11 @@ namespace UnitTests.StreamingTests
             }
         }
 
-        private async Task<bool> CheckCounters(SimpleGeneratorOptions generatorConfig, bool assertIsTrue)
+        private async Task<bool> CheckCounters(SimpleGeneratorOptions generatorConfig, bool assertIsTrue, CancellationToken cancellationToken)
         {
             var reporter = this.fixture.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
 
-            var report = await reporter.GetReport(GeneratedStreamTestConstants.StreamProviderName, generatorConfig.StreamNamespace);
+            var report = await reporter.GetReport(GeneratedStreamTestConstants.StreamProviderName, generatorConfig.StreamNamespace, cancellationToken);
             if (assertIsTrue)
             {
                 // one stream per queue
@@ -126,12 +126,12 @@ namespace UnitTests.StreamingTests
         {
             var reporter = this.fixture.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
             await reporter.Reset();
-            await TestingUtils.WaitUntilAsync(assertIsTrue => CheckReporterIsEmpty(reporter, streamNamespace, assertIsTrue), Timeout);
+            await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckReporterIsEmpty(reporter, streamNamespace, lastTry, cancellationToken), Timeout);
         }
 
-        private static async Task<bool> CheckReporterIsEmpty(IGeneratedEventReporterGrain reporter, string streamNamespace, bool assertIsTrue)
+        private static async Task<bool> CheckReporterIsEmpty(IGeneratedEventReporterGrain reporter, string streamNamespace, bool assertIsTrue, CancellationToken cancellationToken)
         {
-            var report = await reporter.GetReport(GeneratedStreamTestConstants.StreamProviderName, streamNamespace);
+            var report = await reporter.GetReport(GeneratedStreamTestConstants.StreamProviderName, streamNamespace, cancellationToken);
             if (assertIsTrue)
             {
                 Assert.Empty(report);

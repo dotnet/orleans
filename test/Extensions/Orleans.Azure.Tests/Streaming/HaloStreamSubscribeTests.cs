@@ -140,7 +140,7 @@ namespace UnitTests.HaloTests.Streaming
             var streamId = Orleans.Runtime.StreamId.Create("HaloStreamingNamespace", _streamId);
             await observer.WaitForMessageDeliveredAsync(streamId, _streamProvider, cts.Token);
 
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer), Timeout);
+            await TestingUtils.WaitUntilAsync((_, cancellationToken) => CheckCounters(producer, consumer, cancellationToken), Timeout);
 
             await consumer.StopConsuming();
         }
@@ -162,15 +162,15 @@ namespace UnitTests.HaloTests.Streaming
             var streamId = Orleans.Runtime.StreamId.Create("HaloStreamingNamespace", _streamId);
             await observer.WaitForMessageDeliveredAsync(streamId, _streamProvider, cts.Token);
 
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer), Timeout);
+            await TestingUtils.WaitUntilAsync((_, cancellationToken) => CheckCounters(producer, consumer, cancellationToken), Timeout);
 
             await consumer.StopConsuming();
         }
 
-        private async Task<bool> CheckCounters(IProducerEventCountingGrain producer, IConsumerEventCountingGrain consumer)
+        private async Task<bool> CheckCounters(IProducerEventCountingGrain producer, IConsumerEventCountingGrain consumer, CancellationToken cancellationToken)
         {
-            var numProduced = await producer.GetNumberProduced();
-            var numConsumed = await consumer.GetNumberConsumed();
+            var numProduced = await producer.GetNumberProduced(cancellationToken);
+            var numConsumed = await consumer.GetNumberConsumed(cancellationToken);
             this.fixture.Logger.LogInformation("CheckCounters: numProduced = {ProducedCount}, numConsumed = {ConsumedCount}", numProduced, numConsumed);
             return numProduced == numConsumed;
         }

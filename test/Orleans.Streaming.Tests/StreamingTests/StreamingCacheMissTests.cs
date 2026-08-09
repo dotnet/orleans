@@ -151,9 +151,9 @@ namespace Tester.StreamingTests
         private static Task WaitForEventCounterAsync(IImplicitSubscriptionCounterGrain grain, int expected)
         {
             return TestingUtils.WaitUntilAsync(
-                async lastTry =>
+                async (lastTry, cancellationToken) =>
                 {
-                    var actual = await grain.GetEventCounter();
+                    var actual = await grain.GetEventCounter(cancellationToken);
                     if (lastTry)
                     {
                         Assert.Equal(expected, actual);

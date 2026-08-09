@@ -141,14 +141,14 @@ public abstract class StreamingResumeTests : TestClusterPerTest
         var slowGrain = this.Client.GetGrain<ISlowImplicitSubscriptionCounterGrain>(key);
 
         await stream.OnNextAsync([1]);
-        await TestingUtils.WaitUntilAsync(lastTry => CheckFastCounter(1, lastTry), TimeSpan.FromSeconds(30), delayOnFail: PollInterval);
+        await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckFastCounter(1, lastTry, cancellationToken), TimeSpan.FromSeconds(30), delayOnFail: PollInterval);
 
         await stream.OnNextAsync([2]);
-        await TestingUtils.WaitUntilAsync(lastTry => CheckFastCounter(2, lastTry), TimeSpan.FromSeconds(30), delayOnFail: PollInterval);
+        await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckFastCounter(2, lastTry, cancellationToken), TimeSpan.FromSeconds(30), delayOnFail: PollInterval);
 
-        async Task<bool> CheckFastCounter(int expected, bool lastTry)
+        async Task<bool> CheckFastCounter(int expected, bool lastTry, CancellationToken cancellationToken)
         {
-            var actual = await fastGrain.GetEventCounter();
+            var actual = await fastGrain.GetEventCounter(cancellationToken);
             if (lastTry)
             {
                 Assert.Equal(expected, actual);
@@ -161,9 +161,9 @@ public abstract class StreamingResumeTests : TestClusterPerTest
     private static Task WaitForEventCounterAsync(IImplicitSubscriptionCounterGrain grain, int expected)
     {
         return TestingUtils.WaitUntilAsync(
-            async lastTry =>
+            async (lastTry, cancellationToken) =>
             {
-                var actual = await grain.GetEventCounter();
+                var actual = await grain.GetEventCounter(cancellationToken);
                 if (lastTry)
                 {
                     Assert.Equal(expected, actual);

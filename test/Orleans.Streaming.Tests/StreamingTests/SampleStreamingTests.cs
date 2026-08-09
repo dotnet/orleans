@@ -56,7 +56,7 @@ namespace UnitTests.StreamingTests
 
             await producer.StopPeriodicProducing();
 
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
+            await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckCounters(producer, consumer, lastTry, cancellationToken), _timeout);
 
             await consumer.StopConsuming();
         }
@@ -84,7 +84,7 @@ namespace UnitTests.StreamingTests
             await producer.StopPeriodicProducing();
             //int numProduced = await producer.NumberProduced;
 
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
+            await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckCounters(producer, consumer, lastTry, cancellationToken), _timeout);
 
             await consumer.StopConsuming();
         }
@@ -112,7 +112,7 @@ namespace UnitTests.StreamingTests
             await producer.StopPeriodicProducing();
             //int numProduced = await producer.NumberProduced;
 
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
+            await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckCounters(producer, consumer, lastTry, cancellationToken), _timeout);
 
             await consumer.StopConsuming();
         }
@@ -124,10 +124,10 @@ namespace UnitTests.StreamingTests
         /// - No duplicate deliveries occurred
         /// - Producer and consumer are properly synchronized
         /// </summary>
-        private async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, ISampleStreaming_ConsumerGrain consumer, bool assertIsTrue)
+        private async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, ISampleStreaming_ConsumerGrain consumer, bool assertIsTrue, CancellationToken cancellationToken)
         {
-            var numProduced = await producer.GetNumberProduced();
-            var numConsumed = await consumer.GetNumberConsumed();
+            var numProduced = await producer.GetNumberProduced(cancellationToken);
+            var numConsumed = await consumer.GetNumberConsumed(cancellationToken);
             this.logger.LogInformation("CheckCounters: numProduced = {ProducedCount}, numConsumed = {ConsumedCount}", numProduced, numConsumed);
             if (assertIsTrue)
             {

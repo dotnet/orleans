@@ -13,6 +13,6 @@
         /// <returns></returns>
         Task SendEvent();
 
-        Task<int> GetNumberProduced();
+        Task<int> GetNumberProduced(CancellationToken cancellationToken = default);
     }
 }
