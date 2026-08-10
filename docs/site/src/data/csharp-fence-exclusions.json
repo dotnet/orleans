@@ -338,6 +338,14 @@
       "hashes": [
         "1c60b57580d6d50b5f4ddd33f8c74d785d8463bb071552af2bcde7dc57f874e9"
       ]
+    },
+    "streaming/kinesis-streaming.md": {
+      "reason": "Kinesis fences are complementary silo, client, and checkpoint configuration fragments which depend on shared AWS credentials, storage registration, and host setup omitted from the page.",
+      "hashes": [
+        "f650adc338b09b68803dbb810981d211a493c46bdcb83f6400116eaa0a9deca0",
+        "487d756640ae6fdb0fff2d2c084dedae77438271bc03c8d72849f77b4caf58d8",
+        "272a5d99bb9efef9f299e8fcb9fba9f63ca900d4620debd444455154d67dd7eb"
+      ]
     }
   }
 }

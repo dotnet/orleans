@@ -1079,6 +1079,7 @@ export async function probeExternalTargets({
 }) {
   const failures = [];
   const warnings = [];
+  const validAllowlistUrls = new Set();
   for (const [url, reason] of Object.entries(allowlist.urls ?? {})) {
     let parsed;
     try {
@@ -1096,20 +1097,17 @@ export async function probeExternalTargets({
     }
     try {
       await resolveExternalDestination(parsed, { lookupImpl });
+      validAllowlistUrls.add(url);
     } catch (error) {
       failures.push(
         `External link allowlist entry '${url}' has an unsafe or unresolved destination: ${error.message}`,
       );
     }
   }
-  const entries = [...externalTargets.entries()].filter(([url]) => {
-    const reason = allowlist.urls?.[url];
-    if (reason) {
-      warnings.push(`Allowlisted '${url}': ${reason}`);
-      return false;
-    }
-    return true;
-  });
+  const entries = [...externalTargets.entries()].filter(
+    ([url]) =>
+      !Object.hasOwn(allowlist.urls ?? {}, url) || validAllowlistUrls.has(url),
+  );
   if (entries.length > maxTargets) {
     failures.push(
       `External link audit discovered ${entries.length} targets, exceeding the request cap of ${maxTargets}.`,
@@ -1139,14 +1137,25 @@ export async function probeExternalTargets({
         if (attempt < retries) await delay(100 * 2 ** attempt);
       }
       const provenance = referenceSummary(references);
+      const allowlistReason = allowlist.urls?.[url];
       if (error) {
         const message = `${url} (${provenance}): ${error.message}${error.networkCode ? ` (${error.networkCode})` : ''}`;
-        if (error.transient) warnings.push(`Transient external link failure: ${message}`);
+        if (allowlistReason && error.transient) {
+          warnings.push(`Allowlisted '${url}' could not be probed: ${message}. Reason: ${allowlistReason}`);
+        } else if (error.transient) warnings.push(`Transient external link failure: ${message}`);
         else failures.push(message);
         continue;
       }
       const status = result.response.status;
-      if (status === 404 || status === 410) {
+      if (allowlistReason) {
+        if (status >= 200 && status < 400) {
+          failures.push(
+            `External link allowlist entry '${url}' is stale because the target now returns ${status}; remove the entry.`,
+          );
+        } else {
+          warnings.push(`Allowlisted '${url}' returned ${status}: ${allowlistReason}`);
+        }
+      } else if (status === 404 || status === 410) {
         failures.push(`${url} (${provenance}): returned ${status}.`);
       } else if (status >= 400 && !transientStatuses.has(status)) {
         failures.push(`${url} (${provenance}): returned ${status}; add a reasoned exact-URL allowlist entry only if the target cannot be probed reliably.`);

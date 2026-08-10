@@ -44,6 +44,7 @@ Every multi-silo production cluster needs a shared membership provider.
 | [Microsoft.Orleans.Clustering.Consul](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.Consul) | HashiCorp Consul |
 | [Microsoft.Orleans.Clustering.Cosmos](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.Cosmos) | Azure Cosmos DB |
 | [Microsoft.Orleans.Clustering.DynamoDB](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.DynamoDB) | Amazon DynamoDB |
+| [Microsoft.Orleans.Clustering.Firestore](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.Firestore) | Google Cloud Firestore |
 | [Microsoft.Orleans.Clustering.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.Redis) | Redis |
 | [Microsoft.Orleans.Clustering.ZooKeeper](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.ZooKeeper) | Apache ZooKeeper |
 
@@ -55,6 +56,7 @@ Every multi-silo production cluster needs a shared membership provider.
 | [Microsoft.Orleans.Persistence.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AzureStorage) | Azure Table and Blob Storage |
 | [Microsoft.Orleans.Persistence.Cosmos](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Cosmos) | Azure Cosmos DB |
 | [Microsoft.Orleans.Persistence.DynamoDB](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.DynamoDB) | Amazon DynamoDB |
+| [Microsoft.Orleans.Persistence.Firestore](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Firestore) | Google Cloud Firestore |
 | [Microsoft.Orleans.Persistence.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Redis) | Redis |
 | [Microsoft.Orleans.Persistence.Memory](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Memory) | Process memory for development and testing |
 
@@ -69,6 +71,7 @@ Memory persistence distributes records across cluster storage grains but isn't d
 | [Microsoft.Orleans.Reminders.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.AzureStorage) | Azure Table Storage reminders. |
 | [Microsoft.Orleans.Reminders.Cosmos](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Cosmos) | Azure Cosmos DB reminders. |
 | [Microsoft.Orleans.Reminders.DynamoDB](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.DynamoDB) | Amazon DynamoDB reminders. |
+| [Microsoft.Orleans.Reminders.Firestore](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Firestore) | Google Cloud Firestore reminders. |
 | [Microsoft.Orleans.Reminders.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Redis) | Redis reminders. |
 | [Microsoft.Orleans.DurableJobs](https://www.nuget.org/packages/Microsoft.Orleans.DurableJobs) | Distributed scheduling for durable one-time jobs. |
 | [Microsoft.Orleans.DurableJobs.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.DurableJobs.AzureStorage) | Azure Blob Storage for durable jobs. |
@@ -83,6 +86,7 @@ Use reminders for recurring durable callbacks and durable jobs for scheduled one
 | [Microsoft.Orleans.Streaming.AdoNet](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.AdoNet) | ADO.NET-backed streams. |
 | [Microsoft.Orleans.Streaming.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.AzureStorage) | Azure Queue Storage streams. |
 | [Microsoft.Orleans.Streaming.EventHubs](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.EventHubs) | Azure Event Hubs streams. |
+| [Microsoft.Orleans.Streaming.Kinesis](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.Kinesis) | Amazon Kinesis Data Streams. |
 | [Microsoft.Orleans.Streaming.NATS](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.NATS) | NATS JetStream streams. |
 | [Microsoft.Orleans.Streaming.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.Redis) | Redis Streams integration. |
 | [Microsoft.Orleans.Streaming.SQS](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.SQS) | Amazon SQS streams. |
@@ -96,6 +100,7 @@ Custom grain directory providers store grain registration information for select
 | --- | --- |
 | [Microsoft.Orleans.GrainDirectory.AdoNet](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.AdoNet) | ADO.NET-compatible relational databases |
 | [Microsoft.Orleans.GrainDirectory.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.AzureStorage) | Azure Table Storage |
+| [Microsoft.Orleans.GrainDirectory.Firestore](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.Firestore) | Google Cloud Firestore |
 | [Microsoft.Orleans.GrainDirectory.Redis](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.Redis) | Redis |
 
 These packages don't replace the cluster membership provider.

@@ -13,6 +13,10 @@
   <Folder Name="/samples/Adventure/AdventureServer/">
     <Project Path="../samples/Adventure/AdventureServer/AdventureServer.csproj" />
   </Folder>
+  <Folder Name="/samples/AWS/" />
+  <Folder Name="/samples/AWS/KinesisDynamoDB/">
+    <Project Path="../samples/AWS/KinesisDynamoDB/KinesisDynamoDB.csproj" />
+  </Folder>
   <Folder Name="/samples/BankAccount/" />
   <Folder Name="/samples/BankAccount/AccountTransfer.Grains/">
     <Project Path="../samples/BankAccount/AccountTransfer.Grains/AccountTransfer.Grains.csproj" />
@@ -105,6 +109,9 @@
   </Folder>
   <Folder Name="/samples/FSharpHelloWorld/HelloWorldInterfaces/">
     <Project Path="../samples/FSharpHelloWorld/HelloWorldInterfaces/HelloWorldInterfaces.csproj" />
+  </Folder>
+  <Folder Name="/samples/GoogleFirestore/">
+    <Project Path="../samples/GoogleFirestore/Firestore.csproj" />
   </Folder>
   <Folder Name="/samples/GPSTracker/" />
   <Folder Name="/samples/GPSTracker/GPSTracker.Common/">
@@ -281,6 +288,9 @@
     <Project Path="site/src/content/docs/host/snippets/aspire/ServiceDefaults/ServiceDefaults.csproj" />
     <Project Path="site/src/content/docs/host/snippets/aspire/SharedContracts/SharedContracts.csproj" />
     <Project Path="site/src/content/docs/host/snippets/aspire/Silo/Silo.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/host/snippets/google-firestore/">
+    <Project Path="site/src/content/docs/host/snippets/google-firestore/Firestore.csproj" />
   </Folder>
   <Folder Name="/site/src/content/docs/host/snippets/hosting/">
     <Project Path="site/src/content/docs/host/snippets/hosting/Hosting.csproj" />

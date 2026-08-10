@@ -884,29 +884,36 @@ describe('external link audit', () => {
 
   test('requires exact, reasoned, non-stale allowlist entries', async () => {
     const url = 'https://example.com/unprobeable';
+    const reachableUrl = 'https://example.com/reachable';
     const privateUrl = 'http://127.0.0.1/internal';
     const result = await probeExternalTargets({
       externalTargets: new Map([
         [url, [{ relativeFile: 'guide.md', line: 1 }]],
-        [privateUrl, [{ relativeFile: 'guide.md', line: 2 }]],
+        [reachableUrl, [{ relativeFile: 'guide.md', line: 2 }]],
+        [privateUrl, [{ relativeFile: 'guide.md', line: 3 }]],
       ]),
       allowlist: {
         urls: {
           [url]: 'This endpoint blocks automated probes but is reviewed manually.',
+          [reachableUrl]: 'This endpoint was unavailable but should now fail stale.',
           [privateUrl]: 'This reason is deliberately long but cannot bypass destination safety.',
           'not a URL': 'This reason is long enough but the URL is malformed.',
           'https://example.com/stale': 'This exact target is no longer referenced anywhere.',
         },
       },
       lookupImpl: async () => [{ address: '8.8.8.8', family: 4 }],
+      requestImpl: async (target) =>
+        response(target.pathname === '/reachable' ? 200 : 403),
+      retries: 0,
     });
 
-    expect(result.probed).toBe(0);
+    expect(result.probed).toBe(2);
     expect(result.warnings).toContainEqual(expect.stringContaining('Allowlisted'));
     expect(result.failures).toEqual(
       expect.arrayContaining([
         expect.stringContaining('malformed URL'),
         expect.stringContaining('stale'),
+        expect.stringContaining('target now returns 200'),
         expect.stringContaining('unsafe or unresolved destination'),
         expect.stringContaining("non-public address '127.0.0.1'"),
       ]),

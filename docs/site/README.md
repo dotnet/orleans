@@ -55,14 +55,14 @@ The source audit reports a rule ID, file, line, and remediation. It enforces:
   Source diagnostics include file/line provenance.
 - Generated links to this repository are checked against the local checkout.
   Remaining external HTTP(S) validation uses bounded concurrency, redirects,
-  timeouts, retries, and host-specific HEAD-to-GET fallback. Definitive broken targets fail.
-  Rate limits and transient network failures are reported explicitly without
-  making CI nondeterministic. Pull-request content is untrusted: the probe rejects
-  credentials, non-default ports, and any hostname/IP which can reach private,
-  loopback, link-local, metadata, or other non-public networks. DNS answers are
-  validated and pinned into the actual TLS connection at every redirect hop, so
-  contributors cannot use redirects, rebinding, or proxy environment variables
-  to turn link validation into an internal-network request.
+  timeouts, retries, and host-specific HEAD-to-GET fallback. Definitive broken
+  targets fail. Rate limits and transient network failures are reported explicitly
+  without making CI nondeterministic. Pull-request content is untrusted: the probe
+  rejects credentials, non-default ports, and any hostname/IP which can reach
+  private, loopback, link-local, metadata, or other non-public networks. DNS
+  answers are validated and pinned into the actual TLS connection at every
+  redirect hop, so contributors cannot use redirects, rebinding, or proxy
+  environment variables to turn link validation into an internal-network request.
 
 `npm run build` and `npm run validate` discover every project under `docs/` and
 `samples/`, require exact one-to-one membership in `docs/Docs.slnx`, evaluate an
@@ -94,10 +94,16 @@ by targeting only `net10.0`, and fix `PROJECT005` by updating the effective
 Orleans package version to `10.2.2`. `PROJECT006` identifies an invalid, vague,
 or stale migration exception. Fix `SNIPPET001`/`SNIPPET002` in the
 reported snippet project before rebuilding.
+When adding a project, pass `--include-references false` and use a solution folder
+which matches its path under `docs/` or `samples/`; repository source dependencies
+build transitively and aren't direct `Docs.slnx` entries.
 Fix `LINK001` using the canonical URL in its remediation. Rendered-link failures
 name the source file/line when the authored link can be mapped, otherwise the
 rendered route. `src/data/external-link-allowlist.json` accepts exact URLs only;
-each entry needs a narrow reason and stale entries fail validation.
+each entry needs a narrow reason and remains actively probed, so reachable or
+unreferenced entries fail as stale. A generated API package awaiting its first
+NuGet publication also needs a temporary entry in
+`src/data/unpublished-api-packages.json`; remove both entries after publication.
 
 Options remain an intentionally curated shortlist rather than a generated
 catalog; the audit requires that page to identify the generated API reference as
