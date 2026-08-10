@@ -74,6 +74,7 @@ namespace Orleans.Streams
         /// <summary>
         /// Creates and initializes a grain-based checkpointer with default options.
         /// </summary>
+        [Obsolete("Use the overload which accepts a CancellationToken.")]
         public static async Task<IStreamQueueCheckpointer<string>> Create(string providerName, string partition, string serviceId, IClusterClient clusterClient)
             => await Create(providerName, partition, serviceId, clusterClient, CancellationToken.None);
 
@@ -99,6 +100,7 @@ namespace Orleans.Streams
         /// <summary>
         /// Creates and initializes a grain-based checkpointer.
         /// </summary>
+        [Obsolete("Use the overload which accepts a CancellationToken.")]
         public static async Task<IStreamQueueCheckpointer<string>> Create(
             string providerName,
             string partition,
@@ -176,6 +178,7 @@ namespace Orleans.Streams
         }
 
         /// <inheritdoc />
+        [Obsolete("Use the overload which accepts a CancellationToken.")]
         public Task<string> Load() => Load(CancellationToken.None);
 
         /// <inheritdoc />
@@ -192,6 +195,7 @@ namespace Orleans.Streams
         }
 
         /// <inheritdoc />
+        [Obsolete("Use the overload which accepts a CancellationToken.")]
         public void Update(string offset, DateTime utcNow)
             => Update(offset, utcNow, CancellationToken.None);
 

@@ -39,7 +39,7 @@ public abstract class StreamQueueCheckpointerTests
     {
         var (checkpointer, store) = await CreateSubject(NoCheckpoint);
 
-        var checkpoint = await checkpointer.Load();
+        var checkpoint = await checkpointer.Load(CancellationToken.None);
 
         Assert.Equal(NoCheckpoint, checkpoint);
         Assert.False(checkpointer.CheckpointExists);
@@ -52,7 +52,7 @@ public abstract class StreamQueueCheckpointerTests
     {
         var (checkpointer, store) = await CreateSubject("10");
 
-        var checkpoint = await checkpointer.Load();
+        var checkpoint = await checkpointer.Load(CancellationToken.None);
 
         Assert.Equal("10", checkpoint);
         Assert.True(checkpointer.CheckpointExists);
@@ -65,7 +65,7 @@ public abstract class StreamQueueCheckpointerTests
     {
         var (checkpointer, store) = await CreateLoadedSubject("10");
 
-        checkpointer.Update("20", TestTimeUtc);
+        checkpointer.Update("20", TestTimeUtc, CancellationToken.None);
         await store.WaitForCompletedWrites(1);
         await checkpointer.FlushAsync(CancellationToken.None);
 
@@ -78,10 +78,10 @@ public abstract class StreamQueueCheckpointerTests
     public async Task Update_WithinPersistInterval_ThrottlesWriteUntilFlush()
     {
         var (checkpointer, store) = await CreateLoadedSubject("10");
-        checkpointer.Update("20", TestTimeUtc);
+        checkpointer.Update("20", TestTimeUtc, CancellationToken.None);
         await store.WaitForCompletedWrites(1);
 
-        checkpointer.Update("30", TestTimeUtc + PersistInterval - TimeSpan.FromTicks(1));
+        checkpointer.Update("30", TestTimeUtc + PersistInterval - TimeSpan.FromTicks(1), CancellationToken.None);
 
         Assert.Equal(["20"], store.WriteAttempts);
         Assert.Equal("20", store.PersistedCheckpoint);
@@ -96,10 +96,10 @@ public abstract class StreamQueueCheckpointerTests
     public async Task Update_AtPersistIntervalBoundary_PersistsWithoutFlush()
     {
         var (checkpointer, store) = await CreateLoadedSubject("10");
-        checkpointer.Update("20", TestTimeUtc);
+        checkpointer.Update("20", TestTimeUtc, CancellationToken.None);
         await store.WaitForCompletedWrites(1);
 
-        checkpointer.Update("30", TestTimeUtc + PersistInterval);
+        checkpointer.Update("30", TestTimeUtc + PersistInterval, CancellationToken.None);
         await store.WaitForCompletedWrites(2);
 
         Assert.Equal(["20", "30"], store.WriteAttempts);
@@ -111,11 +111,11 @@ public abstract class StreamQueueCheckpointerTests
     public async Task FlushAsync_AfterMultipleThrottledUpdates_PersistsOnlyLatestCheckpoint()
     {
         var (checkpointer, store) = await CreateLoadedSubject("10");
-        checkpointer.Update("20", TestTimeUtc);
+        checkpointer.Update("20", TestTimeUtc, CancellationToken.None);
         await store.WaitForCompletedWrites(1);
 
-        checkpointer.Update("30", TestTimeUtc);
-        checkpointer.Update("40", TestTimeUtc);
+        checkpointer.Update("30", TestTimeUtc, CancellationToken.None);
+        checkpointer.Update("40", TestTimeUtc, CancellationToken.None);
         await checkpointer.FlushAsync(CancellationToken.None);
 
         Assert.Equal(["20", "40"], store.WriteAttempts);
@@ -128,9 +128,9 @@ public abstract class StreamQueueCheckpointerTests
     {
         var (checkpointer, store) = await CreateLoadedSubject("10");
         var blockedWrite = store.BlockNextWrite();
-        checkpointer.Update("20", TestTimeUtc);
+        checkpointer.Update("20", TestTimeUtc, CancellationToken.None);
         await store.WaitForWriteAttempts(1);
-        checkpointer.Update("30", TestTimeUtc + PersistInterval + PersistInterval);
+        checkpointer.Update("30", TestTimeUtc + PersistInterval + PersistInterval, CancellationToken.None);
 
         var flush = checkpointer.FlushAsync(CancellationToken.None);
 
@@ -155,7 +155,7 @@ public abstract class StreamQueueCheckpointerTests
         Task flush;
         using (context.Activate())
         {
-            checkpointer.Update("20", TestTimeUtc);
+            checkpointer.Update("20", TestTimeUtc, CancellationToken.None);
             flush = checkpointer.FlushAsync(CancellationToken.None);
         }
 
@@ -168,7 +168,7 @@ public abstract class StreamQueueCheckpointerTests
         var secondWrite = store.BlockNextWrite();
         using (context.Activate())
         {
-            checkpointer.Update("30", TestTimeUtc + PersistInterval);
+            checkpointer.Update("30", TestTimeUtc + PersistInterval, CancellationToken.None);
         }
 
         await store.WaitForWriteAttempts(2);
@@ -194,7 +194,7 @@ public abstract class StreamQueueCheckpointerTests
         var (checkpointer, store) = await CreateLoadedSubject("10");
         var expected = new InvalidOperationException("checkpoint write failed");
         store.FailNextWrite(expected);
-        checkpointer.Update("20", TestTimeUtc);
+        checkpointer.Update("20", TestTimeUtc, CancellationToken.None);
 
         await checkpointer.FlushAsync(CancellationToken.None);
 
@@ -208,7 +208,7 @@ public abstract class StreamQueueCheckpointerTests
     {
         var (checkpointer, store) = await CreateLoadedSubject("10");
         var blockedWrite = store.BlockNextWrite();
-        checkpointer.Update("20", TestTimeUtc);
+        checkpointer.Update("20", TestTimeUtc, CancellationToken.None);
         await store.WaitForWriteAttempts(1);
         using var cancellation = new CancellationTokenSource();
 
@@ -231,7 +231,7 @@ public abstract class StreamQueueCheckpointerTests
     {
         var (checkpointer, store) = await CreateLoadedSubject("20");
 
-        checkpointer.Update(EquivalentCheckpoint, TestTimeUtc);
+        checkpointer.Update(EquivalentCheckpoint, TestTimeUtc, CancellationToken.None);
         await checkpointer.FlushAsync(CancellationToken.None);
 
         Assert.Empty(store.WriteAttempts);
@@ -244,7 +244,7 @@ public abstract class StreamQueueCheckpointerTests
     {
         var (checkpointer, store) = await CreateLoadedSubject("20");
 
-        checkpointer.Update("10", TestTimeUtc);
+        checkpointer.Update("10", TestTimeUtc, CancellationToken.None);
         await checkpointer.FlushAsync(CancellationToken.None);
 
         if (RegressionPolicy is OffsetRegressionPolicy.Ignore)
@@ -270,7 +270,7 @@ public abstract class StreamQueueCheckpointerTests
         CreateLoadedSubject(string persistedCheckpoint)
     {
         var subject = await CreateSubject(persistedCheckpoint);
-        Assert.Equal(persistedCheckpoint, await subject.Checkpointer.Load());
+        Assert.Equal(persistedCheckpoint, await subject.Checkpointer.Load(CancellationToken.None));
         return subject;
     }
 

@@ -69,7 +69,7 @@ namespace Tester.AzureUtils.Streaming
 
         private async Task SendAndReceiveFromQueueAdapter(IQueueAdapterFactory adapterFactory)
         {
-            IQueueAdapter adapter = await adapterFactory.CreateAdapter();
+            IQueueAdapter adapter = await adapterFactory.CreateAdapter(CancellationToken.None);
             IQueueAdapterCache cache = adapterFactory.GetQueueAdapterCache();
 
             // Create receiver per queue
@@ -97,7 +97,9 @@ namespace Tester.AzureUtils.Streaming
                 {
                     while (receivedBatches < NumBatches)
                     {
-                        var receivedMessages = receiver.GetQueueMessagesAsync(QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG).Result;
+                        var receivedMessages = receiver.GetQueueMessagesAsync(
+                            QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG,
+                            CancellationToken.None).Result;
                         Assert.NotNull(receivedMessages);
                         var messages = receivedMessages.ToArray();
                         if (!messages.Any())

@@ -21,6 +21,7 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="maxCount">Max amount of message which should be delivered in this request</param>
         /// <param name="waitTime">Wait time of this request</param>
         /// <returns></returns>
+        [Obsolete("Use the overload which accepts a CancellationToken.")]
         Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime);
 
         /// <summary>
@@ -30,19 +31,18 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="waitTime">The maximum wait time.</param>
         /// <param name="cancellationToken">The token used to cancel the operation.</param>
         /// <returns>The received messages.</returns>
+#pragma warning disable CS0618 // Required for compatibility with providers which only implement the legacy overload.
         Task<IEnumerable<EventData>> ReceiveAsync(
             int maxCount,
             TimeSpan waitTime,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return ReceiveAsync(maxCount, waitTime).WaitAsync(cancellationToken);
-        }
+            CancellationToken cancellationToken) => ReceiveAsync(maxCount, waitTime);
+#pragma warning restore CS0618
 
         /// <summary>
         /// Send a clean up message
         /// </summary>
         /// <returns></returns>
+        [Obsolete("Use the overload which accepts a CancellationToken.")]
         Task CloseAsync();
 
         /// <summary>
@@ -50,7 +50,9 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         /// <param name="cancellationToken">The token used to cancel the operation.</param>
         /// <returns>A task representing the operation.</returns>
+#pragma warning disable CS0618 // Required for compatibility with providers which only implement the legacy overload.
         Task CloseAsync(CancellationToken cancellationToken) => CloseAsync();
+#pragma warning restore CS0618
     }
 
     /// <summary>

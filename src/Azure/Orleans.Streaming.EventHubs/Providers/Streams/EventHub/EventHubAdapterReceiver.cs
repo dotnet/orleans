@@ -161,6 +161,7 @@ namespace Orleans.Streaming.EventHubs
             }
         }
 
+        [Obsolete("Use the overload which accepts a CancellationToken.")]
         public Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
             => GetQueueMessagesAsync(maxCount, CancellationToken.None);
 
@@ -267,7 +268,7 @@ namespace Orleans.Streaming.EventHubs
             if (earliestSubscriptionToken is IEventHubPartitionLocation location
                 && long.TryParse(location.EventHubOffset, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
             {
-                this.checkpointer?.Update(location.EventHubOffset, utcNow);
+                this.checkpointer?.Update(location.EventHubOffset, utcNow, CancellationToken.None);
             }
         }
 

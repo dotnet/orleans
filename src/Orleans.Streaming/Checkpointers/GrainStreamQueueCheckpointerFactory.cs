@@ -56,6 +56,7 @@ namespace Orleans.Streams
         }
 
         /// <inheritdoc />
+        [Obsolete("Use the overload which accepts a CancellationToken.")]
         public Task<IStreamQueueCheckpointer<string>> Create(string partition)
             => Create(partition, CancellationToken.None);
 

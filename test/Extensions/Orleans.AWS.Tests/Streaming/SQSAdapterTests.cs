@@ -78,7 +78,7 @@ namespace AWSUtils.Tests.Streaming
 
         private async Task SendAndReceiveFromQueueAdapter(IQueueAdapterFactory adapterFactory)
         {
-            IQueueAdapter adapter = await adapterFactory.CreateAdapter();
+            IQueueAdapter adapter = await adapterFactory.CreateAdapter(CancellationToken.None);
             IQueueAdapterCache cache = adapterFactory.GetQueueAdapterCache();
 
             // Create receiver per queue
@@ -106,7 +106,9 @@ namespace AWSUtils.Tests.Streaming
                 {
                     while (receivedBatches < NumBatches)
                     {
-                        var messages = receiver.GetQueueMessagesAsync(SQSStorage.MAX_NUMBER_OF_MESSAGE_TO_PEEK).Result.ToArray();
+                        var messages = receiver.GetQueueMessagesAsync(
+                            SQSStorage.MAX_NUMBER_OF_MESSAGE_TO_PEEK,
+                            CancellationToken.None).Result.ToArray();
                         if (!messages.Any())
                         {
                             continue;
