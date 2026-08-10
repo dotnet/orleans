@@ -55,6 +55,30 @@ public class CallbackDataTests
         GC.KeepAlive(cancellation);
     }
 
+    [Fact, TestCategory("BVT")]
+    public void StaleOwnerCannotLeaseReusedCallback()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var instruments = CreateInstruments(serviceProvider);
+        var callback = CallbackDataPool.Get();
+        callback.Initialize(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
+        var staleOwner = new CallbackDataOwner(callback);
+        CallbackDataPool.Return(staleOwner);
+
+        var reusedCallback = CallbackDataPool.Get();
+        Assert.Same(callback, reusedCallback);
+        reusedCallback.Initialize(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
+        var currentOwner = new CallbackDataOwner(reusedCallback);
+
+        using var staleLease = staleOwner.Acquire();
+        Assert.False(staleLease.TryGetValue(out _));
+        using var currentLease = currentOwner.Acquire();
+        Assert.True(currentLease.TryGetValue(out var currentCallback));
+        Assert.Same(reusedCallback, currentCallback);
+
+        CallbackDataPool.Return(currentOwner);
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference CreateCompletedCallback(CancellationToken cancellationToken, ApplicationRequestInstruments instruments)
     {
@@ -71,15 +95,18 @@ public class CallbackDataTests
         Action<Message> unregister,
         ApplicationRequestInstruments instruments)
     {
-        var shared = new SharedCallbackData(
-            unregister,
+        var shared = CreateSharedData(unregister);
+        return new CallbackData(shared, completion, new Message(), instruments);
+    }
+
+    private static SharedCallbackData CreateSharedData(Action<Message>? unregister = null) =>
+        new(
+            unregister ?? (_ => { }),
             logger: NullLogger<CallbackData>.Instance,
             responseTimeout: TimeSpan.FromMinutes(1),
             cancelOnTimeout: false,
             waitForCancellationAcknowledgement: false,
             cancellationManager: null);
-        return new CallbackData(shared, completion, new Message(), instruments);
-    }
 
     private static ServiceProvider CreateServiceProvider()
     {
