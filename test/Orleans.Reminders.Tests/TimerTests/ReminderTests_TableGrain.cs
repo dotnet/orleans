@@ -468,6 +468,40 @@ namespace UnitTests.TimerTests
         }
 
         [Fact]
+        public async Task Rem_Grain_StorageRecoveryAtExactDueTime_DeliversDueOccurrence()
+        {
+            const string reminderName = "exact_due_storage_recovery";
+            var grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            var grainId = grain.GetGrainId();
+            var dueTime = ReminderLoadingWindow + TimeSpan.FromSeconds(20);
+            var period = TimeSpan.FromSeconds(90);
+            var firstTickTime = ReminderUtcNow.UtcDateTime + dueTime;
+            using var cts = new CancellationTokenSource(TestConstants.InitTimeout);
+
+            await grain.StartReminder(reminderName, dueTime, period);
+            Assert.Equal(0, observer.GetActiveReminderCount(grainId, reminderName));
+
+            await using var outage = _readController.BlockNextRangeRead(grainId);
+            await AdvanceUntilBlockedAsync(outage, cts.Token);
+            await AdvanceReminderTimeAsync(firstTickTime - ReminderUtcNow.UtcDateTime, cts.Token);
+
+            var activatedTask = observer.WaitForActiveReminderCountAsync(grainId, 1, cts.Token, reminderName);
+            outage.Release();
+            await activatedTask;
+            await observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cts.Token);
+
+            var tickTask = observer.WaitForReminderTickAsync(grainId, cts.Token, reminderName);
+            var immediateDeliveryDelay = TimeSpan.FromMilliseconds(1);
+            await AdvanceReminderTimeAsync(immediateDeliveryDelay, cts.Token);
+            var tick = await tickTask;
+
+            Assert.Equal(firstTickTime, tick.Status.FirstTickTime);
+            Assert.Equal(firstTickTime + immediateDeliveryDelay, tick.Status.CurrentTickTime);
+
+            await grain.StopReminder(reminderName);
+        }
+
+        [Fact]
         public async Task Rem_Grain_DistantReminder_DeliveredLateAfterStorageOutageRecovers()
         {
             const string reminderName = "storage_outage_recovery";

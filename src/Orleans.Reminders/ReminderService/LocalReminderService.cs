@@ -562,14 +562,12 @@ namespace Orleans.Runtime.ReminderService
         {
             var key = new ReminderIdentity(entry.GrainId, entry.ReminderName);
             var nextTick = CalculateNextTickTime(entry, now);
-            // Keep distant schedules in storage; exact-due entries are intentionally skipped to simplify fake-time tests.
             var isWithinLoadingWindow = nextTick <= now.AddClamped(reminderOptions.ReminderLoadingWindow);
-            var shouldLoad = nextTick > now && isWithinLoadingWindow;
             if (!localReminders.TryGetValue(key, out var localReminder))
             {
                 // Distant reminders remain exclusively in storage until a later refresh brings their next tick
                 // into the loading window.
-                if (shouldLoad)
+                if (isWithinLoadingWindow)
                 {
                     LogTraceInTableNotInLocal(entry);
                     AddOrUpdateLocalReminder(entry, tableSequence);
@@ -595,7 +593,9 @@ namespace Orleans.Runtime.ReminderService
                 return;
             }
 
-            if (!isWithinLoadingWindow || (state is LocalReminderState.Tombstone && !shouldLoad))
+            // A due-now tombstone represents an occurrence which this owner already fired. Do not resurrect it
+            // from a refresh captured at the same timestamp, but allow due-now entries with no local history.
+            if (!isWithinLoadingWindow || (state is LocalReminderState.Tombstone && nextTick <= now))
             {
                 LogTraceRemovingReminder(localReminder);
                 stopTasks.Add(
