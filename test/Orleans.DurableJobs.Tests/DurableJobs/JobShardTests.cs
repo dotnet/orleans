@@ -106,6 +106,7 @@ public class JobShardTests
         Assert.Equal(1, rescheduleShard.PersistRetryCallCount);
         Assert.Equal(rescheduleJob.Id, rescheduleShard.LastPersistedRetryJobId);
         Assert.Equal(rescheduleDueTime, rescheduleShard.LastPersistedRetryDueTime);
+        Assert.Equal(0, rescheduleShard.LastPersistedRetryDequeueCount);
 
         // --- RetryJobLaterAsync path: preserves/increments the existing dequeue count. ---
         var retryShard = new TestJobShard("shard-retry", start, end);
@@ -129,6 +130,7 @@ public class JobShardTests
         Assert.Equal(1, retryShard.PersistRetryCallCount);
         Assert.Equal(retryJob.Id, retryShard.LastPersistedRetryJobId);
         Assert.Equal(retryDueTime, retryShard.LastPersistedRetryDueTime);
+        Assert.Equal(1, retryShard.LastPersistedRetryDequeueCount);
 
         // The two reschedule paths must diverge on dequeue-count semantics.
         Assert.NotEqual(afterReschedule.DequeueCount, afterRetry.DequeueCount);
@@ -150,22 +152,25 @@ public class JobShardTests
 
         public DateTimeOffset? LastPersistedRetryDueTime { get; private set; }
 
+        public int? LastPersistedRetryDequeueCount { get; private set; }
+
         public TestJobShard(string id, DateTimeOffset startTime, DateTimeOffset endTime)
             : base(id, startTime, endTime)
         {
         }
 
-        protected override Task PersistAddJobAsync(string jobId, string jobName, DateTimeOffset dueTime, GrainId target, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken) =>
+        protected override Task PersistAddJobAsync(DurableJob job, CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
         protected override Task PersistRemoveJobAsync(string jobId, CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
-        protected override Task PersistRetryJobAsync(string jobId, DateTimeOffset newDueTime, CancellationToken cancellationToken)
+        protected override Task PersistRetryJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken)
         {
             PersistRetryCallCount++;
-            LastPersistedRetryJobId = jobId;
+            LastPersistedRetryJobId = jobContext.Job.Id;
             LastPersistedRetryDueTime = newDueTime;
+            LastPersistedRetryDequeueCount = jobContext.DequeueCount;
             return Task.CompletedTask;
         }
     }
