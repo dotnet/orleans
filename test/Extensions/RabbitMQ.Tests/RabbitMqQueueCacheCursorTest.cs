@@ -34,33 +34,32 @@ public class RabbitMqQueueCacheCursorTest
     [InlineData(1)]
     [InlineData(2)]
     [InlineData(0)]
-    public void WhenDeliveryFailed_ShouldRetrySameMessageAfterMoveNext(int initialToken)
+    public void WhenDeliveryFailed_ShouldRetrySameMessage(int initialToken)
     {
         var (cursor, _) = InitializeNewCursor(sequenceToken: initialToken);
         cursor.MoveNext();
         var failedMessage = cursor.GetCurrent(out _);
         cursor.RecordDeliveryFailure();
-        //Moving from current wont happen since it failed
-        cursor.MoveNext();
-        
-        cursor.Refresh(new EventSequenceTokenV2(0));
 
-        //Trying to move to the next message after a refresh
-        cursor.MoveNext();
+        Assert.True(cursor.MoveNext());
         var currentMessage = cursor.GetCurrent(out _);
 
-        Assert.Equal(failedMessage.SequenceToken.SequenceNumber, currentMessage.SequenceToken.SequenceNumber);
+        Assert.Same(failedMessage, currentMessage);
+        Assert.False(((RabbitMqBatchContainer)currentMessage).DeliveryFailed);
     }
 
     [Fact]
-    public void WhenDeliveryFailed_ShouldNotMoveToNextMessage()
+    public void WhenRetrySucceeds_ShouldAdvanceToNextMessage()
     {
         var (cursor, _) = InitializeNewCursor();
         cursor.MoveNext();
-        var currentMessage = cursor.GetCurrent(out _);
+        var failedMessage = cursor.GetCurrent(out _);
         cursor.RecordDeliveryFailure();
 
-        Assert.False(cursor.MoveNext());
+        Assert.True(cursor.MoveNext());
+        Assert.Same(failedMessage, cursor.GetCurrent(out _));
+        Assert.True(cursor.MoveNext());
+        Assert.NotSame(failedMessage, cursor.GetCurrent(out _));
     }
 
     [Fact]
@@ -156,5 +155,5 @@ public class RabbitMqQueueCacheCursorTest
 
 
     private RabbitMqQueueCacheCursor CreateCacheCursor(ConcurrentQueue<RabbitMqBatchContainer> processingMessages, EventSequenceTokenV2 handshakeToken)
-        => new(handshakeToken, processingMessages, _ => { }, () => { }, () => processingMessages, () => { });
+        => new(handshakeToken, processingMessages, _ => { }, () => processingMessages, () => { });
 }

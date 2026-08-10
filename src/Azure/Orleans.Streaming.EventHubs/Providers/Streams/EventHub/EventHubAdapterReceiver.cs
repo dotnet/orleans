@@ -457,10 +457,7 @@ namespace Orleans.Streaming.EventHubs
             public void Refresh(StreamSequenceToken? token)
             {
                 this.cache.Refresh(this.cursor, token);
-                LastRefreshToken = token;
             }
-
-            public StreamSequenceToken? LastRefreshToken { get; private set; }
 
             public void RecordDeliveryFailure()
             {
