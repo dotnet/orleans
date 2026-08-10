@@ -156,5 +156,5 @@ public class RabbitMqQueueCacheCursorTest
 
 
     private RabbitMqQueueCacheCursor CreateCacheCursor(ConcurrentQueue<RabbitMqBatchContainer> processingMessages, EventSequenceTokenV2 handshakeToken)
-        => new (handshakeToken, processingMessages, _ => { }, () => { }, () => processingMessages);
+        => new(handshakeToken, processingMessages, _ => { }, () => { }, () => processingMessages, () => { });
 }
