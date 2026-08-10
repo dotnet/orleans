@@ -967,7 +967,9 @@ namespace UnitTests.Grains
 
         public async Task OnSubscribed(IStreamSubscriptionHandleFactory handleFactory)
         {
-            await BecomeConsumer(Guid.Parse(handleFactory.StreamId.Key.ToString()), handleFactory.ProviderName, handleFactory.StreamId.Namespace.ToString());
+            var streamNamespace = handleFactory.StreamId.GetNamespace()
+                ?? throw new InvalidOperationException("Implicit stream subscriptions require a stream namespace.");
+            await BecomeConsumer(Guid.Parse(handleFactory.StreamId.GetKeyAsString()), handleFactory.ProviderName, streamNamespace);
         }
     }
 
