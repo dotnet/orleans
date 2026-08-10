@@ -217,20 +217,8 @@ namespace UnitTests.Grains
             return Task.FromResult(counterValue);
         }
 
-        public Task WaitForCounterForTestAsync(string reminderName, long target, CancellationToken cancellationToken)
-        {
-            long current;
-            try
-            {
-                current = long.Parse(File.ReadAllText(GetFileName(reminderName)), CultureInfo.InvariantCulture);
-            }
-            catch (FileNotFoundException)
-            {
-                current = 0;
-            }
-
-            return counterWaiter.WaitAsync(reminderName, target, current, cancellationToken);
-        }
+        public Task<bool> WaitForCounterForTestAsync(string reminderName, long target, long current, CancellationToken cancellationToken)
+            => counterWaiter.WaitAsync(reminderName, target, current, cancellationToken);
 
         public Task<IGrainReminder?> GetReminderObject(string reminderName)
         {
@@ -433,20 +421,8 @@ namespace UnitTests.Grains
             return Task.FromResult(long.Parse(File.ReadAllText(GetFileName(name))));
         }
 
-        public Task WaitForCounterForTestAsync(string reminderName, long target, CancellationToken cancellationToken)
-        {
-            long current;
-            try
-            {
-                current = long.Parse(File.ReadAllText(GetFileName(reminderName)), CultureInfo.InvariantCulture);
-            }
-            catch (FileNotFoundException)
-            {
-                current = 0;
-            }
-
-            return counterWaiter.WaitAsync(reminderName, target, current, cancellationToken);
-        }
+        public Task<bool> WaitForCounterForTestAsync(string reminderName, long target, long current, CancellationToken cancellationToken)
+            => counterWaiter.WaitAsync(reminderName, target, current, cancellationToken);
 
         public async Task<IGrainReminder?> GetReminderObject(string reminderName)
         {
@@ -467,17 +443,23 @@ namespace UnitTests.Grains
     {
         private readonly object lockObject = new();
         private readonly Dictionary<string, long> counters = new();
-        private readonly Dictionary<string, List<(long Target, TaskCompletionSource Completion)>> waiters = new();
+        private readonly Dictionary<string, List<(long Target, TaskCompletionSource<bool> Completion)>> waiters = new();
+        private bool deactivated;
 
-        public async Task WaitAsync(string reminderName, long target, long current, CancellationToken cancellationToken)
+        public async Task<bool> WaitAsync(string reminderName, long target, long current, CancellationToken cancellationToken)
         {
-            TaskCompletionSource completion;
+            TaskCompletionSource<bool> completion;
             lock (lockObject)
             {
+                if (deactivated)
+                {
+                    return false;
+                }
+
                 current = Math.Max(current, counters.GetValueOrDefault(reminderName));
                 if (current >= target)
                 {
-                    return;
+                    return true;
                 }
 
                 if (!waiters.TryGetValue(reminderName, out var reminderWaiters))
@@ -493,16 +475,33 @@ namespace UnitTests.Grains
             using var registration = cancellationToken.Register(
                 static state =>
                 {
-                    var (source, token) = ((TaskCompletionSource Source, CancellationToken Token))state!;
+                    var (source, token) = ((TaskCompletionSource<bool> Source, CancellationToken Token))state!;
                     source.TrySetCanceled(token);
                 },
                 (completion, cancellationToken));
-            await completion.Task.ConfigureAwait(false);
+            try
+            {
+                return await completion.Task.ConfigureAwait(false);
+            }
+            finally
+            {
+                lock (lockObject)
+                {
+                    if (waiters.TryGetValue(reminderName, out var reminderWaiters))
+                    {
+                        reminderWaiters.RemoveAll(waiter => ReferenceEquals(waiter.Completion, completion));
+                        if (reminderWaiters.Count == 0)
+                        {
+                            waiters.Remove(reminderName);
+                        }
+                    }
+                }
+            }
         }
 
         public void Signal(string reminderName, long current)
         {
-            List<TaskCompletionSource>? completed = null;
+            List<TaskCompletionSource<bool>>? completed = null;
             lock (lockObject)
             {
                 counters[reminderName] = current;
@@ -534,7 +533,7 @@ namespace UnitTests.Grains
             {
                 foreach (var completion in completed)
                 {
-                    completion.TrySetResult();
+                    completion.TrySetResult(true);
                 }
             }
         }
@@ -549,9 +548,10 @@ namespace UnitTests.Grains
 
         public void Deactivate(GrainId grainId)
         {
-            List<TaskCompletionSource> pending;
+            List<TaskCompletionSource<bool>> pending;
             lock (lockObject)
             {
+                deactivated = true;
                 pending = waiters.Values.SelectMany(static value => value.Select(static waiter => waiter.Completion)).ToList();
                 waiters.Clear();
                 counters.Clear();
@@ -559,7 +559,7 @@ namespace UnitTests.Grains
 
             foreach (var completion in pending)
             {
-                completion.TrySetException(new InvalidOperationException($"Grain {grainId} deactivated while waiting for a reminder counter."));
+                completion.TrySetResult(false);
             }
         }
     }

@@ -197,8 +197,9 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
         // stop the secondary silo
         await using (await PauseReminderTimeAsync(cts.Token))
         {
-            log.LogInformation("Stopping secondary silo");
-            await StopSiloAsync(GetSecondarySilo());
+            var reminderOwner = GetReminderOwner(g1, DR);
+            log.LogInformation("Stopping reminder owner {SiloAddress}", reminderOwner.SiloAddress);
+            await StopSiloAsync(reminderOwner);
             await WaitForLivenessToStabilizeAsync().WaitAsync(cts.Token);
         }
 
@@ -209,7 +210,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     public async Task Rem_Azure_2F_MultiGrain()
     {
         using var cts = new CancellationTokenSource(ENDWAIT);
-        var silos = await StartAdditionalSilosAndWaitForReminderServicesAsync(
+        _ = await StartAdditionalSilosAndWaitForReminderServicesAsync(
             2,
             cts.Token,
             startAdditionalSiloOnNewPort: true);
@@ -227,10 +228,10 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
         await using (await PauseReminderTimeAsync(cts.Token))
         {
             log.LogInformation("Stopping 2 silos");
-            int i = Random.Shared.Next(silos.Count);
-            await StopSiloAsync(silos[i]);
-            silos.RemoveAt(i);
-            await StopSiloAsync(silos[Random.Shared.Next(silos.Count)]);
+            var reminderOwner = GetReminderOwner(g1, DR);
+            var otherSilo = HostedCluster.GetActiveSilos().First(silo => !silo.SiloAddress.Equals(reminderOwner.SiloAddress));
+            await StopSiloAsync(reminderOwner);
+            await StopSiloAsync(otherSilo);
             await WaitForLivenessToStabilizeAsync().WaitAsync(cts.Token);
         }
 
@@ -241,7 +242,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     public async Task Rem_Azure_1F1J_MultiGrain()
     {
         using var cts = new CancellationTokenSource(ENDWAIT);
-        var silos = await StartAdditionalSilosAndWaitForReminderServicesAsync(1, cts.Token);
+        _ = await StartAdditionalSilosAndWaitForReminderServicesAsync(1, cts.Token);
 
         IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         IReminderTestGrain2 g2 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -252,15 +253,13 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
         IAddressable[] grains = [g1, g2, g3, g4, g5];
         await PrepareForGrainFailureAsync(cts.Token, grains);
 
-        var siloToKill = silos[Random.Shared.Next(silos.Count)];
-        // stop a silo and join a new one
+        var siloToKill = GetReminderOwner(g1, DR);
+        // stop a silo and join a new one in parallel
         await using (await PauseReminderTimeAsync(cts.Token))
         {
             log.LogInformation("Stopping a silo and joining a silo");
-            await StopSiloAsync(siloToKill);
-            await WaitForLivenessToStabilizeAsync().WaitAsync(cts.Token);
-            await StartAdditionalSilosAndWaitForReminderServicesAsync(
-                1,
+            await StopSiloAndStartAdditionalSiloAsync(
+                siloToKill,
                 cts.Token,
                 startAdditionalSiloOnNewPort: true);
         }
@@ -330,7 +329,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     public async Task Rem_Azure_GT_1F1J_MultiGrain()
     {
         using var cts = new CancellationTokenSource(ENDWAIT);
-        var silos = await StartAdditionalSilosAndWaitForReminderServicesAsync(1, cts.Token);
+        _ = await StartAdditionalSilosAndWaitForReminderServicesAsync(1, cts.Token);
 
         IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         IReminderTestGrain2 g2 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -340,14 +339,12 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
         IAddressable[] grains = [g1, g2, g3, g4];
         await PrepareForGrainFailureAsync(cts.Token, grains);
 
-        var siloToKill = silos[Random.Shared.Next(silos.Count)];
-        // stop a silo and join a new one
+        var siloToKill = GetReminderOwner(g1, DR);
+        // stop a silo and join a new one in parallel
         await using (await PauseReminderTimeAsync(cts.Token))
         {
             log.LogInformation("Stopping a silo and joining a silo");
-            await StopSiloAsync(siloToKill);
-            await WaitForLivenessToStabilizeAsync().WaitAsync(cts.Token);
-            await StartAdditionalSilosAndWaitForReminderServicesAsync(1, cts.Token);
+            await StopSiloAndStartAdditionalSiloAsync(siloToKill, cts.Token);
         }
 
         await CompleteGrainFailureTestAsync(cts.Token, grains);

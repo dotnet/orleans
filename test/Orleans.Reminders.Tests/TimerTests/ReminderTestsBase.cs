@@ -235,32 +235,36 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         CancellationToken cancellationToken,
         bool startAdditionalSiloOnNewPort = false)
     {
-        var result = new List<InProcessSiloHandle>(silosToStart);
-        for (var i = 0; i < silosToStart; i++)
-        {
-            var started = await StartAdditionalSilosAsync(1, startAdditionalSiloOnNewPort).WaitAsync(cancellationToken);
-            var silo = Assert.Single(started);
-            var reminderServiceStarted = observer.WaitForReminderServiceStartedAsync(cancellationToken, silo.SiloAddress);
-            await Task.WhenAll(
-                reminderServiceStarted,
-                WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken));
-            result.Add(silo);
-        }
-
+        var result = await StartAdditionalSilosAsync(silosToStart, startAdditionalSiloOnNewPort).WaitAsync(cancellationToken);
+        var reminderServicesStarted = result.Select(silo =>
+            observer.WaitForReminderServiceStartedAsync(cancellationToken, silo.SiloAddress));
+        await Task.WhenAll(
+            Task.WhenAll(reminderServicesStarted),
+            WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken));
         return result;
     }
 
-    protected InProcessSiloHandle GetSecondarySilo()
+    protected async Task<InProcessSiloHandle> StopSiloAndStartAdditionalSiloAsync(
+        InProcessSiloHandle siloToStop,
+        CancellationToken cancellationToken,
+        bool startAdditionalSiloOnNewPort = false)
     {
-        foreach (var silo in HostedCluster.GetActiveSilos())
-        {
-            if (silo.InstanceNumber != 0)
-            {
-                return silo;
-            }
-        }
+        var stopTask = StopSiloAsync(siloToStop);
+        var startTask = StartAdditionalSilosAsync(1, startAdditionalSiloOnNewPort);
+        await Task.WhenAll(stopTask, startTask).WaitAsync(cancellationToken);
 
-        throw new InvalidOperationException("Expected at least one non-primary silo.");
+        var silo = Assert.Single(await startTask);
+        await Task.WhenAll(
+            observer.WaitForReminderServiceStartedAsync(cancellationToken, silo.SiloAddress),
+            WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken));
+        return silo;
+    }
+
+    protected InProcessSiloHandle GetReminderOwner(IAddressable grain, string reminderName)
+    {
+        var siloAddress = Assert.Single(observer.GetActiveReminderSilos(grain.GetGrainId(), reminderName));
+        return HostedCluster.GetSiloForAddress(siloAddress)
+            ?? throw new InvalidOperationException($"Could not find reminder owner {siloAddress} in the active test silos.");
     }
 
     protected Task StopSiloAsync(InProcessSiloHandle silo)
@@ -378,6 +382,21 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
             }));
 
             var counterWaitTasks = new List<Task>(reminders.Length);
+            var previousTickCounts = new int[reminders.Length];
+            var tickTasks = new Task[reminders.Length];
+            for (var reminderIndex = 0; reminderIndex < reminders.Length; reminderIndex++)
+            {
+                var reminder = reminders[reminderIndex];
+                previousTickCounts[reminderIndex] = observer.GetTickCount(
+                    reminder.Grain.GetGrainId(),
+                    reminder.ReminderName);
+                tickTasks[reminderIndex] = observer.WaitForTickCountAsync(
+                    reminder.Grain,
+                    previousTickCounts[reminderIndex] + 1,
+                    cancellationToken,
+                    reminder.ReminderName);
+            }
+
             foreach (var reminder in reminders)
             {
                 var current = await GetReminderCounterOrZeroAsync(reminder.Grain, reminder.ReminderName);
@@ -399,7 +418,27 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
                 tickCount,
                 reminders.Length);
             await AdvanceReminderTimeAsync(period, cancellationToken);
-            await Task.WhenAll(counterWaitTasks);
+            await Task.WhenAll(Task.WhenAll(counterWaitTasks), Task.WhenAll(tickTasks));
+
+            await Task.WhenAll(reminders.Select(reminder =>
+                observer.WaitForLocalReminderScheduleAsync(
+                    reminder.Grain,
+                    reminder.ReminderName,
+                    cancellationToken)));
+            for (var reminderIndex = 0; reminderIndex < reminders.Length; reminderIndex++)
+            {
+                var reminder = reminders[reminderIndex];
+                Assert.Equal(
+                    1,
+                    observer.GetActiveReminderCount(
+                        reminder.Grain.GetGrainId(),
+                        reminder.ReminderName));
+                Assert.Equal(
+                    previousTickCounts[reminderIndex] + 1,
+                    observer.GetTickCount(
+                        reminder.Grain.GetGrainId(),
+                        reminder.ReminderName));
+            }
         }
     }
 
@@ -737,22 +776,30 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         long target,
         CancellationToken cancellationToken)
     {
-        if (!HostedCluster.TryGetGrainContext(grain.GetGrainId(), out var grainContext))
-        {
-            throw new InvalidOperationException($"Could not find an activation for grain {grain.GetGrainId()}.");
-        }
-
-        var waitTask = grainContext.GrainInstance switch
-        {
-            ReminderTestGrain2 reminderTestGrain => reminderTestGrain.WaitForCounterForTestAsync(reminderName, target, cancellationToken),
-            ReminderTestCopyGrain reminderTestCopyGrain => reminderTestCopyGrain.WaitForCounterForTestAsync(reminderName, target, cancellationToken),
-            { } instance => throw new InvalidOperationException($"Unexpected grain instance type {instance.GetType()} for grain {grain.GetGrainId()}."),
-            null => throw new InvalidOperationException($"Grain {grain.GetGrainId()} does not have an instance.")
-        };
-
         try
         {
-            await waitTask;
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var current = await GetReminderCounterOrZeroAsync(grain, reminderName);
+                if (!HostedCluster.TryGetGrainContext(grain.GetGrainId(), out var grainContext))
+                {
+                    await Task.Yield();
+                    continue;
+                }
+
+                var completed = grainContext.GrainInstance switch
+                {
+                    ReminderTestGrain2 reminderTestGrain => await reminderTestGrain.WaitForCounterForTestAsync(reminderName, target, current, cancellationToken),
+                    ReminderTestCopyGrain reminderTestCopyGrain => await reminderTestCopyGrain.WaitForCounterForTestAsync(reminderName, target, current, cancellationToken),
+                    { } instance => throw new InvalidOperationException($"Unexpected grain instance type {instance.GetType()} for grain {grain.GetGrainId()}."),
+                    null => false
+                };
+                if (completed)
+                {
+                    return;
+                }
+            }
         }
         catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
         {

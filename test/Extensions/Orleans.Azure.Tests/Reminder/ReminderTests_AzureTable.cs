@@ -203,8 +203,9 @@ namespace Tester.AzureUtils.TimerTests
             // stop the secondary silo
             await using (await PauseReminderTimeAsync(cts.Token))
             {
-                log.LogInformation("Stopping secondary silo");
-                await this.StopSiloAsync(this.GetSecondarySilo());
+                var reminderOwner = this.GetReminderOwner(g1, DR);
+                log.LogInformation("Stopping reminder owner {SiloAddress}", reminderOwner.SiloAddress);
+                await this.StopSiloAsync(reminderOwner);
                 await this.WaitForLivenessToStabilizeAsync().WaitAsync(cts.Token);
             }
 
@@ -215,7 +216,7 @@ namespace Tester.AzureUtils.TimerTests
         public async Task Rem_Azure_2F_MultiGrain()
         {
             using var cts = new CancellationTokenSource(ENDWAIT);
-            var silos = await this.StartAdditionalSilosAndWaitForReminderServicesAsync(
+            _ = await this.StartAdditionalSilosAndWaitForReminderServicesAsync(
                 2,
                 cts.Token,
                 startAdditionalSiloOnNewPort: true);
@@ -233,10 +234,10 @@ namespace Tester.AzureUtils.TimerTests
             await using (await PauseReminderTimeAsync(cts.Token))
             {
                 log.LogInformation("Stopping 2 silos");
-                int i = Random.Shared.Next(silos.Count);
-                await this.StopSiloAsync(silos[i]);
-                silos.RemoveAt(i);
-                await this.StopSiloAsync(silos[Random.Shared.Next(silos.Count)]);
+                var reminderOwner = this.GetReminderOwner(g1, DR);
+                var otherSilo = this.HostedCluster.GetActiveSilos().First(silo => !silo.SiloAddress.Equals(reminderOwner.SiloAddress));
+                await this.StopSiloAsync(reminderOwner);
+                await this.StopSiloAsync(otherSilo);
                 await this.WaitForLivenessToStabilizeAsync().WaitAsync(cts.Token);
             }
 
@@ -247,7 +248,7 @@ namespace Tester.AzureUtils.TimerTests
         public async Task Rem_Azure_1F1J_MultiGrain()
         {
             using var cts = new CancellationTokenSource(ENDWAIT);
-            var silos = await this.StartAdditionalSilosAndWaitForReminderServicesAsync(1, cts.Token);
+            _ = await this.StartAdditionalSilosAndWaitForReminderServicesAsync(1, cts.Token);
 
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -258,15 +259,13 @@ namespace Tester.AzureUtils.TimerTests
             IAddressable[] grains = [g1, g2, g3, g4, g5];
             await PrepareForGrainFailureAsync(cts.Token, grains);
 
-            var siloToKill = silos[Random.Shared.Next(silos.Count)];
-            // stop a silo and join a new one
+            var siloToKill = this.GetReminderOwner(g1, DR);
+            // stop a silo and join a new one in parallel
             await using (await PauseReminderTimeAsync(cts.Token))
             {
                 log.LogInformation("Stopping a silo and joining a silo");
-                await this.StopSiloAsync(siloToKill);
-                await this.WaitForLivenessToStabilizeAsync().WaitAsync(cts.Token);
-                await this.StartAdditionalSilosAndWaitForReminderServicesAsync(
-                    1,
+                await this.StopSiloAndStartAdditionalSiloAsync(
+                    siloToKill,
                     cts.Token,
                     startAdditionalSiloOnNewPort: true);
             }
@@ -316,7 +315,7 @@ namespace Tester.AzureUtils.TimerTests
         public async Task Rem_Azure_GT_1F1J_MultiGrain()
         {
             using var cts = new CancellationTokenSource(ENDWAIT);
-            var silos = await this.StartAdditionalSilosAndWaitForReminderServicesAsync(1, cts.Token);
+            _ = await this.StartAdditionalSilosAndWaitForReminderServicesAsync(1, cts.Token);
 
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -326,14 +325,12 @@ namespace Tester.AzureUtils.TimerTests
             IAddressable[] grains = [g1, g2, g3, g4];
             await PrepareForGrainFailureAsync(cts.Token, grains);
 
-            var siloToKill = silos[Random.Shared.Next(silos.Count)];
-            // stop a silo and join a new one
+            var siloToKill = this.GetReminderOwner(g1, DR);
+            // stop a silo and join a new one in parallel
             await using (await PauseReminderTimeAsync(cts.Token))
             {
                 log.LogInformation("Stopping a silo and joining a silo");
-                await this.StopSiloAsync(siloToKill);
-                await this.WaitForLivenessToStabilizeAsync().WaitAsync(cts.Token);
-                await this.StartAdditionalSilosAndWaitForReminderServicesAsync(1, cts.Token);
+                await this.StopSiloAndStartAdditionalSiloAsync(siloToKill, cts.Token);
             }
 
             await CompleteGrainFailureTestAsync(cts.Token, grains);

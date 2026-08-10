@@ -257,6 +257,21 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     }
 
     /// <summary>
+    /// Gets the silos which currently host local owners for a reminder.
+    /// </summary>
+    public SiloAddress[] GetActiveReminderSilos(GrainId grainId, string reminderName)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(reminderName);
+
+        lock (_lock)
+        {
+            return _activeLocalReminders.TryGetValue(new ReminderTickKey(grainId, reminderName), out var instances)
+                ? instances.Values.Select(instance => instance.SiloAddress).OfType<SiloAddress>().Distinct().ToArray()
+                : [];
+        }
+    }
+
+    /// <summary>
     /// Waits for a specific number of active local reminder owners for a reminder.
     /// </summary>
     public Task WaitForActiveReminderCountAsync(GrainId grainId, int expectedCount, CancellationToken cancellationToken, string reminderName)
