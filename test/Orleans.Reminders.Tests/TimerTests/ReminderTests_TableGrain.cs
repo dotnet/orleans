@@ -7,6 +7,7 @@ using System.Reactive.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Internal;
 using Orleans.Reminders;
+using Orleans.Runtime.ReminderService;
 using Orleans.Testing.Reminders;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -204,6 +205,41 @@ namespace UnitTests.TimerTests
 
             await grain.StopReminder(reminderName);
             Assert.Null(await grain.GetReminderObject(reminderName));
+        }
+
+        [Fact]
+        public async Task Rem_Grain_RefreshAtFiredTickDoesNotRedeliverOccurrence()
+        {
+            const string reminderName = "stale_refresh_at_fired_tick";
+            var grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            var grainId = grain.GetGrainId();
+            var dueTime = ReminderLoadingWindow + TimeSpan.FromSeconds(5);
+            var period = ReminderLoadingWindow + TimeSpan.FromSeconds(10);
+            var firstTickTime = ReminderUtcNow.UtcDateTime + dueTime;
+            using var cts = new CancellationTokenSource(TestConstants.InitTimeout);
+
+            await grain.StartReminder(reminderName, dueTime, period);
+
+            var activatedTask = observer.WaitForActiveReminderCountAsync(grainId, 1, cts.Token, reminderName);
+            await AdvanceUntilAsync(activatedTask, cts.Token);
+            await observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cts.Token);
+
+            var firstTickTask = observer.WaitForReminderTickAsync(grainId, cts.Token, reminderName);
+            var firstEvictionTask = observer.WaitForReminderQuiescenceAsync(grainId, reminderName, cts.Token);
+            await AdvanceReminderTimeAsync(firstTickTime - ReminderUtcNow.UtcDateTime, cts.Token);
+            var firstTick = await firstTickTask;
+            await firstEvictionTask;
+
+            Assert.Equal(firstTickTime, firstTick.Status.CurrentTickTime);
+            Assert.Equal(1, observer.GetTickCount(grainId, reminderName));
+
+            var reminderService = HostedCluster.Silos.Single().ServiceProvider.GetRequiredService<LocalReminderService>();
+            await reminderService.TestOnlyRefresh();
+
+            Assert.Equal(0, observer.GetActiveReminderCount(grainId, reminderName));
+            Assert.Equal(1, observer.GetTickCount(grainId, reminderName));
+
+            await grain.StopReminder(reminderName);
         }
 
         [Fact]

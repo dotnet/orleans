@@ -353,6 +353,13 @@ namespace Orleans.Runtime.ReminderService
             return task;
         }
 
+        internal Task TestOnlyRefresh()
+        {
+            var refreshTask = new Task<Task>(ReadAndUpdateReminders);
+            Scheduler.QueueTask(refreshTask);
+            return refreshTask.Unwrap();
+        }
+
         private void RemoveOutOfRangeReminders(List<Task> removedReminderTasks)
         {
             CheckRuntimeContext();
@@ -593,9 +600,15 @@ namespace Orleans.Runtime.ReminderService
                 return;
             }
 
-            // A due-now tombstone represents an occurrence which this owner already fired. Do not resurrect it
-            // from a refresh captured at the same timestamp, but allow due-now entries with no local history.
-            if (!isWithinLoadingWindow || (state is LocalReminderState.Tombstone && nextTick <= now))
+            // Retain the marker for an unchanged occurrence which this owner fired at the same timestamp.
+            if (state is LocalReminderState.Tombstone
+                && localReminder.ShouldRetainFiredOccurrenceTombstone(entry, nextTick))
+            {
+                localReminder.LocalSequenceNumber = tableSequence;
+                return;
+            }
+
+            if (!isWithinLoadingWindow)
             {
                 LogTraceRemovingReminder(localReminder);
                 stopTasks.Add(
@@ -875,6 +888,13 @@ namespace Orleans.Runtime.ReminderService
             return CalculateNextTickTime(entry, now) <= now.AddClamped(loadingWindow);
         }
 
+        internal static bool ShouldRetainFiredOccurrenceTombstone(
+            ReminderEntry localEntry,
+            ReminderEntry tableEntry,
+            DateTime? lastFiredTickTime,
+            DateTime nextTick)
+            => lastFiredTickTime == nextTick && StringComparer.Ordinal.Equals(localEntry.ETag, tableEntry.ETag);
+
         internal static DateTime CalculateFollowingTickTime(ReminderEntry entry, DateTime previousTickTime, DateTime now)
         {
             Debug.Assert(previousTickTime.Kind == DateTimeKind.Utc);
@@ -883,7 +903,7 @@ namespace Orleans.Runtime.ReminderService
             return nextTick > previousTickTime ? nextTick : previousTickTime.AddClamped(entry.Period);
         }
 
-        private bool TryEvictLocalReminder(LocalReminderData reminder, long scheduleVersion)
+        private bool TryEvictLocalReminder(LocalReminderData reminder, long scheduleVersion, DateTime? lastFiredTickTime)
         {
             CheckRuntimeContext();
 
@@ -897,7 +917,7 @@ namespace Orleans.Runtime.ReminderService
             }
 
             var sequence = GetLocalMutationSequence();
-            if (!reminder.TryStopOutsideLoadingWindow(scheduleVersion, sequence))
+            if (!reminder.TryStopOutsideLoadingWindow(scheduleVersion, sequence, lastFiredTickTime))
             {
                 return false;
             }
@@ -924,6 +944,7 @@ namespace Orleans.Runtime.ReminderService
 #endif
             private readonly ReminderIdentity _identity;
             private ReminderEntry? _entry;
+            private DateTime? _lastFiredTickTime;
             private CancellationTokenSource _scheduleChangedCancellation = new();
             private long _scheduleVersion;
 
@@ -1025,6 +1046,19 @@ namespace Orleans.Runtime.ReminderService
                 }
             }
 
+            public bool ShouldRetainFiredOccurrenceTombstone(ReminderEntry entry, DateTime nextTick)
+            {
+                lock (_lock)
+                {
+                    return _entry is { } localEntry
+                        && LocalReminderService.ShouldRetainFiredOccurrenceTombstone(
+                            localEntry,
+                            entry,
+                            _lastFiredTickTime,
+                            nextTick);
+                }
+            }
+
             public bool TryStart()
             {
                 GrainId grainId;
@@ -1102,7 +1136,10 @@ namespace Orleans.Runtime.ReminderService
                 return runTask ?? Task.CompletedTask;
             }
 
-            public bool TryStopOutsideLoadingWindow(long scheduleVersion, long localSequenceNumber)
+            public bool TryStopOutsideLoadingWindow(
+                long scheduleVersion,
+                long localSequenceNumber,
+                DateTime? lastFiredTickTime)
             {
                 ReminderEntry entry;
                 CancellationTokenSource scheduleChangedCancellation;
@@ -1114,6 +1151,7 @@ namespace Orleans.Runtime.ReminderService
                     }
 
                     _localSequenceNumber = localSequenceNumber;
+                    _lastFiredTickTime = lastFiredTickTime;
                     _stopReason = (int)ReminderEvents.LocalReminderStopReason.OutsideLoadingWindow;
                     entry = _entry ?? throw new InvalidOperationException($"Reminder {_identity} is a tombstone.");
                     scheduleChangedCancellation = _scheduleChangedCancellation;
@@ -1238,7 +1276,7 @@ namespace Orleans.Runtime.ReminderService
                     // a future table refresh will load it again as it approaches the window.
                     if (tickTime > now.AddClamped(_shared.reminderOptions.ReminderLoadingWindow))
                     {
-                        if (_shared.TryEvictLocalReminder(this, scheduleVersion))
+                        if (_shared.TryEvictLocalReminder(this, scheduleVersion, previousTickTime))
                         {
                             return null;
                         }

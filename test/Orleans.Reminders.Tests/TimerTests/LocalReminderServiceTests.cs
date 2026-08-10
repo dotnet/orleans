@@ -86,6 +86,34 @@ public class LocalReminderServiceTests
         Assert.Equal(expected, result);
     }
 
+    [Theory, TestCategory("BVT")]
+    [InlineData(true, 0, true, true)]
+    [InlineData(false, 0, true, false)]
+    [InlineData(true, 0, false, false)]
+    [InlineData(true, 1, true, false)]
+    public void ShouldRetainFiredOccurrenceTombstone_RequiresMatchingFiredTickAndSchedule(
+        bool hasFiredTick,
+        int nextTickOffsetTicks,
+        bool sameETag,
+        bool expected)
+    {
+        var now = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var localEntry = CreateReminderEntry(now, TimeSpan.FromMinutes(10));
+        var tableEntry = CreateReminderEntry(now, TimeSpan.FromMinutes(10));
+        if (!sameETag)
+        {
+            tableEntry.ETag = "updated-etag";
+        }
+
+        var result = LocalReminderService.ShouldRetainFiredOccurrenceTombstone(
+            localEntry,
+            tableEntry,
+            hasFiredTick ? now : null,
+            now.AddTicks(nextTickOffsetTicks));
+
+        Assert.Equal(expected, result);
+    }
+
     [Fact, TestCategory("BVT")]
     public void ReminderOptions_DefaultLoadingWindowIsTwiceDefaultRefreshPeriod()
     {
