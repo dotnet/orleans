@@ -116,6 +116,10 @@ items:
                 href: grains/event-sourcing/log-consistency-providers.md
               - name: Replicated instances
                 href: grains/event-sourcing/replicated-instances.md
+          - name: Journaling
+            items:
+              - name: Redis journal storage
+                href: grains/journaling/redis-journal-storage.md
           - name: Transactions
             href: grains/transactions.md
       - name: Streaming

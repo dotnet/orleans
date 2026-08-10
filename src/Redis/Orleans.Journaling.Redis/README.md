@@ -36,4 +36,12 @@ If the Redis connection is already registered in dependency injection, configure
 ## Documentation
 
 - [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Orleans Journaling](https://learn.microsoft.com/dotnet/orleans/)
+- [Grain Persistence](https://learn.microsoft.com/dotnet/orleans/grains/grain-persistence)
+- [Redis Documentation](https://redis.io/docs/latest/)
+
+## Feedback & Contributing
+- If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)
+- Join our community on [Discord](https://aka.ms/orleans-discord)
+- Follow the [@msftorleans](https://twitter.com/msftorleans) Twitter account for Orleans announcements
+- Contributions are welcome! Please review our [contribution guidelines](https://github.com/dotnet/orleans/blob/main/CONTRIBUTING.md)
+- This project is licensed under the [MIT license](https://github.com/dotnet/orleans/blob/main/LICENSE)
