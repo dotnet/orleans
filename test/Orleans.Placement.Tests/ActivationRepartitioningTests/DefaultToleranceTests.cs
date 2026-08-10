@@ -236,7 +236,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         await ResetCounters();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Receivers_ShouldMoveCloseTo_PullingAgent()
     {
         var sp1 = GrainFactory.GetGrain<ISP>("s1");
@@ -282,21 +282,29 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         Assert.Equal(Silo1, sr2_host);
         Assert.Equal(Silo2, sr3_host);
 
+        await Silo1Repartitioner.FlushBuffers();
+        await Silo2Repartitioner.FlushBuffers();
         await Silo1Repartitioner.TriggerExchangeRequest();
-        await Task.Delay(100); // leave some breathing room - may not be enough though, thats why this test is skippable
 
         var allowedDuration = TimeSpan.FromSeconds(3);
-        Stopwatch stopwatch = new();
-        stopwatch.Start();
+        var stopwatch = Stopwatch.StartNew();
 
-        do
+        while (stopwatch.Elapsed < allowedDuration)
         {
             sr1_host = await sr1.GetAddress();
             sr2_host = await sr2.GetAddress();
 
-            Skip.If(stopwatch.Elapsed > allowedDuration);
+            if (sr1_host != Silo1 && sr2_host != Silo1)
+            {
+                break;
+            }
+
+            await Task.Delay(10);
         }
-        while (sr1_host == Silo1 || sr2_host == Silo1);
+
+        Assert.True(
+            sr1_host != Silo1 && sr2_host != Silo1,
+            $"Receivers did not move from {Silo1} within {allowedDuration}. SR1 was on {sr1_host}; SR2 was on {sr2_host}.");
 
         // refresh
         sr1_host = await sr1.GetAddress();
