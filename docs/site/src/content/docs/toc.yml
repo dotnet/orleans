@@ -152,6 +152,8 @@ items:
         href: streaming/kinesis-streaming.md
       - name: Amazon SQS
         href: streaming/sqs-streaming.md
+      - name: RabbitMQ Streams
+        href: streaming/rabbitmq-streaming.md
       - name: Delivery semantics
         href: streaming/delivery-semantics.md
       - name: Pub-sub storage

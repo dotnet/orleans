@@ -12,11 +12,13 @@ description: "A collection of Orleans sample apps demonstrating streaming capabi
 
 # Orleans Streaming samples
 
-This folder contains two samples demonstrating Orleans Streams.
+This folder contains three samples demonstrating Orleans Streams.
 
 The first sample, in the `Simple` folder, demonstrates pub/sub using Azure Event Hub and an implicit consumer.
 
 The second sample, in the `CustomDataAdapter` folder, demonstrates how to configure a custom data adapter so that Orleans can consume stream messages which did not originate from Orleans.
+
+The third sample, in the `RabbitMQ` folder, demonstrates persistent Orleans streams backed by a local RabbitMQ Streams container.
 
 ## Sample prerequisites
 
