@@ -91,6 +91,7 @@ internal class RabbitMqQueueCache : IQueueCache
 
         purgedItems = _messagesToPurge.Cast<IBatchContainer>().ToList();
         _messagesToPurge.Clear();
+        Interlocked.Add(ref _countProcessingMessages, -purgedItems.Count);
 
         return purgedItems.Count > 0;
     }
@@ -111,30 +112,11 @@ internal class RabbitMqQueueCache : IQueueCache
                         {
                             _messagesToPurge.Add(messageRead);
                             lazyQueue.Value.TryDequeue(out _);
-                            _activeStreamCursorsProcessedMessageCount.Remove(streamId, out var count);
-
-                            if ((cursorsCount.Count - count.Count) != 0)
-                            {
-                            }
-                        }
-                        else if (messageRead is null)
-                        {
-                            //The messageRead object was null, so it means that the current message failed to process.
-                            //But even failed messages (that are not purged) should be decreased from the count of current processing messages
-                            //so that new messages can come in and restart the consumer cursor.
-                            Interlocked.Decrement(ref _countProcessingMessages);
-
-                            //if there are no more messages after the current one, remove the stream from the dictionary
-                            if (!lazyQueue.Value.TryPeek(out _))
-                            {
-                                _processingMessages.TryRemove(streamId, out var oldQueue);
-                                PreventNewMessagesRaceCondition(streamId, oldQueue);
-                            }
+                            _activeStreamCursorsProcessedMessageCount.TryRemove(streamId, out _);
                         }
                     }
                 },
-                //Since the message is being retried we have to consider it as a message being processed again
-                () => Interlocked.Increment(ref _countProcessingMessages), () =>
+                () =>
                 {
                     if (_processingMessages.TryGetValue(streamId, out lazyQueue))
                     {
@@ -163,24 +145,6 @@ internal class RabbitMqQueueCache : IQueueCache
         }
 
         return null;
-    }
-
-    private void PreventNewMessagesRaceCondition(StreamId streamId,
-        Lazy<ConcurrentQueue<RabbitMqBatchContainer>> oldQueue)
-    {
-        //In case the stream received new messages while we were removing it from the dictionary we need to re-add it
-        if (!oldQueue.Value.IsEmpty)
-        {
-            _processingMessages.AddOrUpdate(streamId, _ => oldQueue, (_, newQueue) =>
-            {
-                while (newQueue.Value.TryDequeue(out var batch))
-                {
-                    oldQueue.Value.Enqueue(batch);
-                }
-
-                return oldQueue;
-            });
-        }
     }
 
     public bool IsUnderPressure() => _countProcessingMessages >= GetMaxAddCount();

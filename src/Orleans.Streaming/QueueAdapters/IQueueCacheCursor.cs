@@ -34,11 +34,6 @@ namespace Orleans.Streams
         void Refresh(StreamSequenceToken token);
 
         /// <summary>
-        /// Gets the token from the most recent refresh.
-        /// </summary>
-        StreamSequenceToken? LastRefreshToken => null;
-
-        /// <summary>
         /// Records that delivery of the current event has failed
         /// </summary>
         void RecordDeliveryFailure();

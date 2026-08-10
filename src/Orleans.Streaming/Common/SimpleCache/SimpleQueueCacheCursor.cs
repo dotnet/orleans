@@ -102,11 +102,7 @@ namespace Orleans.Providers.Streams.Common
             {
                 cache.RefreshCursor(this, sequenceToken);
             }
-
-            LastRefreshToken = sequenceToken;
         }
-
-        public StreamSequenceToken? LastRefreshToken { get; private set; }
 
         /// <inheritdoc />
         public void RecordDeliveryFailure()
