@@ -26,6 +26,7 @@ namespace UnitTests.Grains
         private readonly IOptions<ReminderOptions> reminderOptions;
 
         private readonly ILogger logger;
+        private readonly ReminderCounterWaiter counterWaiter = new();
         private string _id = null!; // used to distinguish during debugging between multiple activations of the same grain
 
         private string filePrefix = null!;
@@ -52,6 +53,7 @@ namespace UnitTests.Grains
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             this.logger.LogInformation("OnDeactivateAsync");
+            counterWaiter.Deactivate(this.GrainId);
             return Task.CompletedTask;
         }
 
@@ -85,6 +87,7 @@ namespace UnitTests.Grains
 
             string fileName = GetFileName(reminderName);
             File.Delete(fileName); // if successfully started, then remove any old data
+            counterWaiter.Reset(reminderName);
             this.logger.LogInformation("Started reminder {Reminder}", r);
             return r;
         }
@@ -136,6 +139,7 @@ namespace UnitTests.Grains
             string fileName = GetFileName(reminderName);
             string counterValue = this.sequence[reminderName].ToString(CultureInfo.InvariantCulture);
             File.WriteAllText(fileName, counterValue);
+            counterWaiter.Signal(reminderName, sequenceNumber);
 
             return;
         }
@@ -213,6 +217,9 @@ namespace UnitTests.Grains
             return Task.FromResult(counterValue);
         }
 
+        public Task<bool> WaitForCounterForTestAsync(string reminderName, long target, long current, CancellationToken cancellationToken)
+            => counterWaiter.WaitAsync(reminderName, target, current, cancellationToken);
+
         public Task<IGrainReminder?> GetReminderObject(string reminderName)
         {
             return this.GetReminder(reminderName);
@@ -256,6 +263,7 @@ namespace UnitTests.Grains
         private static readonly long aCCURACY = 50 * TimeSpan.TicksPerMillisecond; // when we use ticks to compute sequence numbers, we might get wrong results as timeouts don't happen with precision of ticks  ... we keep this as a leeway
 
         private readonly ILogger logger;
+        private readonly ReminderCounterWaiter counterWaiter = new();
         private long myId; // used to distinguish during debugging between multiple activations of the same grain
 
         private string filePrefix = null!;
@@ -280,6 +288,7 @@ namespace UnitTests.Grains
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             this.logger.LogInformation("OnDeactivateAsync.");
+            counterWaiter.Deactivate(this.GrainId);
             return Task.CompletedTask;
         }
 
@@ -308,6 +317,7 @@ namespace UnitTests.Grains
             }
 
             File.Delete(GetFileName(reminderName)); // if successfully started, then remove any old data
+            counterWaiter.Reset(reminderName);
             this.logger.LogInformation("Started reminder {Reminder}.", r);
             return r;
         }
@@ -358,6 +368,7 @@ namespace UnitTests.Grains
             this.logger.LogInformation("{ReminderName} Sequence # {SequenceNumber} with status {Status}.", reminderName, this.sequence[reminderName], status);
 
             File.WriteAllText(GetFileName(reminderName), this.sequence[reminderName].ToString());
+            counterWaiter.Signal(reminderName, sequenceNumber);
 
             return;
         }
@@ -410,6 +421,9 @@ namespace UnitTests.Grains
             return Task.FromResult(long.Parse(File.ReadAllText(GetFileName(name))));
         }
 
+        public Task<bool> WaitForCounterForTestAsync(string reminderName, long target, long current, CancellationToken cancellationToken)
+            => counterWaiter.WaitAsync(reminderName, target, current, cancellationToken);
+
         public async Task<IGrainReminder?> GetReminderObject(string reminderName)
         {
             return await this.GetReminder(reminderName);
@@ -422,6 +436,131 @@ namespace UnitTests.Grains
         private string GetFileName(string reminderName)
         {
             return string.Format("{0}{1}", this.filePrefix, reminderName);
+        }
+    }
+
+    internal sealed class ReminderCounterWaiter
+    {
+        private readonly object lockObject = new();
+        private readonly Dictionary<string, long> counters = new();
+        private readonly Dictionary<string, List<(long Target, TaskCompletionSource<bool> Completion)>> waiters = new();
+        private bool deactivated;
+
+        public async Task<bool> WaitAsync(string reminderName, long target, long current, CancellationToken cancellationToken)
+        {
+            TaskCompletionSource<bool> completion;
+            lock (lockObject)
+            {
+                if (deactivated)
+                {
+                    return false;
+                }
+
+                current = Math.Max(current, counters.GetValueOrDefault(reminderName));
+                if (current >= target)
+                {
+                    return true;
+                }
+
+                if (!waiters.TryGetValue(reminderName, out var reminderWaiters))
+                {
+                    reminderWaiters = [];
+                    waiters.Add(reminderName, reminderWaiters);
+                }
+
+                completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                reminderWaiters.Add((target, completion));
+            }
+
+            using var registration = cancellationToken.Register(
+                static state =>
+                {
+                    var (source, token) = ((TaskCompletionSource<bool> Source, CancellationToken Token))state!;
+                    source.TrySetCanceled(token);
+                },
+                (completion, cancellationToken));
+            try
+            {
+                return await completion.Task.ConfigureAwait(false);
+            }
+            finally
+            {
+                lock (lockObject)
+                {
+                    if (waiters.TryGetValue(reminderName, out var reminderWaiters))
+                    {
+                        reminderWaiters.RemoveAll(waiter => ReferenceEquals(waiter.Completion, completion));
+                        if (reminderWaiters.Count == 0)
+                        {
+                            waiters.Remove(reminderName);
+                        }
+                    }
+                }
+            }
+        }
+
+        public void Signal(string reminderName, long current)
+        {
+            List<TaskCompletionSource<bool>>? completed = null;
+            lock (lockObject)
+            {
+                counters[reminderName] = current;
+                if (!waiters.TryGetValue(reminderName, out var reminderWaiters))
+                {
+                    return;
+                }
+
+                for (var i = reminderWaiters.Count - 1; i >= 0; i--)
+                {
+                    var waiter = reminderWaiters[i];
+                    if (waiter.Completion.Task.IsCompleted || current >= waiter.Target)
+                    {
+                        reminderWaiters.RemoveAt(i);
+                        if (!waiter.Completion.Task.IsCompleted)
+                        {
+                            (completed ??= []).Add(waiter.Completion);
+                        }
+                    }
+                }
+
+                if (reminderWaiters.Count == 0)
+                {
+                    waiters.Remove(reminderName);
+                }
+            }
+
+            if (completed is not null)
+            {
+                foreach (var completion in completed)
+                {
+                    completion.TrySetResult(true);
+                }
+            }
+        }
+
+        public void Reset(string reminderName)
+        {
+            lock (lockObject)
+            {
+                counters[reminderName] = 0;
+            }
+        }
+
+        public void Deactivate(GrainId grainId)
+        {
+            List<TaskCompletionSource<bool>> pending;
+            lock (lockObject)
+            {
+                deactivated = true;
+                pending = waiters.Values.SelectMany(static value => value.Select(static waiter => waiter.Completion)).ToList();
+                waiters.Clear();
+                counters.Clear();
+            }
+
+            foreach (var completion in pending)
+            {
+                completion.TrySetResult(false);
+            }
         }
     }
 
