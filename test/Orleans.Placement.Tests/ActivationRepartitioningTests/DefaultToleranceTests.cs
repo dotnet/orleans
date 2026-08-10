@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Placement;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Placement.Repartitioning;
 using Orleans.Streams;
@@ -239,15 +240,71 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
     [Fact]
     public async Task Receivers_ShouldMoveCloseTo_PullingAgent()
     {
+        var silo1Control = GrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, Silo1);
+        var silo2Control = GrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, Silo2);
+        var allowedDuration = TimeSpan.FromSeconds(3);
+        var stopwatch = Stopwatch.StartNew();
+        var silo1AgentCount = 0;
+        var silo2AgentCount = 0;
+        var observedOwner = 0;
+        var stableObservationCount = 0;
+        const int requiredStableObservationCount = 5;
+        do
+        {
+            var agentCounts = await Task.WhenAll(
+                silo1Control.SendControlCommandToProvider<PersistentStreamProvider>(
+                    Fixture.StreamProviderName,
+                    (int)PersistentStreamProviderCommand.GetNumberRunningAgents,
+                    null),
+                silo2Control.SendControlCommandToProvider<PersistentStreamProvider>(
+                    Fixture.StreamProviderName,
+                    (int)PersistentStreamProviderCommand.GetNumberRunningAgents,
+                    null));
+            silo1AgentCount = Assert.IsType<int>(agentCounts[0]);
+            silo2AgentCount = Assert.IsType<int>(agentCounts[1]);
+
+            var currentOwner = (silo1AgentCount, silo2AgentCount) switch
+            {
+                (1, 0) => 1,
+                (0, 1) => 2,
+                _ => 0,
+            };
+            if (currentOwner != 0 && currentOwner == observedOwner)
+            {
+                stableObservationCount++;
+            }
+            else
+            {
+                observedOwner = currentOwner;
+                stableObservationCount = currentOwner == 0 ? 0 : 1;
+            }
+
+            if (stableObservationCount >= requiredStableObservationCount)
+            {
+                break;
+            }
+
+            await Task.Delay(50);
+        }
+        while (stopwatch.Elapsed < allowedDuration);
+
+        Assert.True(
+            stableObservationCount >= requiredStableObservationCount,
+            $"Expected a stable pulling-agent assignment within {allowedDuration}. Silo1 reported {silo1AgentCount}; Silo2 reported {silo2AgentCount}; stable observations: {stableObservationCount}.");
+        var pullingAgentSilo = observedOwner == 1 ? Silo1 : Silo2;
+        var receiverSilo = pullingAgentSilo == Silo1 ? Silo2 : Silo1;
+        var receiverRepartitioner = receiverSilo == Silo1 ? Silo1Repartitioner : Silo2Repartitioner;
+        var pullingAgentRepartitioner = pullingAgentSilo == Silo1 ? Silo1Repartitioner : Silo2Repartitioner;
+
         var sp1 = GrainFactory.GetGrain<ISP>("s1");
         var sp2 = GrainFactory.GetGrain<ISP>("s2");
         var sp3 = GrainFactory.GetGrain<ISP>("s3");
 
-        RequestContext.Set(IPlacementDirector.PlacementHintKey, Silo1);
+        RequestContext.Set(IPlacementDirector.PlacementHintKey, receiverSilo);
         await sp1.FirstPing();
         await sp2.FirstPing();
 
-        RequestContext.Set(IPlacementDirector.PlacementHintKey, Silo2);
+        RequestContext.Set(IPlacementDirector.PlacementHintKey, pullingAgentSilo);
         await sp3.FirstPing();
 
         var i = 0;
@@ -278,23 +335,22 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         var sr2_host = await sr2.GetAddress();
         var sr3_host = await sr3.GetAddress();
 
-        Assert.Equal(Silo1, sr1_host);
-        Assert.Equal(Silo1, sr2_host);
-        Assert.Equal(Silo2, sr3_host);
+        Assert.Equal(receiverSilo, sr1_host);
+        Assert.Equal(receiverSilo, sr2_host);
+        Assert.Equal(pullingAgentSilo, sr3_host);
 
-        await Silo1Repartitioner.FlushBuffers();
-        await Silo2Repartitioner.FlushBuffers();
-        await Silo1Repartitioner.TriggerExchangeRequest();
+        await receiverRepartitioner.FlushBuffers();
+        await pullingAgentRepartitioner.FlushBuffers();
+        await receiverRepartitioner.TriggerExchangeRequest();
 
-        var allowedDuration = TimeSpan.FromSeconds(3);
-        var stopwatch = Stopwatch.StartNew();
+        stopwatch.Restart();
 
         while (stopwatch.Elapsed < allowedDuration)
         {
             sr1_host = await sr1.GetAddress();
             sr2_host = await sr2.GetAddress();
 
-            if (sr1_host != Silo1 && sr2_host != Silo1)
+            if (sr1_host != receiverSilo && sr2_host != receiverSilo)
             {
                 break;
             }
@@ -303,17 +359,17 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         }
 
         Assert.True(
-            sr1_host != Silo1 && sr2_host != Silo1,
-            $"Receivers did not move from {Silo1} within {allowedDuration}. SR1 was on {sr1_host}; SR2 was on {sr2_host}.");
+            sr1_host != receiverSilo && sr2_host != receiverSilo,
+            $"Receivers did not move from {receiverSilo} to pulling-agent silo {pullingAgentSilo} within {allowedDuration}. SR1 was on {sr1_host}; SR2 was on {sr2_host}.");
 
         // refresh
         sr1_host = await sr1.GetAddress();
         sr2_host = await sr2.GetAddress();
         sr3_host = await sr3.GetAddress();
 
-        Assert.Equal(Silo2, sr1_host);  // SR1 is now in silo 2, as there is 1 pulling agent (which is moved to silo 2 by the streaming runtime)
-        Assert.Equal(Silo2, sr2_host);  // SR2 is now in silo 2, as there is 1 pulling agent (which is moved to silo 2 by the streaming runtime)
-        Assert.Equal(Silo2, sr3_host);
+        Assert.Equal(pullingAgentSilo, sr1_host);
+        Assert.Equal(pullingAgentSilo, sr2_host);
+        Assert.Equal(pullingAgentSilo, sr3_host);
 
         await ResetCounters();
     }
