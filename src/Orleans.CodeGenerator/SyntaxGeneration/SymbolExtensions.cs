@@ -1,8 +1,8 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Text;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
@@ -10,8 +10,8 @@ namespace Orleans.CodeGenerator.SyntaxGeneration;
 
 internal static class SymbolExtensions
 {
-    private static readonly ConcurrentDictionary<ITypeSymbol, TypeSyntax> TypeCache = new(SymbolEqualityComparer.Default);
-    private static readonly ConcurrentDictionary<ISymbol, string> NameCache = new(SymbolEqualityComparer.Default);
+    private static readonly ConditionalWeakTable<ITypeSymbol, TypeSyntax> TypeCache = new();
+    private static readonly ConditionalWeakTable<ISymbol, string> NameCache = new();
 
     public struct DisplayNameOptions
     {
@@ -64,12 +64,7 @@ internal static class SymbolExtensions
             return PredefinedType(Token(SyntaxKind.VoidKeyword));
         }
 
-        if (!TypeCache.TryGetValue(typeSymbol, out var result))
-        {
-            result = TypeCache[typeSymbol] = ParseTypeName(typeSymbol.ToDisplayName());
-        }
-
-        return result;
+        return TypeCache.GetValue(typeSymbol, static symbol => ParseTypeName(symbol.ToDisplayName()));
     }
 
     public static TypeSyntax ToTypeSyntax(this ITypeSymbol typeSymbol, Dictionary<ITypeParameterSymbol, string>? substitutions)
@@ -118,12 +113,7 @@ internal static class SymbolExtensions
             return "void";
         }
 
-        if (!NameCache.TryGetValue(typeSymbol, out var result))
-        {
-            result = NameCache[typeSymbol] = typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        }
-
-        return result;
+        return NameCache.GetValue(typeSymbol, static symbol => symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
     }
 
     public static string ToDisplayName(this IAssemblySymbol? assemblySymbol)
@@ -133,12 +123,7 @@ internal static class SymbolExtensions
             return string.Empty;
         }
 
-        if (!NameCache.TryGetValue(assemblySymbol, out var result))
-        {
-            result = NameCache[assemblySymbol] = assemblySymbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
-        }
-
-        return result;
+        return NameCache.GetValue(assemblySymbol, static symbol => symbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
     }
 
     private static void ToTypeSyntaxInner(ITypeSymbol typeSymbol, StringBuilder res, DisplayNameOptions options)
