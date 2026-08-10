@@ -28,25 +28,25 @@ namespace Orleans.Transactions.TestKit.xUnit
         {
         }
 
-        [Fact]
+        [SkippableFact]
         public override Task FirstTime_Load_ShouldReturnEmptyLoadResponse()
         {
             return base.FirstTime_Load_ShouldReturnEmptyLoadResponse();
         }
 
-        [Fact]
+        [SkippableFact]
         public override Task StoreWithoutChanges()
         {
             return base.StoreWithoutChanges();
         }
 
-        [Fact]
+        [SkippableFact]
         public override Task WrongEtags()
         {
             return base.WrongEtags();
         }
 
-        [Theory]
+        [SkippableTheory]
         [InlineData(true)]
         [InlineData(false)]
         public override Task ConfirmOne(bool useTwoSteps)
@@ -54,19 +54,19 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.ConfirmOne(useTwoSteps);
         }
 
-        [Fact]
+        [SkippableFact]
         public override Task CancelOne()
         {
             return base.CancelOne();
         }
 
-        [Fact]
+        [SkippableFact]
         public override Task ReplaceOne()
         {
             return base.ReplaceOne();
         }
 
-        [Theory]
+        [SkippableTheory]
         [InlineData(false, false)]
         [InlineData(true, true)]
         [InlineData(true, false)]
@@ -75,19 +75,19 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.ConfirmOneAndCancelOne(useTwoSteps, reverseOrder);
         }
 
-        [Fact]
+        [SkippableFact]
         public override Task GrowingBatch()
         {
             return base.GrowingBatch();
         }
 
-        [Fact]
+        [SkippableFact]
         public override Task ShrinkingBatch()
         {
             return base.ShrinkingBatch();
         }
 
-        [Theory]
+        [SkippableTheory]
         [InlineData(99)]
         [InlineData(100)]
         [InlineData(200)]
@@ -96,7 +96,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.PrepareMany(count);
         }
 
-        [Theory]
+        [SkippableTheory]
         [InlineData(99, true)]
         [InlineData(99, false)]
         [InlineData(100, true)]
@@ -108,7 +108,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.ConfirmMany(count, useTwoSteps);
         }
 
-        [Theory]
+        [SkippableTheory]
         [InlineData(99)]
         [InlineData(100)]
         [InlineData(200)]
@@ -117,7 +117,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.CancelMany(count);
         }
 
-        [Theory]
+        [SkippableTheory]
         [InlineData(99)]
         [InlineData(100)]
         [InlineData(200)]
