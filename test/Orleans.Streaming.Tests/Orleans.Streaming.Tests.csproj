@@ -27,5 +27,6 @@
     <InternalsVisibleTo Include="Orleans.Azure.Tests" />
     <InternalsVisibleTo Include="Orleans.Redis.Tests" />
     <InternalsVisibleTo Include="Orleans.Streaming.NATS.Tests" />
+    <InternalsVisibleTo Include="Orleans.Streaming.Kinesis.Tests" />
   </ItemGroup>
 </Project>

@@ -130,6 +130,8 @@ items:
             href: streaming/streams-programming-apis.md
           - name: Stream providers
             href: streaming/stream-providers.md
+          - name: Amazon Kinesis
+            href: streaming/kinesis-streaming.md
           - name: Delivery semantics
             href: streaming/delivery-semantics.md
           - name: Pub-sub storage

@@ -16,6 +16,7 @@ A stream provider connects the Orleans streaming API to a transport and defines 
 | Memory | [`Microsoft.Orleans.Streaming`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming) | Stable | No; silo memory only | Yes, within the transient in-memory cache | None |
 | Azure Queue Storage | [`Microsoft.Orleans.Streaming.AzureStorage`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.AzureStorage) | Stable | Yes, in Azure Storage queues | No | Azure Storage account or Azurite; credentials and a stable Orleans service ID |
 | Azure Event Hubs | [`Microsoft.Orleans.Streaming.EventHubs`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.EventHubs) | Stable | Yes, within Event Hubs retention | Yes | Event Hubs namespace, hub, consumer group, and checkpoint storage |
+| Amazon Kinesis | [`Microsoft.Orleans.Streaming.Kinesis`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.Kinesis) | Stable | Yes, within Kinesis retention | Yes | Kinesis data stream, AWS credentials, region, and durable checkpoint storage |
 | Amazon SQS | [`Microsoft.Orleans.Streaming.SQS`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.SQS) | Stable | Yes, within SQS retention | No | AWS account, queue permissions, region/endpoint configuration |
 | ADO.NET | [`Microsoft.Orleans.Streaming.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.AdoNet) | **Alpha** | Yes, in relational tables until expiry/dead-letter eviction | No | Supported database, ADO.NET driver, and Orleans streaming SQL schema |
 | NATS JetStream | [`Microsoft.Orleans.Streaming.NATS`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.NATS) | **Alpha** | Configurable; file storage is the default | No | NATS server with JetStream and sufficient storage; subject/stream administration |
@@ -52,6 +53,10 @@ The examples use durable Azure Table Storage for `PubSubStore`; queue durability
 <a id="azure-event-hub-stream-provider"></a>
 
 Register [Azure Event Hubs](https://learn.microsoft.com/azure/event-hubs/event-hubs-about) with <xref:Orleans.Hosting.SiloBuilderExtensions.AddEventHubStreams*>. Event Hubs retention and partition positions make this provider rewindable. Configure a consumer group dedicated to the Orleans application and durable checkpoint storage. Partition count bounds physical read parallelism, and retention bounds how far recovery can rewind.
+
+## Amazon Kinesis
+
+Register [Amazon Kinesis Data Streams](https://docs.aws.amazon.com/streams/latest/dev/introduction.html) with <xref:Orleans.Hosting.SiloBuilderExtensions.AddKinesisStreams*>. Kinesis retains events independently of Orleans, and the provider persists each shard's last delivered sequence number so that delivery can resume after shutdown or queue reassignment. See [Stream with Amazon Kinesis](kinesis-streaming.md) for configuration, checkpoint choices, and operational constraints.
 
 ## Amazon SQS
 

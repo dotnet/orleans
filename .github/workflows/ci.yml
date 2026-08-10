@@ -22,6 +22,7 @@ env:
   CONSUL_IMAGE: public.ecr.aws/hashicorp/consul:1.19
   DYNAMODB_IMAGE: amazon/dynamodb-local:latest
   ELASTICMQ_IMAGE: softwaremill/elasticmq-native:latest
+  MINISTACK_IMAGE: ministackorg/ministack:1.4.11@sha256:8b05715b9effc23d998d4a4e0c0a0c4af7f9435f0ff076a30cf27a77326f14b1
   MSSQL_IMAGE: mcr.microsoft.com/mssql/server:latest
   NATS_IMAGE: nats:latest
   POSTGRES_IMAGE: postgres
@@ -910,6 +911,90 @@ jobs:
     - name: Clean up container
       if: always()
       run: docker rm -f nats || true
+    - name: Archive Test Results
+      if: always()
+      continue-on-error: true
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      with:
+        name: test_output_${{ github.job }}_${{ matrix.framework }}
+        retention-days: 1
+        path: |
+          **/TestResults/*
+          **/logs/*
+  test-kinesis:
+    name: AWS Kinesis provider tests
+    runs-on: ubuntu-latest
+    env:
+      BuildExternalAssets: "false"
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+      AWS_ACCESS_KEY_ID: test
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION: us-east-1
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: ["Kinesis"]
+        framework: ["net8.0", "net10.0"]
+    steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Start Ministack
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        bash .github/scripts/docker-pull-with-retry.sh "$MINISTACK_IMAGE"
+
+        docker run -d --pull=never --name ministack \
+          -p 4566:4566 \
+          -e MINISTACK_REGION="$AWS_REGION" \
+          "$MINISTACK_IMAGE"
+    - name: Start DynamoDB Local
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        bash .github/scripts/docker-pull-with-retry.sh "$DYNAMODB_IMAGE"
+
+        docker run -d --pull=never --name dynamodb \
+          -p 8000:8000 \
+          -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+          -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+          -e AWS_REGION="$AWS_REGION" \
+          "$DYNAMODB_IMAGE"
+    - name: Wait for Ministack and DynamoDB Local
+      run: |
+        echo "Waiting for Ministack and DynamoDB Local to be ready..."
+        timeout 60 bash -c 'until curl --fail --silent http://localhost:4566/_ministack/health > /dev/null && nc -z localhost 8000; do sleep 1; done'
+        echo "Ministack and DynamoDB Local are ready"
+    - name: Setup .NET
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+      with:
+        global-json-file: global.json
+    - name: Test
+      run: dotnet test
+        test/Extensions/Orleans.Streaming.Kinesis.Tests/Orleans.Streaming.Kinesis.Tests.csproj
+        --framework ${{ matrix.framework }}
+        --filter "Category=${{ matrix.provider }}"
+        --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
+        --
+        -parallel none -noshadow
+      env:
+        ORLEANSKINESISCONNECTIONSTRING: "http://localhost:4566;test;test;us-east-1"
+        ORLEANSDYNAMODBSERVICE: "http://localhost:8000"
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+        ORLEANSDYNAMODBACCESSKEY: "test"
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+        ORLEANSDYNAMODBSECRETKEY: "test"
+    - name: Clean up Ministack
+      if: always()
+      run: docker rm -f ministack || true
+    - name: Clean up DynamoDB Local
+      if: always()
+      run: docker rm -f dynamodb || true
     - name: Archive Test Results
       if: always()
       continue-on-error: true

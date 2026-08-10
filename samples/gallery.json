@@ -11,6 +11,17 @@
     "featured": true
   },
   {
+    "slug": "aws-kinesis-dynamodb",
+    "title": "AWS Kinesis and DynamoDB",
+    "description": "An AWS-hosted Orleans application using DynamoDB for clustering, persistence, reminders, and Kinesis checkpoints.",
+    "path": "AWS/KinesisDynamoDB",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "image": null,
+    "languages": ["C#"],
+    "tags": ["aws", "kinesis", "dynamodb", "streaming"],
+    "featured": false
+  },
+  {
     "slug": "bank-account",
     "title": "Bank Account",
     "description": "A bank transfer simulation demonstrating ACID transactions across stateful grains.",
