@@ -2738,11 +2738,9 @@ namespace Orleans.Serialization.UnitTests
         private readonly IEqualityComparer<string>[] _comparers =
         [
             new CaseInsensitiveEqualityComparer(),
-#if NETCOREAPP3_1_OR_GREATER
             StringComparer.Ordinal,
             StringComparer.OrdinalIgnoreCase,
             EqualityComparer<string>.Default,
-#endif
 #if NET6_0_OR_GREATER
             StringComparer.InvariantCulture,
             StringComparer.InvariantCultureIgnoreCase,

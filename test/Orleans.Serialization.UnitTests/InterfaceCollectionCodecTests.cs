@@ -19,9 +19,7 @@ using Orleans.Serialization.TestKit;
 using Orleans.Serialization.Utilities;
 using Xunit;
 using Xunit.Abstractions;
-#if !NETCOREAPP3_1
 using static VerifyXunit.Verifier;
-#endif
 
 namespace Orleans.Serialization.UnitTests;
 
@@ -374,7 +372,6 @@ public class InterfaceCollectionRegressionTests
         Assert.Equal(4, readOnlyDictionary["d"]);
     }
 
-#if !NETCOREAPP3_1
     [Fact]
     public void CanDeserializeLegacyInterfaceCodecPayload()
     {
@@ -463,7 +460,6 @@ public class InterfaceCollectionRegressionTests
     [Fact]
     public Task ReadOnlyDictionaryInterfaceConcreteDictionary_Formatted_MatchesSnapshot()
         => VerifyConcreteRuntimeBitStream<IReadOnlyDictionary<string, int>>(new Dictionary<string, int> { ["a"] = 1, ["b"] = 2 }, ReadOnlyDictionaryCodecAlias);
-#endif
 
     private static T RoundTrip<T>(T value)
     {
@@ -478,7 +474,6 @@ public class InterfaceCollectionRegressionTests
         return serviceProvider.GetRequiredService<DeepCopier<T>>().Copy(value)!;
     }
 
-#if !NETCOREAPP3_1
     private static Task VerifyFallbackBitStream<T>(T value, string codecAlias)
     {
         var formatted = FormatSerializedPayload(value);
@@ -505,7 +500,6 @@ public class InterfaceCollectionRegressionTests
         using var session = serviceProvider.GetRequiredService<SerializerSessionPool>().GetSession();
         return BitStreamFormatter.Format(payload, session);
     }
-#endif
 
     [GenerateSerializer]
     [Alias("Orleans.Serialization.UnitTests.InterfaceCollectionRegressionTests.ReadOnlyListContainer")]
