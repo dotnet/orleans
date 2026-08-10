@@ -76,9 +76,31 @@ namespace Orleans.Serialization.Configuration
         /// Gets the set of allowed Orleans-formatted runtime type names.
         /// </summary>
         /// <remarks>
-        /// Prefer <see cref="AddAllowedType(Type)"/> when the type is available to avoid constructing
-        /// formatted names manually.
+        /// <para>
+        /// An Orleans-formatted runtime type name uses CLR type-name syntax, including namespace,
+        /// nesting, generic arguments, arrays, and optional assembly qualification. Use
+        /// <see cref="RuntimeTypeNameFormatter.Format(Type)"/> to produce this format.
+        /// </para>
+        /// <para>
+        /// Prefer <see cref="AddAllowedType(Type)"/> when the <see cref="Type"/> is available. It produces
+        /// the underlying CLR name without compound aliases so that later alias configuration does not
+        /// affect the allow-list entry. Unqualified names such as <see cref="Type.FullName"/> remain
+        /// supported for compatibility.
+        /// </para>
         /// </remarks>
+        /// <example>
+        /// <code>
+        /// services.AddSerializer(builder => builder.Configure(options =>
+        /// {
+        ///     // Preferred: let Orleans construct the entry.
+        ///     options.AddAllowedType(typeof(MyMessage));
+        ///
+        ///     // Supported when a string entry is required.
+        ///     options.AllowedTypes.Add(
+        ///         RuntimeTypeNameFormatter.Format(typeof(MyOtherMessage)));
+        /// }));
+        /// </code>
+        /// </example>
         public HashSet<string> AllowedTypes { get; } = new HashSet<string>(StringComparer.Ordinal);
 
         /// <summary>
@@ -88,6 +110,12 @@ namespace Orleans.Serialization.Configuration
         /// Prefer <see cref="AddAllowedAssembly(Assembly)"/> when the assembly is available to avoid
         /// constructing assembly names manually.
         /// </remarks>
+        /// <example>
+        /// <code>
+        /// services.AddSerializer(builder => builder.Configure(options =>
+        ///     options.AddAllowedAssembly(typeof(MyMessage).Assembly)));
+        /// </code>
+        /// </example>
         public HashSet<string> AllowedAssemblies { get; } = new HashSet<string>(StringComparer.Ordinal);
 
         /// <summary>
@@ -112,8 +140,13 @@ namespace Orleans.Serialization.Configuration
         internal HashSet<object> TypeManifestProviders { get; } = new();
 
         /// <summary>
-        /// Adds the formatted type name for <paramref name="type"/> to <see cref="AllowedTypes"/>.
+        /// Adds the Orleans-formatted runtime type name for <paramref name="type"/> to
+        /// <see cref="AllowedTypes"/>.
         /// </summary>
+        /// <remarks>
+        /// This is the preferred way to allow an available <see cref="Type"/>. It formats the underlying
+        /// CLR type name without compound aliases and includes all constructed generic components.
+        /// </remarks>
         /// <param name="type">The type to allow.</param>
         public void AddAllowedType(Type type)
         {
