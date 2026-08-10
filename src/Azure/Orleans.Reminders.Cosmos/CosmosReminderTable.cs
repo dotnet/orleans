@@ -77,7 +77,7 @@ internal partial class CosmosReminderTable : IReminderTable
             {
                 var (self, grainId, requestOptions) = args;
                 var iterator = self._container.GetItemLinqQueryable<ReminderEntity>(requestOptions: requestOptions).ToFeedIterator();
-                return iterator.DrainAsync();
+                return iterator.ToListAsync();
             },
             (this, grainId, requestOptions)).ConfigureAwait(false);
 
@@ -105,7 +105,7 @@ internal partial class CosmosReminderTable : IReminderTable
                     ? query.Where(r => r.GrainHash > begin && r.GrainHash <= end)
                     : query.Where(r => r.GrainHash > begin || r.GrainHash <= end);
 
-                return query.ToFeedIterator().DrainAsync();
+                return query.ToFeedIterator().ToListAsync();
             },
             (this, begin, end)).ConfigureAwait(false);
 
@@ -213,7 +213,7 @@ internal partial class CosmosReminderTable : IReminderTable
                 var iterator = self._container.GetItemLinqQueryable<ReminderEntity>()
                     .Where(entity => entity.ServiceId == self._clusterOptions.ServiceId)
                     .ToFeedIterator();
-                return iterator.DrainAsync();
+                return iterator.ToListAsync();
             }, this).ConfigureAwait(false);
 
             var deleteTasks = new List<Task>();

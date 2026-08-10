@@ -13,7 +13,7 @@ internal static class FeedIteratorExtensions
     /// partition with no matching items), so iteration must continue until
     /// <c>HasMoreResults</c> is <c>false</c>.
     /// </summary>
-    public static async Task<List<T>> DrainAsync<T>(
+    public static async Task<List<T>> ToListAsync<T>(
         this FeedIterator<T> iterator,
         CancellationToken cancellationToken = default)
     {

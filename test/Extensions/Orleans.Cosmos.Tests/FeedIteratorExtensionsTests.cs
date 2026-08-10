@@ -12,7 +12,7 @@ using Xunit;
 namespace Tester.Cosmos.Reminders;
 
 /// <summary>
-/// Unit tests for <see cref="FeedIteratorExtensions.DrainAsync{T}"/>. These validate the
+/// Unit tests for <see cref="FeedIteratorExtensions.ToListAsync{T}"/>. These validate the
 /// specific pagination invariant that once tripped a real production bug in
 /// <c>CosmosReminderTable.ReadRows</c>: a <see cref="FeedIterator{T}"/> can return an
 /// empty page while <see cref="FeedIterator.HasMoreResults"/> remains <c>true</c>
@@ -27,7 +27,7 @@ namespace Tester.Cosmos.Reminders;
 public class FeedIteratorExtensionsTests
 {
     [Fact]
-    public async Task DrainAsync_EmptyPageInMiddle_ContinuesIterating()
+    public async Task ToListAsync_EmptyPageInMiddle_ContinuesIterating()
     {
         // Simulates the pathological page layout the fix guards against: results,
         // then an empty page while HasMoreResults is still true, then more results.
@@ -37,13 +37,13 @@ public class FeedIteratorExtensionsTests
             Array.Empty<int>(),
             new[] { 4, 5 });
 
-        var drained = await iterator.DrainAsync();
+        var drained = await iterator.ToListAsync();
 
         Assert.Equal(new[] { 1, 2, 3, 4, 5 }, drained);
     }
 
     [Fact]
-    public async Task DrainAsync_LeadingEmptyPage_ContinuesIterating()
+    public async Task ToListAsync_LeadingEmptyPage_ContinuesIterating()
     {
         // First page empty while HasMoreResults is still true. A break-on-empty
         // implementation would return zero rows even though matches exist further on.
@@ -51,42 +51,42 @@ public class FeedIteratorExtensionsTests
             Array.Empty<int>(),
             new[] { 1, 2, 3 });
 
-        var drained = await iterator.DrainAsync();
+        var drained = await iterator.ToListAsync();
 
         Assert.Equal(new[] { 1, 2, 3 }, drained);
     }
 
     [Fact]
-    public async Task DrainAsync_AllEmptyPages_ReturnsEmpty()
+    public async Task ToListAsync_AllEmptyPages_ReturnsEmpty()
     {
         var iterator = new FakeFeedIterator<int>(
             Array.Empty<int>(),
             Array.Empty<int>(),
             Array.Empty<int>());
 
-        var drained = await iterator.DrainAsync();
+        var drained = await iterator.ToListAsync();
 
         Assert.Empty(drained);
     }
 
     [Fact]
-    public async Task DrainAsync_SinglePage_ReturnsAllItems()
+    public async Task ToListAsync_SinglePage_ReturnsAllItems()
     {
         var iterator = new FakeFeedIterator<int>(new[] { 1, 2, 3, 4, 5 });
 
-        var drained = await iterator.DrainAsync();
+        var drained = await iterator.ToListAsync();
 
         Assert.Equal(new[] { 1, 2, 3, 4, 5 }, drained);
     }
 
     [Fact]
-    public async Task DrainAsync_TrailingEmptyPage_ReturnsAllItems()
+    public async Task ToListAsync_TrailingEmptyPage_ReturnsAllItems()
     {
         var iterator = new FakeFeedIterator<int>(
             new[] { 1, 2 },
             Array.Empty<int>());
 
-        var drained = await iterator.DrainAsync();
+        var drained = await iterator.ToListAsync();
 
         Assert.Equal(new[] { 1, 2 }, drained);
     }
