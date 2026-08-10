@@ -7,6 +7,7 @@
 - Create PRs using `dotnet/orleans` as the base repository and `origin`/personal fork branches as the head.
 - Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) for commit messages from now on.
 - PR titles must also follow Conventional Commits naming conventions because squash merges use the PR title as the resulting commit message.
+- When reviewing changes, check whether corresponding documentation or sample updates are needed in the `/docs` and `/samples` directories.
 - When creating PRs, keep the PR description simple: explain the problem it addresses and the solution it implements, including the rationale where helpful. Do not include a section describing what commands to run to test the PR.
 
 Example:
