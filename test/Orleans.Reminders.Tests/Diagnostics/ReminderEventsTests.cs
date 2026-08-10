@@ -51,7 +51,6 @@ public class ReminderEventsTests
     public async Task ReminderDiagnosticObserver_WaitsForAdditionalTickCount_FromCurrentState()
     {
         using var observer = ReminderDiagnosticObserver.Create();
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
         var grainId = GrainId.Create("test", "grain");
         const string reminderName = "reminder";
         var now = DateTime.UtcNow;
@@ -63,7 +62,7 @@ public class ReminderEventsTests
             new TickStatus(now, TimeSpan.FromSeconds(5), now),
             siloAddress);
 
-        var waitTask = observer.WaitForAdditionalTickCountAsync(grainId, 1, cts.Token, reminderName);
+        var waitTask = observer.WaitForAdditionalTickCountAsync(grainId, 1, CancellationToken.None, reminderName);
         Assert.False(waitTask.IsCompleted);
 
         ReminderEvents.EmitTickCompleted(
@@ -72,7 +71,8 @@ public class ReminderEventsTests
             new TickStatus(now, TimeSpan.FromSeconds(5), now.AddSeconds(5)),
             siloAddress);
 
-        await waitTask.WaitAsync(TimeSpan.FromSeconds(1));
+        Assert.True(waitTask.IsCompletedSuccessfully);
+        await waitTask;
     }
 
     [Fact, TestCategory("BVT")]
@@ -143,7 +143,6 @@ public class ReminderEventsTests
     public async Task ReminderDiagnosticObserver_WaitsForReminderQuiescence_FromLifecycleEvents()
     {
         using var observer = ReminderDiagnosticObserver.Create();
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
         var grainId = GrainId.Create("test", "grain");
         const string reminderName = "reminder";
         var identity1 = new object();
@@ -155,7 +154,7 @@ public class ReminderEventsTests
         ReminderEvents.EmitLocalReminderStarted(grainId, reminderName, identity2, siloAddress2);
         Assert.Equal(2, observer.GetActiveReminderCount(grainId, reminderName));
 
-        var waitTask = observer.WaitForReminderQuiescenceAsync(grainId, reminderName, cts.Token);
+        var waitTask = observer.WaitForReminderQuiescenceAsync(grainId, reminderName, CancellationToken.None);
         Assert.False(waitTask.IsCompleted);
 
         ReminderEvents.EmitLocalReminderStopped(grainId, reminderName, identity1, ReminderEvents.LocalReminderStopReason.RemovedFromTable, siloAddress1);
@@ -164,21 +163,52 @@ public class ReminderEventsTests
 
         ReminderEvents.EmitLocalReminderStopped(grainId, reminderName, identity2, ReminderEvents.LocalReminderStopReason.Unregistered, siloAddress2);
 
-        await waitTask.WaitAsync(TimeSpan.FromSeconds(1));
+        Assert.True(waitTask.IsCompletedSuccessfully);
+        await waitTask;
         Assert.Equal(0, observer.GetActiveReminderCount(grainId, reminderName));
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task ReminderDiagnosticObserver_CanceledQuiescenceWait_RemainsCanceled()
+    {
+        using var observer = ReminderDiagnosticObserver.Create();
+        using var cts = new CancellationTokenSource();
+        var grainId = GrainId.Create("test", "grain");
+        const string reminderName = "reminder";
+        var identity = new object();
+        var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 14007), 8);
+
+        ReminderEvents.EmitLocalReminderStarted(grainId, reminderName, identity, siloAddress);
+        var canceledWaitTask = observer.WaitForReminderQuiescenceAsync(grainId, reminderName, cts.Token);
+
+        cts.Cancel();
+
+        Assert.True(canceledWaitTask.IsCanceled);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledWaitTask);
+
+        var currentWaitTask = observer.WaitForReminderQuiescenceAsync(grainId, reminderName, CancellationToken.None);
+        ReminderEvents.EmitLocalReminderStopped(
+            grainId,
+            reminderName,
+            identity,
+            ReminderEvents.LocalReminderStopReason.Unregistered,
+            siloAddress);
+
+        Assert.True(currentWaitTask.IsCompletedSuccessfully);
+        await currentWaitTask;
+        Assert.True(canceledWaitTask.IsCanceled);
     }
 
     [Fact, TestCategory("BVT")]
     public async Task ReminderDiagnosticObserver_WaitsForCurrentOwnerSchedule_AfterOwnershipChange()
     {
         using var observer = ReminderDiagnosticObserver.Create();
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
         var grainId = GrainId.Create("test", "grain");
         const string reminderName = "reminder";
         var previousOwner = new object();
         var currentOwner = new object();
-        var previousSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 14007), 8);
-        var currentSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 14008), 9);
+        var previousSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 14008), 9);
+        var currentSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 14009), 10);
         var now = DateTime.UtcNow;
 
         ReminderEvents.EmitLocalReminderStarted(grainId, reminderName, previousOwner, previousSilo);
@@ -192,7 +222,7 @@ public class ReminderEventsTests
             new TickStatus(now, TimeSpan.FromSeconds(5), now),
             previousSilo);
 
-        var waitTask = observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cts.Token);
+        var waitTask = observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, CancellationToken.None);
         Assert.False(waitTask.IsCompleted);
 
         ReminderEvents.EmitLocalReminderStopped(
@@ -202,7 +232,8 @@ public class ReminderEventsTests
             ReminderEvents.LocalReminderStopReason.RemovedFromRange,
             previousSilo);
 
-        await waitTask.WaitAsync(TimeSpan.FromSeconds(1));
+        Assert.True(waitTask.IsCompletedSuccessfully);
+        await waitTask;
     }
 
     private sealed class Observer : IObserver<ReminderEvents.ReminderEvent>, IDisposable
