@@ -3,6 +3,7 @@ using Xunit;
 
 namespace Tester.AzureUtils;
 
+[TestCategory("AzureStorage"), TestCategory("BVT")]
 public class AzureClientOptionsTests
 {
     [Fact]

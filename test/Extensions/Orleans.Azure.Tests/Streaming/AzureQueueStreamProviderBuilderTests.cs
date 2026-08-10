@@ -9,6 +9,7 @@ namespace Tester.AzureUtils;
 /// <summary>
 /// Tests for Azure Queue Stream Provider configuration builder, validating various configuration scenarios.
 /// </summary>
+[TestCategory("AzureStorage"), TestCategory("BVT")]
 public class AzureQueueStreamProviderBuilderTests
 {
 	/// <summary>

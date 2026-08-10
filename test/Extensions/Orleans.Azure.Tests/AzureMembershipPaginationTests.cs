@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Tester.AzureUtils;
 
-[TestCategory("AzureStorage"), TestCategory("Storage")]
+[TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("BVT")]
 public class AzureMembershipPaginationTests
 {
     private const string ClusterId = "membership-pagination-tests";

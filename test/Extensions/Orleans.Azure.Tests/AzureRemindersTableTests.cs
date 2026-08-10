@@ -49,7 +49,7 @@ namespace UnitTests.RemindersTest
             return Task.FromResult("not used");
         }
 
-        [SkippableFact]
+        [SkippableFact, TestCategory("Functional")]
         public void RemindersTable_Azure_Init()
         {
         }

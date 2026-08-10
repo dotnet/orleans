@@ -52,7 +52,7 @@ namespace Tester.AzureUtils.TimerTests
             await TestTableInsertRate(table, 500);
         }
 
-        [SkippableFact, TestCategory("Reminders")]
+        [SkippableFact, TestCategory("Reminders"), TestCategory("Functional")]
         public async Task Reminders_AzureTable_InsertNewRowAndReadBack()
         {
             string clusterId = NewClusterId();
