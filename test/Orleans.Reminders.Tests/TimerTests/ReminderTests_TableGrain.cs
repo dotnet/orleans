@@ -475,6 +475,7 @@ namespace UnitTests.TimerTests
             var grainId = grain.GetGrainId();
             var dueTime = ReminderLoadingWindow + TimeSpan.FromSeconds(20);
             var period = TimeSpan.FromSeconds(90);
+            var firstTickTime = ReminderUtcNow.UtcDateTime + dueTime;
             using var cts = new CancellationTokenSource(TestConstants.InitTimeout);
 
             await grain.StartReminder(reminderName, dueTime, period);
@@ -492,13 +493,17 @@ namespace UnitTests.TimerTests
 
             var activatedTask = observer.WaitForActiveReminderCountAsync(grainId, 1, cts.Token, reminderName);
             await AdvanceUntilAsync(activatedTask, cts.Token);
+            await observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cts.Token);
 
             var tickTask = observer.WaitForReminderTickAsync(grainId, cts.Token, reminderName);
-            await AdvanceUntilAsync(tickTask, cts.Token);
+            var expectedTickTime = firstTickTime + period;
+            var timeUntilTick = expectedTickTime - ReminderUtcNow.UtcDateTime;
+            Assert.True(timeUntilTick > TimeSpan.Zero, $"Expected the recovered reminder to be armed before {expectedTickTime:O}, but reminder time was {ReminderUtcNow:O}.");
+            await AdvanceReminderTimeAsync(timeUntilTick, cts.Token);
             var tick = await tickTask;
 
             Assert.Equal(1, observer.GetTickCount(grainId, reminderName));
-            Assert.Equal(tick.Status.FirstTickTime + period, tick.Status.CurrentTickTime);
+            Assert.Equal(expectedTickTime, tick.Status.CurrentTickTime);
 
             await grain.StopReminder(reminderName);
         }

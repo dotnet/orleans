@@ -42,6 +42,22 @@ public class LocalReminderServiceTests
         Assert.Equal(startAt + TimeSpan.FromMinutes(30), nextTick);
     }
 
+    [Theory, TestCategory("BVT")]
+    [InlineData(-1, 0)]
+    [InlineData(0, 0)]
+    [InlineData(1, 1)]
+    public void CalculateNextTickTime_PreservesCadenceAtOccurrenceBoundary(int offsetTicks, int expectedAdditionalPeriods)
+    {
+        var period = TimeSpan.FromMinutes(10);
+        var startAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var boundary = startAt + (2 * period);
+        var entry = CreateReminderEntry(startAt, period);
+
+        var nextTick = LocalReminderService.CalculateNextTickTime(entry, boundary.AddTicks(offsetTicks));
+
+        Assert.Equal(boundary + (expectedAdditionalPeriods * period), nextTick);
+    }
+
     [Fact, TestCategory("BVT")]
     public void CalculateNextTickTime_TreatsPersistedUnspecifiedTimestampAsUtc()
     {
