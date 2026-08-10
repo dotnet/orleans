@@ -48,6 +48,11 @@ foreach ($entry in $entries) {
             throw "Gallery entry '$($entry.slug)' references missing path '$relativePath'."
         }
     }
+
+    $readmePath = Join-Path $samplesRoot (Join-Path $entry.path 'README.md')
+    if (-not (Test-Path -LiteralPath $readmePath -PathType Leaf)) {
+        throw "Gallery entry '$($entry.slug)' does not have a README.md."
+    }
 }
 
 & (Join-Path $samplesRoot 'Update-Readme.ps1') -Check
