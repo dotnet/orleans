@@ -4,12 +4,14 @@ using Microsoft.Extensions.Options;
 using Orleans.DurableJobs;
 using Orleans.Journaling.Json;
 using Orleans.Hosting;
+using TestExtensions;
 using Xunit;
 
 namespace Tester.AzureUtils.DurableJobs;
 
 #pragma warning disable ORLEANSEXP005
 
+[TestCategory("Azure"), TestCategory("DurableJobs")]
 public class AzureStorageDurableJobsConfigurationTests
 {
     [Fact]

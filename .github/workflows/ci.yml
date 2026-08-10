@@ -401,7 +401,7 @@ jobs:
         global-json-file: global.json
     - name: Test
       run: dotnet test
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --filter "(Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional))|(Category=Azure&Category=DurableJobs)"
         --framework ${{ matrix.framework }}
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
@@ -681,7 +681,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --filter "Category=${{ matrix.provider }}"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
