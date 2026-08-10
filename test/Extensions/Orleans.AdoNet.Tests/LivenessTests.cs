@@ -153,7 +153,7 @@ namespace UnitTests.MembershipTests
     public class LivenessTests_MySql : LivenessTestsBase
     {
         public const string TestDatabaseName = "OrleansTest_MySql_Liveness";
-        private const string AdoNetInvariantName = AdoNetInvariants.InvariantNamePostgreSql;
+        private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameMySql;
         public LivenessTests_MySql(ITestOutputHelper output) : base(output)
         {
             EnsurePreconditionsMet();
