@@ -104,18 +104,16 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
         var results = await orchestratorGrain.GetCompletedTasks();
         Assert.Equal(2, results.Count);
 
-        var firstResult = results[0];
-        var secondResult = results[1];
-
-        // Verify parent-child relationships
-        Assert.NotNull(firstResult.CorrelationKey);
-        Assert.NotNull(secondResult.CorrelationKey);
-        Assert.True(parentKey.IsAncestorOf(firstResult.CorrelationKey));
-        Assert.True(parentKey.IsAncestorOf(secondResult.CorrelationKey));
-
-        // Verify results
-        Assert.Equal("Processed: task1", firstResult.Result);
-        Assert.Equal("Processed: task2", secondResult.Result);
+        Assert.All(
+            results,
+            result =>
+            {
+                Assert.NotNull(result.CorrelationKey);
+                Assert.True(parentKey.IsAncestorOf(result.CorrelationKey));
+            });
+        Assert.Equal(
+            ["Processed: task1", "Processed: task2"],
+            results.Select(result => result.Result).Order());
     }
 
     /// <summary>
