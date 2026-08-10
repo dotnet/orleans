@@ -1,8 +1,8 @@
 <Project>
   <!--
     NOTE: Microsoft.Orleans.Streaming.Kinesis is not published to NuGet yet, so this sample currently
-    builds only from within the Orleans repository, where the references are resolved from source.
-    The version pins below are here so it works unchanged once that package ships.
+    builds only from within the Orleans repository, where Samples.slnx supplies packages built from
+    the current sources. The version pins below are here so it works unchanged once the package ships.
   -->
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>

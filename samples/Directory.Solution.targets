@@ -1,0 +1,25 @@
+<Project>
+  <PropertyGroup>
+    <BuildExternalAssets Condition="'$(BuildExternalAssets)' == ''">true</BuildExternalAssets>
+    <OrleansSamplePackageVersion>10.0.0-dev.$([System.DateTime]::UtcNow.Ticks)</OrleansSamplePackageVersion>
+    <OrleansSamplePackageRoot>$(MSBuildThisFileDirectory)..\Artifacts\Samples\$(Configuration)</OrleansSamplePackageRoot>
+    <OrleansSamplePackageSource>$(OrleansSamplePackageRoot)\packages</OrleansSamplePackageSource>
+    <OrleansSamplePackagesPath>$(OrleansSamplePackageRoot)\packages-cache</OrleansSamplePackagesPath>
+    <_OrleansSampleRestoreProperties>OrleansSamplePackageVersion=$(OrleansSamplePackageVersion);OrleansSamplePackageSource=$(OrleansSamplePackageSource);OrleansSamplePackagesPath=$(OrleansSamplePackagesPath)</_OrleansSampleRestoreProperties>
+    <_GenerateRestoreGraphProjectEntryInputProperties>$(_GenerateRestoreGraphProjectEntryInputProperties);$(_OrleansSampleRestoreProperties)</_GenerateRestoreGraphProjectEntryInputProperties>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Update="@(ProjectReference)">
+      <AdditionalProperties>%(AdditionalProperties);$(_OrleansSampleRestoreProperties)</AdditionalProperties>
+    </ProjectReference>
+  </ItemGroup>
+
+  <Target Name="PackOrleansForSamples"
+          BeforeTargets="Restore"
+          Condition="'$(SolutionFileName)' == 'Samples.slnx'">
+    <RemoveDir Directories="$(OrleansSamplePackageSource)" />
+    <Exec
+      Command="dotnet pack &quot;$(MSBuildThisFileDirectory)..\src\Orleans.slnx&quot; --configuration $(Configuration) --output &quot;$(OrleansSamplePackageSource)&quot; -p:Version=$(OrleansSamplePackageVersion) -p:BuildExternalAssets=$(BuildExternalAssets) --nologo" />
+  </Target>
+</Project>

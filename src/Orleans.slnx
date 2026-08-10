@@ -1,0 +1,87 @@
+<Solution>
+  <Folder Name="/AdoNet/">
+    <Project Path="AdoNet/Orleans.Clustering.AdoNet/Orleans.Clustering.AdoNet.csproj" />
+    <Project Path="AdoNet/Orleans.GrainDirectory.AdoNet/Orleans.GrainDirectory.AdoNet.csproj" />
+    <Project Path="AdoNet/Orleans.Persistence.AdoNet/Orleans.Persistence.AdoNet.csproj" />
+    <Project Path="AdoNet/Orleans.Reminders.AdoNet/Orleans.Reminders.AdoNet.csproj" />
+    <Project Path="AdoNet/Orleans.Streaming.AdoNet/Orleans.Streaming.AdoNet.csproj" />
+  </Folder>
+  <Folder Name="/AWS/">
+    <Project Path="AWS/Orleans.Clustering.DynamoDB/Orleans.Clustering.DynamoDB.csproj" />
+    <Project Path="AWS/Orleans.Persistence.DynamoDB/Orleans.Persistence.DynamoDB.csproj" />
+    <Project Path="AWS/Orleans.Reminders.DynamoDB/Orleans.Reminders.DynamoDB.csproj" />
+    <Project Path="AWS/Orleans.Streaming.Kinesis/Orleans.Streaming.Kinesis.csproj" />
+    <Project Path="AWS/Orleans.Streaming.SQS/Orleans.Streaming.SQS.csproj" />
+    <Project Path="AWS/Orleans.Transactions.DynamoDB/Orleans.Transactions.DynamoDB.csproj" />
+  </Folder>
+  <Folder Name="/Azure/">
+    <Project Path="Azure/Orleans.Clustering.AzureStorage/Orleans.Clustering.AzureStorage.csproj" />
+    <Project Path="Azure/Orleans.Clustering.Cosmos/Orleans.Clustering.Cosmos.csproj" />
+    <Project Path="Azure/Orleans.DurableJobs.AzureStorage/Orleans.DurableJobs.AzureStorage.csproj" />
+    <Project Path="Azure/Orleans.GrainDirectory.AzureStorage/Orleans.GrainDirectory.AzureStorage.csproj" />
+    <Project Path="Azure/Orleans.Journaling.AzureStorage/Orleans.Journaling.AzureStorage.csproj" />
+    <Project Path="Azure/Orleans.Persistence.AzureStorage/Orleans.Persistence.AzureStorage.csproj" />
+    <Project Path="Azure/Orleans.Persistence.Cosmos/Orleans.Persistence.Cosmos.csproj" />
+    <Project Path="Azure/Orleans.Reminders.AzureStorage/Orleans.Reminders.AzureStorage.csproj" />
+    <Project Path="Azure/Orleans.Reminders.Cosmos/Orleans.Reminders.Cosmos.csproj" />
+    <Project Path="Azure/Orleans.Streaming.AzureStorage/Orleans.Streaming.AzureStorage.csproj" />
+    <Project Path="Azure/Orleans.Streaming.EventHubs/Orleans.Streaming.EventHubs.csproj" />
+    <Project Path="Azure/Orleans.Transactions.AzureStorage/Orleans.Transactions.AzureStorage.csproj" />
+  </Folder>
+  <Folder Name="/Cassandra/">
+    <Project Path="Cassandra/Orleans.Clustering.Cassandra/Orleans.Clustering.Cassandra.csproj" />
+  </Folder>
+  <Folder Name="/Dashboard/">
+    <Project Path="Dashboard/Orleans.Dashboard.Abstractions/Orleans.Dashboard.Abstractions.csproj" />
+    <Project Path="Dashboard/Orleans.Dashboard/Orleans.Dashboard.csproj" />
+  </Folder>
+  <Folder Name="/Google/">
+    <Project Path="Google/Orleans.Clustering.Firestore/Orleans.Clustering.Firestore.csproj" />
+    <Project Path="Google/Orleans.GrainDirectory.Firestore/Orleans.GrainDirectory.Firestore.csproj" />
+    <Project Path="Google/Orleans.Persistence.Firestore/Orleans.Persistence.Firestore.csproj" />
+    <Project Path="Google/Orleans.Reminders.Firestore/Orleans.Reminders.Firestore.csproj" />
+  </Folder>
+  <Folder Name="/Redis/">
+    <Project Path="Redis/Orleans.Clustering.Redis/Orleans.Clustering.Redis.csproj" />
+    <Project Path="Redis/Orleans.GrainDirectory.Redis/Orleans.GrainDirectory.Redis.csproj" />
+    <Project Path="Redis/Orleans.Persistence.Redis/Orleans.Persistence.Redis.csproj" />
+    <Project Path="Redis/Orleans.Reminders.Redis/Orleans.Reminders.Redis.csproj" />
+    <Project Path="Redis/Orleans.Streaming.Redis/Orleans.Streaming.Redis.csproj" />
+  </Folder>
+  <Folder Name="/Serializers/">
+    <Project Path="Serializers/Orleans.Serialization.Protobuf/Orleans.Serialization.Protobuf.csproj" />
+  </Folder>
+  <Project Path="Orleans.Analyzers/Orleans.Analyzers.csproj" />
+  <Project Path="Orleans.BroadcastChannel/Orleans.BroadcastChannel.csproj" />
+  <Project Path="Orleans.Client/Orleans.Client.csproj" />
+  <Project Path="Orleans.Clustering.Consul/Orleans.Clustering.Consul.csproj" />
+  <Project Path="Orleans.Clustering.ZooKeeper/Orleans.Clustering.ZooKeeper.csproj" />
+  <Project Path="Orleans.CodeGenerator/Orleans.CodeGenerator.csproj" />
+  <Project Path="Orleans.Connections.Security/Orleans.Connections.Security.csproj" />
+  <Project Path="Orleans.Core.Abstractions/Orleans.Core.Abstractions.csproj" />
+  <Project Path="Orleans.Core/Orleans.Core.csproj" />
+  <Project Path="Orleans.DurableJobs/Orleans.DurableJobs.csproj" />
+  <Project Path="Orleans.EventSourcing/Orleans.EventSourcing.csproj" />
+  <Project Path="Orleans.Hosting.Kubernetes/Orleans.Hosting.Kubernetes.csproj" />
+  <Project Path="Orleans.Journaling/Orleans.Journaling.csproj" />
+  <Project Path="Orleans.Persistence.Memory/Orleans.Persistence.Memory.csproj" />
+  <Project Path="Orleans.Reminders.Abstractions/Orleans.Reminders.Abstractions.csproj" />
+  <Project Path="Orleans.Reminders/Orleans.Reminders.csproj" />
+  <Project Path="Orleans.Runtime/Orleans.Runtime.csproj" />
+  <Project Path="Orleans.Sdk/Orleans.Sdk.csproj" />
+  <Project Path="Orleans.Serialization.Abstractions/Orleans.Serialization.Abstractions.csproj" />
+  <Project Path="Orleans.Serialization.FSharp/Orleans.Serialization.FSharp.csproj" />
+  <Project Path="Orleans.Serialization.MessagePack/Orleans.Serialization.MessagePack.csproj" />
+  <Project Path="Orleans.Serialization.NewtonsoftJson/Orleans.Serialization.NewtonsoftJson.csproj" />
+  <Project Path="Orleans.Serialization.SystemTextJson/Orleans.Serialization.SystemTextJson.csproj" />
+  <Project Path="Orleans.Serialization.TestKit/Orleans.Serialization.TestKit.csproj" />
+  <Project Path="Orleans.Serialization/Orleans.Serialization.csproj" />
+  <Project Path="Orleans.Server/Orleans.Server.csproj" />
+  <Project Path="Orleans.Streaming.NATS/Orleans.Streaming.NATS.csproj" />
+  <Project Path="Orleans.Streaming/Orleans.Streaming.csproj" />
+  <Project Path="Orleans.Testing.Reminders/Orleans.Testing.Reminders.csproj" />
+  <Project Path="Orleans.TestingHost/Orleans.TestingHost.csproj" />
+  <Project Path="Orleans.Transactions.TestKit.Base/Orleans.Transactions.TestKit.Base.csproj" />
+  <Project Path="Orleans.Transactions.TestKit.xUnit/Orleans.Transactions.TestKit.xUnit.csproj" />
+  <Project Path="Orleans.Transactions/Orleans.Transactions.csproj" />
+</Solution>

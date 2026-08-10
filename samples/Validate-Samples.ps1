@@ -65,11 +65,38 @@ $projectFiles = Get-ChildItem -LiteralPath $samplesRoot -Recurse -File -Include 
 [xml] $solution = Get-Content -LiteralPath $solutionPath
 $solutionProjects = @(
     $solution.SelectNodes('//Project') |
-        Where-Object { -not $_.Path.StartsWith('../') } |
         ForEach-Object { $_.Path.Replace('\', '/') }
 ) | Sort-Object
 if (($projectFiles -join "`n") -ne ($solutionProjects -join "`n")) {
     throw 'Samples.slnx does not contain exactly the projects under samples.'
+}
+
+$sourceRoot = [System.IO.Path]::GetFullPath((Join-Path $samplesRoot '../src'))
+$sourceProjectFiles = Get-ChildItem -LiteralPath $sourceRoot -Recurse -File -Include '*.csproj', '*.fsproj', '*.vbproj' |
+    ForEach-Object { [System.IO.Path]::GetRelativePath($sourceRoot, $_.FullName).Replace('\', '/') } |
+    Sort-Object
+[xml] $sourceSolution = Get-Content -LiteralPath (Join-Path $sourceRoot 'Orleans.slnx')
+$sourceSolutionProjects = @(
+    $sourceSolution.SelectNodes('//Project') |
+        ForEach-Object { $_.Path.Replace('\', '/') }
+) | Sort-Object
+if (($sourceProjectFiles -join "`n") -ne ($sourceSolutionProjects -join "`n")) {
+    throw 'src/Orleans.slnx does not contain exactly the projects under src.'
+}
+
+$sourcePackageIds = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+foreach ($sourceProjectPath in $sourceProjectFiles) {
+    [xml] $sourceProject = Get-Content -LiteralPath (Join-Path $sourceRoot $sourceProjectPath)
+    if ($sourceProject.SelectSingleNode('//IsPackable').'#text' -eq 'false') {
+        continue
+    }
+
+    $packageId = $sourceProject.SelectSingleNode('//PackageId').'#text'
+    if (-not $packageId) {
+        throw "$sourceProjectPath does not declare the PackageId produced for the sample feed."
+    }
+
+    $null = $sourcePackageIds.Add($packageId)
 }
 
 foreach ($projectPath in $projectFiles) {
@@ -77,6 +104,11 @@ foreach ($projectPath in $projectFiles) {
     foreach ($reference in $project.SelectNodes('//PackageReference')) {
         if ($reference.Version -or $reference.VersionOverride) {
             throw "$projectPath contains a non-central package version for '$($reference.Include)'."
+        }
+
+        if ($reference.Include.StartsWith('Microsoft.Orleans.', [System.StringComparison]::OrdinalIgnoreCase) -and
+            -not $sourcePackageIds.Contains($reference.Include)) {
+            throw "$projectPath references '$($reference.Include)', which is not produced by src/Orleans.slnx."
         }
     }
 }
