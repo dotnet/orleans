@@ -50,6 +50,12 @@ public sealed class InProcessTestClusterOptions
     internal bool UseTestClusterGrainDirectory { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether to use the experimental distributed grain directory.
+    /// </summary>
+    /// <value><see langword="true" /> if the distributed grain directory should be used; otherwise, <see langword="false" />.</value>
+    public bool UseDistributedGrainDirectory { get; set; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether to use the real environment statistics.
     /// </summary>
     public bool UseRealEnvironmentStatistics { get; set; }

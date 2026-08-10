@@ -50,6 +50,7 @@ API: <xref:Orleans.TestingHost.InProcessTestClusterBuilder>, <xref:Orleans.Testi
 | <xref:Orleans.TestingHost.InProcessTestClusterOptions.InitializeClientOnDeploy?displayProperty=nameWithType> | `true` |
 | Test-cluster membership | `true` |
 | Test-cluster grain directory | `true` |
+| <xref:Orleans.TestingHost.InProcessTestClusterOptions.UseDistributedGrainDirectory?displayProperty=nameWithType> | `false` |
 | <xref:Orleans.TestingHost.InProcessTestClusterOptions.GatewayPerSilo?displayProperty=nameWithType> | `true` |
 | <xref:Orleans.TestingHost.InProcessTestClusterOptions.UseRealEnvironmentStatistics?displayProperty=nameWithType> | `false` |
 | Connection transport | In-memory |

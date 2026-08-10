@@ -216,6 +216,8 @@ namespace Orleans.TestingHost
 
         public System.Collections.Generic.List<System.Action<InProcessTestSiloSpecificOptions, Microsoft.Extensions.Hosting.IHostApplicationBuilder>> SiloHostConfigurationDelegates { get { throw null; } }
 
+        public bool UseDistributedGrainDirectory { get { throw null; } set { } }
+
         public bool UseRealEnvironmentStatistics { get { throw null; } set { } }
     }
 

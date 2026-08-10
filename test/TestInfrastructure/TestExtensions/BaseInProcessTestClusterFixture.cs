@@ -54,6 +54,7 @@ public abstract class BaseInProcessTestClusterFixture : Xunit.IAsyncLifetime
     {
         EnsurePreconditionsMet();
         var builder = new InProcessTestClusterBuilder();
+        builder.Options.UseDistributedGrainDirectory = true;
         builder.ConfigureHost(hostBuilder => TestDefaultConfiguration.ConfigureHostConfiguration(hostBuilder.Configuration));
         ConfigureTestCluster(builder);
 
