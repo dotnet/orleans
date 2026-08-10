@@ -1,0 +1,26 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.2.4" />
+    <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.2.4" />
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.2.4" />
+    <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.2.4" />
+    <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.2.4" />
+    <PackageVersion Include="MessagePack" Version="3.1.7" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.3.0" />
+    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.3.0" />
+    <PackageVersion Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.EventSourcing" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Server" Version="10.2.2" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.16.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.16.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.16.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.16.0" />
+  </ItemGroup>
+</Project>

@@ -9,7 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Client\Orleans.Client.csproj" />
+    <PackageReference Include="Microsoft.Orleans.Client" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\AdventureGrainInterfaces\AdventureGrainInterfaces.csproj" />

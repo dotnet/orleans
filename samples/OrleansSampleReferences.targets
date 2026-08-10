@@ -1,0 +1,24 @@
+<Project>
+  <!--
+    Samples reference Orleans as NuGet packages so that a sample folder can be copied out of the
+    repository and built as-is. When a sample is built inside the repository, every
+    'Microsoft.Orleans.*' PackageReference is replaced by a ProjectReference to the project which
+    produces that package, so samples are always validated against the current sources.
+
+    Set OrleansSampleReferenceMode=Package to build in-tree samples against published packages.
+    The swap lives here rather than in Directory.Build.props because PackageReference items are
+    only known once the project body has been evaluated.
+  -->
+  <ItemGroup Condition="'$(OrleansSampleReferenceMode)' == 'Source'">
+    <!-- Every packable Orleans project. Its package id is always 'Microsoft.' + the project file name. -->
+    <OrleansSourceProject Include="$(SourceRoot)src\Orleans.*\Orleans.*.csproj;$(SourceRoot)src\*\Orleans.*\Orleans.*.csproj" />
+    <OrleansSourceProject Update="@(OrleansSourceProject)" PackageId="Microsoft.%(Filename)" ProjectPath="%(FullPath)" />
+
+    <!-- Intersect the referenced packages with the projects which produce them. -->
+    <_OrleansUnreferencedProject Include="@(OrleansSourceProject->'%(PackageId)')" Exclude="@(PackageReference)" />
+    <_OrleansReferencedProject Include="@(OrleansSourceProject->'%(PackageId)')" Exclude="@(_OrleansUnreferencedProject)" />
+
+    <PackageReference Remove="@(_OrleansReferencedProject)" />
+    <ProjectReference Include="@(_OrleansReferencedProject->'%(ProjectPath)')" Exclude="@(ProjectReference)" />
+  </ItemGroup>
+</Project>

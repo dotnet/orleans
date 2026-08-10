@@ -6,7 +6,7 @@
     <ServerGarbageCollection>true</ServerGarbageCollection>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Server\Orleans.Server.csproj" />
+    <PackageReference Include="Microsoft.Orleans.Server" />
     <PackageReference Include="System.Runtime.Caching" />
   </ItemGroup>
 </Project>

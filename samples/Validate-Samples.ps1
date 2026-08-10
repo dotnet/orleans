@@ -81,6 +81,55 @@ foreach ($projectPath in $projectFiles) {
     }
 }
 
+# Samples are copied out of the repository and built standalone, so each one carries its own
+# Directory.Packages.props and must not reference anything outside its own directory.
+$rootPackageProps = [System.IO.Path]::GetFullPath((Join-Path $samplesRoot 'Directory.Packages.props'))
+$packageVersions = @{}
+foreach ($projectPath in $projectFiles) {
+    $projectFullPath = [System.IO.Path]::GetFullPath((Join-Path $samplesRoot $projectPath))
+    $unitRoot = $null
+    for ($directory = (Split-Path -Parent $projectFullPath); $directory -and $directory.StartsWith($normalizedSamplesRoot, $pathComparison); $directory = (Split-Path -Parent $directory)) {
+        $candidate = Join-Path $directory 'Directory.Packages.props'
+        if (Test-Path -LiteralPath $candidate) {
+            $unitRoot = $directory
+            break
+        }
+    }
+
+    if (-not $unitRoot -or [System.IO.Path]::GetFullPath((Join-Path $unitRoot 'Directory.Packages.props')) -eq $rootPackageProps) {
+        throw "$projectPath is not covered by a sample-level Directory.Packages.props."
+    }
+
+    [xml] $packageProps = Get-Content -LiteralPath (Join-Path $unitRoot 'Directory.Packages.props')
+    $declaredVersions = @{}
+    foreach ($packageVersion in $packageProps.SelectNodes('//PackageVersion')) {
+        $declaredVersions[$packageVersion.Include] = $packageVersion.Version
+        $existing = $packageVersions[$packageVersion.Include]
+        if ($existing -and $existing -ne $packageVersion.Version) {
+            throw "Package '$($packageVersion.Include)' is pinned to both '$existing' and '$($packageVersion.Version)'."
+        }
+
+        $packageVersions[$packageVersion.Include] = $packageVersion.Version
+    }
+
+    [xml] $project = Get-Content -LiteralPath $projectFullPath
+    foreach ($reference in $project.SelectNodes('//PackageReference')) {
+        if (-not $declaredVersions.ContainsKey($reference.Include)) {
+            throw "$projectPath references '$($reference.Include)', which has no version in $([System.IO.Path]::GetRelativePath($samplesRoot, $unitRoot))/Directory.Packages.props."
+        }
+    }
+
+    $normalizedUnitRoot = $unitRoot.TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+    foreach ($reference in $project.SelectNodes('//ProjectReference')) {
+        $referencePath = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $projectFullPath) $reference.Include.Replace('\', [System.IO.Path]::DirectorySeparatorChar)))
+        if (-not $referencePath.StartsWith($normalizedUnitRoot, $pathComparison)) {
+            throw "$projectPath references '$($reference.Include)' outside its own sample; samples must build standalone."
+        }
+    }
+}
+
 Write-Host "Validated $($entries.Count) gallery entries and $($projectFiles.Count) projects."
 
 if (-not $NoBuild) {

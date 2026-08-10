@@ -13,10 +13,10 @@
   <ItemGroup>
     <PackageReference Include="Aspire.Azure.Data.Tables" />
     <PackageReference Include="Aspire.Azure.Storage.Blobs" />
-    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Persistence.AzureStorage\Orleans.Persistence.AzureStorage.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Server\Orleans.Server.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.EventSourcing\Orleans.EventSourcing.csproj" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" />
+    <PackageReference Include="Microsoft.Orleans.Server" />
+    <PackageReference Include="Microsoft.Orleans.EventSourcing" />
   </ItemGroup>
 
 </Project>

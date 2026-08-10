@@ -1,0 +1,19 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageVersion Include="Azure.Messaging.EventHubs" Version="5.12.2" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.Orleans.Client" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Core.Abstractions" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Sdk" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Server" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Streaming" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Streaming.EventHubs" Version="10.2.2" />
+  </ItemGroup>
+</Project>

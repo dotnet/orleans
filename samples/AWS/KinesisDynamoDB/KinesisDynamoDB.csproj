@@ -7,11 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Server\Orleans.Server.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Clustering.DynamoDB\Orleans.Clustering.DynamoDB.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Persistence.DynamoDB\Orleans.Persistence.DynamoDB.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Reminders.DynamoDB\Orleans.Reminders.DynamoDB.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Streaming.Kinesis\Orleans.Streaming.Kinesis.csproj" />
+    <PackageReference Include="Microsoft.Orleans.Server" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.DynamoDB" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.DynamoDB" />
+    <PackageReference Include="Microsoft.Orleans.Reminders.DynamoDB" />
+    <PackageReference Include="Microsoft.Orleans.Streaming.Kinesis" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
   </ItemGroup>
 </Project>

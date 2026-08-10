@@ -143,8 +143,8 @@
   <Project Path="../src/Orleans.Transactions/Orleans.Transactions.csproj" />
   <Project Path="GoogleFirestore/Firestore.csproj" />
   <Project Path="HelloWorld/HelloWorld.csproj" />
-  <Project Path="JournalingAzureBlobJson.AppHost/JournalingAzureBlobJson.AppHost.csproj" />
-  <Project Path="JournalingAzureBlobJson/JournalingAzureBlobJson.csproj" />
+  <Project Path="JournalingAzureBlobJson/JournalingAzureBlobJson.AppHost/JournalingAzureBlobJson.AppHost.csproj" />
+  <Project Path="JournalingAzureBlobJson/JournalingAzureBlobJson/JournalingAzureBlobJson.csproj" />
   <Project Path="Stocks/Stocks.csproj" />
   <Project Path="TicTacToe/TicTacToe.csproj" />
   <Project Path="Voting/Voting.csproj" />

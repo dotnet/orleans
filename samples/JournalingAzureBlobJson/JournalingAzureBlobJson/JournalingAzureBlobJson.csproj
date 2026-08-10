@@ -6,7 +6,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
 
@@ -17,11 +16,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Client\Orleans.Client.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Server\Orleans.Server.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Sdk\Orleans.Sdk.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Journaling\Orleans.Journaling.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Journaling.AzureStorage\Orleans.Journaling.AzureStorage.csproj" />
+    <PackageReference Include="Microsoft.Orleans.Client" />
+    <PackageReference Include="Microsoft.Orleans.Server" />
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
+    <PackageReference Include="Microsoft.Orleans.Journaling" />
+    <PackageReference Include="Microsoft.Orleans.Journaling.AzureStorage" />
   </ItemGroup>
 
 </Project>

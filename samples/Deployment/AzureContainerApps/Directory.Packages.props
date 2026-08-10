@@ -1,0 +1,26 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageVersion Include="Azure.Data.Tables" Version="12.11.0" />
+    <PackageVersion Include="Azure.Identity" Version="1.18.0" />
+    <PackageVersion Include="Grpc.AspNetCore" Version="2.76.0" />
+    <PackageVersion Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.23.0" />
+    <PackageVersion Include="Microsoft.ApplicationInsights.WorkerService" Version="2.23.0" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.OpenApi" Version="2.7.5" />
+    <PackageVersion Include="Microsoft.Orleans.Client" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Core" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Core.Abstractions" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Dashboard" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Runtime" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Sdk" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Server" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.23.0" />
+    <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.1.0" />
+  </ItemGroup>
+</Project>
