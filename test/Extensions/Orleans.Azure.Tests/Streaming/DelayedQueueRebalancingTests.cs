@@ -93,7 +93,7 @@ namespace Tester.AzureUtils.Streaming
         [SkippableFact, TestCategory("Functional")]
         public async Task DelayedQueueRebalancingTests_1()
         {
-            await WaitForAgentsState(2, "1");
+            await WaitForAgentsState(2, "1", includeHistory: true);
 
             await WaitForAgentsState(4, "2");
         }
@@ -101,7 +101,7 @@ namespace Tester.AzureUtils.Streaming
         [SkippableFact, TestCategory("Functional")]
         public async Task DelayedQueueRebalancingTests_2()
         {
-            await WaitForAgentsState(2, "1");
+            await WaitForAgentsState(2, "1", includeHistory: true);
 
             var existingSilos = this.HostedCluster.GetActiveSilos().Select(silo => silo.SiloAddress).ToArray();
             var addedSilos = await this.HostedCluster.StartAdditionalSilosAsync(2, true);
@@ -115,10 +115,10 @@ namespace Tester.AzureUtils.Streaming
             await WaitForAgentsState(2, "3");
         }
 
-        private Task WaitForAgentsState(int numExpectedAgentsPerSilo, string callContext)
+        private Task WaitForAgentsState(int numExpectedAgentsPerSilo, string callContext, bool includeHistory = false)
         {
             var activeSilos = this.HostedCluster.GetActiveSilos().Select(silo => silo.SiloAddress).ToArray();
-            return diagnosticObserver.WaitForAgentsStateAsync(activeSilos, numExpectedAgentsPerSilo, AGENT_STATE_TIMEOUT, callContext);
+            return diagnosticObserver.WaitForAgentsStateAsync(activeSilos, numExpectedAgentsPerSilo, includeHistory, AGENT_STATE_TIMEOUT, callContext);
         }
 
         private sealed class StreamQueueDiagnosticObserver : IDisposable, IObserver<StreamingEvents.StreamingEvent>
@@ -127,6 +127,7 @@ namespace Tester.AzureUtils.Streaming
             private readonly IDisposable subscription;
             private readonly object lockObj = new();
             private readonly Dictionary<SiloAddress, StreamingEvents.PullingAgentManagerState> agentStates = [];
+            private readonly HashSet<(SiloAddress SiloAddress, int RunningAgents)> observedAgentStates = [];
             private readonly HashSet<SiloAddress> locallyMaturedSilos = [];
             private readonly HashSet<(SiloAddress LocalSilo, SiloAddress MaturedSilo)> remotelyMaturedSilos = [];
             private readonly List<ConditionWaiter> waiters = [];
@@ -142,10 +143,10 @@ namespace Tester.AzureUtils.Streaming
                 return new StreamQueueDiagnosticObserver(streamProvider);
             }
 
-            public Task WaitForAgentsStateAsync(SiloAddress[] expectedSilos, int expectedAgentsPerSilo, TimeSpan timeout, string callContext)
+            public Task WaitForAgentsStateAsync(SiloAddress[] expectedSilos, int expectedAgentsPerSilo, bool includeHistory, TimeSpan timeout, string callContext)
             {
                 return WaitUntilAsync(
-                    () => HasAgentState(expectedSilos, expectedAgentsPerSilo),
+                    () => HasAgentState(expectedSilos, expectedAgentsPerSilo, includeHistory),
                     timeout,
                     () => $"Call {callContext}: expected silos {Utils.EnumerableToString(expectedSilos)} to have {expectedAgentsPerSilo} agents each, got {FormatAgentStates(expectedSilos)}.");
             }
@@ -184,6 +185,7 @@ namespace Tester.AzureUtils.Streaming
                     {
                         case StreamingEvents.PullingAgentManagerState state when state.SiloAddress is not null:
                             agentStates[state.SiloAddress] = state;
+                            observedAgentStates.Add((state.SiloAddress, state.RunningAgents));
                             break;
                         case StreamingEvents.QueueBalancerMaturityCompleted maturity when maturity.SiloAddress is not null:
                             if (maturity.IsLocalSilo)
@@ -214,9 +216,12 @@ namespace Tester.AzureUtils.Streaming
                 subscription.Dispose();
             }
 
-            private bool HasAgentState(SiloAddress[] expectedSilos, int expectedAgentsPerSilo)
+            private bool HasAgentState(SiloAddress[] expectedSilos, int expectedAgentsPerSilo, bool includeHistory)
             {
-                return expectedSilos.All(silo => agentStates.TryGetValue(silo, out var state) && state.RunningAgents == expectedAgentsPerSilo);
+                return expectedSilos.All(silo =>
+                    includeHistory
+                        ? observedAgentStates.Contains((silo, expectedAgentsPerSilo))
+                        : agentStates.TryGetValue(silo, out var state) && state.RunningAgents == expectedAgentsPerSilo);
             }
 
             private Task WaitUntilAsync(Func<bool> predicate, TimeSpan timeout, Func<string> timeoutMessage)
@@ -242,16 +247,14 @@ namespace Tester.AzureUtils.Streaming
                 }
                 catch (TimeoutException)
                 {
-                    RemoveWaiter(waiter);
-                    throw new TimeoutException(timeoutMessage());
-                }
-            }
+                    string message;
+                    lock (lockObj)
+                    {
+                        waiters.Remove(waiter);
+                        message = timeoutMessage();
+                    }
 
-            private void RemoveWaiter(ConditionWaiter waiter)
-            {
-                lock (lockObj)
-                {
-                    waiters.Remove(waiter);
+                    throw new TimeoutException(message);
                 }
             }
 
