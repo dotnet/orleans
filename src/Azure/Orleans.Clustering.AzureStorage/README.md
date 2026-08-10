@@ -109,8 +109,8 @@ await host.WaitForShutdownAsync();
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Clustering providers](https://learn.microsoft.com/en-us/dotnet/orleans/implementation/cluster-management)
-- [Azure Storage provider](https://learn.microsoft.com/en-us/dotnet/orleans/implementation/azure-storage-providers)
+- [Clustering providers](https://learn.microsoft.com/dotnet/orleans/implementation/cluster-management)
+- [Typical configurations](https://learn.microsoft.com/dotnet/orleans/host/configuration-guide/typical-configurations)
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)

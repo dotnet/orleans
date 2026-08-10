@@ -97,7 +97,7 @@ You can configure Orleans Redis reminders using `Microsoft.Extensions.Configurat
 
 ### .NET Aspire Integration
 
-For applications using .NET Aspire, consider using the [.NET Aspire Redis integration](https://learn.microsoft.com/en-us/dotnet/aspire/caching/stackexchange-redis-integration) which provides simplified Redis configuration, automatic service discovery, health checks, and telemetry. The Aspire integration automatically configures connection strings that Orleans can consume via the configuration system.
+For applications using .NET Aspire, consider using the [.NET Aspire Redis integration](https://learn.microsoft.com/dotnet/aspire/caching/stackexchange-redis-integration) which provides simplified Redis configuration, automatic service discovery, health checks, and telemetry. The Aspire integration automatically configures connection strings that Orleans can consume via the configuration system.
 
 #### Example - Program.cs with Aspire Redis Integration
 ```csharp
@@ -147,8 +147,7 @@ builder.Build().Run();
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Reminders and Timers](https://learn.microsoft.com/en-us/dotnet/orleans/grains/timers-and-reminders)
-- [Reminder Services](https://learn.microsoft.com/en-us/dotnet/orleans/implementation/reminder-services)
+- [Reminders and Timers](https://learn.microsoft.com/dotnet/orleans/grains/timers-and-reminders)
 - [Redis Documentation](https://redis.io/documentation)
 
 ## Feedback & Contributing
