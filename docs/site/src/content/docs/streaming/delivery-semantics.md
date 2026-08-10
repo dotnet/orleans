@@ -48,7 +48,7 @@ Use event version numbers or domain sequence numbers when business logic require
 A rewindable provider can start or resume a subscription from a provider sequence token while the corresponding event remains in that provider's retention window. Rewindability isn't the same as durability:
 
 - Memory streams are rewindable only over their transient in-memory cache.
-- Event Hubs and Redis Streams are rewindable over retained external data.
+- Event Hubs, RabbitMQ Streams, and Redis Streams are rewindable over retained external data.
 - Azure Queue, Amazon SQS, ADO.NET, and NATS JetStream providers aren't rewindable.
 
 Explicit subscriptions can resume from retained positions according to the provider's token semantics. An implicit subscription accepts a recovery token when an activation attaches its observer, then advances monotonically for that attachment. Once a delivery call completes successfully, resuming the active implicit handle with a sequence token throws <xref:System.InvalidOperationException>; passing `null` replaces the observer at its current position.
