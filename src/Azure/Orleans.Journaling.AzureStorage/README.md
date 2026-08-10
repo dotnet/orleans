@@ -181,8 +181,8 @@ public class ShoppingCartGrain(
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Orleans Journaling](https://learn.microsoft.com/en-us/dotnet/orleans/implementation/event-sourcing)
-- [Event Sourcing Grains](https://learn.microsoft.com/en-us/dotnet/orleans/grains/event-sourcing)
+- [Grain Persistence](https://learn.microsoft.com/dotnet/orleans/grains/grain-persistence)
+- [Azure Blob Storage Documentation](https://learn.microsoft.com/azure/storage/blobs/)
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)
