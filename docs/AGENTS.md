@@ -47,6 +47,50 @@ Use <xref:Orleans.Runtime.IPersistentState`1> for persistent grain state.
 Configure it with <xref:Orleans.Hosting.AzureTableSiloBuilderExtensions.AddAzureTableGrainStorage*?displayProperty=nameWithType>.
 ```
 
+## Documentation types
+
+Orleans runs high-scale production services at Microsoft and elsewhere, so
+first-class documentation is a primary deliverable, not an afterthought. It must
+address the concerns that actually arise when operating secure, high-scale
+systems: correctness, security, availability, upgrades, capacity, cost, and
+diagnosis of failures under load. The repository doesn't have complete coverage
+of every category below yet; treat the gaps as work worth doing rather than as
+precedent.
+
+All of the following are highly valued, and none substitutes for another:
+
+- **Architecture and implementation detail** — how Orleans actually works
+  internally: components and their responsibilities, protocols and message
+  flows, state machines, invariants, consistency and failure semantics,
+  concurrency and threading model, and the reasoning behind design decisions
+  along with their trade-offs. This is what operators and contributors need to
+  reason about behavior under failure, scale, and version skew, and to predict
+  what a change will do in production.
+- **Cookbook and how-to guides** — focused, task-oriented recipes that solve one
+  real problem ("configure ADO.NET clustering", "roll a cluster without
+  downtime", "secure silo-to-silo traffic"). They assume the reader has a goal
+  and want the shortest correct path, including prerequisites, pitfalls, and
+  verification steps.
+- **Walkthroughs and tutorials** — guided, start-to-finish learning paths that
+  build something working from an empty directory. They optimize for a first
+  successful outcome and teach concepts in the order the reader needs them.
+- **Conceptual documentation** — explains the ideas and the model: grains,
+  activations, placement, persistence, streaming, and when and why to use each.
+  It builds the mental model that makes the other categories comprehensible, and
+  it should be honest about what Orleans is not suited for.
+- **API reference** — accurate, complete, and example-bearing documentation of
+  the public surface, including semantics, thread-safety, lifetime, exceptions,
+  and defaults. Reference pages should link out to the conceptual and how-to
+  content that gives them context.
+- **FAQ and troubleshooting** — the questions people really ask and the failures
+  they really hit, organized by observed symptom (exception, log message, metric,
+  or behavior) with root cause, remedy, and prevention. This is often the
+  highest-value documentation for a production incident.
+
+Prefer adding a missing category over repeatedly expanding an existing page.
+Keep the categories distinct, and cross-link between them instead of blending a
+tutorial into a reference or burying architecture detail inside a how-to.
+
 ## Content
 
 - Keep ordinary conceptual and how-to documentation timeless. Name Orleans releases only in migration or upgrade guidance where the release boundary matters.
@@ -54,12 +98,15 @@ Configure it with <xref:Orleans.Hosting.AzureTableSiloBuilderExtensions.AddAzure
 - Prefer correcting or enhancing useful content over deleting it. Preserve
   authoritative references during rewrites, and remove them only when obsolete,
   redundant, or replaced with a clearer current source.
-- Preserve valuable architecture and implementation detail, and keep it distinct from conceptual and task-oriented how-to guidance.
+- Preserve and expand valuable architecture and implementation detail, and keep it distinct from conceptual and task-oriented how-to guidance.
 - Treat hub pages as overviews: link to peer detail pages instead of singling out one provider or feature for inline configuration guidance.
 - Preserve stable URLs and anchors when moving content, or provide an explicit redirect or compatibility anchor.
 
 ## Sources and generated output
 
+- Register every new page in `docs/site/src/content/docs/toc.yml` under the
+  section that matches its documentation type. An unlisted page is effectively
+  unpublished.
 - Keep recursive includes within the documentation source tree. Missing,
   circular, traversal, absolute, drive-relative, or symlink-escaping includes
   are invalid. Edit the include source and ensure active includes participate in
