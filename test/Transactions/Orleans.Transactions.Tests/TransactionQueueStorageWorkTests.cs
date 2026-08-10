@@ -547,12 +547,8 @@ public class TransactionQueueStorageWorkTests
         private readonly Queue<TaskCompletionSource<bool>> delays = new();
         private readonly TaskCompletionSource<object?> delayRequested = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public int DelayCallCount { get; private set; }
-
         public Task<bool> Delay(TimeSpan timeSpan, CancellationToken cancellationToken = default)
         {
-            this.DelayCallCount++;
-
             if (cancellationToken.IsCancellationRequested)
             {
                 return Task.FromResult(false);
@@ -572,7 +568,7 @@ public class TransactionQueueStorageWorkTests
 
         public Task WaitForDelayAsync()
         {
-            return this.DelayCallCount > 0 ? Task.CompletedTask : this.delayRequested.Task;
+            return this.delayRequested.Task;
         }
 
         public void ReleaseNextDelay(bool result = true)
