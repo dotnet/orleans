@@ -1,0 +1,126 @@
+---
+import Default from '@astrojs/starlight/components/MarkdownContent.astro';
+---
+
+<Default>
+  <slot />
+</Default>
+
+<dialog class="image-lightbox-dialog" aria-label="Image preview">
+  <button type="button">Close</button>
+  <img alt="" />
+</dialog>
+
+<script>
+  import mermaid from 'mermaid';
+
+  declare global {
+    interface Window {
+      orleansMermaidThemeObserver?: MutationObserver;
+    }
+  }
+
+  let renderSequence = 0;
+  let pendingRender = Promise.resolve();
+
+  async function renderDiagrams() {
+    const diagrams = document.querySelectorAll<HTMLElement>(
+      '.mermaid-diagram[data-mermaid-source]',
+    );
+    if (diagrams.length === 0) {
+      return;
+    }
+
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      theme: document.documentElement.dataset.theme === 'dark' ? 'dark' : 'default',
+    });
+
+    for (const [index, diagram] of diagrams.entries()) {
+      const source = diagram.dataset.mermaidSource;
+      if (!source) {
+        continue;
+      }
+
+      diagram.dataset.mermaidStatus = 'loading';
+      try {
+        const result = await mermaid.render(
+          `orleans-mermaid-${renderSequence}-${index}`,
+          source,
+        );
+        diagram.innerHTML = result.svg;
+        result.bindFunctions?.(diagram);
+        diagram.dataset.mermaidStatus = 'rendered';
+      } catch (error) {
+        console.error('Failed to render Mermaid diagram.', error);
+        const message = document.createElement('p');
+        message.textContent = 'This diagram could not be rendered.';
+        const fallback = document.createElement('pre');
+        const code = document.createElement('code');
+        code.textContent = source;
+        fallback.append(code);
+        diagram.replaceChildren(message, fallback);
+        diagram.dataset.mermaidStatus = 'error';
+      }
+    }
+
+    renderSequence++;
+  }
+
+  function scheduleRender() {
+    pendingRender = pendingRender.then(renderDiagrams);
+  }
+
+  scheduleRender();
+  window.orleansMermaidThemeObserver?.disconnect();
+  window.orleansMermaidThemeObserver = new MutationObserver(scheduleRender);
+  window.orleansMermaidThemeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme'],
+  });
+
+  const lightboxDialog = document.querySelector<HTMLDialogElement>('.image-lightbox-dialog');
+  const lightboxImage = lightboxDialog?.querySelector('img');
+  const closeButton = lightboxDialog?.querySelector('button');
+  if (lightboxDialog && lightboxImage && closeButton) {
+    const dialog = lightboxDialog;
+    const dialogImage = lightboxImage;
+    for (const lightbox of document.querySelectorAll<HTMLElement>('[data-image-lightbox]')) {
+      const sourceImage = lightbox.querySelector('img');
+      if (!sourceImage) {
+        continue;
+      }
+      const thumbnail = sourceImage;
+
+      lightbox.role = 'button';
+      lightbox.tabIndex = 0;
+      lightbox.ariaLabel = `Open image: ${thumbnail.alt}`;
+
+      function openLightbox() {
+        dialogImage.src = thumbnail.currentSrc || thumbnail.src;
+        dialogImage.alt = thumbnail.alt;
+        dialog.showModal();
+      }
+
+      lightbox.addEventListener('click', openLightbox);
+      lightbox.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openLightbox();
+        }
+      });
+    }
+
+    closeButton.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) {
+        dialog.close();
+      }
+    });
+    dialog.addEventListener('close', () => {
+      dialogImage.removeAttribute('src');
+      dialogImage.alt = '';
+    });
+  }
+</script>

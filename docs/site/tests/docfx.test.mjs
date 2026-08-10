@@ -102,6 +102,17 @@ describe('DocFX conversion', () => {
       '',
       '# [Visual Studio](#tab/visual-studio)',
       '',
+      'Visual Studio instructions.',
+      '',
+      '# [Visual Studio Code](#tab/visual-studio-code)',
+      '',
+      '```text',
+      '# [This remains code](#tab/not-a-tab)',
+      '---',
+      '```',
+      '',
+      '---',
+      '',
       '## Named section <a name="named-section"></a>',
       '',
       '[Repository](<https://github.com/dotnet/orleans>)',
@@ -127,6 +138,7 @@ describe('DocFX conversion', () => {
     expect(converted).toContain('public string SayHello() => "Hello";');
     expect(converted).not.toContain('// <hello>');
     expect(converted).toContain('{/* Source: Example.cs; region: hello */}');
+    expect(converted).toContain('<div class="image-lightbox" data-image-lightbox>');
     expect(converted).toContain('![An image](image.png)');
     expect(converted).toContain(
       '[ObserverManager&lt;IChat>](https://learn.microsoft.com/dotnet/api/orleans.utilities.observermanager-1)',
@@ -155,7 +167,14 @@ describe('DocFX conversion', () => {
     expect(converted).toContain('- First task\n- Second task');
     expect(converted).not.toContain('[!VIDEO');
     expect(converted).not.toContain('[!div');
-    expect(converted).toContain('### Visual Studio');
+    expect(converted).toContain(
+      "import { TabItem, Tabs } from '@astrojs/starlight/components';",
+    );
+    expect(converted).toContain('<Tabs syncKey="docfx-tabs">');
+    expect(converted).toContain('<TabItem label="Visual Studio">');
+    expect(converted).toContain('<TabItem label="Visual Studio Code">');
+    expect(converted).toContain('# [This remains code](#tab/not-a-tab)');
+    expect(converted).not.toContain('# [Visual Studio](#tab/visual-studio)');
     expect(converted).toContain('<span id="named-section"></span>');
     expect(converted).toContain('[Repository](https://github.com/dotnet/orleans)');
     expect(converted).toContain(
@@ -181,6 +200,25 @@ describe('DocFX conversion', () => {
         sourcePath,
       }),
     ).rejects.toThrow("Snippet region 'missing' was not found");
+  });
+
+  test('rejects unclosed tab groups', async () => {
+    const directory = await temporaryDirectory();
+    const sourcePath = path.join(directory, 'guide.md');
+
+    await expect(
+      convertDocfxMarkdown({
+        source: [
+          '---',
+          'title: Broken tabs',
+          '---',
+          '# [Linux](#tab/linux)',
+          '',
+          'Linux instructions.',
+        ].join('\n'),
+        sourcePath,
+      }),
+    ).rejects.toThrow('Unclosed tab group');
   });
 
   test('fails when an include cannot be found', async () => {

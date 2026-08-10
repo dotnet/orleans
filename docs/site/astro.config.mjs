@@ -5,6 +5,7 @@ import remarkDirective from 'remark-directive';
 import starlightLinksValidator from 'starlight-links-validator';
 import starlightLlmsTxt from 'starlight-llms-txt';
 import { createSidebar } from './scripts/lib/docfx.mjs';
+import { remarkMermaid } from './src/plugins/remark-mermaid.mjs';
 import { remarkVersionZones } from './src/plugins/remark-version-zones.mjs';
 
 const sidebar = await createSidebar(new URL('./src/content/docs/toc.yml', import.meta.url));
@@ -24,6 +25,9 @@ export default defineConfig({
       },
       favicon: '/favicon.svg',
       customCss: ['./src/styles/custom.css'],
+      components: {
+        MarkdownContent: './src/components/MarkdownContent.astro',
+      },
       editLink: {
         baseUrl: 'https://github.com/dotnet/orleans/edit/main/docs/site/',
       },
@@ -59,7 +63,7 @@ export default defineConfig({
   ],
   markdown: {
     processor: unified({
-      remarkPlugins: [remarkDirective, remarkVersionZones],
+      remarkPlugins: [remarkDirective, remarkVersionZones, remarkMermaid],
     }),
   },
   build: {

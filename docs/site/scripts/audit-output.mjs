@@ -53,6 +53,11 @@ const suspiciousPatterns = [
   [/&lt;xref:|<xref:/i, 'unconverted xref'],
   [/:::\s*zone(?:-end)?\b/i, 'unconverted zone directive'],
   [/href="(?:%5B|\[)/i, 'Markdown encoded as an href'],
+  [
+    /data-language="mermaid"|class="[^"]*\blanguage-mermaid\b/i,
+    'Mermaid diagram rendered as a code block',
+  ],
+  [/href="#tab\//i, 'DocFX tab rendered as a heading link'],
 ];
 
 for (const file of files.filter((candidate) => candidate.endsWith('.html'))) {
