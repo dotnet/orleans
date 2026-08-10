@@ -56,7 +56,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable
 
     private void StoreEvent(ReminderEvents.ReminderEvent value)
     {
-        List<TaskCompletionSource<bool>> ready = [];
+        List<Waiter> ready = [];
         lock (_lock)
         {
             switch (value)
@@ -136,9 +136,9 @@ public sealed class ReminderDiagnosticObserver : IDisposable
             }
         }
 
-        foreach (var taskSource in ready)
+        foreach (var waiter in ready)
         {
-            taskSource.TrySetResult(true);
+            waiter.Complete();
         }
     }
 
@@ -307,9 +307,10 @@ public sealed class ReminderDiagnosticObserver : IDisposable
 
             waiter = new TickCountWaiter(grainId, reminderName, targetCount);
             _tickCountWaiters.Add(waiter);
+            RegisterCancellation(waiter, _tickCountWaiters, cancellationToken);
         }
 
-        return WaitAsync(waiter, cancellationToken);
+        return waiter.TaskSource.Task;
     }
 
     private Task WaitForActiveReminderCountCoreAsync(GrainId grainId, int targetCount, string reminderName, CancellationToken cancellationToken)
@@ -329,9 +330,10 @@ public sealed class ReminderDiagnosticObserver : IDisposable
 
             waiter = new ActiveReminderCountWaiter(grainId, reminderName, targetCount);
             _activeReminderCountWaiters.Add(waiter);
+            RegisterCancellation(waiter, _activeReminderCountWaiters, cancellationToken);
         }
 
-        return WaitAsync(waiter, cancellationToken);
+        return waiter.TaskSource.Task;
     }
 
     private Task WaitForLocalReminderScheduleCoreAsync(GrainId grainId, string reminderName, CancellationToken cancellationToken)
@@ -351,69 +353,29 @@ public sealed class ReminderDiagnosticObserver : IDisposable
 
             waiter = new LocalReminderScheduleWaiter(grainId, reminderName);
             _localReminderScheduleWaiters.Add(waiter);
+            RegisterCancellation(waiter, _localReminderScheduleWaiters, cancellationToken);
         }
 
-        return WaitAsync(waiter, cancellationToken);
+        return waiter.TaskSource.Task;
     }
 
-    private async Task WaitAsync(TickCountWaiter waiter, CancellationToken cancellationToken)
+    private void RegisterCancellation<TWaiter>(TWaiter waiter, List<TWaiter> waiters, CancellationToken cancellationToken)
+        where TWaiter : Waiter
     {
-        using var registration = cancellationToken.Register(static state =>
+        waiter.CancellationRegistration = cancellationToken.Register(static state =>
         {
-            var (observer, pendingWaiter, token) = ((ReminderDiagnosticObserver Observer, TickCountWaiter Waiter, CancellationToken Token))state!;
-            observer.CancelWaiter(pendingWaiter, token);
-        }, (this, waiter, cancellationToken));
-
-        await waiter.TaskSource.Task.ConfigureAwait(false);
+            var (observer, pendingWaiter, pendingWaiters, token) =
+                ((ReminderDiagnosticObserver Observer, TWaiter Waiter, List<TWaiter> Waiters, CancellationToken Token))state!;
+            observer.CancelWaiter(pendingWaiter, pendingWaiters, token);
+        }, (this, waiter, waiters, cancellationToken));
     }
 
-    private async Task WaitAsync(LocalReminderScheduleWaiter waiter, CancellationToken cancellationToken)
-    {
-        using var registration = cancellationToken.Register(static state =>
-        {
-            var (observer, pendingWaiter, token) = ((ReminderDiagnosticObserver Observer, LocalReminderScheduleWaiter Waiter, CancellationToken Token))state!;
-            observer.CancelWaiter(pendingWaiter, token);
-        }, (this, waiter, cancellationToken));
-
-        await waiter.TaskSource.Task.ConfigureAwait(false);
-    }
-
-    private async Task WaitAsync(ActiveReminderCountWaiter waiter, CancellationToken cancellationToken)
-    {
-        using var registration = cancellationToken.Register(static state =>
-        {
-            var (observer, pendingWaiter, token) = ((ReminderDiagnosticObserver Observer, ActiveReminderCountWaiter Waiter, CancellationToken Token))state!;
-            observer.CancelWaiter(pendingWaiter, token);
-        }, (this, waiter, cancellationToken));
-
-        await waiter.TaskSource.Task.ConfigureAwait(false);
-    }
-
-    private void CancelWaiter(TickCountWaiter waiter, CancellationToken cancellationToken)
+    private void CancelWaiter<TWaiter>(TWaiter waiter, List<TWaiter> waiters, CancellationToken cancellationToken)
+        where TWaiter : Waiter
     {
         lock (_lock)
         {
-            _tickCountWaiters.Remove(waiter);
-        }
-
-        waiter.TaskSource.TrySetCanceled(cancellationToken);
-    }
-
-    private void CancelWaiter(LocalReminderScheduleWaiter waiter, CancellationToken cancellationToken)
-    {
-        lock (_lock)
-        {
-            _localReminderScheduleWaiters.Remove(waiter);
-        }
-
-        waiter.TaskSource.TrySetCanceled(cancellationToken);
-    }
-
-    private void CancelWaiter(ActiveReminderCountWaiter waiter, CancellationToken cancellationToken)
-    {
-        lock (_lock)
-        {
-            _activeReminderCountWaiters.Remove(waiter);
+            waiters.Remove(waiter);
         }
 
         waiter.TaskSource.TrySetCanceled(cancellationToken);
@@ -470,7 +432,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         return false;
     }
 
-    private void ReleaseReadyTickWaiters(List<TaskCompletionSource<bool>> ready)
+    private void ReleaseReadyTickWaiters(List<Waiter> ready)
     {
         for (var i = _tickCountWaiters.Count - 1; i >= 0; i--)
         {
@@ -481,11 +443,11 @@ public sealed class ReminderDiagnosticObserver : IDisposable
             }
 
             _tickCountWaiters.RemoveAt(i);
-            ready.Add(waiter.TaskSource);
+            ready.Add(waiter);
         }
     }
 
-    private void ReleaseReadyActiveReminderWaiters(List<TaskCompletionSource<bool>> ready)
+    private void ReleaseReadyActiveReminderWaiters(List<Waiter> ready)
     {
         for (var i = _activeReminderCountWaiters.Count - 1; i >= 0; i--)
         {
@@ -496,11 +458,11 @@ public sealed class ReminderDiagnosticObserver : IDisposable
             }
 
             _activeReminderCountWaiters.RemoveAt(i);
-            ready.Add(waiter.TaskSource);
+            ready.Add(waiter);
         }
     }
 
-    private void ReleaseReadyLocalReminderScheduleWaiters(List<TaskCompletionSource<bool>> ready)
+    private void ReleaseReadyLocalReminderScheduleWaiters(List<Waiter> ready)
     {
         for (var i = _localReminderScheduleWaiters.Count - 1; i >= 0; i--)
         {
@@ -511,7 +473,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable
             }
 
             _localReminderScheduleWaiters.RemoveAt(i);
-            ready.Add(waiter.TaskSource);
+            ready.Add(waiter);
         }
     }
 
@@ -532,27 +494,36 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         public long TickWaitArmedVersion { get; set; } = -1;
     }
 
-    private sealed class TickCountWaiter(GrainId grainId, string? reminderName, int targetCount)
+    private abstract class Waiter
+    {
+        public TaskCompletionSource<bool> TaskSource { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public CancellationTokenRegistration CancellationRegistration { get; set; }
+
+        public void Complete()
+        {
+            CancellationRegistration.Dispose();
+            TaskSource.TrySetResult(true);
+        }
+    }
+
+    private sealed class TickCountWaiter(GrainId grainId, string? reminderName, int targetCount) : Waiter
     {
         public GrainId GrainId { get; } = grainId;
         public string? ReminderName { get; } = reminderName;
         public int TargetCount { get; } = targetCount;
-        public TaskCompletionSource<bool> TaskSource { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
-    private sealed class ActiveReminderCountWaiter(GrainId grainId, string reminderName, int targetCount)
+    private sealed class ActiveReminderCountWaiter(GrainId grainId, string reminderName, int targetCount) : Waiter
     {
         public GrainId GrainId { get; } = grainId;
         public string ReminderName { get; } = reminderName;
         public int TargetCount { get; } = targetCount;
-        public TaskCompletionSource<bool> TaskSource { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
-    private sealed class LocalReminderScheduleWaiter(GrainId grainId, string reminderName)
+    private sealed class LocalReminderScheduleWaiter(GrainId grainId, string reminderName) : Waiter
     {
         public GrainId GrainId { get; } = grainId;
         public string ReminderName { get; } = reminderName;
-        public TaskCompletionSource<bool> TaskSource { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
     /// <inheritdoc/>
