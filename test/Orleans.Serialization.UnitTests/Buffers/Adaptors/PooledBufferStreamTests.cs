@@ -2,7 +2,6 @@ using System;
 using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using Microsoft.Extensions;
@@ -16,7 +15,7 @@ namespace Orleans.Serialization.Buffers.Adaptors.UnitTests;
 /// <summary>
 /// Unit tests for the PooledBufferStream constructor.
 /// </summary>
-[Category("BVT")]
+[Trait("Category", "BVT")]
 public class PooledBufferStreamTests
 {
     /// <summary>
@@ -861,6 +860,7 @@ public class PooledBufferStreamTests
 /// <summary>
 /// Unit tests for the BufferSegment class.
 /// </summary>
+[Trait("Category", "BVT")]
 public class BufferSegmentTests
 {
     /// <summary>

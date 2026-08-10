@@ -3,6 +3,7 @@ using FirestoreUtils = Orleans.Clustering.Firestore.Utils;
 
 namespace Orleans.Clustering.Firestore.Tests;
 
+[TestCategory("BVT")]
 public class UtilsTests
 {
     [Theory]

@@ -8,6 +8,7 @@ using Xunit;
 
 namespace UnitTests
 {
+    [TestCategory("BVT")]
     public class EmbeddedAssetTests
     {
         private static readonly Assembly DashboardAssembly = typeof(DashboardOptions).Assembly;

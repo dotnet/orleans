@@ -13,6 +13,7 @@ using Orleans.Dashboard.Core;
 
 namespace UnitTests
 {
+    [TestCategory("Functional")]
     public class GrainStateTests : IDisposable
     {
         private readonly TestCluster _cluster;

@@ -6,6 +6,7 @@ using Xunit;
 
 namespace UnitTests;
 
+[TestCategory("BVT")]
 public class TraceHistoryTests
 {
     private readonly DateTime _startTime = DateTime.UtcNow;

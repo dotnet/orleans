@@ -9,7 +9,7 @@ using Xunit;
 
 namespace NonSilo.Tests.ScheduledJobs;
 
-[TestCategory("DurableJobs")]
+[TestCategory("BVT"), TestCategory("DurableJobs")]
 public class ShardExecutorTests
 {
     [Fact]
