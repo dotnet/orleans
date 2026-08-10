@@ -3,6 +3,7 @@ using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans.Configuration;
 using Orleans.Internal;
@@ -166,7 +167,37 @@ namespace UnitTests.StreamingTests
             Assert.Empty(pubSub.ReceivedCalls());
         }
 
-        private static PersistentStreamPullingAgent CreateAgent(IStreamPubSub? pubSub, QueueId queueId, IQueueAdapterReceiver? receiver = null, IQueueAdapterCache? queueAdapterCache = null)
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task ReadFromQueue_CleansInactiveStreamsUsingTimeProvider()
+        {
+            var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default)
+                .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
+
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
+
+            var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
+            using var diagnostics = StreamingDiagnosticObserver.Create();
+            var inactive = diagnostics.WaitForStreamInactiveAsync(streamId.StreamId, "provider", CancellationToken.None);
+
+            var agent = CreateAgent(pubSub, queueId, receiver: receiver, timeProvider: timeProvider);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+            await testAccessor.RegisterStream(streamId, new EventSequenceTokenV2(1), timeProvider.GetUtcNow().UtcDateTime);
+            Assert.Single(await testAccessor.GetPubSubCache());
+
+            timeProvider.Advance(new StreamPullingAgentOptions().StreamInactivityPeriod + TimeSpan.FromTicks(1));
+            await testAccessor.ReadFromQueue(queueId, receiver, 1);
+
+            await inactive.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Empty(await testAccessor.GetPubSubCache());
+        }
+
+        private static PersistentStreamPullingAgent CreateAgent(IStreamPubSub? pubSub, QueueId queueId, IQueueAdapterReceiver? receiver = null, IQueueAdapterCache? queueAdapterCache = null, TimeProvider? timeProvider = null)
         {
             var siloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1);
             var localSiloDetails = Substitute.For<ILocalSiloDetails>();
@@ -211,7 +242,7 @@ namespace UnitTests.StreamingTests
                 new NoOpStreamDeliveryFailureHandler(),
                 new FixedBackoff(TimeSpan.FromMilliseconds(1)),
                 new FixedBackoff(TimeSpan.FromMilliseconds(1)),
-                TimeProvider.System,
+                timeProvider ?? TimeProvider.System,
                 shared);
         }
 
