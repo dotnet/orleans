@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Transactions.Abstractions;
 
@@ -39,9 +40,10 @@ namespace Orleans.Transactions
         // prepare records
         private readonly SortedDictionary<long, PendingTransactionState<TState>> prepares;
 
-        // follow-up actions, to be executed after storing this batch
-        private readonly List<Action> followUpActions;
+        // follow-up actions, to be executed when this batch completes
+        private readonly List<Action<bool>> followUpActions;
         private readonly List<Func<Task<bool>>> storeConditions;
+        private int completionInvoked;
         
         // counters for each type of event
         private int total = 0;
@@ -72,7 +74,7 @@ namespace Orleans.Transactions
             this.confirmUpTo = confirmUpTo;
             this.cancelAbove = cancelAbove;
             this.cancelAboveStart = cancelAbove;
-            this.followUpActions = new List<Action>();
+            this.followUpActions = new List<Action<bool>>();
             this.storeConditions = new List<Func<Task<bool>>>();
             this.prepares = new SortedDictionary<long, PendingTransactionState<TState>>();
         }
@@ -95,11 +97,16 @@ namespace Orleans.Transactions
                 (cancelAbove < cancelAboveStart) ? cancelAbove : (long?)null);
         }
 
-        public void RunFollowUpActions()
+        public void Complete(bool success)
         {
+            if (Interlocked.Exchange(ref this.completionInvoked, 1) != 0)
+            {
+                return;
+            }
+
             foreach (var action in followUpActions)
             {
-                action();
+                action(success);
             }
         }
 
@@ -194,7 +201,7 @@ namespace Orleans.Transactions
             MetaData.CommitRecords.Remove(transactionId);
         }
 
-        public void FollowUpAction(Action action)
+        public void FollowUpAction(Action<bool> action)
         {
             followUpActions.Add(action);
         }
