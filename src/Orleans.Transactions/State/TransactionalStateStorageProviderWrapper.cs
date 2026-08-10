@@ -38,8 +38,15 @@ namespace Orleans.Transactions
         {
             if (this.StateStorage.Etag != expectedETag)
                 throw new ArgumentException(nameof(expectedETag), "Etag does not match");
-            var state = stateStorage!.State!; // StateStorage access above initializes the field and ReadStateAsync has populated its state.
-            state.Metadata = metadata;
+            var storedState = stateStorage!.State!; // StateStorage access above initializes the field and ReadStateAsync has populated its state.
+            var storedETag = stateStorage.Etag;
+            var state = new TransactionalStateRecord<TState>
+            {
+                CommittedState = storedState.CommittedState,
+                CommittedSequenceId = storedState.CommittedSequenceId,
+                Metadata = metadata,
+                PendingStates = new List<PendingTransactionState<TState>>(storedState.PendingStates),
+            };
 
             var pendinglist = state.PendingStates;
 
@@ -91,8 +98,23 @@ namespace Orleans.Transactions
                 }
             }
 
-            await stateStorage.WriteStateAsync();
-            return stateStorage.Etag ?? throw new InvalidOperationException("The grain storage provider did not supply an ETag after writing transactional state.");
+            stateStorage.State = state;
+            var writeSucceeded = false;
+            try
+            {
+                await stateStorage.WriteStateAsync();
+                var result = stateStorage.Etag ?? throw new InvalidOperationException("The grain storage provider did not supply an ETag after writing transactional state.");
+                writeSucceeded = true;
+                return result;
+            }
+            finally
+            {
+                if (!writeSucceeded)
+                {
+                    stateStorage.State = storedState;
+                    stateStorage.Etag = storedETag;
+                }
+            }
         }
 
         private StateStorageBridge<TransactionalStateRecord<TState>> GetStateStorage()
