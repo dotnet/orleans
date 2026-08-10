@@ -10,30 +10,30 @@
   <PropertyGroup>
     <!--
       Samples reference Orleans as NuGet packages so that a sample folder can be copied out of the
-      repository and built as-is. Inside the repository they are built against the current sources
-      instead. See OrleansSampleReferences.targets.
+      repository and built as-is. Inside the repository the packages are resolved from the current
+      sources instead. See OrleansSampleReferences.targets.
 
-      A sample which needs an Orleans package that has not shipped yet sets
-      OrleansSamplePackagesPublished to false in its own Directory.Build.props; it is then always
-      built against the sources, so Package mode stays green until the package is released.
+      Build with -p:UseInTreeDependencies=false to build the in-tree samples against the published
+      packages. A sample which needs an Orleans package that has not shipped yet sets
+      RequiresInTreeDependencies in its own Directory.Build.props and always uses the sources, so
+      that build stays green until the package is released.
     -->
-    <OrleansSampleReferenceMode Condition="'$(OrleansSampleReferenceMode)' == ''">Source</OrleansSampleReferenceMode>
-    <OrleansSamplePackagesPublished Condition="'$(OrleansSamplePackagesPublished)' == ''">true</OrleansSamplePackagesPublished>
-    <_SampleUsesOrleansSources>$([MSBuild]::ValueOrDefault('$(_SampleUsesOrleans)', 'false'))</_SampleUsesOrleansSources>
-    <_SampleUsesOrleansSources Condition="'$(OrleansSampleReferenceMode)' != 'Source' and '$(OrleansSamplePackagesPublished)' == 'true'">false</_SampleUsesOrleansSources>
+    <UseInTreeDependencies Condition="'$(UseInTreeDependencies)' == ''">true</UseInTreeDependencies>
+    <_UseInTreeOrleansDependencies>$([MSBuild]::ValueOrDefault('$(_SampleUsesOrleans)', 'false'))</_UseInTreeOrleansDependencies>
+    <_UseInTreeOrleansDependencies Condition="'$(UseInTreeDependencies)' != 'true' and '$(RequiresInTreeDependencies)' != 'true'">false</_UseInTreeOrleansDependencies>
   </PropertyGroup>
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <LangVersion Condition="'$(MSBuildProjectExtension)' == '.vbproj'">latest</LangVersion>
-    <OrleansBuildTimeCodeGen Condition="'$(_SampleUsesOrleansSources)' == 'true'">true</OrleansBuildTimeCodeGen>
+    <OrleansBuildTimeCodeGen Condition="'$(_UseInTreeOrleansDependencies)' == 'true'">true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(_SampleUsesOrleansSources)' == 'true'">
+  <ItemGroup Condition="'$(_UseInTreeOrleansDependencies)' == 'true'">
     <ProjectReference Include="$(SourceRoot)src\Orleans.Core\Orleans.Core.csproj" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(_SampleUsesOrleansSources)' == 'true' and '$(_SampleUsesOrleansServer)' == 'true'">
+  <ItemGroup Condition="'$(_UseInTreeOrleansDependencies)' == 'true' and '$(_SampleUsesOrleansServer)' == 'true'">
     <ProjectReference Include="$(SourceRoot)src\Orleans.Persistence.Memory\Orleans.Persistence.Memory.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
   </ItemGroup>

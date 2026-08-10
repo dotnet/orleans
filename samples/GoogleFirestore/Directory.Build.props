@@ -2,10 +2,11 @@
   <PropertyGroup>
     <!--
       The Microsoft.Orleans.*.Firestore packages have not been published to NuGet yet, so this sample
-      is always built against the repository sources, even in Package mode. Remove this once they
-      ship; the package versions it needs are already pinned in Directory.Packages.props.
+      always resolves them from the repository sources, even when the samples are built against
+      packages. Remove this once they ship; the versions it needs are already pinned in
+      Directory.Packages.props.
     -->
-    <OrleansSamplePackagesPublished>false</OrleansSamplePackagesPublished>
+    <RequiresInTreeDependencies>true</RequiresInTreeDependencies>
   </PropertyGroup>
 
   <!-- Only present inside the repository; a copied-out sample has no parent file to import. -->

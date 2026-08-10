@@ -16,8 +16,8 @@ These rules apply recursively to everything under `samples/`. The repository-lev
 
 - Every sample project targets `net10.0` and is non-packable.
 - Reference Orleans as `Microsoft.Orleans.*` NuGet packages, never with project references into `src/`. Each sample folder is a self-contained unit that a user can copy out of the repository and build unchanged, so a project must not reference anything outside its own sample folder.
-- When a sample is built inside the repository, `samples/OrleansSampleReferences.targets` replaces every `Microsoft.Orleans.*` `PackageReference` with a `ProjectReference` to the project that produces it, so in-tree builds always validate the current sources. Build with `-p:OrleansSampleReferenceMode=Package` to build in-tree against the published packages instead.
-- A sample that needs an Orleans package which has not shipped yet sets `<OrleansSamplePackagesPublished>false</OrleansSamplePackagesPublished>` in its own `Directory.Build.props`. It is then always built from the sources, so the package-mode build stays green until the package is released. Pin the versions it will need anyway, and remove the flag once the package is on NuGet.
+- When a sample is built inside the repository, `samples/OrleansSampleReferences.targets` replaces every `Microsoft.Orleans.*` `PackageReference` with a `ProjectReference` to the project that produces it, so in-tree builds always validate the current sources. Build with `-p:UseInTreeDependencies=false` to build the in-tree samples against the published packages instead.
+- A sample that needs an Orleans package which has not shipped yet sets `<RequiresInTreeDependencies>true</RequiresInTreeDependencies>` in its own `Directory.Build.props`. It then always resolves Orleans from the sources, so the package build stays green until the package is released. Pin the versions it will need anyway, and remove the flag once the package is on NuGet.
 - Give each sample its own `Directory.Packages.props` declaring a `PackageVersion` for every package it uses, including the Orleans ones. The file at `samples/Directory.Packages.props` deliberately declares no versions, because NuGet only reads the nearest one; a sample missing its own file fails at restore. When several gallery entries share code, such as `Streaming/Common`, the shared parent folder is the copy-out unit and owns the file.
 - `PackageReference` elements must not carry `Version` or `VersionOverride`. Keep a package pinned to the same version across all samples, keep Aspire hosting and component versions aligned, and pin vulnerable transitive dependencies explicitly since `CentralPackageTransitivePinningEnabled` is on.
 - `samples/Directory.Build.props` adds `Microsoft.Orleans.Core` automatically, plus the runtime and memory persistence when `Microsoft.Orleans.Server` is referenced.
@@ -33,6 +33,6 @@ These rules apply recursively to everything under `samples/`. The repository-lev
 ## Validation
 
 - Run `pwsh ./samples/Validate-Samples.ps1` for any change under `samples/`. It checks the gallery manifest, README freshness, solution membership, package version declarations, sample self-containment, and builds the full solution.
-- Verify a new or changed sample still builds standalone: copy its folder outside the repository and run `dotnet build`. Samples with `OrleansSamplePackagesPublished` set to `false` are exempt until their packages ship.
+- Verify a new or changed sample still builds standalone: copy its folder outside the repository and run `dotnet build`. Samples with `RequiresInTreeDependencies` set are exempt until their packages ship.
 - Building a sample must not require cloud credentials. Only running a sample may.
 - Check `git diff --check` before committing.

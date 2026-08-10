@@ -5,14 +5,14 @@
     'Microsoft.Orleans.*' PackageReference is replaced by a ProjectReference to the project which
     produces that package, so samples are always validated against the current sources.
 
-    Set OrleansSampleReferenceMode=Package to build in-tree samples against published packages.
-    A sample which needs an Orleans package that has not shipped yet sets
-    OrleansSamplePackagesPublished to false and is always built against the sources.
+    Build with -p:UseInTreeDependencies=false to build the in-tree samples against the published
+    packages. A sample which needs an Orleans package that has not shipped yet sets
+    RequiresInTreeDependencies and always uses the sources.
 
     The swap lives here rather than in Directory.Build.props because PackageReference items are
     only known once the project body has been evaluated.
   -->
-  <ItemGroup Condition="'$(_SampleUsesOrleansSources)' == 'true'">
+  <ItemGroup Condition="'$(_UseInTreeOrleansDependencies)' == 'true'">
     <!-- Every packable Orleans project. Its package id is always 'Microsoft.' + the project file name. -->
     <OrleansSourceProject Include="$(SourceRoot)src\Orleans.*\Orleans.*.csproj;$(SourceRoot)src\*\Orleans.*\Orleans.*.csproj" />
     <OrleansSourceProject Update="@(OrleansSourceProject)" PackageId="Microsoft.%(Filename)" ProjectPath="%(FullPath)" />
