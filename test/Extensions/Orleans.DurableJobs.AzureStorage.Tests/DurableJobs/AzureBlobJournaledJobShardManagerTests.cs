@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.DurableJobs.Tests;
 using Orleans.Hosting;
+using Orleans.Journaling;
 using Orleans.Runtime;
 using Tester;
 using TestExtensions;
@@ -25,7 +26,10 @@ public sealed class AzureBlobJournaledJobShardManagerTestFixture : IJobShardMana
         var containerName = "durablejobs-shard-tests-" + Guid.NewGuid().ToString("N");
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddMetrics();
+        services.AddSingleton<OrleansInstruments>();
         services.AddSingleton(TimeProvider.System);
+        services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (sp, _) => sp.GetRequiredService<TimeProvider>());
         services.UseAzureBlobDurableJobs(options =>
         {
             options.ConfigureTestDefaults();
@@ -34,10 +38,8 @@ public sealed class AzureBlobJournaledJobShardManagerTestFixture : IJobShardMana
 
         var serviceProvider = services.BuildServiceProvider();
         var lifecycle = new SiloLifecycleSubject(serviceProvider.GetRequiredService<ILogger<SiloLifecycleSubject>>());
-        foreach (var participant in serviceProvider.GetServices<ILifecycleParticipant<ISiloLifecycle>>())
-        {
-            participant.Participate(lifecycle);
-        }
+        var storageProvider = serviceProvider.GetRequiredService<IJournalStorageProvider>();
+        Assert.IsAssignableFrom<ILifecycleParticipant<ISiloLifecycle>>(storageProvider).Participate(lifecycle);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         await lifecycle.OnStart(cts.Token);
