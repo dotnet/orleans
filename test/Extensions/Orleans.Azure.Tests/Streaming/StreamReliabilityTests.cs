@@ -1311,7 +1311,7 @@ namespace UnitTests.Streaming.Reliability
                 errors.LastOrDefault());
         }
 
-        private static async Task<Exception> CaptureStreamingSignalFailureAsync(Task task)
+        private static async Task<Exception?> CaptureStreamingSignalFailureAsync(Task task)
         {
             try
             {
@@ -1362,7 +1362,7 @@ namespace UnitTests.Streaming.Reliability
         private async Task WaitForGrainsReachableAsync(string when, bool didKill, params long[] grainIds)
         {
             var stopwatch = Stopwatch.StartNew();
-            Exception lastException = null;
+            Exception? lastException = null;
 
             for (var attempt = 1; attempt <= GrainReachabilityAttemptCount && stopwatch.Elapsed < GrainReachabilityTimeout; attempt++)
             {

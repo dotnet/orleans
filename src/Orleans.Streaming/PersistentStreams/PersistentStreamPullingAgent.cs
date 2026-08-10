@@ -604,7 +604,7 @@ namespace Orleans.Streams
 
         private void CleanupPubSubCache(DateTime now)
         {
-            List<QualifiedStreamId> inactiveStreams = null;
+            List<QualifiedStreamId>? inactiveStreams = null;
             foreach (var tuple in pubSubCache)
             {
                 if (tuple.Value.IsInactive(now, options.StreamInactivityPeriod))

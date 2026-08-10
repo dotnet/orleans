@@ -177,7 +177,7 @@ namespace UnitTests.StreamingTests
 
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var receiver = Substitute.For<IQueueAdapterReceiver>();
-            receiver.GetQueueMessagesAsync(Arg.Any<int>())
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
 
             var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
