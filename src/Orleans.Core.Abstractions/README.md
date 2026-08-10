@@ -26,9 +26,9 @@ public interface IHelloGrain : IGrainWithStringKey
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Grain interfaces](https://learn.microsoft.com/en-us/dotnet/orleans/grains/grain-interfaces)
-- [Grain references](https://learn.microsoft.com/en-us/dotnet/orleans/grains/grain-references)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
+- [Develop grains](https://dotnet.github.io/orleans/docs/grains/)
+- [Grain references](https://dotnet.github.io/orleans/docs/grains/grain-references/)
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)

@@ -62,9 +62,9 @@ await host.WaitForShutdownAsync();
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Client Configuration](https://learn.microsoft.com/en-us/dotnet/orleans/host/client)
-- [Dependency Injection](https://learn.microsoft.com/en-us/dotnet/orleans/host/configuration-guide/dependency-injection)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
+- [Client Configuration](https://dotnet.github.io/orleans/docs/host/client/)
+- [Dependency injection in .NET](https://learn.microsoft.com/dotnet/core/extensions/dependency-injection)
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)

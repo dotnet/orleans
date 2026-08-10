@@ -107,9 +107,9 @@ For complete working examples, see the playground projects:
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Orleans observability](https://learn.microsoft.com/en-us/dotnet/orleans/host/monitoring/)
-- [Server configuration](https://learn.microsoft.com/en-us/dotnet/orleans/host/configuration-guide/server-configuration)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
+- [Orleans observability](https://dotnet.github.io/orleans/docs/host/monitoring/)
+- [Server configuration](https://dotnet.github.io/orleans/docs/host/configuration-guide/server-configuration/)
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)

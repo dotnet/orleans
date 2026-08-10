@@ -85,9 +85,9 @@ let retrievedUser = grain.GetUser() |> Async.AwaitTask |> Async.RunSynchronously
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Orleans Serialization](https://learn.microsoft.com/en-us/dotnet/orleans/host/configuration-guide/serialization)
-- [F# Documentation](https://learn.microsoft.com/en-us/dotnet/fsharp/)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
+- [Orleans Serialization](https://dotnet.github.io/orleans/docs/host/configuration-guide/serialization/)
+- [F# Documentation](https://learn.microsoft.com/dotnet/fsharp/)
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)

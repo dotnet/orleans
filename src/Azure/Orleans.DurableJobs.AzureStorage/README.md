@@ -488,7 +488,7 @@ var blobServiceClient = new BlobServiceClient(storageAccountUri, credential);
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
 - [Azure Blob Storage Documentation](https://learn.microsoft.com/azure/storage/blobs/)
 - [Orleans Durable Jobs Core Package](../../../Orleans.DurableJobs/README.md)
 

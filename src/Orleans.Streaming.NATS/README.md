@@ -123,8 +123,8 @@ public class MyEvent
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Orleans Streams](https://learn.microsoft.com/en-us/dotnet/orleans/streaming/)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
+- [Orleans Streams](https://dotnet.github.io/orleans/docs/streaming/)
 - [NATS JetStream Documentation](https://docs.nats.io/nats-concepts/jetstream)
 
 ## Feedback & Contributing

@@ -66,10 +66,10 @@ await host.WaitForShutdownAsync();
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
 - [Getting started with Orleans](https://dotnet.github.io/orleans/docs/tutorials-and-samples/hello-world/)
-- [Grains](https://learn.microsoft.com/en-us/dotnet/orleans/grains/)
-- [Hosting Orleans](https://learn.microsoft.com/en-us/dotnet/orleans/host/)
+- [Grains](https://dotnet.github.io/orleans/docs/grains/)
+- [Orleans configuration guide](https://dotnet.github.io/orleans/docs/host/configuration-guide/)
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)

@@ -110,10 +110,10 @@ public class ConsumerGrain : Grain, IConsumerGrain, IAsyncObserver<string>
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Orleans Streams](https://learn.microsoft.com/en-us/dotnet/orleans/streaming/index)
-- [Stream Providers](https://learn.microsoft.com/en-us/dotnet/orleans/streaming/stream-providers)
-- [ADO.NET Database Setup](https://learn.microsoft.com/en-us/dotnet/orleans/host/configuration-guide/adonet-configuration)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
+- [Orleans Streams](https://dotnet.github.io/orleans/docs/streaming/)
+- [Stream Providers](https://dotnet.github.io/orleans/docs/streaming/stream-providers/)
+- [ADO.NET Database Setup](https://dotnet.github.io/orleans/docs/host/configuration-guide/adonet-configuration/)
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)

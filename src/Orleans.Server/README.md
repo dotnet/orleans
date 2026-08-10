@@ -64,10 +64,10 @@ await host.WaitForShutdownAsync();
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Orleans server (silo) configuration](https://learn.microsoft.com/en-us/dotnet/orleans/host/configuration-guide/server-configuration)
-- [Hosting Orleans](https://learn.microsoft.com/en-us/dotnet/orleans/host/generic-host)
-- [Grain persistence](https://learn.microsoft.com/en-us/dotnet/orleans/grains/grain-persistence)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
+- [Orleans server (silo) configuration](https://dotnet.github.io/orleans/docs/host/configuration-guide/server-configuration/)
+- [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensions/generic-host)
+- [Grain persistence](https://dotnet.github.io/orleans/docs/grains/grain-persistence/)
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)

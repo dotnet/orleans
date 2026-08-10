@@ -125,9 +125,9 @@ namespace ExampleGrains;
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Clustering providers](https://learn.microsoft.com/en-us/dotnet/orleans/implementation/cluster-management)
-- [Relational Database Provider](https://learn.microsoft.com/en-us/dotnet/orleans/implementation/relational-storage-providers)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
+- [Clustering providers](https://dotnet.github.io/orleans/docs/implementation/cluster-management/)
+- [ADO.NET database configuration](https://dotnet.github.io/orleans/docs/host/configuration-guide/adonet-configuration/)
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)

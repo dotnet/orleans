@@ -106,9 +106,9 @@ public class MyGrain : Grain, IMyGrain, IGrainWithStringKey
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Grain Persistence](https://learn.microsoft.com/en-us/dotnet/orleans/grains/grain-persistence)
-- [Azure Storage Persistence](https://learn.microsoft.com/en-us/dotnet/orleans/grains/grain-persistence/azure-storage)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
+- [Grain Persistence](https://dotnet.github.io/orleans/docs/grains/grain-persistence/)
+- [Azure Storage Persistence](https://dotnet.github.io/orleans/docs/grains/grain-persistence/azure-storage/)
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)

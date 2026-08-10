@@ -31,7 +31,7 @@ await builder.RunAsync();
 ```
 
 ## Using Protobuf Types with Orleans
-This package supports types generated from `.proto` files using Google.Protobuf. For detailed information on creating Protobuf messages and configuring your project, see [Create Protobuf messages for .NET apps](https://learn.microsoft.com/en-us/aspnet/core/grpc/protobuf).
+This package supports types generated from `.proto` files using Google.Protobuf. For detailed information on creating Protobuf messages and configuring your project, see [Create Protobuf messages for .NET apps](https://learn.microsoft.com/aspnet/core/grpc/protobuf).
 
 Once you have defined your Protobuf messages and configured code generation, you can use them directly in your grain interfaces:
 
@@ -62,9 +62,9 @@ public class MyGrain : Grain, IMyGrain
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Create Protobuf messages for .NET apps](https://learn.microsoft.com/en-us/aspnet/core/grpc/protobuf) - Official guide for working with Protobuf in .NET
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Orleans Serialization](https://learn.microsoft.com/en-us/dotnet/orleans/host/configuration-guide/serialization)
+- [Create Protobuf messages for .NET apps](https://learn.microsoft.com/aspnet/core/grpc/protobuf) - Official guide for working with Protobuf in .NET
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
+- [Orleans Serialization](https://dotnet.github.io/orleans/docs/host/configuration-guide/serialization/)
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)
