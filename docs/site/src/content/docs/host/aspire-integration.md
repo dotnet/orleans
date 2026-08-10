@@ -1,7 +1,7 @@
 ---
 title: Orleans and Aspire integration
 description: Model and run Orleans applications with Aspire.
-ms.date: 08/02/2026
+ms.date: 08/10/2026
 ms.topic: how-to
 ---
 
@@ -90,6 +90,49 @@ Register the matching Azure Tables client in the silo:
 
 The same principle applies to Redis and databases: the AppHost resource can launch a local container during development and bind to a managed service in deployment.
 
+## Provider wiring reference
+
+For automatically configured external resources, the AppHost needs the corresponding Aspire hosting integration. The silo or client needs both the Orleans provider package and the Aspire client integration, and it must register the client using the Aspire resource name.
+
+| Resource | Application registration | Supported automatic Orleans configuration |
+|---|---|---|
+| Redis | `AddKeyedRedisClient` | Clustering, grain storage, reminders, and grain directories |
+| Azure Tables | `AddKeyedAzureTableServiceClient` | Clustering, grain storage, reminders, and grain directories |
+| Azure Blobs | `AddKeyedAzureBlobServiceClient` | Grain storage |
+| ADO.NET database | Configure the Orleans provider from the injected connection string | Clustering, grain storage, and reminders require manual configuration |
+| In-memory | None | Development clustering, grain storage, reminders, and streaming |
+
+The resulting provider support matrix is:
+
+| Capability | Redis | Azure Tables | Azure Blobs | ADO.NET | In-memory |
+|---|---|---|---|---|---|
+| Clustering | Automatic | Automatic | No | Manual | Development only |
+| Grain storage | Automatic | Automatic | Automatic | Manual | Development only |
+| Reminders | Automatic | Automatic | No | Manual | Development only |
+| Grain directory | Automatic | Automatic | No | No | No |
+
+### ADO.NET providers
+
+ADO.NET resource types don't infer the `AdoNet` provider name expected by Orleans, and `Aspire.Hosting.Orleans` doesn't expose an API to override the inferred name. Reference the database resource directly from the silo project so that Aspire injects its connection string:
+
+:::code language="csharp" source="snippets/aspire/AppHost/AppHostExamples.cs" id="adonet_apphost":::
+
+Configure the Orleans ADO.NET providers from that connection string:
+
+:::code language="csharp" source="snippets/aspire/Silo/SiloProgram.cs" id="adonet_silo":::
+
+Register an Aspire database client separately only when application code also consumes that database client. Orleans ADO.NET providers use their configured connection string directly.
+
+### Grain directories
+
+Redis and Azure Tables can back named grain directories. This example configures a Redis grain directory in the AppHost:
+
+:::code language="csharp" source="snippets/aspire/AppHost/AppHostExamples.cs" id="grain_directory_apphost":::
+
+Register the Redis client with the same resource name in the silo:
+
+:::code language="csharp" source="snippets/aspire/Silo/SiloProgram.cs" id="grain_directory_silo":::
+
 ## AppHost extension methods reference
 
 `AddOrleans` produces standard Orleans configuration. The application projects still call <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*> or <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*>, and Orleans validates the resulting provider configuration at startup. You can inspect injected environment variables in the Aspire dashboard when diagnosing a missing provider, keyed resource, or endpoint.
@@ -121,6 +164,10 @@ Consult the [Aspire Orleans integration reference](https://aspire.dev/integratio
 <a id="opentelemetry-configuration"></a>
 <a id="health-checks"></a>
 <a id="see-also"></a>
+
+Set stable service and cluster identifiers for environments that must interoperate across restarts and rolling deployments:
+
+:::code language="csharp" source="snippets/aspire/AppHost/AppHostExamples.cs" id="explicit_cluster_ids":::
 
 - Treat the AppHost as a resource model, not as a substitute for durable services.
 - Use managed identities or workload identities instead of embedding secrets.
