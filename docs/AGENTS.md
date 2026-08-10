@@ -65,8 +65,8 @@ another:
   along with their trade-offs. This is what operators and contributors need to
   reason about behavior under failure, scale, and version skew, and to predict
   what a change will do in production.
-- **Cookbook and how-to guides** — focused, task-oriented recipes that solve one
-  real problem ("configure ADO.NET clustering", "roll a cluster without
+- **Cookbook and how-to guides** — focused, task-oriented recipes that address
+  one goal ("configure ADO.NET clustering", "roll a cluster without
   downtime", "secure silo-to-silo traffic"). They assume the reader has a goal
   and want the shortest correct path, including prerequisites, pitfalls, and
   verification steps.
@@ -97,7 +97,7 @@ tutorial into a reference or burying architecture detail inside a how-to.
 - Prefer correcting or enhancing useful content over deleting it. Preserve
   authoritative references during rewrites, and remove them only when obsolete,
   redundant, or replaced with a clearer current source.
-- Preserve and expand valuable architecture and implementation detail, and keep it distinct from conceptual and task-oriented how-to guidance.
+- Preserve and expand architecture and implementation detail, and keep it distinct from conceptual and task-oriented how-to guidance.
 - Treat hub pages as overviews: link to peer detail pages instead of singling out one provider or feature for inline configuration guidance.
 - Preserve stable URLs and anchors when moving content, or provide an explicit redirect or compatibility anchor.
 
