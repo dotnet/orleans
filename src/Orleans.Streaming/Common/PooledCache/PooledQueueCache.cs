@@ -224,7 +224,7 @@ namespace Orleans.Providers.Streams.Common
             if (sequenceToken is OldestInStreamToken)
             {
                 // Start from the oldest message in cache
-                var block = messageBlocks.Last;
+                var block = messageBlocks.Last!;
                 cursor.State = CursorStates.Set;
                 cursor.CurrentBlock = block;
                 cursor.Index = block.Value.OldestMessageIndex;

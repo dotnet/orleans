@@ -25,7 +25,7 @@ public sealed class OldestInStreamToken : StreamSequenceToken
     public static OldestInStreamToken Instance { get; } = new OldestInStreamToken();
 
     /// <inheritdoc/>
-    public override bool Equals(StreamSequenceToken other)
+    public override bool Equals(StreamSequenceToken? other)
     {
         return other is OldestInStreamToken;
     }
@@ -33,10 +33,10 @@ public sealed class OldestInStreamToken : StreamSequenceToken
     /// <summary>
     /// Always less than any other token, except another <see cref="OldestInStreamToken"/>.
     /// </summary>
-    public override int CompareTo(StreamSequenceToken other)
+    public override int CompareTo(StreamSequenceToken? other)
     {
+        if (other is null) return 1;
         if (other is OldestInStreamToken) return 0;
         return -1;
     }
 }
-
