@@ -1,9 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Configuration;
 using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.MembershipService;
 using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Diagnostics;
@@ -23,7 +25,7 @@ public class LeaseTestGrain : Grain, ILeaseTestGrain
     public Task<SiloAddress> GetAddress() => Task.FromResult(Runtime.SiloAddress);
 }
 
-[TestCategory("Lease"), TestCategory("Directory")]
+[TestCategory("BVT"), TestCategory("Lease"), TestCategory("Directory")]
 public class GrainDirectoryLeaseTests
 {
     private static readonly DateTimeOffset InitialTime = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
@@ -48,7 +50,7 @@ public class GrainDirectoryLeaseTests
             Assert.Equal(secondary.SiloAddress, await leaseGrain.GetAddress());
 
             var leaseCreated = WaitForSiloLeaseHoldCreatedAsync(events, primary.SiloAddress, secondary.SiloAddress);
-            await cluster.KillSiloAsync(secondary);
+            await KillSiloAndWaitForDirectoryMembershipAsync(cluster, primary, secondary);
             await leaseCreated;
             var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory!;
 
@@ -95,7 +97,7 @@ public class GrainDirectoryLeaseTests
             Assert.Equal(secondary.SiloAddress, await leaseGrain.GetAddress());
 
             var leaseCreated = WaitForSiloLeaseHoldCreatedAsync(events, primary.SiloAddress, secondary.SiloAddress);
-            await cluster.KillSiloAsync(secondary);
+            await KillSiloAndWaitForDirectoryMembershipAsync(cluster, primary, secondary);
             await leaseCreated;
 
             var grainLocator = primary.ServiceProvider.GetRequiredService<CachedGrainLocator>();
@@ -269,7 +271,7 @@ public class GrainDirectoryLeaseTests
             Assert.Equal(secondary.SiloAddress, await leaseGrain.GetAddress());
 
             // Ungraceful kill, but leases are disabled (duration = Zero).
-            await cluster.KillSiloAsync(secondary);
+            await KillSiloAndWaitForDirectoryMembershipAsync(cluster, primary, secondary);
 
             var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory!;
             var fakeAddress = GrainAddress.NewActivationAddress(primary.SiloAddress, leaseGrain.GetGrainId());
@@ -304,7 +306,7 @@ public class GrainDirectoryLeaseTests
             Assert.Equal(secondary.SiloAddress, await leaseGrain.GetAddress());
 
             var leaseCreated = WaitForSiloLeaseHoldCreatedAsync(events, primary.SiloAddress, secondary.SiloAddress);
-            await cluster.KillSiloAsync(secondary);
+            await KillSiloAndWaitForDirectoryMembershipAsync(cluster, primary, secondary);
             await leaseCreated;
 
             var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory!;
@@ -342,7 +344,7 @@ public class GrainDirectoryLeaseTests
             Assert.Equal(secondary.SiloAddress, await grain3.GetAddress());
 
             var leaseCreated = WaitForSiloLeaseHoldCreatedAsync(events, primary.SiloAddress, secondary.SiloAddress);
-            await cluster.KillSiloAsync(secondary);
+            await KillSiloAndWaitForDirectoryMembershipAsync(cluster, primary, secondary);
             await leaseCreated;
 
             var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory!;
@@ -384,20 +386,21 @@ public class GrainDirectoryLeaseTests
     {
         var timeProvider = new FakeTimeProvider(InitialTime);
         var builder = new InProcessTestClusterBuilder(2);
-        builder.Options.UseTestClusterGrainDirectory = false;
+#pragma warning disable ORLEANSEXP003
+        builder.Options.UseDistributedGrainDirectory = true;
+#pragma warning restore ORLEANSEXP003
         builder.ConfigureSilo((_, siloBuilder) =>
         {
+            siloBuilder.Services.AddSingleton<MembershipTableManager>();
+            siloBuilder.Services.AddSingleton<IMembershipManager, LeaseTestMembershipManager>();
             siloBuilder.Services.AddSingleton<TimeProvider>(timeProvider);
+            siloBuilder.Services.AddKeyedSingleton(TimeProviderNames.Membership, TimeProvider.System);
             siloBuilder.Services.Configure<ClusterMembershipOptions>(options =>
             {
                 options.ProbeTimeout = TimeSpan.FromSeconds(1);
                 options.NumMissedProbesLimit = 1;
             });
             siloBuilder.Services.PostConfigure<GrainDirectoryOptions>(o => o.RangeLeaseDuration = rangeLeaseDuration ?? RangeLeaseDuration);
-
-#pragma warning disable ORLEANSEXP003
-            siloBuilder.AddDistributedGrainDirectory();
-#pragma warning restore ORLEANSEXP003
         });
 
         return (builder.Build(), timeProvider);
@@ -413,6 +416,61 @@ public class GrainDirectoryLeaseTests
         {
             await cluster.DisposeAsync();
         }
+    }
+
+    private static async Task KillSiloAndWaitForDirectoryMembershipAsync(
+        InProcessTestCluster cluster,
+        InProcessSiloHandle observer,
+        InProcessSiloHandle victim)
+    {
+        using var timeout = new CancellationTokenSource(EventTimeout);
+        var membership = observer.ServiceProvider.GetRequiredService<ClusterMembershipService>();
+        var directoryMembership = observer.ServiceProvider.GetRequiredService<DirectoryMembershipService>();
+
+        var initialView = await WaitForDirectoryMembershipAsync(
+            cluster,
+            observer,
+            directoryMembership,
+            membership.CurrentSnapshot.Version,
+            timeout.Token);
+        Assert.Equal(SiloStatus.Active, initialView.ClusterMembershipSnapshot.GetSiloStatus(victim.SiloAddress));
+
+        await cluster.KillSiloAsync(victim);
+        await cluster.WaitForLivenessToStabilizeAsync(didKill: true);
+        var deadMembership = membership.CurrentSnapshot;
+        Assert.Equal(SiloStatus.Dead, deadMembership.GetSiloStatus(victim.SiloAddress));
+
+        var deadView = await WaitForDirectoryMembershipAsync(
+            cluster,
+            observer,
+            directoryMembership,
+            deadMembership.Version,
+            timeout.Token);
+        Assert.Equal(SiloStatus.Dead, deadView.ClusterMembershipSnapshot.GetSiloStatus(victim.SiloAddress));
+        Assert.True(deadView.ClusterMembershipSnapshot.Members[victim.SiloAddress].WasDeclaredDead);
+    }
+
+    private static async Task<DirectoryMembershipSnapshot> WaitForDirectoryMembershipAsync(
+        InProcessTestCluster cluster,
+        InProcessSiloHandle silo,
+        DirectoryMembershipService membership,
+        MembershipVersion targetVersion,
+        CancellationToken cancellationToken)
+    {
+        var view = membership.CurrentView.Version >= targetVersion
+            ? membership.CurrentView
+            : await membership.RefreshViewAsync(targetVersion, cancellationToken);
+
+        var partitionWaits = new Task[membership.PartitionsPerSilo];
+        for (var partitionIndex = 0; partitionIndex < partitionWaits.Length; partitionIndex++)
+        {
+            var partition = cluster.InternalClient!.GetSystemTarget<IGrainDirectoryTestHooks>(
+                GrainDirectoryPartition.CreateGrainId(silo.SiloAddress, partitionIndex).GrainId);
+            partitionWaits[partitionIndex] = partition.WaitForMembershipVersionAsync(view.Version).AsTask();
+        }
+
+        await Task.WhenAll(partitionWaits).WaitAsync(cancellationToken);
+        return view;
     }
 
     private static Task<DiagnosticEvent> WaitForSiloLeaseHoldCreatedAsync(
@@ -444,4 +502,50 @@ public class GrainDirectoryLeaseTests
                 && delayed.Operation == "RegisterAsync",
             EventTimeout);
 
+}
+
+internal sealed class LeaseTestMembershipManager(MembershipTableManager inner) : IMembershipManager
+{
+    private bool _gracefulShutdown;
+
+    public MembershipTableSnapshot CurrentSnapshot => ((IMembershipManager)inner).CurrentSnapshot;
+
+    public IAsyncEnumerable<MembershipTableSnapshot> MembershipUpdates => ((IMembershipManager)inner).MembershipUpdates;
+
+    public SiloStatus LocalSiloStatus => ((IMembershipManager)inner).LocalSiloStatus;
+
+    public bool CheckHealth(DateTime lastCheckTime, [NotNullWhen(false)] out string? reason) =>
+        ((IHealthCheckable)inner).CheckHealth(lastCheckTime, out reason);
+
+    public void Participate(ISiloLifecycle lifecycle) => ((ILifecycleParticipant<ISiloLifecycle>)inner).Participate(lifecycle);
+
+    public Task ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) =>
+        ((IMembershipManager)inner).ProcessGossipSnapshot(snapshot, cancellationToken);
+
+    public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) =>
+        ((IMembershipManager)inner).Refresh(targetVersion, cancellationToken);
+
+    public Task<bool> TryKillSilo(SiloAddress silo, CancellationToken cancellationToken) =>
+        ((IMembershipManager)inner).TryKillSilo(silo, cancellationToken);
+
+    public Task<bool> TrySuspectSilo(SiloAddress silo, SiloAddress? indirectProbingSilo, CancellationToken cancellationToken) =>
+        ((IMembershipManager)inner).TrySuspectSilo(silo, indirectProbingSilo, cancellationToken);
+
+    public Task UpdateIAmAlive(CancellationToken cancellationToken) =>
+        ((IMembershipManager)inner).UpdateIAmAlive(cancellationToken);
+
+    public Task UpdateLocalStatus(SiloStatus status, CancellationToken cancellationToken)
+    {
+        if (status is SiloStatus.ShuttingDown)
+        {
+            _gracefulShutdown = true;
+        }
+
+        if (!_gracefulShutdown && status is SiloStatus.Stopping or SiloStatus.Dead)
+        {
+            return Task.CompletedTask;
+        }
+
+        return ((IMembershipManager)inner).UpdateLocalStatus(status, cancellationToken);
+    }
 }

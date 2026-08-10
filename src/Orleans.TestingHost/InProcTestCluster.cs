@@ -785,10 +785,19 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                 if (Options.UseTestClusterMembership)
                 {
                     services.AddSingleton<IMembershipTable>(_membershipTable);
-                    if (Options.UseTestClusterGrainDirectory)
+#pragma warning disable ORLEANSEXP003
+                    if (!Options.UseDistributedGrainDirectory && Options.UseTestClusterGrainDirectory)
+#pragma warning restore ORLEANSEXP003
                     {
                         siloBuilder.AddGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (_, _) => _grainDirectory);
                     }
+                }
+
+#pragma warning disable ORLEANSEXP003
+                if (Options.UseDistributedGrainDirectory)
+#pragma warning restore ORLEANSEXP003
+                {
+                    new ConfigureDistributedGrainDirectory().Configure(siloBuilder);
                 }
 
                 siloBuilder.UseInMemoryConnectionTransport(_transportHub);
