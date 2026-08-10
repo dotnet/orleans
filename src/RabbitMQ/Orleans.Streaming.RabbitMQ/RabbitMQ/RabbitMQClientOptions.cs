@@ -19,16 +19,19 @@ public record RabbitMQClientOptions
     public StreamSystemConfig StreamSystemConfig { get; set; } = new();
 
     /// <summary>
-    ///     Optional Circuit Break configuration used to connect with the RabbitMQ Cluster.
-    ///     When not provided it will retry for 4 times and wait 5 seconds to retry again.
+    ///     Gets or sets the retry options used when connecting to the RabbitMQ cluster.
     ///     <example>
     ///         Example:
     ///         <code>
-    ///         options.CircuitBreakConnectionConfig = new CircuitBreakConnectionConfig { RetryTimesUntilBreak = 4, WaitingTime = TimeSpan.FromSeconds(5) }
+    ///         options.ConnectionRetry = new RabbitMQConnectionRetryOptions
+    ///         {
+    ///             MaxAttempts = 4,
+    ///             Delay = TimeSpan.FromSeconds(5)
+    ///         };
     ///     </code>
     ///     </example>
     /// </summary>
-    public CircuitBreakConnectionConfig CircuitBreakConnectionConfig { get; set; } = new();
+    public RabbitMQConnectionRetryOptions ConnectionRetry { get; set; } = new();
 
     /// <summary>
     ///     The Stream Options used to create streams.
