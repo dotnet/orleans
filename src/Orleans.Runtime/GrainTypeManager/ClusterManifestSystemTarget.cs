@@ -54,7 +54,7 @@ namespace Orleans.Runtime
 
         public ValueTask<ManifestHash> GetSiloManifestHash() => new(_siloManifestHash);
 
-        public ValueTask<GrainManifest> GetSiloManifestByHash(ManifestHash hash) =>
+        public ValueTask<GrainManifest?> GetSiloManifestByHash(ManifestHash hash) =>
             new(hash == _siloManifestHash ? _siloManifest : null);
 
         public ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(MajorMinorVersion version)

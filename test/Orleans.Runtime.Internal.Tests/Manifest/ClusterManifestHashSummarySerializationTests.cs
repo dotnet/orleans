@@ -31,7 +31,8 @@ public sealed class ClusterManifestHashSummarySerializationTests
                 [siloB] = new ManifestHash("hash-b"),
             });
 
-        var roundTripped = serializer.Deserialize<ClusterManifestHashSummary>(serializer.SerializeToArray(summary));
+        var roundTripped = Assert.IsType<ClusterManifestHashSummary>(
+            serializer.Deserialize<ClusterManifestHashSummary>(serializer.SerializeToArray(summary)));
 
         Assert.Equal(summary.Version, roundTripped.Version);
         Assert.Equal(summary.SiloManifestHashes.Count, roundTripped.SiloManifestHashes.Count);

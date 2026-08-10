@@ -2118,7 +2118,8 @@ public class DisseminationProtocolTests
         var value = Assert.Single(repair.Values);
         Assert.Equal(peerDigest.Version, value.FromVersion);
         Assert.Equal(localDigest.Version, value.ToVersion);
-        var update = serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload);
+        var update = Assert.IsType<MembershipTableSnapshotUpdate>(
+            serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload));
         Assert.NotNull(update.Diff);
         Assert.Null(update.Snapshot);
         var receiverManager = new FakeMembershipManager(baseSnapshot);
@@ -2166,8 +2167,10 @@ public class DisseminationProtocolTests
 
         var firstValue = Assert.Single(firstRepair.Values);
         var updatedValue = Assert.Single(updatedRepair.Values);
-        var firstUpdate = serializer.Deserialize<MembershipTableSnapshotUpdate>(firstValue.Payload);
-        var updatedUpdate = serializer.Deserialize<MembershipTableSnapshotUpdate>(updatedValue.Payload);
+        var firstUpdate = Assert.IsType<MembershipTableSnapshotUpdate>(
+            serializer.Deserialize<MembershipTableSnapshotUpdate>(firstValue.Payload));
+        var updatedUpdate = Assert.IsType<MembershipTableSnapshotUpdate>(
+            serializer.Deserialize<MembershipTableSnapshotUpdate>(updatedValue.Payload));
         Assert.Equal(
             DateTime.UnixEpoch.AddSeconds(1),
             firstUpdate.Snapshot!.Entries[local].IAmAliveTime);
@@ -2321,9 +2324,12 @@ public class DisseminationProtocolTests
         Assert.Equal((0L, 1L), (first.FromVersion, first.ToVersion));
         Assert.Equal((1L, 2L), (second.FromVersion, second.ToVersion));
         Assert.Equal((2L, 3L), (third.FromVersion, third.ToVersion));
-        Assert.NotNull(serializer.Deserialize<MembershipTableSnapshotUpdate>(first.Payload).Snapshot);
-        Assert.NotNull(serializer.Deserialize<MembershipTableSnapshotUpdate>(second.Payload).Diff);
-        Assert.NotNull(serializer.Deserialize<MembershipTableSnapshotUpdate>(third.Payload).Diff);
+        Assert.NotNull(Assert.IsType<MembershipTableSnapshotUpdate>(
+            serializer.Deserialize<MembershipTableSnapshotUpdate>(first.Payload)).Snapshot);
+        Assert.NotNull(Assert.IsType<MembershipTableSnapshotUpdate>(
+            serializer.Deserialize<MembershipTableSnapshotUpdate>(second.Payload)).Diff);
+        Assert.NotNull(Assert.IsType<MembershipTableSnapshotUpdate>(
+            serializer.Deserialize<MembershipTableSnapshotUpdate>(third.Payload)).Diff);
 
         var receiverManager = new FakeMembershipManager(CreateMembershipSnapshot(MembershipVersion.MinValue.Value));
         var receiverNamespace = CreateMembershipNamespace(receiverManager, serializer);
@@ -2364,7 +2370,8 @@ public class DisseminationProtocolTests
         Assert.True(await sourceNamespace.PublishAsync(disseminationService, secondSnapshot, CancellationToken.None));
 
         Assert.Equal(0, disseminationService.Values[1].FromVersion);
-        Assert.NotNull(serializer.Deserialize<MembershipTableSnapshotUpdate>(disseminationService.Values[1].Payload).Snapshot);
+        Assert.NotNull(Assert.IsType<MembershipTableSnapshotUpdate>(
+            serializer.Deserialize<MembershipTableSnapshotUpdate>(disseminationService.Values[1].Payload)).Snapshot);
     }
 
     [Fact]
@@ -2393,7 +2400,8 @@ public class DisseminationProtocolTests
         Assert.True(await sourceNamespace.PublishAsync(disseminationService, secondSnapshot, CancellationToken.None));
 
         Assert.Equal(1, disseminationService.Values[1].FromVersion);
-        Assert.NotNull(serializer.Deserialize<MembershipTableSnapshotUpdate>(disseminationService.Values[1].Payload).Diff);
+        Assert.NotNull(Assert.IsType<MembershipTableSnapshotUpdate>(
+            serializer.Deserialize<MembershipTableSnapshotUpdate>(disseminationService.Values[1].Payload)).Diff);
     }
 
     [Fact]
@@ -2424,7 +2432,8 @@ public class DisseminationProtocolTests
         Assert.True(await sourceNamespace.PublishAsync(disseminationService, thirdSnapshot, CancellationToken.None));
 
         Assert.Equal(1, disseminationService.Values[1].FromVersion);
-        Assert.NotNull(serializer.Deserialize<MembershipTableSnapshotUpdate>(disseminationService.Values[1].Payload).Diff);
+        Assert.NotNull(Assert.IsType<MembershipTableSnapshotUpdate>(
+            serializer.Deserialize<MembershipTableSnapshotUpdate>(disseminationService.Values[1].Payload)).Diff);
     }
 
     [Fact]

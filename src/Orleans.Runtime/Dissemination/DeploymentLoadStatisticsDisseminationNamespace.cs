@@ -100,8 +100,8 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
             return ValueTask.FromResult(DisseminationApplyResult.Rejected);
         }
 
-        var statistics = serializer.Deserialize<SiloRuntimeStatistics>(value.Payload);
-        if (value.ToVersion != statistics.DateTime.Ticks)
+        if (serializer.Deserialize<SiloRuntimeStatistics>(value.Payload) is not { } statistics
+            || value.ToVersion != statistics.DateTime.Ticks)
         {
             return ValueTask.FromResult(DisseminationApplyResult.Rejected);
         }
