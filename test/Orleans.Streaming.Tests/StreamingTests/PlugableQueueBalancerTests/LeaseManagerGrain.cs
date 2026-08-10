@@ -1,5 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Tester.StreamingTests
@@ -10,7 +8,6 @@ namespace Tester.StreamingTests
         Task<QueueId> Acquire();
         Task<bool> Renew(QueueId leaseNumber);
         Task Release(QueueId leaseNumber);
-        Task<int> GetLeaseResposibility();
         Task SetQueuesAsLeases(IEnumerable<QueueId> queues);
         //methods used in test asserts
         Task RecordBalancerResponsibility(string balancerId, int ownedQueues);
@@ -23,19 +20,11 @@ namespace Tester.StreamingTests
         //queueId is the lease id here
         private static readonly DateTime UnAssignedLeaseTime = DateTime.MinValue;
         private Dictionary<QueueId, DateTime> queueLeaseToRenewTimeMap = null!;
-        private ISiloStatusOracle siloStatusOracle = null!;
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            this.siloStatusOracle = base.ServiceProvider.GetRequiredService<ISiloStatusOracle>();
             this.queueLeaseToRenewTimeMap = new Dictionary<QueueId, DateTime>();
             this.responsibilityMap = new Dictionary<string, int>();
             return Task.CompletedTask;
-        }
-        public Task<int> GetLeaseResposibility()
-        {
-            var siloCount = this.siloStatusOracle.GetApproximateSiloStatuses(onlyActive: true).Count;
-            var resposibity = this.queueLeaseToRenewTimeMap.Count / siloCount;
-            return Task.FromResult(resposibity);
         }
 
         public Task<QueueId> Acquire()

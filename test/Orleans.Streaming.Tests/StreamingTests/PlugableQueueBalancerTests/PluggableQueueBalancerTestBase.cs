@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Xunit;
+﻿using Xunit;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
@@ -9,21 +8,11 @@ namespace Tester.StreamingTests
     public class PluggableQueueBalancerTestBase : OrleansTestingBase
     {
         private readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
-        private static readonly Type QueueBalancerType = typeof(LeaseBasedQueueBalancerForTest);
-
         public virtual async Task ShouldUseInjectedQueueBalancerAndBalanceCorrectly(BaseTestClusterFixture fixture, string streamProviderName, int siloCount, int totalQueueCount)
         {
             var leaseManager = fixture.GrainFactory.GetGrain<ILeaseManagerGrain>(streamProviderName);
             var expectedResponsibilityPerBalancer = totalQueueCount / siloCount;
             await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckLeases(leaseManager, siloCount, expectedResponsibilityPerBalancer, lastTry, cancellationToken), Timeout);
-        }
-
-        public class SiloBuilderConfigurator : ISiloConfigurator
-        {
-            public void Configure(ISiloBuilder hostBuilder)
-            {
-                hostBuilder.ConfigureServices(services => services.AddTransient<LeaseBasedQueueBalancerForTest>());
-            }
         }
 
         private async Task<bool> CheckLeases(ILeaseManagerGrain leaseManager, int siloCount, int expectedResponsibilityPerBalancer, bool lastTry, CancellationToken cancellationToken)
