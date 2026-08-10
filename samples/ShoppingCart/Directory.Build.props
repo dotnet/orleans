@@ -1,5 +1,9 @@
 <Project>
-  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+  <!-- Only present inside the repository; a copied-out sample has no parent file to import. -->
+  <PropertyGroup>
+    <_ParentDirectoryBuildProps>$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))</_ParentDirectoryBuildProps>
+  </PropertyGroup>
+  <Import Project="$(_ParentDirectoryBuildProps)" Condition="'$(_ParentDirectoryBuildProps)' != ''" />
   <PropertyGroup>
     <ServerGarbageCollection>true</ServerGarbageCollection>
   </PropertyGroup>

@@ -12,12 +12,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Server\Orleans.Server.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Sdk\Orleans.Sdk.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Clustering.Firestore\Orleans.Clustering.Firestore.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.GrainDirectory.Firestore\Orleans.GrainDirectory.Firestore.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Persistence.Firestore\Orleans.Persistence.Firestore.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Reminders.Firestore\Orleans.Reminders.Firestore.csproj" />
+    <PackageReference Include="Microsoft.Orleans.Server" />
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.Firestore" />
+    <PackageReference Include="Microsoft.Orleans.GrainDirectory.Firestore" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.Firestore" />
+    <PackageReference Include="Microsoft.Orleans.Reminders.Firestore" />
   </ItemGroup>
 
 </Project>

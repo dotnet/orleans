@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Server\Orleans.Server.csproj" />
+    <PackageReference Include="Microsoft.Orleans.Server" />
   </ItemGroup>
 
   <ItemGroup>

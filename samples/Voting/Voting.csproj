@@ -7,9 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)src\Dashboard\Orleans.Dashboard\Orleans.Dashboard.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Hosting.Kubernetes\Orleans.Hosting.Kubernetes.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Server\Orleans.Server.csproj" />
+    <PackageReference Include="Microsoft.Orleans.Dashboard" />
+    <PackageReference Include="Microsoft.Orleans.Hosting.Kubernetes" />
+    <PackageReference Include="Microsoft.Orleans.Server" />
   </ItemGroup>
 
 </Project>

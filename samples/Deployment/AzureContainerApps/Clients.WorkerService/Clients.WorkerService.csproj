@@ -9,8 +9,8 @@
   </PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="$(SourceRoot)src\Orleans.Client\Orleans.Client.csproj" />
-		<ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
+		<PackageReference Include="Microsoft.Orleans.Client" />
+		<PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />
 		<PackageReference Include="Swashbuckle.AspNetCore" />
 	</ItemGroup>

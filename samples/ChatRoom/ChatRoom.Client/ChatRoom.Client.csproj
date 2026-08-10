@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Client\Orleans.Client.csproj" />
+    <PackageReference Include="Microsoft.Orleans.Client" />
     <PackageReference Include="SixLabors.ImageSharp" />
     <PackageReference Include="Spectre.Console" />
     <PackageReference Include="Spectre.Console.ImageSharp" />

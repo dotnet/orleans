@@ -15,9 +15,9 @@
     <PackageReference Include="Blazor.Serialization" />
     <PackageReference Include="Blazor.LocalStorage" />
     <PackageReference Include="Bogus" />
-    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Clustering.Cosmos\Orleans.Clustering.Cosmos.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Persistence.Cosmos\Orleans.Persistence.Cosmos.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Server\Orleans.Server.csproj" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.Cosmos" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.Cosmos" />
+    <PackageReference Include="Microsoft.Orleans.Server" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />
     <PackageReference Include="MudBlazor" />
   </ItemGroup>

@@ -6,7 +6,7 @@
     <ServerGarbageCollection>true</ServerGarbageCollection>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Transactions\Orleans.Transactions.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Sdk\Orleans.Sdk.csproj" />
+    <PackageReference Include="Microsoft.Orleans.Transactions" />
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
   </ItemGroup>
 </Project>

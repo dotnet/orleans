@@ -1,27 +1,10 @@
 <Project>
-  <Import Project="..\Directory.Packages.props" />
-
-  <ItemGroup>
-    <PackageVersion Include="Blazor.LocalStorage" Version="9.0.1" />
-    <PackageVersion Include="Blazor.Serialization" Version="9.0.1" />
-    <PackageVersion Include="Bogus" Version="35.6.5" />
-    <PackageVersion Include="Dumpify" Version="0.6.6" />
-    <PackageVersion Include="Grpc.AspNetCore" Version="2.76.0" />
-    <PackageVersion Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.23.0" />
-    <PackageVersion Include="Microsoft.ApplicationInsights.WorkerService" Version="2.23.0" />
-    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.1" />
-    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.1" />
-    <PackageVersion Include="Microsoft.OpenApi" Version="2.7.5" />
-    <PackageVersion Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.23.0" />
-    <PackageVersion Include="MsgPack.Cli" Version="1.0.1" />
-    <PackageVersion Include="MudBlazor" Version="8.15.0" />
-    <PackageVersion Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.14.0-beta.1" />
-    <PackageVersion Include="OpenTelemetry.Exporter.Zipkin" Version="1.15.3" />
-    <PackageVersion Include="SixLabors.ImageSharp" Version="3.1.12" />
-    <PackageVersion Include="Spectre.Console" Version="0.54.0" />
-    <PackageVersion Include="Spectre.Console.ImageSharp" Version="0.54.0" />
-    <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.1.0" />
-    <PackageVersion Include="System.Linq.Async" Version="6.0.1" />
-    <PackageVersion Include="System.Runtime.Caching" Version="10.0.2" />
-  </ItemGroup>
+  <!--
+    Each sample owns its package versions so that its folder can be copied out of the repository
+    and built as-is. This file only stops the search from reaching the repository-wide versions,
+    so a sample which is missing its own Directory.Packages.props fails during restore.
+  -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
 </Project>

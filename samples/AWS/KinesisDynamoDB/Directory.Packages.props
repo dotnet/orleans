@@ -1,0 +1,20 @@
+<Project>
+  <!--
+    NOTE: Microsoft.Orleans.Streaming.Kinesis is not published to NuGet yet, so this sample currently
+    builds only from within the Orleans repository, where Samples.slnx supplies packages built from
+    the current sources. The version pins below are here so it works unchanged once the package ships.
+  -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.Orleans.Clustering.DynamoDB" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Persistence.DynamoDB" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Reminders.DynamoDB" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Server" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Streaming.Kinesis" Version="10.2.2" />
+  </ItemGroup>
+</Project>

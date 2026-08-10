@@ -11,6 +11,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Core\Orleans.Core.csproj" />
+    <PackageReference Include="Microsoft.Orleans.Core" />
   </ItemGroup>
 </Project>

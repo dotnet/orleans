@@ -1,0 +1,21 @@
+<Project>
+  <!--
+    NOTE: the Microsoft.Orleans.*.Firestore packages are not published to NuGet yet, so this sample
+    currently builds only from within the Orleans repository, where Samples.slnx supplies packages
+    built from the current sources. The version pins below are here so it works unchanged once they ship.
+  -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.Orleans.Clustering.Firestore" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.GrainDirectory.Firestore" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Persistence.Firestore" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Reminders.Firestore" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Sdk" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Server" Version="10.2.2" />
+  </ItemGroup>
+</Project>

@@ -7,7 +7,7 @@
     <OutputType>Exe</OutputType>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Client\Orleans.Client.csproj" />
+    <PackageReference Include="Microsoft.Orleans.Client" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\GPSTracker.Common\GPSTracker.Common.csproj" />

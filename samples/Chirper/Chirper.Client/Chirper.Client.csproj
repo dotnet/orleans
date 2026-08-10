@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Client\Orleans.Client.csproj" />
+    <PackageReference Include="Microsoft.Orleans.Client" />
     <PackageReference Include="Spectre.Console" />
   </ItemGroup>
 
