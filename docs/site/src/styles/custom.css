@@ -31,6 +31,79 @@
   color: var(--sl-color-accent-high);
 }
 
+.mermaid-diagram {
+  overflow-x: auto;
+  margin-block: 1.5rem;
+  text-align: center;
+}
+
+.mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.mermaid-diagram[data-mermaid-status='error'] {
+  padding: 1rem;
+  border: 1px solid var(--sl-color-red);
+  border-radius: 0.5rem;
+  text-align: start;
+}
+
+.mermaid-diagram[data-mermaid-status='error'] p {
+  margin-block-start: 0;
+  color: var(--sl-color-red-high);
+  font-weight: 700;
+}
+
+.mermaid-diagram[data-mermaid-status='error'] pre {
+  margin-block-end: 0;
+}
+
+.image-lightbox {
+  cursor: zoom-in;
+}
+
+.image-lightbox[role='button']:focus-visible {
+  border-radius: 0.25rem;
+  outline: 3px solid var(--sl-color-accent);
+  outline-offset: 3px;
+}
+
+.image-lightbox-dialog {
+  width: min(96vw, 90rem);
+  max-width: none;
+  max-height: 96vh;
+  padding: 3.5rem 1rem 1rem;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.75rem;
+  background: var(--sl-color-bg);
+  box-shadow: 0 1rem 4rem rgb(0 0 0 / 35%);
+}
+
+.image-lightbox-dialog::backdrop {
+  background: rgb(0 0 0 / 75%);
+}
+
+.image-lightbox-dialog img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(96vh - 4.5rem);
+  margin-inline: auto;
+}
+
+.image-lightbox-dialog button {
+  position: absolute;
+  inset-block-start: 0.75rem;
+  inset-inline-end: 0.75rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.35rem;
+  color: var(--sl-color-text);
+  font: inherit;
+  background: var(--sl-color-bg-nav);
+  cursor: pointer;
+}
+
 .video-embed {
   position: relative;
   width: 100%;

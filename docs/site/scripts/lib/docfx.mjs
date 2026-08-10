@@ -27,6 +27,101 @@ function normalizeFenceLanguages(source) {
   );
 }
 
+function updateFence(fence, line) {
+  const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
+  if (!marker) {
+    return fence;
+  }
+  if (!fence) {
+    return { character: marker[0], length: marker.length };
+  }
+  if (marker[0] === fence.character && marker.length >= fence.length) {
+    return undefined;
+  }
+  return fence;
+}
+
+function convertTabs(source, sourcePath) {
+  const lines = source.split('\n');
+  const output = [];
+  const tabPattern = /^(\s*)#{1,6}\s+\[([^\]]+)\]\(#tab\/([^)]+)\)\s*$/;
+  const terminatorPattern = /^(\s*)(?:---|\*\*\*)\s*$/;
+  let converted = false;
+  let fence;
+
+  for (let index = 0; index < lines.length; ) {
+    const line = lines[index];
+    const tab = fence ? undefined : tabPattern.exec(line);
+    if (!tab) {
+      output.push(line);
+      fence = updateFence(fence, line);
+      index += 1;
+      continue;
+    }
+
+    const indent = tab[1];
+    const items = [];
+    let terminated = false;
+    while (index < lines.length) {
+      const heading = tabPattern.exec(lines[index]);
+      if (!heading || heading[1] !== indent) {
+        break;
+      }
+
+      const content = [];
+      const label = heading[2];
+      index += 1;
+      let contentFence;
+      while (index < lines.length) {
+        const current = lines[index];
+        const nextHeading = contentFence ? undefined : tabPattern.exec(current);
+        if (nextHeading?.[1] === indent) {
+          break;
+        }
+
+        const terminator = contentFence ? undefined : terminatorPattern.exec(current);
+        if (terminator?.[1] === indent) {
+          terminated = true;
+          index += 1;
+          break;
+        }
+
+        content.push(current);
+        contentFence = updateFence(contentFence, current);
+        index += 1;
+      }
+
+      while (content[0] === '') {
+        content.shift();
+      }
+      while (content.at(-1) === '') {
+        content.pop();
+      }
+      items.push({ label, content });
+      if (terminated) {
+        break;
+      }
+    }
+
+    if (!terminated) {
+      throw new Error(`Unclosed tab group in ${sourcePath}.`);
+    }
+
+    converted = true;
+    output.push(`${indent}<Tabs syncKey="docfx-tabs">`);
+    for (const item of items) {
+      output.push(`${indent}<TabItem label="${escapeHtml(item.label)}">`);
+      output.push('');
+      output.push(...item.content);
+      output.push('');
+      output.push(`${indent}</TabItem>`);
+    }
+    output.push(`${indent}</Tabs>`);
+  }
+
+  return { source: output.join('\n'), converted };
+}
+
 function toPosix(value) {
   return value.split(path.sep).join('/');
 }
@@ -697,7 +792,17 @@ async function convertImages(source, sourcePath) {
     }
 
     const alt = escapeMarkdown(attributes['alt-text']);
-    output.push(`${indent}![${alt}](${attributes.source})`);
+    if (attributes.lightbox) {
+      output.push(
+        `${indent}<div class="image-lightbox" data-image-lightbox>`,
+        '',
+        `${indent}![${alt}](${attributes.source})`,
+        '',
+        `${indent}</div>`,
+      );
+    } else {
+      output.push(`${indent}![${alt}](${attributes.source})`);
+    }
   }
   return output.join('\n');
 }
@@ -1083,7 +1188,7 @@ function convertHtmlCommentsForMdx(source) {
 
 function escapeMdxAngles(source) {
   const htmlTags =
-    'a|abbr|b|blockquote|br|code|dd|details|div|dl|dt|em|hr|i|iframe|img|input|kbd|li|ol|p|pre|source|span|strong|sub|summary|sup|table|tbody|td|th|thead|tr|ul';
+    'a|abbr|b|blockquote|br|code|dd|details|div|dl|dt|em|hr|i|iframe|img|input|kbd|li|ol|p|pre|source|span|strong|sub|summary|sup|tabitem|table|tabs|tbody|td|th|thead|tr|ul';
   const pattern = new RegExp(
     `<(?!\\/?(?:${htmlTags})\\b|https?:\\/\\/|mailto:)(?=[A-Za-z\\d=/])`,
     'gi',
@@ -1156,6 +1261,12 @@ function assertNoUnconvertedConstructs(body, sourcePath) {
       throw new Error(`An unconverted ${name} remains in ${sourcePath}.`);
     }
   }
+  transformOutsideCodeFences(body, (line) => {
+    if (/^#{1,6}\s+\[[^\]]+\]\(#tab\/[^)]+\)\s*$/.test(line)) {
+      throw new Error(`An unconverted tab group remains in ${sourcePath}.`);
+    }
+    return line;
+  });
 }
 
 export async function convertDocfxMarkdown({
@@ -1174,7 +1285,8 @@ export async function convertDocfxMarkdown({
   body = convertLearnBlocks(body, sourcePath);
   body = convertCallouts(body, sourcePath);
   body = convertZones(body, sourcePath);
-  body = body.replace(/^#{1,6}\s+\[([^\]]+)\]\(#tab\/[^)]+\)\s*$/gm, '### $1');
+  const tabs = convertTabs(body, sourcePath);
+  body = tabs.source;
   body = normalizeFenceLanguages(body);
   body = transformOutsideCodeFences(body, (line) => {
     const converted = convertXrefs(convertLinks(line, sourcePath, sourceRoot), uidMap);
@@ -1189,13 +1301,16 @@ export async function convertDocfxMarkdown({
   const slug = routeFromSourcePath(sourcePath, sourceRoot)
     .replace(/^\/orleans\//, '')
     .replace(/\/$/, '');
+  const componentImports = tabs.converted
+    ? "import { TabItem, Tabs } from '@astrojs/starlight/components';\n\n"
+    : '';
   return `${serializeFrontmatter(metadata, sourcePath, {
     title: extractedTitle.title,
     frontmatter: {
       slug,
       ...(typeof editUrl === 'string' ? { editUrl } : {}),
     },
-  })}${body}\n`;
+  })}${componentImports}${body}\n`;
 }
 
 export function routeFromSourcePath(sourcePath, sourceRoot) {
