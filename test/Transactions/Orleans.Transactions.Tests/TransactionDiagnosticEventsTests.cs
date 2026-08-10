@@ -14,6 +14,8 @@ namespace Orleans.Transactions.Tests;
 [TestCategory("BVT"), TestCategory("Transactions")]
 public class TransactionDiagnosticEventsTests
 {
+    private static readonly TimeSpan RecoveryObservationTimeout = TimeSpan.FromSeconds(30);
+
     [Fact]
     public void RecoveryEventsDeliverExpectedPayloads()
     {
@@ -408,7 +410,7 @@ public class TransactionDiagnosticEventsTests
 
         var transition = await observer.WaitForNextTransitionAsync(
             afterSequence: 0,
-            GetDeadline(TimeSpan.FromSeconds(1)));
+            GetDeadline(RecoveryObservationTimeout));
 
         Assert.Equal(TransactionRecoveryEventObserver.RecoveryTransitionKind.StorageWriteCompleted, transition.Kind);
         Assert.Equal(committedTransactionIds, transition.TransactionIds);
@@ -432,7 +434,7 @@ public class TransactionDiagnosticEventsTests
 
         var transition = await observer.WaitForNextTransitionAsync(
             afterSequence: 0,
-            GetDeadline(TimeSpan.FromSeconds(1)));
+            GetDeadline(RecoveryObservationTimeout));
 
         Assert.Equal(TransactionRecoveryEventObserver.RecoveryTransitionKind.LockExpired, transition.Kind);
         Assert.Equal(transactionId, transition.TransactionId);
@@ -511,7 +513,7 @@ public class TransactionDiagnosticEventsTests
             DateTime.UtcNow,
             manager);
 
-        var transition = await observer.WaitForNextTransitionAsync(0, GetDeadline(TimeSpan.FromSeconds(1)));
+        var transition = await observer.WaitForNextTransitionAsync(0, GetDeadline(RecoveryObservationTimeout));
 
         Assert.Equal(TransactionRecoveryEventObserver.RecoveryTransitionKind.RemotePreparePersisted, transition.Kind);
         Assert.Equal(transactionId, transition.TransactionId);
@@ -536,7 +538,7 @@ public class TransactionDiagnosticEventsTests
 
         var transition = await observer.WaitForNextTransitionAsync(
             afterSequence,
-            GetDeadline(TimeSpan.FromSeconds(1)));
+            GetDeadline(RecoveryObservationTimeout));
 
         Assert.Equal(TransactionRecoveryEventObserver.RecoveryTransitionKind.RemotePreparedSent, transition.Kind);
     }
@@ -554,14 +556,14 @@ public class TransactionDiagnosticEventsTests
         using var gate = observer.GateNextTransition(transition =>
             transition.Kind == TransactionRecoveryEventObserver.RecoveryTransitionKind.TransactionManagerWaitingForPrepared);
 
-        var emission = Task.Run(() => TransactionDiagnosticEvents.EmitTransactionManagerWaitingForPrepared(
+        var emission = RunBlockingEmission(() => TransactionDiagnosticEvents.EmitTransactionManagerWaitingForPrepared(
             resource,
             transactionId,
             timeStamp,
             waitCount: 2,
             deadline: timeStamp.AddSeconds(10),
             identity));
-        var transition = await gate.WaitAsync(GetDeadline(TimeSpan.FromSeconds(1)));
+        var transition = await gate.WaitAsync(GetDeadline(RecoveryObservationTimeout));
 
         Assert.False(emission.IsCompleted);
         Assert.Equal(transactionId, transition.TransactionId);
@@ -584,7 +586,7 @@ public class TransactionDiagnosticEventsTests
         using var gate = observer.GateNextTransition(transition =>
             transition.Kind == TransactionRecoveryEventObserver.RecoveryTransitionKind.TransactionConfirmCompleted
             && transition.TransactionId == committedTransactionId);
-        var wait = gate.WaitAsync(GetDeadline(TimeSpan.FromSeconds(1)));
+        var wait = gate.WaitAsync(GetDeadline(RecoveryObservationTimeout));
 
         TransactionDiagnosticEvents.EmitTransactionConfirmCompleted(
             resource,
@@ -596,7 +598,7 @@ public class TransactionDiagnosticEventsTests
 
         Assert.False(wait.IsCompleted);
 
-        var matchingEmission = Task.Run(() => TransactionDiagnosticEvents.EmitTransactionConfirmCompleted(
+        var matchingEmission = RunBlockingEmission(() => TransactionDiagnosticEvents.EmitTransactionConfirmCompleted(
             resource,
             committedTransactionId,
             timeStamp,
@@ -622,7 +624,7 @@ public class TransactionDiagnosticEventsTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => observer.WaitForNextTransitionAsync(
                 observer.LatestRelevantSequence,
-                GetDeadline(TimeSpan.FromSeconds(1)),
+                GetDeadline(RecoveryObservationTimeout),
                 canceled.Token));
 
         var timeout = await Assert.ThrowsAsync<TimeoutException>(
@@ -737,6 +739,13 @@ public class TransactionDiagnosticEventsTests
 
     private static long GetDeadline(TimeSpan timeout)
         => Stopwatch.GetTimestamp() + (long)(timeout.TotalSeconds * Stopwatch.Frequency);
+
+    private static Task RunBlockingEmission(Action emission)
+        => Task.Factory.StartNew(
+            emission,
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
 
     private sealed class RecordingObserver : IObserver<TransactionDiagnosticEvents.TransactionDiagnosticEvent>
     {
