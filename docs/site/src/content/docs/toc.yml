@@ -92,6 +92,8 @@ items:
                 href: grains/grain-persistence/azure-storage.md
               - name: Amazon DynamoDB
                 href: grains/grain-persistence/dynamodb-storage.md
+              - name: Google Cloud Firestore
+                href: grains/grain-persistence/google-firestore-storage.md
               - name: Redis
                 href: grains/grain-persistence/redis-storage.md
               - name: Memory
@@ -168,6 +170,8 @@ items:
             items:
               - name: Consul
                 href: host/configuration-guide/clustering/consul.md
+              - name: Google Cloud Firestore
+                href: host/configuration-guide/google-firestore-providers.md
           - name: Options classes
             href: host/configuration-guide/list-of-options-classes.md
           - name: Silo metadata

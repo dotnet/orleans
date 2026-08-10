@@ -20,6 +20,7 @@ Officially maintained providers are available from [NuGet](https://www.nuget.org
 | [Azure Table and Blob Storage](azure-storage.md) | [`Microsoft.Orleans.Persistence.AzureStorage`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AzureStorage) | Azure-hosted state records |
 | [Azure Cosmos DB for NoSQL](azure-cosmos-db.md) | [`Microsoft.Orleans.Persistence.Cosmos`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Cosmos) | Globally distributed Azure NoSQL storage |
 | [Amazon DynamoDB](dynamodb-storage.md) | [`Microsoft.Orleans.Persistence.DynamoDB`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.DynamoDB) | AWS-hosted key-value storage |
+| [Google Cloud Firestore](google-firestore-storage.md) | [`Microsoft.Orleans.Persistence.Firestore`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Firestore) | Google Cloud-hosted document storage |
 | [ADO.NET](relational-storage.md) | [`Microsoft.Orleans.Persistence.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AdoNet) | SQL Server, MySQL/MariaDB, PostgreSQL, Oracle, and SQLite |
 | [Redis](redis-storage.md) | [`Microsoft.Orleans.Persistence.Redis`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Redis) | Low-latency state backed by Redis |
 | [Memory](memory-storage.md) | `Microsoft.Orleans.Persistence.Memory` | Tests and disposable development environments |

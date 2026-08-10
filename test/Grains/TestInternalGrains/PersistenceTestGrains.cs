@@ -663,7 +663,7 @@ namespace UnitTests.Grains
         {
             logger.LogInformation(" ==================================== Test1 Started");
             CheckRuntimeEnvironment();
-            for (var i = 1*Multiple; i < 2*Multiple; i++)
+            for (var i = 1 * Multiple; i < 2 * Multiple; i++)
             {
                 var t1 = SetOne(i);
                 await t1;
@@ -689,7 +689,7 @@ namespace UnitTests.Grains
         {
             logger.LogInformation("==================================== Test2 Started");
             CheckRuntimeEnvironment();
-            for (var i = 2*Multiple; i < 3*Multiple; i++)
+            for (var i = 2 * Multiple; i < 3 * Multiple; i++)
             {
                 var t1 = _other.SetOne(i);
                 await t1;

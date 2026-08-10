@@ -29,6 +29,7 @@ Use a pluggable directory for grain types that need different operational charac
 |---|---|---|
 | Redis | [`Microsoft.Orleans.GrainDirectory.Redis`](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.Redis) | A shared Redis service already meets latency and availability requirements. |
 | Azure Table Storage | [`Microsoft.Orleans.GrainDirectory.AzureStorage`](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.AzureStorage) | Azure Table is the preferred shared backing service. |
+| [Google Cloud Firestore](configuration-guide/google-firestore-providers.md) | [`Microsoft.Orleans.GrainDirectory.Firestore`](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.Firestore) | A shared Firestore database already meets latency and availability requirements. |
 | ADO.NET | [`Microsoft.Orleans.GrainDirectory.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.AdoNet) | Grain locations should use an existing supported relational database. |
 | Custom | Application or third-party package | The application has a backend-specific requirement not met by built-in providers. |
 
