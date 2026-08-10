@@ -12,18 +12,23 @@ namespace Tester.Redis.Streaming;
 public sealed class RedisStreamBatchContainerTests
 {
     [Fact]
-    public void RedisStreamBatchContainer_FromStreamEntry_CreatesRedisSequenceTokens()
+    public void RedisStreamBatchContainer_FromStreamEntry_PreservesStreamIdAndCreatesRedisSequenceTokens()
     {
         using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var serializer = serviceProvider.GetRequiredService<Serializer<RedisStreamBatchContainer>>();
+        var streamId = StreamId.Create(nameof(RedisStreamBatchContainerTests), Guid.NewGuid());
         var payload = RedisStreamBatchContainer.ToRedisValue(
             serializer,
-            StreamId.Create(nameof(RedisStreamBatchContainerTests), "stream"),
+            streamId,
             new object[] { 1, 2 },
             new Dictionary<string, object>());
         var entry = new StreamEntry("1735790000000-3", [new NameValueEntry(RedisStreamReceiverOptions.DefaultFieldName, payload)]);
 
         var container = RedisStreamBatchContainer.FromStreamEntry(serializer, entry, RedisStreamReceiverOptions.DefaultFieldName);
+
+        Assert.Equal(streamId, container.StreamId);
+        Assert.Equal(streamId.GetNamespace(), container.StreamId.GetNamespace());
+        Assert.Equal(streamId.GetKeyAsString(), container.StreamId.GetKeyAsString());
 
         var batchToken = Assert.IsType<RedisStreamSequenceToken>(container.SequenceToken);
         Assert.Equal("1735790000000-3", batchToken.EntryId);
