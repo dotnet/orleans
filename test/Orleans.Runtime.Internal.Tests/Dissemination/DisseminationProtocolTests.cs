@@ -247,6 +247,7 @@ public class DisseminationProtocolTests
         var local = CreateSilo(11111);
         var peer = CreateSilo(11112);
         var transport = new FakeTransport(local, peer);
+        var timeProvider = new FakeTimeProvider();
         var sendCount = 0;
         transport.SendBroadcastHandler = (target, batch, cancellationToken) =>
         {
@@ -260,7 +261,7 @@ public class DisseminationProtocolTests
         };
 
         var ns = new FakeNamespace(local);
-        var protocol = CreateProtocol(transport, ns);
+        var protocol = CreateProtocol(transport, ns, timeProvider: timeProvider);
 
         var firstResult = await PublishValue(protocol, ns, ns.CreateValue(FakeNamespace.DefaultKey, sequence: 1), CancellationToken.None);
         await protocol.FlushPendingBroadcast(CancellationToken.None);
@@ -821,6 +822,7 @@ public class DisseminationProtocolTests
         var failedPeer = CreateSilo(11112);
         var healthyPeer = CreateSilo(11113);
         var transport = new FakeTransport(local, failedPeer, healthyPeer);
+        var timeProvider = new FakeTimeProvider();
         var failedPeerAttempts = 0;
         transport.SendBroadcastHandler = (target, batch, cancellationToken) =>
         {
@@ -841,7 +843,7 @@ public class DisseminationProtocolTests
         var protocol = CreateProtocol(transport, ns, options =>
         {
             options.Overlay.FanOutFactor = static _ => 10;
-        });
+        }, timeProvider);
 
         Assert.True(await PublishValue(protocol, ns, ns.CreateValue("first", sequence: 1), CancellationToken.None));
         await protocol.FlushPendingBroadcast(CancellationToken.None);
