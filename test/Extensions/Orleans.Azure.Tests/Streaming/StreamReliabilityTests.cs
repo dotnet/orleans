@@ -943,8 +943,7 @@ namespace UnitTests.Streaming.Reliability
                 await this.HostedCluster.RestartSiloAsync(silo);
             }
 
-            // Note: Needed to reinitialize client in this test case to connect to new silos
-            // this.HostedCluster.InitializeClient();
+            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             var newSilos = this.HostedCluster.GetActiveSilos().Select(silo => silo.SiloAddress).ToArray();
             _output.WriteLine("\n\n\n\n-----------------------------------------------------\n" +
