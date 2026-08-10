@@ -12,10 +12,15 @@
       Samples reference Orleans as NuGet packages so that a sample folder can be copied out of the
       repository and built as-is. Inside the repository they are built against the current sources
       instead. See OrleansSampleReferences.targets.
+
+      A sample which needs an Orleans package that has not shipped yet sets
+      OrleansSamplePackagesPublished to false in its own Directory.Build.props; it is then always
+      built against the sources, so Package mode stays green until the package is released.
     -->
     <OrleansSampleReferenceMode Condition="'$(OrleansSampleReferenceMode)' == ''">Source</OrleansSampleReferenceMode>
+    <OrleansSamplePackagesPublished Condition="'$(OrleansSamplePackagesPublished)' == ''">true</OrleansSamplePackagesPublished>
     <_SampleUsesOrleansSources>$([MSBuild]::ValueOrDefault('$(_SampleUsesOrleans)', 'false'))</_SampleUsesOrleansSources>
-    <_SampleUsesOrleansSources Condition="'$(OrleansSampleReferenceMode)' != 'Source'">false</_SampleUsesOrleansSources>
+    <_SampleUsesOrleansSources Condition="'$(OrleansSampleReferenceMode)' != 'Source' and '$(OrleansSamplePackagesPublished)' == 'true'">false</_SampleUsesOrleansSources>
   </PropertyGroup>
 
   <PropertyGroup>

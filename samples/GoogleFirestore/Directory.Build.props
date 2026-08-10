@@ -1,0 +1,16 @@
+<Project>
+  <PropertyGroup>
+    <!--
+      The Microsoft.Orleans.*.Firestore packages have not been published to NuGet yet, so this sample
+      is always built against the repository sources, even in Package mode. Remove this once they
+      ship; the package versions it needs are already pinned in Directory.Packages.props.
+    -->
+    <OrleansSamplePackagesPublished>false</OrleansSamplePackagesPublished>
+  </PropertyGroup>
+
+  <!-- Only present inside the repository; a copied-out sample has no parent file to import. -->
+  <PropertyGroup>
+    <_ParentDirectoryBuildProps>$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))</_ParentDirectoryBuildProps>
+  </PropertyGroup>
+  <Import Project="$(_ParentDirectoryBuildProps)" Condition="'$(_ParentDirectoryBuildProps)' != ''" />
+</Project>
