@@ -7,4 +7,5 @@ VALUES
         AND @DeploymentId IS NOT NULL
         AND IAmAliveTime < @IAmAliveTime
         AND Status != 3;
-');
+')
+ON CONFLICT (QueryKey) DO NOTHING;
