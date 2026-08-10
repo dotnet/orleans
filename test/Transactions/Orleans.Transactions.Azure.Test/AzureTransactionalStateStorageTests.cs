@@ -31,6 +31,7 @@ namespace Orleans.Transactions.Azure.Tests
     /// <summary>
     /// Tests for Azure Table Storage implementation of transactional state storage.
     /// </summary>
+    [TestCategory("AzureStorage"), TestCategory("Transactions"), TestCategory("Functional")]
     public class AzureTransactionalStateStorageTests : TransactionalStateStorageTestRunnerxUnit<TestState>, IClassFixture<TestFixture>
     {
         private const string tableName = "StateStorageTests";
@@ -50,7 +51,7 @@ namespace Orleans.Transactions.Azure.Tests
             return CreateStorage(table, $"{partition}{DateTime.UtcNow.Ticks}", jsonSettings);
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task NoChangeStoreUsesStrictETag()
         {
             var (writer, staleWriter, writerLoad, staleLoad) = await CreateInitializedWriters();
@@ -62,7 +63,7 @@ namespace Orleans.Transactions.Azure.Tests
                 () => staleWriter.Store(staleLoad.ETag, staleLoad.Metadata, [], null, null));
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task StaleWriterConvergesAfterLoad()
         {
             var (writer, staleWriter, writerLoad, staleLoad) = await CreateInitializedWriters();
@@ -96,7 +97,7 @@ namespace Orleans.Transactions.Azure.Tests
             Assert.Equal(staleWriterTimestamp, converged.Metadata.TimeStamp);
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task FailedStoreRequiresSuccessfulLoadBeforeReuse()
         {
             var (writer, staleWriter, writerLoad, staleLoad) = await CreateInitializedWriters();
@@ -113,7 +114,7 @@ namespace Orleans.Transactions.Azure.Tests
             await staleWriter.Store(refreshed.ETag, refreshed.Metadata, [], null, null);
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task ConflictDiagnosticsExcludePayloads()
         {
             var table = await InitTableAsync(NullLogger.Instance);
@@ -249,7 +250,7 @@ namespace Orleans.Transactions.Azure.Tests
         }
     }
 
-    [TestCategory("BVT")]
+    [TestCategory("AzureStorage"), TestCategory("Transactions"), TestCategory("BVT")]
     public class AzureTransactionalStateStorageSnapshotTests
     {
         private const string Partition = "test-partition";

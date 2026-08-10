@@ -14,7 +14,7 @@ namespace Tester.AzureUtils.Streaming
     /// <summary>
     /// Tests for programmatic subscription functionality with Azure Queue streaming providers.
     /// </summary>
-    [TestCategory("BVT"), TestCategory("Streaming"), TestCategory("AQStreaming")]
+    [TestCategory("BVT"), TestCategory("Streaming"), TestCategory("AQStreaming"), TestCategory("AzureStorage")]
     public class AQProgrammaticSubscribeTest : ProgrammaticSubscribeTestsRunner, IClassFixture<AQProgrammaticSubscribeTest.Fixture>
     {
         private const int queueCount = 8;

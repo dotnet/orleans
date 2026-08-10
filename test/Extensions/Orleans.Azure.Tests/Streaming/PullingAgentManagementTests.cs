@@ -10,6 +10,7 @@ using Xunit;
 
 namespace UnitTests.StreamingTests
 {
+    [TestCategory("AzureStorage")]
     public class PullingAgentManagementTests : OrleansTestingBase, IClassFixture<PullingAgentManagementTests.Fixture>
     {
         private readonly Fixture fixture;

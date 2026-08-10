@@ -7,7 +7,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
     /// <summary>
     /// Tests for transaction golden path scenarios with skewed clocks using DynamoDB.
     /// </summary>
-    [TestCategory("DynamoDB"), TestCategory("Transactions")]
+    [TestCategory("DynamoDB"), TestCategory("Transactions"), TestCategory("Functional")]
     public class SkewedClockGoldenPathTransactionTests : GoldenPathTransactionTestRunnerxUnit, IClassFixture<SkewedClockTestFixture>
     {
         public SkewedClockGoldenPathTransactionTests(SkewedClockTestFixture fixture, ITestOutputHelper output)
