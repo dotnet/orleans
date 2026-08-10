@@ -118,9 +118,10 @@ tutorial into a reference or burying architecture detail inside a how-to.
 
 - Run the parser-backed link, include, redirect, navigation, and project-policy
   checks that cover the changed content.
-- Build every changed snippet project with `dotnet build`, and run
-  `docs/site/src/content/docs/validate-snippets.ps1` when snippet or project
-  policy changes.
+- Run `docs/site/src/content/docs/validate-snippets.ps1` for changed snippets
+  and snippet project policy changes. It builds ordinary snippet projects and
+  runs projects marked with `IsTestProject=true`, so executable testing examples
+  are validated behaviorally.
 - Run `samples/Validate-Samples.ps1` when maintained samples change.
 - When `docs/Docs.slnx` is present after integration, build it as the aggregate documentation project.
 - From `docs/site`, run `npm run validate`, including redirect and rendered

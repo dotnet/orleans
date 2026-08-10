@@ -8,9 +8,7 @@ using Orleans.Serialization.Session;
 using Orleans.Serialization.Utilities;
 using UnitTests.SerializerExternalModels;
 using Xunit;
-#if !NETCOREAPP3_1
 using static VerifyXunit.Verifier;
-#endif
 
 namespace Orleans.Serialization.UnitTests;
 
@@ -34,51 +32,41 @@ public sealed class GeneratedSerializerBitwiseCompatibilityTests : IDisposable
     public void GeneratedClassSerializer_ExactType_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs(CreateBaselineClass()));
 
-#if !NETCOREAPP3_1
     [Fact]
     public Task GeneratedClassSerializer_ExactType_Formatted_MatchesSnapshot()
         => Verify(FormatSerializedPayload(SerializeAs(CreateBaselineClass())), extension: "txt").UseDirectory("snapshots");
-#endif
 
     [Fact]
     public void GeneratedRecordSerializer_UntypedRoot_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs<object>(CreateBaselinePerson()));
 
-#if !NETCOREAPP3_1
     [Fact]
     public Task GeneratedRecordSerializer_UntypedRoot_Formatted_MatchesSnapshot()
         => Verify(FormatSerializedPayload(SerializeAs<object>(CreateBaselinePerson())), extension: "txt").UseDirectory("snapshots");
-#endif
 
     [Fact]
     public void GeneratedAutoFieldIdSerializer_ExactType_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs(CreateBaselineAutoProperties()));
 
-#if !NETCOREAPP3_1
     [Fact]
     public Task GeneratedAutoFieldIdSerializer_ExactType_Formatted_MatchesSnapshot()
         => Verify(FormatSerializedPayload(SerializeAs(CreateBaselineAutoProperties())), extension: "txt").UseDirectory("snapshots");
-#endif
 
     [Fact]
     public void GeneratedPolymorphicSerializer_BaseType_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs<BaselineBase>(CreateBaselineDerived()));
 
-#if !NETCOREAPP3_1
     [Fact]
     public Task GeneratedPolymorphicSerializer_BaseType_Formatted_MatchesSnapshot()
         => Verify(FormatSerializedPayload(SerializeAs<BaselineBase>(CreateBaselineDerived())), extension: "txt").UseDirectory("snapshots");
-#endif
 
     [Fact]
     public void Person3_ExactType_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs(CreatePerson3()));
 
-#if !NETCOREAPP3_1
     [Fact]
     public Task Person3_ExactType_Formatted_MatchesSnapshot()
         => Verify(FormatSerializedPayload(SerializeAs(CreatePerson3())), extension: "txt").UseDirectory("snapshots");
-#endif
 
     [Fact]
     public void Person4_ExactType_MatchesBaseline()
@@ -88,11 +76,9 @@ public sealed class GeneratedSerializerBitwiseCompatibilityTests : IDisposable
     public void Person5_ExactType_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs(CreatePerson5()));
 
-#if !NETCOREAPP3_1
     [Fact]
     public Task Person5_ExactType_Formatted_MatchesSnapshot()
         => Verify(FormatSerializedPayload(SerializeAs(CreatePerson5())), extension: "txt").UseDirectory("snapshots");
-#endif
 
     [Fact]
     public void Person5_RecordAndClass_AreBitwiseEquivalent()
@@ -112,21 +98,17 @@ public sealed class GeneratedSerializerBitwiseCompatibilityTests : IDisposable
     public void Person2External_ExactType_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs(CreatePerson2External()));
 
-#if !NETCOREAPP3_1
     [Fact]
     public Task Person2External_ExactType_Formatted_MatchesSnapshot()
         => Verify(FormatSerializedPayload(SerializeAs(CreatePerson2External())), extension: "txt").UseDirectory("snapshots");
-#endif
 
     [Fact]
     public void GenericPersonExternalStruct_ExactType_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs(CreateGenericPersonExternalStruct()));
 
-#if !NETCOREAPP3_1
     [Fact]
     public Task GenericPersonExternalStruct_ExactType_Formatted_MatchesSnapshot()
         => Verify(FormatSerializedPayload(SerializeAs(CreateGenericPersonExternalStruct())), extension: "txt").UseDirectory("snapshots");
-#endif
 
     [Fact]
     public void ReadonlyGenericPersonExternalStruct_ExactType_MatchesBaseline()
@@ -137,11 +119,9 @@ public sealed class GeneratedSerializerBitwiseCompatibilityTests : IDisposable
     public void GenericPersonExternal_ExactType_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs(CreateGenericPersonExternal()));
 
-#if !NETCOREAPP3_1
     [Fact]
     public Task GenericPersonExternal_ExactType_Formatted_MatchesSnapshot()
         => Verify(FormatSerializedPayload(SerializeAs(CreateGenericPersonExternal())), extension: "txt").UseDirectory("snapshots");
-#endif
 #endif
 #endif
 
@@ -149,21 +129,17 @@ public sealed class GeneratedSerializerBitwiseCompatibilityTests : IDisposable
     public void GenericPocoString_Untyped_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs<object>(CreateGenericPocoString()));
 
-#if !NETCOREAPP3_1
     [Fact]
     public Task GenericPocoString_Untyped_Formatted_MatchesSnapshot()
         => Verify(FormatSerializedPayload(SerializeAs<object>(CreateGenericPocoString())), extension: "txt").UseDirectory("snapshots");
-#endif
 
     [Fact]
     public void NestedGenericPoco_Untyped_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs<object>(CreateNestedGenericPoco()));
 
-#if !NETCOREAPP3_1
     [Fact]
     public Task NestedGenericPoco_Untyped_Formatted_MatchesSnapshot()
         => Verify(FormatSerializedPayload(SerializeAs<object>(CreateNestedGenericPoco())), extension: "txt").UseDirectory("snapshots");
-#endif
 
     [Fact]
     public void OuterInnerGen_Untyped_MatchesBaseline()
@@ -181,11 +157,9 @@ public sealed class GeneratedSerializerBitwiseCompatibilityTests : IDisposable
     public void DerivedFromDictionary_ExactType_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs(CreateDerivedFromDictionary()));
 
-#if !NETCOREAPP3_1
     [Fact]
     public Task DerivedFromDictionary_ExactType_Formatted_MatchesSnapshot()
         => Verify(FormatSerializedPayload(SerializeAs(CreateDerivedFromDictionary())), extension: "txt").UseDirectory("snapshots");
-#endif
 
 #if NET6_0_OR_GREATER
     [Fact]
@@ -196,11 +170,9 @@ public sealed class GeneratedSerializerBitwiseCompatibilityTests : IDisposable
     public void SubClassWithRequiredMembersInBase_ExactType_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs(CreateSubClassWithRequiredMembersInBase()));
 
-#if !NETCOREAPP3_1
     [Fact]
     public Task ClassWithRequiredMembers_ExactType_Formatted_MatchesSnapshot()
         => Verify(FormatSerializedPayload(SerializeAs(CreateClassWithRequiredMembers())), extension: "txt").UseDirectory("snapshots");
-#endif
 #endif
 
     [Fact]
@@ -219,61 +191,49 @@ public sealed class GeneratedSerializerBitwiseCompatibilityTests : IDisposable
     public void DuplicateReferences_ExactType_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs<object[]>(CreateDuplicateReferences()));
 
-#if !NETCOREAPP3_1
     [Fact]
     public Task DuplicateReferences_ExactType_Formatted_MatchesSnapshot()
         => Verify(FormatSerializedPayload(SerializeAs<object[]>(CreateDuplicateReferences())), extension: "txt").UseDirectory("snapshots");
-#endif
 
     [Fact]
     public void DuplicateReferencesSuppressTracking_ExactType_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs<object[]>(CreateDuplicateSuppressTrackingReferences()));
 
-#if !NETCOREAPP3_1
     [Fact]
     public Task DuplicateReferencesSuppressTracking_ExactType_Formatted_MatchesSnapshot()
         => Verify(FormatSerializedPayload(SerializeAs<object[]>(CreateDuplicateSuppressTrackingReferences())), extension: "txt").UseDirectory("snapshots");
-#endif
 
     [Fact]
     public void ClassWithTypeFields_Untyped_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs<object>(CreateClassWithTypeFields()));
 
-#if !NETCOREAPP3_1
     [Fact]
     public Task ClassWithTypeFields_Untyped_Formatted_MatchesSnapshot()
         => Verify(FormatSerializedPayload(SerializeAs<object>(CreateClassWithTypeFields())), extension: "txt").UseDirectory("snapshots");
-#endif
 
     [Fact]
     public void WrapsMyForeignLibraryType_ExactType_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs(CreateWrapsMyForeignLibraryType()));
 
-#if !NETCOREAPP3_1
     [Fact]
     public Task WrapsMyForeignLibraryType_ExactType_Formatted_MatchesSnapshot()
         => Verify(FormatSerializedPayload(SerializeAs(CreateWrapsMyForeignLibraryType())), extension: "txt").UseDirectory("snapshots");
-#endif
 
     [Fact]
     public void MyFirstForeignLibraryType_ExactType_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs(CreateMyFirstForeignLibraryType()));
 
-#if !NETCOREAPP3_1
     [Fact]
     public Task MyFirstForeignLibraryType_ExactType_Formatted_MatchesSnapshot()
         => Verify(FormatSerializedPayload(SerializeAs(CreateMyFirstForeignLibraryType())), extension: "txt").UseDirectory("snapshots");
-#endif
 
     [Fact]
     public void MySecondForeignLibraryType_ExactType_MatchesBaseline()
         => AssertBitwiseCompatibility(SerializeAs(CreateMySecondForeignLibraryType()));
 
-#if !NETCOREAPP3_1
     [Fact]
     public Task MySecondForeignLibraryType_ExactType_Formatted_MatchesSnapshot()
         => Verify(FormatSerializedPayload(SerializeAs(CreateMySecondForeignLibraryType())), extension: "txt").UseDirectory("snapshots");
-#endif
 
     public void Dispose() => _serviceProvider.Dispose();
 

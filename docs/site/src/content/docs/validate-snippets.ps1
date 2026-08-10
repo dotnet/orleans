@@ -1,31 +1,32 @@
 <#
 .SYNOPSIS
-    Validates that all Orleans documentation snippet projects compile successfully.
+    Validates all Orleans documentation snippet projects.
 
 .DESCRIPTION
-    This script finds all .csproj files in the snippets directories under docs/orleans/
-    and runs 'dotnet build' on each project to verify they compile.
+    This script finds all .csproj files in the documentation snippets directories
+    and runs 'dotnet build' on ordinary projects or 'dotnet test' on projects which
+    declare IsTestProject=true.
     
     Use this script to validate snippet code after making changes to ensure all
-    documentation examples remain buildable.
+    documentation examples remain buildable and executable test examples pass.
 
 .PARAMETER Parallel
-    Run builds in parallel (default: false for clearer output)
+    Run validations in parallel (default: false for clearer output)
 
 .EXAMPLE
     .\validate-snippets.ps1
     
-    Builds all snippet projects sequentially and reports results.
+    Validates all snippet projects sequentially and reports results.
 
 .EXAMPLE
     .\validate-snippets.ps1 -Parallel
     
-    Builds all snippet projects in parallel for faster validation.
+    Validates all snippet projects in parallel for faster validation.
 
 .NOTES
     Exit codes:
-    0 - All projects built successfully
-    1 - One or more projects failed to build
+    0 - All projects validated successfully
+    1 - One or more projects failed validation
 #>
 
 param(
@@ -39,10 +40,17 @@ Write-Host "Orleans Documentation Snippet Validator" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Find all .csproj files in snippets directories
+# Find all .csproj files in snippets directories and identify executable test projects.
 $snippetProjects = Get-ChildItem -Path $scriptDir -Recurse -Filter "*.csproj" |
     Where-Object { $_.FullName -match "snippets" } |
-    Select-Object -ExpandProperty FullName
+    ForEach-Object {
+        [xml] $projectXml = Get-Content -Path $_.FullName -Raw
+        $isTestProject = $projectXml.Project.PropertyGroup.IsTestProject -contains "true"
+        [pscustomobject]@{
+            Path = $_.FullName
+            IsTestProject = $isTestProject
+        }
+    }
 
 if ($snippetProjects.Count -eq 0) {
     Write-Host "No snippet projects found!" -ForegroundColor Yellow
@@ -51,8 +59,9 @@ if ($snippetProjects.Count -eq 0) {
 
 Write-Host "Found $($snippetProjects.Count) snippet project(s) to validate:" -ForegroundColor Green
 $snippetProjects | ForEach-Object { 
-    $relativePath = $_.Replace($scriptDir, "").TrimStart("\", "/")
-    Write-Host "  - $relativePath" -ForegroundColor Gray
+    $relativePath = $_.Path.Replace($scriptDir, "").TrimStart("\", "/")
+    $action = if ($_.IsTestProject) { "test" } else { "build" }
+    Write-Host "  - $relativePath ($action)" -ForegroundColor Gray
 }
 Write-Host ""
 
@@ -60,21 +69,26 @@ $results = @()
 $failCount = 0
 $successCount = 0
 
-function Build-Project {
-    param([string]$ProjectPath)
+function Invoke-ProjectValidation {
+    param(
+        [string]$ProjectPath,
+        [bool]$IsTestProject
+    )
     
     $relativePath = $ProjectPath.Replace($scriptDir, "").TrimStart("\", "/")
-    $projectDir = Split-Path -Parent $ProjectPath
+    $command = if ($IsTestProject) { "test" } else { "build" }
+    $action = if ($IsTestProject) { "Testing" } else { "Building" }
     
-    Write-Host "Building: $relativePath" -ForegroundColor Yellow -NoNewline
+    Write-Host "${action}: $relativePath" -ForegroundColor Yellow -NoNewline
     
-    $output = & dotnet build $ProjectPath --nologo -v q 2>&1
+    $output = & dotnet $command $ProjectPath --nologo -v q 2>&1
     $exitCode = $LASTEXITCODE
     
     if ($exitCode -eq 0) {
         Write-Host " [OK]" -ForegroundColor Green
         return @{
             Project = $relativePath
+            Action = $command
             Success = $true
             Output = $output -join "`n"
         }
@@ -82,6 +96,7 @@ function Build-Project {
         Write-Host " [FAILED]" -ForegroundColor Red
         return @{
             Project = $relativePath
+            Action = $command
             Success = $false
             Output = $output -join "`n"
         }
@@ -89,24 +104,27 @@ function Build-Project {
 }
 
 if ($Parallel) {
-    Write-Host "Running builds in parallel..." -ForegroundColor Cyan
+    Write-Host "Running validations in parallel..." -ForegroundColor Cyan
     $results = $snippetProjects | ForEach-Object -Parallel {
-        $ProjectPath = $_
+        $ProjectPath = $_.Path
+        $IsTestProject = $_.IsTestProject
         $scriptDir = $using:scriptDir
         $relativePath = $ProjectPath.Replace($scriptDir, "").TrimStart("\", "/")
+        $command = if ($IsTestProject) { "test" } else { "build" }
         
-        $output = & dotnet build $ProjectPath --nologo -v q 2>&1
+        $output = & dotnet $command $ProjectPath --nologo -v q 2>&1
         $exitCode = $LASTEXITCODE
         
         @{
             Project = $relativePath
+            Action = $command
             Success = ($exitCode -eq 0)
             Output = $output -join "`n"
         }
     } -ThrottleLimit 4
 } else {
     foreach ($project in $snippetProjects) {
-        $result = Build-Project -ProjectPath $project
+        $result = Invoke-ProjectValidation -ProjectPath $project.Path -IsTestProject $project.IsTestProject
         $results += $result
     }
 }
@@ -123,14 +141,14 @@ Write-Host "Succeeded: $successCount" -ForegroundColor Green
 Write-Host "Failed:    $failCount" -ForegroundColor $(if ($failCount -gt 0) { "Red" } else { "Green" })
 Write-Host ""
 
-# Show details for failed builds
+# Show details for failed validations
 $failed = $results | Where-Object { -not $_.Success }
 if ($failed.Count -gt 0) {
     Write-Host "Failed Projects:" -ForegroundColor Red
     Write-Host "----------------" -ForegroundColor Red
     foreach ($f in $failed) {
         Write-Host ""
-        Write-Host "Project: $($f.Project)" -ForegroundColor Red
+        Write-Host "Project: $($f.Project) ($($f.Action))" -ForegroundColor Red
         Write-Host "Output:" -ForegroundColor Yellow
         Write-Host $f.Output
     }
@@ -138,5 +156,5 @@ if ($failed.Count -gt 0) {
     exit 1
 }
 
-Write-Host "All snippet projects built successfully!" -ForegroundColor Green
+Write-Host "All snippet projects validated successfully!" -ForegroundColor Green
 exit 0

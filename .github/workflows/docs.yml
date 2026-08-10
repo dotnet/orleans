@@ -44,6 +44,9 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Test API data generator
+        run: dotnet test docs/tools/PackageJsonGenerator.Tests/PackageJsonGenerator.Tests.csproj
+
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
@@ -79,7 +82,7 @@ jobs:
           path: docs/site/dist
 
   snippets:
-    name: Build documentation snippets
+    name: Validate documentation snippets
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -91,7 +94,7 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Build snippets
+      - name: Validate snippets
         shell: pwsh
         run: ./docs/site/src/content/docs/validate-snippets.ps1
 
