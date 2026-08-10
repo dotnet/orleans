@@ -919,6 +919,8 @@ namespace Orleans.Providers.Streams.Common
 
         public virtual Orleans.Streams.IBatchContainer? GetCurrent(out System.Exception? exception) { throw null; }
 
+        public Orleans.Streams.StreamSequenceToken? LastRefreshToken { get { throw null; } }
+
         public virtual bool MoveNext() { throw null; }
 
         public void RecordDeliveryFailure() { }
@@ -1681,6 +1683,7 @@ namespace Orleans.Streams
     public partial interface IQueueCacheCursor : System.IDisposable
     {
         IBatchContainer? GetCurrent(out System.Exception? exception);
+        StreamSequenceToken? LastRefreshToken { get; }
         bool MoveNext();
         void RecordDeliveryFailure();
         void Refresh(StreamSequenceToken token);

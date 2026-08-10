@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streaming.RabbitMQ.Adapters;
 using Orleans.Streaming.RabbitMQ.RabbitMQ;
@@ -18,7 +19,8 @@ public class RabbitMQSiloConfigurator : SiloPersistentStreamConfigurator
             services.AddSingleton(sp => new RabbitMQQueueProvider(sp.GetService<RabbitMQStreamSystemProvider>(),
                 providerName, sp.GetOptionsByName<RabbitMQClientOptions>(providerName)));
             services.AddSingleton(sp => new RabbitMQAdapterReceiverFactory(sp.GetService<ILoggerFactory>(),
-                    sp.GetService<Serializer>(), sp.GetOptionsByName<RabbitMQClientOptions>(providerName)))
+                    sp.GetService<Serializer>(), sp.GetOptionsByName<RabbitMQClientOptions>(providerName),
+                    sp.GetService<OrleansInstruments>()))
                 .AddSingleton(sp =>
                     new RabbitMQStreamSystemProvider(sp.GetOptionsByName<RabbitMQClientOptions>(providerName),
                         sp.GetService<ILogger<RabbitMQStreamSystemProvider>>()))
