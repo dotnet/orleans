@@ -173,28 +173,28 @@ internal static class TransactionRecoveryFailureObservation
 
     private static async Task WaitUntilAsync(Task first, long deadline)
     {
-        if (first.IsCompleted)
+        while (!first.IsCompleted)
         {
-            return;
-        }
+            var now = Stopwatch.GetTimestamp();
+            if (now >= deadline)
+            {
+                return;
+            }
 
-        var now = Stopwatch.GetTimestamp();
-        if (now < deadline)
-        {
             await Task.WhenAny(first, Task.Delay(Stopwatch.GetElapsedTime(now, deadline))).ConfigureAwait(false);
         }
     }
 
     private static async Task WaitUntilAsync(Task first, Task second, long deadline)
     {
-        if (first.IsCompleted || second.IsCompleted)
+        while (!first.IsCompleted && !second.IsCompleted)
         {
-            return;
-        }
+            var now = Stopwatch.GetTimestamp();
+            if (now >= deadline)
+            {
+                return;
+            }
 
-        var now = Stopwatch.GetTimestamp();
-        if (now < deadline)
-        {
             await Task.WhenAny(first, second, Task.Delay(Stopwatch.GetElapsedTime(now, deadline))).ConfigureAwait(false);
         }
     }

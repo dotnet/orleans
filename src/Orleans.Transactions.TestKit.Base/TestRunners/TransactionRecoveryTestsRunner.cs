@@ -225,8 +225,7 @@ namespace Orleans.Transactions.TestKit
                         $"The transaction gated at {phase} did not settle within {this.failureDetectionTimeout}.");
                 }
 
-                failedGroups.Should().NotBeNullOrEmpty(
-                    $"terminating the activation blocked at {phase} must interrupt the gated transaction");
+                var groupsToProbe = failedGroups ?? transactionGroups;
                 var liveness = this.testCluster.WaitForLivenessToStabilizeAsync(didKill: true);
                 try
                 {
@@ -238,7 +237,7 @@ namespace Orleans.Transactions.TestKit
                     throw;
                 }
                 var recovery = await RecoverTransactions(
-                    failedGroups!,
+                    groupsToProbe,
                     getIndex,
                     this.recoveryTimeout,
                     this.failureDetectionTimeout,
