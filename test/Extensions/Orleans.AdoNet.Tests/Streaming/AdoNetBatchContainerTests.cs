@@ -9,7 +9,7 @@ namespace Tester.AdoNet.Streaming;
 /// Tests for <see cref="AdoNetBatchContainer"/>.
 /// </summary>
 [Collection(TestEnvironmentFixture.DefaultCollection)]
-[TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestCategory("BVT"), TestCategory("AdoNet"), TestCategory("Streaming")]
 public class AdoNetBatchContainerTests(TestEnvironmentFixture fixture)
 {
     [Fact]

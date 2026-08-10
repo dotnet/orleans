@@ -12,6 +12,7 @@ namespace Tester.AdoNet.Streaming;
 /// <summary>
 /// Tests for SQL Server ADO.NET stream filtering functionality.
 /// </summary>
+[TestCategory("SqlServer"), TestCategory("BVT"), TestCategory("AdoNet"), TestCategory("Streaming")]
 public class SqlServerAdoNetStreamFilteringTests() : AdoNetStreamFilteringTests(new Fixture(AdoNetInvariants.InvariantNameSqlServer))
 {
 }
@@ -19,6 +20,7 @@ public class SqlServerAdoNetStreamFilteringTests() : AdoNetStreamFilteringTests(
 /// <summary>
 /// Tests for MySQL ADO.NET stream filtering functionality.
 /// </summary>
+[TestCategory("MySql"), TestCategory("BVT"), TestCategory("AdoNet"), TestCategory("Streaming")]
 public class MySqlAdoNetStreamFilteringTests : AdoNetStreamFilteringTests
 {
     public MySqlAdoNetStreamFilteringTests() : base(new Fixture(AdoNetInvariants.InvariantNameMySql))
@@ -30,6 +32,7 @@ public class MySqlAdoNetStreamFilteringTests : AdoNetStreamFilteringTests
 /// <summary>
 /// Tests for PostgreSQL ADO.NET stream filtering functionality.
 /// </summary>
+[TestCategory("PostgreSql"), TestCategory("BVT"), TestCategory("AdoNet"), TestCategory("Streaming")]
 public class PostgreSqlAdoNetStreamFilteringTests() : AdoNetStreamFilteringTests(new Fixture(AdoNetInvariants.InvariantNamePostgreSql))
 {
 }

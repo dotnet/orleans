@@ -10,7 +10,7 @@ namespace Tester.AdoNet.GrainDirectory;
 /// <summary>
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against Sql Server.
 /// </summary>
-[TestCategory("SqlServer")]
+[TestCategory("SqlServer"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
 public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueriesTests(AdoNetInvariants.InvariantNameSqlServer, 90)
 {
 }
@@ -18,7 +18,7 @@ public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueries
 /// <summary>
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against PostgreSQL.
 /// </summary>
-[TestCategory("PostgreSql")]
+[TestCategory("PostgreSql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
 public class PostgreSqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 {
     public PostgreSqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNamePostgreSql, 90)
@@ -30,7 +30,7 @@ public class PostgreSqlRelationalOrleansQueriesTests : RelationalOrleansQueriesT
 /// <summary>
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against MySQL.
 /// </summary>
-[TestCategory("MySql")]
+[TestCategory("MySql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
 public class MySqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 {
     public MySqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNameMySql, 90)

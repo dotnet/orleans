@@ -12,6 +12,7 @@ namespace Tester.AdoNet.Streaming;
 /// <summary>
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against Sql Server.
 /// </summary>
+[TestCategory("SqlServer"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
 public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueriesTests(AdoNetInvariants.InvariantNameSqlServer, 90)
 {
 }
@@ -19,6 +20,7 @@ public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueries
 /// <summary>
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against MySQL.
 /// </summary>
+[TestCategory("MySql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
 public class MySqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 {
     public MySqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNameMySql, 100)
@@ -30,6 +32,7 @@ public class MySqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 /// <summary>
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against PostgreSQL.
 /// </summary>
+[TestCategory("PostgreSql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
 public class PostgreSqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 {
     public PostgreSqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNamePostgreSql, 99)

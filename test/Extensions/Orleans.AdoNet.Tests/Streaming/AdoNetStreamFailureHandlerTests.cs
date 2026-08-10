@@ -14,6 +14,7 @@ namespace Tester.AdoNet.Streaming;
 /// <summary>
 /// Tests for <see cref="AdoNetStreamFailureHandler"/> against SQL Server.
 /// </summary>
+[TestCategory("SqlServer"), TestCategory("BVT"), TestCategory("AdoNet"), TestCategory("Streaming")]
 public class SqlServerAdoNetStreamFailureHandlerTests() : AdoNetStreamFailureHandlerTests(AdoNetInvariants.InvariantNameSqlServer)
 {
 }
@@ -21,6 +22,7 @@ public class SqlServerAdoNetStreamFailureHandlerTests() : AdoNetStreamFailureHan
 /// <summary>
 /// Tests for <see cref="AdoNetStreamFailureHandler"/> against MySQL.
 /// </summary>
+[TestCategory("MySql"), TestCategory("BVT"), TestCategory("AdoNet"), TestCategory("Streaming")]
 public class MySqlAdoNetStreamFailureHandlerTests : AdoNetStreamFailureHandlerTests
 {
     public MySqlAdoNetStreamFailureHandlerTests() : base(AdoNetInvariants.InvariantNameMySql)
@@ -32,6 +34,7 @@ public class MySqlAdoNetStreamFailureHandlerTests : AdoNetStreamFailureHandlerTe
 /// <summary>
 /// Tests for <see cref="AdoNetStreamFailureHandler"/> against PostgreSQL.
 /// </summary>
+[TestCategory("PostgreSql"), TestCategory("BVT"), TestCategory("AdoNet"), TestCategory("Streaming")]
 public class PostgreSqlAdoNetStreamFailureHandlerTests() : AdoNetStreamFailureHandlerTests(AdoNetInvariants.InvariantNamePostgreSql)
 {
 }
