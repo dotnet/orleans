@@ -76,6 +76,18 @@ namespace UnitTests.ActivationsLifeCycleTests
             await Initialize(collectionAgeLimit, DEFAULT_COLLECTION_QUANTUM);
         }
 
+        private static async Task CancelWorkerAsync(CancellationTokenSource cancellation, Task worker)
+        {
+            cancellation.Cancel();
+            try
+            {
+                await worker;
+            }
+            catch (OperationCanceledException exception) when (exception.CancellationToken == cancellation.Token)
+            {
+            }
+        }
+
         public async Task DisposeAsync()
         {
             if (testCluster is null) return;
@@ -175,44 +187,49 @@ namespace UnitTests.ActivationsLifeCycleTests
                 tasks0.Add(g.Nop());
             }
             await Task.WhenAll(tasks0);
-            bool[] quit = new bool[]{ false };
-            async Task busyWorker()
+            using var workerCancellation = new CancellationTokenSource();
+            async Task busyWorker(CancellationToken cancellationToken)
             {
                 logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivations: busyWorker started");
-                while (!quit[0])
+                while (true)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     List<Task> tasks1 = new List<Task>(busyGrains.Count);
                     foreach (var g in busyGrains)
                         tasks1.Add(g.Nop());
                     await Task.WhenAll(tasks1);
                 }
             }
-            Task.Run(busyWorker).Ignore();
-
-            logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivations: activating {Count} idle grains.", idleGrainCount);
-            tasks0.Clear();
-            for (var i = 0; i < idleGrainCount; ++i)
+            var workerTask = Task.Run(() => busyWorker(workerCancellation.Token));
+            try
             {
-                IIdleActivationGcTestGrain1 g = this.testCluster.GrainFactory!.GetGrain<IIdleActivationGcTestGrain1>(Guid.NewGuid());
-                tasks0.Add(g.Nop());
+                logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivations: activating {Count} idle grains.", idleGrainCount);
+                tasks0.Clear();
+                for (var i = 0; i < idleGrainCount; ++i)
+                {
+                    IIdleActivationGcTestGrain1 g = this.testCluster.GrainFactory!.GetGrain<IIdleActivationGcTestGrain1>(Guid.NewGuid());
+                    tasks0.Add(g.Nop());
+                }
+                await Task.WhenAll(tasks0);
+
+                int activationsCreated = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, idleGrainTypeName) + await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, busyGrainTypeName);
+                Assert.Equal(idleGrainCount + busyGrainCount, activationsCreated);
+
+                logger.LogInformation(
+                    "ActivationCollectorShouldNotCollectBusyActivations: grains activated; waiting for idle activation count to converge to zero (activation GC idle timeout is {DefaultIdleTime} sec).",
+                    DEFAULT_IDLE_TIMEOUT.TotalSeconds);
+                await WaitForActivationCountToConverge(idleGrainTypeName, expectedCount: 0);
+
+                // we should have only collected grains from the idle category (IdleActivationGcTestGrain1).
+                int idleActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, idleGrainTypeName);
+                int busyActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, busyGrainTypeName);
+                Assert.Equal(0, idleActivationsNotCollected);
+                Assert.Equal(busyGrainCount, busyActivationsNotCollected);
             }
-            await Task.WhenAll(tasks0);
-
-            int activationsCreated = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, idleGrainTypeName) + await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, busyGrainTypeName);
-            Assert.Equal(idleGrainCount + busyGrainCount, activationsCreated);
-
-            logger.LogInformation(
-                "ActivationCollectorShouldNotCollectBusyActivations: grains activated; waiting for idle activation count to converge to zero (activation GC idle timeout is {DefaultIdleTime} sec).",
-                DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-            await WaitForActivationCountToConverge(idleGrainTypeName, expectedCount: 0);
-
-            // we should have only collected grains from the idle category (IdleActivationGcTestGrain1).
-            int idleActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, idleGrainTypeName);
-            int busyActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, busyGrainTypeName);
-            Assert.Equal(0, idleActivationsNotCollected);
-            Assert.Equal(busyGrainCount, busyActivationsNotCollected);
-
-            quit[0] = true;
+            finally
+            {
+                await CancelWorkerAsync(workerCancellation, workerTask);
+            }
         }          
         
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
@@ -236,56 +253,60 @@ namespace UnitTests.ActivationsLifeCycleTests
                 tasks0.Add(g.Nop());
             }
             await Task.WhenAll(tasks0);
-            bool[] quit = new bool[]{ false };
-            async Task busyWorker()
+            using var workerCancellation = new CancellationTokenSource();
+            async Task busyWorker(CancellationToken cancellationToken)
             {
                 logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: busyWorker started");
-                while (!quit[0])
+                while (true)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     List<Task> tasks1 = new List<Task>(busyGrains.Count);
                     foreach (var g in busyGrains)
                         tasks1.Add(g.Nop());
                     await Task.WhenAll(tasks1);
                 }
             }
-            Task.Run(busyWorker).Ignore();
-
-            logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: activating {Count} idle grains.", idleGrainCount);
-            tasks0.Clear();
-            for (var i = 0; i < idleGrainCount; ++i)
+            var workerTask = Task.Run(() => busyWorker(workerCancellation.Token));
+            try
             {
-                IIdleActivationGcTestGrain1 g = this.testCluster.GrainFactory!.GetGrain<IIdleActivationGcTestGrain1>(Guid.NewGuid());
-                tasks0.Add(g.Nop());
+                logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: activating {Count} idle grains.", idleGrainCount);
+                tasks0.Clear();
+                for (var i = 0; i < idleGrainCount; ++i)
+                {
+                    IIdleActivationGcTestGrain1 g = this.testCluster.GrainFactory!.GetGrain<IIdleActivationGcTestGrain1>(Guid.NewGuid());
+                    tasks0.Add(g.Nop());
+                }
+                await Task.WhenAll(tasks0);
+
+                int activationsCreated = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, idleGrainTypeName) + await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, busyGrainTypeName);
+                Assert.Equal(idleGrainCount + busyGrainCount, activationsCreated);
+
+                logger.LogInformation(
+                    "ManualCollectionShouldNotCollectBusyActivations: grains activated; waiting {TotalSeconds} sec (activation GC idle timeout is {DefaultIdleTime} sec).",
+                    shortIdleTimeout.TotalSeconds,
+                    DEFAULT_IDLE_TIMEOUT.TotalSeconds);
+                await Task.Delay(shortIdleTimeout);
+
+                TimeSpan everything = TimeSpan.FromMinutes(10);
+                logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: triggering manual collection (timespan is {TotalSeconds} sec).",  everything.TotalSeconds);
+                IManagementGrain mgmtGrain = this.testCluster.GrainFactory!.GetGrain<IManagementGrain>(0);
+                await mgmtGrain.ForceActivationCollection(everything);
+
+                logger.LogInformation(
+                    "ManualCollectionShouldNotCollectBusyActivations: waiting for idle activation count to converge to zero (activation GC idle timeout is {DefaultIdleTime} sec).",
+                    DEFAULT_IDLE_TIMEOUT.TotalSeconds);
+                await WaitForActivationCountToConverge(idleGrainTypeName, expectedCount: 0);
+
+                // we should have only collected grains from the idle category (IdleActivationGcTestGrain).
+                int idleActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, idleGrainTypeName);
+                int busyActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, busyGrainTypeName);
+                Assert.Equal(0, idleActivationsNotCollected);
+                Assert.Equal(busyGrainCount, busyActivationsNotCollected);
             }
-            await Task.WhenAll(tasks0);
-
-            int activationsCreated = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, idleGrainTypeName) + await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, busyGrainTypeName);
-            Assert.Equal(idleGrainCount + busyGrainCount, activationsCreated);
-
-            logger.LogInformation(
-                "ManualCollectionShouldNotCollectBusyActivations: grains activated; waiting {TotalSeconds} sec (activation GC idle timeout is {DefaultIdleTime} sec).",
-                shortIdleTimeout.TotalSeconds,
-                DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-            await Task.Delay(shortIdleTimeout);
-
-            TimeSpan everything = TimeSpan.FromMinutes(10);
-            logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: triggering manual collection (timespan is {TotalSeconds} sec).",  everything.TotalSeconds);
-            IManagementGrain mgmtGrain = this.testCluster.GrainFactory!.GetGrain<IManagementGrain>(0);
-            await mgmtGrain.ForceActivationCollection(everything);
-
-
-            logger.LogInformation(
-                "ManualCollectionShouldNotCollectBusyActivations: waiting for idle activation count to converge to zero (activation GC idle timeout is {DefaultIdleTime} sec).",
-                DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-            await WaitForActivationCountToConverge(idleGrainTypeName, expectedCount: 0);
-
-            // we should have only collected grains from the idle category (IdleActivationGcTestGrain).
-            int idleActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, idleGrainTypeName);
-            int busyActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, busyGrainTypeName);
-            Assert.Equal(0, idleActivationsNotCollected);
-            Assert.Equal(busyGrainCount, busyActivationsNotCollected);
-
-            quit[0] = true;
+            finally
+            {
+                await CancelWorkerAsync(workerCancellation, workerTask);
+            }
         }    
         
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
@@ -341,44 +362,49 @@ namespace UnitTests.ActivationsLifeCycleTests
                 tasks0.Add(g.Nop());
             }
             await Task.WhenAll(tasks0);
-            bool[] quit = new bool[]{ false };
-            async Task busyWorker()
+            using var workerCancellation = new CancellationTokenSource();
+            async Task busyWorker(CancellationToken cancellationToken)
             {
                 logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration: busyWorker started");
-                while (!quit[0])
+                while (true)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     List<Task> tasks1 = new List<Task>(busyGrains.Count);
                     foreach (var g in busyGrains)
                         tasks1.Add(g.Nop());
                     await Task.WhenAll(tasks1);
                 }
             }
-            Task.Run(busyWorker).Ignore();
-
-            logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration: activating {Count} idle grains.", idleGrainCount);
-            tasks0.Clear();
-            for (var i = 0; i < idleGrainCount; ++i)
+            var workerTask = Task.Run(() => busyWorker(workerCancellation.Token));
+            try
             {
-                IIdleActivationGcTestGrain2 g = this.testCluster.GrainFactory!.GetGrain<IIdleActivationGcTestGrain2>(Guid.NewGuid());
-                tasks0.Add(g.Nop());
+                logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration: activating {Count} idle grains.", idleGrainCount);
+                tasks0.Clear();
+                for (var i = 0; i < idleGrainCount; ++i)
+                {
+                    IIdleActivationGcTestGrain2 g = this.testCluster.GrainFactory!.GetGrain<IIdleActivationGcTestGrain2>(Guid.NewGuid());
+                    tasks0.Add(g.Nop());
+                }
+                await Task.WhenAll(tasks0);
+
+                int activationsCreated = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, idleGrainTypeName) + await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, busyGrainTypeName);
+                Assert.Equal(idleGrainCount + busyGrainCount, activationsCreated);
+
+                logger.LogInformation(
+                    "IdleActivationCollectorShouldNotCollectBusyActivations: grains activated; waiting for idle activation count to converge to zero (activation GC idle timeout is {DefaultIdleTime} sec).",
+                    DEFAULT_IDLE_TIMEOUT.TotalSeconds);
+                await WaitForActivationCountToConverge(idleGrainTypeName, expectedCount: 0);
+
+                // we should have only collected grains from the idle category (IdleActivationGcTestGrain2).
+                int idleActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, idleGrainTypeName);
+                int busyActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, busyGrainTypeName);
+                Assert.Equal(0, idleActivationsNotCollected);
+                Assert.Equal(busyGrainCount, busyActivationsNotCollected);
             }
-            await Task.WhenAll(tasks0);
-
-            int activationsCreated = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, idleGrainTypeName) + await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, busyGrainTypeName);
-            Assert.Equal(idleGrainCount + busyGrainCount, activationsCreated);
-
-            logger.LogInformation(
-                "IdleActivationCollectorShouldNotCollectBusyActivations: grains activated; waiting for idle activation count to converge to zero (activation GC idle timeout is {DefaultIdleTime} sec).",
-                DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-            await WaitForActivationCountToConverge(idleGrainTypeName, expectedCount: 0);
-
-            // we should have only collected grains from the idle category (IdleActivationGcTestGrain2).
-            int idleActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, idleGrainTypeName);
-            int busyActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, busyGrainTypeName);
-            Assert.Equal(0, idleActivationsNotCollected);
-            Assert.Equal(busyGrainCount, busyActivationsNotCollected);
-
-            quit[0] = true;
+            finally
+            {
+                await CancelWorkerAsync(workerCancellation, workerTask);
+            }
         } 
   
         [Fact(Skip = "Flaky test. Needs to be investigated."), TestCategory("ActivationCollector"), TestCategory("Functional")]

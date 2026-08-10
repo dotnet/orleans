@@ -454,21 +454,21 @@ namespace UnitTests.SchedulerTests
             Task join = null!;
             Task wrapper = new Task(() =>
             {
-                task1 = Task.Run(() =>
+                task1 = Task.Run(async () =>
                 {
                     this.output.WriteLine("Task-1 Started");
                     Assert.NotEqual(scheduler, TaskScheduler.Current);
-                    Task.Delay(1);
+                    await Task.Delay(1);
                     Assert.NotEqual(scheduler, TaskScheduler.Current);
                     pause1.WaitOne();
                     this.output.WriteLine("Task-1 Done");
                     return 1;
                 });
-                task2 = Task.Run(() =>
+                task2 = Task.Run(async () =>
                 {
                     this.output.WriteLine("Task-2 Started");
                     Assert.NotEqual(scheduler, TaskScheduler.Current);
-                    Task.Delay(1);
+                    await Task.Delay(1);
                     Assert.NotEqual(scheduler, TaskScheduler.Current);
                     pause2.WaitOne();
                     this.output.WriteLine("Task-2 Done");
