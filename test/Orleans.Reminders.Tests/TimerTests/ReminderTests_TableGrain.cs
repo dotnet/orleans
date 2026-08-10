@@ -129,6 +129,20 @@ namespace UnitTests.TimerTests
         }
 
         [Fact]
+        public async Task Rem_Grain_ConcurrentCounterWaitersUseSingleClockDriver()
+        {
+            using var cts = new CancellationTokenSource(TestConstants.InitTimeout);
+            var grains = Enumerable.Range(0, 16)
+                .Select(_ => this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid()))
+                .ToArray();
+
+            await Task.WhenAll(grains.Select(grain => grain.StartReminder(DR)));
+            await AdvanceRemindersByTicksAsync(1, cts.Token, GetReminderIdentities(grains, DR));
+            await AssertReminderCountersAsync(grains, (DR, 1));
+            await StopRemindersAsync(grains, DR, cts.Token);
+        }
+
+        [Fact]
         public async Task Rem_Grain_CanRestartBeforeRemovedReminderIsPurged()
         {
             using var cts = new CancellationTokenSource(TestConstants.InitTimeout);
