@@ -682,3 +682,13 @@ internal sealed class SnapshotCollectionConsumer :
 
     public void ApplyRemove(SnapshotReferenceRecord item) => throw new NotSupportedException();
 }
+
+[GenerateSerializer]
+internal sealed class SnapshotReferenceRecord
+{
+    [Id(0)]
+    public required byte[] Payload { get; init; }
+
+    [Id(1)]
+    public required byte[] Alias { get; init; }
+}
