@@ -8,7 +8,6 @@
       samples, then restores Orleans packages from that local feed.
     -->
     <RestoreAdditionalProjectSources Condition="'$(OrleansSamplePackageSource)' != ''">$(OrleansSamplePackageSource);$(RestoreAdditionalProjectSources)</RestoreAdditionalProjectSources>
-    <RestorePackagesPath Condition="'$(OrleansSamplePackagesPath)' != ''">$(OrleansSamplePackagesPath)</RestorePackagesPath>
     <IsPackable>false</IsPackable>
     <LangVersion Condition="'$(MSBuildProjectExtension)' == '.vbproj'">latest</LangVersion>
   </PropertyGroup>

@@ -16,7 +16,7 @@ These rules apply recursively to everything under `samples/`. The repository-lev
 
 - Every sample project targets `net10.0` and is non-packable.
 - Reference Orleans as `Microsoft.Orleans.*` NuGet packages, never with project references into `src/`. Each sample folder is a self-contained unit that a user can copy out of the repository and build unchanged, so a project must not reference anything outside its own sample folder.
-- An in-tree `Samples.slnx` restore first packs `src/Orleans.slnx` with a unique prerelease version. `samples/Directory.Solution.targets` then passes that version and local package source to every sample project, so the samples validate the packages produced by the current sources rather than bypassing the package boundary with project references.
+- `Build-Samples.ps1` first packs `src/Orleans.slnx` with a unique prerelease version, then passes that version and local package source to `Samples.slnx`, so the samples validate the packages produced by the current sources rather than bypassing the package boundary with project references.
 - Give each sample its own `Directory.Packages.props` declaring a `PackageVersion` for every package it uses, including the Orleans ones. The file at `samples/Directory.Packages.props` deliberately declares no versions, because NuGet only reads the nearest one; a sample missing its own file fails at restore. When several gallery entries share code, such as `Streaming/Common`, the shared parent folder is the copy-out unit and owns the file.
 - `PackageReference` elements must not carry `Version` or `VersionOverride`. Keep a package pinned to the same version across all samples, keep Aspire hosting and component versions aligned, and pin vulnerable transitive dependencies explicitly since `CentralPackageTransitivePinningEnabled` is on.
 - Follow the repository `.editorconfig`. Samples are teaching material, so favor clear, idiomatic code and comments that explain the Orleans concept being shown.
@@ -30,7 +30,7 @@ These rules apply recursively to everything under `samples/`. The repository-lev
 
 ## Validation
 
-- Run `pwsh ./samples/Validate-Samples.ps1` for any change under `samples/`. It checks the gallery manifest, README freshness, solution membership, package version declarations, sample self-containment, and builds the full solution.
+- Run `pwsh ./samples/Validate-Samples.ps1` for any change under `samples/`. It checks the gallery manifest, README freshness, solution membership, package version declarations, sample self-containment, and invokes `Build-Samples.ps1` to build all samples against locally packed Orleans packages.
 - Verify a new or changed sample still builds standalone: copy its folder outside the repository and run `dotnet build`. A sample using an Orleans package which has not been published yet is exempt until that package ships; the in-tree solution still builds it from the local package source.
 - Building a sample must not require cloud credentials. Only running a sample may.
 - Check `git diff --check` before committing.

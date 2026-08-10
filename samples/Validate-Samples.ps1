@@ -165,7 +165,7 @@ foreach ($projectPath in $projectFiles) {
 Write-Host "Validated $($entries.Count) gallery entries and $($projectFiles.Count) projects."
 
 if (-not $NoBuild) {
-    & dotnet build $solutionPath --configuration Release --no-incremental
+    & (Join-Path $samplesRoot 'Build-Samples.ps1') -Configuration Release -NoIncremental
     if ($LASTEXITCODE -ne 0) {
         throw "Sample build failed with exit code $LASTEXITCODE."
     }
