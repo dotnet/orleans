@@ -4,6 +4,11 @@ interface Orleans.Providers.IMemoryStreamQueueGrain [Version(0)]
 
 class Orleans.Providers.MemoryStreamQueueGrain
 
+# Orleans.Streams.ConfiguredStreamCheckpointGrain
+class [GrainType("stream.checkpoint.configured")] Orleans.Streams.ConfiguredStreamCheckpointGrain
+
+interface Orleans.Streams.IConfiguredStreamCheckpointerGrain [Version(0)]
+
 interface Orleans.Streams.IPersistentStreamPullingAgent [Version(0)]
   Initialize() -> Task
   Shutdown() -> Task
@@ -27,6 +32,10 @@ interface Orleans.Streams.IPubSubRendezvousGrain [Version(0)]
   UnregisterProducer(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId) -> Task
   Validate() -> Task
 
+interface Orleans.Streams.IStreamCheckpointerGrain [Version(0)]
+  Load(System.Threading.CancellationToken) -> ValueTask<string>
+  Update(string, string, System.Threading.CancellationToken) -> ValueTask<string>
+
 interface Orleans.Streams.IStreamConsumerExtension [Version(0)]
   CompleteStream(Orleans.Runtime.GuidId) -> Task
   DeliverBatch(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, Orleans.Streams.IBatchContainer, Orleans.Streams.StreamHandshakeToken?) -> Task<Orleans.Streams.StreamHandshakeToken?>
@@ -45,3 +54,6 @@ class Orleans.Streams.PersistentStreamPullingManager
 
 # Orleans.Streams.PubSubRendezvousGrain
 class [GrainType("pubsubrendezvous")] Orleans.Streams.PubSubRendezvousGrain
+
+# Orleans.Streams.StreamCheckpointGrain
+class [GrainType("stream.checkpoint")] Orleans.Streams.StreamCheckpointGrain
