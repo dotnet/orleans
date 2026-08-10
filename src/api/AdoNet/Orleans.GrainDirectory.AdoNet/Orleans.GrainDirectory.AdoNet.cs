@@ -21,8 +21,10 @@ namespace Orleans.GrainDirectory.AdoNet
     public partial class AdoNetGrainDirectoryOptions
     {
         [Redact]
-        [System.ComponentModel.DataAnnotations.Required]
-        public string ConnectionString { get { throw null; } set { } }
+        public string? ConnectionString { get { throw null; } set { } }
+
+        [Redact]
+        public System.Data.Common.DbDataSource? DataSource { get { throw null; } set { } }
 
         [System.ComponentModel.DataAnnotations.Required]
         public string Invariant { get { throw null; } set { } }

@@ -35,7 +35,8 @@ namespace Orleans.Runtime.MembershipService
             //and assumes the database with appropriate definitions exists already.
             orleansQueries = await RelationalOrleansQueries.CreateInstance(
                 clusteringTableOptions.Invariant,
-                clusteringTableOptions.ConnectionString);
+                clusteringTableOptions.ConnectionString,
+                clusteringTableOptions.DataSource);
 
             // even if I am not the one who created the table,
             // try to insert an initial table version if it is not already there,

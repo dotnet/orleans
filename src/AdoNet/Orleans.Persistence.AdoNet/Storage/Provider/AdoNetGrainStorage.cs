@@ -333,7 +333,7 @@ namespace Orleans.Storage
         /// <summary> Initialization function for this storage provider. </summary>
         private async Task Init(CancellationToken cancellationToken)
         {
-            Storage = RelationalStorage.CreateInstance(options.Invariant, options.ConnectionString);
+            Storage = RelationalStorage.CreateInstance(options.Invariant, options.ConnectionString, options.DataSource);
             var queries = await Storage.ReadAsync(DefaultInitializationQuery, command => { }, (selector, resultSetCount, token) =>
             {
                 return Task.FromResult(Tuple.Create(selector.GetValue<string>("QueryKey"), selector.GetValue<string>("QueryText")));

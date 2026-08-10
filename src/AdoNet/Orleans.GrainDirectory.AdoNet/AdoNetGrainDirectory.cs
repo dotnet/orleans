@@ -152,7 +152,7 @@ internal sealed partial class AdoNetGrainDirectory(string name, AdoNetGrainDirec
 
                 // slow path - the member variable will only be set if the call succeeds
                 return _queries = await RelationalOrleansQueries
-                    .CreateInstance(options.Invariant, options.ConnectionString)
+                    .CreateInstance(options.Invariant, options.ConnectionString, options.DataSource)
                     .WaitAsync(lifetime.ApplicationStopping);
             }
             finally

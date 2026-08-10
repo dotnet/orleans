@@ -1,3 +1,5 @@
+using System.Data.Common;
+
 namespace Orleans.Configuration
 {
     /// <summary>
@@ -9,7 +11,16 @@ namespace Orleans.Configuration
         /// Connection string for AdoNet Storage
         /// </summary>
         [Redact]
-        public string ConnectionString { get; set; } = null!;
+        public string? ConnectionString { get; set; }
+
+        /// <summary>
+        /// Gets or sets the data source used to open database connections.
+        /// </summary>
+        /// <remarks>
+        /// The data source is owned by the caller and is not disposed by Orleans.
+        /// </remarks>
+        [Redact]
+        public DbDataSource? DataSource { get; set; }
 
         /// <summary>
         /// The invariant name of the connector for membership's database.

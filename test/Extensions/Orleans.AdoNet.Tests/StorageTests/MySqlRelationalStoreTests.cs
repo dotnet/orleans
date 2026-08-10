@@ -1,7 +1,9 @@
 using System.Runtime.ExceptionServices;
+using MySql.Data.MySqlClient;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
+using UnitTests.StorageTests.Relational;
 using Xunit;
 
 namespace UnitTests.StorageTests.AdoNet
@@ -62,6 +64,22 @@ namespace UnitTests.StorageTests.AdoNet
         public async Task CancellationToken_MySql_Test()
         {
             await CancellationTokenTest(_storage, CancellationTestTimeoutLimit);
+        }
+
+        [SkippableFact, TestCategory("Functional")]
+        public async Task DataSource_MySql_Test()
+        {
+            using var dataSource = new ProviderDbDataSource(
+                _storage.CurrentConnectionString,
+                () => new MySqlConnection(_storage.CurrentConnectionString));
+            var storage = RelationalStorage.CreateInstance(AdoNetInvariantName, dataSource);
+
+            var values = await storage.ReadAsync(
+                "SELECT 47;",
+                parameterProvider: null,
+                (record, _, _) => Task.FromResult(record.GetInt32(0)));
+
+            Assert.Equal([47], values);
         }
     }
 }

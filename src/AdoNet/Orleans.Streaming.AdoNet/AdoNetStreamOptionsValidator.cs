@@ -15,9 +15,9 @@ public class AdoNetStreamOptionsValidator(AdoNetStreamOptions options, string na
             throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.Invariant)} is required.");
         }
 
-        if (IsNullOrWhiteSpace(options.ConnectionString))
+        if (IsNullOrWhiteSpace(options.ConnectionString) == (options.DataSource is null))
         {
-            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.ConnectionString)} is required.");
+            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': configure exactly one of {nameof(options.ConnectionString)} or {nameof(options.DataSource)}.");
         }
 
         if (options.MaxAttempts < 0)

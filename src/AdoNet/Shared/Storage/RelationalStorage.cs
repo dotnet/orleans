@@ -35,6 +35,11 @@ namespace Orleans.Tests.SqlUtils
         private readonly string _connectionString;
 
         /// <summary>
+        /// The optional data source used to open connections.
+        /// </summary>
+        private readonly DbDataSource? _dataSource;
+
+        /// <summary>
         /// The invariant name of the connector for this database.
         /// </summary>
         private readonly string _invariantName;
@@ -99,6 +104,39 @@ namespace Orleans.Tests.SqlUtils
             }
 
             return new RelationalStorage(invariantName, connectionString);
+        }
+
+        /// <summary>
+        /// Creates an instance of a database of type <see cref="IRelationalStorage"/>.
+        /// </summary>
+        /// <param name="invariantName">The invariant name of the connector for this database.</param>
+        /// <param name="dataSource">The data source used to open database connections.</param>
+        /// <returns>A relational storage instance.</returns>
+        public static IRelationalStorage CreateInstance(string invariantName, DbDataSource dataSource)
+        {
+            if (string.IsNullOrWhiteSpace(invariantName))
+            {
+                throw new ArgumentException("The name of invariant must contain characters", nameof(invariantName));
+            }
+
+            ArgumentNullException.ThrowIfNull(dataSource);
+            DbConnectionFactory.ValidateDataSource(invariantName, dataSource);
+            return new RelationalStorage(invariantName, dataSource);
+        }
+
+        /// <summary>
+        /// Creates an instance using exactly one configured connection source.
+        /// </summary>
+        public static IRelationalStorage CreateInstance(string invariantName, string? connectionString, DbDataSource? dataSource)
+        {
+            if (string.IsNullOrWhiteSpace(connectionString) == (dataSource is null))
+            {
+                throw new ArgumentException($"Configure exactly one of {nameof(connectionString)} or {nameof(dataSource)}.");
+            }
+
+            return dataSource is null
+                ? CreateInstance(invariantName, connectionString!)
+                : CreateInstance(invariantName, dataSource);
         }
 
 
@@ -214,6 +252,16 @@ namespace Orleans.Tests.SqlUtils
             this._databaseCommandInterceptor = DbConstantsStore.GetDatabaseCommandInterceptor(InvariantName);
         }
 
+        private RelationalStorage(string invariantName, DbDataSource dataSource)
+        {
+            _connectionString = dataSource.ConnectionString;
+            _dataSource = dataSource;
+            _invariantName = invariantName;
+            _supportsCommandCancellation = DbConstantsStore.SupportsCommandCancellation(InvariantName);
+            _isSynchronousAdoNetImplementation = DbConstantsStore.IsSynchronousAdoNetImplementation(InvariantName);
+            _databaseCommandInterceptor = DbConstantsStore.GetDatabaseCommandInterceptor(InvariantName);
+        }
+
         private static async Task<Tuple<IEnumerable<TResult>, int>> SelectAsync<TResult>(DbDataReader reader, Func<IDataReader, int, CancellationToken, Task<TResult>> selector, CancellationToken cancellationToken)
         {
             var results = new List<TResult>();
@@ -263,9 +311,8 @@ namespace Orleans.Tests.SqlUtils
             CommandBehavior commandBehavior,
             CancellationToken cancellationToken)
         {
-            using (var connection = DbConnectionFactory.CreateConnection(_invariantName, _connectionString))
+            using (var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false))
             {
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
                 using (var command = connection.CreateCommand())
                 {
                     parameterProvider?.Invoke(command);
@@ -285,6 +332,26 @@ namespace Orleans.Tests.SqlUtils
 
                     return await ret.ConfigureAwait(continueOnCapturedContext: false);
                 }
+            }
+        }
+
+        private async ValueTask<DbConnection> OpenConnectionAsync(CancellationToken cancellationToken)
+        {
+            if (_dataSource is not null)
+            {
+                return await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+            }
+
+            var connection = DbConnectionFactory.CreateConnection(_invariantName, _connectionString);
+            try
+            {
+                await connection.OpenAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+                return connection;
+            }
+            catch
+            {
+                connection.Dispose();
+                throw;
             }
         }
 

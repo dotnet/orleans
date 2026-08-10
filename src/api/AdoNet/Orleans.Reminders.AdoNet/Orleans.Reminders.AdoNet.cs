@@ -11,7 +11,10 @@ namespace Orleans.Configuration
     public partial class AdoNetReminderTableOptions
     {
         [Redact]
-        public string ConnectionString { get { throw null; } set { } }
+        public string? ConnectionString { get { throw null; } set { } }
+
+        [Redact]
+        public System.Data.Common.DbDataSource? DataSource { get { throw null; } set { } }
 
         public string Invariant { get { throw null; } set { } }
     }

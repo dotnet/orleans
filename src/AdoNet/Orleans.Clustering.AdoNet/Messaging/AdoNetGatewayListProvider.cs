@@ -45,7 +45,7 @@ namespace Orleans.Runtime.Membership
         public async Task InitializeGatewayListProvider()
         {
             LogTraceInitializeGatewayListProvider();
-            _orleansQueries = await RelationalOrleansQueries.CreateInstance(_options.Invariant, _options.ConnectionString);
+            _orleansQueries = await RelationalOrleansQueries.CreateInstance(_options.Invariant, _options.ConnectionString, _options.DataSource);
         }
 
         public async Task<IList<Uri>> GetGateways()

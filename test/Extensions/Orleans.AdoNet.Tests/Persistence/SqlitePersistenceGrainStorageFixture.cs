@@ -88,5 +88,34 @@ namespace Tester.AdoNet.Persistence
 
             return await File.ReadAllTextAsync(scriptPath).ConfigureAwait(false);
         }
+
+        public async Task<AdoNetGrainStorage> CreateGrainStorageAsync(
+            System.Data.Common.DbDataSource dataSource,
+            string storageName = "SqliteDataSourceGrainStorageForTest")
+        {
+            var providerRuntime = new ClientProviderRuntime(
+                this.InternalGrainFactory,
+                this.Services,
+                this.Services.GetRequiredService<ClientGrainContext>());
+
+            var options = new AdoNetGrainStorageOptions
+            {
+                DataSource = dataSource,
+                Invariant = AdoInvariant,
+                GrainStorageSerializer = new JsonGrainStorageSerializer(providerRuntime.ServiceProvider.GetService<OrleansJsonSerializer>()!)
+            };
+
+            var storageProvider = new AdoNetGrainStorage(
+                providerRuntime.ServiceProvider.GetRequiredService<IActivatorProvider>(),
+                providerRuntime.ServiceProvider.GetRequiredService<ILogger<AdoNetGrainStorage>>(),
+                Options.Create(options),
+                Options.Create(new ClusterOptions { ServiceId = Guid.NewGuid().ToString() }),
+                storageName);
+
+            ISiloLifecycleSubject siloLifeCycle = new SiloLifecycleSubject(NullLoggerFactory.Instance.CreateLogger<SiloLifecycleSubject>());
+            storageProvider.Participate(siloLifeCycle);
+            await siloLifeCycle.OnStart(CancellationToken.None).ConfigureAwait(false);
+            return storageProvider;
+        }
     }
 }
