@@ -73,13 +73,21 @@ namespace Orleans.Serialization.Configuration
         public Dictionary<string, Type> WellKnownTypeAliases { get; } = new Dictionary<string, Type>();
 
         /// <summary>
-        /// Gets the mapping of allowed type names.
+        /// Gets the set of allowed Orleans-formatted runtime type names.
         /// </summary>
+        /// <remarks>
+        /// Prefer <see cref="AddAllowedType(Type)"/> when the type is available to avoid constructing
+        /// formatted names manually.
+        /// </remarks>
         public HashSet<string> AllowedTypes { get; } = new HashSet<string>(StringComparer.Ordinal);
 
         /// <summary>
         /// Gets the set of assembly names whose types are allowed.
         /// </summary>
+        /// <remarks>
+        /// Prefer <see cref="AddAllowedAssembly(Assembly)"/> when the assembly is available to avoid
+        /// constructing assembly names manually.
+        /// </remarks>
         public HashSet<string> AllowedAssemblies { get; } = new HashSet<string>(StringComparer.Ordinal);
 
         /// <summary>
@@ -91,6 +99,11 @@ namespace Orleans.Serialization.Configuration
         /// Gets or sets a value indicating whether to allow all types by default.
         /// Default: <see langword="false"/>.
         /// </summary>
+        /// <remarks>
+        /// Setting this property to <see langword="true"/> bypasses type-name validation and permits any
+        /// resolvable type. This is insecure when serialized input can be influenced by an untrusted party.
+        /// Prefer allowing individual types or trusted assemblies.
+        /// </remarks>
         public bool AllowAllTypes { get; set; }
 
         /// <summary>

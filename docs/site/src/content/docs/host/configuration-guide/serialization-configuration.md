@@ -1,7 +1,7 @@
 ---
 title: Serialization configuration in Orleans
 description: Learn how to configure serialization in .NET Orleans.
-ms.date: 05/23/2025
+ms.date: 08/10/2026
 ms.topic: how-to
 uid: orleans-serialization-configuration
 ---
@@ -42,3 +42,67 @@ siloBuilder.Services.AddSerializer(serializerBuilder =>
         isSupported: type => type.Namespace.StartsWith("Example.Namespace"));
 });
 ```
+
+## Authorize type-name resolution
+
+Registering an external serializer selects which codec can handle a value. It doesn't, by itself, authorize Orleans to resolve every CLR type name accepted by that serializer. Type-name resolution is a separate security boundary, and <xref:Orleans.Serialization.Configuration.TypeManifestOptions.AllowAllTypes?displayProperty=nameWithType> defaults to `false`.
+
+This distinction is especially visible for polymorphic signatures such as `IReadOnlyList<TriggerRule>`, where `TriggerRule` is abstract and values are handled by `System.Text.Json`. Register the JSON serializer and explicitly trust the application type:
+
+```csharp
+siloBuilder.Services.AddSerializer(serializerBuilder =>
+{
+    serializerBuilder.AddJsonSerializer(
+        isSupported: type => type.Namespace?.StartsWith("MyApp") == true);
+    serializerBuilder.Configure(options =>
+        options.AddAllowedType(typeof(TriggerRule)));
+});
+```
+
+<xref:Orleans.Serialization.Configuration.TypeManifestOptions.AddAllowedType*> uses Orleans' runtime type-name formatter, including for constructed and nested generic types. The <xref:Orleans.Serialization.Configuration.TypeManifestOptions.AllowedTypes> string set remains supported for compatibility and contains Orleans-formatted runtime type names. Prefer `AddAllowedType` instead of constructing those names manually.
+
+If every type in an application assembly is trusted, allow the assembly instead:
+
+```csharp
+siloBuilder.Services.AddSerializer(serializerBuilder =>
+{
+    serializerBuilder.Configure(options =>
+        options.AddAllowedAssembly(typeof(TriggerRule).Assembly));
+});
+```
+
+Assembly trust applies component by component. Allowing a generic type definition's assembly doesn't implicitly trust generic arguments from other assemblies.
+
+For policy-based trust, register <xref:Orleans.Serialization.ITypeNameFilter> to evaluate names before Orleans loads the corresponding type:
+
+```csharp
+public sealed class ApplicationTypeNameFilter : ITypeNameFilter
+{
+    public bool? IsTypeNameAllowed(string typeName, string assemblyName)
+    {
+        if (assemblyName == "MyApp.Contracts"
+            || assemblyName.StartsWith("MyApp.Contracts,", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return null;
+    }
+}
+
+siloBuilder.Services.AddSingleton<ITypeNameFilter, ApplicationTypeNameFilter>();
+```
+
+A filter returns `true` to allow, `false` to deny, or `null` when it has no opinion. Types explicitly added to `AllowedTypes` are authoritative. For other names, a denial from any `ITypeNameFilter` takes precedence over other type-name filters and assembly trust. <xref:Orleans.Serialization.ITypeFilter> provides a resolved-`Type` fallback when name-based checks have no affirmative result; a denial wins within that fallback. Both formatting and parsing apply these checks, including to constructed generic components and array element types.
+
+As a compatibility escape hatch, you can disable the boundary:
+
+```csharp
+siloBuilder.Services.AddSerializer(serializerBuilder =>
+{
+    serializerBuilder.Configure(options => options.AllowAllTypes = true);
+});
+```
+
+> [!WARNING]
+> `AllowAllTypes` bypasses type-name validation, including custom filters, and permits any resolvable type. Use it only when serialized input is fully trusted. Prefer allowing individual types or trusted assemblies.

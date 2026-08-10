@@ -490,7 +490,7 @@ public class TypeConverter
     [DoesNotReturn]
     private static void ThrowTypeNotAllowed(string fullTypeName, List<QualifiedType> errors)
     {
-        const string allowListMessage = $"To allow it, add it to {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowedTypes)}, add its assembly to {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowedAssemblies)}, or register an {nameof(ITypeNameFilter)} instance which allows it.";
+        const string allowListMessage = $"A registered {nameof(ITypeNameFilter)} denied it. Update that filter, or set {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowAllTypes)} to true to bypass type-name validation. Allowing all types is insecure when serialized input can be influenced by an untrusted party.";
         if (errors is { Count: 1 })
         {
             var value = errors[0];
@@ -524,7 +524,7 @@ public class TypeConverter
     [DoesNotReturn]
     private static void ThrowTypeNotAllowed(Type value)
     {
-        var message = $"Type \"{value.FullName}\" is not allowed. To allow it, add it to {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowedTypes)}, add its assembly to {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowedAssemblies)}, or register an {nameof(ITypeNameFilter)} or {nameof(ITypeFilter)} instance which allows it.";
+        var message = $"Type \"{value.FullName}\" is not allowed. To allow it, call {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AddAllowedType)}, call {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AddAllowedAssembly)}, add its Orleans-formatted name to {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowedTypes)}, register an {nameof(ITypeNameFilter)} or {nameof(ITypeFilter)} instance which allows it, or set {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowAllTypes)} to true. Allowing all types is insecure when serialized input can be influenced by an untrusted party.";
         throw new InvalidOperationException(message);
     }
 
