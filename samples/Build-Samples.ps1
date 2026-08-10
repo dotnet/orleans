@@ -7,7 +7,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$sourceSolution = Join-Path $repositoryRoot 'src/Orleans.slnx'
+$sourceSolution = Join-Path $repositoryRoot 'Orleans.slnx'
 $sampleSolution = Join-Path $PSScriptRoot 'Samples.slnx'
 $packageSource = Join-Path $repositoryRoot "Artifacts/Samples/$Configuration/packages"
 $packageVersion = "10.0.0-dev.$([System.DateTime]::UtcNow.Ticks)"

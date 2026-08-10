@@ -80,13 +80,15 @@ $sourceRoot = [System.IO.Path]::GetFullPath((Join-Path $samplesRoot '../src'))
 $sourceProjectFiles = Get-ChildItem -LiteralPath $sourceRoot -Recurse -File -Include '*.csproj', '*.fsproj', '*.vbproj' |
     ForEach-Object { [System.IO.Path]::GetRelativePath($sourceRoot, $_.FullName).Replace('\', '/') } |
     Sort-Object
-[xml] $sourceSolution = Get-Content -LiteralPath (Join-Path $sourceRoot 'Orleans.slnx')
+[xml] $sourceSolution = Get-Content -LiteralPath (Join-Path $samplesRoot '../Orleans.slnx')
 $sourceSolutionProjects = @(
     $sourceSolution.SelectNodes('//Project') |
-        ForEach-Object { $_.Path.Replace('\', '/') }
+        ForEach-Object { $_.Path.Replace('\', '/') } |
+        Where-Object { $_.StartsWith('src/') } |
+        ForEach-Object { $_.Substring('src/'.Length) }
 ) | Sort-Object
 if (($sourceProjectFiles -join "`n") -ne ($sourceSolutionProjects -join "`n")) {
-    throw 'src/Orleans.slnx does not contain exactly the projects under src.'
+    throw 'Orleans.slnx does not contain exactly the projects under src.'
 }
 
 $sourcePackageIds = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
@@ -113,7 +115,7 @@ foreach ($projectPath in $projectFiles) {
 
         if ($reference.Include.StartsWith('Microsoft.Orleans.', [System.StringComparison]::OrdinalIgnoreCase) -and
             -not $sourcePackageIds.Contains($reference.Include)) {
-            throw "$projectPath references '$($reference.Include)', which is not produced by src/Orleans.slnx."
+            throw "$projectPath references '$($reference.Include)', which is not produced by Orleans.slnx."
         }
     }
 }
