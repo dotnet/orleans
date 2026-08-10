@@ -62,7 +62,7 @@ namespace Orleans.Streams
         /// <summary>
         /// Gets the token from the most recent refresh.
         /// </summary>
-        StreamSequenceToken? LastRefreshToken { get; }
+        StreamSequenceToken? LastRefreshToken => null;
 
         /// <summary>
         /// Records that delivery of the current event has failed

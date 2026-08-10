@@ -23,11 +23,6 @@
     <Project Path="playground/DurableJobsJournaling/DurableJobsJournaling.Silo/DurableJobsJournaling.Silo.csproj" />
     <Project Path="playground/DurableJobsJournaling/DurableJobsJournaling.Web/DurableJobsJournaling.Web.csproj" />
   </Folder>
-  <Folder Name="/samples/RabbitMQ/">
-    <Project Path="Client/Client.csproj" />
-    <Project Path="GrainsAbstraction/GrainsAbstraction.csproj" />
-    <Project Path="Server/Server.csproj" />
-  </Folder>
   <Folder Name="/playground/Dashboard/">
     <Project Path="playground/DashboardCohosted/DashboardCohosted.csproj" />
     <Project Path="playground/DashboardSeparateHost/DashboardSeparateHost.csproj" />

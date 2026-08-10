@@ -9,7 +9,6 @@ namespace Orleans.Streaming.RabbitMQ.Adapters;
 [GenerateSerializer]
 public record RabbitMqBatchContainer : IBatchContainer
 {
-    private readonly StreamId _streamId;
     [Id(0)] private readonly List<object> _events;
 
     [Id(1)] private readonly Dictionary<string, object> _requestContext;
@@ -25,7 +24,7 @@ public record RabbitMqBatchContainer : IBatchContainer
 
     internal RabbitMqBatchContainer(StreamId streamId, List<object> events, EventSequenceTokenV2 sequenceTokenV2)
     {
-        _streamId = streamId;
+        StreamId = streamId;
         _events = events;
         _sequenceTokenV2 = sequenceTokenV2;
     }
