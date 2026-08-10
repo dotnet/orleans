@@ -22,12 +22,34 @@ public sealed class InProcessTestClusterDirectoryTests
     public async Task DistributedDirectoryCanBeEnabled()
     {
         var builder = new InProcessTestClusterBuilder(1);
+#pragma warning disable ORLEANSEXP003
         builder.Options.UseDistributedGrainDirectory = true;
+#pragma warning restore ORLEANSEXP003
 
         await using var cluster = builder.Build();
         await cluster.DeployAsync();
 
         Assert.Equal("DistributedGrainDirectory", GetDefaultDirectory(cluster).GetType().Name);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task DistributedDirectoryCanBeEnabledWhenNamedDirectoryExists()
+    {
+        var builder = new InProcessTestClusterBuilder(1);
+#pragma warning disable ORLEANSEXP003
+        builder.Options.UseDistributedGrainDirectory = true;
+        builder.ConfigureSilo(static (_, siloBuilder) => siloBuilder.AddDistributedGrainDirectory("named"));
+#pragma warning restore ORLEANSEXP003
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync();
+
+        var defaultDirectory = GetDefaultDirectory(cluster);
+        var namedDirectory = cluster.Silos[0].ServiceProvider.GetRequiredKeyedService<IGrainDirectory>("named");
+        Assert.Same(namedDirectory, defaultDirectory);
+        Assert.Single(
+            cluster.Silos[0].ServiceProvider.GetServices<ILifecycleParticipant<ISiloLifecycle>>(),
+            static participant => participant.GetType().Name == "DistributedGrainDirectory");
     }
 
     private static IGrainDirectory GetDefaultDirectory(InProcessTestCluster cluster) =>

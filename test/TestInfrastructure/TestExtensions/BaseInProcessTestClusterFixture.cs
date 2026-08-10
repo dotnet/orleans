@@ -54,7 +54,9 @@ public abstract class BaseInProcessTestClusterFixture : Xunit.IAsyncLifetime
     {
         EnsurePreconditionsMet();
         var builder = new InProcessTestClusterBuilder();
+#pragma warning disable ORLEANSEXP003 // Distributed grain directory is enabled by default for Orleans tests.
         builder.Options.UseDistributedGrainDirectory = true;
+#pragma warning restore ORLEANSEXP003
         builder.ConfigureHost(hostBuilder => TestDefaultConfiguration.ConfigureHostConfiguration(hostBuilder.Configuration));
         ConfigureTestCluster(builder);
 

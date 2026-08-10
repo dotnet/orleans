@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -53,6 +54,7 @@ public sealed class InProcessTestClusterOptions
     /// Gets or sets a value indicating whether to use the experimental distributed grain directory.
     /// </summary>
     /// <value><see langword="true" /> if the distributed grain directory should be used; otherwise, <see langword="false" />.</value>
+    [Experimental("ORLEANSEXP003")]
     public bool UseDistributedGrainDirectory { get; set; }
 
     /// <summary>
