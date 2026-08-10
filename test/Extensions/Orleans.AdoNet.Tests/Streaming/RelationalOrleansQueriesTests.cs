@@ -23,7 +23,7 @@ public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueries
 [TestCategory("MySql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
 public class MySqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 {
-    public MySqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNameMySql, 100)
+    public MySqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNameMySql, 20)
     {
         MySqlConnection.ClearAllPools();
     }

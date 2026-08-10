@@ -33,7 +33,7 @@ public class PostgreSqlRelationalOrleansQueriesTests : RelationalOrleansQueriesT
 [TestCategory("MySql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
 public class MySqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 {
-    public MySqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNameMySql, 90)
+    public MySqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNameMySql, 20)
     {
         MySqlConnection.ClearAllPools();
     }

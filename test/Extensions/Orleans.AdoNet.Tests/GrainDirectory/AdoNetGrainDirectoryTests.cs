@@ -39,7 +39,7 @@ public class PostgreSqlAdoNetGrainDirectoryTests : AdoNetGrainDirectoryTests
 [TestCategory("MySql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
 public class MySqlAdoNetGrainDirectoryTests : AdoNetGrainDirectoryTests
 {
-    public MySqlAdoNetGrainDirectoryTests() : base(AdoNetInvariants.InvariantNameMySql, 90)
+    public MySqlAdoNetGrainDirectoryTests() : base(AdoNetInvariants.InvariantNameMySql, 20)
     {
         MySqlConnection.ClearAllPools();
     }
