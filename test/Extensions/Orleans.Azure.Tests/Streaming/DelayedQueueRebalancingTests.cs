@@ -25,7 +25,15 @@ namespace Tester.AzureUtils.Streaming
         public override async Task InitializeAsync()
         {
             diagnosticObserver = StreamQueueDiagnosticObserver.Create(adapterName);
-            await base.InitializeAsync();
+            try
+            {
+                await base.InitializeAsync();
+            }
+            catch
+            {
+                diagnosticObserver.Dispose();
+                throw;
+            }
         }
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
