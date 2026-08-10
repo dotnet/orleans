@@ -324,12 +324,22 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         var sr2_GotHit = false;
         var sr3_GotHit = false;
 
-        while (!sr1_GotHit || !sr2_GotHit || !sr3_GotHit)
+        stopwatch.Restart();
+        while (stopwatch.Elapsed < allowedDuration && (!sr1_GotHit || !sr2_GotHit || !sr3_GotHit))
         {
             sr1_GotHit = await sr1.GotStreamHit();
             sr2_GotHit = await sr2.GotStreamHit();
             sr3_GotHit = await sr3.GotStreamHit();
+
+            if (!sr1_GotHit || !sr2_GotHit || !sr3_GotHit)
+            {
+                await Task.Delay(10);
+            }
         }
+
+        Assert.True(
+            sr1_GotHit && sr2_GotHit && sr3_GotHit,
+            $"Expected all stream receivers to observe a message within {allowedDuration}. SR1: {sr1_GotHit}; SR2: {sr2_GotHit}; SR3: {sr3_GotHit}.");
 
         var sr1_host = await sr1.GetAddress();
         var sr2_host = await sr2.GetAddress();
