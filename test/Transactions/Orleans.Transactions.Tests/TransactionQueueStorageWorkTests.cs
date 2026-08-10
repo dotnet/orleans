@@ -429,7 +429,7 @@ public class TransactionQueueStorageWorkTests
             Microsoft.Extensions.Logging.ILogger logger,
             ITimerManager timerManager,
             IActivationLifetime activationLifetime)
-            : base(options, resource, deactivate, storage, clock, logger, timerManager, activationLifetime)
+            : base(options, resource, deactivate, storage, clock, logger, timerManager, activationLifetime, diagnosticIdentity: default)
         {
         }
 

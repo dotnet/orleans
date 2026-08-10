@@ -61,6 +61,27 @@ namespace Orleans.Transactions.AzureStorage.Tests
             return this.testRunner.TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(transactionTestGrainClassName, concurrent);
         }
 
+        [SkippableFact]
+        public Task TransactionWillRecoverAfterManagerWait()
+        {
+            return this.testRunner.TransactionWillRecoverAfterManagerWait(
+                TransactionTestConstants.SingleStateTransactionalGrain);
+        }
+
+        [SkippableFact]
+        public Task TransactionWillRecoverAfterRemotePreparePersisted()
+        {
+            return this.testRunner.TransactionWillRecoverAfterRemotePreparePersisted(
+                TransactionTestConstants.SingleStateTransactionalGrain);
+        }
+
+        [SkippableFact]
+        public Task TransactionWillRecoverAfterLocalCommitStored()
+        {
+            return this.testRunner.TransactionWillRecoverAfterLocalCommitStored(
+                TransactionTestConstants.SingleStateTransactionalGrain);
+        }
+
         private class SiloBuilderConfiguratorUsingAzureClustering : ISiloConfigurator
         {
             public void Configure(ISiloBuilder hostBuilder)

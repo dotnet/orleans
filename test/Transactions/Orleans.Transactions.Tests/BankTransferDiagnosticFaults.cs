@@ -39,7 +39,10 @@ public sealed class StorageWriteCompletedFaultScope : IDisposable
 
     private void OnStorageWriteCompleted(TransactionDiagnosticEvents.StorageWriteCompleted evt)
     {
-        if (evt.Resource.Name != this.stateName || evt.Resource.Reference.GrainId != this.targetGrainId || evt.CommitCount == 0)
+        if (evt.Resource.Name != this.stateName
+            || evt.Resource.Reference.GrainId != this.targetGrainId
+            || evt.CommitCount == 0
+            || evt.TransactionIds.IsDefaultOrEmpty)
         {
             return;
         }
@@ -48,7 +51,8 @@ public sealed class StorageWriteCompletedFaultScope : IDisposable
         if (Interlocked.Exchange(ref this.shouldThrow, 0) == 1)
         {
             throw new InvalidOperationException(
-                $"Transaction queue exception thrown after storage write completed for {evt.Resource}, batch size {evt.BatchSize}, etag {evt.ETag}");
+                $"Transaction queue exception thrown after storage write completed for {evt.Resource}, "
+                + $"transactions [{string.Join(",", evt.TransactionIds)}], batch size {evt.BatchSize}, etag {evt.ETag}");
         }
     }
 

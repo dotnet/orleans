@@ -74,9 +74,41 @@ namespace Orleans.Transactions
 
         // used for remote commit
         public DateTime? LastSent;
+        public bool IsRestoredRemoteCommit;
+        public int RecoveryPingCount;
         public bool PrepareIsPersisted;
         public TaskCompletionSource<bool>? ConfirmationResponsePromise;
 
+        internal DateTime GetNextRemotePingAt(TimeSpan pingFrequency)
+        {
+            if (IsRestoredRemoteCommit && RecoveryPingCount == 0)
+            {
+                return DateTime.MinValue;
+            }
+
+            return LastSent!.Value + GetRemotePingDelay(pingFrequency);
+        }
+
+        internal void RecordRemotePingSent(DateTime sentAt)
+        {
+            LastSent = sentAt;
+            if (RecoveryPingCount < int.MaxValue)
+            {
+                RecoveryPingCount++;
+            }
+        }
+
+        private TimeSpan GetRemotePingDelay(TimeSpan pingFrequency)
+        {
+            if (RecoveryPingCount == 0)
+            {
+                return pingFrequency;
+            }
+
+            var exponent = Math.Min(RecoveryPingCount - 1, 30);
+            var retryDelayTicks = TimeSpan.TicksPerSecond << exponent;
+            return TimeSpan.FromTicks(Math.Min(retryDelayTicks, pingFrequency.Ticks));
+        }
 
         /// <summary>
         /// Indicates whether a transaction record is ready to commit

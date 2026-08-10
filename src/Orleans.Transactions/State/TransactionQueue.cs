@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -24,6 +26,7 @@ namespace Orleans.Transactions.State
         protected readonly ILogger logger;
         private readonly IActivationLifetime activationLifetime;
         private readonly ConfirmationWorker<TState> confirmationWorker;
+        private readonly TransactionDiagnosticEvents.TransactionDiagnosticIdentity diagnosticIdentity;
         private CommitQueue<TState> commitQueue;
         private Task readyTask;
 
@@ -47,6 +50,9 @@ namespace Orleans.Transactions.State
         private long stableSequenceNumber;
         public ReadWriteLock<TState> RWLock { get; }
         public CausalClock Clock { get; }
+        internal ParticipantId Resource => resource;
+        internal TimeSpan PrepareTimeout => options.PrepareTimeout;
+        internal TransactionDiagnosticEvents.TransactionDiagnosticIdentity DiagnosticIdentity => diagnosticIdentity;
 
         public TransactionQueue(
             IOptions<TransactionalStateOptions> options,
@@ -56,7 +62,8 @@ namespace Orleans.Transactions.State
             IClock clock,
             ILogger logger,
             ITimerManager timerManager,
-            IActivationLifetime activationLifetime)
+            IActivationLifetime activationLifetime,
+            TransactionDiagnosticEvents.TransactionDiagnosticIdentity diagnosticIdentity)
         {
             this.options = options.Value;
             this.resource = resource;
@@ -65,6 +72,7 @@ namespace Orleans.Transactions.State
             this.Clock = new CausalClock(clock);
             this.logger = logger;
             this.activationLifetime = activationLifetime;
+            this.diagnosticIdentity = diagnosticIdentity;
             this.storageWorker = new BatchWorkerFromDelegate(StorageWork, this.activationLifetime.OnDeactivating);
             this.RWLock = new ReadWriteLock<TState>(options, this, this.storageWorker, logger, activationLifetime);
             this.confirmationWorker = new ConfirmationWorker<TState>(options, this.resource, this.storageWorker, () => this.storageBatch, this.logger, timerManager, activationLifetime);
@@ -139,6 +147,12 @@ namespace Orleans.Transactions.State
 
                                 LogTracePersisted(record);
                                 record.PrepareIsPersisted = true;
+                                TransactionDiagnosticEvents.EmitRemotePreparePersisted(
+                                    resource,
+                                    record.TransactionId,
+                                    record.Timestamp,
+                                    record.TransactionManager,
+                                    identity: diagnosticIdentity);
 
                                 if (behindRemoteEntryBySameTM)
                                 {
@@ -148,6 +162,13 @@ namespace Orleans.Transactions.State
                                           .Prepared(record.TransactionManager.Name, record.TransactionId, record.Timestamp, this.resource, TransactionalStatus.Ok)
                                           .Ignore();
                                     record.LastSent = DateTime.UtcNow;
+                                    TransactionDiagnosticEvents.EmitRemotePreparedSent(
+                                        resource,
+                                        record.TransactionId,
+                                        record.Timestamp,
+                                        record.TransactionManager,
+                                        record.LastSent.Value,
+                                        identity: diagnosticIdentity);
                                 }
                             });
                             break;
@@ -167,7 +188,7 @@ namespace Orleans.Transactions.State
             }
         }
 
-        public async Task NotifyOfPrepared(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
+        public async Task NotifyOfPrepared(Guid transactionId, DateTime timeStamp, ParticipantId participant, TransactionalStatus status)
         {
             var pos = commitQueue.Find(transactionId, timeStamp);
             LogTraceNotifyOfPrepared(transactionId, new(timeStamp), status);
@@ -185,11 +206,27 @@ namespace Orleans.Transactions.State
                 if (status == TransactionalStatus.Ok)
                 {
                     localEntry.WaitCount--;
+                    TransactionDiagnosticEvents.EmitPreparedReceived(
+                        resource,
+                        transactionId,
+                        timeStamp,
+                        participant,
+                        status,
+                        localEntry.WaitCount,
+                        identity: diagnosticIdentity);
 
                     storageWorker.Notify();
                 }
                 else
                 {
+                    TransactionDiagnosticEvents.EmitPreparedReceived(
+                        resource,
+                        transactionId,
+                        timeStamp,
+                        participant,
+                        status,
+                        localEntry.WaitCount,
+                        identity: diagnosticIdentity);
                     await AbortCommits(status, pos);
 
                     this.RWLock.Notify();
@@ -210,6 +247,15 @@ namespace Orleans.Transactions.State
                 {
                     info.Status = status;
                 }
+
+                TransactionDiagnosticEvents.EmitPreparedReceived(
+                    resource,
+                    transactionId,
+                    timeStamp,
+                    participant,
+                    status,
+                    remainingCount: null,
+                    identity: diagnosticIdentity);
 
                 // TODO fix memory leak if corresponding commit messages never arrive
             }
@@ -267,27 +313,147 @@ namespace Orleans.Transactions.State
                 case CommitRole.LocalCommit:
                     {
                         LogTraceAborting(status, entry);
-                        try
+                        var deactivationToken = this.activationLifetime.OnDeactivating;
+                        var fanOutDiagnosticsEnabled = AreCancelFanOutEventsEnabled();
+                        var targetCount = 0;
+                        var selfTargetCount = 0;
+                        var fanOutStartedAt = 0L;
+                        if (fanOutDiagnosticsEnabled)
                         {
-                            // tell remote participants
-                            await Task.WhenAll(entry.WriteParticipants
-                                .Where(p => !p.Equals(resource))
-                                .Select(p => p.Reference.AsReference<ITransactionalResourceExtension>()
-                                     .Cancel(p.Name, entry.TransactionId, entry.Timestamp, status)));
-                        }
-                        catch(Exception ex)
-                        {
-                            LogWarningFailedToNotifyAllTransactionParticipantsOfCancellation(entry.TransactionId, new(entry.Timestamp), status, ex);
+                            (targetCount, selfTargetCount) = CountCancelTargets(entry.WriteParticipants);
+                            if (targetCount > 0)
+                            {
+                                TransactionDiagnosticEvents.EmitCancelFanOutStarted(
+                                    resource,
+                                    entry.TransactionId,
+                                    entry.Timestamp,
+                                    status,
+                                    targetCount,
+                                    selfTargetCount,
+                                    diagnosticIdentity);
+                                fanOutStartedAt = Stopwatch.GetTimestamp();
+                            }
                         }
 
-                        // reply to transaction agent
-                        if (exception is not null)
+                        var fanOutTasks = new List<Task>();
+                        foreach (var participant in entry.WriteParticipants)
                         {
-                            entry.PromiseForTA.TrySetException(exception);
+                            if (participant.Equals(resource))
+                            {
+                                continue;
+                            }
+
+                            try
+                            {
+                                fanOutTasks.Add(SendCancel(
+                                    participant,
+                                    entry.TransactionId,
+                                    entry.Timestamp,
+                                    status,
+                                    TransactionDiagnosticEvents.CancelReason.TransactionAbort));
+                            }
+                            catch (Exception ex)
+                            {
+                                fanOutTasks.Add(Task.FromException(ex));
+                            }
                         }
-                        else
+
+                        var fanOut = Task.WhenAll(fanOutTasks);
+                        CompleteAbortDecision(entry, status, exception);
+                        var cleanupBudgetExpired = false;
+
+                        try
                         {
-                            entry.PromiseForTA.TrySetResult(status);
+                            var cleanupDeadline = Task.Delay(this.options.LockTimeout, deactivationToken);
+                            var completed = await Task.WhenAny(fanOut, cleanupDeadline);
+                            if (ShouldAbandonCancelFanOut(fanOut, completed))
+                            {
+                                fanOut.Ignore();
+                                await cleanupDeadline;
+                                cleanupBudgetExpired = true;
+                                throw new TimeoutException(
+                                    $"Cancel fan-out did not complete within the {this.options.LockTimeout} cleanup budget.");
+                            }
+
+                            await fanOut;
+
+                            if (fanOutDiagnosticsEnabled && targetCount > 0)
+                            {
+                                TransactionDiagnosticEvents.EmitCancelFanOutCompleted(
+                                    resource,
+                                    entry.TransactionId,
+                                    entry.Timestamp,
+                                    status,
+                                    targetCount,
+                                    selfTargetCount,
+                                    Stopwatch.GetElapsedTime(fanOutStartedAt),
+                                    diagnosticIdentity);
+                            }
+                        }
+                        catch (OperationCanceledException ex) when (deactivationToken.IsCancellationRequested)
+                        {
+                            fanOut.Ignore();
+                            if (fanOutDiagnosticsEnabled && targetCount > 0)
+                            {
+                                TransactionDiagnosticEvents.EmitCancelFanOutFailed(
+                                    resource,
+                                    entry.TransactionId,
+                                    entry.Timestamp,
+                                    status,
+                                    targetCount,
+                                    selfTargetCount,
+                                    Stopwatch.GetElapsedTime(fanOutStartedAt),
+                                    ex,
+                                    diagnosticIdentity);
+                            }
+
+                            LogWarningCancelFanOutAbandonedDuringDeactivation(
+                                entry.TransactionId,
+                                new(entry.Timestamp),
+                                status,
+                                ex);
+                        }
+                        catch (TimeoutException ex) when (cleanupBudgetExpired)
+                        {
+                            fanOut.Ignore();
+                            if (fanOutDiagnosticsEnabled && targetCount > 0)
+                            {
+                                TransactionDiagnosticEvents.EmitCancelFanOutFailed(
+                                    resource,
+                                    entry.TransactionId,
+                                    entry.Timestamp,
+                                    status,
+                                    targetCount,
+                                    selfTargetCount,
+                                    Stopwatch.GetElapsedTime(fanOutStartedAt),
+                                    ex,
+                                    diagnosticIdentity);
+                            }
+
+                            LogWarningCancelFanOutCleanupTimedOut(
+                                entry.TransactionId,
+                                new(entry.Timestamp),
+                                status,
+                                this.options.LockTimeout,
+                                ex);
+                        }
+                        catch (Exception ex)
+                        {
+                            if (fanOutDiagnosticsEnabled && targetCount > 0)
+                            {
+                                TransactionDiagnosticEvents.EmitCancelFanOutFailed(
+                                    resource,
+                                    entry.TransactionId,
+                                    entry.Timestamp,
+                                    status,
+                                    targetCount,
+                                    selfTargetCount,
+                                    Stopwatch.GetElapsedTime(fanOutStartedAt),
+                                    ex,
+                                    diagnosticIdentity);
+                            }
+
+                            LogWarningFailedToNotifyAllTransactionParticipantsOfCancellation(entry.TransactionId, new(entry.Timestamp), status, ex);
                         }
 
                         break;
@@ -295,16 +461,7 @@ namespace Orleans.Transactions.State
                 case CommitRole.ReadOnly:
                     {
                         LogTraceAborting(status, entry);
-
-                        // reply to transaction agent
-                        if (exception is not null)
-                        {
-                            entry.PromiseForTA.TrySetException(exception);
-                        }
-                        else
-                        {
-                            entry.PromiseForTA.TrySetResult(status);
-                        }
+                        CompleteAbortDecision(entry, status, exception);
 
                         break;
                     }
@@ -313,6 +470,26 @@ namespace Orleans.Transactions.State
                         LogErrorImpossibleCase(entry.Role);
                         throw new NotSupportedException($"{entry.Role} is not a supported CommitRole.");
                     }
+            }
+        }
+
+        private void CompleteAbortDecision(
+            TransactionRecord<TState> entry,
+            TransactionalStatus status,
+            Exception? exception)
+        {
+            var completed = exception is not null
+                ? entry.PromiseForTA.TrySetException(exception)
+                : entry.PromiseForTA.TrySetResult(status);
+
+            if (completed)
+            {
+                TransactionDiagnosticEvents.EmitTransactionManagerAbortDecisionCompleted(
+                    resource,
+                    entry.TransactionId,
+                    entry.Timestamp,
+                    status,
+                    diagnosticIdentity);
             }
         }
 
@@ -334,8 +511,12 @@ namespace Orleans.Transactions.State
                     LogTraceReceivedPingUnknown(transactionId);
 
                     // we never heard of this transaction - so it must have aborted
-                    await resource.Reference.AsReference<ITransactionalResourceExtension>()
-                            .Cancel(resource.Name, transactionId, timeStamp, TransactionalStatus.PresumedAbort);
+                    await SendCancel(
+                        resource,
+                        transactionId,
+                        timeStamp,
+                        TransactionalStatus.PresumedAbort,
+                        TransactionDiagnosticEvents.CancelReason.RecoveryPing);
                 }
             }
         }
@@ -348,7 +529,17 @@ namespace Orleans.Transactions.State
             var pos = commitQueue.Find(transactionId, timeStamp);
 
             if (pos == -1)
+            {
+                TransactionDiagnosticEvents.EmitTransactionConfirmCompleted(
+                    resource,
+                    transactionId,
+                    timeStamp,
+                    TransactionalStatus.Ok,
+                    queueEntryFound: false,
+                    succeeded: true,
+                    identity: diagnosticIdentity);
                 return; // must have already been confirmed
+            }
 
             var remoteEntry = commitQueue[pos];
 
@@ -366,7 +557,27 @@ namespace Orleans.Transactions.State
 
             // now we wait for the batch to finish
 
-            await remoteEntry.ConfirmationResponsePromise.Task;
+            var confirmStatus = TransactionalStatus.Ok;
+            try
+            {
+                await remoteEntry.ConfirmationResponsePromise.Task;
+            }
+            catch
+            {
+                confirmStatus = TransactionalStatus.UnknownException;
+                throw;
+            }
+            finally
+            {
+                TransactionDiagnosticEvents.EmitTransactionConfirmCompleted(
+                    resource,
+                    transactionId,
+                    timeStamp,
+                    confirmStatus,
+                    queueEntryFound: true,
+                    succeeded: confirmStatus == TransactionalStatus.Ok,
+                    identity: diagnosticIdentity);
+            }
         }
 
         public async Task NotifyOfCancel(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
@@ -376,15 +587,38 @@ namespace Orleans.Transactions.State
             var pos = commitQueue.Find(transactionId, timeStamp);
 
             if (pos == -1)
+            {
+                TransactionDiagnosticEvents.EmitTransactionCancelCompleted(
+                    resource,
+                    transactionId,
+                    timeStamp,
+                    status,
+                    queueEntryFound: false,
+                    succeeded: true,
+                    identity: diagnosticIdentity);
                 return;
+            }
 
-            this.storageBatch.Cancel(commitQueue[pos].SequenceNumber);
-
-            await AbortCommits(status, pos);
-
-            storageWorker.Notify();
-
-            this.RWLock.Notify();
+            var succeeded = false;
+            try
+            {
+                this.storageBatch.Cancel(commitQueue[pos].SequenceNumber);
+                await AbortCommits(status, pos);
+                storageWorker.Notify();
+                this.RWLock.Notify();
+                succeeded = true;
+            }
+            finally
+            {
+                TransactionDiagnosticEvents.EmitTransactionCancelCompleted(
+                    resource,
+                    transactionId,
+                    timeStamp,
+                    status,
+                    queueEntryFound: true,
+                    succeeded,
+                    identity: diagnosticIdentity);
+            }
         }
 
         /// <summary>
@@ -407,31 +641,75 @@ namespace Orleans.Transactions.State
         /// Ensures queue is ready to process requests.
         /// </summary>
         /// <returns></returns>
-        public Task Ready()
+        public Task Ready(Guid? transactionId = null)
         {
             if (this.readyTask.IsCompletedSuccessfully)
             {
                 return readyTask;
             }
 
+            TransactionDiagnosticEvents.EmitReadyWaitStarted(resource, transactionId, diagnosticIdentity);
             return ReadyAsync();
             async Task ReadyAsync()
             {
+                var recoveredAfterFailure = false;
                 try
                 {
                     await readyTask;
                 }
                 catch (Exception exception)
                 {
+                    recoveredAfterFailure = true;
+                    TransactionDiagnosticEvents.EmitReadyWaitFailed(resource, transactionId, exception, diagnosticIdentity);
                     LogWarningExceptionInTransactionQueue(exception);
                     await AbortAndRestore(TransactionalStatus.UnknownException, exception, storageOutcomeInDoubt: false);
                 }
+
+                TransactionDiagnosticEvents.EmitReadyWaitCompleted(
+                    resource,
+                    transactionId,
+                    recoveredAfterFailure,
+                    diagnosticIdentity);
             }
         }
 
-        private async Task Restore()
+        private async Task Restore(ImmutableArray<Guid> transactionIds = default)
         {
-            TransactionalStorageLoadResponse<TState> loadresponse = await storage.Load();
+            if (transactionIds.IsDefault)
+            {
+                transactionIds = ImmutableArray<Guid>.Empty;
+            }
+
+            TransactionDiagnosticEvents.EmitQueueRestoreStarted(resource, transactionIds, diagnosticIdentity);
+
+            TransactionalStorageLoadResponse<TState> loadresponse;
+            try
+            {
+                loadresponse = await storage.Load();
+            }
+            catch (Exception exception)
+            {
+                var storageConflict = exception is InconsistentStateException;
+                if (storageConflict)
+                {
+                    TransactionDiagnosticEvents.EmitStorageConflictDetected(
+                        resource,
+                        TransactionDiagnosticEvents.StorageOperation.Load,
+                        storageOutcomeInDoubt: false,
+                        queuedTransactionCount: transactionIds.Length,
+                        exception: exception,
+                        transactionIds: transactionIds,
+                        identity: diagnosticIdentity);
+                }
+
+                TransactionDiagnosticEvents.EmitQueueRestoreFailed(
+                    resource,
+                    exception,
+                    storageConflict,
+                    transactionIds,
+                    diagnosticIdentity);
+                throw;
+            }
 
             this.storageBatch = new StorageBatch<TState>(loadresponse);
 
@@ -444,27 +722,39 @@ namespace Orleans.Transactions.State
             this.Clock.Merge(storageBatch.MetaData.TimeStamp);
 
             // resume prepared transactions (not TM)
+            var recoveredPendingCount = 0;
             foreach (var pr in loadresponse.PendingStates.OrderBy(ps => ps.TimeStamp))
             {
                 if (pr.SequenceId > loadresponse.CommittedSequenceId && pr.TransactionManager.Reference != null)
                 {
                     LogDebugRecoverTwoPhaseCommit(pr.TransactionId);
                     ParticipantId tm = pr.TransactionManager;
+                    var transactionId = Guid.Parse(pr.TransactionId);
 
                     commitQueue.Add(new TransactionRecord<TState>()
                     {
                         Role = CommitRole.RemoteCommit,
-                        TransactionId = Guid.Parse(pr.TransactionId),
+                        TransactionId = transactionId,
                         Timestamp = pr.TimeStamp,
                         State = pr.State,
                         SequenceNumber = pr.SequenceId,
                         TransactionManager = tm,
                         PrepareIsPersisted = true,
                         LastSent = default(DateTime),
+                        IsRestoredRemoteCommit = true,
                         ConfirmationResponsePromise = null,
                         NumberWrites = 1 // was a writing transaction
                     });
                     this.stableSequenceNumber = pr.SequenceId;
+                    recoveredPendingCount++;
+
+                    TransactionDiagnosticEvents.EmitRemoteRecoveryPingScheduled(
+                        resource,
+                        transactionId,
+                        pr.TimeStamp,
+                        tm,
+                        DateTime.UtcNow,
+                        identity: diagnosticIdentity);
                 }
             }
 
@@ -474,6 +764,14 @@ namespace Orleans.Transactions.State
                 LogDebugRecoverCommitConfirmation(kvp.Key);
                 this.confirmationWorker.Add(kvp.Key, kvp.Value.Timestamp, kvp.Value.WriteParticipants);
             }
+
+            TransactionDiagnosticEvents.EmitQueueRestoreCompleted(
+                resource,
+                loadresponse.CommittedSequenceId,
+                recoveredPendingCount,
+                storageBatch.MetaData.CommitRecords.Count,
+                transactionIds,
+                diagnosticIdentity);
 
             // check for work
             this.storageWorker.Notify();
@@ -580,6 +878,18 @@ namespace Orleans.Transactions.State
                             if (exception is InconsistentStateException)
                             {
                                 status = TransactionalStatus.StorageConflict;
+                                var transactionIds = TransactionDiagnosticEvents.IsEnabled(
+                                    nameof(TransactionDiagnosticEvents.StorageConflictDetected))
+                                    ? CaptureTransactionIds()
+                                    : ImmutableArray<Guid>.Empty;
+                                TransactionDiagnosticEvents.EmitStorageConflictDetected(
+                                    resource,
+                                    TransactionDiagnosticEvents.StorageOperation.Store,
+                                    writeAttempted,
+                                    commitQueue.Count,
+                                    exception,
+                                    transactionIds,
+                                    diagnosticIdentity);
                                 LogWarningReloadFromStorageTriggeredByETagMismatch(exception);
                             }
                             else
@@ -597,7 +907,9 @@ namespace Orleans.Transactions.State
                             this.resource,
                             this.storageBatch.ETag,
                             batchBeingSentToStorage.BatchSize,
-                            batchBeingSentToStorage.CommitCount);
+                            batchBeingSentToStorage.CommitCount,
+                            batchBeingSentToStorage.CommittedTransactionIds,
+                            diagnosticIdentity);
                     }
 
                     if (committableEntries > 0)
@@ -650,7 +962,23 @@ namespace Orleans.Transactions.State
 
             async Task AbortAndRestoreCore(TransactionalStatus status, Exception? exception, bool storageOutcomeInDoubt)
             {
-                List<Task> pending = [RWLock.AbortExecutingTransactions(exception)];
+                var transactionIds = AreRecoveryCorrelationEventsEnabled()
+                    ? CaptureTransactionIds()
+                    : ImmutableArray<Guid>.Empty;
+                TransactionDiagnosticEvents.EmitAbortAndRestoreStarted(
+                    resource,
+                    status,
+                    storageOutcomeInDoubt,
+                    commitQueue.Count,
+                    transactionIds,
+                    diagnosticIdentity);
+
+                List<Task> pending =
+                [
+                    RWLock.AbortExecutingTransactions(
+                        exception,
+                        TransactionDiagnosticEvents.LockBreakReason.StorageRecovery)
+                ];
                 this.RWLock.AbortQueuedTransactions();
 
                 foreach (var entry in commitQueue.Elements)
@@ -671,18 +999,135 @@ namespace Orleans.Transactions.State
                 commitQueue.Clear();
 
                 await Task.WhenAll(pending);
-                if (++failCounter >= 10 || status == TransactionalStatus.StorageConflict)
+                var failureCount = ++failCounter;
+                if (failureCount >= 10 || status == TransactionalStatus.StorageConflict)
                 {
                     LogDebugStorageWorkerTriggeringGrainDeactivation();
+                    TransactionDiagnosticEvents.EmitDeactivationRequested(
+                        resource,
+                        status,
+                        failureCount,
+                        transactionIds,
+                        diagnosticIdentity);
                     this.deactivate();
                 }
                 StorageBatch<TState>? discardedBatch = this.storageBatch;
-                await this.Restore();
+                await this.Restore(transactionIds);
                 if (discardedBatch is not null && !ReferenceEquals(discardedBatch, this.storageBatch))
                 {
                     discardedBatch.Complete(success: false);
                 }
+                TransactionDiagnosticEvents.EmitAbortAndRestoreCompleted(
+                    resource,
+                    status,
+                    storageOutcomeInDoubt,
+                    transactionIds,
+                    diagnosticIdentity);
             }
+        }
+
+        private static bool AreRecoveryCorrelationEventsEnabled()
+            => TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.AbortAndRestoreStarted))
+                || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.AbortAndRestoreCompleted))
+                || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.QueueRestoreStarted))
+                || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.QueueRestoreCompleted))
+                || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.QueueRestoreFailed))
+                || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.StorageConflictDetected))
+                || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.DeactivationRequested));
+
+        private ImmutableArray<Guid> CaptureTransactionIds()
+        {
+            if (commitQueue.Count == 0)
+            {
+                return ImmutableArray<Guid>.Empty;
+            }
+
+            var result = ImmutableArray.CreateBuilder<Guid>(commitQueue.Count);
+            for (var i = 0; i < commitQueue.Count; i++)
+            {
+                result.Add(commitQueue[i].TransactionId);
+            }
+
+            return result.MoveToImmutable();
+        }
+
+        protected virtual async Task SendCancel(
+            ParticipantId target,
+            Guid transactionId,
+            DateTime timeStamp,
+            TransactionalStatus status,
+            TransactionDiagnosticEvents.CancelReason reason)
+        {
+            var isSelf = target.Reference.GrainId == resource.Reference.GrainId;
+            TransactionDiagnosticEvents.EmitCancelSendStarted(
+                resource,
+                transactionId,
+                timeStamp,
+                target,
+                isSelf,
+                status,
+                reason,
+                diagnosticIdentity);
+
+            try
+            {
+                await target.Reference.AsReference<ITransactionalResourceExtension>()
+                    .Cancel(target.Name, transactionId, timeStamp, status);
+                TransactionDiagnosticEvents.EmitCancelSendCompleted(
+                    resource,
+                    transactionId,
+                    timeStamp,
+                    target,
+                    isSelf,
+                    status,
+                    reason,
+                    diagnosticIdentity);
+            }
+            catch (Exception exception)
+            {
+                TransactionDiagnosticEvents.EmitCancelSendFailed(
+                    resource,
+                    transactionId,
+                    timeStamp,
+                    target,
+                    isSelf,
+                    status,
+                    reason,
+                    exception,
+                    diagnosticIdentity);
+                throw;
+            }
+        }
+
+        private static bool AreCancelFanOutEventsEnabled()
+            => TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.CancelFanOutStarted))
+                || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.CancelFanOutCompleted))
+                || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.CancelFanOutFailed));
+
+        internal static bool ShouldAbandonCancelFanOut(Task fanOut, Task completed)
+            => !ReferenceEquals(completed, fanOut) && !fanOut.IsCompleted;
+
+        private (int TargetCount, int SelfTargetCount) CountCancelTargets(List<ParticipantId> participants)
+        {
+            var targetCount = 0;
+            var selfTargetCount = 0;
+            foreach (var participant in participants)
+            {
+                if (participant.Equals(resource))
+                {
+                    continue;
+                }
+
+                targetCount++;
+                if (participant.Reference is not null
+                    && resource.Reference is not null
+                    && participant.Reference.GrainId == resource.Reference.GrainId)
+                {
+                    selfTargetCount++;
+                }
+            }
+
+            return (targetCount, selfTargetCount);
         }
 
         private void CompleteInDoubtEntryLocally(TransactionRecord<TState> entry, TransactionalStatus status, Exception? exception)
@@ -727,6 +1172,13 @@ namespace Orleans.Transactions.State
                             // check for timeout periodically
                             if (bottom.WaitingSince + this.options.PrepareTimeout <= now)
                             {
+                                TransactionDiagnosticEvents.EmitPrepareTimedOut(
+                                    resource,
+                                    bottom.TransactionId,
+                                    bottom.Timestamp,
+                                    bottom.WaitCount,
+                                    bottom.WaitingSince + this.options.PrepareTimeout,
+                                    diagnosticIdentity);
                                 await AbortCommits(TransactionalStatus.PrepareTimeout);
                                 this.RWLock.Notify();
                             }
@@ -747,6 +1199,13 @@ namespace Orleans.Transactions.State
                                       .Ignore();
 
                                 bottom.LastSent = now;
+                                TransactionDiagnosticEvents.EmitRemotePreparedSent(
+                                    resource,
+                                    bottom.TransactionId,
+                                    bottom.Timestamp,
+                                    bottom.TransactionManager,
+                                    now,
+                                    diagnosticIdentity);
 
                                 LogTraceSentPrepared(bottom);
 
@@ -756,21 +1215,45 @@ namespace Orleans.Transactions.State
                                 }
                                 else
                                 {
-                                    storageWorker.Notify(bottom.LastSent.Value + this.options.RemoteTransactionPingFrequency);
+                                    var scheduledAt = bottom.LastSent.Value + this.options.RemoteTransactionPingFrequency;
+                                    TransactionDiagnosticEvents.EmitRemoteRecoveryPingScheduled(
+                                        resource,
+                                        bottom.TransactionId,
+                                        bottom.Timestamp,
+                                        bottom.TransactionManager,
+                                        scheduledAt,
+                                        diagnosticIdentity);
+                                    storageWorker.Notify(scheduledAt);
                                 }
                             }
                             else if (!bottom.IsReadOnly && bottom.LastSent.HasValue)
                             {
                                 // send ping messages periodically to reactivate crashed TMs
 
-                                if (bottom.LastSent + this.options.RemoteTransactionPingFrequency <= now)
+                                if (bottom.GetNextRemotePingAt(this.options.RemoteTransactionPingFrequency) <= now)
                                 {
                                     LogTraceSentPing(bottom);
                                     bottom.TransactionManager.Reference.AsReference<ITransactionManagerExtension>()
                                           .Ping(bottom.TransactionManager.Name, bottom.TransactionId, bottom.Timestamp, resource).Ignore();
-                                    bottom.LastSent = now;
+                                    bottom.RecordRemotePingSent(now);
+                                    TransactionDiagnosticEvents.EmitRemoteRecoveryPingSent(
+                                        resource,
+                                        bottom.TransactionId,
+                                        bottom.Timestamp,
+                                        bottom.TransactionManager,
+                                        now,
+                                        diagnosticIdentity);
+
+                                    var scheduledAt = bottom.GetNextRemotePingAt(this.options.RemoteTransactionPingFrequency);
+                                    TransactionDiagnosticEvents.EmitRemoteRecoveryPingScheduled(
+                                        resource,
+                                        bottom.TransactionId,
+                                        bottom.Timestamp,
+                                        bottom.TransactionManager,
+                                        scheduledAt,
+                                        diagnosticIdentity);
                                 }
-                                storageWorker.Notify(bottom.LastSent.Value + this.options.RemoteTransactionPingFrequency);
+                                storageWorker.Notify(bottom.GetNextRemotePingAt(this.options.RemoteTransactionPingFrequency));
                             }
 
                             break;
@@ -903,7 +1386,9 @@ namespace Orleans.Transactions.State
             }
             commitQueue.RemoveFromBack(commitQueue.Count - from);
 
-            pending.Add(this.RWLock.AbortExecutingTransactions(exception: null));
+            pending.Add(this.RWLock.AbortExecutingTransactions(
+                exception: null,
+                reason: TransactionDiagnosticEvents.LockBreakReason.TransactionAbort));
             await Task.WhenAll(pending);
         }
 
@@ -972,6 +1457,18 @@ namespace Orleans.Transactions.State
             Message = "Failed to notify all transaction participants of cancellation. TransactionId: {TransactionId}, Timestamp: {Timestamp}, Status: {Status}"
         )]
         private partial void LogWarningFailedToNotifyAllTransactionParticipantsOfCancellation(Guid transactionId, DateTimeLogRecord timeStamp, TransactionalStatus status, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Stopped awaiting transaction cancellation fan-out because the activation is deactivating. TransactionId: {TransactionId}, Timestamp: {Timestamp}, Status: {Status}"
+        )]
+        private partial void LogWarningCancelFanOutAbandonedDuringDeactivation(Guid transactionId, DateTimeLogRecord timeStamp, TransactionalStatus status, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Stopped awaiting transaction cancellation fan-out after the cleanup budget elapsed. TransactionId: {TransactionId}, Timestamp: {Timestamp}, Status: {Status}, CleanupTimeout: {CleanupTimeout}"
+        )]
+        private partial void LogWarningCancelFanOutCleanupTimedOut(Guid transactionId, DateTimeLogRecord timeStamp, TransactionalStatus status, TimeSpan cleanupTimeout, Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Trace,

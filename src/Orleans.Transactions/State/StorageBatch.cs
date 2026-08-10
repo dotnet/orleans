@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -39,6 +40,7 @@ namespace Orleans.Transactions
 
         // prepare records
         private readonly SortedDictionary<long, PendingTransactionState<TState>> prepares;
+        private readonly List<Guid> committedTransactionIds;
 
         // follow-up actions, to be executed when this batch completes
         private readonly List<Action<bool>> followUpActions;
@@ -62,6 +64,8 @@ namespace Orleans.Transactions
 
         public int CommitCount => commit;
 
+        public ImmutableArray<Guid> CommittedTransactionIds => [.. committedTransactionIds];
+
         public override string ToString()
         {
             return $"batchsize={total} [{read}r {prepare}p {commit}c {confirm}cf {collect}cl {cancel}cc]";
@@ -77,6 +81,7 @@ namespace Orleans.Transactions
             this.followUpActions = new List<Action<bool>>();
             this.storeConditions = new List<Func<Task<bool>>>();
             this.prepares = new SortedDictionary<long, PendingTransactionState<TState>>();
+            this.committedTransactionIds = new List<Guid>();
         }
 
         public StorageBatch(StorageBatch<TState> previous)
@@ -185,6 +190,7 @@ namespace Orleans.Transactions
         {
             commit++;
             total++;
+            committedTransactionIds.Add(transactionId);
 
             MetaData.CommitRecords.Add(transactionId, new CommitRecord()
             {
