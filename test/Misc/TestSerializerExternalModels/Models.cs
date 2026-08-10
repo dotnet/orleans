@@ -2,6 +2,10 @@ using Orleans;
 
 namespace UnitTests.SerializerExternalModels;
 
+public abstract class JsonPolymorphicBase
+{
+}
+
 [GenerateSerializer]
 public record struct Person2ExternalStruct(int Age, string Name)
 {

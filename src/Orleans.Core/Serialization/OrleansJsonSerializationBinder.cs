@@ -86,7 +86,8 @@ namespace Orleans.Serialization
 
         private static string BuildNotAllowedMessage(string fullName) =>
             $"Unable to resolve type \"{fullName}\". The type could not be found or is not permitted by the configured type allow-list. " +
-            $"To allow it, mark the type with [GenerateSerializer], add it to {nameof(Configuration.TypeManifestOptions)}.{nameof(Configuration.TypeManifestOptions.AllowedTypes)}, " +
-            $"register an {nameof(ITypeNameFilter)} or {nameof(ITypeFilter)} which allows it, or set {nameof(OrleansJsonSerializerOptions)}.{nameof(OrleansJsonSerializerOptions.AllowAllTypes)} to true to restore the previous behavior.";
+            $"To allow it, mark the type with [GenerateSerializer], call {nameof(Configuration.TypeManifestOptions)}.{nameof(Configuration.TypeManifestOptions.AddAllowedType)}, " +
+            $"call {nameof(Configuration.TypeManifestOptions)}.{nameof(Configuration.TypeManifestOptions.AddAllowedAssembly)}, add its Orleans-formatted name to {nameof(Configuration.TypeManifestOptions)}.{nameof(Configuration.TypeManifestOptions.AllowedTypes)}, " +
+            $"or register an {nameof(ITypeNameFilter)} or {nameof(ITypeFilter)} which allows it. Setting {nameof(OrleansJsonSerializerOptions)}.{nameof(OrleansJsonSerializerOptions.AllowAllTypes)} to true restores the previous behavior but is insecure when serialized input can be influenced by an untrusted party.";
     }
 }

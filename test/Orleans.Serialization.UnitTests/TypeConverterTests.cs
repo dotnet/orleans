@@ -1,10 +1,12 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Activators;
 using Orleans.Serialization.Configuration;
 using Orleans.Serialization.TypeSystem;
+using UnitTests.SerializerExternalModels;
 using Xunit;
 
 namespace Orleans.Serialization.UnitTests
@@ -20,11 +22,98 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [Fact]
-        public void TypeConverter_DefaultsToAllowAllTypes_WhenAllFiltersHaveNoOpinion_AndAllowAllTypesIsTrue()
+        public void TypeConverter_AllowAllTypes_TakesPrecedenceOverDenyingFilters()
         {
-            var converter = CreateConverter(allowAllTypes: true);
+            var converter = CreateConverter(
+                allowAllTypes: true,
+                typeNameFilters: [new DelegateTypeNameFilter((_, _) => false)],
+                typeFilters: [new DelegateTypeFilter(_ => false)]);
 
             AssertRoundTrips(converter, typeof(TypeConverterTestsUnconfiguredType));
+        }
+
+        [Fact]
+        public void TypeConverter_JsonSerializerRegistration_DoesNotAuthorizeAbstractGenericArguments()
+        {
+            using var services = CreateJsonSerializerServices();
+            var converter = services.GetRequiredService<TypeConverter>();
+            var type = typeof(IReadOnlyList<JsonPolymorphicBase>);
+
+            AssertTypeNotAllowed(converter, type);
+
+            var exception = Assert.Throws<InvalidOperationException>(() => converter.Format(type));
+            Assert.Contains(nameof(TypeManifestOptions.AddAllowedType), exception.Message);
+            Assert.Contains(nameof(TypeManifestOptions.AddAllowedAssembly), exception.Message);
+            Assert.Contains(nameof(TypeManifestOptions.AllowAllTypes), exception.Message);
+        }
+
+        [Fact]
+        public void TypeConverter_JsonSerializer_AllowsAbstractGenericArgumentsAddedByType()
+        {
+            using var services = CreateJsonSerializerServices(
+                options => options.AddAllowedType(typeof(JsonPolymorphicBase)));
+
+            AssertRoundTrips(
+                services.GetRequiredService<TypeConverter>(),
+                typeof(IReadOnlyList<JsonPolymorphicBase>));
+        }
+
+        [Fact]
+        public void TypeConverter_JsonSerializer_AllowsAbstractGenericArgumentsAddedByFormattedName()
+        {
+            using var services = CreateJsonSerializerServices(
+                options => options.AllowedTypes.Add(typeof(JsonPolymorphicBase).FullName!));
+
+            AssertRoundTrips(
+                services.GetRequiredService<TypeConverter>(),
+                typeof(IReadOnlyList<JsonPolymorphicBase>));
+        }
+
+        [Fact]
+        public void TypeConverter_JsonSerializer_AllowsAbstractGenericArgumentsFromAllowedAssembly()
+        {
+            using var services = CreateJsonSerializerServices(
+                options => options.AddAllowedAssembly(typeof(JsonPolymorphicBase).Assembly));
+
+            AssertRoundTrips(
+                services.GetRequiredService<TypeConverter>(),
+                typeof(IReadOnlyList<JsonPolymorphicBase>));
+        }
+
+        [Fact]
+        public void TypeConverter_JsonSerializer_AllowsAbstractGenericArgumentsWhenAllTypesAreAllowed()
+        {
+            using var services = CreateJsonSerializerServices(options => options.AllowAllTypes = true);
+
+            AssertRoundTrips(
+                services.GetRequiredService<TypeConverter>(),
+                typeof(IReadOnlyList<JsonPolymorphicBase>));
+        }
+
+        [Fact]
+        public void TypeConverter_JsonSerializer_AllowsAbstractGenericArgumentsUsingTypeNameFilter()
+        {
+            using var services = CreateJsonSerializerServices(
+                configureServices: services => services.AddSingleton<ITypeNameFilter>(
+                    new DelegateTypeNameFilter((typeName, _) =>
+                        typeName == typeof(JsonPolymorphicBase).FullName ? true : null)));
+
+            AssertRoundTrips(
+                services.GetRequiredService<TypeConverter>(),
+                typeof(IReadOnlyList<JsonPolymorphicBase>));
+        }
+
+        [Fact]
+        public void TypeConverter_JsonSerializer_AllowsAbstractGenericArgumentsUsingTypeFilter()
+        {
+            using var services = CreateJsonSerializerServices(
+                configureServices: services => services.AddSingleton<ITypeFilter>(
+                    new DelegateTypeFilter(type =>
+                        type == typeof(JsonPolymorphicBase) ? true : null)));
+
+            AssertRoundTrips(
+                services.GetRequiredService<TypeConverter>(),
+                typeof(IReadOnlyList<JsonPolymorphicBase>));
         }
 
         [Fact]
@@ -101,6 +190,17 @@ namespace Orleans.Serialization.UnitTests
                 ]);
 
             AssertTypeNotAllowed(converter, typeof(TypeConverterTestsUnconfiguredType));
+        }
+
+        [Fact]
+        public void TypeConverter_ConfiguredAllowedTypes_TakePrecedenceOverDenyingFilters()
+        {
+            var converter = CreateConverter(
+                configureOptions: options => options.AddAllowedType(typeof(TypeConverterTestsUnconfiguredType)),
+                typeNameFilters: [new DelegateTypeNameFilter((_, _) => false)],
+                typeFilters: [new DelegateTypeFilter(_ => false)]);
+
+            AssertRoundTrips(converter, typeof(TypeConverterTestsUnconfiguredType));
         }
 
         [Fact]
@@ -409,6 +509,24 @@ namespace Orleans.Serialization.UnitTests
                 typeFilters ?? Array.Empty<ITypeFilter>(),
                 Options.Create(options),
                 new CachedTypeResolver());
+        }
+
+        private static ServiceProvider CreateJsonSerializerServices(
+            Action<TypeManifestOptions>? configureOptions = null,
+            Action<IServiceCollection>? configureServices = null)
+        {
+            var services = new ServiceCollection();
+            services.AddSerializer(builder =>
+            {
+                builder.AddJsonSerializer(isSupported: _ => true);
+                if (configureOptions is not null)
+                {
+                    builder.Configure(configureOptions);
+                }
+            });
+
+            configureServices?.Invoke(services);
+            return services.BuildServiceProvider();
         }
 
         private sealed class DelegateTypeNameFilter(Func<string, string, bool?> filter) : ITypeNameFilter
