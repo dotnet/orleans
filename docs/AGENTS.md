@@ -49,15 +49,14 @@ Configure it with <xref:Orleans.Hosting.AzureTableSiloBuilderExtensions.AddAzure
 
 ## Documentation types
 
-Orleans runs high-scale production services at Microsoft and elsewhere, so
-first-class documentation is a primary deliverable, not an afterthought. It must
-address the concerns that actually arise when operating secure, high-scale
-systems: correctness, security, availability, upgrades, capacity, cost, and
-diagnosis of failures under load. The repository doesn't have complete coverage
-of every category below yet; treat the gaps as work worth doing rather than as
-precedent.
+Documentation and samples are a primary deliverable in this repository. They
+must address the concerns involved in operating secure, high-scale systems:
+correctness, security, availability, upgrades, capacity, cost, and diagnosis of
+failures under load. The repository doesn't have complete coverage of every
+category below yet; don't treat existing gaps as precedent.
 
-All of the following are highly valued, and none substitutes for another:
+Each of the following serves a distinct purpose, and none substitutes for
+another:
 
 - **Architecture and implementation detail** — how Orleans actually works
   internally: components and their responsibilities, protocols and message
@@ -82,10 +81,10 @@ All of the following are highly valued, and none substitutes for another:
   the public surface, including semantics, thread-safety, lifetime, exceptions,
   and defaults. Reference pages should link out to the conceptual and how-to
   content that gives them context.
-- **FAQ and troubleshooting** — the questions people really ask and the failures
-  they really hit, organized by observed symptom (exception, log message, metric,
-  or behavior) with root cause, remedy, and prevention. This is often the
-  highest-value documentation for a production incident.
+- **FAQ and troubleshooting** — commonly asked questions and encountered
+  failures, organized by observed symptom (exception, log message, metric, or
+  behavior) with root cause, remedy, and prevention. This documentation should
+  support diagnosis during production incidents.
 
 Prefer adding a missing category over repeatedly expanding an existing page.
 Keep the categories distinct, and cross-link between them instead of blending a
