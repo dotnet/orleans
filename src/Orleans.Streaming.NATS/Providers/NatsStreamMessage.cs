@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using Orleans.Runtime;
 
@@ -13,10 +12,6 @@ internal class NatsStreamMessage
     [JsonConverter(typeof(StreamIdJsonConverter))]
     [JsonPropertyName("sid")]
     public StreamId StreamId { get; set; }
-
-    [Id(1)]
-    [JsonPropertyName("ctx")]
-    public Dictionary<string, object>? RequestContext { get; set; }
 
     [Id(2)]
     [JsonPropertyName("p")]

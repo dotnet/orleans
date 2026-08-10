@@ -26,12 +26,19 @@ internal sealed class NatsAdapter(
     public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token,
         Dictionary<string, object>? requestContext)
     {
+        await natsConnectionManager.EnqueueMessage(CreateMessage(serializer, streamId, events, requestContext));
+    }
+
+    internal static NatsStreamMessage CreateMessage<T>(Serializer serializer, StreamId streamId, IEnumerable<T> events,
+        Dictionary<string, object>? requestContext)
+    {
         var batchContainer = new NatsBatchContainer(streamId, events.Cast<object>().ToArray(), requestContext);
         var raw = serializer.GetSerializer<NatsBatchContainer>().SerializeToArray(batchContainer);
 
-        await natsConnectionManager.EnqueueMessage(new NatsStreamMessage
+        // Request context is carried in the Orleans-serialized payload, which preserves its value types.
+        return new NatsStreamMessage
         {
-            StreamId = streamId, Payload = raw, RequestContext = requestContext
-        });
+            StreamId = streamId, Payload = raw
+        };
     }
 }
