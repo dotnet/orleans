@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Streams
@@ -11,7 +12,17 @@ namespace Orleans.Streams
         /// Creates a queue adapter.
         /// </summary>
         /// <returns>The queue adapter</returns>
+        [Obsolete("Use the overload which accepts a CancellationToken.")]
         Task<IQueueAdapter> CreateAdapter();
+
+        /// <summary>
+        /// Creates a queue adapter.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>The queue adapter.</returns>
+#pragma warning disable CS0618 // Required for compatibility with providers which only implement the legacy overload.
+        Task<IQueueAdapter> CreateAdapter(CancellationToken cancellationToken) => CreateAdapter();
+#pragma warning restore CS0618
 
         /// <summary>
         /// Creates queue message cache adapter.

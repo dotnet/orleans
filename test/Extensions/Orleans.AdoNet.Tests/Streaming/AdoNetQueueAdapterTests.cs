@@ -199,7 +199,7 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
         var receiver = adapter.CreateReceiver(queueId);
         await receiver.Initialize(TimeSpan.FromSeconds(10));
         var beforeDequeued = DateTime.UtcNow;
-        var messages = await receiver.GetQueueMessagesAsync(10);
+        var messages = await receiver.GetQueueMessagesAsync(10, CancellationToken.None);
         var afterDequeued = DateTime.UtcNow;
 
         // assert - dequeued messages are as expected

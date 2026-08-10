@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -55,14 +56,20 @@ namespace Orleans.Streams
         }
 
         /// <inheritdoc />
+        [Obsolete("Use the overload which accepts a CancellationToken.")]
         public Task<IStreamQueueCheckpointer<string>> Create(string partition)
+            => Create(partition, CancellationToken.None);
+
+        /// <inheritdoc />
+        public Task<IStreamQueueCheckpointer<string>> Create(string partition, CancellationToken cancellationToken)
         {
             return GrainStreamQueueCheckpointer.Create(
                 _providerName,
                 partition,
                 _clusterOptions.ServiceId.ToString(),
                 _clusterClient,
-                _checkpointerOptions);
+                _checkpointerOptions,
+                cancellationToken);
         }
     }
 }

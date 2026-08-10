@@ -89,7 +89,7 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
 
     private async Task SendAndReceiveFromQueueAdapter(IQueueAdapterFactory adapterFactory)
     {
-        IQueueAdapter adapter = await adapterFactory.CreateAdapter();
+        IQueueAdapter adapter = await adapterFactory.CreateAdapter(CancellationToken.None);
         IQueueAdapterCache cache = adapterFactory.GetQueueAdapterCache();
 
         // Create receiver per queue
@@ -120,7 +120,7 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
             {
                 while (receivedBatches < NumBatches)
                 {
-                    var receivedMessages = receiver.GetQueueMessagesAsync(50).Result;
+                    var receivedMessages = receiver.GetQueueMessagesAsync(50, CancellationToken.None).Result;
                     Assert.NotNull(receivedMessages);
                     var messages = receivedMessages.ToArray();
                     if (!messages.Any())

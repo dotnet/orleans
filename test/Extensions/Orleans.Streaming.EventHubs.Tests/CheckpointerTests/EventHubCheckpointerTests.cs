@@ -108,7 +108,7 @@ public class EventHubCheckpointerTests
         {
             if (PurgeOffsetToReport is not null)
             {
-                checkpointer?.Update(PurgeOffsetToReport, DateTime.UtcNow);
+                checkpointer?.Update(PurgeOffsetToReport, DateTime.UtcNow, CancellationToken.None);
             }
         }
 
@@ -143,6 +143,27 @@ public class EventHubCheckpointerTests
             ReceiveCount++;
             // Simulate a receiver binary compiled before the return value was annotated as non-null.
             return Task.FromResult<IEnumerable<EventData>>(null!);
+        }
+
+        public Task CloseAsync() => Task.CompletedTask;
+    }
+
+    private sealed class CancellableEventHubReceiver : IEventHubReceiver
+    {
+        public TaskCompletionSource<CancellationToken> ReceiveStarted { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
+            => Task.FromResult<IEnumerable<EventData>>([]);
+
+        public async Task<IEnumerable<EventData>> ReceiveAsync(
+            int maxCount,
+            TimeSpan waitTime,
+            CancellationToken cancellationToken)
+        {
+            ReceiveStarted.SetResult(cancellationToken);
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return [];
         }
 
         public Task CloseAsync() => Task.CompletedTask;
@@ -248,11 +269,41 @@ public class EventHubCheckpointerTests
         var eventHubReceiver = new NullReturningEventHubReceiver();
         var receiver = await CreateReceiver(new TestCheckpointer(), cache, eventHubReceiver);
 
-        var messages = await receiver.GetQueueMessagesAsync(10);
+        var messages = await receiver.GetQueueMessagesAsync(10, CancellationToken.None);
 
         Assert.Empty(messages);
         Assert.Equal(1, eventHubReceiver.ReceiveCount);
         Assert.Equal(0, cache.AddCount);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task GetQueueMessagesAsync_ForwardsCancellationToken()
+    {
+        var eventHubReceiver = new CancellableEventHubReceiver();
+        var receiver = await CreateReceiver(
+            new TestCheckpointer(),
+            eventHubReceiver: eventHubReceiver);
+        using var cancellation = new CancellationTokenSource();
+
+        var operation = receiver.GetQueueMessagesAsync(10, cancellation.Token);
+        Assert.Equal(cancellation.Token, await eventHubReceiver.ReceiveStarted.Task);
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task CancellationOverloads_FallBackToLegacyReceiver()
+    {
+        IEventHubReceiver receiver = new TestEventHubReceiver();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Empty(await receiver.ReceiveAsync(10, TimeSpan.Zero, cancellation.Token));
+        await receiver.CloseAsync(cancellation.Token);
+
+        Assert.Equal(1, ((TestEventHubReceiver)receiver).CloseCount);
     }
 
     [Fact, TestCategory("BVT")]
@@ -404,7 +455,7 @@ public class EventHubCheckpointerTests
         Assert.NotNull(constructor);
         var checkpointer = (EventHubCheckpointer)constructor.Invoke([inner]);
 
-        Assert.Equal(expected, await checkpointer.Load());
+        Assert.Equal(expected, await checkpointer.Load(CancellationToken.None));
     }
 
     [Fact, TestCategory("BVT")]

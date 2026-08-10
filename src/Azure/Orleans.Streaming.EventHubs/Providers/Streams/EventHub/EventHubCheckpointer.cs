@@ -81,9 +81,17 @@ namespace Orleans.Streaming.EventHubs
         /// Loads a checkpoint
         /// </summary>
         /// <returns></returns>
-        public async Task<string> Load()
+        [Obsolete("Use the overload which accepts a CancellationToken.")]
+        public Task<string> Load() => Load(CancellationToken.None);
+
+        /// <summary>
+        /// Loads a checkpoint.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>The checkpoint.</returns>
+        public async Task<string> Load(CancellationToken cancellationToken)
         {
-            var checkpoint = await _inner.Load();
+            var checkpoint = await _inner.Load(cancellationToken);
             return CheckpointExists ? checkpoint : EventHubConstants.StartOfStream;
         }
 
@@ -93,7 +101,18 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         /// <param name="offset"></param>
         /// <param name="utcNow"></param>
-        public void Update(string offset, DateTime utcNow) => _inner.Update(offset, utcNow);
+        [Obsolete("Use the overload which accepts a CancellationToken.")]
+        public void Update(string offset, DateTime utcNow)
+            => Update(offset, utcNow, CancellationToken.None);
+
+        /// <summary>
+        /// Updates the checkpoint.
+        /// </summary>
+        /// <param name="offset">The checkpoint offset.</param>
+        /// <param name="utcNow">The current UTC time.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        public void Update(string offset, DateTime utcNow, CancellationToken cancellationToken)
+            => _inner.Update(offset, utcNow, cancellationToken);
 
         /// <summary>
         /// Flushes any pending checkpoint to persistent storage.
