@@ -5,16 +5,18 @@ import remarkDirective from 'remark-directive';
 import starlightLinksValidator from 'starlight-links-validator';
 import starlightLlmsTxt from 'starlight-llms-txt';
 import { createSidebar } from './scripts/lib/docfx.mjs';
+import { devSearchPlugin } from './scripts/lib/dev-search.mjs';
 import { remarkMermaid } from './src/plugins/remark-mermaid.mjs';
 import { remarkVersionZones } from './src/plugins/remark-version-zones.mjs';
 
 const sidebar = await createSidebar(new URL('./src/content/docs/toc.yml', import.meta.url));
 const buildConcurrency = Number(process.env.ORLEANS_DOCS_BUILD_CONCURRENCY) || 4;
+const siteBase = '/orleans/';
 sidebar.unshift({ label: 'Documentation', link: '/docs/' });
 
 export default defineConfig({
   site: 'https://dotnet.github.io/orleans/',
-  base: '/orleans/',
+  base: siteBase,
   integrations: [
     starlight({
       title: 'Microsoft Orleans',
@@ -27,6 +29,7 @@ export default defineConfig({
       customCss: ['./src/styles/custom.css'],
       components: {
         MarkdownContent: './src/components/MarkdownContent.astro',
+        Search: './src/components/Search.astro',
       },
       editLink: {
         baseUrl: 'https://github.com/dotnet/orleans/edit/main/docs/site/',
@@ -68,5 +71,13 @@ export default defineConfig({
   },
   build: {
     concurrency: buildConcurrency,
+  },
+  vite: {
+    plugins: [
+      devSearchPlugin({
+        directory: new URL('./.generated/pagefind/', import.meta.url),
+        route: `${siteBase}pagefind/`,
+      }),
+    ],
   },
 });

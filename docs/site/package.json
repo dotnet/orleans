@@ -8,7 +8,7 @@
   },
   "scripts": {
     "api:generate": "pwsh ../scripts/Generate-ApiData.ps1 -Parallelism 4",
-    "dev": "npm run prepare:docs && astro dev",
+    "dev": "npm run prepare:docs && node scripts/prepare-dev-search.mjs && astro dev",
     "preview": "astro preview",
     "prepare:docs": "node scripts/prepare-docs.mjs",
     "legacy:redirects": "node scripts/generate-legacy-redirects.mjs",

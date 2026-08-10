@@ -16,6 +16,8 @@ npm run dev
 API generation builds the public Orleans packages and can take several minutes.
 The generated package JSON is ignored by Git and should not be committed. You can
 skip this step when API reference pages aren't needed for the local preview.
+The development server builds a lightweight Pagefind index from the prepared
+documentation so that site search works without a production build.
 
 After a production build, serve the exact static artifact with `npm run preview`.
 

@@ -1,0 +1,33 @@
+---
+import Default from '@astrojs/starlight/components/Search.astro';
+---
+
+<Default {...Astro.props} />
+
+<script>
+  if (import.meta.env.DEV) {
+    window.addEventListener('DOMContentLoaded', async () => {
+      const siteSearch = document.querySelector('site-search');
+      const placeholder = siteSearch?.querySelector<HTMLElement>('.dialog-frame > div[dir="ltr"]');
+      if (!placeholder) {
+        return;
+      }
+
+      placeholder.removeAttribute('style');
+      placeholder.removeAttribute('dir');
+      placeholder.className = 'search-container';
+      placeholder.id = 'starlight__search';
+      placeholder.replaceChildren();
+
+      // @ts-expect-error Pagefind's default UI package does not publish TypeScript declarations.
+      const { PagefindUI } = await import('@pagefind/default-ui');
+      new PagefindUI({
+        element: '#starlight__search',
+        baseUrl: import.meta.env.BASE_URL,
+        bundlePath: import.meta.env.BASE_URL.replace(/\/$/, '') + '/pagefind/',
+        showImages: false,
+        showSubResults: true,
+      });
+    });
+  }
+</script>
