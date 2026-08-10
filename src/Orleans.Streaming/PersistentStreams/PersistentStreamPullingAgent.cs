@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.IO;
@@ -29,7 +28,7 @@ namespace Orleans.Streams
         private readonly string streamProviderName;
         private readonly IStreamPubSub pubSub;
         private readonly IStreamFilter streamFilter;
-        private readonly ConcurrentDictionary<QualifiedStreamId, StreamConsumerCollection> pubSubCache;
+        private readonly Dictionary<QualifiedStreamId, StreamConsumerCollection> pubSubCache;
         private readonly StreamPullingAgentOptions options;
         private readonly ILogger logger;
         private readonly IQueueAdapterCache queueAdapterCache;
@@ -90,7 +89,7 @@ namespace Orleans.Streams
             streamProviderName = strProviderName;
             pubSub = streamPubSub;
             this.streamFilter = streamFilter;
-            pubSubCache = new ConcurrentDictionary<QualifiedStreamId, StreamConsumerCollection>();
+            pubSubCache = new Dictionary<QualifiedStreamId, StreamConsumerCollection>();
             this.options = options;
             options.InitialSubscriptionStartPosition.Validate();
             this.queueAdapter = queueAdapter ?? throw new ArgumentNullException(nameof(queueAdapter));
@@ -829,7 +828,7 @@ namespace Orleans.Streams
             }
 
             if (streamData.Count == 0)
-                pubSubCache.TryRemove(streamId, out _);
+                pubSubCache.Remove(streamId);
         }
 
         private Task RunQueuePump(QueueId queueId, CancellationToken cancellationToken)
@@ -1279,6 +1278,7 @@ namespace Orleans.Streams
             }
 
             streamData.RegistrationTask = RegisterStreamAsync();
+            pubSubCache.Add(streamId, streamData);
 
             async Task RegisterStreamAsync()
             {
@@ -1363,7 +1363,7 @@ namespace Orleans.Streams
                 if (pubSubCache.TryGetValue(streamId, out var cachedStreamData)
                     && ReferenceEquals(cachedStreamData, streamData))
                 {
-                    pubSubCache.TryRemove(streamId, out _);
+                    pubSubCache.Remove(streamId);
                 }
 
                 streamData.DisposeAll(logger);
@@ -1648,7 +1648,7 @@ namespace Orleans.Streams
                         if (faultedSubscription) return;
                     }
                 }
-                await RestartOrInactivateConsumer(consumerData);
+                consumerData.State = StreamConsumerDataState.Inactive;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -1660,28 +1660,8 @@ namespace Orleans.Streams
                 _useLegacyDeliveryProgress = true;
                 // RunConsumerCursor is fired with .Ignore so we should log if anything goes wrong, because there is no one to catch the exception
                 LogErrorRunConsumerCursor(exc);
-                await RestartOrInactivateConsumer(consumerData);
-                throw;
-            }
-        }
-
-        private async Task RestartOrInactivateConsumer(StreamConsumerData consumerData)
-        {
-            await consumerData.Semaphore.WaitAsync();
-            try
-            {
                 consumerData.State = StreamConsumerDataState.Inactive;
-
-                if (!IsShutdown
-                    && consumerData.Cursor?.LastRefreshToken is { } lastRefreshToken
-                    && (consumerData.LastProcessedToken is null || IsBefore(consumerData.LastProcessedToken, lastRefreshToken)))
-                {
-                    RunConsumerCursor(consumerData).Ignore();
-                }
-            }
-            finally
-            {
-                consumerData.Semaphore.Release();
+                throw;
             }
         }
 

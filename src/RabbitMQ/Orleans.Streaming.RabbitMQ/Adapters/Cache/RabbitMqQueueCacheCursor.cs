@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Diagnostics.CodeAnalysis;
 using Orleans.Streams;
 
 namespace Orleans.Streaming.RabbitMQ.Adapters.Cache;
@@ -11,22 +10,20 @@ internal class RabbitMqQueueCacheCursor : IQueueCacheCursor
     private readonly Action<RabbitMqBatchContainer> _onMessageRead;
     private readonly Func<ConcurrentQueue<RabbitMqBatchContainer>> _onPreRefresh;
     private readonly Action _onDispose;
-    private readonly Action _onRetryMessage;
     private RabbitMqBatchContainer _current;
 
+    private bool _hasRefreshed;
     private bool _movedFromDeliveredMessage;
 
     public RabbitMqQueueCacheCursor(StreamSequenceToken handshakeToken,
         ConcurrentQueue<RabbitMqBatchContainer> processingMessages,
         Action<RabbitMqBatchContainer> onMessageRead,
-        Action onRetryMessage,
         Func<ConcurrentQueue<RabbitMqBatchContainer>> onPreRefresh, Action onDispose)
     {
         _handshakeToken = handshakeToken;
         _onMessageRead = onMessageRead;
         _onPreRefresh = onPreRefresh;
         _onDispose = onDispose;
-        _onRetryMessage = onRetryMessage;
         Initialize(processingMessages);
     }
 
@@ -80,17 +77,7 @@ internal class RabbitMqQueueCacheCursor : IQueueCacheCursor
 
     private void PurgeCurrentMessage()
     {
-        //Only messages that won't be retried (aka, didn't fail to process on the last run) should be purged,
-        //otherwise we would be losing failed messages
-        if (_current is { WillRetry: true })
-        {
-            _current = null;
-        }
-        else
-        {
-            _processingMessages.TryDequeue(out _);
-        }
-
+        _processingMessages.TryDequeue(out _);
         _onMessageRead(_current);
         _current = null;
     }
@@ -129,11 +116,9 @@ internal class RabbitMqQueueCacheCursor : IQueueCacheCursor
     {
         if (_current is { DeliveryFailed: true })
         {
-            //Reset failed state so we can retry process this message when the cursor hit this point again
+            // Keep the current message selected so that the pulling agent retries it in place.
             _current.DeliveryFailed = false;
-            _current.WillRetry = true;
-            PurgeCurrentMessage();
-            return false;
+            return true;
         }
 
         RabbitMqBatchContainer message;
@@ -144,7 +129,7 @@ internal class RabbitMqQueueCacheCursor : IQueueCacheCursor
             //The consumer will reject the message and reinitialize the cursor.
             //This condition should only be true for the first time the cursor is requested to MoveNext, avoiding losing the current message
             if (_processingMessages.TryPeek(out message) &&
-                message.SequenceToken.SequenceNumber > _handshakeToken.SequenceNumber && LastRefreshToken is null &&
+                message.SequenceToken.SequenceNumber > _handshakeToken.SequenceNumber && !_hasRefreshed &&
                 !_movedFromDeliveredMessage)
             {
                 _movedFromDeliveredMessage = true;
@@ -154,16 +139,6 @@ internal class RabbitMqQueueCacheCursor : IQueueCacheCursor
             _processingMessages.TryPeek(out message);
 
             _current = message;
-
-            if (_current is { WillRetry: true })
-            {
-                //Reset retry flag so that the cursor can try deliver this message to the consumer once again
-                _current.WillRetry = false;
-                _current = null;
-
-                //Let the queue cache know that this message is now being retried/processed again
-                _onRetryMessage();
-            }
 
             return _current is not null;
         }
@@ -188,12 +163,12 @@ internal class RabbitMqQueueCacheCursor : IQueueCacheCursor
     public void Refresh(StreamSequenceToken token)
     {
         //Now that we have access again to the current processingMessages, we can just start reading messages again
-        LastRefreshToken = token;
+        _hasRefreshed = true;
         var processingMessages = _onPreRefresh?.Invoke();
 
         //Create new cursor that only goes to the message before the handshakeToken
         var newCursor =
-            new RabbitMqQueueCacheCursor(_handshakeToken, processingMessages, _onMessageRead, _onRetryMessage, null, null);
+            new RabbitMqQueueCacheCursor(_handshakeToken, processingMessages, _onMessageRead, null, null);
         var nextBatch = newCursor.GetNextBatch();
 
         //Since the initialization came from a refresh, it means that unlike a first initialization,
@@ -209,8 +184,6 @@ internal class RabbitMqQueueCacheCursor : IQueueCacheCursor
             _processingMessages = processingMessages;
         }
     }
-
-    public StreamSequenceToken LastRefreshToken { get; private set; }
 
     public void RecordDeliveryFailure()
     {

@@ -31,10 +31,6 @@ public record RabbitMqBatchContainer : IBatchContainer
 
     [field: NonSerialized] public bool DeliveryFailed { get; set; }
 
-    /// <summary>
-    /// Indicates if the current batch should be retried in case of a failure
-    /// </summary>
-    [field: NonSerialized] public bool WillRetry { get; set; }
     [field: NonSerialized] public RabbitMqBatchContainer NextBatch { get; set; }
 
     [field: NonSerialized] public string CreatedAt { get; private set; }
