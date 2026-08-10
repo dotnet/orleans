@@ -1,6 +1,7 @@
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using ServiceBus.Tests.TestStreamProviders;
 using TestExtensions;
 using UnitTests.Grains.ProgrammaticSubscribe;
@@ -21,7 +22,7 @@ namespace ServiceBus.Tests.MonitorTests
     {
         private const string StreamProviderName = "EventHubStreamProvider";
         private const string StreamNamespace = "EHTestsNamespace";
-        private static readonly TimeSpan timeout = TimeSpan.FromSeconds(5);
+        private static readonly TimeSpan timeout = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan monitorWriteInterval = TimeSpan.FromSeconds(2);
         private static readonly int ehPartitionCountPerSilo = 4;
 
@@ -80,45 +81,115 @@ namespace ServiceBus.Tests.MonitorTests
 
             //configure data generator for stream and start producing
             var mgmtGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
+            await TestingUtils.WaitUntilAsync(
+                (lastTry, cancellationToken) => CheckReceiversInitialized(mgmtGrain, lastTry, cancellationToken),
+                timeout);
             var randomStreamPlacementArg = new EHStreamProviderForMonitorTestsAdapterFactory.StreamRandomPlacementArg(streamId, this.seed.Next(100));
             await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
                 (int)EHStreamProviderForMonitorTestsAdapterFactory.Commands.Randomly_Place_Stream_To_Queue, randomStreamPlacementArg);
+            await TestingUtils.WaitUntilAsync(
+                (lastTry, cancellationToken) => CheckMonitorCounters(mgmtGrain, requireCachePressure: false, lastTry, cancellationToken),
+                timeout);
 
-            // let the test to run for a while to build up some streaming traffic
-            await Task.Delay(timeout);
-            //wait sometime after cache pressure changing, for the system to notice it and trigger cache monitor to track it
             await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
                 (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.ChangeCachePressure, null);
-            await Task.Delay(timeout);
-
-            //assert EventHubReceiverMonitor call counters
-            var receiverMonitorCounters = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
-                (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetReceiverMonitorCallCounters, null);
-            foreach (var callCounter in receiverMonitorCounters)
-            {
-                AssertReceiverMonitorCallCounters((callCounter as EventHubReceiverMonitorCounters)!);
-            }
-
-            var cacheMonitorCounters = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
-                (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetCacheMonitorCallCounters, null);
-            foreach (var callCounter in cacheMonitorCounters)
-            {
-                AssertCacheMonitorCallCounters((callCounter as CacheMonitorCounters)!);
-            }
-
-            var objectPoolMonitorCounters = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
-             (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetObjectPoolMonitorCallCounters, null);
-            foreach (var callCounter in objectPoolMonitorCounters)
-            {
-                AssertObjectPoolMonitorCallCounters((callCounter as ObjectPoolMonitorCounters)!);
-            }
+            await TestingUtils.WaitUntilAsync(
+                (lastTry, cancellationToken) => CheckMonitorCounters(mgmtGrain, requireCachePressure: true, lastTry, cancellationToken),
+                timeout);
         }
 
-        private static void AssertCacheMonitorCallCounters(CacheMonitorCounters totalCacheMonitorCallCounters)
+        private static async Task<bool> CheckReceiversInitialized(IManagementGrain mgmtGrain, bool lastTry, CancellationToken cancellationToken)
+        {
+            var receiverMonitorCounters = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
+                (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetReceiverMonitorCallCounters, null).WaitAsync(cancellationToken);
+            var ready = receiverMonitorCounters.Length > 0
+                && receiverMonitorCounters.All(callCounter =>
+                    ((EventHubReceiverMonitorCounters)callCounter!).TrackInitializationCallCounter == ehPartitionCountPerSilo);
+
+            if (ready || lastTry)
+            {
+                Assert.NotEmpty(receiverMonitorCounters);
+                foreach (var callCounter in receiverMonitorCounters)
+                {
+                    var c = (EventHubReceiverMonitorCounters)callCounter!;
+                    Assert.True(c.TrackInitializationCallCounter == ehPartitionCountPerSilo,
+                        $"Expected {nameof(c.TrackInitializationCallCounter)} == {ehPartitionCountPerSilo}, got {c.TrackInitializationCallCounter}");
+                }
+            }
+
+            return ready;
+        }
+
+        private static async Task<bool> CheckMonitorCounters(
+            IManagementGrain mgmtGrain,
+            bool requireCachePressure,
+            bool lastTry,
+            CancellationToken cancellationToken)
+        {
+            var receiverMonitorCounters = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
+                (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetReceiverMonitorCallCounters, null).WaitAsync(cancellationToken);
+            var cacheMonitorCounters = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
+                (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetCacheMonitorCallCounters, null).WaitAsync(cancellationToken);
+            var objectPoolMonitorCounters = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
+                (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetObjectPoolMonitorCallCounters, null).WaitAsync(cancellationToken);
+
+            var ready = receiverMonitorCounters.Length > 0
+                && receiverMonitorCounters.All(callCounter => ReceiverMonitorCallCountersAreExpected((EventHubReceiverMonitorCounters)callCounter!))
+                && cacheMonitorCounters.Length > 0
+                && cacheMonitorCounters.All(callCounter => CacheMonitorCallCountersAreExpected((CacheMonitorCounters)callCounter!, requireCachePressure))
+                && objectPoolMonitorCounters.Length > 0
+                && objectPoolMonitorCounters.All(callCounter => ObjectPoolMonitorCallCountersAreExpected((ObjectPoolMonitorCounters)callCounter!));
+
+            if (ready || lastTry)
+            {
+                Assert.NotEmpty(receiverMonitorCounters);
+                foreach (var callCounter in receiverMonitorCounters)
+                {
+                    AssertReceiverMonitorCallCounters((EventHubReceiverMonitorCounters)callCounter!);
+                }
+
+                Assert.NotEmpty(cacheMonitorCounters);
+                foreach (var callCounter in cacheMonitorCounters)
+                {
+                    AssertCacheMonitorCallCounters((CacheMonitorCounters)callCounter!, requireCachePressure);
+                }
+
+                Assert.NotEmpty(objectPoolMonitorCounters);
+                foreach (var callCounter in objectPoolMonitorCounters)
+                {
+                    AssertObjectPoolMonitorCallCounters((ObjectPoolMonitorCounters)callCounter!);
+                }
+            }
+
+            return ready;
+        }
+
+        private static bool CacheMonitorCallCountersAreExpected(CacheMonitorCounters c, bool requireCachePressure) =>
+            (!requireCachePressure || c.TrackCachePressureMonitorStatusChangeCallCounter > 0)
+            && c.TrackMemoryAllocatedCallCounter > 0
+            && c.TrackMemoryReleasedCallCounter == 0
+            && c.TrackMessageAddedCounter > 0
+            && c.TrackMessagePurgedCounter == 0;
+
+        private static bool ReceiverMonitorCallCountersAreExpected(EventHubReceiverMonitorCounters c) =>
+            c.TrackInitializationCallCounter == ehPartitionCountPerSilo
+            && c.TrackMessagesReceivedCallCounter > 0
+            && c.TrackReadCallCounter > 0
+            && c.TrackShutdownCallCounter == 0;
+
+        private static bool ObjectPoolMonitorCallCountersAreExpected(ObjectPoolMonitorCounters c) =>
+            c.TrackObjectAllocatedByCacheCallCounter > 0
+            && c.TrackObjectReleasedFromCacheCallCounter == 0;
+
+        private static void AssertCacheMonitorCallCounters(CacheMonitorCounters totalCacheMonitorCallCounters, bool requireCachePressure)
         {
             var c = totalCacheMonitorCallCounters;
-            Assert.True(c.TrackCachePressureMonitorStatusChangeCallCounter > 0,
-                $"Expected {nameof(c.TrackCachePressureMonitorStatusChangeCallCounter)} > 0, got {c.TrackCachePressureMonitorStatusChangeCallCounter}");
+            if (requireCachePressure)
+            {
+                Assert.True(c.TrackCachePressureMonitorStatusChangeCallCounter > 0,
+                    $"Expected {nameof(c.TrackCachePressureMonitorStatusChangeCallCounter)} > 0, got {c.TrackCachePressureMonitorStatusChangeCallCounter}");
+            }
+
             Assert.True(c.TrackMemoryAllocatedCallCounter > 0, $"Expected {nameof(c.TrackMemoryAllocatedCallCounter)} > 0, got {c.TrackMemoryAllocatedCallCounter}");
             Assert.True(0 == c.TrackMemoryReleasedCallCounter, $"Expected {nameof(c.TrackMemoryReleasedCallCounter)} == 0, got {c.TrackMemoryReleasedCallCounter}");
             Assert.True(c.TrackMessageAddedCounter > 0, $"Expected {nameof(c.TrackMessageAddedCounter)} > 0, got {c.TrackMessageAddedCounter}");
