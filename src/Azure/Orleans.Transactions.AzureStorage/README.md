@@ -96,8 +96,8 @@ public class MyState
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Transactions](https://learn.microsoft.com/dotnet/orleans/grains/transactions)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
+- [Transactions](https://dotnet.github.io/orleans/docs/grains/transactions/)
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)

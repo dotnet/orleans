@@ -67,9 +67,9 @@ await host.WaitForShutdownAsync();
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Configuration Guide](https://learn.microsoft.com/en-us/dotnet/orleans/host/configuration-guide/)
-- [Orleans Clustering](https://learn.microsoft.com/en-us/dotnet/orleans/implementation/cluster-management)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
+- [Configuration Guide](https://dotnet.github.io/orleans/docs/host/configuration-guide/)
+- [Orleans Clustering](https://dotnet.github.io/orleans/docs/implementation/cluster-management/)
 - [AWS SDK for .NET Documentation](https://docs.aws.amazon.com/sdk-for-net/index.html)
 
 ## Feedback & Contributing

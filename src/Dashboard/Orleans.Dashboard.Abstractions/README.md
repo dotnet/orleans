@@ -21,8 +21,8 @@ This package provides:
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Orleans observability](https://learn.microsoft.com/en-us/dotnet/orleans/host/monitoring/)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
+- [Orleans observability](https://dotnet.github.io/orleans/docs/host/monitoring/)
 - [Orleans Dashboard package](https://www.nuget.org/packages/Microsoft.Orleans.Dashboard/)
 
 ## Feedback & Contributing

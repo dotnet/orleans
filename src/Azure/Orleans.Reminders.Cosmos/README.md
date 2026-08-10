@@ -79,8 +79,8 @@ public class ReminderGrain : Grain, IReminderGrain, IRemindable
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Reminders and Timers](https://learn.microsoft.com/dotnet/orleans/grains/timers-and-reminders)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
+- [Reminders and Timers](https://dotnet.github.io/orleans/docs/grains/timers-and-reminders/)
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)

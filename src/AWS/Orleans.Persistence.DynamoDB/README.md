@@ -74,8 +74,8 @@ public class MyGrain : Grain, IMyGrain, IGrainWithStringKey
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Grain Persistence](https://learn.microsoft.com/en-us/dotnet/orleans/grains/grain-persistence)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
+- [Grain Persistence](https://dotnet.github.io/orleans/docs/grains/grain-persistence/)
 - [AWS SDK for .NET Documentation](https://docs.aws.amazon.com/sdk-for-net/index.html)
 
 ## Feedback & Contributing

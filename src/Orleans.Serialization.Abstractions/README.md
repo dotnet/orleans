@@ -34,9 +34,9 @@ public class MyData
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Serialization in Orleans](https://learn.microsoft.com/dotnet/orleans/host/configuration-guide/serialization)
-- [Configure serialization](https://learn.microsoft.com/dotnet/orleans/host/configuration-guide/serialization-configuration)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
+- [Serialization in Orleans](https://dotnet.github.io/orleans/docs/host/configuration-guide/serialization/)
+- [Configure serialization](https://dotnet.github.io/orleans/docs/host/configuration-guide/serialization-configuration/)
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)

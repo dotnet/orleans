@@ -146,8 +146,8 @@ builder.Build().Run();
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Reminders and Timers](https://learn.microsoft.com/dotnet/orleans/grains/timers-and-reminders)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
+- [Reminders and Timers](https://dotnet.github.io/orleans/docs/grains/timers-and-reminders/)
 - [Redis Documentation](https://redis.io/documentation)
 
 ## Feedback & Contributing

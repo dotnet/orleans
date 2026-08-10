@@ -103,6 +103,6 @@ To provide a different checkpoint implementation, use the configurator overload 
 
 ## Documentation
 
-- [Microsoft Orleans documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Orleans streaming](https://learn.microsoft.com/dotnet/orleans/streaming/)
+- [Microsoft Orleans documentation](https://dotnet.github.io/orleans/docs/)
+- [Orleans streaming](https://dotnet.github.io/orleans/docs/streaming/)
 - [Amazon Kinesis Data Streams documentation](https://docs.aws.amazon.com/streams/latest/dev/introduction.html)

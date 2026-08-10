@@ -110,8 +110,8 @@ Existing data is read using its stored format metadata, or as legacy OrleansBina
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Grain Persistence](https://learn.microsoft.com/dotnet/orleans/grains/grain-persistence)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
+- [Grain Persistence](https://dotnet.github.io/orleans/docs/grains/grain-persistence/)
 - [System.Text.Json Documentation](https://learn.microsoft.com/dotnet/standard/serialization/system-text-json/overview)
 
 ## Feedback & Contributing

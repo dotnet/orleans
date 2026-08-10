@@ -123,7 +123,7 @@ You can configure Orleans Redis clustering using `Microsoft.Extensions.Configura
 
 ### .NET Aspire Integration
 
-For applications using .NET Aspire, consider using the [.NET Aspire Redis integration](https://learn.microsoft.com/en-us/dotnet/aspire/caching/stackexchange-redis-integration) which provides simplified Redis configuration, automatic service discovery, health checks, and telemetry. The Aspire integration automatically configures connection strings that Orleans can consume via the configuration system.
+For applications using .NET Aspire, consider using the [.NET Aspire Redis integration](https://learn.microsoft.com/dotnet/aspire/caching/stackexchange-redis-integration) which provides simplified Redis configuration, automatic service discovery, health checks, and telemetry. The Aspire integration automatically configures connection strings that Orleans can consume via the configuration system.
 
 #### Example - Program.cs with Aspire Redis Integration
 ```csharp
@@ -172,9 +172,9 @@ builder.Build().Run();
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Configuration Guide](https://learn.microsoft.com/en-us/dotnet/orleans/host/configuration-guide/)
-- [Orleans Clustering](https://learn.microsoft.com/en-us/dotnet/orleans/implementation/cluster-management)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
+- [Configuration Guide](https://dotnet.github.io/orleans/docs/host/configuration-guide/)
+- [Orleans Clustering](https://dotnet.github.io/orleans/docs/implementation/cluster-management/)
 - [Redis Documentation](https://redis.io/documentation)
 
 ## Feedback & Contributing

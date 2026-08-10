@@ -162,11 +162,11 @@ await host.WaitForShutdownAsync();
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Event Sourcing Overview](https://learn.microsoft.com/dotnet/orleans/grains/event-sourcing)
-- [JournaledGrain Basics](https://learn.microsoft.com/dotnet/orleans/grains/event-sourcing/journaledgrain-basics)
-- [Replicated Instances](https://learn.microsoft.com/dotnet/orleans/grains/event-sourcing/replicated-instances)
-- [Log-Consistency Providers](https://learn.microsoft.com/dotnet/orleans/grains/event-sourcing/log-consistency-providers)
+- [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
+- [Event Sourcing Overview](https://dotnet.github.io/orleans/docs/grains/event-sourcing/)
+- [JournaledGrain Basics](https://dotnet.github.io/orleans/docs/grains/event-sourcing/journaledgrain-basics/)
+- [Replicated Instances](https://dotnet.github.io/orleans/docs/grains/event-sourcing/replicated-instances/)
+- [Log-Consistency Providers](https://dotnet.github.io/orleans/docs/grains/event-sourcing/log-consistency-providers/)
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)
