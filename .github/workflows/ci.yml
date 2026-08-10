@@ -33,8 +33,8 @@ jobs:
   build:
     name: Build
     runs-on: ${{ matrix.os }}
-    continue-on-error: true
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
@@ -59,10 +59,10 @@ jobs:
   test-redis:
     name: Redis provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
     strategy:
+      fail-fast: false
       matrix:
         provider: ["Redis"]
         framework: ["net8.0", "net10.0"]
@@ -116,11 +116,11 @@ jobs:
   test-cassandra:
     name: Cassandra provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
       CASSANDRA_IMAGE: cassandra:${{ matrix.dbversion }}
     strategy:
+      fail-fast: false
       matrix:
         provider: ["Cassandra"]
         dbversion: ["4.0", "4.1", "5.0"]
@@ -163,12 +163,12 @@ jobs:
   test-postgres:
     name: PostgreSQL provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
       POSTGRES_PASSWORD: postgres
     strategy:
+      fail-fast: false
       matrix:
         provider: ["PostgreSql"]
         framework: ["net8.0", "net10.0"]
@@ -224,7 +224,6 @@ jobs:
   test-mariadb:
     name: MariaDB/MySQL provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
       # The official MariaDB 10.6 image is not published to GHCR. Use Google's Docker Hub mirror
@@ -233,6 +232,7 @@ jobs:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
       MARIADB_ROOT_PASSWORD: "mariadb"
     strategy:
+      fail-fast: false
       matrix:
         provider: ["MySql"]
         framework: ["net8.0", "net10.0"]
@@ -306,7 +306,6 @@ jobs:
   test-sqlserver:
     name: Microsoft SQL Server provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
       ACCEPT_EULA: "Y"
@@ -314,6 +313,7 @@ jobs:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
       SA_PASSWORD: "yourWeak(!)Password"
     strategy:
+      fail-fast: false
       matrix:
         provider: ["SqlServer"]
         framework: ["net8.0", "net10.0"]
@@ -369,10 +369,10 @@ jobs:
   test-azure-storage:
     name: Azure Storage provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
     strategy:
+      fail-fast: false
       matrix:
         framework: ["net8.0", "net10.0"]
         provider: ["AzureStorage"]
@@ -430,10 +430,10 @@ jobs:
   test-azure-eventhubs:
     name: Azure Event Hubs provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
     strategy:
+      fail-fast: false
       matrix:
         framework: ["net8.0", "net10.0"]
         provider: ["EventHub"]
@@ -515,10 +515,10 @@ jobs:
   test-azure-cosmosdb:
     name: Azure Cosmos DB provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
     strategy:
+      fail-fast: false
       matrix:
         framework: ["net8.0", "net10.0"]
         provider: ["Cosmos"]
@@ -608,10 +608,10 @@ jobs:
   test-consul:
     name: Consul provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
     strategy:
+      fail-fast: false
       matrix:
         provider: ["Consul"]
         framework: ["net8.0", "net10.0"]
@@ -651,10 +651,10 @@ jobs:
   test-zookeeper:
     name: ZooKeeper provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
     strategy:
+      fail-fast: false
       matrix:
         provider: ["ZooKeeper"]
         framework: ["net8.0", "net10.0"]
@@ -706,7 +706,6 @@ jobs:
   test-dynamodb:
     name: AWS DynamoDB provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
@@ -715,6 +714,7 @@ jobs:
       AWS_SECRET_ACCESS_KEY: pass
       AWS_REGION: us-east-1
     strategy:
+      fail-fast: false
       matrix:
         provider: ["DynamoDB"]
         framework: ["net8.0", "net10.0"]
@@ -773,7 +773,6 @@ jobs:
   test-sqs:
     name: AWS SQS provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
@@ -782,6 +781,7 @@ jobs:
       AWS_SECRET_ACCESS_KEY: pass
       AWS_REGION: us-east-1
     strategy:
+      fail-fast: false
       matrix:
         provider: ["SQS"]
         framework: ["net8.0", "net10.0"]
@@ -856,10 +856,10 @@ jobs:
   test-nats:
     name: NATS stream provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
     strategy:
+      fail-fast: false
       matrix:
         provider: ["NATS"]
         framework: ["net8.0", "net10.0"]
@@ -1008,8 +1008,8 @@ jobs:
   test:
     name: Test
     runs-on: ${{ matrix.os }}
-    continue-on-error: true
     strategy:
+      fail-fast: false
       matrix:
         suite: [BVT, SlowBVT, Functional]
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -1049,8 +1049,8 @@ jobs:
   test-codegenerator:
     name: Test Code Generator
     runs-on: ${{ matrix.os }}
-    continue-on-error: true
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         framework: ["net8.0", "net10.0"]
@@ -1084,6 +1084,7 @@ jobs:
     name: Google Cloud providers tests
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         provider: ["GoogleCloud"]
         framework: ["net8.0", "net10.0"]
@@ -1157,3 +1158,31 @@ jobs:
         path: |
           **/TestResults/*
           **/logs/*
+  ci:
+    name: CI
+    if: always()
+    needs:
+      - build
+      - test-redis
+      - test-cassandra
+      - test-postgres
+      - test-mariadb
+      - test-sqlserver
+      - test-azure-storage
+      - test-azure-eventhubs
+      - test-azure-cosmosdb
+      - test-consul
+      - test-zookeeper
+      - test-dynamodb
+      - test-sqs
+      - test-nats
+      - test-kinesis
+      - test
+      - test-codegenerator
+      - test-google
+    runs-on: ubuntu-latest
+    steps:
+    - name: Verify all CI jobs succeeded
+      env:
+        JOB_RESULTS: ${{ toJSON(needs) }}
+      run: jq --exit-status 'all(.[]; .result == "success")' <<< "$JOB_RESULTS"
