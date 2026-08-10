@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
+using Orleans.Internal;
 using Orleans.Streams;
-using Polly;
 using RabbitMQ.Stream.Client;
 
 namespace Orleans.Streaming.RabbitMQ.RabbitMQ;
@@ -86,24 +86,39 @@ internal class RabbitMQStreamSystemProvider : IAsyncDisposable
     private async Task<StreamSystem> CreateStreamSystem()
     {
         _logger.LogInformation("Creating RabbitMQ stream system");
-        var (exceptionsAllowedBeforeBreaking, durationOfBreak) = _rabbitMqClientOptions.CircuitBreakConnectionConfig;
+        var retryOptions = _rabbitMqClientOptions.ConnectionRetry;
+        ArgumentOutOfRangeException.ThrowIfLessThan(retryOptions.MaxAttempts, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(retryOptions.Delay, TimeSpan.Zero);
 
-        var circuitBreakerPolicy = Policy.Handle<Exception>().CircuitBreakerAsync(exceptionsAllowedBeforeBreaking,
-            durationOfBreak, LogFailedToConnectToRabbitStream, LogCreateStreamRetry);
-        var streamSystem = await circuitBreakerPolicy.ExecuteAsync(
-                () => StreamSystem.Create(_rabbitMqClientOptions.StreamSystemConfig)).ConfigureAwait(false);
+        var streamSystem = await AsyncExecutorWithRetries.ExecuteWithRetries(
+            _ => StreamSystem.Create(_rabbitMqClientOptions.StreamSystemConfig),
+            retryOptions.MaxAttempts,
+            (exception, attempt) =>
+            {
+                LogFailedToConnectToRabbitStream(
+                    exception,
+                    attempt + 1,
+                    retryOptions.MaxAttempts,
+                    retryOptions.Delay);
+                return true;
+            },
+            Timeout.InfiniteTimeSpan,
+            new FixedBackoff(retryOptions.Delay)).ConfigureAwait(false);
         _logger.LogInformation("RabbitMQ stream system created");
-
 
         return streamSystem;
     }
 
-    private void LogFailedToConnectToRabbitStream(Exception exception, TimeSpan durationOfBreak) =>
+    private void LogFailedToConnectToRabbitStream(
+        Exception exception,
+        int attempt,
+        int maxAttempts,
+        TimeSpan delay) =>
         _logger.LogError(exception,
-            "Failed to connect to rabbit, retrying in {DurationOfBreak} seconds", durationOfBreak);
-
-    private void LogCreateStreamRetry()
-        => _logger.LogInformation("Retrying creation of RabbitMQ Stream connection");
+            "RabbitMQ connection attempt {Attempt} of {MaxAttempts} failed, retrying in {Delay}",
+            attempt,
+            maxAttempts,
+            delay);
 
     public async ValueTask DisposeAsync()
 
