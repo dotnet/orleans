@@ -57,7 +57,6 @@
     <Project Path="src/Orleans.Server/Orleans.Server.csproj" />
     <Project Path="src/Orleans.Streaming/Orleans.Streaming.csproj" />
     <Project Path="src/Orleans.TestingHost/Orleans.TestingHost.csproj" />
-    <Project Path="src/Orleans.Testing.Reminders/Orleans.Testing.Reminders.csproj" />
     <Project Path="src/Serializers/Orleans.Serialization.Protobuf/Orleans.Serialization.Protobuf.csproj" />
   </Folder>
   <Folder Name="/src/Dashboard/">
@@ -125,6 +124,7 @@
     <Project Path="src/Orleans.Transactions/Orleans.Transactions.csproj" />
   </Folder>
   <Folder Name="/test/">
+    <Project Path="test/Orleans.Testing.Reminders/Orleans.Testing.Reminders.csproj" />
     <Project Path="test/Orleans.Analyzers.Tests/Orleans.Analyzers.Tests.csproj" />
     <Project Path="test/Orleans.DefaultCluster.Tests/Orleans.DefaultCluster.Tests.csproj" />
     <Project Path="test/Orleans.DependencyInjection.Tests/Orleans.DependencyInjection.Tests.csproj" />
