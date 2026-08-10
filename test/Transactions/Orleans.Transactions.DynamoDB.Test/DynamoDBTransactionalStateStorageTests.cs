@@ -35,7 +35,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
     /// <summary>
     /// Tests for DynamoDB implementation of transactional state storage.
     /// </summary>
-    [TestCategory("DynamoDB"), TestCategory("Functional")]
+    [TestCategory("DynamoDB"), TestCategory("Transactions"), TestCategory("Functional")]
     public class DynamoDBTransactionalStateStorageTests : TransactionalStateStorageTestRunnerxUnit<TestState>, IClassFixture<TestFixture>
     {
         private const string tableName = "StateStorageTests";
