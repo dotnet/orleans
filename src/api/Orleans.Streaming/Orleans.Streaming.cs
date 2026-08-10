@@ -1165,7 +1165,11 @@ namespace Orleans.Streaming
 
         public override int CompareTo(Streams.StreamSequenceToken? other) { throw null; }
 
+        public override bool Equals(object? obj) { throw null; }
+
         public override bool Equals(Streams.StreamSequenceToken? other) { throw null; }
+
+        public override int GetHashCode() { throw null; }
     }
 }
 

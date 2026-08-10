@@ -731,6 +731,33 @@ namespace UnitTests.OrleansRuntime.Streams
             }
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void SimpleQueueCache_GetCursorAtOldestEntry()
+        {
+            var cache = new SimpleQueueCache(10, NullLogger.Instance);
+            var streamId = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+            var oldest = new TestBatchContainer { StreamId = streamId, SequenceToken = new EventSequenceTokenV2(1) };
+            var newest = new TestBatchContainer { StreamId = streamId, SequenceToken = new EventSequenceTokenV2(2) };
+            cache.AddToCache([oldest, newest]);
+
+            using var cursor = cache.GetCacheCursor(streamId, OldestInStreamToken.Instance);
+
+            Assert.True(cursor.MoveNext());
+            Assert.Same(oldest, cursor.GetCurrent(out _));
+            Assert.True(cursor.MoveNext());
+            Assert.Same(newest, cursor.GetCurrent(out _));
+            Assert.False(cursor.MoveNext());
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void OldestInStreamToken_InstancesAreEqual()
+        {
+            var other = new OldestInStreamToken();
+
+            Assert.Equal(OldestInStreamToken.Instance, other);
+            Assert.Equal(OldestInStreamToken.Instance.GetHashCode(), other.GetHashCode());
+        }
+
         private int RunGoldenPath(PooledQueueCache cache, CachedMessageConverter converter, int startOfCache)
         {
             int sequenceNumber = startOfCache;

@@ -862,7 +862,8 @@ namespace Orleans.Streams
                     {
                         exceptionOccured = exc;
                         consumerData.SafeDisposeCursor(logger);
-                        consumerData.Cursor = queueCache!.GetCacheCursor(consumerData.StreamId, OldestInStreamToken.Instance); // queueCache must be non-null here: consumerData.Cursor was only ever populated via queueCache.GetCacheCursor.
+                        var recoveryToken = exc is QueueCacheMissException ? OldestInStreamToken.Instance : null;
+                        consumerData.Cursor = queueCache!.GetCacheCursor(consumerData.StreamId, recoveryToken); // queueCache must be non-null here: consumerData.Cursor was only ever populated via queueCache.GetCacheCursor.
                     }
 
                     if (exceptionOccured is null)

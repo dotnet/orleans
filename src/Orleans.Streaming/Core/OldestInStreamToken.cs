@@ -25,10 +25,19 @@ public sealed class OldestInStreamToken : StreamSequenceToken
     public static OldestInStreamToken Instance { get; } = new OldestInStreamToken();
 
     /// <inheritdoc/>
+    public override bool Equals(object? obj)
+    {
+        return obj is OldestInStreamToken;
+    }
+
+    /// <inheritdoc/>
     public override bool Equals(StreamSequenceToken? other)
     {
         return other is OldestInStreamToken;
     }
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => 0;
 
     /// <summary>
     /// Always less than any other token, except another <see cref="OldestInStreamToken"/>.
