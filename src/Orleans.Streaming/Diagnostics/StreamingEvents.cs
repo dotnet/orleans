@@ -410,6 +410,61 @@ public static class StreamingEvents
         public readonly IStreamQueueBalancer QueueBalancer = queueBalancer;
     }
 
+    /// <summary>
+    /// Event payload for when a pulling agent manager reports its current queue assignments.
+    /// </summary>
+    /// <param name="streamProvider">The name of the stream provider.</param>
+    /// <param name="siloAddress">The address of the silo.</param>
+    /// <param name="currentQueues">The queues currently owned by the manager.</param>
+    /// <param name="runningAgents">The number of running pulling agents.</param>
+    public sealed class PullingAgentManagerState(
+        string streamProvider,
+        SiloAddress? siloAddress,
+        QueueId[] currentQueues,
+        int runningAgents) : StreamingEvent(streamProvider, siloAddress)
+    {
+        /// <summary>
+        /// The queues currently owned by the manager.
+        /// </summary>
+        public readonly QueueId[] CurrentQueues = currentQueues;
+
+        /// <summary>
+        /// The number of running pulling agents.
+        /// </summary>
+        public readonly int RunningAgents = runningAgents;
+    }
+
+    /// <summary>
+    /// Event payload for when a deployment-based queue balancer completes a silo maturity transition.
+    /// </summary>
+    /// <param name="streamProvider">The name of the stream provider.</param>
+    /// <param name="siloAddress">The address of the silo running the queue balancer.</param>
+    /// <param name="maturedSiloAddress">The silo whose maturity period completed.</param>
+    /// <param name="isLocalSilo">Whether the matured silo is the local silo.</param>
+    /// <param name="queueBalancer">The queue balancer instance.</param>
+    public sealed class QueueBalancerMaturityCompleted(
+        string streamProvider,
+        SiloAddress? siloAddress,
+        SiloAddress maturedSiloAddress,
+        bool isLocalSilo,
+        IStreamQueueBalancer queueBalancer) : StreamingEvent(streamProvider, siloAddress)
+    {
+        /// <summary>
+        /// The silo whose maturity period completed.
+        /// </summary>
+        public readonly SiloAddress MaturedSiloAddress = maturedSiloAddress;
+
+        /// <summary>
+        /// Whether the matured silo is the local silo.
+        /// </summary>
+        public readonly bool IsLocalSilo = isLocalSilo;
+
+        /// <summary>
+        /// The queue balancer instance.
+        /// </summary>
+        public readonly IStreamQueueBalancer QueueBalancer = queueBalancer;
+    }
+
     internal static void EmitMessageDelivered(string streamProviderName, StreamConsumerData consumerData, IBatchContainer batch, SiloAddress? siloAddress)
     {
         if (!Listener.IsEnabled(nameof(MessageDelivered)))
@@ -680,6 +735,57 @@ public static class StreamingEvents
                 siloAddress,
                 oldQueues,
                 newQueues,
+                queueBalancer));
+        }
+    }
+
+    internal static void EmitPullingAgentManagerState(string streamProviderName, SiloAddress? siloAddress, IEnumerable<QueueId> currentQueues, int runningAgents)
+    {
+        if (!Listener.IsEnabled(nameof(PullingAgentManagerState)))
+        {
+            return;
+        }
+
+        Emit(streamProviderName, siloAddress, currentQueues, runningAgents);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(string streamProviderName, SiloAddress? siloAddress, IEnumerable<QueueId> currentQueues, int runningAgents)
+        {
+            Listener.Write(nameof(PullingAgentManagerState), new PullingAgentManagerState(
+                streamProviderName,
+                siloAddress,
+                [.. currentQueues],
+                runningAgents));
+        }
+    }
+
+    internal static void EmitQueueBalancerMaturityCompleted(
+        string streamProviderName,
+        SiloAddress? siloAddress,
+        SiloAddress maturedSiloAddress,
+        bool isLocalSilo,
+        IStreamQueueBalancer queueBalancer)
+    {
+        if (!Listener.IsEnabled(nameof(QueueBalancerMaturityCompleted)))
+        {
+            return;
+        }
+
+        Emit(streamProviderName, siloAddress, maturedSiloAddress, isLocalSilo, queueBalancer);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(
+            string streamProviderName,
+            SiloAddress? siloAddress,
+            SiloAddress maturedSiloAddress,
+            bool isLocalSilo,
+            IStreamQueueBalancer queueBalancer)
+        {
+            Listener.Write(nameof(QueueBalancerMaturityCompleted), new QueueBalancerMaturityCompleted(
+                streamProviderName,
+                siloAddress,
+                maturedSiloAddress,
+                isLocalSilo,
                 queueBalancer));
         }
     }
