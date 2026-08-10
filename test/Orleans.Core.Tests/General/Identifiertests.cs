@@ -109,9 +109,16 @@ namespace UnitTests.General
         /// Tests GrainId serialization and deserialization through printable string representation.
         /// </summary>
         [Theory, TestCategory("SlowBVT"), TestCategory("Identifiers")]
-        [MemberData(nameof(TestGrainIds))]
-        public void GrainId_ToFromPrintableString(GrainId grainId)
+        [InlineData("Guid", "Guid", TestGuid, 0, null, false)]
+        [InlineData("Guid with extension", "Guid", TestGuid, 0, "Guid-ExtKey-1", true)]
+        [InlineData("Guid with null extension", "Guid", TestGuid, 0, null, true)]
+        [InlineData("Integer", "Integer", null, TestInteger, null, false)]
+        [InlineData("Integer with extension", "Integer", null, TestInteger, "Long-ExtKey-2", true)]
+        [InlineData("Integer with null extension", "Integer", null, TestInteger, null, true)]
+        [InlineData("Integer from UniqueKey with extension", "IntegerFromUniqueKey", null, TestInteger, "Long-ExtKey-2", true)]
+        public void GrainId_ToFromPrintableString(string testCase, string keyKind, string? guidKey, long integerKey, string? extension, bool useExtensionOverload)
         {
+            var grainId = CreateTestGrainId(testCase, keyKind, guidKey, integerKey, extension, useExtensionOverload);
             string str = grainId.ToString();
             var roundTripped = GrainId.Parse(str);
 
@@ -119,9 +126,16 @@ namespace UnitTests.General
         }
 
         [Theory, TestCategory("SlowBVT"), TestCategory("Identifiers")]
-        [MemberData(nameof(TestGrainIds))]
-        public void GrainId_TryParseFromPrintableString(GrainId grainId)
+        [InlineData("Guid", "Guid", TestGuid, 0, null, false)]
+        [InlineData("Guid with extension", "Guid", TestGuid, 0, "Guid-ExtKey-1", true)]
+        [InlineData("Guid with null extension", "Guid", TestGuid, 0, null, true)]
+        [InlineData("Integer", "Integer", null, TestInteger, null, false)]
+        [InlineData("Integer with extension", "Integer", null, TestInteger, "Long-ExtKey-2", true)]
+        [InlineData("Integer with null extension", "Integer", null, TestInteger, null, true)]
+        [InlineData("Integer from UniqueKey with extension", "IntegerFromUniqueKey", null, TestInteger, "Long-ExtKey-2", true)]
+        public void GrainId_TryParseFromPrintableString(string testCase, string keyKind, string? guidKey, long integerKey, string? extension, bool useExtensionOverload)
         {
+            var grainId = CreateTestGrainId(testCase, keyKind, guidKey, integerKey, extension, useExtensionOverload);
             string str = grainId.ToString();
             var success = GrainId.TryParse(str, out var roundTripped);
 
@@ -133,34 +147,43 @@ namespace UnitTests.General
         /// Tests GrainId JSON serialization and deserialization round-trip.
         /// </summary>
         [Theory, TestCategory("SlowBVT"), TestCategory("Identifiers")]
-        [MemberData(nameof(TestGrainIds))]
-        public void GrainId_RoundTripJsonConverter(GrainId grainId)
+        [InlineData("Guid", "Guid", TestGuid, 0, null, false)]
+        [InlineData("Guid with extension", "Guid", TestGuid, 0, "Guid-ExtKey-1", true)]
+        [InlineData("Guid with null extension", "Guid", TestGuid, 0, null, true)]
+        [InlineData("Integer", "Integer", null, TestInteger, null, false)]
+        [InlineData("Integer with extension", "Integer", null, TestInteger, "Long-ExtKey-2", true)]
+        [InlineData("Integer with null extension", "Integer", null, TestInteger, null, true)]
+        [InlineData("Integer from UniqueKey with extension", "IntegerFromUniqueKey", null, TestInteger, "Long-ExtKey-2", true)]
+        public void GrainId_RoundTripJsonConverter(string testCase, string keyKind, string? guidKey, long integerKey, string? extension, bool useExtensionOverload)
         {
+            var grainId = CreateTestGrainId(testCase, keyKind, guidKey, integerKey, extension, useExtensionOverload);
             var serialized = JsonSerializer.Serialize(grainId);
             var deserialized = JsonSerializer.Deserialize<GrainId>(serialized);
 
             Assert.Equal(grainId, deserialized);
         }
 
-        public static TheoryData<GrainId> TestGrainIds
+        private const string TestGuid = "83582e92-76a6-4c2d-b0f0-f266875ecf83";
+        private const long TestInteger = 0x1234_5678_90AB_CDEF;
+
+        private static GrainId CreateTestGrainId(string testCase, string keyKind, string? guidKey, long integerKey, string? extension, bool useExtensionOverload)
         {
-            get
+            var grainType = GrainType.Create("test");
+            if (keyKind == "Guid")
             {
-                var td = new TheoryData<GrainId>();
-                var grainType = GrainType.Create("test");
-                var guid = Guid.NewGuid();
-                var integer = Random.Shared.NextInt64();
-
-                td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateGuidKey(guid)));
-                td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateGuidKey(guid, "Guid-ExtKey-1")));
-                td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateGuidKey(guid, (string?)null)));
-                td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateIntegerKey(integer)));
-                td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateIntegerKey(integer, "Long-ExtKey-2")));
-                td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateIntegerKey(integer, (string?)null)));
-                td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateIntegerKey(UniqueKey.NewKey(integer).PrimaryKeyToLong(), "Long-ExtKey-2")));
-
-                return td;
+                var key = Guid.Parse(guidKey ?? throw new ArgumentNullException(nameof(guidKey)));
+                return useExtensionOverload
+                    ? GrainId.Create(grainType, GrainIdKeyExtensions.CreateGuidKey(key, extension))
+                    : GrainId.Create(grainType, GrainIdKeyExtensions.CreateGuidKey(key));
             }
+
+            return keyKind switch
+            {
+                "Integer" when useExtensionOverload => GrainId.Create(grainType, GrainIdKeyExtensions.CreateIntegerKey(integerKey, extension)),
+                "Integer" => GrainId.Create(grainType, GrainIdKeyExtensions.CreateIntegerKey(integerKey)),
+                "IntegerFromUniqueKey" => GrainId.Create(grainType, GrainIdKeyExtensions.CreateIntegerKey(UniqueKey.NewKey(integerKey).PrimaryKeyToLong(), extension)),
+                _ => throw new ArgumentOutOfRangeException(nameof(keyKind), keyKind, $"Unknown GrainId key kind for test case '{testCase}'"),
+            };
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
