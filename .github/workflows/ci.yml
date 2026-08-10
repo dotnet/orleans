@@ -33,7 +33,6 @@ jobs:
   build:
     name: Build
     runs-on: ${{ matrix.os }}
-    continue-on-error: true
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -59,7 +58,6 @@ jobs:
   test-redis:
     name: Redis provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
     strategy:
@@ -116,7 +114,6 @@ jobs:
   test-cassandra:
     name: Cassandra provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
       CASSANDRA_IMAGE: cassandra:${{ matrix.dbversion }}
@@ -163,7 +160,6 @@ jobs:
   test-postgres:
     name: PostgreSQL provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
@@ -224,7 +220,6 @@ jobs:
   test-mariadb:
     name: MariaDB/MySQL provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
       # The official MariaDB 10.6 image is not published to GHCR. Use Google's Docker Hub mirror
@@ -306,7 +301,6 @@ jobs:
   test-sqlserver:
     name: Microsoft SQL Server provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
       ACCEPT_EULA: "Y"
@@ -369,7 +363,6 @@ jobs:
   test-azure-storage:
     name: Azure Storage provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
     strategy:
@@ -430,7 +423,6 @@ jobs:
   test-azure-eventhubs:
     name: Azure Event Hubs provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
     strategy:
@@ -515,7 +507,6 @@ jobs:
   test-azure-cosmosdb:
     name: Azure Cosmos DB provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
     strategy:
@@ -608,7 +599,6 @@ jobs:
   test-consul:
     name: Consul provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
     strategy:
@@ -651,7 +641,6 @@ jobs:
   test-zookeeper:
     name: ZooKeeper provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
     strategy:
@@ -706,7 +695,6 @@ jobs:
   test-dynamodb:
     name: AWS DynamoDB provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
@@ -773,7 +761,6 @@ jobs:
   test-sqs:
     name: AWS SQS provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
@@ -856,7 +843,6 @@ jobs:
   test-nats:
     name: NATS stream provider tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       BuildExternalAssets: "false"
     strategy:
@@ -1008,7 +994,6 @@ jobs:
   test:
     name: Test
     runs-on: ${{ matrix.os }}
-    continue-on-error: true
     strategy:
       matrix:
         suite: [BVT, SlowBVT, Functional]
@@ -1049,7 +1034,6 @@ jobs:
   test-codegenerator:
     name: Test Code Generator
     runs-on: ${{ matrix.os }}
-    continue-on-error: true
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
