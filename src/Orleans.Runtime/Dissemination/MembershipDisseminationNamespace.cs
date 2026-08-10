@@ -135,7 +135,11 @@ internal sealed class MembershipDisseminationNamespace(
             return DisseminationApplyResult.Rejected;
         }
 
-        var update = serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload);
+        if (serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload) is not { } update)
+        {
+            return DisseminationApplyResult.Rejected;
+        }
+
         if (update.Diff is { } diff)
         {
             return update.Snapshot is null
