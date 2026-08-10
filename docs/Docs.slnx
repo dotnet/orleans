@@ -245,7 +245,13 @@
     <Project Path="site/src/content/docs/grains/grain-versioning/snippets/versioning/versioning.csproj" />
   </Folder>
   <Folder Name="/site/src/content/docs/grains/snippets/">
+    <Project Path="site/src/content/docs/grains/snippets/async-enumerable-results/async-enumerable-results.csproj" />
     <Project Path="site/src/content/docs/grains/snippets/interceptors/interceptors.csproj" />
+    <Project Path="site/src/content/docs/grains/snippets/placement/placement.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/grains/snippets/testing/" />
+  <Folder Name="/site/src/content/docs/grains/snippets/testing/orleans-testing/">
+    <Project Path="site/src/content/docs/grains/snippets/testing/orleans-testing/Sample.OrleansTesting/Sample.OrleansTesting.csproj" />
   </Folder>
   <Folder Name="/site/src/content/docs/grains/snippets/timers/">
     <Project Path="site/src/content/docs/grains/snippets/timers/Timers.csproj" />
@@ -284,12 +290,6 @@
     <Project Path="site/src/content/docs/host/snippets/transport-layer-security/csharp/ClientExample/ClientExample.csproj" />
     <Project Path="site/src/content/docs/host/snippets/transport-layer-security/csharp/SiloExample/SiloExample.csproj" />
   </Folder>
-  <Folder Name="/site/src/content/docs/implementation/" />
-  <Folder Name="/site/src/content/docs/implementation/snippets/" />
-  <Folder Name="/site/src/content/docs/implementation/snippets/testing/" />
-  <Folder Name="/site/src/content/docs/implementation/snippets/testing/orleans-testing/">
-    <Project Path="site/src/content/docs/implementation/snippets/testing/orleans-testing/Sample.OrleansTesting/Sample.OrleansTesting.csproj" />
-  </Folder>
   <Folder Name="/site/src/content/docs/migration/" />
   <Folder Name="/site/src/content/docs/migration/snippets/">
     <Project Path="site/src/content/docs/migration/snippets/Orleans10MigrationSnippets.csproj" />
@@ -302,6 +302,12 @@
   </Folder>
   <Folder Name="/site/src/content/docs/quickstarts/snippets/deploy-scale-orleans-on-azure/cosmos/">
     <Project Path="site/src/content/docs/quickstarts/snippets/deploy-scale-orleans-on-azure/cosmos/Cosmos.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/quickstarts/snippets/hello-world/">
+    <Project Path="site/src/content/docs/quickstarts/snippets/hello-world/Client/Client.csproj" />
+    <Project Path="site/src/content/docs/quickstarts/snippets/hello-world/GrainInterfaces/GrainInterfaces.csproj" />
+    <Project Path="site/src/content/docs/quickstarts/snippets/hello-world/Grains/Grains.csproj" />
+    <Project Path="site/src/content/docs/quickstarts/snippets/hello-world/Silo/Silo.csproj" />
   </Folder>
   <Folder Name="/site/src/content/docs/quickstarts/snippets/url-shortener/">
     <Project Path="site/src/content/docs/quickstarts/snippets/url-shortener/orleansurlshortener/orleansurlshortener.csproj" />
@@ -319,6 +325,9 @@
   <Folder Name="/site/src/content/docs/tutorials-and-samples/snippets/" />
   <Folder Name="/site/src/content/docs/tutorials-and-samples/snippets/custom-grain-storage/">
     <Project Path="site/src/content/docs/tutorials-and-samples/snippets/custom-grain-storage/GrainStorage.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/tutorials-and-samples/snippets/hello-world/">
+    <Project Path="site/src/content/docs/tutorials-and-samples/snippets/hello-world/HelloWorld.csproj" />
   </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/PackageJsonGenerator.Tests/PackageJsonGenerator.Tests.csproj" />

@@ -171,13 +171,12 @@
       ]
     },
     "grains/grain-placement-filtering.md": {
-      "reason": "Placement-filter fences split attributes, filters, and registration into API-shape excerpts which depend on runtime context.",
+      "reason": "Built-in placement-filter fences are partial silo configuration and grain attribute excerpts which depend on surrounding host and grain declarations.",
       "hashes": [
         "727f2ed70b1453483892160f3b92c610b9fc74aee951ed46ada37b737e2670f4",
         "b75a4bb4ec5a1081e85b95199a648e0ed4f93643b37730d0c2640b6401de46d5",
         "38619342e2e76219cdd923edd7a3a3532984e5685b0136cc754fb6719ef0cb0b",
-        "4a6177b767340e95c2198d9fb96068bd5d519f51d2f612ac518a813e79dddafe",
-        "6f81e4202c4ddf6beb1d61242b04b0b2542c6eb72de2bee2e6ec91657149e947"
+        "4a6177b767340e95c2198d9fb96068bd5d519f51d2f612ac518a813e79dddafe"
       ]
     },
     "grains/grain-placement.md": {
