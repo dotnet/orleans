@@ -19,7 +19,6 @@
 
 
   <ItemGroup>
-    <PackageReference Include="Polly" />
     <PackageReference Include="RabbitMQ.Stream.Client" />
   </ItemGroup>
 
