@@ -500,6 +500,45 @@ public class TransactionDiagnosticEventsTests
     }
 
     [Fact]
+    public async Task RecoveryObserverWaitsForCompletionAfterStorageConflict()
+    {
+        var resource = CreateParticipant(
+            "resource",
+            CreateGrainReference("resource"),
+            ParticipantId.Role.Resource);
+        var transactionId = Guid.NewGuid();
+        var transactionIds = ImmutableArray.Create(transactionId);
+        var conflict = new InconsistentStateException("etag mismatch");
+        using var observer = new TransactionRecoveryEventObserver(_ => true);
+        var completion = observer.WaitForRecoveryCompletionAsync(
+            transactionId,
+            resource.Reference.GrainId,
+            afterSequence: 0,
+            GetDeadline(RecoveryObservationTimeout));
+
+        TransactionDiagnosticEvents.EmitStorageConflictDetected(
+            resource,
+            TransactionDiagnosticEvents.StorageOperation.Store,
+            storageOutcomeInDoubt: true,
+            queuedTransactionCount: 1,
+            conflict,
+            transactionIds);
+
+        await Task.Yield();
+        Assert.False(completion.IsCompleted);
+
+        TransactionDiagnosticEvents.EmitAbortAndRestoreCompleted(
+            resource,
+            TransactionalStatus.StorageConflict,
+            storageOutcomeInDoubt: true,
+            transactionIds);
+
+        var transition = await completion;
+        Assert.Equal(TransactionRecoveryEventObserver.RecoveryTransitionKind.AbortAndRestoreCompleted, transition.Kind);
+        Assert.Equal(transactionId, transition.TransactionId);
+    }
+
+    [Fact]
     public async Task RecoveryObserverLockExpiredTransitionContainsTransactionId()
     {
         var resource = CreateParticipant("resource", ParticipantId.Role.Resource);
