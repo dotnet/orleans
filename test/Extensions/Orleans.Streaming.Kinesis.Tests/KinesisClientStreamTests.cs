@@ -14,6 +14,9 @@ namespace Orleans.Streaming.Kinesis.Tests
     /// <summary>
     /// Tests Kinesis streaming functionality from Orleans client perspective including producer dropout scenarios.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestArea("Streaming")]
+    [TestProvider("Kinesis")]
     [TestCategory("AWS"), TestCategory("Kinesis")]
     public class KinesisClientStreamTests : TestClusterPerTest
     {

@@ -11,6 +11,8 @@ namespace Tester.Cosmos.Reminders;
 /// <summary>
 /// Tests for operation of the Orleans reminders table using Azure Cosmos DB.
 /// </summary>
+[TestProvider("Cosmos")]
+[TestArea("Reminders")]
 [TestCategory("Reminders"), TestCategory("Cosmos")]
 public class CosmosRemindersTableTests : ReminderTableTestsBase
 {
@@ -41,23 +43,27 @@ public class CosmosRemindersTableTests : ReminderTableTestsBase
         return Task.FromResult(TestDefaultConfiguration.CosmosDBAccountKey!);
     }
 
+    [TestSuite("Functional")]
     [SkippableFact, TestCategory("Functional")]
     public void RemindersTable_Cosmos_Init()
     {
     }
 
+    [TestSuite("Functional")]
     [SkippableFact, TestCategory("Functional")]
     public async Task RemindersTable_Cosmos_RemindersRange()
     {
         await RemindersRange(50);
     }
 
+    [TestSuite("Functional")]
     [SkippableFact, TestCategory("Functional")]
     public async Task RemindersTable_Cosmos_RemindersParallelUpsert()
     {
         await RemindersParallelUpsert();
     }
 
+    [TestSuite("Functional")]
     [SkippableFact, TestCategory("Functional")]
     public async Task RemindersTable_Cosmos_ReminderSimple()
     {

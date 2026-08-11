@@ -6,6 +6,8 @@ using Xunit;
 
 namespace Orleans.Journaling.Tests;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT")]
 public sealed class AzureTableJournalStorageOptionsTests
 {

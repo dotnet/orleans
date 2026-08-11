@@ -10,6 +10,9 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.DynamoDB.Tests.FaultInjection.ControlledInjection;
 
+[TestSuite("Functional")]
+[TestProvider("DynamoDB")]
+[TestArea("Transactions")]
 [TestCategory("DynamoDB"), TestCategory("Transactions"), TestCategory("Functional")]
 public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFaultInjectionTestFixture>
 {

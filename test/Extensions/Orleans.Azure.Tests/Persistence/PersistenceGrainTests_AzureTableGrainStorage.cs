@@ -11,6 +11,9 @@ namespace Tester.AzureUtils.Persistence;
 /// PersistenceGrainTests using AzureGrainStorage - Requires access to external Azure table storage
 /// </summary>
 [TestCategory("Persistence"), TestCategory("AzureStorage")]
+[TestSuite("Functional")]
+[TestProvider("AzureStorage")]
+[TestArea("Persistence")]
 public class PersistenceGrainTests_AzureTableGrainStorage : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceGrainTests_AzureTableGrainStorage.Fixture>
 {
     public class Fixture : BaseAzureTestClusterFixture
@@ -58,6 +61,9 @@ public class PersistenceGrainTests_AzureTableGrainStorage : Base_PersistenceGrai
 }
 
 [TestCategory("Persistence"), TestCategory("AzureStorage")]
+[TestSuite("Functional")]
+[TestProvider("AzureStorage")]
+[TestArea("Persistence")]
 public class PersistenceGrainTests_AzureTableGrainStorage_DeleteStateOnClear : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceGrainTests_AzureTableGrainStorage_DeleteStateOnClear.Fixture>
 {
     public class Fixture : BaseAzureTestClusterFixture

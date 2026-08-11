@@ -10,6 +10,8 @@ using Xunit;
 
 namespace UnitTests.StreamingTests;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT")]
 public sealed class GrainStreamQueueCheckpointerTests : StreamQueueCheckpointerTests
 {
@@ -436,6 +438,8 @@ public sealed class GrainStreamQueueCheckpointerTests : StreamQueueCheckpointerT
 
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT")]
 public sealed class OrderedGrainStreamQueueCheckpointerTests : StreamQueueCheckpointerTests
 {

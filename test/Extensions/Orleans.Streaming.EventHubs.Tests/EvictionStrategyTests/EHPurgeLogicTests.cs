@@ -20,6 +20,9 @@ namespace ServiceBus.Tests.EvictionStrategyTests
     /// Tests for EventHub cache purge logic and eviction strategy behavior under pressure conditions.
     /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming")]
+    [TestSuite("BVT")]
+    [TestProvider("EventHub")]
+    [TestArea("Streaming")]
     public class EHPurgeLogicTests
     {
         private readonly CachePressureInjectionMonitor cachePressureInjectionMonitor;

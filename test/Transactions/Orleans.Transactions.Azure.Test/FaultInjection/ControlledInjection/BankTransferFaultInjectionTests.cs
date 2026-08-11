@@ -8,6 +8,9 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Azure.Tests.FaultInjection.ControlledInjection;
 
+[TestSuite("Functional")]
+[TestProvider("AzureStorage")]
+[TestArea("Transactions")]
 [TestCategory("AzureStorage"), TestCategory("Transactions"), TestCategory("Functional")]
 public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFaultInjectionTestFixture>
 {

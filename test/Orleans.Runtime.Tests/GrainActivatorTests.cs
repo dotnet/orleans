@@ -23,6 +23,9 @@ namespace UnitTests.General
     /// This test demonstrates implementing a custom activator that bypasses DI entirely
     /// and tracks the number of disposed instances.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("DI")]
     public class GrainActivatorTests : OrleansTestingBase, IClassFixture<GrainActivatorTests.Fixture>
     {

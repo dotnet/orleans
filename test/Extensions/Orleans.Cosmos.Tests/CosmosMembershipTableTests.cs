@@ -21,6 +21,9 @@ namespace Tester.Cosmos.Clustering;
 /// - Partition key strategies for cluster isolation
 /// </summary>
 [TestCategory("Membership"), TestCategory("Cosmos")]
+[TestSuite("Functional")]
+[TestProvider("Cosmos")]
+[TestArea("Membership")]
 public class CosmosMembershipTableTests : MembershipTableTestsBase
 {
     private const string CosmosEmulatorTransactionalBatchConditionSkipReason = "The Cosmos DB emulator does not enforce the transactional batch ETag conditions required by this test.";

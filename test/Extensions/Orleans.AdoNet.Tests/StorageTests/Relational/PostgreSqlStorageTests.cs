@@ -11,6 +11,9 @@ namespace UnitTests.StorageTests.Relational
     /// optionally remove <see cref="RelationalStorageTests"/> inheritance and implement a provider and environment
     /// setup as done in <see cref="CommonFixture"/> and how it delegates it.</remarks>
     [TestCategory("PostgreSql"), TestCategory("Persistence")]
+    [TestSuite("Functional")]
+    [TestProvider("PostgreSql")]
+    [TestArea("Persistence")]
     public class PostgreSqlStorageTests : RelationalStorageTests, IClassFixture<CommonFixture>
     {
         /// <summary>

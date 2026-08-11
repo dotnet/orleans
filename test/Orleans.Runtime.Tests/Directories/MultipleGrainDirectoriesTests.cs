@@ -10,6 +10,8 @@ namespace Tester.Directories
     /// <summary>
     /// Base class for testing multiple grain directory implementations across cluster silos.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestArea("GrainDirectory")]
     public abstract class MultipleGrainDirectoriesTests : TestClusterPerTest
     {
         protected override void ConfigureTestCluster(TestClusterBuilder builder)

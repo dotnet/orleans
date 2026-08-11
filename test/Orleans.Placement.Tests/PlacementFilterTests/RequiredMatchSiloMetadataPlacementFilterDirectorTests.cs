@@ -8,6 +8,9 @@ namespace UnitTests.PlacementFilterTests;
 /// <summary>
 /// Tests for required match silo metadata placement filter director behavior.
 /// </summary>
+[TestSuite("Functional")]
+[TestProvider("None")]
+[TestArea("Placement")]
 [TestCategory("Placement"), TestCategory("Filters"), TestCategory("SiloMetadata")]
 public class RequiredMatchSiloMetadataPlacementFilterDirectorTests
 {

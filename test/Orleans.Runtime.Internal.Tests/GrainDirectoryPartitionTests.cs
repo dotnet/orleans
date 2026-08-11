@@ -27,6 +27,9 @@ namespace UnitTests;
 /// 
 /// This is essential for maintaining Orleans' single activation guarantee.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("GrainDirectory")]
 [TestCategory("BVT"), TestCategory("GrainDirectory")]
 public class GrainDirectoryPartitionTests
 {

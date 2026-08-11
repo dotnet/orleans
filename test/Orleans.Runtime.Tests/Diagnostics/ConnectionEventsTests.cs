@@ -7,6 +7,9 @@ using Orleans.Core.Diagnostics;
 
 namespace Tester.Diagnostics;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public class ConnectionEventsTests
 {
     [Fact, TestCategory("BVT")]

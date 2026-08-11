@@ -5,6 +5,9 @@ using Xunit.Abstractions;
 
 namespace Orleans.Persistence.Firestore.Tests;
 
+[TestSuite("Functional")]
+[TestProvider("GoogleCloud")]
+[TestArea("Persistence")]
 [TestCategory("Persistence"), TestCategory("Firestore"), TestCategory("GoogleCloud")]
 public class FirestorePersistenceGrainTests : GrainPersistenceTestsRunner, IClassFixture<FirestorePersistenceGrainTests.Fixture>
 {

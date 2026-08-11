@@ -7,6 +7,9 @@ namespace Orleans.Transactions.DynamoDB.Tests
     /// <summary>
     /// Tests for transaction consistency behavior with DynamoDB.
     /// </summary>
+    [TestSuite("Nightly")]
+    [TestArea("Transactions")]
+    [TestProvider("DynamoDB")]
     [TestCategory("DynamoDB"), TestCategory("Transactions-dev")]
     public class ConsistencyTests : ConsistencyTransactionTestRunnerxUnit, IClassFixture<TestFixture>
     {

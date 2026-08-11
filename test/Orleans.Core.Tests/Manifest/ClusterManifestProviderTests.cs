@@ -28,6 +28,8 @@ using Xunit;
 
 namespace UnitTests.Manifest;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT"), TestCategory("Manifest")]
 public class ClusterManifestProviderTests
 {

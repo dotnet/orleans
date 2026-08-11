@@ -6,6 +6,9 @@ using Xunit;
 
 namespace UnitTests.Runtime
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Placement")]
     [TestCategory("BVT"), TestCategory("Placement")]
     public class LocalPlacementDirectorTests
     {

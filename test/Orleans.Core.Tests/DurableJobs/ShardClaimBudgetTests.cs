@@ -7,6 +7,9 @@ using Xunit;
 namespace NonSilo.Tests.DurableJobs;
 
 [TestCategory("BVT"), TestCategory("DurableJobs")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableJobs")]
 public class ShardClaimBudgetTests
 {
     private static readonly TimeSpan RampUpDuration = TimeSpan.FromMinutes(5);

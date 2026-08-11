@@ -12,6 +12,8 @@ namespace Tester;
 
 public class CallbackDataTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void AlreadyCanceledTokenCompletesCallback()
     {
@@ -33,6 +35,8 @@ public class CallbackDataTests
         Assert.Equal(cancellation.Token, exception.CancellationToken);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void CancellationSubscriptionAfterCompletionDoesNotRetainCallback()
     {

@@ -6,6 +6,9 @@ namespace UnitTests.ActivationRebalancingTests;
 /// <summary>
 /// Tests for dynamic activation rebalancing while new activations are being created.
 /// </summary>
+[TestSuite("Functional")]
+[TestProvider("None")]
+[TestArea("Placement")]
 [TestCategory("Functional"), TestCategory("ActivationRebalancing")]
 public class DynamicRebalancingTests(RebalancerFixture fixture, ITestOutputHelper output)
     : RebalancingTestBase<RebalancerFixture>(fixture, output), IClassFixture<RebalancerFixture>

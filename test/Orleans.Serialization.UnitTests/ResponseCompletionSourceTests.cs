@@ -11,6 +11,9 @@ using Xunit;
 namespace Orleans.Serialization.UnitTests;
 
 [Trait("Category", "BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Serialization")]
 public class ResponseCompletionSourceTests
 {
     [Fact]

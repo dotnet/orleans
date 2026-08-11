@@ -13,6 +13,9 @@ using Xunit;
 
 namespace DefaultCluster.Tests.General
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class MigrationTests : HostedTestClusterEnsureDefaultStarted
     {
         public MigrationTests(DefaultClusterFixture fixture) : base(fixture)
@@ -305,6 +308,9 @@ namespace DefaultCluster.Tests.General
         }
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class StuckDeactivationRecoveryTests : TestClusterPerTest
     {
         protected override void ConfigureTestCluster(TestClusterBuilder builder)

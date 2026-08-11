@@ -11,6 +11,9 @@ using Xunit;
 
 namespace UnitTests.General
 {
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Placement")]
     [TestCategory("Elasticity"), TestCategory("Placement")]
     public class ElasticPlacementTests : TestClusterPerTest
     {

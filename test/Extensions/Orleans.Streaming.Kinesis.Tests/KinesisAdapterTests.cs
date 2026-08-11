@@ -19,6 +19,9 @@ namespace Orleans.Streaming.Kinesis.Tests
     /// <summary>
     /// Tests Kinesis adapter functionality for sending and receiving messages through Orleans streaming.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestArea("Streaming")]
+    [TestProvider("Kinesis")]
     [TestCategory("AWS"), TestCategory("Kinesis")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class KinesisAdapterTests : IAsyncLifetime

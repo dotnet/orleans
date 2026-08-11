@@ -25,6 +25,9 @@ namespace UnitTests.Directory
     /// It handles registration, lookup, and cleanup of grain activations while maintaining consistency with the distributed directory.
     /// </summary>
     [TestCategory("BVT"), TestCategory("Directory")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("GrainDirectory")]
     public class CachedGrainLocatorTests
     {
         private readonly LoggerFactory loggerFactory;

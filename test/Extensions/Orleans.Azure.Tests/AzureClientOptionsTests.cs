@@ -4,6 +4,9 @@ using Xunit;
 namespace Tester.AzureUtils;
 
 [TestCategory("AzureStorage"), TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("AzureStorage")]
+[TestArea("Persistence")]
 public class AzureClientOptionsTests
 {
     [Fact]

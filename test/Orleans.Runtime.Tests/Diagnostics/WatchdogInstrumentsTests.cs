@@ -8,6 +8,8 @@ namespace Tester.Diagnostics;
 
 public class WatchdogInstrumentsTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void WatchdogInstruments_RecordsMetricsUsingMeterFactory()
     {

@@ -11,6 +11,8 @@ namespace Orleans.Journaling.Tests;
 /// all operations are journaled for durability. This is particularly useful for implementing
 /// reliable message processing patterns in Orleans grains.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT")]
 public class DurableQueueTests : JournalingTestBase
 {

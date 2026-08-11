@@ -12,6 +12,9 @@ namespace UnitTests.StreamingTests
     /// <summary>
     /// Tests for the controllable stream provider adapter, validating echo commands through adapter and factory interfaces.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ControllableStreamProviderTests : OrleansTestingBase, IClassFixture<ControllableStreamProviderTests.Fixture>
     {
         public class Fixture : BaseTestClusterFixture

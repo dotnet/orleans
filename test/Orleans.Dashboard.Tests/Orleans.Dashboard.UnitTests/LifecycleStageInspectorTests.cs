@@ -10,6 +10,9 @@ using Xunit;
 namespace UnitTests;
 
 [TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Dashboard")]
 public class LifecycleStageInspectorTests
 {
     [Fact]

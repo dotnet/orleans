@@ -10,6 +10,9 @@ namespace UnitTests.OrleansRuntime.Streams;
 
 public class StreamInstrumentsTagUtilsTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Streaming")]
     [Fact, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
     public void GrainTagsUseStableLowCardinalityDimensions()
     {
@@ -37,6 +40,9 @@ public class StreamInstrumentsTagUtilsTests
         Assert.DoesNotContain("subscription", firstTags.Keys);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Streaming")]
     [Fact, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
     public void StreamOnlyTagsUseUnknownGrainType()
     {
@@ -50,6 +56,9 @@ public class StreamInstrumentsTagUtilsTests
         Assert.DoesNotContain("namespace", tags.Keys);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Streaming")]
     [Fact, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
     public void QueueTagsIncludeOnlyBoundedDimensions()
     {

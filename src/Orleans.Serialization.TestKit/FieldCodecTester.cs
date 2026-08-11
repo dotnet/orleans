@@ -22,6 +22,9 @@ namespace Orleans.Serialization.TestKit
     /// Methods for testing field codecs.
     /// </summary>
     [Trait("Category", "BVT")]
+    [Trait("Suite", "BVT")]
+    [Trait("Provider", "None")]
+    [Trait("Area", "Serialization")]
     [ExcludeFromCodeCoverage]
     public abstract class FieldCodecTester<TValue, TCodec> : SerializationTester where TCodec : class, IFieldCodec<TValue>
     {

@@ -5,6 +5,9 @@ using Xunit;
 
 namespace UnitTests.General
 {
+    [TestSuite("BVT")]
+    [TestSuite("Functional")]
+    [TestProvider("None")]
     [TestCategory("BVT"), TestCategory("Functional")]
     public class BackoffComputationTests
     {

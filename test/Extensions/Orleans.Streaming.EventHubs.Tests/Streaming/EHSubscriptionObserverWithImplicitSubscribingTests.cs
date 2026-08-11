@@ -12,6 +12,9 @@ namespace ServiceBus.Tests.StreamingTests
     /// Tests for EventHub subscription observer behavior with implicit subscriptions across multiple stream providers.
     /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("EventHub")]
+    [TestArea("Streaming")]
     public class EHSubscriptionObserverWithImplicitSubscribingTests : SubscriptionObserverWithImplicitSubscribingTestRunner, IClassFixture<EHSubscriptionObserverWithImplicitSubscribingTests.Fixture>
     {
         private const string EHPath = "ehorleanstest8";

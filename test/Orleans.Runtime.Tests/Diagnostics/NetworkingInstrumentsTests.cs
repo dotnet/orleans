@@ -9,6 +9,8 @@ namespace Tester.Diagnostics;
 
 public class NetworkingInstrumentsTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void NetworkingInstruments_RecordsMetricsUsingMeterFactory()
     {

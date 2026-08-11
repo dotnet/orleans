@@ -8,6 +8,8 @@ namespace Orleans.TestingHost.Tests;
 
 public class ClientLifecycleTests
 {
+    [TestSuite("Functional")]
+    [TestProvider("None")]
     [Fact, TestCategory("Functional")]
     public async Task TestCluster_ClientProperties_AreAvailableOnlyWhileDeployed()
     {
@@ -29,6 +31,8 @@ public class ClientLifecycleTests
         AssertClientUnavailable(() => cluster.GrainFactory);
     }
 
+    [TestSuite("Functional")]
+    [TestProvider("None")]
     [Fact, TestCategory("Functional")]
     public async Task InProcessTestCluster_Client_IsAvailableOnlyWhileDeployed()
     {
@@ -48,6 +52,8 @@ public class ClientLifecycleTests
         AssertClientUnavailable(() => cluster.Client);
     }
 
+    [TestSuite("Functional")]
+    [TestProvider("None")]
     [Fact, TestCategory("Functional")]
     public async Task TestCluster_ClientProperties_RemainUnavailableWhenStartupFails()
     {
@@ -63,6 +69,8 @@ public class ClientLifecycleTests
         AssertClientUnavailable(() => cluster.GrainFactory);
     }
 
+    [TestSuite("Functional")]
+    [TestProvider("None")]
     [Fact, TestCategory("Functional")]
     public async Task InProcessTestCluster_Client_RemainsUnavailableWhenStartupFails()
     {

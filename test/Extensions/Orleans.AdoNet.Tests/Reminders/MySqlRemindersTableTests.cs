@@ -13,6 +13,9 @@ namespace UnitTests.RemindersTest
     /// Tests for Orleans reminders table operations using MySQL as the storage backend.
     /// </summary>
     [TestCategory("Functional"), TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("MySql")]
+    [TestSuite("Functional")]
+    [TestProvider("MySql")]
+    [TestArea("Reminders")]
     public class MySqlRemindersTableTests : ReminderTableTestsBase
     {
         public MySqlRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())

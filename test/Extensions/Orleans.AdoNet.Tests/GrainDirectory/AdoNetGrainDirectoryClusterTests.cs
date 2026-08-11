@@ -13,6 +13,8 @@ namespace Tester.AdoNet.GrainDirectory;
 /// Cluster tests for ADO.NET Grain Directory against SQL Server.
 /// </summary>
 [TestCategory("SqlServer"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
+[TestProvider("SqlServer")]
+[TestSuite("Functional")]
 public class SqlServerAdoNetGrainDirectoryClusterTests() : AdoNetGrainDirectoryClusterTests(AdoNetInvariants.InvariantNameSqlServer)
 {
 }
@@ -21,6 +23,8 @@ public class SqlServerAdoNetGrainDirectoryClusterTests() : AdoNetGrainDirectoryC
 /// Cluster tests for ADO.NET Grain Directory against PostgreSQL.
 /// </summary>
 [TestCategory("PostgreSql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
+[TestProvider("PostgreSql")]
+[TestSuite("Functional")]
 public class PostgreSqlAdoNetGrainDirectoryClusterTests : AdoNetGrainDirectoryClusterTests
 {
     public PostgreSqlAdoNetGrainDirectoryClusterTests() : base(AdoNetInvariants.InvariantNamePostgreSql)
@@ -33,6 +37,8 @@ public class PostgreSqlAdoNetGrainDirectoryClusterTests : AdoNetGrainDirectoryCl
 /// Cluster tests for ADO.NET Grain Directory against MySQL.
 /// </summary>
 [TestCategory("MySql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
+[TestProvider("MySql")]
+[TestSuite("Functional")]
 public class MySqlAdoNetGrainDirectoryClusterTests : AdoNetGrainDirectoryClusterTests
 {
     public MySqlAdoNetGrainDirectoryClusterTests() : base(AdoNetInvariants.InvariantNameMySql)
@@ -45,6 +51,8 @@ public class MySqlAdoNetGrainDirectoryClusterTests : AdoNetGrainDirectoryCluster
 /// Cluster tests base class for ADO.NET Grain Directory.
 /// </summary>
 [TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
+[TestSuite("Functional")]
+[TestArea("GrainDirectory")]
 public abstract class AdoNetGrainDirectoryClusterTests : MultipleGrainDirectoriesTests
 {
     private const string TestDatabaseName = "OrleansGrainDirectoryTest";

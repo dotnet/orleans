@@ -19,6 +19,8 @@ namespace Orleans.TestingHost.Tests
     /// the host's <see cref="IServiceProvider"/> and its background threads (such as the Watchdog) are
     /// never released, leaking the entire silo for the lifetime of the process.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
     [TestCategory("Functional")]
     public class SiloDisposalLeakTests
     {

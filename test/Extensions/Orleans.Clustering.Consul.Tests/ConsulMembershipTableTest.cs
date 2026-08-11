@@ -26,6 +26,9 @@ namespace Consul.Tests
     /// - Cleanup of defunct silo entries
     /// </summary>
     [TestCategory("Membership"), TestCategory("Consul")]
+    [TestSuite("Functional")]
+    [TestProvider("Consul")]
+    [TestArea("Membership")]
     public class ConsulMembershipTableTest : MembershipTableTestsBase
     {
         public ConsulMembershipTableTest(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())

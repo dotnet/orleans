@@ -10,6 +10,9 @@ using Xunit;
 
 namespace Tester.AzureUtils.DurableJobs;
 
+[TestSuite("Functional")]
+[TestProvider("AzureStorage")]
+[TestArea("Persistence")]
 public class AzureStorageBlobDurableJobsTests : TestClusterPerTest
 {
     private DurableJobTestsRunner _runner = null!;

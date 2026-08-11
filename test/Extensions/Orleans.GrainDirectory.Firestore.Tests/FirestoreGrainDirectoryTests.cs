@@ -8,6 +8,9 @@ using Orleans.GrainDirectory.Firestore;
 
 namespace Orleans.GrainDirectory.Firestore.Tests;
 
+[TestSuite("Functional")]
+[TestProvider("GoogleCloud")]
+[TestArea("GrainDirectory")]
 [TestCategory("GrainDirectory"), TestCategory("Functional"), TestCategory("Firestore"),
  TestCategory("GoogleCloud")]
 public class FirestoreGrainDirectoryTests : GrainDirectoryTests<FirestoreGrainDirectory>, IAsyncLifetime

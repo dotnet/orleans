@@ -8,6 +8,8 @@ namespace Tester.Diagnostics;
 
 public class ApplicationRequestInstrumentsTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void TimedOutAndCanceledCounters_CarryGrainTypeTag()
     {

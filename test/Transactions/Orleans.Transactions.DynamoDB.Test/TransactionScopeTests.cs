@@ -10,6 +10,9 @@ namespace Orleans.Transactions.DynamoDB.Tests
     /// <summary>
     /// Tests for scoped transaction functionality with DynamoDB.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("DynamoDB")]
+    [TestArea("Transactions")]
     [TestCategory("DynamoDB"), TestCategory("Transactions"), TestCategory("Functional")]
     public class TransactionScopeTests : ScopedTransactionsTestRunnerxUnit, IClassFixture<TestFixture>
     {

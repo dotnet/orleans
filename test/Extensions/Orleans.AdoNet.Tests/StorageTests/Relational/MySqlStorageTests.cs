@@ -13,6 +13,9 @@ namespace UnitTests.StorageTests.Relational
     /// provider and environment setup as done in <see cref="CommonFixture"/> and how it delegates it.
     /// </remarks>
     [TestCategory("MySql"), TestCategory("Persistence")]
+    [TestSuite("Functional")]
+    [TestProvider("MySql")]
+    [TestArea("Persistence")]
     public class MySqlStorageTests : RelationalStorageTests, IClassFixture<CommonFixture>
     {
         /// <summary>

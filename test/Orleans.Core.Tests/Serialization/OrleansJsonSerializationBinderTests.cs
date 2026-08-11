@@ -14,6 +14,9 @@ namespace NonSilo.Tests.Serialization;
 /// resolving types named in a JSON payload via <see cref="TypeNameHandling"/>. This prevents arbitrary CLR
 /// types from being constructed during deserialization of persisted or streamed grain state.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Serialization")]
 [TestCategory("BVT"), TestCategory("Serialization")]
 public class OrleansJsonSerializationBinderTests
 {

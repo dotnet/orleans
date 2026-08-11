@@ -4,6 +4,8 @@ using Xunit;
 
 namespace UnitTests.StreamingTests;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT")]
 public sealed class StreamCheckpointComparersTests
 {

@@ -8,6 +8,9 @@ using Xunit;
 namespace Tester.Redis.Streaming;
 
 [Collection(TestEnvironmentFixture.DefaultCollection)]
+[TestSuite("BVT")]
+[TestProvider("Redis")]
+[TestArea("Streaming")]
 [TestCategory("Redis"), TestCategory("Streaming")]
 public sealed class RedisStreamStorageTests
 {

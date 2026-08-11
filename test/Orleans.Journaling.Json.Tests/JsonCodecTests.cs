@@ -15,6 +15,8 @@ namespace Orleans.Journaling.Json.Tests;
 /// <summary>
 /// Round-trip and JSON-format tests for the direct JSON codecs.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT")]
 public class JsonCodecTests
 {

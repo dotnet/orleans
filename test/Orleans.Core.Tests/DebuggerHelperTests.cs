@@ -11,6 +11,9 @@ namespace DefaultCluster.Tests.General
     /// in development environments. The debugger helper provides access to the actual grain
     /// instance behind the grain reference proxy.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class DebuggerHelperTests : HostedTestClusterEnsureDefaultStarted
     {
         public DebuggerHelperTests(DefaultClusterFixture fixture) : base(fixture)

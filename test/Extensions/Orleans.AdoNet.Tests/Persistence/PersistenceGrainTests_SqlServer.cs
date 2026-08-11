@@ -14,6 +14,9 @@ namespace Tester.AdoNet.Persistence
     /// Tests for Orleans grain state persistence functionality using SQL Server as the storage provider.
     /// </summary>
     [TestCategory("Persistence"), TestCategory("SqlServer")]
+    [TestSuite("Functional")]
+    [TestProvider("SqlServer")]
+    [TestArea("Persistence")]
     public class PersistenceGrainTests_SqlServer : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_SqlServer.Fixture>
     {
         public const string TestDatabaseName = "OrleansTest_SqlServer_Storage";

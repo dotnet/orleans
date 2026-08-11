@@ -14,6 +14,9 @@ namespace Tester.AdoNet.Persistence
     /// Tests for Orleans grain state persistence functionality using MySQL as the storage provider.
     /// </summary>
     [TestCategory("Persistence"), TestCategory("MySql")]
+    [TestSuite("Functional")]
+    [TestProvider("MySql")]
+    [TestArea("Persistence")]
     public class PersistenceGrainTests_MySql : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_MySql.Fixture>
     {
         public const string TestDatabaseName = "OrleansTest_MySql_Storage";

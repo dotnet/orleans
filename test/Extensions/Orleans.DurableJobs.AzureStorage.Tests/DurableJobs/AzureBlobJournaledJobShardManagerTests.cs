@@ -13,6 +13,9 @@ using Xunit;
 
 namespace Tester.AzureUtils.DurableJobs;
 
+[TestSuite("BVT")]
+[TestProvider("AzureStorage")]
+[TestArea("Persistence")]
 [TestCategory("Azure"), TestCategory("DurableJobs")]
 public sealed class AzureBlobJournaledJobShardManagerTests(AzureBlobJournaledJobShardManagerTestFixture fixture)
     : JobShardManagerTestsRunner(fixture), IClassFixture<AzureBlobJournaledJobShardManagerTestFixture>;

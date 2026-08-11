@@ -6,6 +6,9 @@ namespace UnitTests.ActivationRebalancingTests;
 /// <summary>
 /// Tests for static activation rebalancing without adding new activations during the process.
 /// </summary>
+[TestSuite("Functional")]
+[TestProvider("None")]
+[TestArea("Placement")]
 [TestCategory("Functional"), TestCategory("ActivationRebalancing")]
 public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper output)
     : RebalancingTestBase<RebalancerFixture>(fixture, output), IClassFixture<RebalancerFixture>

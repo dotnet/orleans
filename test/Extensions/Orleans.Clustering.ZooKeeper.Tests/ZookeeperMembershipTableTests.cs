@@ -24,6 +24,9 @@ namespace UnitTests.MembershipTests
     /// membership operations correctly, including node failures and network partitions.
     /// </summary>
     [TestCategory("Membership"), TestCategory("ZooKeeper")]
+    [TestSuite("Functional")]
+    [TestProvider("ZooKeeper")]
+    [TestArea("Membership")]
     public class ZookeeperMembershipTableTests : MembershipTableTestsBase
     {
         public ZookeeperMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment)

@@ -15,6 +15,9 @@ namespace Tester.AzureUtils.Persistence;
 /// Validates that Azure blob storage uses the stream serializer for reads and writes when available.
 /// </summary>
 [TestCategory("Persistence"), TestCategory("AzureStorage")]
+[TestSuite("Functional")]
+[TestProvider("AzureStorage")]
+[TestArea("Persistence")]
 public class PersistenceGrainTests_AzureBlobStore_StreamSerializer : IClassFixture<PersistenceGrainTests_AzureBlobStore_StreamSerializer.Fixture>
 {
     private readonly Fixture fixture;

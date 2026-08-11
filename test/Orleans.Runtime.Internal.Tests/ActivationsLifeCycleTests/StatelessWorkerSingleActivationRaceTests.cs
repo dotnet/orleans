@@ -55,6 +55,8 @@ public class StatelessWorkerSingleActivationRaceTests(StatelessWorkerSingleActiv
     /// destroyed, the context is marked terminated, is removed from the activation directory,
     /// and forwards a late delivery to a fresh wrapper instead of resurrecting a worker.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("StatelessWorker")]
     public async Task TerminatedContextForwardsLateDeliveryToFreshWrapper()
     {
@@ -92,6 +94,8 @@ public class StatelessWorkerSingleActivationRaceTests(StatelessWorkerSingleActiv
     /// must use the same replacement activation so that <c>maxLocalWorkers: 1</c> is
     /// preserved even when a terminated wrapper receives another message.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("StatelessWorker")]
     public async Task LateDeliveryAndFreshCallUseSingleReplacementActivation()
     {

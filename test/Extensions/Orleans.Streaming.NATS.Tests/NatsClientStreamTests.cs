@@ -11,6 +11,9 @@ using Orleans.Streaming.NATS.Hosting;
 
 namespace NATS.Tests;
 
+[TestSuite("Functional")]
+[TestProvider("NATS")]
+[TestArea("Streaming")]
 public class NatsClientStreamTests : TestClusterPerTest
 {
     private const string NatsStreamProviderName = "NatsProvider-Client-Test";

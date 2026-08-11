@@ -4,6 +4,9 @@ using Xunit;
 
 namespace Tester.TransportTests;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public abstract class TransportTestsBase
 {
     private readonly BaseTestClusterFixture _fixture;

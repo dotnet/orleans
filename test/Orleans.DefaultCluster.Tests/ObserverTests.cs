@@ -16,6 +16,7 @@ namespace DefaultCluster.Tests.General
     /// or events without polling. Observers are weakly referenced to prevent
     /// memory leaks and support automatic cleanup.
     /// </summary>
+    [TestArea("Runtime")]
     public class ObserverTests : HostedTestClusterEnsureDefaultStarted
     {
         private readonly TimeSpan timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(10);
@@ -52,6 +53,8 @@ namespace DefaultCluster.Tests.General
         /// that multiple notifications are delivered correctly, and that the
         /// observer callback context is properly maintained.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT")]
         public async Task ObserverTest_SimpleNotification()
         {
@@ -75,6 +78,8 @@ namespace DefaultCluster.Tests.General
         /// Similar to SimpleNotification test but uses the generated factory pattern
         /// to create observer references, verifying both approaches work identically.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT")]
         public async Task ObserverTest_SimpleNotification_GeneratedFactory()
         {
@@ -126,6 +131,8 @@ namespace DefaultCluster.Tests.General
         /// Verifies that Orleans detects and rejects duplicate subscriptions
         /// to prevent duplicate notifications and maintain subscription integrity.
         /// </summary>
+        [TestSuite("SlowBVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("SlowBVT")]
         public async Task ObserverTest_DoubleSubscriptionSameReference()
         {
@@ -180,6 +187,8 @@ namespace DefaultCluster.Tests.General
         /// stop receiving them after unsubscribing, and that the unsubscribe
         /// operation properly cleans up the subscription.
         /// </summary>
+        [TestSuite("SlowBVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("SlowBVT")]
         public async Task ObserverTest_SubscribeUnsubscribe()
         {
@@ -219,6 +228,8 @@ namespace DefaultCluster.Tests.General
         /// Verifies that attempting to unsubscribe a non-existent subscription
         /// is handled gracefully without causing system errors.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT")]
         public async Task ObserverTest_Unsubscribe()
         {
@@ -249,6 +260,8 @@ namespace DefaultCluster.Tests.General
         /// Verifies that a grain can maintain multiple observer subscriptions
         /// and correctly notify all registered observers of state changes.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT")]
         public async Task ObserverTest_DoubleSubscriptionDifferentReferences()
         {
@@ -289,6 +302,8 @@ namespace DefaultCluster.Tests.General
         /// DeleteObjectReference, the grain can no longer send notifications
         /// to that observer, demonstrating automatic cleanup behavior.
         /// </summary>
+        [TestSuite("SlowBVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("SlowBVT")]
         public async Task ObserverTest_DeleteObject()
         {
@@ -325,6 +340,8 @@ namespace DefaultCluster.Tests.General
         /// CreateObjectReference) throws an appropriate exception, enforcing
         /// the requirement that observers must be grain references.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT")]
         public async Task ObserverTest_SubscriberMustBeGrainReference()
         {
@@ -348,6 +365,8 @@ namespace DefaultCluster.Tests.General
         /// (like Grain classes or existing grain references) throws appropriate
         /// exceptions, ensuring type safety in the observer pattern.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT")]
         public void ObserverTest_CreateObjectReference_ThrowsForInvalidArgumentTypes()
         {

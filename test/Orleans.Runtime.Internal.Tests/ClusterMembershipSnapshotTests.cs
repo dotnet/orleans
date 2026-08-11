@@ -6,6 +6,9 @@ using Xunit;
 
 namespace UnitTests;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Membership")]
 [TestCategory("BVT"), TestCategory("Membership")]
 public class ClusterMembershipSnapshotTests
 {

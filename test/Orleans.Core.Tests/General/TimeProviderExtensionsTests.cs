@@ -8,6 +8,8 @@ public class TimeProviderExtensionsTests
 {
     private static readonly TimeSpan MaximumTimerDelay = TimeSpan.FromMilliseconds(0xfffffffe);
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Theory, TestCategory("BVT")]
     [MemberData(nameof(TimerDelayBoundaries))]
     public async Task DelayUntilAsync_CompletesAtRequestedTime(TimeSpan delay)
@@ -28,6 +30,8 @@ public class TimeProviderExtensionsTests
         Assert.Equal(start.Add(delay), timeProvider.GetUtcNow());
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task DelayUntilAsync_CanBeCancelledBeyondMaximumTimerDelay()
     {

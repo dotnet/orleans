@@ -11,6 +11,8 @@ namespace Orleans.Journaling.Tests;
 /// a single value of any type. It's useful for grain state properties that need
 /// durability without the complexity of collections.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT")]
 public class DurableValueTests : JournalingTestBase
 {

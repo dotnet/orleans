@@ -9,6 +9,9 @@ using Orleans.Runtime;
 
 namespace Orleans.Reminders.Firestore.Tests;
 
+[TestSuite("Functional")]
+[TestProvider("GoogleCloud")]
+[TestArea("Reminders")]
 [TestCategory("Reminders"), TestCategory("Firestore"), TestCategory("GoogleCloud"), TestCategory("Functional")]
 [Collection(TestEnvironmentFixture.DefaultCollection)]
 public class FirestoreRemindersTests : ReminderTableTestsBase, IClassFixture<TestEnvironmentFixture>

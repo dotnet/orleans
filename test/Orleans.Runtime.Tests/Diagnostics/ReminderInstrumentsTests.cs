@@ -8,6 +8,8 @@ namespace Tester.Diagnostics;
 
 public class ReminderInstrumentsTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void ReminderInstruments_RecordsMetricsUsingMeterFactory()
     {

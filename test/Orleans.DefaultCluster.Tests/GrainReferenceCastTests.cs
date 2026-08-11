@@ -14,6 +14,9 @@ namespace DefaultCluster.Tests
     /// including upcasting to base interfaces, casting between multiple implemented interfaces,
     /// and proper error handling for invalid casts. Tests both pre- and post-activation scenarios.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class GrainReferenceCastTests : HostedTestClusterEnsureDefaultStarted
     {
         private readonly IInternalGrainFactory internalGrainFactory;

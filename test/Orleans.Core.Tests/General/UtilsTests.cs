@@ -9,6 +9,9 @@ namespace UnitTests.UtilsTests
     /// Tests for utility functions including gateway URI conversion for IPv4 and IPv6 addresses.
     /// </summary>
     [TestCategory("Utils")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class UtilsTests
     {
         private readonly ITestOutputHelper output;

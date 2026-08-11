@@ -8,6 +8,8 @@ using Xunit;
 
 namespace UnitTests.ActivationsLifeCycleTests;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT"), TestCategory("Migration")]
 public class ActivationDataMigrationTests(ActivationDataMigrationTests.Fixture fixture) : IClassFixture<ActivationDataMigrationTests.Fixture>
 {

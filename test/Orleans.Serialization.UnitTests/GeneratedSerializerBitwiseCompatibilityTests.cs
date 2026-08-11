@@ -17,6 +17,9 @@ namespace Orleans.Serialization.UnitTests;
 /// can be checked for wire-format drift without deserializing newly produced data.
 /// </summary>
 [Trait("Category", "BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Serialization")]
 public sealed class GeneratedSerializerBitwiseCompatibilityTests : IDisposable
 {
     private readonly ServiceProvider _serviceProvider;

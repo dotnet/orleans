@@ -4,6 +4,8 @@ using Xunit;
 
 namespace AWSUtils.Tests.StorageTests;
 
+[TestSuite("BVT")]
+[TestProvider("DynamoDB")]
 [TestCategory("DynamoDB"), TestCategory("BVT")]
 public class DynamoDBStorageCancellationTests
 {

@@ -20,6 +20,9 @@ namespace Tester.AzureUtils.TimerTests
     /// </summary>
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     [TestCategory("AzureStorage")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Reminders")]
     public class ReminderTests_Azure_Standalone : AzureStorageBasicTests
     {
         private readonly ITestOutputHelper output;

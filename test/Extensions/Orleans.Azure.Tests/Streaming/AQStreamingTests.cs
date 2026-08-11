@@ -16,6 +16,9 @@ using Xunit;
 namespace Tester.AzureUtils.Streaming
 {
     [TestCategory("Streaming"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Streaming")]
     public class AQStreamingTests(AQStreamingTests.Fixture fixture) : IClassFixture<AQStreamingTests.Fixture>
     {
         public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;

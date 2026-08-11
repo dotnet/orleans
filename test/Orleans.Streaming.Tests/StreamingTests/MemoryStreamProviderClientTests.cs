@@ -20,6 +20,9 @@ namespace Tester.StreamingTests
     /// These tests focus on client disconnection scenarios to ensure
     /// proper cleanup and recovery of stream producers and consumers.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class MemoryStreamProviderClientTests : OrleansTestingBase, IClassFixture<MemoryStreamProviderClientTests.Fixture>
     {
         /// <summary>

@@ -11,6 +11,9 @@ namespace ServiceBus.Tests.Streaming
     /// Tests for EventHub programmatic subscription functionality with multiple stream providers.
     /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("EventHub")]
+    [TestArea("Streaming")]
     public class EHProgrammaticSubscribeTest : ProgrammaticSubscribeTestsRunner, IClassFixture<EHProgrammaticSubscribeTest.Fixture>
     {
         private const string EHPath = "ehorleanstest4";

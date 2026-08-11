@@ -8,6 +8,8 @@ using Xunit;
 
 namespace Tester.Directories;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT"), TestCategory("Directory")]
 public class GrainDirectoryCacheFactoryTests
 {

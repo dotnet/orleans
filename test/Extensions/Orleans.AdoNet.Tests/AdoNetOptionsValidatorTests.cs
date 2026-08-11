@@ -11,6 +11,9 @@ using UnitTests.StorageTests.Relational;
 namespace UnitTests.AdoNet;
 
 [TestCategory("AdoNet")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Persistence")]
 public sealed class AdoNetOptionsValidatorTests
 {
     [Fact]

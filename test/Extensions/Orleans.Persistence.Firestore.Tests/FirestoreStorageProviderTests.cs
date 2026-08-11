@@ -15,6 +15,9 @@ using UnitTests.StorageTests.Relational;
 
 namespace Orleans.Persistence.Firestore.Tests;
 
+[TestSuite("Functional")]
+[TestProvider("GoogleCloud")]
+[TestArea("Persistence")]
 [TestCategory("Persistence"), TestCategory("Firestore"), TestCategory("GoogleCloud"), TestCategory("Functional")]
 [Collection(TestEnvironmentFixture.DefaultCollection)]
 public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixture>, IAsyncLifetime
@@ -33,6 +36,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
             fixture.Services.GetRequiredService<ClientGrainContext>());
     }
 
+    [TestSuite("Functional")]
     [SkippableTheory, TestCategory("Functional")]
     [InlineData(null, false)]
     [InlineData(null, true)]
@@ -51,6 +55,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         await Test_PersistenceProvider_WriteRead(testName, storage, grainState);
     }
 
+    [TestSuite("Functional")]
     [SkippableTheory, TestCategory("Functional")]
     [InlineData(null, false)]
     [InlineData(null, true)]
@@ -277,6 +282,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         Assert.Equal("Unknown", exception.StoredEtag);
     }
 
+    [TestSuite("Functional")]
     [SkippableTheory, TestCategory("Functional")]
     [InlineData(null, true, false)]
     [InlineData(null, false, true)]

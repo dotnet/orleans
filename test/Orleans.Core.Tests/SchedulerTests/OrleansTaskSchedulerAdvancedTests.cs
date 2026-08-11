@@ -10,6 +10,9 @@ namespace UnitTests.SchedulerTests
     /// <summary>
     /// Advanced tests for Orleans task scheduler functionality.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class OrleansTaskSchedulerAdvancedTests(ITestOutputHelper output) : IDisposable
     {
         private static readonly TimeSpan WaitTimeout = TimeSpan.FromSeconds(10);

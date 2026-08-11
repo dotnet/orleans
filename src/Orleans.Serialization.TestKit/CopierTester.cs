@@ -14,6 +14,9 @@ namespace Orleans.Serialization.TestKit
     /// Test methods for copiers.
     /// </summary>
     [Trait("Category", "BVT")]
+    [Trait("Suite", "BVT")]
+    [Trait("Provider", "None")]
+    [Trait("Area", "Serialization")]
     [ExcludeFromCodeCoverage]
     public abstract class CopierTester<TValue, TCopier> : SerializationTester where TCopier : class, IDeepCopier<TValue>
     {

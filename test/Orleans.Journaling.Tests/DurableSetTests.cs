@@ -11,6 +11,8 @@ namespace Orleans.Journaling.Tests;
 /// uniqueness of elements and durability through journaling. This is useful for maintaining
 /// collections of unique identifiers, tags, or other distinct values in Orleans grains.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT")]
 public class DurableSetTests : JournalingTestBase
 {

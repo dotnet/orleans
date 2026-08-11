@@ -10,6 +10,9 @@ namespace UnitTests.MembershipTests
     /// <summary>
     /// Tests for the in-memory membership table used by development clustering.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("BVT"), TestCategory("Membership")]
     public class InMemoryMembershipTableTests
     {

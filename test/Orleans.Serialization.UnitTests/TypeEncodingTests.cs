@@ -34,6 +34,9 @@ namespace Orleans.Serialization.UnitTests
     /// - Enable cross-version compatibility through stable type identifiers
     /// - Provide efficient polymorphic serialization
     /// </summary>
+    [Trait("Suite", "BVT")]
+    [Trait("Provider", "None")]
+    [Trait("Area", "Serialization")]
     public class TypeEncodingTests
     {
         private readonly IServiceProvider _serviceProvider;

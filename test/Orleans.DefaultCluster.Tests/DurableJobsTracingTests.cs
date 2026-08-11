@@ -91,6 +91,9 @@ public class DurableJobsTracingTests : IClassFixture<DurableJobsTracingTests.Fix
         CapturedActivities.Clear();
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("DurableJobs")]
     [Fact, TestCategory("BVT"), TestCategory("DurableJobs")]
     public async Task ScheduleAndExecuteShareTraceId()
     {

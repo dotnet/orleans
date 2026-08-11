@@ -9,6 +9,8 @@ namespace Tester.Diagnostics;
 
 public class StorageInstrumentsTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void StorageInstruments_RecordsMetricsUsingMeterFactory()
     {

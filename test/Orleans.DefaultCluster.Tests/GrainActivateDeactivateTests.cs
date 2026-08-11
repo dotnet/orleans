@@ -10,6 +10,9 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
     /// handle activation failures, support reactivation after deactivation, and manage
     /// complex scenarios like deactivation during activation or with long-running operations.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class GrainActivateDeactivateTests : HostedTestClusterEnsureDefaultStarted, IDisposable
     {
         private readonly IActivateDeactivateWatcherGrain watcher;

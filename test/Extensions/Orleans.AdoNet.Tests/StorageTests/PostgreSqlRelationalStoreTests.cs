@@ -8,6 +8,9 @@ namespace UnitTests.StorageTests.AdoNet
     /// Tests for PostgreSQL relational storage functionality.
     /// </summary>
     [TestCategory("Persistence"), TestCategory("PostgreSql")]
+    [TestSuite("Functional")]
+    [TestProvider("PostgreSql")]
+    [TestArea("Persistence")]
     public class PostgreSqlRelationalStoreTests : RelationalStoreTestsBase, IClassFixture<PostgreSqlRelationalStoreTests.Fixture>
     {
         private const string TestDatabaseName = "OrleansStreamTest";

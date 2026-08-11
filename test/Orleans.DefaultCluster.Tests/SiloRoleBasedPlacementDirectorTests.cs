@@ -12,6 +12,9 @@ namespace DefaultCluster.Tests.General
     /// grain affinity to specific infrastructure (e.g., grains that need
     /// access to local resources or should run on specialized hardware).
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class SiloRoleBasedPlacementDirectorTests : HostedTestClusterEnsureDefaultStarted
     {
         public SiloRoleBasedPlacementDirectorTests(DefaultClusterFixture fixture) : base(fixture)

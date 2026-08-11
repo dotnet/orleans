@@ -15,6 +15,10 @@ namespace NonSilo.Tests.Caching;
 /// even under extreme concurrent access patterns.
 /// </summary>
 [TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestSuite("Nightly")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public sealed class ConcurrentLruCacheSoakTests
 {
     private readonly ITestOutputHelper testOutputHelper;

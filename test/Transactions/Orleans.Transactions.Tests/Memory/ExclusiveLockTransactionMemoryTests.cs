@@ -4,6 +4,9 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Tests;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Transactions")]
 [TestCategory("BVT"), TestCategory("Transactions")]
 public class ExclusiveLockTransactionMemoryTests : ExclusiveLockTransactionTestRunnerxUnit, IClassFixture<MemoryTransactionsFixture>
 {

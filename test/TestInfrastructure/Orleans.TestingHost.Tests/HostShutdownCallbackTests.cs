@@ -11,6 +11,8 @@ namespace Orleans.TestingHost.Tests
     /// shuts down, so in-flight calls observe a terminal result instead of hanging forever once the
     /// host can no longer receive responses.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
     [TestCategory("Functional")]
     public class HostShutdownCallbackTests
     {

@@ -36,6 +36,7 @@ namespace UnitTests.ActivationCancellationTests;
 ///
 /// The code below implements these helpers and uses them in the OperationCanceledException test.
 /// </summary>
+[TestArea("Runtime")]
 public class ActivationCancellationLoggingTests : OrleansTestingBase, IClassFixture<ActivationCancellationLoggingTests.Fixture>
 {
     private readonly Fixture _fixture;
@@ -135,6 +136,8 @@ public class ActivationCancellationLoggingTests : OrleansTestingBase, IClassFixt
     /// When OperationCanceledException is thrown because the cancellation token was observed during activation,
     /// it should be logged at WARNING level (not ERROR) because this is intentional cancellation behavior.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
     [Fact, TestCategory("Functional"), TestCategory("ActivationCancellation")]
     public async Task OperationCanceledException_WhenCancellationTokenObserved_LogsInfoNotError()
     {
@@ -170,6 +173,8 @@ public class ActivationCancellationLoggingTests : OrleansTestingBase, IClassFixt
     /// When ObjectDisposedException is thrown because services are disposed after cancellation,
     /// it should be logged at WARNING level (not ERROR) because this is expected behavior during cancellation.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
     [Fact, TestCategory("Functional"), TestCategory("ActivationCancellation")]
     public async Task ObjectDisposedException_WhenCancellationRequested_LogsWarningNotError()
     {
@@ -205,6 +210,8 @@ public class ActivationCancellationLoggingTests : OrleansTestingBase, IClassFixt
     /// When TaskCanceledException (which inherits from OperationCanceledException) is thrown during cancellation,
     /// it should be logged at INFO level (not ERROR).
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
     [Fact, TestCategory("Functional"), TestCategory("ActivationCancellation")]
     public async Task TaskCanceledException_WhenCancellationRequested_LogsInfoNotError()
     {
@@ -243,6 +250,8 @@ public class ActivationCancellationLoggingTests : OrleansTestingBase, IClassFixt
     /// When a generic exception (not related to cancellation) is thrown during activation,
     /// it should be logged at ERROR level because this is an unexpected failure.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("ActivationCancellation")]
     public async Task GenericException_DuringActivation_LogsError()
     {
@@ -269,6 +278,8 @@ public class ActivationCancellationLoggingTests : OrleansTestingBase, IClassFixt
     /// When ObjectDisposedException is thrown but the cancellation token was NOT cancelled,
     /// it should be logged at ERROR level (the 'when' guard should NOT match).
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("ActivationCancellation")]
     public async Task ObjectDisposedException_WhenNotCancelled_LogsError()
     {
@@ -295,6 +306,8 @@ public class ActivationCancellationLoggingTests : OrleansTestingBase, IClassFixt
     /// When OperationCanceledException is thrown but the cancellation token was NOT cancelled,
     /// it should be logged at ERROR level (the 'when' guard should NOT match).
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("ActivationCancellation")]
     public async Task OperationCanceledException_WhenNotCancelled_LogsError()
     {
@@ -324,6 +337,8 @@ public class ActivationCancellationLoggingTests : OrleansTestingBase, IClassFixt
     /// <summary>
     /// Baseline test: Successful activation should not log any errors or warnings.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("ActivationCancellation")]
     public async Task SuccessfulActivation_NoErrorOrWarningLogs()
     {

@@ -12,6 +12,9 @@ namespace Analyzers.Tests;
 /// about distributed communication boundaries.
 /// </summary>
 [TestCategory("BVT"), TestCategory("Analyzer")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Analyzer")]
 public class GrainInterfacePropertyDiagnosticAnalyzerTest : DiagnosticAnalyzerTestBase<GrainInterfacePropertyDiagnosticAnalyzer>
 {
     private const string DiagnosticId = GrainInterfacePropertyDiagnosticAnalyzer.DiagnosticId;

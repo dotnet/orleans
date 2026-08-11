@@ -7,6 +7,9 @@ using TestExtensions;
 
 namespace Tester.Redis.Streaming;
 
+[TestSuite("Functional")]
+[TestProvider("Redis")]
+[TestArea("Streaming")]
 [TestCategory("Redis"), TestCategory("Streaming"), TestCategory("StreamingResume")]
 public sealed class RedisStreamingResumeTests : StreamingResumeTests
 {

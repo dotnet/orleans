@@ -16,6 +16,8 @@ namespace Orleans.Journaling.Json.Tests;
 /// <summary>
 /// Tests that verify same-format recovery for JSON journaling and the Orleans binary compatibility baseline.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT")]
 public class CodecRecoveryTests : JournalingTestBase
 {

@@ -17,6 +17,9 @@ namespace AWSUtils.Tests.StorageTests
     /// Tests DynamoDB storage provider for grain persistence including serialization of grain references.
     /// </summary>
     [TestCategory("Persistence"), TestCategory("AWS"), TestCategory("DynamoDb")]
+    [TestSuite("Functional")]
+    [TestProvider("DynamoDB")]
+    [TestArea("Persistence")]
     public class PersistenceGrainTests_AWSDynamoDBStore : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_AWSDynamoDBStore.Fixture>
     {
         public class Fixture : TestExtensions.BaseTestClusterFixture

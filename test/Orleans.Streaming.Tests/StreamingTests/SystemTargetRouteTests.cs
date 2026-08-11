@@ -13,6 +13,9 @@ namespace Tester.StreamingTests
     /// <summary>
     /// Tests for persistent streaming over single gateway configurations, validating system target routing behavior.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class SystemTargetRouteTests : OrleansTestingBase, IClassFixture<SystemTargetRouteTests.Fixture>
     {
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);

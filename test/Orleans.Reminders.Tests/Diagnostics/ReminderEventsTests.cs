@@ -10,6 +10,8 @@ namespace UnitTests.Diagnostics;
 
 public class ReminderEventsTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void EmitRegistered_EmitsGrainIdAndReminderName()
     {
@@ -26,6 +28,8 @@ public class ReminderEventsTests
         Assert.Same(siloAddress, registered.SiloAddress);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task ReminderDiagnosticObserver_MatchesTickCompleted_ByIdentifiers()
     {
@@ -47,6 +51,8 @@ public class ReminderEventsTests
         Assert.Same(siloAddress, tickCompleted.SiloAddress);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task ReminderDiagnosticObserver_WaitsForAdditionalTickCount_FromCurrentState()
     {
@@ -75,6 +81,8 @@ public class ReminderEventsTests
         await waitTask;
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task ReminderDiagnosticObserver_WaitsForTickCondition_UntilConditionIsSatisfied()
     {
@@ -113,6 +121,8 @@ public class ReminderEventsTests
         await waitTask.WaitAsync(TimeSpan.FromSeconds(1));
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void EmitLocalReminderLifecycle_EmitsReminderInstanceAndReason()
     {
@@ -139,6 +149,8 @@ public class ReminderEventsTests
         Assert.Same(siloAddress, stopped.SiloAddress);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task ReminderDiagnosticObserver_WaitsForReminderQuiescence_FromLifecycleEvents()
     {
@@ -168,6 +180,8 @@ public class ReminderEventsTests
         Assert.Equal(0, observer.GetActiveReminderCount(grainId, reminderName));
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task ReminderDiagnosticObserver_CanceledQuiescenceWait_RemainsCanceled()
     {
@@ -199,6 +213,9 @@ public class ReminderEventsTests
         Assert.True(canceledWaitTask.IsCanceled);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Reminders")]
     [Fact, TestCategory("BVT")]
     public async Task ReminderDiagnosticObserver_WaitsForCurrentOwnerSchedule_AfterOwnershipChange()
     {

@@ -15,6 +15,9 @@ namespace Tester.AzureUtils.Persistence;
 /// PersistenceStateTests using AzureStore - Requires access to external Azure blob storage
 /// </summary>
 [TestCategory("Persistence"), TestCategory("AzureStorage")]
+[TestSuite("Functional")]
+[TestProvider("AzureStorage")]
+[TestArea("Persistence")]
 public class PersistenceStateTests_AzureBlobStore : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceStateTests_AzureBlobStore.Fixture>
 {
     public class Fixture : BaseAzureTestClusterFixture
@@ -48,6 +51,9 @@ public class PersistenceStateTests_AzureBlobStore : Base_PersistenceGrainTests_A
 }
 
 [TestCategory("Persistence"), TestCategory("AzureStorage")]
+[TestSuite("Functional")]
+[TestProvider("AzureStorage")]
+[TestArea("Persistence")]
 public class PersistenceStateTests_AzureBlobStore_CustomContainerFactory : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceStateTests_AzureBlobStore_CustomContainerFactory.Fixture>
 {
     public class Fixture : BaseAzureTestClusterFixture
@@ -125,6 +131,9 @@ public class PersistenceStateTests_AzureBlobStore_CustomContainerFactory : Base_
 }
 
 [TestCategory("Persistence"), TestCategory("AzureStorage")]
+[TestSuite("Functional")]
+[TestProvider("AzureStorage")]
+[TestArea("Persistence")]
 public class PersistenceStateTests_AzureBlobStore_DeleteStateOnClear : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceStateTests_AzureBlobStore_DeleteStateOnClear.Fixture>
 {
     public class Fixture : BaseAzureTestClusterFixture

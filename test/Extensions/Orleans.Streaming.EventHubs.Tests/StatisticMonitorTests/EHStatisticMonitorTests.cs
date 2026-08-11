@@ -18,6 +18,9 @@ namespace ServiceBus.Tests.MonitorTests
     /// Tests for EventHub statistics monitoring including receiver, cache, and object pool monitor counters.
     /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming")]
+    [TestSuite("Functional")]
+    [TestProvider("EventHub")]
+    [TestArea("Streaming")]
     public class EHStatisticMonitorTests : OrleansTestingBase, IClassFixture<EHStatisticMonitorTests.Fixture>
     {
         private const string StreamProviderName = "EventHubStreamProvider";

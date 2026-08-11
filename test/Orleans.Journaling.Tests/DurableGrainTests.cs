@@ -17,6 +17,9 @@ namespace Orleans.Journaling.Tests;
 /// - Large state handling
 /// </summary>
 [TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Journaling")]
 public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<IntegrationTestFixture>
 {
     private IGrainFactory Client => fixture.Client;

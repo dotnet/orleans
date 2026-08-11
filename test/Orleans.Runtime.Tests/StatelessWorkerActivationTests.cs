@@ -21,6 +21,9 @@ namespace UnitTests.General;
 /// - Automatic scaling up to MaxLocalWorkers under concurrent load
 /// - Proper cleanup when activations are deactivated
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public class StatelessWorkerActivationTests : IClassFixture<StatelessWorkerActivationTests.Fixture>
 {
     public class Fixture : BaseTestClusterFixture

@@ -7,6 +7,8 @@ namespace UnitTests.Messaging;
 
 public class MessageTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void AddToCacheInvalidationHeader_LimitsHeaderLength()
     {
@@ -24,6 +26,8 @@ public class MessageTests
         Assert.DoesNotContain(header, update => update.GrainId.Equals(GrainId.Create("test", Message.MaxCacheInvalidationHeaderEntries.ToString())));
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void AddToCacheInvalidationHeader_DeduplicatesByGrainId()
     {

@@ -22,6 +22,8 @@ namespace Tester.Redis;
 /// (for example, DI-provided) multiplexers untouched. Each provider implements <see cref="System.IDisposable"/>
 /// and <see cref="System.IAsyncDisposable"/> independently, so both disposal paths are exercised.
 /// </summary>
+[TestSuite("Functional")]
+[TestProvider("Redis")]
 [TestCategory("Redis"), TestCategory("Functional")]
 [Collection(TestEnvironmentFixture.DefaultCollection)]
 public sealed class RedisMultiplexerOwnershipTests

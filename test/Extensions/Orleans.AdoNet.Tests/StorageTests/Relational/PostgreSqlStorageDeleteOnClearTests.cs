@@ -8,6 +8,9 @@ namespace UnitTests.StorageTests.Relational
     /// Persistence tests for PostgreSQL with the delete-state-on-clear option enabled.
     /// </summary>
     [TestCategory("PostgreSql"), TestCategory("Persistence")]
+    [TestSuite("Functional")]
+    [TestProvider("PostgreSql")]
+    [TestArea("Persistence")]
     public class PostgreSqlStorageDeleteOnClearTests : RelationalStorageTests, IClassFixture<CommonFixture>
     {
         private const string AdoNetInvariant = AdoNetInvariants.InvariantNamePostgreSql;

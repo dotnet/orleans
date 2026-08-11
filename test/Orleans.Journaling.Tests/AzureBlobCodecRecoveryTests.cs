@@ -14,6 +14,8 @@ using Xunit;
 
 namespace Orleans.Journaling.Tests;
 
+[TestSuite("Functional")]
+[TestProvider("AzureStorage")]
 [TestCategory("AzureStorage"), TestCategory("Functional")]
 public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLifetime
 {

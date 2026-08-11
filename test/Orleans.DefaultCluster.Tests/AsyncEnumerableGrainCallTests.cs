@@ -50,6 +50,8 @@ public class AsyncEnumerableGrainCallTests
     /// Verifies that values are correctly transmitted and the enumerator is properly disposed after use.
     /// This demonstrates Orleans' support for streaming data from grains without keeping all data in memory.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable()
     {
@@ -86,6 +88,8 @@ public class AsyncEnumerableGrainCallTests
     /// the operation properly throws OperationCanceledException and no values are returned.
     /// This test ensures Orleans handles early cancellation gracefully in distributed streaming scenarios.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable_CancelBeforeYield()
     {
@@ -144,6 +148,8 @@ public class AsyncEnumerableGrainCallTests
     /// The errorIndex parameter determines when the error occurs, testing both immediate and delayed errors.
     /// The waitAfterYield parameter tests error handling with and without async delays after yielding values.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Theory, TestCategory("BVT"), TestCategory("Observable")]
     [InlineData(0, false)]
     [InlineData(0, true)]
@@ -186,6 +192,8 @@ public class AsyncEnumerableGrainCallTests
     /// Verifies that OperationCanceledException is properly propagated and resources are cleaned up.
     /// This tests Orleans' ability to handle cooperative cancellation in distributed streaming scenarios.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Theory, TestCategory("BVT"), TestCategory("Observable")]
     [InlineData(0, false)]
     [InlineData(0, true)]
@@ -233,6 +241,8 @@ public class AsyncEnumerableGrainCallTests
     /// - Mid-stream cancellation (during enumeration)
     /// - Proper cleanup and disposal of server-side resources
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Theory, TestCategory("BVT"), TestCategory("Observable")]
     [InlineData(0, false)]
     [InlineData(0, true)]
@@ -298,6 +308,8 @@ public class AsyncEnumerableGrainCallTests
     /// Similar to CancellationToken test but uses the extension method approach for cancellation.
     /// Verifies that the WithCancellation extension properly integrates with Orleans' async enumerable support.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Theory, TestCategory("BVT"), TestCategory("Observable")]
     [InlineData(0, false)]
     [InlineData(0, true)]
@@ -363,6 +375,8 @@ public class AsyncEnumerableGrainCallTests
     /// Verifies that Orleans automatically batches multiple values to reduce network round-trips.
     /// This optimization is crucial for performance when streaming many small values.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable_Batch()
     {
@@ -399,6 +413,8 @@ public class AsyncEnumerableGrainCallTests
     /// Verifies that the WithBatchSize extension method correctly controls the number of items per batch.
     /// This allows clients to tune the trade-off between latency and throughput.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable_SplitBatch()
     {
@@ -435,6 +451,8 @@ public class AsyncEnumerableGrainCallTests
     /// Verifies that each value results in a separate network call when batching is disabled.
     /// This mode provides lowest latency but highest overhead for streaming scenarios.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable_NoBatching()
     {
@@ -473,6 +491,8 @@ public class AsyncEnumerableGrainCallTests
     /// Verifies that cancelling mid-stream properly stops enumeration and cleans up resources.
     /// This simulates real-world scenarios where clients need to stop consuming data early.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable_WithCancellation()
     {
@@ -523,6 +543,8 @@ public class AsyncEnumerableGrainCallTests
     /// Verifies that the client can stop consuming before all values are produced.
     /// This tests Orleans' ability to handle backpressure and early termination in streaming scenarios.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable_SlowProducer()
     {
@@ -563,6 +585,8 @@ public class AsyncEnumerableGrainCallTests
     /// Verifies that the enumerator is not prematurely cleaned up when the client consumes slowly.
     /// Uses diagnostic listeners to monitor the cleanup timer behavior.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable_SlowConsumer()
     {
@@ -602,6 +626,8 @@ public class AsyncEnumerableGrainCallTests
     /// This prevents resource leaks when clients fail to complete enumeration.
     /// The test ensures proper error handling when trying to continue after eviction.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable_SlowConsumer_Evicted()
     {
@@ -654,6 +680,8 @@ public class AsyncEnumerableGrainCallTests
     /// Verifies that grain deactivation properly terminates active enumerations with an appropriate error.
     /// This ensures clean shutdown and prevents hanging clients when grains are deactivated.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable_Deactivate()
     {

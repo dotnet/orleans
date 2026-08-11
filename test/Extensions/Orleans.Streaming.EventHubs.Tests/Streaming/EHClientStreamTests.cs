@@ -18,6 +18,9 @@ namespace ServiceBus.Tests.StreamingTests
     /// Tests for EventHub streaming functionality with client producer/consumer scenarios and dropped client handling.
     /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("EventHub")]
+    [TestArea("Streaming")]
     public class EHClientStreamTests : TestClusterPerTest
     {
         private const string StreamProviderName = "EventHubStreamProvider";

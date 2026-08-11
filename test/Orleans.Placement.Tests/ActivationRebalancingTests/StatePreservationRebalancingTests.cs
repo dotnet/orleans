@@ -16,6 +16,9 @@ namespace UnitTests.ActivationRebalancingTests;
 /// <summary>
 /// Tests for activation rebalancing with state preservation when the hosting silo dies.
 /// </summary>
+[TestSuite("Functional")]
+[TestProvider("None")]
+[TestArea("Placement")]
 [TestCategory("Functional"), TestCategory("ActivationRebalancing")]
 public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHelper output)
     : RebalancingTestBase<SPFixture>(fixture, output), IClassFixture<SPFixture>

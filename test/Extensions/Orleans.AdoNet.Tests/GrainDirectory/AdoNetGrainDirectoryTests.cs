@@ -17,6 +17,8 @@ namespace Tester.AdoNet.GrainDirectory;
 /// Tests for <see cref="AdoNetGrainDirectory"/> against SQL Server.
 /// </summary>
 [TestCategory("SqlServer"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
+[TestProvider("SqlServer")]
+[TestSuite("Functional")]
 public class SqlServerAdoNetGrainDirectoryTests() : AdoNetGrainDirectoryTests(AdoNetInvariants.InvariantNameSqlServer, 90)
 {
 }
@@ -25,6 +27,8 @@ public class SqlServerAdoNetGrainDirectoryTests() : AdoNetGrainDirectoryTests(Ad
 /// Tests for <see cref="AdoNetGrainDirectory"/> against PostgreSQL.
 /// </summary>
 [TestCategory("PostgreSql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
+[TestProvider("PostgreSql")]
+[TestSuite("Functional")]
 public class PostgreSqlAdoNetGrainDirectoryTests : AdoNetGrainDirectoryTests
 {
     public PostgreSqlAdoNetGrainDirectoryTests() : base(AdoNetInvariants.InvariantNamePostgreSql, 90)
@@ -37,6 +41,8 @@ public class PostgreSqlAdoNetGrainDirectoryTests : AdoNetGrainDirectoryTests
 /// Tests for <see cref="AdoNetGrainDirectory"/> against MySQL.
 /// </summary>
 [TestCategory("MySql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
+[TestProvider("MySql")]
+[TestSuite("Functional")]
 public class MySqlAdoNetGrainDirectoryTests : AdoNetGrainDirectoryTests
 {
     public MySqlAdoNetGrainDirectoryTests() : base(AdoNetInvariants.InvariantNameMySql, 20)
@@ -50,6 +56,8 @@ public class MySqlAdoNetGrainDirectoryTests : AdoNetGrainDirectoryTests
 /// </summary>
 [Collection(TestEnvironmentFixture.DefaultCollection)]
 [TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
+[TestSuite("Functional")]
+[TestArea("GrainDirectory")]
 public abstract class AdoNetGrainDirectoryTests(string invariant, int concurrency = 100) : IAsyncLifetime
 {
     private RelationalStorageForTesting _testing = null!;
@@ -244,6 +252,8 @@ public abstract class AdoNetGrainDirectoryTests(string invariant, int concurrenc
     /// <summary>
     /// Tests that a grain activation can be looked up.
     /// </summary>
+    [TestSuite("Stress")]
+    [TestCategory("Stress")]
     [SkippableFact]
     public async Task AdoNetGrainDirectory_ChaosTest()
     {

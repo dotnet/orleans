@@ -32,6 +32,9 @@ namespace Orleans.Transactions.Azure.Tests
     /// Tests for Azure Table Storage implementation of transactional state storage.
     /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Transactions"), TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Transactions")]
     public class AzureTransactionalStateStorageTests : TransactionalStateStorageTestRunnerxUnit<TestState>, IClassFixture<TestFixture>
     {
         private const string tableName = "StateStorageTests";
@@ -251,6 +254,9 @@ namespace Orleans.Transactions.Azure.Tests
     }
 
     [TestCategory("AzureStorage"), TestCategory("Transactions"), TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Transactions")]
     public class AzureTransactionalStateStorageSnapshotTests
     {
         private const string Partition = "test-partition";

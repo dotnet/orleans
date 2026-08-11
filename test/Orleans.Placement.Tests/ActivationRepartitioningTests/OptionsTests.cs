@@ -8,6 +8,9 @@ namespace UnitTests.ActivationRepartitioningTests;
 /// <summary>
 /// Tests for activation repartitioner configuration options validation.
 /// </summary>
+[TestSuite("Functional")]
+[TestProvider("None")]
+[TestArea("Placement")]
 [TestCategory("Functional"), TestCategory("ActivationRepartitioning")]
 public class OptionsTests
 {

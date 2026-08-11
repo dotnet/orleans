@@ -12,6 +12,9 @@ namespace DefaultCluster.Tests
     /// reliably trigger grain methods at specified intervals, making them
     /// ideal for periodic background tasks that must survive failures.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ReminderTest : HostedTestClusterEnsureDefaultStarted
     {
         public ReminderTest(DefaultClusterFixture fixture) : base(fixture)

@@ -7,6 +7,9 @@ using static VerifyXunit.Verifier;
 
 namespace Tester.Redis.Reminders;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("BVT"), TestCategory("Reminders")]
 public class RedisReminderSerializationTests
 {

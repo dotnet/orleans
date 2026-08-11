@@ -15,6 +15,8 @@ namespace UnitTests.TimerTests;
 
 public class LocalReminderServiceTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void CalculateFollowingTickTime_ReturnsNextScheduledOccurrence()
     {
@@ -27,6 +29,8 @@ public class LocalReminderServiceTests
         Assert.Equal(startAt + period, nextTick);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void CalculateFollowingTickTime_SkipsMissedOccurrencesWithoutDrifting()
     {
@@ -42,6 +46,8 @@ public class LocalReminderServiceTests
         Assert.Equal(startAt + TimeSpan.FromMinutes(30), nextTick);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Theory, TestCategory("BVT")]
     [InlineData(-1, 0)]
     [InlineData(0, 0)]
@@ -58,6 +64,8 @@ public class LocalReminderServiceTests
         Assert.Equal(boundary + (expectedAdditionalPeriods * period), nextTick);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void CalculateNextTickTime_TreatsPersistedUnspecifiedTimestampAsUtc()
     {
@@ -71,6 +79,8 @@ public class LocalReminderServiceTests
         Assert.Equal(persistedStartAt.Ticks, nextTick.Ticks);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Theory, TestCategory("BVT")]
     [InlineData(-1, false)]
     [InlineData(0, true)]
@@ -86,6 +96,8 @@ public class LocalReminderServiceTests
         Assert.Equal(expected, result);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Theory, TestCategory("BVT")]
     [InlineData(true, 0, true, true)]
     [InlineData(false, 0, true, false)]
@@ -114,6 +126,8 @@ public class LocalReminderServiceTests
         Assert.Equal(expected, result);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void ReminderOptions_DefaultLoadingWindowIsTwiceDefaultRefreshPeriod()
     {
@@ -122,6 +136,8 @@ public class LocalReminderServiceTests
         Assert.Equal(2 * options.RefreshReminderListPeriod, options.ReminderLoadingWindow);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void ReminderOptionsValidator_RejectsNonPositiveLoadingWindow()
     {
@@ -130,6 +146,8 @@ public class LocalReminderServiceTests
         Assert.Throws<OrleansConfigurationException>(() => Validate(options));
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Theory, TestCategory("BVT")]
     [InlineData(-1, true)]
     [InlineData(0, false)]
@@ -148,6 +166,8 @@ public class LocalReminderServiceTests
         Assert.Equal(throws, exception is OrleansConfigurationException);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void AddReminders_RegistersReminderOptionsValidatorOnce_AndValidatesInvalidConfigurationThroughDI()
     {
@@ -215,6 +235,8 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         this.fixture = fixture;
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task InitialRead_TreatsNullTableResultAsNoWork()
     {

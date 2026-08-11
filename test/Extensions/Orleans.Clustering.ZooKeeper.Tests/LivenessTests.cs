@@ -7,6 +7,9 @@ using Xunit.Abstractions;
 namespace Tester.ZooKeeperUtils
 {
     [TestCategory("Membership"), TestCategory("ZooKeeper")]
+    [TestSuite("Functional")]
+    [TestProvider("ZooKeeper")]
+    [TestArea("Membership")]
     public class LivenessTests_ZK : LivenessTestsBase
     {
         public LivenessTests_ZK(ITestOutputHelper output) : base(output)

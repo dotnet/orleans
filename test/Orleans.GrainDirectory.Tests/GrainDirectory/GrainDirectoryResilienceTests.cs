@@ -28,6 +28,9 @@ internal class MyDirectoryTestGrain : Grain, IMyDirectoryTestGrain
 }
 
 [TestCategory("Stress"), TestCategory("Directory")]
+[TestSuite("Stress")]
+[TestProvider("None")]
+[TestArea("GrainDirectory")]
 public sealed class GrainDirectoryResilienceTests
 {
     private static readonly TimeSpan DirectoryMigrationTimeout = TimeSpan.FromMinutes(1);

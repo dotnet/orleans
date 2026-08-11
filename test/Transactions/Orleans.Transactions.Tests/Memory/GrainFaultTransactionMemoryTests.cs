@@ -8,6 +8,9 @@ namespace Orleans.Transactions.Tests
     /// Tests for transaction behavior under grain fault conditions with in-memory storage.
     /// </summary>
     [TestCategory("BVT"), TestCategory("Transactions")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Transactions")]
     public class GrainFaultTransactionMemoryTests : GrainFaultTransactionTestRunnerxUnit, IClassFixture<MemoryTransactionsFixture>
     {
         public GrainFaultTransactionMemoryTests(MemoryTransactionsFixture fixture, ITestOutputHelper output)

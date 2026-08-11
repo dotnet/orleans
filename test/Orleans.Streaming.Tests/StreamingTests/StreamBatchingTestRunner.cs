@@ -7,6 +7,8 @@ using Xunit.Abstractions;
 
 namespace UnitTests.StreamingTests
 {
+    [TestSuite("Functional")]
+    [TestArea("Streaming")]
     public abstract class StreamBatchingTestRunner
     {
         protected readonly BaseTestClusterFixture fixture;

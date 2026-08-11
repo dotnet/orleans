@@ -12,6 +12,9 @@ namespace Tester.AzureUtils.DurableJobs;
 #pragma warning disable ORLEANSEXP005
 
 [TestCategory("Azure"), TestCategory("DurableJobs")]
+[TestSuite("BVT")]
+[TestProvider("AzureStorage")]
+[TestArea("DurableJobs")]
 public class AzureStorageDurableJobsConfigurationTests
 {
     [Fact]

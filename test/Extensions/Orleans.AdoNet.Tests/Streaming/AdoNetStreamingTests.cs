@@ -1,9 +1,13 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using MySql.Data.MySqlClient;
+using Orleans.Runtime;
 using Orleans.Streaming.AdoNet.Storage;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.General;
+using UnitTests.GrainInterfaces;
+using UnitTests.Grains;
 using UnitTests.Streaming;
 using UnitTests.StreamingTests;
 using static System.String;
@@ -14,6 +18,8 @@ namespace Tester.AdoNet.Streaming;
 /// Cluster streaming tests for ADO.NET Streaming against SQL Server.
 /// </summary>
 [TestCategory("SqlServer"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("SqlServer")]
+[TestSuite("Functional")]
 public class SqlServerAdoNetStreamingTests() : AdoNetStreamingTests(AdoNetInvariants.InvariantNameSqlServer)
 {
 }
@@ -22,6 +28,8 @@ public class SqlServerAdoNetStreamingTests() : AdoNetStreamingTests(AdoNetInvari
 /// Cluster streaming tests for ADO.NET Streaming against MySQL.
 /// </summary>
 [TestCategory("MySql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("MySql")]
+[TestSuite("Functional")]
 public class MySqlAdoNetStreamingTests : AdoNetStreamingTests
 {
     public MySqlAdoNetStreamingTests() : base(AdoNetInvariants.InvariantNameMySql)
@@ -34,6 +42,8 @@ public class MySqlAdoNetStreamingTests : AdoNetStreamingTests
 /// Cluster streaming tests for ADO.NET Streaming against PostgreSQL.
 /// </summary>
 [TestCategory("PostgreSql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("PostgreSql")]
+[TestSuite("Functional")]
 public class PostgreSqlAdoNetStreamingTests() : AdoNetStreamingTests(AdoNetInvariants.InvariantNamePostgreSql)
 {
 }
@@ -42,10 +52,13 @@ public class PostgreSqlAdoNetStreamingTests() : AdoNetStreamingTests(AdoNetInvar
 /// Cluster streaming tests for ADO.NET Streaming.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestSuite("Functional")]
+[TestArea("Streaming")]
 public abstract class AdoNetStreamingTests : TestClusterPerTest
 {
     private const string TestDatabaseName = "OrleansStreamTest";
     private const string AdoNetStreamProviderName = "AdoNet";
+    private static readonly TimeSpan StreamingDiagnosticTimeout = TimeSpan.FromSeconds(30);
 
     private static string _invariant = null!;
 
@@ -67,6 +80,7 @@ public abstract class AdoNetStreamingTests : TestClusterPerTest
 
         // base initialization must only happen after the above
         await base.InitializeAsync();
+        await WaitForStreamingProviderReadyAsync();
 
         // the runner must only be created after base initialization
         _runner = new SingleStreamTestRunner(InternalClient, AdoNetStreamProviderName);
@@ -90,6 +104,11 @@ public abstract class AdoNetStreamingTests : TestClusterPerTest
                 })
                 .AddMemoryGrainStorage("MemoryStore")
                 .AddMemoryGrainStorage("PubSubStore");
+
+            siloBuilder.Services.AddSingleton<StreamingDiagnosticEventRecorder>();
+            siloBuilder.Services.AddSingleton<StreamingDiagnosticsProbeSystemTarget>();
+            siloBuilder.Services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(serviceProvider => serviceProvider.GetRequiredService<StreamingDiagnosticsProbeSystemTarget>());
+            siloBuilder.AddStartupTask<StreamingDiagnosticEventRecorder>(ServiceLifecycleStage.RuntimeInitialize);
         }
     }
 
@@ -103,6 +122,30 @@ public abstract class AdoNetStreamingTests : TestClusterPerTest
                 options.ConnectionString = _testing.CurrentConnectionString;
             });
         }
+    }
+
+    private async Task WaitForStreamingProviderReadyAsync()
+    {
+        var activeSilos = HostedCluster.GetActiveSilos().Select(static silo => silo.SiloAddress).ToArray();
+        var grainFactory = (IInternalGrainFactory)GrainFactory;
+        var waits = activeSilos.Select(siloAddress =>
+            grainFactory.GetSystemTarget<IStreamingDiagnosticsProbe>(
+                StreamingDiagnosticsProbeConstants.SystemTargetType,
+                siloAddress)
+            .WaitForProviderReady(AdoNetStreamProviderName, expectedQueueCount: 1, StreamingDiagnosticTimeout))
+            .ToArray();
+
+        foreach (var wait in waits)
+        {
+            _ = wait.ContinueWith(
+                static completed => _ = completed.Exception,
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+        }
+
+        // ADO.NET uses one queue by default, so readiness on its owning silo is sufficient.
+        await await Task.WhenAny(waits);
     }
 
     //------------------------ One to One -----------------------------------------------------//

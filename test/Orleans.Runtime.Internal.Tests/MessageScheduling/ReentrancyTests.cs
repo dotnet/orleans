@@ -22,6 +22,7 @@ namespace UnitTests
     /// <summary>
     /// Tests for grain reentrancy, MayInterleave predicates, and fan-out scenarios.
     /// </summary>
+    [TestArea("Runtime")]
     public class ReentrancyTests : OrleansTestingBase, IClassFixture<ReentrancyTests.Fixture>
     {
         public class Fixture : BaseTestClusterFixture
@@ -42,6 +43,9 @@ namespace UnitTests
         }
 
         // See https://github.com/dotnet/orleans/pull/5086
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task CorrelationId_Bug()
         {
@@ -49,6 +53,9 @@ namespace UnitTests
             await grain.Start(Guid.NewGuid(), Guid.NewGuid());
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task ReentrantGrain()
         {
@@ -60,6 +67,9 @@ namespace UnitTests
             this.fixture.Logger.LogInformation("Reentrancy ReentrantGrain Test finished OK.");
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateReturnsTrue()
         {
@@ -71,6 +81,9 @@ namespace UnitTests
             this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateReturnsTrue Test finished OK.");
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Theory, TestCategory("Functional"), TestCategory("Reentrancy")]
         [InlineData(true)]
         [InlineData(false)]
@@ -100,6 +113,9 @@ namespace UnitTests
             Assert.True(firstExit >= 2, $"Expected both methods to enter before exiting. Log: {string.Join(", ", log)}");
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateThrows()
         {
@@ -118,6 +134,9 @@ namespace UnitTests
             this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateThrows Test finished OK.");
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsTrue()
         {
@@ -129,6 +148,9 @@ namespace UnitTests
             this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsTrue Test finished OK.");
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateThrows()
         {
@@ -147,6 +169,9 @@ namespace UnitTests
             this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateThrows Test finished OK.");
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task Reentrancy_Deadlock_1()
         {
@@ -164,6 +189,9 @@ namespace UnitTests
         }
 
         // TODO: [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact(Skip = "Ignore"), TestCategory("Failures"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task Reentrancy_Deadlock_2()
         {
@@ -183,6 +211,9 @@ namespace UnitTests
             this.fixture.Logger.LogInformation("ReentrancyTest_Deadlock_2 OK - no deadlock.");
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Failures"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         private async Task NonReentrantFanOut()
         {
@@ -193,18 +224,27 @@ namespace UnitTests
                 () => target.FanOutOtherLongRunningTask(grain, 2, TimeSpan.FromSeconds(10), 5));
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_Task_Reentrant()
         {
             await Do_FanOut_Task_Join(0, false, false);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_Task_NonReentrant()
         {
             await Do_FanOut_Task_Join(0, true, false);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_Task_Reentrant_Chain()
         {
@@ -212,38 +252,57 @@ namespace UnitTests
         }
 
         // TODO: [Fact, TestCategory("BVT"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact(Skip ="Ignore"), TestCategory("Failures"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_Task_NonReentrant_Chain()
         {
             await Do_FanOut_Task_Join(0, true, true);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_AC_Reentrant()
         {
             await Do_FanOut_AC_Join(0, false, false);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_AC_NonReentrant()
         {
             await Do_FanOut_AC_Join(0, true, false);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_AC_Reentrant_Chain()
         {
             await Do_FanOut_AC_Join(0, false, true);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [TestCategory("MultithreadingFailures")]
         // TODO: [TestCategory("Functional")]
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact(Skip ="Ignore"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_AC_NonReentrant_Chain()
         {
             await Do_FanOut_AC_Join(0, true, true);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Stress"), TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_Task_Stress_Reentrant()
         {
@@ -253,6 +312,8 @@ namespace UnitTests
             await Do_FanOut_Stress(numLoops, blockSize, timeout, false, false);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Stress"), TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_Task_Stress_NonReentrant()
         {
@@ -262,6 +323,8 @@ namespace UnitTests
             await Do_FanOut_Stress(numLoops, blockSize, timeout, true, false);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Stress"), TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_AC_Stress_Reentrant()
         {
@@ -271,6 +334,8 @@ namespace UnitTests
             await Do_FanOut_Stress(numLoops, blockSize, timeout, false, true);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Stress"), TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_AC_Stress_NonReentrant()
         {

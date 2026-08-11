@@ -8,6 +8,8 @@ namespace Tester.Diagnostics;
 
 public class GrainInstrumentsTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void GrainInstruments_RecordsMetricsUsingMeterFactory()
     {

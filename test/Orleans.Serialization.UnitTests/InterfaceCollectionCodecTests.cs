@@ -170,6 +170,9 @@ public class ReadOnlyDictionaryInterfaceCopierTests(ITestOutputHelper output, Se
 }
 
 [Trait("Category", "BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Serialization")]
 public class InterfaceCollectionRegressionTests
 {
     private const int MaxInterfaceCollectionCapacityHint = 16 * 1024;

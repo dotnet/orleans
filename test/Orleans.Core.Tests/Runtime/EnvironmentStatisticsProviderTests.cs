@@ -7,6 +7,8 @@ namespace UnitTests.Runtime;
 
 public class EnvironmentStatisticsProviderTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Runtime")]
     public void RuntimeMemoryMetrics_AreObservableGauges()
     {

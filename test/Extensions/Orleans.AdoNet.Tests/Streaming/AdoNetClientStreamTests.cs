@@ -15,6 +15,8 @@ namespace Tester.AdoNet.Streaming;
 /// Tests for SQL Server ADO.NET client stream functionality.
 /// </summary>
 [TestCategory("SqlServer"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("SqlServer")]
+[TestSuite("Functional")]
 public class SqlServerAdoNetClientStreamTests(ITestOutputHelper output) : AdoNetClientStreamTests(AdoNetInvariants.InvariantNameSqlServer, output)
 {
 }
@@ -23,6 +25,8 @@ public class SqlServerAdoNetClientStreamTests(ITestOutputHelper output) : AdoNet
 /// Tests for MySQL ADO.NET client stream functionality.
 /// </summary>
 [TestCategory("MySql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("MySql")]
+[TestSuite("Functional")]
 public class MySqlAdoNetClientStreamTests : AdoNetClientStreamTests
 {
     public MySqlAdoNetClientStreamTests(ITestOutputHelper output) : base(AdoNetInvariants.InvariantNameMySql, output)
@@ -35,6 +39,8 @@ public class MySqlAdoNetClientStreamTests : AdoNetClientStreamTests
 /// Tests for PostgreSQL ADO.NET client stream functionality.
 /// </summary>
 [TestCategory("PostgreSql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("PostgreSql")]
+[TestSuite("Functional")]
 public class PostgreSqlAdoNetClientStreamTests(ITestOutputHelper output) : AdoNetClientStreamTests(AdoNetInvariants.InvariantNamePostgreSql, output)
 {
 }
@@ -43,6 +49,8 @@ public class PostgreSqlAdoNetClientStreamTests(ITestOutputHelper output) : AdoNe
 /// Base class for ADO.NET client stream tests.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestSuite("Functional")]
+[TestArea("Streaming")]
 public abstract class AdoNetClientStreamTests : TestClusterPerTest
 {
     protected AdoNetClientStreamTests(string invariant, ITestOutputHelper output)

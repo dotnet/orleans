@@ -8,6 +8,9 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     /// <summary>
     /// Tests for minimum version selector strategy ensuring v1 grains are always activated.
     /// </summary>
+    [TestSuite("SlowBVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT")]
     public class MinimumVersionTests : UpgradeTestsBase
     {
@@ -25,6 +28,9 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     /// <summary>
     /// Tests for latest version selector strategy with backward compatibility and grain upgrades.
     /// </summary>
+    [TestSuite("SlowBVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT")]
     public class LatestVersionTests : UpgradeTestsBase
     {
@@ -58,6 +64,9 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     /// <summary>
     /// Tests for all versions compatible strategy preventing automatic grain upgrades.
     /// </summary>
+    [TestSuite("SlowBVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT")]
     public class AllVersionsCompatibleTests : UpgradeTestsBase
     {
@@ -84,6 +93,9 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     /// <summary>
     /// Tests for random compatible version selection strategy distributing activations across versions.
     /// </summary>
+    [TestSuite("SlowBVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT")]
     public class RandomCompatibleVersionTests : UpgradeTestsBase
     {

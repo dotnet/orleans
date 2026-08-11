@@ -14,6 +14,9 @@ namespace Tester.Redis.GrainDirectory
     /// </summary>
     [TestCategory("Redis"), TestCategory("Directory"), TestCategory("Functional")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
+    [TestSuite("Functional")]
+    [TestProvider("Redis")]
+    [TestArea("GrainDirectory")]
     public class RedisMultipleGrainDirectoriesTests : MultipleGrainDirectoriesTests
     {
         public class SiloConfigurator : ISiloConfigurator

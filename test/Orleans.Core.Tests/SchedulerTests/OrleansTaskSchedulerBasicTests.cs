@@ -76,6 +76,9 @@ namespace UnitTests.SchedulerTests
     /// These tests verify fundamental scheduling operations without requiring a full Orleans runtime.
     /// </summary>
     [TestCategory("BVT"), TestCategory("Scheduler")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class OrleansTaskSchedulerBasicTests : IDisposable
     {
         private static readonly object Lockable = new();

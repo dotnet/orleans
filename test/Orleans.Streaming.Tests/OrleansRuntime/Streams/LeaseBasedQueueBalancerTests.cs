@@ -15,6 +15,9 @@ namespace UnitTests.OrleansRuntime.Streams;
 
 public class LeaseBasedQueueBalancerTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Streaming")]
     [Fact, TestCategory("BVT"), TestCategory("Streaming")]
     public async Task Shutdown_DrainsQueuedMembershipUpdatesBeforeDisposingTimers()
     {

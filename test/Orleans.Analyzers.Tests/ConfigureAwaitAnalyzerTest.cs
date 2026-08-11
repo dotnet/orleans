@@ -18,6 +18,9 @@ namespace Analyzers.Tests;
 /// to ensure proper execution within the grain's activation context.
 /// </summary>
 [TestCategory("BVT"), TestCategory("Analyzer")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Analyzer")]
 public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAwaitAnalyzer>
 {
     private static readonly string[] Usings = new[] {

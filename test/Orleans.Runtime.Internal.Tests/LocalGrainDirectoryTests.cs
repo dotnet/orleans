@@ -6,6 +6,9 @@ using Xunit;
 
 namespace UnitTests;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("GrainDirectory")]
 [TestCategory("BVT"), TestCategory("GrainDirectory")]
 public class LocalGrainDirectoryTests
 {

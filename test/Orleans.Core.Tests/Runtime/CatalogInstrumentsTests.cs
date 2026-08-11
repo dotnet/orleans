@@ -8,6 +8,8 @@ namespace UnitTests.Runtime;
 
 public class CatalogInstrumentsTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Runtime")]
     public void ActivationLifecycleLatencyMetrics_AreHistograms()
     {

@@ -11,6 +11,9 @@ namespace Analyzers.Tests
     /// avoid this common mistake and ensures grain interfaces follow the Orleans programming model.
     /// </summary>
     [TestCategory("BVT"), TestCategory("Analyzer")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Analyzer")]
     public class NoRefParamsDiagnosticAnalyzerTest : DiagnosticAnalyzerTestBase<NoRefParamsDiagnosticAnalyzer>
     {
         /// <summary>

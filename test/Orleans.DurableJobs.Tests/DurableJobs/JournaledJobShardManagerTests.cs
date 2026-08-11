@@ -17,6 +17,9 @@ using Xunit;
 
 namespace Tester.DurableJobs;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableJobs")]
 [TestCategory("BVT"), TestCategory("DurableJobs")]
 public class JournaledJobShardManagerTests
 {

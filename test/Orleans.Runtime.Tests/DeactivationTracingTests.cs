@@ -16,6 +16,9 @@ namespace UnitTests.General
     /// Tests for verifying OnDeactivateAsync tracing spans are correctly created
     /// during grain deactivation across various scenarios.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [Collection("ActivationTracing")]
     public class DeactivationTracingTests : OrleansTestingBase, IClassFixture<ActivationTracingTests.Fixture>
     {

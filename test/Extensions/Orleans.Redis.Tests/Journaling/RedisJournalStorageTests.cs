@@ -13,6 +13,8 @@ using Xunit;
 
 namespace Tester.Redis.Journaling;
 
+[TestSuite("BVT")]
+[TestProvider("Redis")]
 [TestCategory("BVT")]
 public sealed class RedisJournalStorageTests
 {

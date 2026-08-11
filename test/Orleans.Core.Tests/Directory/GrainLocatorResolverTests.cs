@@ -24,6 +24,9 @@ namespace NonSilo.Tests.Directory
     /// Tests for grain locator resolver functionality including DHT, cached, and client grain locator resolution.
     /// </summary>
     [TestCategory("BVT"), TestCategory("Directory")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("GrainDirectory")]
     public class GrainLocatorResolverTests
     {
         private readonly IGrainDirectory customDirectory;

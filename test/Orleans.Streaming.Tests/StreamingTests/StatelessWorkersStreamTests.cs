@@ -11,6 +11,9 @@ namespace UnitTests.StreamingTests
     /// <summary>
     /// Tests for stream subscription behavior with stateless worker grains, verifying subscription restrictions.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("Streaming")]
     public class StatelessWorkersStreamTests : OrleansTestingBase, IClassFixture<StatelessWorkersStreamTests.Fixture>
     {

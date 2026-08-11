@@ -21,6 +21,9 @@ namespace Tester
     /// These tests verify that localhost clustering works correctly for both single-silo
     /// and multi-silo scenarios, ensuring developers can easily run Orleans locally.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("Functional")]
     public class LocalhostClusterTests
     {

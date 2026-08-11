@@ -4,6 +4,9 @@ using Xunit;
 
 namespace DefaultCluster.Tests.Serialization;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Serialization")]
 [TestCategory("Serialization"), TestCategory("BVT")]
 public class CollectionExpressionGrainTests : HostedTestClusterEnsureDefaultStarted
 {

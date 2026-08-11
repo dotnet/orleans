@@ -11,6 +11,9 @@ namespace DefaultCluster.Tests;
 /// Validates that the activation status checker correctly identifies locally activated grains
 /// from both silo and client perspectives.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public class LocalActivationStatusCheckerTests(DefaultClusterFixture fixture) : HostedTestClusterEnsureDefaultStarted(fixture)
 {
     /// <summary>

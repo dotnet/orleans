@@ -13,6 +13,9 @@ namespace Orleans.Transactions.DynamoDB.Tests
     /// <summary>
     /// Tests for transaction recovery after silo failures with DynamoDB clustering.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("DynamoDB")]
+    [TestArea("Transactions")]
     [TestCategory("DynamoDB"), TestCategory("Transactions"), TestCategory("Functional")]
     public class TransactionRecoveryTests : TestClusterPerTest
     {

@@ -6,6 +6,9 @@ namespace Orleans.Transactions.Tests
 {
 
     [TestCategory("BVT"), TestCategory("Transactions")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Transactions")]
     public class TransactionConcurrencyTests : TransactionConcurrencyTestRunnerxUnit, IClassFixture<MemoryTransactionsFixture>
     {
         public TransactionConcurrencyTests(MemoryTransactionsFixture fixture, ITestOutputHelper output)

@@ -8,6 +8,8 @@ namespace Tester.Diagnostics;
 
 public class SchedulerInstrumentsTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void SchedulerInstruments_RecordsMetricsUsingMeterFactory()
     {

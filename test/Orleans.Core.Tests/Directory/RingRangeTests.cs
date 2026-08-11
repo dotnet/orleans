@@ -8,6 +8,9 @@ namespace NonSilo.Tests.Directory;
 /// Tests for ring range operations including difference, complement, intersection, and containment logic.
 /// </summary>
 [TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("GrainDirectory")]
 public sealed class RingRangeTests
 {
     internal static Gen<RingRange> GenRingRange => Gen.Select(Gen.UInt, Gen.UInt, RingRange.Create);

@@ -14,6 +14,9 @@ namespace UnitTests
     /// Tests for Orleans configuration utilities, particularly the security features for handling sensitive connection strings.
     /// These tests verify that Orleans properly redacts sensitive information from configuration strings for logging and diagnostics.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ConfigTests
     {
         private readonly ITestOutputHelper output;

@@ -7,6 +7,9 @@ namespace UnitTests.General;
 /// <summary>
 /// Tests for resource optimized placement configuration options validation.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Placement")]
 public sealed class ResourceOptimizedPlacementOptionsTests
 {
     [Fact, TestCategory("PlacementOptions"), TestCategory("BVT")]

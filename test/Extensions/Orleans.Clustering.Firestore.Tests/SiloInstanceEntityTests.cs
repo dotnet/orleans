@@ -4,6 +4,9 @@ using TestExtensions;
 namespace Orleans.Clustering.Firestore.Tests;
 
 [TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("GoogleCloud")]
+[TestArea("Clustering")]
 public class SiloInstanceEntityTests
 {
     public static TheoryData<SiloStatus> SiloStatuses => new(Enum.GetValues<SiloStatus>());

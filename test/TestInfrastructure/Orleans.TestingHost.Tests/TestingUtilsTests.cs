@@ -4,6 +4,9 @@ using Xunit;
 namespace Orleans.TestingHost.Tests;
 
 [TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("TestingHost")]
 public class TestingUtilsTests
 {
     [Fact]

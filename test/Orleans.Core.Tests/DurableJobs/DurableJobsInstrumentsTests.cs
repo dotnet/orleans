@@ -7,6 +7,8 @@ using Xunit;
 
 namespace NonSilo.Tests.DurableJobs;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT")]
 public class DurableJobsInstrumentsTests
 {

@@ -11,6 +11,9 @@ using Xunit;
 
 namespace ServiceBus.Tests.CheckpointerTests;
 
+[TestSuite("BVT")]
+[TestProvider("EventHub")]
+[TestArea("Streaming")]
 [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("BVT")]
 public sealed class EventHubCheckpointerConfigurationTests
 {

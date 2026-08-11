@@ -192,10 +192,10 @@ namespace Orleans.TestingHost.Utils
                         return false;
                     }
 
-                    continue;
+                    return false;
                 }
 
-                if (invokeFinalAttempt && remaining <= finalAttemptWindow)
+                if (invokeFinalAttempt && remaining <= finalAttemptWindow + retryDelay)
                 {
                     finalAttempt = true;
                     continue;
@@ -216,6 +216,11 @@ namespace Orleans.TestingHost.Utils
                     await Task.Delay(delay, linkedCancellation.Token);
                 }
                 catch (OperationCanceledException) when (deadlineCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                {
+                    return false;
+                }
+
+                if (delay >= remaining)
                 {
                     return false;
                 }

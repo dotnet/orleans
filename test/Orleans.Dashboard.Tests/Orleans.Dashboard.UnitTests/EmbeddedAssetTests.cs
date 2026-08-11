@@ -8,6 +8,9 @@ using Xunit;
 
 namespace UnitTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Dashboard")]
     [TestCategory("BVT")]
     public class EmbeddedAssetTests
     {

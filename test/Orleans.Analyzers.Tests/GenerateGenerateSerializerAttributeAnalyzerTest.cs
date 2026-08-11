@@ -11,6 +11,9 @@ namespace Analyzers.Tests;
 /// attribute can lead to slower serialization and larger message sizes.
 /// </summary>
 [TestCategory("BVT"), TestCategory("Analyzer")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Analyzer")]
 public class GenerateGenerateSerializerAttributeAnalyzerTest : DiagnosticAnalyzerTestBase<GenerateGenerateSerializerAttributeAnalyzer>
 {
     private async Task VerifyGeneratedDiagnostic(string code)

@@ -10,6 +10,9 @@ namespace Tester.CodeGenTests
     /// Summary description for GrainClientTest
     /// </summary>
     [TestCategory("BVT"), TestCategory("CodeGen")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("CodeGen")]
     public class GeneratorGrainTest : HostedTestClusterEnsureDefaultStarted
     {
         public GeneratorGrainTest(DefaultClusterFixture fixture) : base(fixture)

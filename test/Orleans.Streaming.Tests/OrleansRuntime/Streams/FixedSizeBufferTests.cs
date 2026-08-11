@@ -1,4 +1,4 @@
-﻿using Orleans.Providers.Streams.Common;
+using Orleans.Providers.Streams.Common;
 using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
@@ -6,6 +6,9 @@ namespace UnitTests.OrleansRuntime.Streams
     /// <summary>
     /// Tests for fixed size buffer pooling and segment allocation.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Streaming")]
     public class FixedSizeBufferTests
     {
         private const int TestBlockSize = 100;

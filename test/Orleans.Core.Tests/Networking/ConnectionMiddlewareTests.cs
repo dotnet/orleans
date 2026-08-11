@@ -11,6 +11,9 @@ using Xunit;
 namespace Orleans.Core.Tests.Networking
 {
     [Trait("Category", "BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ConnectionMiddlewareTests
     {
         [Fact]

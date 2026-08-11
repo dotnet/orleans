@@ -11,6 +11,8 @@ namespace Tester.AdoNet.GrainDirectory;
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against Sql Server.
 /// </summary>
 [TestCategory("SqlServer"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
+[TestProvider("SqlServer")]
+[TestSuite("Functional")]
 public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueriesTests(AdoNetInvariants.InvariantNameSqlServer, 90)
 {
 }
@@ -19,6 +21,8 @@ public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueries
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against PostgreSQL.
 /// </summary>
 [TestCategory("PostgreSql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
+[TestProvider("PostgreSql")]
+[TestSuite("Functional")]
 public class PostgreSqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 {
     public PostgreSqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNamePostgreSql, 90)
@@ -31,6 +35,8 @@ public class PostgreSqlRelationalOrleansQueriesTests : RelationalOrleansQueriesT
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against MySQL.
 /// </summary>
 [TestCategory("MySql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
+[TestProvider("MySql")]
+[TestSuite("Functional")]
 public class MySqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 {
     public MySqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNameMySql, 20)
@@ -43,6 +49,8 @@ public class MySqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/>.
 /// </summary>
 [TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
+[TestSuite("Functional")]
+[TestArea("GrainDirectory")]
 public abstract class RelationalOrleansQueriesTests(string invariant, int concurrency = 100) : IAsyncLifetime
 {
     private const string TestDatabaseName = "OrleansGrainDirectoryTest";
@@ -203,6 +211,8 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// During development, this test consistently triggered deadlocking until the queries were made to prevent it.
     /// If this test shows flakiness then it is likely the queries need to be looked at.
     /// </remarks>
+    [TestSuite("Stress")]
+    [TestCategory("Stress")]
     [SkippableFact]
     public async Task RelationalOrleansQueries_ChaosTest()
     {

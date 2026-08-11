@@ -10,6 +10,9 @@ namespace Tester.AzureUtils
     /// Tests for silo liveness and membership functionality using Azure Table Storage as the membership table.
     /// </summary>
     [TestCategory("Membership"), TestCategory("AzureStorage")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Membership")]
     public class LivenessTests_AzureTable : LivenessTestsBase
     {
         public LivenessTests_AzureTable(ITestOutputHelper output) : base(output)

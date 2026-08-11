@@ -6,6 +6,9 @@ namespace UnitTests.General;
 /// <summary>
 /// Tests for histogram aggregator functionality including bucket collection and value distribution.
 /// </summary>
+[TestSuite("Functional")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public class HistogramAggregatorTests
 {
     [Fact, TestCategory("Functional"), TestCategory("Aggregators")]

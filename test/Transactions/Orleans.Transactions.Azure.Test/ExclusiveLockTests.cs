@@ -4,6 +4,9 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Transactions")]
     [TestCategory("AzureStorage"), TestCategory("Transactions"), TestCategory("Functional")]
     public class ExclusiveLockTests : ExclusiveLockTransactionTestRunnerxUnit, IClassFixture<TestFixture>
     {

@@ -51,6 +51,8 @@ namespace UnitTests.CatalogTests
             this.fixture = fixture;
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Catalog"), TestCategory("Functional")]
         public async Task MinimalReminderInterval()
         {
