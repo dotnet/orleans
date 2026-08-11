@@ -170,11 +170,6 @@ namespace Orleans.Streaming.EventHubs
         public void Dispose()
         {
             this.evictionStrategy.OnPurged = null;
-            if (this.evictionStrategy is IDisposable disposableEvictionStrategy)
-            {
-                disposableEvictionStrategy.Dispose();
-            }
-
             currentBuffer = null;
             if (memoryController is not null)
             {
@@ -182,6 +177,10 @@ namespace Orleans.Streaming.EventHubs
             }
 
             cache.Dispose();
+            if (this.evictionStrategy is IDisposable disposableEvictionStrategy)
+            {
+                disposableEvictionStrategy.Dispose();
+            }
         }
 
         /// <summary>

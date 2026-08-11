@@ -13,6 +13,9 @@ using Xunit;
 
 namespace ServiceBus.Tests;
 
+[TestSuite("BVT")]
+[TestProvider("EventHub")]
+[TestArea("Streaming")]
 [TestCategory("EventHub"), TestCategory("Streaming")]
 public sealed class CacheMemoryTests : IDisposable
 {
@@ -140,18 +143,32 @@ public sealed class CacheMemoryTests : IDisposable
         Assert.All(pools, pool => Assert.Same(pools[0], pool));
     }
 
+    [Fact, TestCategory("BVT")]
+    public void DisposeClearsCacheBeforeDisposingEvictionStrategy()
+    {
+        var controller = new EventHubCacheMemoryController(1024 * 1024);
+        var pool = new EventHubCacheBufferPool(controller, 64 * 1024, null, TimeSpan.FromMinutes(1));
+        var evictionStrategy = new TrackingEvictionStrategy();
+        var cache = CreateCache("0", pool, controller, evictionStrategy);
+        cache.Add([MakeEventData(0)], DateTime.UtcNow);
+
+        cache.Dispose();
+
+        Assert.True(evictionStrategy.WasCacheEmptyOnDispose);
+    }
+
     public void Dispose() => serviceProvider.Dispose();
 
     private EventHubQueueCache CreateCache(
         string partition,
         IObjectPool<FixedSizeBuffer> pool,
-        EventHubCacheMemoryController controller)
+        EventHubCacheMemoryController controller,
+        IEvictionStrategy? evictionStrategy = null)
     {
         var adapter = new TestEventHubDataAdapter(serializer);
-        var purge = new TimePurgePredicate(TimeSpan.FromDays(1), TimeSpan.FromDays(1));
-        var eviction = new EventHubQueueCacheFactory.EventHubCacheEvictionStrategy(
+        evictionStrategy ??= new EventHubQueueCacheFactory.EventHubCacheEvictionStrategy(
             NullLogger.Instance,
-            purge,
+            new TimePurgePredicate(TimeSpan.FromDays(1), TimeSpan.FromDays(1)),
             null,
             null);
         return new EventHubQueueCache(
@@ -159,7 +176,7 @@ public sealed class CacheMemoryTests : IDisposable
             EventHubAdapterReceiver.MaxMessagesPerRead,
             pool,
             adapter,
-            eviction,
+            evictionStrategy,
             NoOpCheckpointer.Instance,
             NullLogger.Instance,
             null,
@@ -185,6 +202,30 @@ public sealed class CacheMemoryTests : IDisposable
             var streamId = StreamId.Create("test", $"{partition}-{queueMessage.SequenceNumber}");
             var token = new EventHubSequenceTokenV2(queueMessage.OffsetString, queueMessage.SequenceNumber, 0);
             return new StreamPosition(streamId, token);
+        }
+    }
+
+    private sealed class TrackingEvictionStrategy : IEvictionStrategy, IDisposable
+    {
+        private IPurgeObservable? purgeObservable;
+
+        public IPurgeObservable PurgeObservable
+        {
+            set => purgeObservable = value;
+        }
+
+        public Action<CachedMessage?, CachedMessage?>? OnPurged { get; set; }
+
+        public bool WasCacheEmptyOnDispose { get; private set; }
+
+        public void Dispose() => WasCacheEmptyOnDispose = purgeObservable?.IsEmpty == true;
+
+        public void OnBlockAllocated(FixedSizeBuffer newBlock)
+        {
+        }
+
+        public void PerformPurge(DateTime utcNow)
+        {
         }
     }
 
