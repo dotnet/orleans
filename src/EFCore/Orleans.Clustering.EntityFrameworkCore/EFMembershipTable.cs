@@ -38,7 +38,7 @@ internal class EFMembershipTable<TDbContext, TETag> : IMembershipTable where TDb
 
         try
         {
-            var ctx = this._dbContextFactory.CreateDbContext();
+            await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             var record = await ctx.Clusters
                 .AsNoTracking()
@@ -50,7 +50,22 @@ internal class EFMembershipTable<TDbContext, TETag> : IMembershipTable where TDb
             record = new ClusterRecord<TETag> {Version = 0, Id = this._clusterId, Timestamp = DateTimeOffset.UtcNow};
 
             ctx.Clusters.Add(record);
-            await ctx.SaveChangesAsync().ConfigureAwait(false);
+            try
+            {
+                await ctx.SaveChangesAsync().ConfigureAwait(false);
+            }
+            catch (DbUpdateException)
+            {
+                await using var verification = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
+                if (await verification.Clusters.AsNoTracking()
+                        .AnyAsync(c => c.Id == this._clusterId)
+                        .ConfigureAwait(false))
+                {
+                    return;
+                }
+
+                throw;
+            }
 
             if (this._logger.IsEnabled(LogLevel.Debug))
             {
@@ -68,15 +83,15 @@ internal class EFMembershipTable<TDbContext, TETag> : IMembershipTable where TDb
     {
         try
         {
-            var ctx = this._dbContextFactory.CreateDbContext();
+            await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
-            var silos = await ctx.Silos.Where(s => s.ClusterId == this._clusterId).ToArrayAsync().ConfigureAwait(false);
+            var silos = await ctx.Silos.Where(s => s.ClusterId == clusterId).ToArrayAsync().ConfigureAwait(false);
             if (silos.Length > 0)
             {
                 ctx.Silos.RemoveRange(silos);
             }
 
-            var cluster = await ctx.Clusters.SingleOrDefaultAsync(s => s.Id == this._clusterId);
+            var cluster = await ctx.Clusters.SingleOrDefaultAsync(s => s.Id == clusterId);
             if (cluster is not null)
             {
                 ctx.Clusters.Remove(cluster);
@@ -95,7 +110,7 @@ internal class EFMembershipTable<TDbContext, TETag> : IMembershipTable where TDb
     {
         try
         {
-            var ctx = this._dbContextFactory.CreateDbContext();
+            await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             var silos = await ctx.Silos
                 .Where(s =>
@@ -123,7 +138,7 @@ internal class EFMembershipTable<TDbContext, TETag> : IMembershipTable where TDb
     {
         try
         {
-            var ctx = this._dbContextFactory.CreateDbContext();
+            await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             var record = await ctx.Silos.Include(s => s.Cluster).AsNoTracking()
                 .SingleOrDefaultAsync(s =>
@@ -159,7 +174,7 @@ internal class EFMembershipTable<TDbContext, TETag> : IMembershipTable where TDb
     {
         try
         {
-            var ctx = this._dbContextFactory.CreateDbContext();
+            await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             var clusterRecord = await ctx.Clusters.Include(s => s.Silos).AsNoTracking()
                 .FirstOrDefaultAsync(s => s.Id == this._clusterId)
@@ -209,11 +224,11 @@ internal class EFMembershipTable<TDbContext, TETag> : IMembershipTable where TDb
             var siloRecord = this.ConvertToRecord(entry);
             siloRecord.ClusterId = clusterRecord.Id;
 
-            var ctx = this._dbContextFactory.CreateDbContext();
+            await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             ctx.Clusters.Update(clusterRecord);
             ctx.Silos.Add(siloRecord);
-            var affected =await ctx.SaveChangesAsync().ConfigureAwait(false);
+            await ctx.SaveChangesAsync().ConfigureAwait(false);
             return true;
         }
         catch (DbUpdateException exc)
@@ -237,12 +252,12 @@ internal class EFMembershipTable<TDbContext, TETag> : IMembershipTable where TDb
             var siloRecord = this.ConvertToRecord(entry);
             siloRecord.ETag = this._etagConverter.ToDbETag(etag);
 
-            var ctx = this._dbContextFactory.CreateDbContext();
+            await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             ctx.Clusters.Update(clusterRecord);
             ctx.Silos.Update(siloRecord);
 
-            var affected = await ctx.SaveChangesAsync().ConfigureAwait(false);
+            await ctx.SaveChangesAsync().ConfigureAwait(false);
             return true;
         }
         catch (DbUpdateConcurrencyException)
@@ -259,7 +274,7 @@ internal class EFMembershipTable<TDbContext, TETag> : IMembershipTable where TDb
 
     public async Task UpdateIAmAlive(MembershipEntry entry)
     {
-        var ctx = this._dbContextFactory.CreateDbContext();
+        await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
         if (this._self is not { } selfRow)
         {

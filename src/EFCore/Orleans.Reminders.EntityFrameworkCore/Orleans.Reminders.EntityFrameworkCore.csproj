@@ -11,6 +11,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Orleans.Reminders.EntityFrameworkCore.SqlServer"/>
+    <InternalsVisibleTo Include="Orleans.Reminders.EntityFrameworkCore.MySql"/>
+    <InternalsVisibleTo Include="Orleans.Reminders.EntityFrameworkCore.PostgreSQL"/>
   </ItemGroup>
 
   <PropertyGroup>

@@ -43,7 +43,7 @@ public class EFReminderTable<TDbContext, TETag> : IReminderTable where TDbContex
     {
         try
         {
-            var ctx = this._dbContextFactory.CreateDbContext();
+            await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             var records = await ctx.Reminders.AsNoTracking().Where(r =>
                     r.ServiceId == this._serviceId &&
@@ -64,7 +64,7 @@ public class EFReminderTable<TDbContext, TETag> : IReminderTable where TDbContex
     {
         try
         {
-            var ctx = this._dbContextFactory.CreateDbContext();
+            await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             var query = ctx.Reminders.AsNoTracking()
                 .Where(r => r.ServiceId == this._serviceId);
@@ -90,11 +90,11 @@ public class EFReminderTable<TDbContext, TETag> : IReminderTable where TDbContex
         }
     }
 
-    public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+    public async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
     {
         try
         {
-            var ctx = this._dbContextFactory.CreateDbContext();
+            await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             var record = await ctx.Reminders
                 .AsNoTracking()
@@ -104,7 +104,7 @@ public class EFReminderTable<TDbContext, TETag> : IReminderTable where TDbContex
                     r.GrainId == grainId.ToString())
                 .ConfigureAwait(false);
 
-            return record is null ? null! : ConvertToEntity(record);
+            return record is null ? null : ConvertToEntity(record);
         }
         catch (Exception exc)
         {
@@ -114,13 +114,13 @@ public class EFReminderTable<TDbContext, TETag> : IReminderTable where TDbContex
         }
     }
 
-    public async Task<string> UpsertRow(ReminderEntry entry)
+    public async Task<string?> UpsertRow(ReminderEntry entry)
     {
         try
         {
             var record = ConvertToRecord(entry);
 
-            var ctx = this._dbContextFactory.CreateDbContext();
+            await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             if (string.IsNullOrWhiteSpace(entry.ETag))
             {
@@ -163,7 +163,7 @@ public class EFReminderTable<TDbContext, TETag> : IReminderTable where TDbContex
     {
         try
         {
-            var ctx = this._dbContextFactory.CreateDbContext();
+            await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             var record = await ctx.Reminders.SingleOrDefaultAsync(r =>
                     r.ServiceId == this._serviceId &&
@@ -171,10 +171,10 @@ public class EFReminderTable<TDbContext, TETag> : IReminderTable where TDbContex
                     r.Name == reminderName)
                 .ConfigureAwait(false);
 
-            if (record is null) return true;
+            if (record is null) return false;
 
-            record.ETag = this._eTagConverter.ToDbETag(eTag);
-
+            ctx.Entry(record).Property(r => r.ETag).OriginalValue =
+                this._eTagConverter.ToDbETag(eTag);
             ctx.Reminders.Remove(record);
 
             await ctx.SaveChangesAsync().ConfigureAwait(false);
@@ -202,7 +202,7 @@ public class EFReminderTable<TDbContext, TETag> : IReminderTable where TDbContex
     {
         try
         {
-            var ctx = this._dbContextFactory.CreateDbContext();
+            await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             var records = await ctx.Reminders
                 .Where(r => r.ServiceId == this._serviceId)

@@ -19,7 +19,9 @@ public class ReminderDbContext<TDbContext, TETag> : DbContext where TDbContext :
             c.Property(p => p.GrainId).IsRequired();
             c.Property(p => p.Name).IsRequired();
             c.Property(p => p.StartAt).IsRequired();
-            c.Property(p => p.Period).IsRequired();
+            c.Property(p => p.Period)
+                .HasConversion(period => period.Ticks, ticks => TimeSpan.FromTicks(ticks))
+                .IsRequired();
             c.Property(p => p.GrainHash).IsRequired();
             c.Property(p => p.ETag).IsRequired().IsRowVersion();
         });
