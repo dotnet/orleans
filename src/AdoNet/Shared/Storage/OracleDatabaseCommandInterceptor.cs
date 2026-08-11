@@ -112,7 +112,11 @@ namespace Orleans.Tests.SqlUtils
 
                 //Byte arrays are mapped as RAW which causes problems
                 //This sets the OracleDbType explicitly to BLOB
-                if (commandParameter.ParameterName == "PayloadBinary")
+                if (commandParameter.ParameterName == "PayloadBinary"
+#if TRANSACTIONS_ADONET
+                    || commandParameter.ParameterName is "Metadata" or "TransactionManager" or "StateData"
+#endif
+                    )
                 {
                     setBlobOracleDbTypeAction.Value(commandParameter);
                     continue;

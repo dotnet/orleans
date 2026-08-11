@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +19,9 @@ using Orleans.Transactions.AdoNet.Utils;
 
 namespace Orleans.Transactions.AdoNet.TransactionalState
 {
+    /// <summary>
+    /// Creates ADO.NET transactional state storage instances.
+    /// </summary>
     public class TransactionalStateStorageFactory : ITransactionalStateStorageFactory, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly string name;
@@ -24,6 +29,9 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
         private readonly ClusterOptions clusterOptions;
         private readonly JsonSerializerSettings jsonSettings;
 
+        /// <summary>
+        /// Initializes a new transactional state storage factory.
+        /// </summary>
         public TransactionalStateStorageFactory(
             string name,
             TransactionalStateStorageOptions options,
@@ -36,12 +44,16 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             this.jsonSettings = TransactionalStateFactory.GetJsonSerializerSettings(services);
         }
 
+        /// <summary>
+        /// Creates a transactional state storage factory from registered services.
+        /// </summary>
         public static ITransactionalStateStorageFactory Create(IServiceProvider services, string name)
         {
             var optionsMonitor = services.GetRequiredService<IOptionsMonitor<TransactionalStateStorageOptions>>();
             return ActivatorUtilities.CreateInstance<TransactionalStateStorageFactory>(services, name, optionsMonitor.Get(name));
         }
 
+        /// <inheritdoc />
         public ITransactionalStateStorage<TState> Create<TState>(
             string stateName,
             IGrainContext context) where TState : class, new()
@@ -53,34 +65,32 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
         private string MakePartitionKey(IGrainContext context, string stateName)
         {
             string grainKey = context.GrainReference.GrainId.ToString();
-            var key = $"{grainKey}_{this.clusterOptions.ServiceId}_{stateName}";
-            return SanitizePropertyName(key);
+            var key = CreateStateId(grainKey, clusterOptions.ServiceId, stateName);
+            return ValidateStateId(key);
         }
 
-        private string SanitizePropertyName(string key)
+        internal static string CreateStateId(string grainKey, string serviceId, string stateName)
         {
-            key = key
-               .Replace('/', '_')        // Forward slash
-               .Replace('\\', '_')       // Backslash
-               .Replace('#', '_')        // Pound sign
-               .Replace('?', '_');       // Question mark
-            // recommand - mysql  255，sqlserver  500 ，pg 1000，oracle 100
-            if (key.Length >= this.options.StateIdKeyMaxLenth)      // the max length of stateId in database
+            var value = $"{grainKey.Length}:{grainKey}{serviceId.Length}:{serviceId}{stateName.Length}:{stateName}";
+            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+        }
+
+        private string ValidateStateId(string key)
+        {
+            if (key.Length > this.options.StateIdKeyMaxLength)
             {
-                throw new ArgumentException(string.Format("Key length {0} is too long. Key={1}", key.Length, key));
+                throw new ArgumentException($"Key length {key.Length} is too long. Key={key}", nameof(key));
             }
 
             return key;
         }
 
+        /// <inheritdoc />
         public void Participate(ISiloLifecycle lifecycle)
         {
             lifecycle.Subscribe(OptionFormattingUtilities.Name<TransactionalStateStorageFactory>(name), this.options.InitStage, Init);
         }
 
-        private  Task Init(CancellationToken cancellationToken)
-        {
-           return Task.CompletedTask;
-        }
+        private Task Init(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

@@ -14,9 +14,9 @@ CREATE TABLE OrleansTransactionStateTable (
   SequenceId BIGINT NOT NULL,
   ETag VARCHAR(36) NOT NULL,
   TransactionId VARCHAR(36) NOT NULL,
-  TransactionTimestamp TIMESTAMP NOT NULL,
+  TransactionTimestamp TIMESTAMPTZ NOT NULL,
   TransactionManager BYTEA NOT NULL,
-  SateData BYTEA NULL,
+  StateData BYTEA NULL,
   Timestamp timestamptz(3) NOT NULL DEFAULT now(),
   PRIMARY KEY (StateId, SequenceId)
 );

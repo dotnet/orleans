@@ -83,6 +83,17 @@ namespace Orleans.Tests.SqlUtils
         /// </example>
         Task<IEnumerable<TResult>> ReadAsync<TResult>(string query, Action<IDbCommand>? parameterProvider, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default);
 
+#if TRANSACTIONS_ADONET
+        Task<(IReadOnlyList<TFirst> First, IReadOnlyList<TSecond> Second)> ReadTransactionAsync<TFirst, TSecond>(
+            string firstQuery,
+            Action<IDbCommand>? firstParameterProvider,
+            Func<IDataRecord, TFirst> firstSelector,
+            string secondQuery,
+            Action<IDbCommand>? secondParameterProvider,
+            Func<IDataRecord, TSecond> secondSelector,
+            CancellationToken cancellationToken = default);
+#endif
+
         /// <summary>
         /// Executes a given statement. Especially intended to use with <em>INSERT</em>, <em>UPDATE</em>, <em>DELETE</em> or <em>DDL</em> queries.
         /// </summary>
@@ -106,7 +117,9 @@ namespace Orleans.Tests.SqlUtils
         /// </example>
         Task<int> ExecuteAsync(string query, Action<IDbCommand>? parameterProvider, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default);
 
-        Task<int> ExecuteTransactionAsync(List<Tuple<string, Action<DbCommand>>> multipleQuery, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default);
+#if TRANSACTIONS_ADONET
+        Task<int> ExecuteTransactionAsync(List<Tuple<string, Action<DbCommand>>> multipleQuery, CancellationToken cancellationToken = default);
+#endif
 
         /// <summary>
         /// The well known invariant name of the underlying database.
