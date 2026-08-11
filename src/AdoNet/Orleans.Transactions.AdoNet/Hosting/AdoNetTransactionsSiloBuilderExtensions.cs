@@ -4,7 +4,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
@@ -13,28 +12,42 @@ using Orleans.Transactions.AdoNet.Storage;
 using Orleans.Transactions.AdoNet.TransactionalState;
 using Orleans.Transactions.AdoNet.Utils;
 
-namespace Orleans.Transactions.AdoNet.Hosting
+namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Extensions for configuring ADO.NET transactional state storage.
+    /// </summary>
     public static class AdoNetTransactionsSiloBuilderExtensions
     {
+        /// <summary>
+        /// Configures ADO.NET as the default transactional state storage provider.
+        /// </summary>
+        /// <param name="builder">The silo builder.</param>
+        /// <param name="configureOptions">The provider configuration.</param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddAdoNetTransactionalStateStorageAsDefault(
             this ISiloBuilder builder,
-            Action<TransactionalStateStorageOptions> configureOptions = null)
+            Action<TransactionalStateStorageOptions>? configureOptions = null)
         {
             return builder.AddAdoNetTransactionalStateStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
         }
 
+        /// <summary>
+        /// Configures a named ADO.NET transactional state storage provider.
+        /// </summary>
+        /// <param name="builder">The silo builder.</param>
+        /// <param name="name">The provider name.</param>
+        /// <param name="configureOptions">The provider configuration.</param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddAdoNetTransactionalStateStorage(
             this ISiloBuilder builder,
             string name,
-            Action<TransactionalStateStorageOptions> configureOptions = null)
+            Action<TransactionalStateStorageOptions>? configureOptions = null)
         {
             return builder.AddAdoNetTransactionalStateStorage(name, (OptionsBuilder<TransactionalStateStorageOptions> optionsBuilder) => optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {
-                configureOptions.Invoke(options);
-                //now just oracle sqlparameter dot is different
-                if (options.Invariant == AdoNetInvariants.InvariantNameOracleDatabase
-                    && string.IsNullOrWhiteSpace(options.SqlParameterDot))
+                configureOptions?.Invoke(options);
+                if (options.Invariant == AdoNetInvariants.InvariantNameOracleDatabase)
                 {
                     options.SqlParameterDot = Constants.OracleParameterDot;
                 }
@@ -48,18 +61,18 @@ namespace Orleans.Transactions.AdoNet.Hosting
     /// </summary>
     internal static class AdoNetTransactionServicecollectionExtensions
     {
-        internal static ISiloBuilder AddAdoNetTransactionalStateStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<TransactionalStateStorageOptions>> configureOptions = null)
+        internal static ISiloBuilder AddAdoNetTransactionalStateStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<TransactionalStateStorageOptions>>? configureOptions = null)
         {
             return builder.ConfigureServices(services => services.AddAdoNetTransactionalStateStorage(name, configureOptions));
         }
 
         internal static IServiceCollection AddAdoNetTransactionalStateStorage(this IServiceCollection services, string name,
-            Action<OptionsBuilder<TransactionalStateStorageOptions>> configureOptions = null)
+            Action<OptionsBuilder<TransactionalStateStorageOptions>>? configureOptions = null)
         {
             configureOptions?.Invoke(services.AddOptions<TransactionalStateStorageOptions>(name));
 
-            services.TryAddSingleton<ITransactionalStateStorageFactory>(sp => sp.GetKeyedService<ITransactionalStateStorageFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-            services.AddKeyedSingleton<ITransactionalStateStorageFactory>(name, (sp, key) => TransactionalStateStorageFactory.Create(sp, key as string));
+            services.TryAddSingleton<ITransactionalStateStorageFactory>(sp => sp.GetRequiredKeyedService<ITransactionalStateStorageFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+            services.AddKeyedSingleton<ITransactionalStateStorageFactory>(name, (sp, key) => TransactionalStateStorageFactory.Create(sp, (string)key!));
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(s => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredKeyedService<ITransactionalStateStorageFactory>(name));
 
             return services;
@@ -86,31 +99,34 @@ namespace Orleans.Transactions.AdoNet.Hosting
             {
                 nameof(KeyEntity.StateId)
             }, null, options.SqlParameterDot);
-            options.ExecuteSqlDcitionary.Add(Constants.QueryKeySql,queryKeySql);
+            options.ExecuteSqlDictionary.Add(Constants.QueryKeySql,queryKeySql);
 
             var addKeySql = ActionToSql.InsertSql(options.KeyEntityTableName, new List<string>() {
                 nameof(KeyEntity.StateId),nameof(KeyEntity.CommittedSequenceId),
                 nameof(KeyEntity.Metadata),nameof(KeyEntity.Timestamp),nameof(KeyEntity.ETag) }, options.SqlParameterDot);
-            options.ExecuteSqlDcitionary.Add(Constants.AddKeySql, addKeySql);
+            options.ExecuteSqlDictionary.Add(Constants.AddKeySql, addKeySql);
 
             string updateKeySql = ActionToSql.UpdateSql(options.KeyEntityTableName, new List<string>()
             {
-                 nameof(KeyEntity.CommittedSequenceId),nameof(KeyEntity.Metadata),nameof(KeyEntity.Timestamp)
+                 nameof(KeyEntity.CommittedSequenceId),nameof(KeyEntity.Metadata),nameof(KeyEntity.Timestamp),nameof(KeyEntity.ETag)
             }, new List<string>() {
                 nameof(KeyEntity.StateId),nameof(KeyEntity.ETag)
-            }, options.SqlParameterDot);
-            options.ExecuteSqlDcitionary.Add(Constants.UpdateKeySql, updateKeySql);
+            }, options.SqlParameterDot, new Dictionary<string, string>
+            {
+                [nameof(KeyEntity.ETag)] = Constants.PreviousETag
+            });
+            options.ExecuteSqlDictionary.Add(Constants.UpdateKeySql, updateKeySql);
 
             string delKeySql = ActionToSql.DeleteSql(options.KeyEntityTableName, new List<string>()
             {
                 nameof(KeyEntity.StateId),nameof(KeyEntity.ETag)
             }, options.SqlParameterDot);
-            options.ExecuteSqlDcitionary.Add(Constants.DelKeySql, delKeySql);
+            options.ExecuteSqlDictionary.Add(Constants.DelKeySql, delKeySql);
 
             string queryStateSql = ActionToSql.QuerySimpleSql(options.StateEntityTableName, new List<string>() {
                 nameof(StateEntity.StateId), nameof(StateEntity.SequenceId),
                 nameof(StateEntity.TransactionId),nameof(StateEntity.TransactionTimestamp),
-                nameof(StateEntity.TransactionManager),nameof(StateEntity.SateData),
+                nameof(StateEntity.TransactionManager),nameof(StateEntity.StateData),
                 nameof(StateEntity.ETag) }, new List<string>()
             {
                 nameof(StateEntity.StateId)
@@ -118,31 +134,31 @@ namespace Orleans.Transactions.AdoNet.Hosting
             {
                 nameof(StateEntity.SequenceId)
             }, options.SqlParameterDot);
-            options.ExecuteSqlDcitionary.Add(Constants.QueryStateSql, queryStateSql);
+            options.ExecuteSqlDictionary.Add(Constants.QueryStateSql, queryStateSql);
 
             string addStateSql = ActionToSql.InsertSql(options.StateEntityTableName, new List<string>() {
                 nameof(StateEntity.StateId), nameof(StateEntity.SequenceId),
                 nameof(StateEntity.TransactionId),nameof(StateEntity.TransactionTimestamp),
-                nameof(StateEntity.TransactionManager),nameof(StateEntity.SateData),
+                nameof(StateEntity.TransactionManager),nameof(StateEntity.StateData),
                 nameof(StateEntity.ETag), nameof(StateEntity.Timestamp)
             }, options.SqlParameterDot);
-            options.ExecuteSqlDcitionary.Add(Constants.AddStateSql, addStateSql);
+            options.ExecuteSqlDictionary.Add(Constants.AddStateSql, addStateSql);
 
             string updateStateSql = ActionToSql.UpdateSql(options.StateEntityTableName, new List<string>()
             {
                 nameof(StateEntity.TransactionId),nameof(StateEntity.TransactionTimestamp),
-                nameof(StateEntity.TransactionManager), nameof(StateEntity.SateData),
-                 nameof(StateEntity.Timestamp) },
+                nameof(StateEntity.TransactionManager), nameof(StateEntity.StateData),
+                 nameof(StateEntity.Timestamp), nameof(StateEntity.ETag) },
              new List<string>() {
                 nameof(StateEntity.StateId),nameof(StateEntity.SequenceId) }
              , options.SqlParameterDot);
-            options.ExecuteSqlDcitionary.Add(Constants.UpdateStateSql, updateStateSql);
+            options.ExecuteSqlDictionary.Add(Constants.UpdateStateSql, updateStateSql);
 
             string delStateSql = ActionToSql.DeleteSql(options.StateEntityTableName, new List<string>()
             {
                 nameof(StateEntity.StateId),nameof(StateEntity.SequenceId),nameof(StateEntity.ETag)
             }, options.SqlParameterDot);
-            options.ExecuteSqlDcitionary.Add(Constants.DelStateSql, delStateSql);
+            options.ExecuteSqlDictionary.Add(Constants.DelStateSql, delStateSql);
         }
     }
 }

@@ -207,6 +207,83 @@ namespace Orleans.Tests.SqlUtils
             return (await ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, selector, commandBehavior, cancellationToken).ConfigureAwait(false)).Item1;
         }
 
+#if TRANSACTIONS_ADONET
+        public async Task<(IReadOnlyList<TFirst> First, IReadOnlyList<TSecond> Second)> ReadTransactionAsync<TFirst, TSecond>(
+            string firstQuery,
+            Action<IDbCommand>? firstParameterProvider,
+            Func<IDataRecord, TFirst> firstSelector,
+            string secondQuery,
+            Action<IDbCommand>? secondParameterProvider,
+            Func<IDataRecord, TSecond> secondSelector,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(firstQuery);
+            ArgumentNullException.ThrowIfNull(firstSelector);
+            ArgumentNullException.ThrowIfNull(secondQuery);
+            ArgumentNullException.ThrowIfNull(secondSelector);
+
+            using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+            using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
+            try
+            {
+                var first = await ReadInTransactionAsync(
+                    connection,
+                    transaction,
+                    firstQuery,
+                    firstParameterProvider,
+                    firstSelector,
+                    cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+                var second = await ReadInTransactionAsync(
+                    connection,
+                    transaction,
+                    secondQuery,
+                    secondParameterProvider,
+                    secondSelector,
+                    cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+
+                await transaction.CommitAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+                return (first, second);
+            }
+            catch
+            {
+                await transaction.RollbackAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+                throw;
+            }
+        }
+
+        private async Task<IReadOnlyList<TResult>> ReadInTransactionAsync<TResult>(
+            DbConnection connection,
+            DbTransaction transaction,
+            string query,
+            Action<IDbCommand>? parameterProvider,
+            Func<IDataRecord, TResult> selector,
+            CancellationToken cancellationToken)
+        {
+            using var command = connection.CreateCommand();
+            parameterProvider?.Invoke(command);
+            command.CommandText = query;
+            command.Transaction = transaction;
+            _databaseCommandInterceptor.Intercept(command);
+
+            var operation = _isSynchronousAdoNetImplementation
+                ? Task.Run(
+                    () => ExecuteReaderAsync(
+                        command,
+                        (record, _, _) => Task.FromResult(selector(record)),
+                        CommandBehavior.Default,
+                        cancellationToken),
+                    cancellationToken)
+                : ExecuteReaderAsync(
+                    command,
+                    (record, _, _) => Task.FromResult(selector(record)),
+                    CommandBehavior.Default,
+                    cancellationToken);
+
+            var result = await operation.ConfigureAwait(continueOnCapturedContext: false);
+            return result.Item1.ToList();
+        }
+#endif
+
 
         /// <summary>
         /// Executes a given statement. Especially intended to use with <em>INSERT</em>, <em>UPDATE</em>, <em>DELETE</em> or <em>DDL</em> queries.
@@ -240,15 +317,15 @@ namespace Orleans.Tests.SqlUtils
             return (await ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, (unit, id, c) => Task.FromResult(unit), commandBehavior, cancellationToken).ConfigureAwait(false)).Item2;
         }
 
+#if TRANSACTIONS_ADONET
         /// <summary>
         /// Executes a given statement. Especially intended to use with <em>INSERT</em>, <em>UPDATE</em>, <em>DELETE</em> or <em>DDL</em> queries with transaction
         /// </summary>
         /// <param name="multipleQuery"></param>
-        /// <param name="commandBehavior"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentNullException"></exception>
-        public async Task<int> ExecuteTransactionAsync(List<Tuple<string, Action<DbCommand>>> multipleQuery, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default)
+        public async Task<int> ExecuteTransactionAsync(List<Tuple<string, Action<DbCommand>>> multipleQuery, CancellationToken cancellationToken = default)
         {
             //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
             if (multipleQuery == null)
@@ -256,8 +333,9 @@ namespace Orleans.Tests.SqlUtils
                 throw new ArgumentNullException(nameof(multipleQuery));
             }
 
-            return (await ExecuteTransactionAsync(multipleQuery, ExecuteReaderAsync, (unit, id, c) => Task.FromResult(unit), commandBehavior, cancellationToken).ConfigureAwait(false));
+            return await ExecuteTransactionCoreAsync(multipleQuery, cancellationToken).ConfigureAwait(false);
         }
+#endif
 
         /// <summary>
         /// Creates an instance of a database of type <see cref="RelationalStorage"/>.
@@ -376,17 +454,16 @@ namespace Orleans.Tests.SqlUtils
             }
         }
 
-        private async Task<int> ExecuteTransactionAsync<TResult>(
+#if TRANSACTIONS_ADONET
+        private async Task<int> ExecuteTransactionCoreAsync(
             List<Tuple<string, Action<DbCommand>>> multipleQuery,
-            Func<DbCommand, Func<IDataRecord, int, CancellationToken, Task<TResult>>, CommandBehavior, CancellationToken, Task<Tuple<IEnumerable<TResult>, int>>> executor,
-            Func<IDataRecord, int, CancellationToken, Task<TResult>> selector,
-            CommandBehavior commandBehavior,
             CancellationToken cancellationToken)
         {
             using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
             using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
             try
             {
+                var affectedRows = 0;
                 foreach (var (query, parameterProvider) in multipleQuery)
                 {
                     using var command = connection.CreateCommand();
@@ -397,14 +474,20 @@ namespace Orleans.Tests.SqlUtils
                     _databaseCommandInterceptor.Intercept(command);
 
                     var operation = _isSynchronousAdoNetImplementation
-                        ? Task.Run(() => executor(command, selector, commandBehavior, cancellationToken), cancellationToken)
-                        : executor(command, selector, commandBehavior, cancellationToken);
+                        ? Task.Run(command.ExecuteNonQuery, cancellationToken)
+                        : command.ExecuteNonQueryAsync(cancellationToken);
+                    var currentAffectedRows = await operation.ConfigureAwait(continueOnCapturedContext: false);
+                    if (currentAffectedRows != 1)
+                    {
+                        throw new InvalidOperationException(
+                            $"Relational transaction command expected to affect one row but affected {currentAffectedRows}.");
+                    }
 
-                    await operation.ConfigureAwait(continueOnCapturedContext: false);
+                    affectedRows += currentAffectedRows;
                 }
 
                 await transaction.CommitAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
-                return 1;
+                return affectedRows;
             }
             catch
             {
@@ -412,6 +495,7 @@ namespace Orleans.Tests.SqlUtils
                 throw;
             }
         }
+#endif
 
 
         private static void CommandCancellation(object? state)

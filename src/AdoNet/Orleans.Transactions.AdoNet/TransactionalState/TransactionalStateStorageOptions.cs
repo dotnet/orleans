@@ -4,6 +4,9 @@ using Orleans.Transactions.AdoNet.Utils;
 
 namespace Orleans.Transactions.AdoNet.TransactionalState
 {
+    /// <summary>
+    /// Configures an ADO.NET transactional state storage provider.
+    /// </summary>
     public class TransactionalStateStorageOptions
     {
         /// <summary>
@@ -17,29 +20,29 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
         public string Invariant { get; set; } = DEFAULT_ADONET_INVARIANT;
 
         /// <summary>
-        /// connection string
+        /// The connection string used to access the database.
         /// </summary>
-        public string ConnectionString { get; set; }
+        public string ConnectionString { get; set; } = null!;
 
         /// <summary>
-        /// the table name of StateEntity in database
+        /// The transactional state table name.
         /// </summary>
         public string StateEntityTableName { get; set; } = "OrleansTransactionStateTable";
 
         /// <summary>
-        /// the table name of KeyEntity in database
+        /// The transactional state key table name.
         /// </summary>
         public string KeyEntityTableName { get; set; } = "OrleansTransactionKeyTable";
 
         /// <summary>
-        ///  the database parameter dot
+        /// The database parameter prefix.
         /// </summary>
         public string SqlParameterDot { get; set; } = Constants.SqlParameterDot;
 
         /// <summary>
-        /// the statId maxlenth
+        /// The maximum supported state identifier length.
         /// </summary>
-        public int StateIdKeyMaxLenth { get; set; } = 255;
+        public int StateIdKeyMaxLength { get; set; } = 255;
 
         /// <summary>
         /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
@@ -47,6 +50,6 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
         public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
 
-        internal Dictionary<string, string> ExecuteSqlDcitionary { get; set; } = new Dictionary<string, string>();
+        internal Dictionary<string, string> ExecuteSqlDictionary { get; } = new();
     }
 }

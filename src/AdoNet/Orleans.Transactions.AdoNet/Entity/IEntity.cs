@@ -8,7 +8,7 @@ namespace Orleans.Transactions.AdoNet.Entity;
 
 internal interface IEntity
 {
-    public string ETag { get; set; }
+    public string? ETag { get; set; }
 
     public string StateId { get; set; }
     /// <summary>
