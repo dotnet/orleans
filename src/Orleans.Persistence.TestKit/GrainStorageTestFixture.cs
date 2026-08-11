@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Storage;
@@ -15,20 +16,31 @@ namespace Orleans.Persistence.TestKit;
 /// </remarks>
 public abstract class GrainStorageTestFixture : IAsyncLifetime
 {
+    private ExceptionDispatchInfo? _preconditionException;
+    private InProcessTestCluster? _cluster;
+    private IGrainStorage? _storage;
+
     /// <summary>
     /// Gets the in-process test cluster.
     /// </summary>
-    protected InProcessTestCluster Cluster { get; private set; }
+    protected InProcessTestCluster Cluster => _cluster ?? throw new InvalidOperationException("The test cluster has not been initialized.");
 
     /// <summary>
     /// Gets the grain factory for creating grain references.
     /// </summary>
-    public IGrainFactory GrainFactory => Cluster?.Client;
+    public IGrainFactory GrainFactory => Cluster.Client;
 
     /// <summary>
     /// Gets the storage provider being tested.
     /// </summary>
-    public IGrainStorage Storage { get; private set; }
+    public IGrainStorage Storage
+    {
+        get
+        {
+            _preconditionException?.Throw();
+            return _storage ?? throw new InvalidOperationException("The storage provider has not been initialized.");
+        }
+    }
 
     /// <summary>
     /// Gets the name of the storage provider being tested.
@@ -39,7 +51,7 @@ public abstract class GrainStorageTestFixture : IAsyncLifetime
     /// Checks preconditions before initializing the cluster.
     /// Override this to check for external dependencies (e.g., Azure Storage emulator).
     /// </summary>
-    /// <exception cref="SkipException">Thrown if preconditions are not met.</exception>
+    /// <exception cref="Xunit.Sdk.SkipException">Thrown if preconditions are not met.</exception>
     protected virtual void CheckPreconditionsOrThrow()
     {
     }
@@ -49,7 +61,7 @@ public abstract class GrainStorageTestFixture : IAsyncLifetime
     /// </summary>
     public void EnsurePreconditionsMet()
     {
-        CheckPreconditionsOrThrow();
+        _preconditionException?.Throw();
     }
 
     /// <summary>
@@ -72,45 +84,48 @@ public abstract class GrainStorageTestFixture : IAsyncLifetime
     /// <param name="builder">The test cluster builder.</param>
     protected virtual void ConfigureTestCluster(InProcessTestClusterBuilder builder)
     {
-        // Default implementation does nothing
     }
 
     /// <inheritdoc/>
     public virtual async Task InitializeAsync()
     {
-        CheckPreconditionsOrThrow();
+        try
+        {
+            CheckPreconditionsOrThrow();
+        }
+        catch (Exception exception)
+        {
+            _preconditionException = ExceptionDispatchInfo.Capture(exception);
+            return;
+        }
 
         var builder = new InProcessTestClusterBuilder();
-        
-        builder.ConfigureSilo((siloBuilder) =>
-        {
-            ConfigureSilo(siloBuilder);
-        });
+        builder.ConfigureSilo((_, siloBuilder) => ConfigureSilo(siloBuilder));
 
         ConfigureTestCluster(builder);
 
-        Cluster = builder.Build();
-        await Cluster.DeployAsync().ConfigureAwait(false);
+        var cluster = builder.Build();
+        await cluster.DeployAsync().ConfigureAwait(false);
+        _cluster = cluster;
 
-        // Retrieve the storage provider from the first silo
-        var silo = Cluster.Silos.First();
-        Storage = silo.Services.GetKeyedService<IGrainStorage>(StorageProviderName);
-        
-        if (Storage is null)
-        {
-            throw new InvalidOperationException(
-                $"Storage provider '{StorageProviderName}' not found. " +
-                $"Ensure ConfigureSilo adds a storage provider with this name.");
-        }
+        _storage = cluster.Silos[0].ServiceProvider.GetRequiredKeyedService<IGrainStorage>(StorageProviderName);
     }
 
     /// <inheritdoc/>
     public virtual async Task DisposeAsync()
     {
-        if (Cluster is not null)
+        if (_cluster is not { } cluster)
         {
-            await Cluster.StopAllSilosAsync().ConfigureAwait(false);
-            await Cluster.DisposeAsync().ConfigureAwait(false);
+            return;
+        }
+
+        try
+        {
+            await cluster.StopAllSilosAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            await cluster.DisposeAsync().ConfigureAwait(false);
         }
     }
 }

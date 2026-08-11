@@ -30,110 +30,122 @@ public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<Mem
     }
 
     [Fact]
-    public Task PersistenceStorage_WriteReadIdCyrillic()
+    public override Task PersistenceStorage_WriteReadIdCyrillic()
     {
         return base.PersistenceStorage_WriteReadIdCyrillic();
     }
 
     [Fact]
-    public Task PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException()
+    public override Task PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException()
     {
         return base.PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException();
     }
 
     [Fact]
-    public Task PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException()
+    public override Task PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException()
     {
         return base.PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException();
     }
 
     [Fact]
-    public Task PersistenceStorage_WriteReadWriteReadStatesInParallel()
+    public override Task PersistenceStorage_WriteReadWriteReadStatesInParallel()
     {
-        return base.PersistenceStorage_WriteReadWriteReadStatesInParallel("MemoryTest", 50);
+        return RunPersistenceStorage_WriteReadWriteReadStatesInParallel("MemoryTest", 50);
     }
 
     [Fact]
-    public Task PersistenceStorage_ReadNonExistentState()
+    public override Task PersistenceStorage_ReadNonExistentState()
     {
         return base.PersistenceStorage_ReadNonExistentState();
     }
 
     [Fact]
-    public Task PersistenceStorage_ReadNonExistentStateHasNonNullState()
+    public override Task PersistenceStorage_ReadNonExistentStateHasNonNullState()
     {
         return base.PersistenceStorage_ReadNonExistentStateHasNonNullState();
     }
 
     [Fact]
-    public Task PersistenceStorage_WriteClearWrite()
+    public override Task PersistenceStorage_WriteClearWrite()
     {
         return base.PersistenceStorage_WriteClearWrite();
     }
 
     [Fact]
-    public Task PersistenceStorage_WriteClearRead()
+    public override Task PersistenceStorage_WriteClearRead()
     {
         return base.PersistenceStorage_WriteClearRead();
     }
 
     [Fact]
-    public Task PersistenceStorage_WriteReadClearReadCycle()
+    public override Task PersistenceStorage_WriteReadClearReadCycle()
     {
         return base.PersistenceStorage_WriteReadClearReadCycle();
     }
 
     [Fact]
-    public Task PersistenceStorage_WriteRead_StringKey()
+    public override Task PersistenceStorage_WriteRead_StringKey()
     {
         return base.PersistenceStorage_WriteRead_StringKey();
     }
 
     [Fact]
-    public Task PersistenceStorage_WriteRead_IntegerKey()
+    public override Task PersistenceStorage_WriteRead_IntegerKey()
     {
         return base.PersistenceStorage_WriteRead_IntegerKey();
     }
 
     [Fact]
-    public Task PersistenceStorage_ETagChangesOnWrite()
+    public override Task PersistenceStorage_ETagChangesOnWrite()
     {
         return base.PersistenceStorage_ETagChangesOnWrite();
     }
 
     [Fact]
-    public Task PersistenceStorage_ClearBeforeWrite()
+    public override Task PersistenceStorage_ClearBeforeWrite()
     {
         return base.PersistenceStorage_ClearBeforeWrite();
     }
 
     [Fact]
-    public Task PersistenceStorage_ClearStateDoesNotNullifyState()
+    public override Task PersistenceStorage_ClearStateDoesNotNullifyState()
     {
         return base.PersistenceStorage_ClearStateDoesNotNullifyState();
     }
 
     [Fact]
-    public Task PersistenceStorage_ClearUpdatesETag()
+    public override Task PersistenceStorage_ClearUpdatesETag()
     {
         return base.PersistenceStorage_ClearUpdatesETag();
     }
 
     [Fact]
-    public Task PersistenceStorage_ReadAfterClear()
+    public override Task PersistenceStorage_ReadAfterClear()
     {
         return base.PersistenceStorage_ReadAfterClear();
     }
 
     [Fact]
-    public Task PersistenceStorage_MultipleClearOperations()
+    public override Task PersistenceStorage_MultipleClearOperations()
     {
         return base.PersistenceStorage_MultipleClearOperations();
     }
 
     [Fact]
-    public Task PersistenceStorage_WriteWithSameValuesUpdatesETag()
+    public override Task PersistenceStorage_WriteWithSameValuesUpdatesETag()
     {
         return base.PersistenceStorage_WriteWithSameValuesUpdatesETag();
+    }
+
+    [Fact]
+    public override Task PersistenceStorage_StateNamesUseIndependentRecords()
+    {
+        return base.PersistenceStorage_StateNamesUseIndependentRecords();
+    }
+
+    [Fact]
+    public override Task PersistenceStorage_ClearInconsistentFailsWithInconsistentStateException()
+    {
+        return base.PersistenceStorage_ClearInconsistentFailsWithInconsistentStateException();
     }
 }

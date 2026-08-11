@@ -11,7 +11,7 @@ public class TestState1 : IEquatable<TestState1>
     /// Gets or sets a string property.
     /// </summary>
     [Id(0)]
-    public string A { get; set; }
+    public string? A { get; set; }
 
     /// <summary>
     /// Gets or sets an integer property.
@@ -26,13 +26,13 @@ public class TestState1 : IEquatable<TestState1>
     public long C { get; set; }
 
     /// <inheritdoc/>
-    public override bool Equals(object obj)
+    public override bool Equals(object? obj)
     {
         return Equals(obj as TestState1);
     }
 
     /// <inheritdoc/>
-    public bool Equals(TestState1 other)
+    public bool Equals(TestState1? other)
     {
         if (other is null)
         {
@@ -45,14 +45,6 @@ public class TestState1 : IEquatable<TestState1>
     /// <inheritdoc/>
     public override int GetHashCode()
     {
-        unchecked
-        {
-            int hash = 17;
-            hash = hash * 23 + (A is not null ? EqualityComparer<string>.Default.GetHashCode(A) : 0);
-            hash = hash * 23 + B.GetHashCode();
-            hash = hash * 23 + C.GetHashCode();
-
-            return hash;
-        }
+        return HashCode.Combine(A, B, C);
     }
 }

@@ -57,16 +57,16 @@ public class MyStorageTests : GrainStorageTestRunner, IClassFixture<MyStorageTes
     }
 
     [Fact]
-    public Task PersistenceStorage_WriteReadIdCyrillic() => base.PersistenceStorage_WriteReadIdCyrillic();
+    public override Task PersistenceStorage_WriteReadIdCyrillic() => base.PersistenceStorage_WriteReadIdCyrillic();
 
     [Fact]
-    public Task PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException() => base.PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException();
+    public override Task PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException() => base.PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException();
 
     [Fact]
-    public Task PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException() => base.PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException();
+    public override Task PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException() => base.PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException();
 
     [Fact]
-    public Task PersistenceStorage_WriteReadWriteReadStatesInParallel() => base.PersistenceStorage_WriteReadWriteReadStatesInParallel();
+    public override Task PersistenceStorage_WriteReadWriteReadStatesInParallel() => base.PersistenceStorage_WriteReadWriteReadStatesInParallel();
 }
 ```
 
@@ -102,6 +102,8 @@ The `GrainStorageTestRunner` base class provides the following test methods:
 - **`PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException()`**: Verifies that writing with an incorrect ETag throws `InconsistentStateException`
 - **`PersistenceStorage_ETagChangesOnWrite()`**: Tests that ETag updates properly on successive writes
 - **`PersistenceStorage_WriteWithSameValuesUpdatesETag()`**: Tests that updating state with same values still updates ETag
+- **`PersistenceStorage_ClearInconsistentFailsWithInconsistentStateException()`**: Verifies that clearing with a stale ETag fails without deleting the latest state
+- **`PersistenceStorage_StateNamesUseIndependentRecords()`**: Verifies that state names identify independent records for the same grain ID
 
 ### Concurrency Tests
 
@@ -167,11 +169,7 @@ public class MyStorageTestFixture : GrainStorageTestFixture
 
     protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
     {
-        // Configure additional settings
-        builder.ConfigureHostConfiguration(config =>
-        {
-            // Add configuration
-        });
+        builder.Options.InitialSilosCount = 1;
     }
 }
 ```
@@ -180,8 +178,8 @@ public class MyStorageTestFixture : GrainStorageTestFixture
 
 The `GrainStorageTestRunner` class provides protected helper methods you can use in your tests:
 
-- **`GetTestReferenceAndState(long grainId, string version)`**: Creates a test grain ID and state with an integer key
-- **`GetTestReferenceAndState(string grainId, string version)`**: Creates a test grain ID and state with a string key
+- **`GetTestReferenceAndState(long grainId, string? version)`**: Creates a test grain ID and state with an integer key
+- **`GetTestReferenceAndState(string grainId, string? version)`**: Creates a test grain ID and state with a string key
 - **`Store_WriteRead<T>(string grainTypeName, GrainId grainId, GrainState<T> grainState)`**: Writes and reads state, asserting correctness
 - **`Store_WriteClearRead<T>(string grainTypeName, GrainId grainId, GrainState<T> grainState)`**: Writes, clears, and reads state
 
@@ -211,16 +209,16 @@ public class MemoryStorageTests : GrainStorageTestRunner, IClassFixture<MemorySt
     }
 
     [Fact]
-    public Task PersistenceStorage_WriteReadIdCyrillic() => base.PersistenceStorage_WriteReadIdCyrillic();
+    public override Task PersistenceStorage_WriteReadIdCyrillic() => base.PersistenceStorage_WriteReadIdCyrillic();
 
     [Fact]
-    public Task PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException() => base.PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException();
+    public override Task PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException() => base.PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException();
 
     [Fact]
-    public Task PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException() => base.PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException();
+    public override Task PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException() => base.PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException();
 
     [Fact]
-    public Task PersistenceStorage_WriteReadWriteReadStatesInParallel() => base.PersistenceStorage_WriteReadWriteReadStatesInParallel();
+    public override Task PersistenceStorage_WriteReadWriteReadStatesInParallel() => base.PersistenceStorage_WriteReadWriteReadStatesInParallel();
 }
 ```
 
