@@ -359,6 +359,20 @@ describe('snippet project policy', { timeout: 30_000 }, () => {
     expect(result.output).toContain('is not an evaluated Compile item');
   });
 
+  test('normalizes C# language whitespace before enforcing ownership', async () => {
+    const root = await temporaryDirectory();
+    await writeValidatedProject(root);
+    await writeFile(path.join(root, 'Standalone.txt'), 'class Standalone {}\n');
+    await writeFile(
+      path.join(root, 'guide.md'),
+      ':::code language=" csharp " source="Standalone.txt":::\n',
+    );
+
+    const result = await runPolicy(root);
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("target 'Standalone.txt' is not an evaluated Compile item");
+  });
+
   test('rejects a missing code directive target at the directive source line', async () => {
     const root = await temporaryDirectory();
     await writeValidatedProject(root);

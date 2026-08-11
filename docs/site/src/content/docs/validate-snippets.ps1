@@ -381,7 +381,7 @@ foreach ($markdownDocument in $renderedMarkdown) {
             continue
         }
 
-        $language = [string]$attributes.language
+        $language = ([string]$attributes.language).Trim()
         $isCsharp = [IO.Path]::GetExtension($target) -ieq ".cs" -or
             $language -ieq "csharp" -or
             $language -ieq "c#" -or
