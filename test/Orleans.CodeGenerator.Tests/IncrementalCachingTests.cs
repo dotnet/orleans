@@ -112,6 +112,79 @@ public class IncrementalCachingTests
     }
 
     [Fact]
+    public async Task ProviderRegistration_UnrelatedChange_DoesNotTriggerMetadataRegeneration()
+    {
+        const string originalCode = """
+            using Orleans;
+
+            [assembly: RegisterProvider("Test", "Clustering", "Client", typeof(TestProject.Provider))]
+
+            namespace TestProject;
+
+            public sealed class Provider
+            {
+            }
+            """;
+
+        const string modifiedCode = originalCode + """
+
+            public sealed class UnrelatedClass
+            {
+                public int Value { get; set; }
+            }
+            """;
+
+        var compilation = await CreateCompilation(originalCode);
+        var newCompilation = ReplaceSource(compilation, modifiedCode);
+        var (result1, result2) = await RunTwice(compilation, newCompilation);
+
+        AssertTrackedStepsCachedOrUnchanged(
+            result2,
+            OrleansSerializationSourceGenerator.ReferenceAssemblyDataTrackingName);
+        AssertTrackedStepsCached(
+            result2,
+            OrleansSerializationSourceGenerator.MetadataAggregateTrackingName,
+            OrleansSerializationSourceGenerator.MetadataOutputsTrackingName);
+        AssertGeneratedSourcesIdentical(result1, result2);
+    }
+
+    [Fact]
+    public async Task AddedProviderRegistration_InvalidatesMetadataPipeline()
+    {
+        const string originalCode = """
+            namespace TestProject;
+
+            public sealed class Provider
+            {
+            }
+            """;
+
+        const string modifiedCode = """
+            using Orleans;
+
+            [assembly: RegisterProvider("Test", "Clustering", "Client", typeof(TestProject.Provider))]
+
+            namespace TestProject;
+
+            public sealed class Provider
+            {
+            }
+            """;
+
+        var compilation = await CreateCompilation(originalCode);
+        var newCompilation = ReplaceSource(compilation, modifiedCode);
+        var (result1, result2) = await RunTwice(compilation, newCompilation);
+
+        AssertTrackedStepModifiedOrNew(result2, OrleansSerializationSourceGenerator.ReferenceAssemblyDataTrackingName);
+        AssertTrackedStepModifiedOrNew(result2, OrleansSerializationSourceGenerator.MetadataAggregateTrackingName);
+        AssertTrackedStepModifiedOrNew(result2, OrleansSerializationSourceGenerator.MetadataOutputsTrackingName);
+
+        const string generatedProviderType = "typeof(global::TestProject.Provider)";
+        Assert.DoesNotContain(generatedProviderType, ConcatenateGeneratedSources(result1), StringComparison.Ordinal);
+        Assert.Contains(generatedProviderType, ConcatenateGeneratedSources(result2), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task AddingNewSerializableType_TriggersRegeneration()
     {
         const string originalCode = """
@@ -833,6 +906,26 @@ public class IncrementalCachingTests
                     Assert.True(
                         reason is IncrementalStepRunReason.Cached or IncrementalStepRunReason.Unchanged,
                         $"Step '{stepName}' had reason '{reason}' — expected Cached or Unchanged.");
+                }
+            }
+        }
+    }
+
+    private static void AssertTrackedStepsCached(GeneratorRunResult result, params string[] stepNames)
+    {
+        var trackedSteps = result.TrackedSteps;
+        Assert.NotEmpty(trackedSteps);
+
+        foreach (var stepName in stepNames)
+        {
+            Assert.True(trackedSteps.TryGetValue(stepName, out var steps), $"Missing tracked step '{stepName}'.");
+            Assert.NotEmpty(steps);
+
+            foreach (var step in steps)
+            {
+                foreach (var (_, reason) in step.Outputs)
+                {
+                    Assert.Equal(IncrementalStepRunReason.Cached, reason);
                 }
             }
         }

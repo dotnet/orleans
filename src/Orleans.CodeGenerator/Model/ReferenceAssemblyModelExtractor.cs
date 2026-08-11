@@ -48,7 +48,7 @@ internal static class ReferenceAssemblyModelExtractor
         var interfaceImplementations = new HashSet<InterfaceImplementationModel>();
         var diagnosticBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
 
-        CollectRegisteredProviders(compilation.Assembly);
+        CollectAssemblyAttributes(compilation.Assembly, includeApplicationParts: false);
 
         foreach (var reference in compilation.References)
         {
@@ -59,22 +59,7 @@ internal static class ReferenceAssemblyModelExtractor
                 continue;
             }
 
-            CollectRegisteredProviders(asm);
-
-            if (!asm.GetAttributes(libraryTypes.ApplicationPartAttribute, out var attrs))
-            {
-                continue;
-            }
-
-            AddApplicationPart(asm.MetadataName);
-            foreach (var attr in attrs)
-            {
-                if (attr.ConstructorArguments.Length > 0
-                    && attr.ConstructorArguments[0].Value is string partName)
-                {
-                    AddApplicationPart(partName);
-                }
-            }
+            CollectAssemblyAttributes(asm, includeApplicationParts: true);
         }
 
         foreach (var asm in assembliesToExamine)
@@ -216,16 +201,36 @@ internal static class ReferenceAssemblyModelExtractor
             }
         }
 
-        void CollectRegisteredProviders(IAssemblySymbol assembly)
+        void CollectAssemblyAttributes(IAssemblySymbol assembly, bool includeApplicationParts)
         {
-            if (!assembly.GetAttributes(libraryTypes.RegisterProviderAttribute, out var attributes))
-            {
-                return;
-            }
+            var hasApplicationPartAttribute = false;
 
-            foreach (var attribute in attributes)
+            foreach (var attribute in assembly.GetAttributes())
             {
                 cancellationToken.ThrowIfCancellationRequested();
+
+                if (includeApplicationParts
+                    && SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, libraryTypes.ApplicationPartAttribute))
+                {
+                    if (!hasApplicationPartAttribute)
+                    {
+                        AddApplicationPart(assembly.MetadataName);
+                        hasApplicationPartAttribute = true;
+                    }
+
+                    if (attribute.ConstructorArguments.Length > 0
+                        && attribute.ConstructorArguments[0].Value is string partName)
+                    {
+                        AddApplicationPart(partName);
+                    }
+
+                    continue;
+                }
+
+                if (!SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, libraryTypes.RegisterProviderAttribute))
+                {
+                    continue;
+                }
 
                 var arguments = attribute.ConstructorArguments;
                 if (arguments.Length < 4
