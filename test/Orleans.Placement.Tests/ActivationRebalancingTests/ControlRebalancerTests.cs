@@ -95,8 +95,8 @@ public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper
 
         Assert.Equal(RebalancerStatus.Suspended, report.Status);
         Assert.True(report.SuspensionDuration.HasValue);
-        // Must be less than the time it was told to be suspended
-        Assert.True(report.SuspensionDuration.Value < duration); 
+        // A coarse clock can report the full duration until its timestamp advances.
+        Assert.InRange(report.SuspensionDuration.Value, TimeSpan.FromTicks(1), duration);
         Assert.Equal(host, report.Host);
 
         resumed = rebalancerEvents.WaitForSessionStartAsync(
