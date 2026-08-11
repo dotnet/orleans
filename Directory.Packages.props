@@ -173,7 +173,7 @@
     <PackageVersion Update="System.Memory.Data" Version="10.0.3" />
     <PackageVersion Update="System.Text.Json" Version="10.0.5" />
   </ItemGroup>
-  <ItemGroup Condition=" '$(MSBuildProjectName)' == 'Orleans.Runtime.Internal.Tests' ">
+  <ItemGroup Condition=" '$(MSBuildProjectName)' == 'Orleans.Runtime.Internal.Tests' and '$(TargetFramework)' == 'net8.0' ">
     <PackageVersion Update="System.Collections.Immutable" Version="10.0.0" />
     <PackageVersion Update="System.IO.Pipelines" Version="10.0.5" />
     <PackageVersion Update="System.Text.Json" Version="10.0.5" />

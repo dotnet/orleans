@@ -332,7 +332,8 @@ internal static class GrainStorageModelBasedConformance
                     {
                         Value = StorageValue.None,
                         ETag = grainState.ETag,
-                        PreviousETag = records.TryGetValue(request.Key, out var existing) ? existing.PreviousETag : null
+                        PreviousETag = records.TryGetValue(request.Key, out var existing) ? existing.PreviousETag : null,
+                        RecordExists = false
                     };
                 }
 
@@ -351,7 +352,7 @@ internal static class GrainStorageModelBasedConformance
             {
                 State = CreateState(request.Value),
                 ETag = ResolveETag(request),
-                RecordExists = priorRecord is not null
+                RecordExists = priorRecord?.RecordExists ?? false
             };
 
             try
@@ -379,7 +380,7 @@ internal static class GrainStorageModelBasedConformance
             {
                 State = new TestState1(),
                 ETag = ResolveETag(request),
-                RecordExists = records.ContainsKey(request.Key)
+                RecordExists = records.TryGetValue(request.Key, out var currentRecord) && currentRecord.RecordExists
             };
 
             try
@@ -396,7 +397,8 @@ internal static class GrainStorageModelBasedConformance
                     {
                         Value = StorageValue.None,
                         ETag = grainState.ETag,
-                        PreviousETag = priorRecord?.ETag
+                        PreviousETag = priorRecord?.ETag,
+                        RecordExists = grainState.RecordExists
                     };
                 }
 
