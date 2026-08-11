@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Persistence.Migration;
@@ -21,6 +23,18 @@ namespace Tester.AzureUtils.Migration.Units
 {
     public class AzureQueueDataAdapterMigrationV1Tests
     {
+        private static readonly Guid Version10FixtureStreamGuid = Guid.Parse("00112233-4455-6677-8899-aabbccddeeff");
+
+        private const string Version10GoldenJson =
+            "{\"$id\":\"1\",\"$type\":\"Orleans.Providers.Streams.AzureQueue.AzureQueueBatchContainerV2, Orleans.Streaming.AzureStorage\"," +
+            "\"events\":{\"$type\":\"System.Collections.Generic.List`1[[System.Object, System.Private.CoreLib]], System.Private.CoreLib\"," +
+            "\"$values\":[\"test-event\"]},\"requestContext\":{\"$id\":\"2\"," +
+            "\"$type\":\"System.Collections.Generic.Dictionary`2[[System.String, System.Private.CoreLib],[System.Object, System.Private.CoreLib]], System.Private.CoreLib\"," +
+            "\"key\":\"value\"},\"StreamId\":{\"$id\":\"3\",\"$type\":\"Orleans.Runtime.StreamId, Orleans.Streaming\"," +
+            "\"fk\":{\"$type\":\"System.Byte[], System.Private.CoreLib\"," +
+            "\"$value\":\"dGVzdC1uYW1lc3BhY2UwMDExMjIzMzQ0NTU2Njc3ODg5OWFhYmJjY2RkZWVmZg==\"}," +
+            "\"ki\":14,\"fh\":1821817189}}";
+
         private readonly AzureQueueDataAdapterMigrationV1 adapter;
         private readonly SerializationManager serializationManager;
         private readonly OrleansMigrationJsonSerializer jsonSerializer;
@@ -57,22 +71,39 @@ namespace Tester.AzureUtils.Migration.Units
         }
 
         [Fact]
-        public void ToQueueMessage_WithJsonMode_ProducesJsonString()
+        public void ToQueueMessage_WithJsonMode_ProducesVersion10GoldenJson()
         {
-            var streamGuid = Guid.NewGuid();
             var streamNamespace = "test-namespace";
-            var events = new[] { new TestEvent { Id = 123, Message = "test" } };
+            var events = new[] { "test-event" };
             var requestContext = new Dictionary<string, object> { { "key", "value" } };
 
-            var result = adapter.ToQueueMessage(streamGuid, streamNamespace, events, null, requestContext);
+            var result = adapter.ToQueueMessage(Version10FixtureStreamGuid, streamNamespace, events, null, requestContext);
 
-            Assert.NotNull(result);
-            Assert.NotEmpty(result);
-            // JSON should contain readable text, not base64
-            Assert.Contains("\"Id\":", result);
-            Assert.Contains("123", result);
-            Assert.Contains("\"Message\":", result);
-            Assert.Contains("test", result);
+            Assert.Equal(Version10GoldenJson, result);
+            Assert.DoesNotContain("\"StreamGuid\"", result);
+            Assert.DoesNotContain("\"StreamNamespace\"", result);
+        }
+
+        [Fact]
+        public void ToQueueMessage_WithJsonMode_ProducesVersion10ConsumableStreamIdFixture()
+        {
+            var result = adapter.ToQueueMessage(
+                Version10FixtureStreamGuid,
+                "test-namespace",
+                new[] { "test-event" },
+                null,
+                new Dictionary<string, object> { { "key", "value" } });
+
+            var fixture = Assert.IsType<Version10BatchContainerWireFixture>(
+                JsonConvert.DeserializeObject<Version10BatchContainerWireFixture>(
+                    result,
+                    new JsonSerializerSettings { MetadataPropertyHandling = MetadataPropertyHandling.Ignore }));
+
+            var streamId = Assert.IsType<Version10StreamIdWireFixture>(fixture.StreamId);
+            var fullKey = Convert.FromBase64String(streamId.FullKey.Value);
+            Assert.Equal("test-namespace00112233445566778899aabbccddeeff", Encoding.UTF8.GetString(fullKey));
+            Assert.Equal(14, streamId.KeyIndex);
+            Assert.Equal(1821817189, streamId.Hash);
         }
 
         [Fact]
@@ -195,6 +226,39 @@ namespace Tester.AzureUtils.Migration.Units
         }
 
         [Fact]
+        public void FromQueueMessage_WithPreferJsonMode_FallsBackToBinary()
+        {
+            var options = new AzureQueueMigrationOptions
+            {
+                SerializationMode = SerializationMode.Binary,
+                DeserializationMode = DeserializationMode.PreferBinary
+            };
+            var logger = this.serializationManager.ServiceProvider.GetRequiredService<ILogger<AzureQueueDataAdapterMigrationV1>>();
+            var binaryAdapter = new AzureQueueDataAdapterMigrationV1(
+                logger,
+                this.serializationManager,
+                this.jsonSerializer,
+                options);
+
+            var streamGuid = Guid.Parse("ffeeddcc-bbaa-9988-7766-554433221100");
+            var binaryMessage = binaryAdapter.ToQueueMessage(
+                streamGuid,
+                "binary-fallback",
+                new[] { new TestEvent { Id = 321, Message = "legacy-binary" } },
+                null,
+                new Dictionary<string, object> { { "format", "binary" } });
+
+            var result = adapter.FromQueueMessage(binaryMessage, 24680L);
+            var deserializedEvent = Assert.Single(result.GetEvents<TestEvent>());
+
+            Assert.Equal(streamGuid, result.StreamGuid);
+            Assert.Equal("binary-fallback", result.StreamNamespace);
+            Assert.Equal(321, deserializedEvent.Item1.Id);
+            Assert.Equal("legacy-binary", deserializedEvent.Item1.Message);
+            Assert.Equal(24680L, deserializedEvent.Item2.SequenceNumber);
+        }
+
+        [Fact]
         public void FromQueueMessage_WithPreferJsonMode_TriesJsonFirst()
         {
             var streamGuid = Guid.NewGuid();
@@ -281,6 +345,30 @@ namespace Tester.AzureUtils.Migration.Units
         }
 
         [Fact]
+        public void RoundTrip_JsonSerialization_PreservesDateLikeStringsAndHighPrecisionNumbers()
+        {
+            var originalEvent = new PrecisionEvent
+            {
+                DateLikeString = "2020-01-01T00:00:00+05:00",
+                HighPrecisionNumber = 1234567890.123456789m,
+                LargeNumber = 1e300
+            };
+
+            var queueMessage = adapter.ToQueueMessage(
+                Guid.NewGuid(),
+                "test-namespace",
+                new[] { originalEvent },
+                null,
+                new Dictionary<string, object>());
+            var batchContainer = adapter.FromQueueMessage(queueMessage, 123L);
+            var deserializedEvent = Assert.Single(batchContainer.GetEvents<PrecisionEvent>()).Item1;
+
+            Assert.Equal(originalEvent.DateLikeString, deserializedEvent.DateLikeString);
+            Assert.Equal(originalEvent.HighPrecisionNumber, deserializedEvent.HighPrecisionNumber);
+            Assert.Equal(originalEvent.LargeNumber, deserializedEvent.LargeNumber);
+        }
+
+        [Fact]
         public void RoundTrip_BinarySerialization_PreservesEventData()
         {
             var options = new AzureQueueMigrationOptions
@@ -337,6 +425,29 @@ namespace Tester.AzureUtils.Migration.Units
                 return false;
             }
         }
+
+        private sealed class Version10BatchContainerWireFixture
+        {
+            public Version10StreamIdWireFixture StreamId { get; set; } = null!;
+        }
+
+        private sealed class Version10StreamIdWireFixture
+        {
+            [JsonProperty("fk")]
+            public Version10ByteArrayWireFixture FullKey { get; set; } = null!;
+
+            [JsonProperty("ki")]
+            public ushort KeyIndex { get; set; }
+
+            [JsonProperty("fh")]
+            public int Hash { get; set; }
+        }
+
+        private sealed class Version10ByteArrayWireFixture
+        {
+            [JsonProperty("$value")]
+            public string Value { get; set; } = null!;
+        }
     }
 
     [Serializable]
@@ -344,5 +455,13 @@ namespace Tester.AzureUtils.Migration.Units
     {
         public int Id { get; set; }
         public string? Message { get; set; } = default!;
+    }
+
+    [Serializable]
+    public class PrecisionEvent
+    {
+        public string? DateLikeString { get; set; }
+        public decimal HighPrecisionNumber { get; set; }
+        public double LargeNumber { get; set; }
     }
 }
