@@ -44,7 +44,12 @@ internal class FieldIdAssignmentHelper
 
     public bool TryGetSymbolKey(ISymbol symbol, out (uint, bool) key) => _symbols.TryGetValue(symbol, out key);
 
-    private bool HasMemberWithIdAnnotation() => Array.Exists(_memberSymbols, member => member.HasAttribute(_libraryTypes.IdAttributeType));
+    private bool HasMemberWithIdAnnotation() => Array.Exists(
+        _memberSymbols,
+        member => member.HasAttribute(_libraryTypes.IdAttributeType)
+            || member is IPropertySymbol property
+                && PropertyUtility.GetMatchingPrimaryConstructorParameter(property, _constructorParameters) is { } parameter
+                && parameter.HasAttribute(_libraryTypes.IdAttributeType));
 
     private bool HasCandidateSerializableMembers()
     {

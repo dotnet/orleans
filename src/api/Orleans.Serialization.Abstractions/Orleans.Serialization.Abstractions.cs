@@ -106,7 +106,7 @@ namespace Orleans
         TSurrogate ConvertToSurrogate(in TValue value);
     }
 
-    [System.AttributeUsage(System.AttributeTargets.Class | System.AttributeTargets.Struct | System.AttributeTargets.Enum | System.AttributeTargets.Method | System.AttributeTargets.Property | System.AttributeTargets.Field)]
+    [System.AttributeUsage(System.AttributeTargets.Class | System.AttributeTargets.Struct | System.AttributeTargets.Enum | System.AttributeTargets.Method | System.AttributeTargets.Property | System.AttributeTargets.Field | System.AttributeTargets.Parameter)]
     public sealed partial class IdAttribute : System.Attribute
     {
         public IdAttribute(uint id) { }
