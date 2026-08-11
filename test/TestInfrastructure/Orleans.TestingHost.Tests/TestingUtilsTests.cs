@@ -116,10 +116,10 @@ public class TestingUtilsTests
                 return Task.FromResult(false);
             },
             TimeSpan.FromSeconds(1),
-            TimeSpan.FromMilliseconds(200)));
+            TimeSpan.FromSeconds(1)));
 
         Assert.Equal("Expected legacy detailed failure", exception.Message);
-        Assert.True(calls > 1);
+        Assert.Equal(2, calls);
     }
 
     [Fact]
@@ -157,10 +157,10 @@ public class TestingUtilsTests
                 return Task.FromResult(false);
             },
             TimeSpan.FromSeconds(1),
-            TimeSpan.FromMilliseconds(200)));
+            TimeSpan.FromSeconds(1)));
 
         Assert.Equal("Expected detailed failure", exception.Message);
-        Assert.True(calls > 1);
+        Assert.Equal(2, calls);
     }
 
     [Fact]
