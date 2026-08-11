@@ -8,15 +8,16 @@ using Newtonsoft.Json;
 namespace Orleans.Transactions.AdoNet.Utils;
 internal static class JsonUtils
 {
-    public static byte[] SerializeWithNewtonsoftJson(object obj, JsonSerializerSettings jsonSettings)
+    public static byte[] SerializeWithNewtonsoftJson(object? value, JsonSerializerSettings jsonSettings)
     {
-        var json = JsonConvert.SerializeObject(obj,jsonSettings);
+        var json = JsonConvert.SerializeObject(value, jsonSettings);
         return Encoding.UTF8.GetBytes(json);
     }
 
-    public static T DeserializeWithNewtonsoftJson<T>(byte[] data)
+    public static T DeserializeWithNewtonsoftJson<T>(byte[] data, JsonSerializerSettings jsonSettings)
     {
         var json = Encoding.UTF8.GetString(data);
-        return JsonConvert.DeserializeObject<T>(json);
+        return JsonConvert.DeserializeObject<T>(json, jsonSettings)
+            ?? throw new JsonSerializationException($"Could not deserialize JSON as {typeof(T)}.");
     }
 }

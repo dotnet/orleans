@@ -73,6 +73,7 @@
     <Project Path="src/Orleans.Hosting.Kubernetes/Orleans.Hosting.Kubernetes.csproj" />
   </Folder>
   <Folder Name="/src/Extensions/AdoNet/">
+    <Project Path="src/AdoNet/Orleans.Transactions.AdoNet/Orleans.Transactions.AdoNet.csproj" />
     <Project Path="src/AdoNet/Orleans.Clustering.AdoNet/Orleans.Clustering.AdoNet.csproj" />
     <Project Path="src/AdoNet/Orleans.GrainDirectory.AdoNet/Orleans.GrainDirectory.AdoNet.csproj" />
     <Project Path="src/AdoNet/Orleans.Persistence.AdoNet/Orleans.Persistence.AdoNet.csproj" />
@@ -210,6 +211,7 @@
     <Project Path="test/TestInfrastructure/TestExtensions/TestExtensions.csproj" />
   </Folder>
   <Folder Name="/test/Transactions/">
+    <Project Path="test/Transactions/Orleans.Transactions.AdoNet.Tests/Orleans.Transactions.AdoNet.Tests.csproj" />
     <Project Path="test/Transactions/Orleans.Transactions.Azure.Test/Orleans.Transactions.Azure.Test.csproj" />
     <Project Path="test/Transactions/Orleans.Transactions.DynamoDB.Test/Orleans.Transactions.DynamoDB.Test.csproj" />
     <Project Path="test/Transactions/Orleans.Transactions.Tests/Orleans.Transactions.Tests.csproj" />
