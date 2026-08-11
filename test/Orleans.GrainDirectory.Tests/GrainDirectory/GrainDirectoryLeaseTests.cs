@@ -61,12 +61,12 @@ public class GrainDirectoryLeaseTests
             await directory.Unregister(fakeAddress);
 
             // The registration should block while the lease hold is active.
-            var registrationBlocked = WaitForRegistrationDelayedByLeaseAsync(events, primary.SiloAddress, leaseGrain.GetGrainId());
+            var retryDelayScheduled = WaitForLeaseRetryScheduledAsync(events, primary.SiloAddress, leaseGrain.GetGrainId());
             var registerTask = directory.Register(fakeAddress);
-            await registrationBlocked;
+            await retryDelayScheduled;
             Assert.False(registerTask.IsCompleted, "Registration should be blocked by the lease hold.");
 
-            // Advance time past the lease duration so the retry succeeds.
+            // The diagnostic event is emitted after the retry delay is armed, so advancing time cannot race timer creation.
             timeProvider.Advance(RangeLeaseDuration);
             var result = await registerTask.WaitAsync(EventTimeout);
             Assert.NotNull(result);
@@ -105,9 +105,9 @@ public class GrainDirectoryLeaseTests
             var fakeAddress = GrainAddress.NewActivationAddress(primary.SiloAddress, leaseGrain.GetGrainId());
             using var cancellation = new CancellationTokenSource();
 
-            var registrationBlocked = WaitForRegistrationDelayedByLeaseAsync(events, primary.SiloAddress, leaseGrain.GetGrainId());
+            var retryDelayScheduled = WaitForLeaseRetryScheduledAsync(events, primary.SiloAddress, leaseGrain.GetGrainId());
             var registerTask = grainLocator.Register(fakeAddress, null, cancellation.Token);
-            await registrationBlocked;
+            await retryDelayScheduled;
             cancellation.Cancel();
 
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => registerTask);
@@ -352,9 +352,9 @@ public class GrainDirectoryLeaseTests
             // All grains on the dead silo should be blocked by the lease hold.
             var blockedTasks = new[]
             {
-                WaitForRegistrationDelayedByLeaseAsync(events, primary.SiloAddress, grain1.GetGrainId()),
-                WaitForRegistrationDelayedByLeaseAsync(events, primary.SiloAddress, grain2.GetGrainId()),
-                WaitForRegistrationDelayedByLeaseAsync(events, primary.SiloAddress, grain3.GetGrainId())
+                WaitForLeaseRetryScheduledAsync(events, primary.SiloAddress, grain1.GetGrainId()),
+                WaitForLeaseRetryScheduledAsync(events, primary.SiloAddress, grain2.GetGrainId()),
+                WaitForLeaseRetryScheduledAsync(events, primary.SiloAddress, grain3.GetGrainId())
             };
 
             var task1 = directory.Register(GrainAddress.NewActivationAddress(primary.SiloAddress, grain1.GetGrainId()));
@@ -490,7 +490,7 @@ public class GrainDirectoryLeaseTests
         && created.ObserverSiloAddress.Equals(observerSiloAddress)
         && created.DeadSiloAddress.Equals(deadSiloAddress);
 
-    private static Task<DiagnosticEvent> WaitForRegistrationDelayedByLeaseAsync(
+    private static Task<DiagnosticEvent> WaitForLeaseRetryScheduledAsync(
         DiagnosticEventCollector events,
         SiloAddress observerSiloAddress,
         GrainId grainId) =>
