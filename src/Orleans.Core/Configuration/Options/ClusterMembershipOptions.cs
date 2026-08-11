@@ -149,7 +149,7 @@ namespace Orleans.Configuration
         /// </remarks>
         /// <value>Connection liveness checks are enabled by default.</value>
         public bool EnableConnectionLivenessCheck { get; set; } = true;
-        /// <summary>
+
         /// <summary>
         /// Gets or sets a value indicating whether to enable membership eviction of silos when they remain in the <c>Joining</c> or <c>Created</c> state for longer than <see cref="MaxJoinAttemptTime"/>.
         /// </summary>
