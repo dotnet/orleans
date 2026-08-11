@@ -69,7 +69,7 @@ namespace Tester.AzureUtils.TimerTests
             await Test_Reminders_UpdateReminder_DoesNotRestartLocalReminder();
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/9337"), TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();
