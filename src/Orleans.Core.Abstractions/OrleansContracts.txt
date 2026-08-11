@@ -20,10 +20,10 @@ interface Orleans.ISystemTarget [Version(0)]
 
 interface Orleans.Runtime.IAsyncEnumerableGrainExtension [Version(0)]
   DisposeAsync(System.Guid) -> ValueTask
-  MoveNext(System.Guid) -> ValueTask<(Orleans.Runtime.EnumerationResult, object?)>
-  MoveNext(System.Guid, System.Threading.CancellationToken) -> ValueTask<(Orleans.Runtime.EnumerationResult, object?)>
-  StartEnumeration(System.Guid, Orleans.Runtime.IAsyncEnumerableRequest<T>) -> ValueTask<(Orleans.Runtime.EnumerationResult, object?)>
-  StartEnumeration(System.Guid, Orleans.Runtime.IAsyncEnumerableRequest<T>, System.Threading.CancellationToken) -> ValueTask<(Orleans.Runtime.EnumerationResult, object?)>
+  MoveNext`1(System.Guid) -> ValueTask<(Orleans.Runtime.EnumerationResult, object?)>
+  MoveNext`1(System.Guid, System.Threading.CancellationToken) -> ValueTask<(Orleans.Runtime.EnumerationResult, object?)>
+  StartEnumeration`1(System.Guid, Orleans.Runtime.IAsyncEnumerableRequest<T>) -> ValueTask<(Orleans.Runtime.EnumerationResult, object?)>
+  StartEnumeration`1(System.Guid, Orleans.Runtime.IAsyncEnumerableRequest<T>, System.Threading.CancellationToken) -> ValueTask<(Orleans.Runtime.EnumerationResult, object?)>
 
 interface Orleans.Runtime.ICancellationSourcesExtension [Version(0)]
   CancelRemoteToken(System.Guid) -> Task

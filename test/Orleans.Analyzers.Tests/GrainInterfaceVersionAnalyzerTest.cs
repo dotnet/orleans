@@ -476,6 +476,46 @@ IMyGrain [Version(1)]
         Assert.DoesNotContain(diagnostics, d => d.Id == GrainInterfaceVersionAnalyzer.RuleId0018);
     }
 
+    [Fact]
+    public async Task GenericMethod_InFile_NoDiagnostic()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    Task<T> ReadStateAsync<T>(T value);
+}
+";
+        const string contractsFile = @"
+interface IMyGrain [Version(1)]
+  ReadStateAsync`1(T) -> Task<T>
+";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        Assert.DoesNotContain(diagnostics, d => d.Id == GrainInterfaceVersionAnalyzer.RuleId0018);
+    }
+
+    [Fact]
+    public async Task GenericMethodArityChanged_ReportsDiagnostic()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    Task<T1> ReadStateAsync<T1, T2>(T1 first, T2 second);
+}
+";
+        const string contractsFile = @"
+interface IMyGrain [Version(1)]
+  ReadStateAsync`1(T) -> Task<T>
+";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        Assert.Contains(diagnostics, d => d.Id == GrainInterfaceVersionAnalyzer.RuleId0018);
+    }
+
     #endregion
 
     #region ORLEANS0019 - Removed Interface Not Retired
@@ -1553,6 +1593,28 @@ public interface IMyGrain : IGrain
             GrainInterfaceVersionAnalyzer.RuleId0018);
 
         Assert.Equal("interface IMyGrain [Version(1)]\n  NewMethod() -> Task\n", content);
+    }
+
+    [Fact]
+    public async Task CodeFix_AddMember_IncludesGenericMethodArity()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    Task<T> ReadStateAsync<T>(T value);
+}
+";
+        const string contractsFile = "interface IMyGrain [Version(1)]";
+
+        var content = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            contractsFile,
+            GrainInterfaceVersionAnalyzer.RuleId0018);
+
+        Assert.Equal(
+            "interface IMyGrain [Version(1)]\n  ReadStateAsync`1(T) -> Task<T>\n",
+            content);
     }
 
     [Fact]

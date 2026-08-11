@@ -643,6 +643,11 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         var methodId = GetAttributeValue(method, Constants.IdAttributeFullyQualifiedName);
         var methodAlias = GetStringAttributeValue(method, Constants.AliasAttributeFullyQualifiedName);
         sb.Append(methodId ?? methodAlias ?? method.Name);
+        if (method.Arity > 0)
+        {
+            sb.Append('`');
+            sb.Append(method.Arity);
+        }
         sb.Append('(');
 
         for (int i = 0; i < method.Parameters.Length; i++)
@@ -664,6 +669,12 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         sb.Append(method.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", ""));
         sb.Append('.');
         sb.Append(method.Name);
+        if (method.Arity > 0)
+        {
+            sb.Append('<');
+            sb.Append(string.Join(", ", method.TypeParameters.Select(parameter => parameter.Name)));
+            sb.Append('>');
+        }
         sb.Append('(');
 
         for (var i = 0; i < method.Parameters.Length; i++)

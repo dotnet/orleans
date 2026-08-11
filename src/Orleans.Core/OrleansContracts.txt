@@ -16,7 +16,7 @@ interface Orleans.ISiloControl [Version(0)]
   GetSimpleGrainStatistics() -> Task<Orleans.Runtime.SimpleGrainStatistic[]>
   MigrateRandomActivations(Orleans.Runtime.SiloAddress, int) -> Task
   Ping(string) -> Task
-  SendControlCommandToProvider(string, int, object?) -> Task<object?>
+  SendControlCommandToProvider`1(string, int, object?) -> Task<object?>
 
 interface Orleans.Placement.Rebalancing.IActivationRebalancerMonitor [Version(0)]
   Report(RebalancingReport) -> Task
@@ -63,7 +63,7 @@ interface Orleans.Runtime.IManagementGrain [Version(0)]
   GetSimpleGrainStatistics(Orleans.Runtime.SiloAddress[]) -> Task<Orleans.Runtime.SimpleGrainStatistic[]>
   GetTotalActivationCount() -> Task<int>
   ResetGrainCallFrequencies(Orleans.Runtime.SiloAddress[]) -> ValueTask
-  SendControlCommandToProvider(string, int, object?) -> Task<object?[]>
+  SendControlCommandToProvider`1(string, int, object?) -> Task<object?[]>
 
 interface Orleans.Runtime.IMembershipService [Version(0)]
   MembershipChangeNotification(Orleans.Runtime.MembershipTableSnapshot) -> Task
@@ -71,6 +71,6 @@ interface Orleans.Runtime.IMembershipService [Version(0)]
   ProbeIndirectly(Orleans.Runtime.SiloAddress, System.TimeSpan, int) -> Task<Orleans.Runtime.IndirectProbeResponse>
 
 interface Orleans.Storage.IMemoryStorageGrain [Version(0)]
-  DeleteStateAsync(string, string?) -> Task
-  ReadStateAsync(string) -> Task<Orleans.IGrainState<T>>
-  WriteStateAsync(string, Orleans.IGrainState<T>) -> Task<string>
+  DeleteStateAsync`1(string, string?) -> Task
+  ReadStateAsync`1(string) -> Task<Orleans.IGrainState<T>>
+  WriteStateAsync`1(string, Orleans.IGrainState<T>) -> Task<string>
