@@ -6,6 +6,7 @@ using System.Linq;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Streaming;
 using Orleans.Streams;
 
 namespace Orleans.Providers
@@ -172,6 +173,10 @@ namespace Orleans.Providers
         {
             return new Cursor(cache, streamId, token);
         }
+
+        /// <inheritdoc />
+        public IQueueCacheCursor GetCacheCursorForCacheMiss(StreamId streamId)
+            => GetCacheCursor(streamId, OldestInStreamToken.Instance);
 
         /// <inheritdoc/>
         public bool IsUnderPressure()

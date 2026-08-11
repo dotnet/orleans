@@ -138,6 +138,10 @@ namespace Orleans.Streaming.EventHubs
         }
 
         /// <inheritdoc />
+        public object GetCursorForCacheMiss(StreamId streamId)
+            => cache.GetCursor(streamId, OldestInStreamToken.Instance);
+
+        /// <inheritdoc />
         public void Refresh(object cursor, StreamSequenceToken? sequenceToken)
         {
             cache.Refresh(cursor, sequenceToken);

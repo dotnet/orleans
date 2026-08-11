@@ -150,6 +150,14 @@ namespace Orleans.Providers.Streams.Common
             return cursor;
         }
 
+        /// <inheritdoc />
+        public virtual IQueueCacheCursor GetCacheCursorForCacheMiss(StreamId streamId)
+        {
+            var cursor = new SimpleQueueCacheCursor(this, streamId, logger);
+            InitializeCursor(cursor, OldestInStreamToken.Instance);
+            return cursor;
+        }
+
         internal void InitializeCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken? sequenceToken)
         {
             LogDebugInitializeCursor(cursor, sequenceToken);

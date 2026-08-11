@@ -449,6 +449,8 @@ namespace Orleans.Providers
 
         public Orleans.Streams.IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? token) { throw null; }
 
+        public Orleans.Streams.IQueueCacheCursor GetCacheCursorForCacheMiss(Runtime.StreamId streamId) { throw null; }
+
         public int GetMaxAddCount() { throw null; }
 
         public Orleans.Streams.StreamSequenceToken GetSequenceToken(ref Streams.Common.CachedMessage cachedMessage) { throw null; }
@@ -883,6 +885,8 @@ namespace Orleans.Providers.Streams.Common
 
         public virtual Orleans.Streams.IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? token) { throw null; }
 
+        public virtual Orleans.Streams.IQueueCacheCursor GetCacheCursorForCacheMiss(Runtime.StreamId streamId) { throw null; }
+
         public int GetMaxAddCount() { throw null; }
 
         public virtual bool IsUnderPressure() { throw null; }
@@ -1003,6 +1007,8 @@ namespace Orleans.Providers.Streams.Generator
         public Orleans.Streams.IBatchContainer GetBatchContainer(ref Common.CachedMessage cachedMessage) { throw null; }
 
         public Orleans.Streams.IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? token) { throw null; }
+
+        public Orleans.Streams.IQueueCacheCursor GetCacheCursorForCacheMiss(Runtime.StreamId streamId) { throw null; }
 
         public int GetMaxAddCount() { throw null; }
 
@@ -1664,6 +1670,7 @@ namespace Orleans.Streams
     {
         void AddToCache(System.Collections.Generic.IList<IBatchContainer> messages);
         IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, StreamSequenceToken? token);
+        IQueueCacheCursor GetCacheCursorForCacheMiss(Runtime.StreamId streamId);
         bool IsUnderPressure();
         bool TryPurgeFromCache(out System.Collections.Generic.IList<IBatchContainer> purgedItems);
         void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, System.DateTime utcNow);

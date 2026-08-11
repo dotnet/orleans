@@ -28,6 +28,25 @@ namespace UnitTests.OrleansRuntime.Streams
             public DateTime EnqueueTimeUtc = DateTime.UtcNow;
         }
 
+        private sealed class DefaultRecoveryQueueCache : IQueueCache
+        {
+            public StreamSequenceToken? RequestedToken { get; private set; }
+
+            public void AddToCache(IList<IBatchContainer> messages) => throw new NotSupportedException();
+
+            public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
+            {
+                RequestedToken = token;
+                return null!;
+            }
+
+            public int GetMaxAddCount() => throw new NotSupportedException();
+
+            public bool IsUnderPressure() => throw new NotSupportedException();
+
+            public bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems) => throw new NotSupportedException();
+        }
+
         [GenerateSerializer]
         public class TestBatchContainer : IBatchContainer
         {
@@ -740,13 +759,23 @@ namespace UnitTests.OrleansRuntime.Streams
             var newest = new TestBatchContainer { StreamId = streamId, SequenceToken = new EventSequenceTokenV2(2) };
             cache.AddToCache([oldest, newest]);
 
-            using var cursor = cache.GetCacheCursor(streamId, OldestInStreamToken.Instance);
+            using var cursor = cache.GetCacheCursorForCacheMiss(streamId);
 
             Assert.True(cursor.MoveNext());
             Assert.Same(oldest, cursor.GetCurrent(out _));
             Assert.True(cursor.MoveNext());
             Assert.Same(newest, cursor.GetCurrent(out _));
             Assert.False(cursor.MoveNext());
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void QueueCacheMissRecovery_DefaultsToNewestEntry()
+        {
+            IQueueCache cache = new DefaultRecoveryQueueCache();
+
+            _ = cache.GetCacheCursorForCacheMiss(default);
+
+            Assert.Null(((DefaultRecoveryQueueCache)cache).RequestedToken);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]

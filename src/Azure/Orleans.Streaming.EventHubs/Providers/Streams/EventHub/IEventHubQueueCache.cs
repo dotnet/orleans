@@ -29,6 +29,13 @@ namespace Orleans.Streaming.EventHubs
         object GetCursor(StreamId streamId, StreamSequenceToken? sequenceToken);
 
         /// <summary>
+        /// Gets a cursor used to resume delivery after a cache miss.
+        /// </summary>
+        /// <param name="streamId">The stream identifier.</param>
+        /// <returns>The cache cursor.</returns>
+        object GetCursorForCacheMiss(StreamId streamId) => GetCursor(streamId, null);
+
+        /// <summary>
         /// Refreshes an inactive cursor at the provided sequence token.
         /// </summary>
         /// <param name="cursor">The cursor to refresh.</param>

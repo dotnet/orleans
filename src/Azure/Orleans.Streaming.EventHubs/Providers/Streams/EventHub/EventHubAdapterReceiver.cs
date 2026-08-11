@@ -253,6 +253,9 @@ namespace Orleans.Streaming.EventHubs
             return new Cursor(this.cache!, streamId, token);
         }
 
+        public IQueueCacheCursor GetCacheCursorForCacheMiss(StreamId streamId)
+            => new Cursor(this.cache!, streamId);
+
         public bool IsUnderPressure()
         {
             return this.GetMaxAddCount() <= 0;
@@ -416,6 +419,12 @@ namespace Orleans.Streaming.EventHubs
             {
                 this.cache = cache;
                 this.cursor = cache.GetCursor(streamId, token);
+            }
+
+            public Cursor(IEventHubQueueCache cache, StreamId streamId)
+            {
+                this.cache = cache;
+                this.cursor = cache.GetCursorForCacheMiss(streamId);
             }
 
             public void Dispose()
