@@ -103,13 +103,13 @@ namespace Tester.AzureUtils.Streaming
                 new Dictionary<string, object> { { "source", "binary-test" } });
 
             this.output.WriteLine("Binary serialized message: {0}", msg);
-            
+
             Assert.False(IsValidJson(msg), "Binary adapter should not produce JSON");
             Assert.True(IsValidBase64String(msg), "Binary adapter should produce valid base64");
 
             var batchContainer = binaryAdapter.FromQueueMessage(msg, token.SequenceNumber);
             var deserializedEvent = batchContainer.GetEvents<EventData>().FirstOrDefault();
-            
+
             Assert.NotNull(deserializedEvent);
             Assert.Equal(data, deserializedEvent.Item1);
             Assert.Equal(streamId, batchContainer.StreamId);
@@ -133,10 +133,10 @@ namespace Tester.AzureUtils.Streaming
             Assert.True(IsValidBase64String(binaryMsg), "Should be valid base64 binary data");
 
             var jsonAdapter = InitializeQueueJsonDataAdapter();
-            
+
             var batchContainer = jsonAdapter.FromQueueMessage(binaryMsg, token.SequenceNumber);
             var deserializedEvent = batchContainer.GetEvents<EventData>().FirstOrDefault();
-            
+
             Assert.NotNull(deserializedEvent);
             Assert.Equal(data, deserializedEvent.Item1);
             Assert.Equal(streamId, batchContainer.StreamId);
@@ -189,10 +189,10 @@ namespace Tester.AzureUtils.Streaming
             Assert.True(IsValidJson(jsonMsg), "Should be valid JSON data");
 
             var binaryPreferredAdapter = InitializeQueueJsonDataAdapter(new AzureQueueJsonDataAdapterOptions { PreferJson = false });
-            
+
             var batchContainer = binaryPreferredAdapter.FromQueueMessage(jsonMsg, token.SequenceNumber);
             var deserializedEvent = batchContainer.GetEvents<EventData>().FirstOrDefault();
-            
+
             Assert.NotNull(deserializedEvent);
             Assert.Equal(data, deserializedEvent.Item1);
             Assert.Equal(streamId, batchContainer.StreamId);
@@ -212,7 +212,7 @@ namespace Tester.AzureUtils.Streaming
                 new Dictionary<string, object>());
 
             var jsonAdapterNoFallback = InitializeQueueJsonDataAdapter(new AzureQueueJsonDataAdapterOptions { EnableFallback = false });
-            
+
             Assert.ThrowsAny<Exception>(() => jsonAdapterNoFallback.FromQueueMessage(binaryMsg, token.SequenceNumber));
         }
 
@@ -248,7 +248,7 @@ namespace Tester.AzureUtils.Streaming
         {
             [Id(0)]
             public int Id { get; set; }
-            
+
             [Id(1)]
             public string Name { get; set; } = string.Empty;
 
