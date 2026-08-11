@@ -9,9 +9,6 @@
 
   <PropertyGroup>
     <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
-    <CollectCoverage>true</CollectCoverage>
-    <CoverletOutputFormat>cobertura</CoverletOutputFormat>
-    <Include>[Orleans.CodeGenerator]*</Include>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,10 +21,6 @@
 
   <ItemGroup>
     <!-- due to Verify.Xunit requiring newer versions of these libraries -->
-    <PackageReference Include="coverlet.msbuild">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
     <PackageReference Include="System.IO.Hashing" />
     <PackageReference Include="System.CodeDom" />
     <PackageReference Include="Verify.Xunit" />
