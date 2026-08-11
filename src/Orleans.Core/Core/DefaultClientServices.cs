@@ -235,11 +235,11 @@ namespace Orleans
             static Dictionary<(string Kind, string Name), Type> GetRegisteredProviders()
             {
                 var result = new Dictionary<(string, string), Type>();
-                var options = new Orleans.Serialization.Configuration.TypeManifestOptions();
 
                 // Collect providers from generated metadata
                 foreach (var asm in ReferencedAssemblyProvider.GetRelevantAssemblies())
                 {
+                    var options = new Orleans.Serialization.Configuration.TypeManifestOptions();
                     var attrs = asm.GetCustomAttributes<Orleans.Serialization.Configuration.TypeManifestProviderAttribute>();
                     foreach (var attr in attrs)
                     {
@@ -249,14 +249,25 @@ namespace Orleans
                             provider.Configure(options);
                         }
                     }
-                }
 
-                // Extract client providers from the collected metadata
-                foreach (var kvp in options.RegisteredProviders)
-                {
-                    if (string.Equals(kvp.Key.Target, "Client", StringComparison.Ordinal))
+                    foreach (var kvp in options.RegisteredProviders)
                     {
-                        result[(kvp.Key.Kind, kvp.Key.Name)] = kvp.Value;
+                        if (string.Equals(kvp.Key.Target, "Client", StringComparison.Ordinal))
+                        {
+                            result[(kvp.Key.Kind, kvp.Key.Name)] = kvp.Value;
+                        }
+                    }
+
+                    // Provider assemblies built with an older generator do not include provider metadata.
+                    if (options.RegisteredProviders.Count is 0 && asm.IsDefined(typeof(RegisterProviderAttribute)))
+                    {
+                        foreach (var attr in asm.GetCustomAttributes<RegisterProviderAttribute>())
+                        {
+                            if (string.Equals(attr.Target, "Client", StringComparison.Ordinal))
+                            {
+                                result[(attr.Kind, attr.Name)] = attr.Type;
+                            }
+                        }
                     }
                 }
 
