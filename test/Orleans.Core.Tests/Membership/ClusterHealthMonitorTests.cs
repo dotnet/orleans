@@ -1,11 +1,17 @@
 using System.Collections.Concurrent;
+using Microsoft.AspNetCore.Connections;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NonSilo.Tests.Utilities;
 using NSubstitute;
 using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
+using Orleans.Messaging;
+using Orleans.Placement.Repartitioning;
+using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
+using Orleans.Runtime.Messaging;
 using Orleans.TestingHost.Diagnostics;
 using TestExtensions;
 using Xunit;
@@ -34,6 +40,7 @@ namespace NonSilo.Tests.Membership
         private readonly ILocalSiloHealthMonitor localSiloHealthMonitor;
         private readonly InMemoryMembershipTable membershipTable;
         private readonly IRemoteSiloProber prober;
+        private readonly ConnectionManager connectionManager;
 
         public ClusterHealthMonitorTests(ITestOutputHelper output)
         {
@@ -70,6 +77,10 @@ namespace NonSilo.Tests.Membership
 
             this.prober = Substitute.For<IRemoteSiloProber>();
             this.membershipTable = new InMemoryMembershipTable(new TableVersion(1, "1"));
+            this.connectionManager = new ConnectionManager(
+                Options.Create(new ConnectionOptions()),
+                null!,
+                this.loggerFactory.CreateLogger<ConnectionManager>());
         }
 
         /// <summary>
@@ -202,6 +213,159 @@ namespace NonSilo.Tests.Membership
         public async Task ClusterHealthMonitor_SilosWithStaleCreatedOrJoiningState_Disabled()
         {
             await ClusterHealthMonitor_StaleJoinOrCreatedSilos_Runner(evictWhenMaxJoinAttemptTimeExceeded: false, numVotesForDeathDeclaration: 3);
+        }
+
+        /// <summary>
+        /// Tests that when an active connection has recently received messages from the target silo,
+        /// the vote to suspect/kill is suppressed even though probes are failing.
+        /// </summary>
+        [Fact]
+        public async Task ClusterHealthMonitor_ConnectionCanary_SuppressesVoteWhenConnectionActive()
+        {
+            var now = DateTimeOffset.UtcNow;
+            var clusterMembershipOptions = new ClusterMembershipOptions
+            {
+                EnableIndirectProbes = false,
+                NumProbedSilos = 1,
+                NumVotesForDeathDeclaration = 1,
+            };
+
+            var canaryConnectionManager = new ConnectionManager(
+                Options.Create(new ConnectionOptions()),
+                null!,
+                this.loggerFactory.CreateLogger<ConnectionManager>());
+
+            var testRig = CreateClusterHealthMonitorTestRig(clusterMembershipOptions, canaryConnectionManager);
+
+            // Set up probes to always fail.
+            var probeCalls = new ConcurrentQueue<SiloAddress>();
+            this.prober.Probe(default!, default).ReturnsForAnyArgs(info =>
+            {
+                probeCalls.Enqueue(info.ArgAt<SiloAddress>(0));
+                return Task.FromException(new Exception("probe failed"));
+            });
+
+            await this.lifecycle.OnStart();
+
+            var targetSilo = Silo("127.0.0.200:100@100");
+            await this.membershipTable.InsertRow(Entry(targetSilo, SiloStatus.Active, now), this.membershipTable.Version.Next());
+            await testRig.Manager.Refresh();
+            await testRig.Manager.UpdateStatus(SiloStatus.Active);
+            await testRig.Manager.Refresh();
+
+            await Until(() => testRig.TestAccessor.MonitoredSilos.Count > 0);
+
+            // Register a test connection and simulate recent message activity.
+            var testConnection = CreateTestConnection(this.loggerFactory);
+            canaryConnectionManager.OnConnected(targetSilo, testConnection);
+            testConnection.SimulateMessageReceived();
+
+            // Drive enough probe failures to normally trigger a vote.
+            for (var i = 0; i < clusterMembershipOptions.NumMissedProbesLimit + 1; i++)
+            {
+                if (this.timerCalls.TryDequeue(out var timer))
+                {
+                    timer.Completion.TrySetResult(true);
+                }
+
+                // Keep re-stamping the canary so it stays fresh.
+                testConnection.SimulateMessageReceived();
+                await Task.Delay(50);
+            }
+
+            await Until(() => probeCalls.Count >= clusterMembershipOptions.NumMissedProbesLimit);
+            await Task.Delay(100);
+
+            // The silo should NOT be dead because the canary detected active connection traffic.
+            var table = await this.membershipTable.ReadAll();
+            var entry = table.Members.SingleOrDefault(m => m.Item1.SiloAddress.Equals(targetSilo));
+            Assert.NotNull(entry);
+            Assert.NotEqual(SiloStatus.Dead, entry.Item1.Status);
+
+            await StopLifecycle();
+        }
+
+        /// <summary>
+        /// Tests that when no connections exist to a target silo, the canary does not interfere
+        /// and the silo is declared dead normally after probe failures.
+        /// </summary>
+        [Fact]
+        public async Task ClusterHealthMonitor_ConnectionCanary_AllowsVoteWhenNoConnection()
+        {
+            // With no connections in the connection manager, canary returns null -> vote proceeds.
+            await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: false, numVotesForDeathDeclaration: 1);
+        }
+
+        /// <summary>
+        /// Tests that when <see cref="ClusterMembershipOptions.EnableConnectionLivenessCheck"/> is disabled,
+        /// votes proceed normally even when an active connection exists.
+        /// </summary>
+        [Fact]
+        public async Task ClusterHealthMonitor_ConnectionCanary_DisabledByOption()
+        {
+            var now = DateTimeOffset.UtcNow;
+            var clusterMembershipOptions = new ClusterMembershipOptions
+            {
+                EnableIndirectProbes = false,
+                NumProbedSilos = 1,
+                NumVotesForDeathDeclaration = 1,
+                EnableConnectionLivenessCheck = false,
+            };
+
+            var canaryConnectionManager = new ConnectionManager(
+                Options.Create(new ConnectionOptions()),
+                null!,
+                this.loggerFactory.CreateLogger<ConnectionManager>());
+
+            var testRig = CreateClusterHealthMonitorTestRig(clusterMembershipOptions, canaryConnectionManager);
+
+            var probeCalls = new ConcurrentQueue<SiloAddress>();
+            this.prober.Probe(default!, default).ReturnsForAnyArgs(info =>
+            {
+                probeCalls.Enqueue(info.ArgAt<SiloAddress>(0));
+                return Task.FromException(new Exception("probe failed"));
+            });
+
+            await this.lifecycle.OnStart();
+
+            var targetSilo = Silo("127.0.0.200:100@100");
+            await this.membershipTable.InsertRow(Entry(targetSilo, SiloStatus.Active, now), this.membershipTable.Version.Next());
+            await testRig.Manager.Refresh();
+            await testRig.Manager.UpdateStatus(SiloStatus.Active);
+            await testRig.Manager.Refresh();
+
+            await Until(() => testRig.TestAccessor.MonitoredSilos.Count > 0);
+
+            // Register a test connection and simulate recent message activity.
+            var testConnection = CreateTestConnection(this.loggerFactory);
+            canaryConnectionManager.OnConnected(targetSilo, testConnection);
+            testConnection.SimulateMessageReceived();
+
+            // Drive enough probe failures to trigger a vote.
+            for (var i = 0; i < clusterMembershipOptions.NumMissedProbesLimit + 1; i++)
+            {
+                if (this.timerCalls.TryDequeue(out var timer))
+                {
+                    timer.Completion.TrySetResult(true);
+                }
+
+                testConnection.SimulateMessageReceived();
+                await Task.Delay(50);
+            }
+
+            await Until(async () =>
+            {
+                var snapshot = await this.membershipTable.ReadAll();
+                return snapshot.Members.Any(m => m.Item1.SiloAddress.Equals(targetSilo) && m.Item1.Status == SiloStatus.Dead);
+            });
+
+            // Despite an active connection, the silo SHOULD be dead because the option is disabled.
+            var table = await this.membershipTable.ReadAll();
+            var entry = table.Members.SingleOrDefault(m => m.Item1.SiloAddress.Equals(targetSilo));
+            Assert.NotNull(entry);
+            Assert.Equal(SiloStatus.Dead, entry.Item1.Status);
+
+            await StopLifecycle();
         }
 
         private async Task ClusterHealthMonitor_BasicScenario_Runner(bool enableIndirectProbes, int? numVotesForDeathDeclaration = default, bool otherSilosAreStale = false)
@@ -622,6 +786,13 @@ namespace NonSilo.Tests.Membership
             Assert.True(maxTimeout > 0);
         }
 
+        private static async Task Until(Func<Task<bool>> condition)
+        {
+            var maxTimeout = 40_000;
+            while (!await condition() && (maxTimeout -= 10) > 0) await Task.Delay(10);
+            Assert.True(maxTimeout > 0);
+        }
+
         private static async Task<MembershipTableSnapshot> WaitForMembershipSnapshot(DiagnosticEventCollector membershipEvents, Func<MembershipTableSnapshot, bool> condition)
         {
             var diagnosticEvent = await membershipEvents.WaitForEventAsync(
@@ -657,6 +828,11 @@ namespace NonSilo.Tests.Membership
 
         private ClusterHealthMonitorTestRig CreateClusterHealthMonitorTestRig(ClusterMembershipOptions clusterMembershipOptions)
         {
+            return CreateClusterHealthMonitorTestRig(clusterMembershipOptions, this.connectionManager);
+        }
+
+        private ClusterHealthMonitorTestRig CreateClusterHealthMonitorTestRig(ClusterMembershipOptions clusterMembershipOptions, ConnectionManager connManager)
+        {
             var manager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
                 clusterMembershipOptions: Options.Create(clusterMembershipOptions),
@@ -679,7 +855,8 @@ namespace NonSilo.Tests.Membership
                 this.loggerFactory.CreateLogger<ClusterHealthMonitor>(),
                 optionsMonitor,
                 this.fatalErrorHandler,
-                null!);
+                null!,
+                connManager);
 
             ((ILifecycleParticipant<ISiloLifecycle>)monitor).Participate(this.lifecycle);
 
@@ -700,6 +877,52 @@ namespace NonSilo.Tests.Membership
                 manager: manager,
                 optionsMonitor: optionsMonitor,
                 testAccessor: testAccessor);
+        }
+
+        /// <summary>
+        /// Creates a minimal test <see cref="Connection"/> suitable for registering with <see cref="ConnectionManager"/>.
+        /// </summary>
+        private TestConnection CreateTestConnection(ILoggerFactory loggerFactory)
+        {
+            var features = new Microsoft.AspNetCore.Http.Features.FeatureCollection();
+            var context = Substitute.For<ConnectionContext>();
+            context.Features.Returns(features);
+            ConnectionDelegate middleware = _ => Task.CompletedTask;
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<MessagingInstruments>();
+            services.AddSingleton<MessagingProcessingInstruments>();
+            var serviceProvider = services.BuildServiceProvider();
+            var orleansInstruments = serviceProvider.GetRequiredService<OrleansInstruments>();
+            var messagingInstruments = serviceProvider.GetRequiredService<MessagingInstruments>();
+            var messagingTrace = new MessagingTrace(
+                loggerFactory,
+                messagingInstruments,
+                serviceProvider.GetRequiredService<MessagingProcessingInstruments>());
+            var shared = new ConnectionCommon(
+                serviceProvider,
+                null!,
+                messagingTrace,
+                orleansInstruments,
+                messagingInstruments,
+                loggerFactory.CreateLogger<Connection>(),
+                new NoOpMessageStatisticsSink());
+            return new TestConnection(context, middleware, shared);
+        }
+
+        private sealed class TestConnection(ConnectionContext context, ConnectionDelegate middleware, ConnectionCommon shared)
+            : Connection(context, middleware, shared)
+        {
+            protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
+            protected override IMessageCenter MessageCenter => null!;
+            protected override bool PrepareMessageForSend(Message msg) => true;
+            protected override void OnReceivedMessage(Message msg) { }
+            protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes) { }
+            protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes) { }
+            protected override void OnSendMessageFailure(Message message, string error) { }
+            protected override void RetryMessage(Message msg, Exception? ex = null) { }
+            public void SimulateMessageReceived() => MarkMessageReceived();
         }
     }
 }
