@@ -867,6 +867,12 @@ namespace Orleans.Runtime.GrainDirectory
                 }
             }
 
+            if (forwardAddress is not null && !IsValidSilo(forwardAddress))
+            {
+                await RefreshMembershipIfNewer(clusterMembershipService.CurrentSnapshot.Version);
+                forwardAddress = this.CheckIfShouldForward(grainId, hopCount, "LookUpAsync");
+            }
+
             if (forwardAddress == null)
             {
                 // we are the owner
