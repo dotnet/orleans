@@ -3,6 +3,7 @@ using Xunit;
 
 namespace UnitTests
 {
+    [TestCategory("BVT")]
     public class TypeFormatterTests
     {
         [Fact]

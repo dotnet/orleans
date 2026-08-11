@@ -149,7 +149,7 @@ namespace Orleans.TestingHost.Utils
             using var deadlineCancellation = new CancellationTokenSource(timeout);
             using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadlineCancellation.Token);
             var finalAttempt = false;
-            var lastAttemptDuration = TimeSpan.Zero;
+            var finalAttemptWindow = retryDelay > TimeSpan.Zero ? retryDelay : TimeSpan.FromMilliseconds(10);
 
             while (Stopwatch.GetElapsedTime(startedAt) < timeout)
             {
@@ -159,7 +159,6 @@ namespace Orleans.TestingHost.Utils
                 }
 
                 bool succeeded;
-                var attemptStartedAt = Stopwatch.GetTimestamp();
                 try
                 {
                     succeeded = await predicate(finalAttempt, linkedCancellation.Token);
@@ -169,7 +168,6 @@ namespace Orleans.TestingHost.Utils
                     return false;
                 }
 
-                lastAttemptDuration = Stopwatch.GetElapsedTime(attemptStartedAt);
                 cancellationToken.ThrowIfCancellationRequested();
                 var elapsed = Stopwatch.GetElapsedTime(startedAt);
                 if (elapsed >= timeout)
@@ -197,33 +195,22 @@ namespace Orleans.TestingHost.Utils
                     continue;
                 }
 
-                var finalAttemptWindow = retryDelay > TimeSpan.Zero ? retryDelay : TimeSpan.FromMilliseconds(10);
                 if (invokeFinalAttempt && remaining <= finalAttemptWindow)
                 {
-                    var minimumBudget = TimeSpan.FromMilliseconds(100);
-                    var finalAttemptBudget = lastAttemptDuration > minimumBudget
-                        ? lastAttemptDuration.Ticks >= remaining.Ticks / 2
-                            ? remaining
-                            : TimeSpan.FromTicks(lastAttemptDuration.Ticks * 2)
-                        : minimumBudget;
-                    var delayBeforeFinalAttempt = remaining - finalAttemptBudget;
-                    if (delayBeforeFinalAttempt > TimeSpan.Zero)
-                    {
-                        try
-                        {
-                            await Task.Delay(delayBeforeFinalAttempt, linkedCancellation.Token);
-                        }
-                        catch (OperationCanceledException) when (deadlineCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
-                        {
-                            return false;
-                        }
-                    }
-
                     finalAttempt = true;
                     continue;
                 }
 
                 var delay = retryDelay < remaining ? retryDelay : remaining;
+                if (invokeFinalAttempt)
+                {
+                    var delayUntilFinalAttempt = remaining - finalAttemptWindow;
+                    if (delayUntilFinalAttempt < delay)
+                    {
+                        delay = delayUntilFinalAttempt;
+                    }
+                }
+
                 try
                 {
                     await Task.Delay(delay, linkedCancellation.Token);

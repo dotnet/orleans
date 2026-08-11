@@ -3,6 +3,7 @@ using TestExtensions;
 
 namespace Orleans.Clustering.Firestore.Tests;
 
+[TestCategory("BVT")]
 public class SiloInstanceEntityTests
 {
     public static TheoryData<SiloStatus> SiloStatuses => new(Enum.GetValues<SiloStatus>());

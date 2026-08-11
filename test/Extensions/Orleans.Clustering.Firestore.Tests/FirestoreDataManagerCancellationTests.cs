@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Orleans.Clustering.Firestore.Tests;
 
+[TestCategory("BVT")]
 public class FirestoreDataManagerCancellationTests
 {
     [Fact]

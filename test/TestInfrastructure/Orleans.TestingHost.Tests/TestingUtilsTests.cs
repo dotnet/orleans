@@ -3,6 +3,7 @@ using Xunit;
 
 namespace Orleans.TestingHost.Tests;
 
+[TestCategory("BVT")]
 public class TestingUtilsTests
 {
     [Fact]

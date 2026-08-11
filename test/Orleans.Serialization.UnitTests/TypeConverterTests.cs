@@ -11,6 +11,7 @@ using Xunit;
 
 namespace Orleans.Serialization.UnitTests
 {
+    [Trait("Category", "BVT")]
     public class TypeConverterTests
     {
         [Fact]

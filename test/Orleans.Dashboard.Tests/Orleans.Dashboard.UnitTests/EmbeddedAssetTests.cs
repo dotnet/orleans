@@ -8,6 +8,7 @@ using Xunit;
 
 namespace UnitTests
 {
+    [TestCategory("BVT")]
     public class EmbeddedAssetTests
     {
         private static readonly Assembly DashboardAssembly = typeof(DashboardOptions).Assembly;
@@ -168,19 +169,16 @@ namespace UnitTests
         {
             var provider = new EmbeddedAssetProvider();
             var httpContext = new DefaultHttpContext();
-            var assembly = typeof(EmbeddedAssetProvider).GetTypeInfo().Assembly;
-            var fontResourceName = assembly
+            var fontResourceName = DashboardAssembly
                 .GetManifestResourceNames()
                 .FirstOrDefault(name =>
-                    name.EndsWith(".woff2", StringComparison.Ordinal) ||
-                    name.EndsWith(".woff", StringComparison.Ordinal));
+                    name.StartsWith(ResourcePrefix, StringComparison.Ordinal) &&
+                    (name.EndsWith(".woff2", StringComparison.Ordinal) ||
+                     name.EndsWith(".woff", StringComparison.Ordinal)));
 
             Assert.NotNull(fontResourceName);
 
-            var resourcePrefix = typeof(EmbeddedAssetProvider).Namespace + ".";
-            var assetName = fontResourceName.StartsWith(resourcePrefix, StringComparison.Ordinal)
-                ? fontResourceName.Substring(resourcePrefix.Length)
-                : fontResourceName;
+            var assetName = fontResourceName.Substring(ResourcePrefix.Length);
 
             var result = provider.ServeAsset(assetName, httpContext);
             Assert.IsNotType<NotFound>(result);
