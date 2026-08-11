@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Orleans.Configuration;
 using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
@@ -125,19 +126,48 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
     {
         var grain = fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
         var callIds = Enumerable.Range(0, 5).Select(_ => Guid.NewGuid()).ToArray();
-        var grainTasks = callIds
-            .Select(async callId =>
-            {
-                using var cts = new CancellationTokenSource();
-                var task = grain.LongWaitInterleaving(cts.Token, TimeSpan.FromSeconds(10), callId);
-                cts.CancelAfter(delay);
-                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
-            })
-            .ToList();
-        await Task.WhenAll(grainTasks);
-        if (delay > 0)
+        var cancellationSources = callIds.Select(_ => new CancellationTokenSource()).ToArray();
+        var observer = new LongRunningTaskObserver();
+        var observerReference = fixture.GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
+        try
         {
-            await WaitForCallCancellation(grain, callIds);
+            var grainTasks = callIds
+                .Select((callId, index) => delay > 0
+                    ? grain.LongWaitInterleavingWithStartNotification(
+                        TimeSpan.FromSeconds(10),
+                        callId,
+                        observerReference,
+                        cancellationSources[index].Token)
+                    : grain.LongWaitInterleaving(
+                        cancellationSources[index].Token,
+                        TimeSpan.FromSeconds(10),
+                        callId))
+                .ToArray();
+            if (delay > 0)
+            {
+                await Task.WhenAll(callIds.Select(observer.WaitForCallToStart));
+            }
+
+            foreach (var cancellationSource in cancellationSources)
+            {
+                cancellationSource.CancelAfter(delay);
+            }
+
+            await Task.WhenAll(grainTasks.Select(task =>
+                Assert.ThrowsAnyAsync<OperationCanceledException>(() => task)));
+            if (delay > 0)
+            {
+                await WaitForCallCancellation(grain, callIds);
+            }
+        }
+        finally
+        {
+            foreach (var cancellationSource in cancellationSources)
+            {
+                cancellationSource.Dispose();
+            }
+
+            fixture.GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
         }
     }
 
@@ -370,15 +400,14 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
 
     private sealed class LongRunningTaskObserver : ILongRunningTaskObserver
     {
-        private readonly TaskCompletionSource<Guid> _callStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _startedCalls = new();
 
-        public void OnCallStarted(Guid callId) => _callStarted.TrySetResult(callId);
+        public void OnCallStarted(Guid callId) => GetCallStarted(callId).TrySetResult();
 
-        public async Task WaitForCallToStart(Guid expectedCallId)
-        {
-            var callId = await _callStarted.Task.WaitAsync(TimeSpan.FromSeconds(30));
-            Assert.Equal(expectedCallId, callId);
-        }
+        public Task WaitForCallToStart(Guid callId) => GetCallStarted(callId).Task.WaitAsync(TimeSpan.FromSeconds(30));
+
+        private TaskCompletionSource GetCallStarted(Guid callId) =>
+            _startedCalls.GetOrAdd(callId, static _ => new(TaskCreationOptions.RunContinuationsAsynchronously));
     }
 
     /// <summary>
