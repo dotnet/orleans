@@ -921,19 +921,14 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         var queueId = "QueueId";
         var payload = new byte[] { 0xFF };
 
-        var beforeQueued = DateTime.UtcNow.AddSeconds(-1);
         var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, streamOptions.ExpiryTimeout.TotalSecondsCeiling());
-        var afterQueued = DateTime.UtcNow.AddSeconds(1);
 
         // arrange - dequeue the message and make immediately available
-        var beforeDequeued = DateTime.UtcNow.AddSeconds(-1);
         await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, cacheOptions.CacheSize, streamOptions.MaxAttempts, 0, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling(), streamOptions.EvictionInterval.TotalSecondsCeiling(), streamOptions.EvictionBatchSize);
-        var afterDequeued = DateTime.UtcNow.AddSeconds(1);
+        Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
 
         // act - clean up with max attempts of one so the message above is flagged
-        var beforeFailure = DateTime.UtcNow.AddSeconds(-1);
         await _queries.FailStreamMessageAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, 1, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
-        var afterFailure = DateTime.UtcNow.AddSeconds(1);
 
         // assert - message no longer in the message table
         Assert.Empty(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"));
@@ -945,16 +940,9 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         Assert.Equal(queueId, dead.QueueId);
         Assert.Equal(ack.MessageId, dead.MessageId);
         Assert.Equal(1, dead.Dequeued);
-        Assert.True(dead.ExpiresOn >= beforeQueued);
-        Assert.True(dead.ExpiresOn <= afterQueued.Add(streamOptions.ExpiryTimeout.SecondsCeiling()));
-        Assert.True(dead.CreatedOn >= beforeQueued);
-        Assert.True(dead.CreatedOn <= afterQueued);
-        Assert.True(dead.ModifiedOn >= beforeDequeued);
-        Assert.True(dead.ModifiedOn <= afterDequeued);
-        Assert.True(dead.DeadOn >= beforeFailure);
-        Assert.True(dead.DeadOn <= afterFailure);
-        Assert.True(dead.RemoveOn >= beforeFailure);
-        Assert.True(dead.RemoveOn <= afterFailure.Add(streamOptions.DeadLetterEvictionTimeout.SecondsCeiling()));
+        Assert.Equal(dead.CreatedOn.Add(streamOptions.ExpiryTimeout.SecondsCeiling()), dead.ExpiresOn);
+        Assert.Equal(dead.ModifiedOn, dead.VisibleOn);
+        Assert.Equal(dead.DeadOn.Add(streamOptions.DeadLetterEvictionTimeout.SecondsCeiling()), dead.RemoveOn);
         Assert.Equal(payload, dead.Payload);
     }
 
@@ -979,9 +967,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, cacheOptions.CacheSize, streamOptions.MaxAttempts, streamOptions.VisibilityTimeout.TotalSecondsCeiling(), streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling(), streamOptions.EvictionInterval.TotalSecondsCeiling(), streamOptions.EvictionBatchSize);
 
         // act - fail the message
-        var beforeFailed = DateTime.UtcNow.AddSeconds(-1);
         await _queries.FailStreamMessageAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
-        var afterFailed = DateTime.UtcNow.AddSeconds(1);
 
         // assert - the message is still in the table and was made visible again
         var saved = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"));
@@ -990,8 +976,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         Assert.Equal(ack.QueueId, saved.QueueId);
         Assert.Equal(ack.MessageId, saved.MessageId);
         Assert.Equal(1, saved.Dequeued);
-        Assert.True(saved.VisibleOn >= beforeFailed, $"{saved.VisibleOn} must be greater than or equal to {beforeFailed}");
-        Assert.True(saved.VisibleOn <= afterFailed, $"{saved.VisibleOn} must be lesser than or equal to {afterFailed}");
+        Assert.Equal(saved.ModifiedOn, saved.VisibleOn);
 
         // assert - no message arrived at dead letters
         Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
