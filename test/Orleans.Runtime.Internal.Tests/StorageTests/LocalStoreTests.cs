@@ -22,6 +22,9 @@ namespace UnitTests.StorageTests
     /// <summary>
     /// Tests for local data store operations including read, write, and delete functionality.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class LocalStoreTests
     {

@@ -14,6 +14,9 @@ namespace Tester.AdoNet.Persistence
     /// Tests for Orleans grain state persistence functionality using PostgreSQL as the storage provider.
     /// </summary>
     [TestCategory("Persistence"), TestCategory("PostgreSql")]
+    [TestSuite("Functional")]
+    [TestProvider("PostgreSql")]
+    [TestArea("Persistence")]
     public class PersistenceGrainTests_Postgres : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_Postgres.Fixture>
     {
         public const string TestDatabaseName = "OrleansTest_Postgres_Storage";

@@ -8,6 +8,9 @@ namespace Orleans.Transactions.AzureStorage.Tests
     /// Tests for transaction consistency with skewed clock scenarios using Azure Storage.
     /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Transactions-dev")]
+    [TestSuite("Nightly")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Transactions")]
     public class ConsistencySkewedClockTests : ConsistencyTransactionTestRunnerxUnit, IClassFixture<SkewedClockTestFixture>
     {
         public ConsistencySkewedClockTests(SkewedClockTestFixture fixture, ITestOutputHelper output)

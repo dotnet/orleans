@@ -12,6 +12,9 @@ namespace Tester.StreamingTests
     /// <summary>
     /// Tests for memory stream provider behavior with batched messages when clients are dropped from the cluster.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class MemoryStreamProviderBatchedClientTests : OrleansTestingBase, IClassFixture<MemoryStreamProviderBatchedClientTests.Fixture>
     {
         public class Fixture : BaseTestClusterFixture

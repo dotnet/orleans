@@ -10,6 +10,9 @@ using Orleans.Runtime;
 namespace Tester.Cosmos.Persistence;
 
 [TestCategory("Cosmos"), TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("Cosmos")]
+[TestArea("Persistence")]
 public class CosmosHostingExtensionsTests
 {
     [Fact]

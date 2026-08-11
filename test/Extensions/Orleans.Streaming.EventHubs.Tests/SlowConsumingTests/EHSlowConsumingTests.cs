@@ -16,6 +16,9 @@ namespace ServiceBus.Tests.SlowConsumingTests
     /// Tests for EventHub slow consumer detection and back pressure algorithm behavior.
     /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming")]
+    [TestSuite("Functional")]
+    [TestProvider("EventHub")]
+    [TestArea("Streaming")]
     public class EHSlowConsumingTests : OrleansTestingBase, IClassFixture<EHSlowConsumingTests.Fixture>
     {
         private const string StreamProviderName = "EventHubStreamProvider";

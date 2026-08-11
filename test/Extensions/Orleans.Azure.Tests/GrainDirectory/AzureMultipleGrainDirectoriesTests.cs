@@ -9,6 +9,9 @@ namespace Tester.Directories
     /// Tests for custom grain directory functionality using Azure Table Storage as the directory backend.
     /// </summary>
     [TestCategory("AzureStorage")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Membership")]
     public class AzureMultipleGrainDirectoriesTests : MultipleGrainDirectoriesTests
     {
         public class SiloConfigurator : ISiloConfigurator

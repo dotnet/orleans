@@ -6,6 +6,9 @@ using Xunit;
 namespace Orleans.Serialization.UnitTests.Buffers;
 
 [Trait("Category", "BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Serialization")]
 public sealed class ArcBufferWriterSerializationTests
 {
     [Fact]

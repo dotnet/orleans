@@ -10,6 +10,8 @@ using Xunit;
 
 namespace UnitTests.ActivationRepartitioningTests;
 
+[TestSuite("Functional")]
+[TestProvider("None")]
 [TestCategory("Functional"), TestCategory("ActivationRepartitioning")]
 public class ActivationRepartitionerMigrationTests(ActivationRepartitionerMigrationTests.Fixture fixture) : IClassFixture<ActivationRepartitionerMigrationTests.Fixture>
 {

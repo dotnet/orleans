@@ -10,6 +10,9 @@ namespace UnitTests.Serialization
     /// Summary description for SerializationTests
     /// </summary>
     [Collection(TestEnvironmentFixture.DefaultCollection)]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Serialization")]
     public class SerializationTestsDifferentTypes
     {
         private readonly TestEnvironmentFixture fixture;

@@ -4,6 +4,8 @@ using Xunit;
 
 namespace UnitTests.Directory;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT"), TestCategory("Directory")]
 public class IGrainDirectoryTests
 {

@@ -17,6 +17,8 @@ namespace UnitTests.Diagnostics;
 
 public class DiagnosticInfrastructureRegressionTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task DiagnosticEventCollector_PredicateTimeout_DoesNotBlockSubsequentWaits()
     {
@@ -43,6 +45,8 @@ public class DiagnosticInfrastructureRegressionTests
         Assert.Equal(2, Assert.IsType<int>(result.Payload));
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task GrainDiagnosticObserver_WaitForAnyGrainDeactivatedAsync_TimesOut()
     {
@@ -51,6 +55,8 @@ public class DiagnosticInfrastructureRegressionTests
         await Assert.ThrowsAsync<TimeoutException>(() => observer.WaitForAnyGrainDeactivatedAsync(_ => false, TimeSpan.FromMilliseconds(100)));
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task GrainDiagnosticObserver_WaitAfterTimeout_CanObserveLaterEvent()
     {
@@ -68,6 +74,8 @@ public class DiagnosticInfrastructureRegressionTests
         Assert.Same(grainContext, created.GrainContext);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task RebalancerDiagnosticObserver_WaitForCycleAsync_ReturnsNewEvent()
     {
@@ -87,6 +95,8 @@ public class DiagnosticInfrastructureRegressionTests
         Assert.Equal(2, result.ActivationsMigrated);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task RebalancerDiagnosticObserver_WaitForSessionStopAsync_ReturnsNewEvent()
     {
@@ -106,6 +116,8 @@ public class DiagnosticInfrastructureRegressionTests
         Assert.Equal(2, result.TotalCycles);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task RebalancerDiagnosticObserver_WaitAfterTimeout_CanObserveLaterEvent()
     {
@@ -128,6 +140,8 @@ public class DiagnosticInfrastructureRegressionTests
         Assert.Equal("latest", result.Reason);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task RebalancerDiagnosticObserver_Dispose_CompletesOutstandingWaiters()
     {
@@ -140,6 +154,8 @@ public class DiagnosticInfrastructureRegressionTests
         await Assert.ThrowsAsync<ObjectDisposedException>(() => waitTask);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void InMemoryLoggerProvider_FormatsStoredThreadId()
     {

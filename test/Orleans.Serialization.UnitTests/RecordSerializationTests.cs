@@ -29,6 +29,9 @@ namespace Orleans.Serialization.UnitTests;
 /// - Clean API contracts
 /// </summary>
 [Trait("Category", "BVT")]
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class RecordSerializationTests
 {
     private readonly ServiceProvider _services;

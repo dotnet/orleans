@@ -12,6 +12,9 @@ namespace ServiceBus.Tests.Streaming
     /// Tests for EventHub streaming resume functionality with configurable cache eviction and stream inactivity settings.
     /// </summary>
     [TestCategory("Functional"), TestCategory("Streaming"), TestCategory("StreamingResume")]
+    [TestSuite("Functional")]
+    [TestProvider("EventHub")]
+    [TestArea("Streaming")]
     public class EHStreamingResumeTests : StreamingResumeTests
     {
         private const string EHPath = "ehorleanstest";

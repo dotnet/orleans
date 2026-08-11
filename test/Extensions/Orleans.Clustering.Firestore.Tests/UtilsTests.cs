@@ -4,6 +4,9 @@ using FirestoreUtils = Orleans.Clustering.Firestore.Utils;
 namespace Orleans.Clustering.Firestore.Tests;
 
 [TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("GoogleCloud")]
+[TestArea("Clustering")]
 public class UtilsTests
 {
     [Theory]

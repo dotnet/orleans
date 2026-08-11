@@ -12,6 +12,9 @@ namespace DefaultCluster.Tests.General
     /// SimpleGrain represents the most basic grain pattern with getter/setter
     /// methods and demonstrates core Orleans programming model concepts.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class SimpleGrainTests : HostedTestClusterEnsureDefaultStarted
     {
         public SimpleGrainTests(DefaultClusterFixture fixture) : base(fixture)

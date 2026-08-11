@@ -6,6 +6,8 @@ namespace NonSilo.Tests.Utils;
 
 public class TimeProviderExtensionsTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task DelayAsync_CompletesImmediatelyForZeroDelay()
     {
@@ -17,6 +19,8 @@ public class TimeProviderExtensionsTests
         await task;
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task DelayAsync_SupportsInfiniteDelay()
     {
@@ -31,6 +35,8 @@ public class TimeProviderExtensionsTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Theory, TestCategory("BVT")]
     [InlineData(-2)]
     [InlineData(-1000)]
@@ -42,6 +48,8 @@ public class TimeProviderExtensionsTests
             () => timeProvider.DelayAsync(TimeSpan.FromMilliseconds(milliseconds)));
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task DelayAsync_SupportsDelaysBeyondMaximumTimerDelay()
     {
@@ -57,6 +65,8 @@ public class TimeProviderExtensionsTests
         await task;
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Theory, TestCategory("BVT")]
     [InlineData(0)]
     [InlineData(-1)]
@@ -72,6 +82,8 @@ public class TimeProviderExtensionsTests
         await task;
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task DelayUntilAsync_SupportsDelaysBeyondMaximumTimerDelay()
     {

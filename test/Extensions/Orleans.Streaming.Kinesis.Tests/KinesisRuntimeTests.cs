@@ -10,6 +10,9 @@ using Xunit;
 
 namespace Orleans.Streaming.Kinesis.Tests;
 
+[TestSuite("BVT")]
+[TestArea("Streaming")]
+[TestProvider("Kinesis")]
 [TestCategory("AWS"), TestCategory("Kinesis")]
 public sealed class KinesisRuntimeTests
 {

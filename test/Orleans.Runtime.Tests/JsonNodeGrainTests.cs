@@ -77,6 +77,9 @@ namespace DefaultCluster.Tests
     /// These tests verify that the fix for GitHub issue #9568 works correctly when JsonNode types
     /// are passed through grain method calls, particularly when JsonValue is passed to a JsonNode parameter.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [Trait("Category", "BVT")]
     public class JsonNodeGrainTests : IClassFixture<JsonNodeGrainTestFixture>
     {

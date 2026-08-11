@@ -9,6 +9,9 @@ namespace Orleans.Transactions.Azure.Tests
     /// Tests for transaction behavior under controlled fault injection scenarios with Azure Storage.
     /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Transactions"), TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Transactions")]
     public class TransactionFaultInjectionTests : ControlledFaultInjectionTransactionTestRunnerxUnit, IClassFixture<ControlledFaultInjectionTestFixture>
     {
         public TransactionFaultInjectionTests(ControlledFaultInjectionTestFixture fixture, ITestOutputHelper output)

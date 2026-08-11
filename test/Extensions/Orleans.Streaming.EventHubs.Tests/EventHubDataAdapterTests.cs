@@ -7,6 +7,9 @@ namespace ServiceBus.Tests;
 
 public class EventHubDataAdapterTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Streaming")]
     [Fact, TestCategory("BVT"), TestCategory("Streaming")]
     public void GetOffset_ThrowsForMissingOffset()
     {

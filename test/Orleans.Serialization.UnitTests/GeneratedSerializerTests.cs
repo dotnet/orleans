@@ -39,6 +39,9 @@ namespace Orleans.Serialization.UnitTests;
 /// - Support for schema evolution
 /// </summary>
 [Trait("Category", "BVT")]
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class GeneratedSerializerTests : IDisposable
 {
     private readonly ServiceProvider _serviceProvider;

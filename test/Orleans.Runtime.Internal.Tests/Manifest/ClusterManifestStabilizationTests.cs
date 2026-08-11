@@ -7,6 +7,8 @@ namespace UnitTests.Manifest;
 
 public sealed class ClusterManifestStabilizationTests
 {
+    [TestSuite("Functional")]
+    [TestProvider("None")]
     [Fact, TestCategory("Functional")]
     public async Task WaitForClusterManifestToStabilizeAsync_WaitsForAllActiveSiloManifests()
     {

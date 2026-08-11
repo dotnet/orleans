@@ -7,6 +7,9 @@ using Xunit;
 
 namespace Tester.Redis.Streaming;
 
+[TestSuite("Functional")]
+[TestProvider("Redis")]
+[TestArea("Streaming")]
 [TestCategory("Redis"), TestCategory("Streaming"), TestCategory("Functional")]
 public sealed class RedisSubscriptionObserverWithImplicitSubscribingTests : SubscriptionObserverWithImplicitSubscribingTestRunner, IClassFixture<RedisSubscriptionObserverWithImplicitSubscribingTests.Fixture>
 {

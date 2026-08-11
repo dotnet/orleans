@@ -19,6 +19,9 @@ namespace Tester.Cosmos.Persistence;
 /// </summary>
 [Collection(TestEnvironmentFixture.DefaultCollection)]
 [TestCategory("Persistence"), TestCategory("Cosmos")]
+[TestSuite("Functional")]
+[TestProvider("Cosmos")]
+[TestArea("Persistence")]
 public class PersistenceProviderTests_Cosmos
 {
     private const string CosmosEmulatorWildcardEtagSkipReason = "The Cosmos DB emulator does not support the wildcard ETag condition semantics required by this test.";

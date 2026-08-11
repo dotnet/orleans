@@ -11,6 +11,9 @@ namespace Analyzers.Tests;
 /// conflicts and data corruption when messages are exchanged between grains.
 /// </summary>
 [TestCategory("BVT"), TestCategory("Analyzer")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Analyzer")]
 public class IdClashAttributeAnalyzerTest : DiagnosticAnalyzerTestBase<IdClashAttributeAnalyzer>
 {
     private async Task VerifyHasDiagnostic(string code, int diagnosticsCount)

@@ -11,6 +11,8 @@ using Orleans.Clustering.Firestore;
 
 namespace Orleans.Clustering.Firestore.Tests;
 
+[TestSuite("Functional")]
+[TestProvider("GoogleCloud")]
 [TestCategory("Functional"), TestCategory("Firestore"), TestCategory("GoogleCloud")]
 public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFixture<TestEnvironmentFixture>
 {

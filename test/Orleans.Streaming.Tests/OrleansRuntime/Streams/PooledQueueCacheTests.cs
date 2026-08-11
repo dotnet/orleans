@@ -7,6 +7,9 @@ using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Streaming")]
     public class PooledQueueCacheTests
     {
         private const int PooledBufferCount = 8;

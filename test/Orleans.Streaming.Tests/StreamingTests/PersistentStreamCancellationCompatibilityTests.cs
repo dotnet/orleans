@@ -7,6 +7,9 @@ namespace UnitTests.StreamingTests;
 
 public class PersistentStreamCancellationCompatibilityTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Streaming")]
     [Fact, TestCategory("BVT"), TestCategory("Streaming")]
     public async Task CancellationOverloads_FallBackToLegacyImplementations()
     {

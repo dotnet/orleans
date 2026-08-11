@@ -26,6 +26,8 @@ namespace Orleans.Journaling.Tests;
 /// fixture in a worktree pinned to upstream/main, replace the fixture bytes, and accept the updated
 /// Verify snapshot under <c>snapshots</c>.
 /// </remarks>
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT")]
 public sealed class UpstreamMainCompatibilityTests : JournalingTestBase
 {

@@ -179,6 +179,9 @@ namespace UnitTests.MembershipTests
     /// <summary>
     /// Tests silo liveness detection using membership grain with specific gateway preferences.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class LivenessTests_MembershipGrain : LivenessTestsBase
     {
         public LivenessTests_MembershipGrain(ITestOutputHelper output) : base(output)

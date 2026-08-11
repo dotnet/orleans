@@ -8,6 +8,9 @@ using KinesisRecord = Amazon.Kinesis.Model.Record;
 
 namespace Orleans.Streaming.Kinesis.Tests;
 
+[TestSuite("BVT")]
+[TestArea("Streaming")]
+[TestProvider("Kinesis")]
 [TestCategory("AWS"), TestCategory("Kinesis")]
 [Collection(TestEnvironmentFixture.DefaultCollection)]
 public sealed class KinesisBatchContainerTests

@@ -9,6 +9,7 @@ using Xunit;
 
 namespace NonSilo.Tests.DurableJobs;
 
+[TestArea("DurableJobs")]
 [TestCategory("DurableJobs")]
 public class JobShardTests
 {

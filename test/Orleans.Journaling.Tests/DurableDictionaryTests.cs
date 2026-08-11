@@ -11,6 +11,8 @@ namespace Orleans.Journaling.Tests;
 /// data structure that automatically persists all operations (add, update, remove) to a
 /// durable journal. This ensures that the dictionary state can be recovered after failures.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT")]
 public class DurableDictionaryTests : JournalingTestBase
 {

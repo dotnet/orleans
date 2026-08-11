@@ -8,6 +8,9 @@ namespace Tester.TransportTests;
 /// <summary>
 /// Tests for Orleans cluster communication using Unix domain socket transport.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public class UnixSocketTransportTests : TransportTestsBase, IClassFixture<UnixSocketTransportTests.Fixture>
 {
     public UnixSocketTransportTests(Fixture fixture) : base(fixture)

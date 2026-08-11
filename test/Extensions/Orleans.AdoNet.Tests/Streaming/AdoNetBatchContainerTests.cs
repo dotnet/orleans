@@ -10,6 +10,9 @@ namespace Tester.AdoNet.Streaming;
 /// </summary>
 [Collection(TestEnvironmentFixture.DefaultCollection)]
 [TestCategory("BVT"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestSuite("Functional")]
+[TestProvider("None")]
+[TestArea("Streaming")]
 public class AdoNetBatchContainerTests(TestEnvironmentFixture fixture)
 {
     [Fact]

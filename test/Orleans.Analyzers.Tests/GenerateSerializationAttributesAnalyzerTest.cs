@@ -11,6 +11,9 @@ namespace Analyzers.Tests;
 /// field attributes that could cause serialization issues.
 /// </summary>
 [TestCategory("BVT"), TestCategory("Analyzer")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Analyzer")]
 public class GenerateSerializationAttributesAnalyzerTest : DiagnosticAnalyzerTestBase<GenerateSerializationAttributesAnalyzer>
 {
     private async Task VerifyGeneratedDiagnostic(string code)

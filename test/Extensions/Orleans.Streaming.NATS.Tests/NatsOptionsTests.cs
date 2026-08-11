@@ -9,6 +9,9 @@ using Xunit;
 
 namespace NATS.Tests;
 
+[TestSuite("BVT")]
+[TestArea("Streaming")]
+[TestProvider("NATS")]
 [TestCategory("NATS")]
 public sealed class NatsOptionsTests
 {

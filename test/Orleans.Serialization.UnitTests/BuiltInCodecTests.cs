@@ -70,6 +70,9 @@ namespace Orleans.Serialization.UnitTests
     /// - Cross-language support where applicable
     /// </summary>
     [Trait("Category", "BVT")]
+    [Trait("Suite", "BVT")]
+    [Trait("Provider", "None")]
+    [Trait("Area", "Serialization")]
     public class CodecTestTests
     {
         [Fact]

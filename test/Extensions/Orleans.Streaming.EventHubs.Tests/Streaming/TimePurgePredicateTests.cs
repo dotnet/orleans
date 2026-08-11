@@ -3,6 +3,9 @@ using Xunit;
 
 namespace ServiceBus.Tests.StreamingTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("EventHub")]
+    [TestArea("Streaming")]
     public class TimePurgePredicateTests
     {
         private static readonly TimeSpan MinTimeInCache = TimeSpan.FromMinutes(5);

@@ -7,6 +7,9 @@ using Xunit;
 
 namespace UnitTests.Streaming.Reliability;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Streaming")]
 public class StreamingDiagnosticEventRecorderTests
 {
     [Fact, TestCategory("BVT"), TestCategory("Streaming")]

@@ -5,6 +5,7 @@ using Xunit;
 
 namespace Orleans.DurableJobs.Tests;
 
+[TestSuite("BVT")]
 [TestCategory("BVT")]
 public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fixture)
 {

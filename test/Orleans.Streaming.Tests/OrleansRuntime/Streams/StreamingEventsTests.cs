@@ -12,6 +12,9 @@ namespace UnitTests.OrleansRuntime.Streams
 {
     public class StreamingEventsTests
     {
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void StreamingEvents_EmitQueueChange_EmitsBalancerChangedOnly()
         {
@@ -36,6 +39,9 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.Same(queueBalancer, changed.QueueBalancer);
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void StreamingEvents_EmitPullingAgentManagerState_EmitsState()
         {
@@ -52,6 +58,9 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.Equal(1, state.RunningAgents);
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void StreamingEvents_EmitQueueBalancerMaturityCompleted_EmitsMaturityCompleted()
         {

@@ -13,6 +13,9 @@ namespace UnitTests.LivenessTests
     /// <summary>
     /// Tests for consistent ring hash provider functionality and virtual buckets distribution.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ConsistentRingProviderTests(ITestOutputHelper output)
     {
         private readonly ITestOutputHelper _output = output;

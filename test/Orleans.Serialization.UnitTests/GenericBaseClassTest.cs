@@ -20,6 +20,9 @@ namespace Orleans.Serialization.UnitTests
     /// based on explicit attribute marking rather than inheritance.
     /// </summary>
     [Trait("Category", "BVT")]
+    [Trait("Suite", "BVT")]
+    [Trait("Provider", "None")]
+    [Trait("Area", "Serialization")]
     public class GenericBaseClassTest
     {
         private readonly ServiceProvider _services;

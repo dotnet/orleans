@@ -8,6 +8,8 @@ using Xunit;
 
 namespace Tester;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT")]
 public class InsideRuntimeClientTests
 {

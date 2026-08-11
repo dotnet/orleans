@@ -11,6 +11,8 @@ namespace UnitTests.Diagnostics;
 [Collection(TestEnvironmentFixture.DefaultCollection)]
 public class DispatcherEventsTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void RuntimeMessagingTrace_OnDispatcherRejectMessage_EmitsRejected()
     {
@@ -27,6 +29,8 @@ public class DispatcherEventsTests
         Assert.Same(exception, rejected.Exception);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void RuntimeMessagingTrace_OnDispatcherForwardingMultiple_EmitsForwardingMultiple()
     {

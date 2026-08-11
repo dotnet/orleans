@@ -19,6 +19,9 @@ namespace Orleans.Serialization.UnitTests;
 /// - Support for streaming scenarios with incremental writes and reads
 /// </summary>
 [Trait("Category", "BVT")]
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class ArcBufferWriterTests
 {
     private const int PageSize = ArcBufferWriter.MinimumPageSize;

@@ -25,6 +25,9 @@ namespace Tester.AzureUtils
     /// including concurrent updates, failure detection, and gateway discovery.
     /// </summary>
     [TestCategory("Membership"), TestCategory("AzureStorage")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Membership")]
     public class AzureMembershipTableTests : MembershipTableTestsBase
     {
         public AzureMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())

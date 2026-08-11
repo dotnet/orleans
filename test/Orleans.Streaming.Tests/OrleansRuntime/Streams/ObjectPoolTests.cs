@@ -1,4 +1,4 @@
-﻿using Orleans.Providers.Streams.Common;
+using Orleans.Providers.Streams.Common;
 using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
@@ -6,6 +6,9 @@ namespace UnitTests.OrleansRuntime.Streams
     /// <summary>
     /// Tests for object pool allocation, recycling, and resource management.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Streaming")]
     public class ObjectPoolTests
     {
         private class Accumulator

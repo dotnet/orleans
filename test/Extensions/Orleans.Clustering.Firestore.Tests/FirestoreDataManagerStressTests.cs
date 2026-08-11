@@ -8,6 +8,7 @@ using Xunit.Abstractions;
 
 namespace Orleans.Clustering.Firestore.Tests;
 
+[TestProvider("GoogleCloud")]
 [TestCategory("Stress"), TestCategory("Firestore"), TestCategory("GoogleCloud")]
 public class FirestoreDataManagerStressTests : IAsyncLifetime
 {

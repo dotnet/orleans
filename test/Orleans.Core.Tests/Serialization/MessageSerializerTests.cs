@@ -22,6 +22,7 @@ namespace UnitTests.Serialization
     /// Tests for Orleans message serialization functionality.
     /// </summary>
     [Collection(TestEnvironmentFixture.DefaultCollection)]
+    [TestArea("Serialization")]
     public class MessageSerializerTests
     {
         private readonly ITestOutputHelper output;
@@ -41,6 +42,8 @@ namespace UnitTests.Serialization
             _grainAddressCodec = fixture.Services.GetRequiredService<IFieldCodec<GrainAddress>>();
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public async Task MessageTest_TtlUpdatedOnAccess()
         {
@@ -51,6 +54,8 @@ namespace UnitTests.Serialization
             Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(-1000), TimeSpan.FromMilliseconds(900));
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public async Task MessageTest_TtlUpdatedOnSerialization()
         {
@@ -64,6 +69,8 @@ namespace UnitTests.Serialization
             Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(-1000), TimeSpan.FromMilliseconds(900));
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void Message_SerializeHeaderTooBig()
         {
@@ -85,6 +92,8 @@ namespace UnitTests.Serialization
             }
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void Message_SerializeBodyTooBig()
         {
@@ -100,6 +109,8 @@ namespace UnitTests.Serialization
             Assert.Throws<InvalidMessageFrameException>(() => this.messageSerializer.Write(writer, message));
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void Message_DeserializeHeaderTooBig()
         {
@@ -109,6 +120,8 @@ namespace UnitTests.Serialization
             DeserializeFakeMessage(maxHeaderSize + 1, maxBodySize - 1);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void Message_DeserializeBodyTooBig()
         {
@@ -148,6 +161,8 @@ namespace UnitTests.Serialization
             return deserializedMessage!;
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
         [InlineData(0, 0)]
         [InlineData(1, 1)]
@@ -159,6 +174,8 @@ namespace UnitTests.Serialization
             Assert.Equal(expected, MessageSerializer.GetRequestContextInitialCapacity(size));
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void Message_RequestContextBeyondInitialCapacity_RoundTrips()
         {
@@ -182,6 +199,8 @@ namespace UnitTests.Serialization
             }
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT")]
         public void MessageTest_CacheInvalidationHeader_RoundTripCompatibility()
         {
@@ -276,6 +295,8 @@ namespace UnitTests.Serialization
             }
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT")]
         public void MessageTest_CacheInvalidationHeader_DeserializeCapsHeaderCount()
         {

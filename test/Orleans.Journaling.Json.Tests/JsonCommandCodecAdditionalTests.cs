@@ -7,6 +7,8 @@ using Xunit;
 
 namespace Orleans.Journaling.Json.Tests;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT")]
 public sealed class JsonCommandCodecAdditionalTests
 {

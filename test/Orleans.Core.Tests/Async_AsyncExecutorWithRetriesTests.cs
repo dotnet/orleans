@@ -13,6 +13,9 @@ namespace NonSilo.Tests
     /// This class tests Orleans' internal retry mechanism for handling transient failures in asynchronous operations.
     /// The AsyncExecutorWithRetries is used throughout Orleans for reliable execution of operations that may fail temporarily.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class Async_AsyncExecutorWithRetriesTests
     {
         private readonly ITestOutputHelper output;

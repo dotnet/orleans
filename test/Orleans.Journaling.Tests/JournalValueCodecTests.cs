@@ -13,6 +13,8 @@ namespace Orleans.Journaling.Tests;
 /// <summary>
 /// Tests for the binary durable journal codec implementations.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT")]
 public class JournalValueCodecTests
 {

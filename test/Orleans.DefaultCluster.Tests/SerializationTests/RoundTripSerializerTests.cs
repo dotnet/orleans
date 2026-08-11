@@ -9,6 +9,9 @@ namespace UnitTests.SerializerTests
     /// Tests serialization round-trip for various data types including records, enums, and inherited generics.
     /// </summary>
     [TestCategory("Serialization"), TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Serialization")]
     public class RoundTripSerializerTests : HostedTestClusterEnsureDefaultStarted
     {
         public RoundTripSerializerTests(DefaultClusterFixture fixture) : base(fixture)

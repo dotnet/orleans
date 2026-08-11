@@ -15,6 +15,9 @@ namespace AWSUtils.Tests.RemindersTest
     /// </summary>
     [TestCategory("Reminders"), TestCategory("AWS"), TestCategory("DynamoDb")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
+    [TestSuite("Functional")]
+    [TestProvider("DynamoDB")]
+    [TestArea("Reminders")]
     public class DynamoDBRemindersTableTests : ReminderTableTestsBase, IClassFixture<DynamoDBStorageTestsFixture>
     {
         public DynamoDBRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, new LoggerFilterOptions())

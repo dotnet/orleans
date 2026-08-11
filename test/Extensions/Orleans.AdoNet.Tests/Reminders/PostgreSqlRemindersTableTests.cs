@@ -12,6 +12,9 @@ namespace UnitTests.RemindersTest
     /// Tests for Orleans reminders table operations using PostgreSQL as the storage backend.
     /// </summary>
     [TestCategory("Functional"), TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("PostgreSql")]
+    [TestSuite("Functional")]
+    [TestProvider("PostgreSql")]
+    [TestArea("Reminders")]
     public class PostgreSqlRemindersTableTests : ReminderTableTestsBase
     {
         public PostgreSqlRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())

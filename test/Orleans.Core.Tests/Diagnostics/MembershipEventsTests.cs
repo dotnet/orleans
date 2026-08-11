@@ -10,6 +10,8 @@ namespace UnitTests.Diagnostics;
 
 public class MembershipEventsTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void EmitViewChanged_EmitsViewChanged()
     {
@@ -26,6 +28,8 @@ public class MembershipEventsTests
         Assert.Same(observerSilo, typed.ObserverSiloAddress);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void EmitSuspectOrKillRequestCompleted_EmitsCompletion()
     {
@@ -53,6 +57,8 @@ public class MembershipEventsTests
         Assert.Same(exception, typed.Exception);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task MembershipDiagnosticObserver_DerivesStatusTransitions_FromViewChanged()
     {

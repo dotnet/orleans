@@ -21,6 +21,9 @@ namespace Benchmarks.Serialization.Comparison;
 /// Compares Orleans serialization performance against other popular serializers for class types.
 /// </summary>
 [Trait("Category", "Benchmark")]
+[TestSuite("Benchmark")]
+[TestProvider("None")]
+[TestArea("Serialization")]
 [Config(typeof(BenchmarkConfig))]
 [BenchmarkCategory("Serialization")]
 [PayloadSizeColumn]

@@ -21,6 +21,9 @@ namespace UnitTests.StreamingTests
 {
     public class PersistentStreamPullingAgentTests
     {
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ReadFromQueue_DoesNotWaitForColdStreamRegistration()
         {
@@ -63,6 +66,9 @@ namespace UnitTests.StreamingTests
             Assert.Null(streamData.RegistrationTask);
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ReadFromQueue_ClearsRegistrationTaskWhenColdStreamRegistrationCompletesSynchronously()
         {
@@ -100,6 +106,9 @@ namespace UnitTests.StreamingTests
             Assert.True(streamData.StreamRegistered);
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ReadFromQueue_DoesNotStartQueueReadAfterShutdownStarts()
         {
@@ -117,6 +126,9 @@ namespace UnitTests.StreamingTests
             Assert.Empty(receiver.ReceivedCalls());
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ReadFromQueue_TreatsNullReceiverResultAsEmpty()
         {
@@ -136,6 +148,9 @@ namespace UnitTests.StreamingTests
             Assert.Empty(await testAccessor.GetPubSubCache());
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task RegisterStream_RemovesCacheEntryWhenProducerRegistrationTerminates()
         {
@@ -150,6 +165,9 @@ namespace UnitTests.StreamingTests
             Assert.Empty(await testAccessor.GetPubSubCache());
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task RegisterStream_DoesNotRegisterProducerAfterShutdownStarts()
         {
@@ -167,6 +185,9 @@ namespace UnitTests.StreamingTests
             Assert.Empty(pubSub.ReceivedCalls());
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ReadFromQueue_CleansInactiveStreamsUsingTimeProvider()
         {
@@ -505,6 +526,9 @@ namespace UnitTests.StreamingTests
             public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId) => Task.FromResult<StreamHandshakeToken?>(rewindToken);
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ReadFromQueue_RefreshesIdleCursorAfterItsTokenMetadataIsPurged()
         {
@@ -559,6 +583,9 @@ namespace UnitTests.StreamingTests
             Assert.Equal(newToken, Assert.Single(consumer.DeliveredTokens));
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task Shutdown_UsesReturnedHandshakeTokenForDeliveryProgress()
         {
@@ -660,6 +687,9 @@ namespace UnitTests.StreamingTests
             return services.BuildServiceProvider().GetRequiredService<MessagingProcessingInstruments>();
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task RegisterStream_KeepsCacheEntryWhenSubscriberHandshakeFails()
         {
@@ -691,6 +721,9 @@ namespace UnitTests.StreamingTests
             Assert.True(cache[streamId].StreamRegistered, "StreamRegistered must be true once producer registration succeeds.");
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task Shutdown_WaitsForInFlightPumpWork()
         {
@@ -723,6 +756,9 @@ namespace UnitTests.StreamingTests
             await pumpTask;
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task Shutdown_IsIdempotent()
         {
@@ -739,6 +775,9 @@ namespace UnitTests.StreamingTests
             await receiver.Received(1).Shutdown(Arg.Any<TimeSpan>());
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task RunQueuePump_ReadsAfterReinitialize()
         {
@@ -760,6 +799,9 @@ namespace UnitTests.StreamingTests
             await receiver.Received(1).GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task Shutdown_PushesEarliestDeliveryProgressTokenToCache()
         {
@@ -810,6 +852,9 @@ namespace UnitTests.StreamingTests
             Assert.Equal(earliestConsumer.LastProcessedToken, Assert.Single(queueCache.DeliveryProgressTokens));
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task Shutdown_PushesEarliestDeliveryProgressUsingBaseTokenPosition()
         {
@@ -860,6 +905,9 @@ namespace UnitTests.StreamingTests
             Assert.Equal(earliestConsumer.LastProcessedToken, Assert.Single(queueCache.DeliveryProgressTokens));
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task Shutdown_SkipsDeliveryProgressForPendingRegistrations()
         {
@@ -914,6 +962,9 @@ namespace UnitTests.StreamingTests
             await shutdownTask;
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task Shutdown_SkipsDeliveryProgressForUnregisteredConsumer()
         {
@@ -964,6 +1015,9 @@ namespace UnitTests.StreamingTests
             Assert.Equal(0, queueCache.DeliveryProgressCallCount);
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task Shutdown_PushesFinalDeliveryProgress()
         {

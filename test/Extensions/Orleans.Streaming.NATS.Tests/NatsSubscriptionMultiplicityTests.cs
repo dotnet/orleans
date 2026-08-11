@@ -10,6 +10,9 @@ using Xunit;
 
 namespace NATS.Tests;
 
+[TestSuite("Functional")]
+[TestProvider("NATS")]
+[TestArea("Streaming")]
 public class NatsSubscriptionMultiplicityTests : TestClusterPerTest
 {
     private const string NatsStreamProviderName = "NatsProvider-Subscription-Test";

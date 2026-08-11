@@ -91,7 +91,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional|Category=Streaming)"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -141,7 +141,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Clustering)"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -199,7 +199,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -284,7 +284,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -346,7 +346,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -366,6 +366,40 @@ jobs:
     - name: Clean up SQL Server
       if: always()
       run: docker rm -f mssql || true
+    - name: Archive Test Results
+      if: always()
+      continue-on-error: true
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      with:
+        name: test_output_${{ github.job }}_${{ matrix.framework }}
+        retention-days: 1
+        path: |
+          **/TestResults/*
+          **/logs/*
+  test-sqlite:
+    name: SQLite provider tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: ["Sqlite"]
+        framework: ["net8.0", "net10.0"]
+    steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Setup .NET
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+      with:
+        global-json-file: global.json
+    - name: Test
+      run: dotnet test
+        --framework ${{ matrix.framework }}
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
+        --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
+        --
+        -parallel none -noshadow
     - name: Archive Test Results
       if: always()
       continue-on-error: true
@@ -411,7 +445,7 @@ jobs:
         global-json-file: global.json
     - name: Test
       run: dotnet test
-        --filter "(Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional))|(Category=Azure&Category=DurableJobs)"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
         --framework ${{ matrix.framework }}
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
@@ -491,7 +525,7 @@ jobs:
         global-json-file: global.json
     - name: Test
       run: dotnet test
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional|Category=Streaming)"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
         --framework ${{ matrix.framework }}
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
@@ -572,7 +606,7 @@ jobs:
         done
     - name: Test
       run: |
-        cosmos_filter='Category=${{ matrix.provider }}&Category!=Performance&Category!=Stress'
+        cosmos_filter='Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress'
         for attempt in 1 2; do
           logger_name="test_results_${{ matrix.provider }}_${{ matrix.framework }}_attempt${attempt}.trx"
           extra_args=()
@@ -641,7 +675,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -691,7 +725,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -754,7 +788,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -833,7 +867,7 @@ jobs:
       run: dotnet test
         test/Extensions/Orleans.AWS.Tests/Orleans.AWS.Tests.csproj
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -911,7 +945,7 @@ jobs:
       run: dotnet test
         test/Extensions/Orleans.Streaming.NATS.Tests/Orleans.Streaming.NATS.Tests.csproj
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -985,7 +1019,7 @@ jobs:
       run: dotnet test
         test/Extensions/Orleans.Streaming.Kinesis.Tests/Orleans.Streaming.Kinesis.Tests.csproj
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -1039,7 +1073,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.suite }}&Category!=Consul"
+        --filter "Provider=None&Suite=${{ matrix.suite }}&Area!=CodeGen"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -1078,6 +1112,17 @@ jobs:
         --blame-crash-dump-type full
         --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.framework }}.trx"
+        --
+        -parallel none -noshadow
+        &&
+        dotnet test
+        test/Orleans.DefaultCluster.Tests/Orleans.DefaultCluster.Tests.csproj
+        --framework ${{ matrix.framework }}
+        --filter "Provider=None&Area=CodeGen&(Suite=BVT|Suite=SlowBVT|Suite=Functional)"
+        --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
+        --logger "trx;LogFileName=test_results_defaultcluster_codegen_${{ matrix.framework }}.trx"
         --
         -parallel none -noshadow
     - name: Archive Test Results
@@ -1151,7 +1196,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -1178,6 +1223,7 @@ jobs:
       - test-postgres
       - test-mariadb
       - test-sqlserver
+      - test-sqlite
       - test-azure-storage
       - test-azure-eventhubs
       - test-azure-cosmosdb

@@ -7,6 +7,9 @@ namespace DefaultCluster.Tests
     /// <summary>
     /// Tests deep copy and serialization round-trip for complex types including value types and types with custom activators.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Serialization")]
     public class SerializationTests : HostedTestClusterEnsureDefaultStarted
     {
         public SerializationTests(DefaultClusterFixture fixture) : base(fixture)

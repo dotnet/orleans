@@ -8,6 +8,9 @@ using Orleans.Tests.SqlUtils;
 namespace UnitTests.StorageTests.Relational;
 
 [TestCategory("AdoNet"), TestCategory("Persistence"), TestCategory("Sqlite")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Persistence")]
 public sealed class RelationalStorageDataSourceTests
 {
     [Fact]

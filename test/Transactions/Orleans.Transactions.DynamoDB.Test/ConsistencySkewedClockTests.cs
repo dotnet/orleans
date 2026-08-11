@@ -7,6 +7,9 @@ namespace Orleans.Transactions.DynamoDB.Tests
     /// <summary>
     /// Tests for transaction consistency with skewed clock scenarios using DynamoDB.
     /// </summary>
+    [TestSuite("Nightly")]
+    [TestArea("Transactions")]
+    [TestProvider("DynamoDB")]
     [TestCategory("DynamoDB"), TestCategory("Transactions-dev")]
     public class ConsistencySkewedClockTests : ConsistencyTransactionTestRunnerxUnit, IClassFixture<SkewedClockTestFixture>
     {

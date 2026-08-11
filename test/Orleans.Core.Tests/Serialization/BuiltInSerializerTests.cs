@@ -23,6 +23,7 @@ namespace UnitTests.Serialization
     /// Orleans can correctly serialize and deserialize various data structures used throughout the framework.
     /// </summary>
     [Collection(TestEnvironmentFixture.DefaultCollection), TestCategory("Serialization")]
+    [TestArea("Serialization")]
     public class BuiltInSerializerTests
     {
         private readonly ITestOutputHelper output;
@@ -38,6 +39,8 @@ namespace UnitTests.Serialization
         /// Verifies that Orleans internal types have appropriate serializers registered.
         /// This is essential for proper functioning of Orleans' internal messaging and state management.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("CodeGen")]
         public void InternalSerializableTypesHaveSerializers()
         {
@@ -58,6 +61,8 @@ namespace UnitTests.Serialization
                 $"Should be able to serialize internal type {nameof(EventHubSequenceTokenV2)}.");
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("CodeGen")]
         public void ValueTupleTypesHasSerializer()
         {
@@ -69,6 +74,8 @@ namespace UnitTests.Serialization
         /// <summary>
         /// Tests that the default (non-fallback) serializer can handle complex classes.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT")]
         public void Serialize_ComplexAccessibleClass()
         {
@@ -122,6 +129,8 @@ namespace UnitTests.Serialization
             Assert.Null(actual.SomeGrainReference);
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT")]
         public void Serialize_Type()
         {
@@ -137,6 +146,8 @@ namespace UnitTests.Serialization
             Assert.Equal(expected.AssemblyQualifiedName, actual.AssemblyQualifiedName);
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT")]
         public void Serialize_ComplexStruct()
         {
@@ -155,6 +166,8 @@ namespace UnitTests.Serialization
             Assert.Equal(expected.GetValueWithPrivateGetter(), actual.GetValueWithPrivateGetter());
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public void Serialize_EmptyList()
         {
@@ -167,6 +180,8 @@ namespace UnitTests.Serialization
             ValidateList(list, (List<int>)deserialized, "int (empty)");
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public void Serialize_BasicDictionaries()
         {
@@ -184,6 +199,8 @@ namespace UnitTests.Serialization
             ValidateDictionary<int, DateTime>(source2, deserialized, "int/date");
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public void Serialize_ReadOnlyDictionary()
         {
@@ -202,6 +219,8 @@ namespace UnitTests.Serialization
             ValidateReadOnlyDictionary(readOnlySource2, deserialized, "int/date");
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public void Serialize_DictionaryWithComparer()
         {
@@ -222,6 +241,8 @@ namespace UnitTests.Serialization
             Assert.Equal<DateTime>(source2[3], result2[13]);  //Round trip for case insensitive int/DateTime dictionary lost the custom comparer"
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public void Serialize_SortedDictionaryWithComparer()
         {
@@ -232,6 +253,8 @@ namespace UnitTests.Serialization
             ValidateSortedDictionary<string, string>(source1, deserialized, "string/string");
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public void Serialize_SortedListWithComparer()
         {
@@ -242,6 +265,8 @@ namespace UnitTests.Serialization
             ValidateSortedList<string, string>(source1, deserialized, "string/string");
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public void Serialize_HashSetWithComparer()
         {
@@ -262,6 +287,8 @@ namespace UnitTests.Serialization
 #pragma warning restore xUnit2017 // Do not use Contains() to check if a value exists in a collection
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public void Serialize_Stack()
         {
@@ -286,6 +313,8 @@ namespace UnitTests.Serialization
         /// Tests that the <see cref="IOnDeserialized"/> callback is invoked after deserialization.
         /// </summary>
         /// <param name="serializerToUse"></param>
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public void Serialize_TypeWithOnDeserializedHook()
         {
@@ -300,6 +329,8 @@ namespace UnitTests.Serialization
             Assert.NotNull(result.Context);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public void Serialize_SortedSetWithComparer()
         {
@@ -320,6 +351,8 @@ namespace UnitTests.Serialization
 #pragma warning restore xUnit2017 // Do not use Contains() to check if a value exists in a collection
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public void Serialize_Array()
         {
@@ -340,6 +373,8 @@ namespace UnitTests.Serialization
             ValidateArray<byte>(source4, deserialized, "byte");
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public void Serialize_ArrayOfArrays()
         {
@@ -402,6 +437,8 @@ namespace UnitTests.Serialization
             ValidateArrayOfArrays(source5, deserialized, "grain reference (large)");
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public void Serialize_ArrayOfArrayOfArrays()
         {
@@ -413,6 +450,8 @@ namespace UnitTests.Serialization
             ValidateArrayOfArrayOfArrays(source, deserialized, "int");
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public void Serialize_ReadOnlyCollection()
         {
@@ -464,6 +503,8 @@ namespace UnitTests.Serialization
             }
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public void Serialize_ObjectIdentity()
         {
@@ -497,6 +538,8 @@ namespace UnitTests.Serialization
             Assert.NotSame(list1, list3); //Object identity gained after round trip of string/list dict
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public void Serialize_Unrecognized()
         {
@@ -522,6 +565,8 @@ namespace UnitTests.Serialization
             }
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public void Serialize_Immutable()
         {
@@ -558,6 +603,8 @@ namespace UnitTests.Serialization
             Assert.NotSame(test5.Mutable, copiedTest5.Mutable);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public void Serialize_GrainReference()
         {
@@ -707,6 +754,8 @@ namespace UnitTests.Serialization
             }
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public void Serialize_CircularReference()
         {
@@ -728,6 +777,8 @@ namespace UnitTests.Serialization
             Assert.Same(deserialized, deserializedCircularTest2.CircularTest1List[0]);
         }
         
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public void Serialize_Enums()
         {

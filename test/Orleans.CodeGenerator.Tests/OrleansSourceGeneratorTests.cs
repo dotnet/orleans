@@ -25,6 +25,9 @@ namespace Orleans.CodeGenerator.Tests;
 /// - Proper handling of generic types
 /// - Diagnostics for incorrect usage
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("CodeGen")]
 public class OrleansSourceGeneratorTests
 {
     /// <summary>

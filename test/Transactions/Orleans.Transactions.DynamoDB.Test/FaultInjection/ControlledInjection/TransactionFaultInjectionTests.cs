@@ -7,6 +7,9 @@ namespace Orleans.Transactions.DynamoDB.Tests
     /// <summary>
     /// Tests for transaction behavior under controlled fault injection scenarios with DynamoDB.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("DynamoDB")]
+    [TestArea("Transactions")]
     [TestCategory("DynamoDB"), TestCategory("Transactions"), TestCategory("Functional")]
     public class TransactionFaultInjectionTests : ControlledFaultInjectionTransactionTestRunnerxUnit, IClassFixture<ControlledFaultInjectionTestFixture>
     {

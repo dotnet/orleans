@@ -18,6 +18,8 @@ namespace Tester.AdoNet.Streaming;
 /// Tests for SQL Server ADO.NET stream batching functionality.
 /// </summary>
 [TestCategory("SqlServer"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("SqlServer")]
+[TestSuite("Functional")]
 public class SqlServerAdoNetStreamsBatchingTests(ITestOutputHelper output) : AdoNetStreamsBatchingTests(new Fixture(AdoNetInvariants.InvariantNameSqlServer), output)
 {
 }
@@ -26,6 +28,8 @@ public class SqlServerAdoNetStreamsBatchingTests(ITestOutputHelper output) : Ado
 /// Tests for MySQL ADO.NET stream batching functionality.
 /// </summary>
 [TestCategory("MySql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("MySql")]
+[TestSuite("Functional")]
 public class MySqlAdoNetStreamsBatchingTests : AdoNetStreamsBatchingTests
 {
     public MySqlAdoNetStreamsBatchingTests(ITestOutputHelper output) : base(new Fixture(AdoNetInvariants.InvariantNameMySql), output)
@@ -38,6 +42,8 @@ public class MySqlAdoNetStreamsBatchingTests : AdoNetStreamsBatchingTests
 /// Tests for PostgreSQL ADO.NET stream batching functionality.
 /// </summary>
 [TestCategory("PostgreSql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("PostgreSql")]
+[TestSuite("Functional")]
 public class PostgreSqlAdoNetStreamsBatchingTests(ITestOutputHelper output) : AdoNetStreamsBatchingTests(new Fixture(AdoNetInvariants.InvariantNamePostgreSql), output)
 {
 }
@@ -46,6 +52,8 @@ public class PostgreSqlAdoNetStreamsBatchingTests(ITestOutputHelper output) : Ad
 /// Base class for ADO.NET stream batching tests.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestSuite("Functional")]
+[TestArea("Streaming")]
 public abstract class AdoNetStreamsBatchingTests : StreamBatchingTestRunner, IAsyncLifetime
 {
     private const string TestDatabaseName = "OrleansStreamTest";

@@ -17,6 +17,9 @@ namespace Tester.AzureUtils
     /// Tests for operation of Orleans SiloInstanceManager using AzureStore - Requires access to external Azure storage
     /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Storage")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Membership")]
     public class SiloInstanceTableManagerTests : IClassFixture<SiloInstanceTableManagerTests.Fixture>, IDisposable
     {
         public class Fixture : IDisposable

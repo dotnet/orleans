@@ -8,6 +8,9 @@ namespace NonSilo.Tests
     /// Validates equality, hash code consistency, and proper handling of null vs empty arrays.
     /// </summary>
     [TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class IdSpanTests
     {
         /// <summary>

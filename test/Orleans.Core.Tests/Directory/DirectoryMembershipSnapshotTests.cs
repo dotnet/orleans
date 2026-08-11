@@ -10,6 +10,9 @@ namespace NonSilo.Tests.Directory;
 /// Tests for directory membership snapshot functionality including range ownership and ring coverage validation.
 /// </summary>
 [TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("GrainDirectory")]
 public sealed class DirectoryMembershipSnapshotTests
 {
     private static readonly Gen<ClusterMembershipSnapshot> GenClusterMembershipSnapshot = Gen.Select(Gen.UInt, Gen.Enum<SiloStatus>(), (hash, status) => (hash, status))

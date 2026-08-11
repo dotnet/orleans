@@ -16,6 +16,9 @@ namespace Tester.AzureUtils.Streaming
 {
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     [TestCategory("AzureStorage"), TestCategory("Streaming")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Streaming")]
     public class AzureQueueAdapterTests : AzureStorageBasicTests, IAsyncLifetime
     {
         private readonly ITestOutputHelper output;

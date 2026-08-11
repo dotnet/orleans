@@ -12,6 +12,9 @@ namespace Orleans.Streaming.Kinesis.Tests
     /// <summary>
     /// Tests multiple subscription scenarios for Kinesis streams including parallel, linear, and resubscription patterns.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestArea("Streaming")]
+    [TestProvider("Kinesis")]
     [TestCategory("AWS"), TestCategory("Kinesis")]
     public class KinesisSubscriptionMultiplicityTests : TestClusterPerTest
     {

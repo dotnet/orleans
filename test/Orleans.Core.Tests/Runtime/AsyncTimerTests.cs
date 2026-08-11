@@ -7,6 +7,8 @@ namespace NonSilo.Tests.Runtime;
 
 public class AsyncTimerTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Theory, TestCategory("BVT")]
     [InlineData(0)]
     [InlineData(-2)]
@@ -22,6 +24,8 @@ public class AsyncTimerTests
         Assert.True(await task);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Theory, TestCategory("BVT")]
     [InlineData(0)]
     [InlineData(-2)]
@@ -37,6 +41,8 @@ public class AsyncTimerTests
         Assert.True(await task);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task NextTick_SupportsInfinitePeriod()
     {
@@ -52,6 +58,8 @@ public class AsyncTimerTests
         Assert.False(await task);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task NextTick_SupportsInfiniteOverride()
     {
@@ -66,6 +74,8 @@ public class AsyncTimerTests
         Assert.False(await task);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task NextTick_SupportsPeriodsBeyondMaximumTimerDelay()
     {
@@ -80,6 +90,8 @@ public class AsyncTimerTests
         Assert.True(await task);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task NextTick_SupportsOverridesBeyondMaximumTimerDelay()
     {
@@ -94,6 +106,8 @@ public class AsyncTimerTests
         Assert.True(await task);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task NextTick_SupportsMaximumPeriod()
     {

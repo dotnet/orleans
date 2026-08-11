@@ -15,6 +15,8 @@ namespace Tester.AdoNet.Streaming;
 /// Tests for <see cref="AdoNetStreamFailureHandler"/> against SQL Server.
 /// </summary>
 [TestCategory("SqlServer"), TestCategory("BVT"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("SqlServer")]
+[TestSuite("Functional")]
 public class SqlServerAdoNetStreamFailureHandlerTests() : AdoNetStreamFailureHandlerTests(AdoNetInvariants.InvariantNameSqlServer)
 {
 }
@@ -23,6 +25,8 @@ public class SqlServerAdoNetStreamFailureHandlerTests() : AdoNetStreamFailureHan
 /// Tests for <see cref="AdoNetStreamFailureHandler"/> against MySQL.
 /// </summary>
 [TestCategory("MySql"), TestCategory("BVT"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("MySql")]
+[TestSuite("Functional")]
 public class MySqlAdoNetStreamFailureHandlerTests : AdoNetStreamFailureHandlerTests
 {
     public MySqlAdoNetStreamFailureHandlerTests() : base(AdoNetInvariants.InvariantNameMySql)
@@ -35,6 +39,8 @@ public class MySqlAdoNetStreamFailureHandlerTests : AdoNetStreamFailureHandlerTe
 /// Tests for <see cref="AdoNetStreamFailureHandler"/> against PostgreSQL.
 /// </summary>
 [TestCategory("PostgreSql"), TestCategory("BVT"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("PostgreSql")]
+[TestSuite("Functional")]
 public class PostgreSqlAdoNetStreamFailureHandlerTests() : AdoNetStreamFailureHandlerTests(AdoNetInvariants.InvariantNamePostgreSql)
 {
 }
@@ -43,6 +49,8 @@ public class PostgreSqlAdoNetStreamFailureHandlerTests() : AdoNetStreamFailureHa
 /// Tests for <see cref="AdoNetStreamFailureHandler"/>.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestSuite("Functional")]
+[TestArea("Streaming")]
 public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsyncLifetime
 {
     private RelationalStorageForTesting _testing = null!;

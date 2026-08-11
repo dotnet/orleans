@@ -10,6 +10,9 @@ namespace AWSUtils.Tests.MembershipTests
     /// Tests DynamoDB silo instance record key generation and retrieval for membership table entries.
     /// </summary>
     [TestCategory("Membership"), TestCategory("AWS"), TestCategory("DynamoDb")]
+    [TestSuite("Functional")]
+    [TestProvider("DynamoDB")]
+    [TestArea("Membership")]
     public class SiloInstanceRecordTests
     {
         [Fact]

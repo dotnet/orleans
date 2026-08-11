@@ -6,6 +6,9 @@ using Xunit;
 
 namespace Tester.Redis.Streaming;
 
+[TestSuite("BVT")]
+[TestProvider("Redis")]
+[TestArea("Streaming")]
 [TestCategory("Redis"), TestCategory("Streaming"), TestCategory("Filters")]
 public sealed class RedisStreamFilteringTests : StreamFilteringTestsBase, IClassFixture<RedisStreamFilteringTests.Fixture>
 {

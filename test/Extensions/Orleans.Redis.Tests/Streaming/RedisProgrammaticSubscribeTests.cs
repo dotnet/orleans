@@ -6,6 +6,9 @@ using Xunit;
 
 namespace Tester.Redis.Streaming;
 
+[TestSuite("BVT")]
+[TestProvider("Redis")]
+[TestArea("Streaming")]
 [TestCategory("Redis"), TestCategory("Streaming")]
 public sealed class RedisProgrammaticSubscribeTests : ProgrammaticSubscribeTestsRunner, IClassFixture<RedisProgrammaticSubscribeTests.Fixture>
 {

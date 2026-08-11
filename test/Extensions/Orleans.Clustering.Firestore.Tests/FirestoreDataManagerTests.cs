@@ -8,6 +8,8 @@ using Utils = Orleans.Clustering.Firestore.Utils;
 
 namespace Orleans.Clustering.Firestore.Tests;
 
+[TestSuite("Functional")]
+[TestProvider("GoogleCloud")]
 [TestCategory("Functional"), TestCategory("Firestore"), TestCategory("GoogleCloud")]
 public class FirestoreDataManagerTests : IAsyncLifetime
 {

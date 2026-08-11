@@ -16,6 +16,8 @@ namespace Tester.AdoNet.Streaming;
 /// Tests for SQL Server ADO.NET subscription observer with implicit subscribing.
 /// </summary>
 [TestCategory("SqlServer"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("SqlServer")]
+[TestSuite("Functional")]
 public class SqlServerAdoNetSubscriptionObserverWithImplicitSubscribingTests() : AdoNetSubscriptionObserverWithImplicitSubscribingTests(new Fixture(AdoNetInvariants.InvariantNameSqlServer))
 {
 }
@@ -24,6 +26,8 @@ public class SqlServerAdoNetSubscriptionObserverWithImplicitSubscribingTests() :
 /// Tests for MySQL ADO.NET subscription observer with implicit subscribing.
 /// </summary>
 [TestCategory("MySql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("MySql")]
+[TestSuite("Functional")]
 public class MySqlAdoNetSubscriptionObserverWithImplicitSubscribingTests : AdoNetSubscriptionObserverWithImplicitSubscribingTests
 {
     public MySqlAdoNetSubscriptionObserverWithImplicitSubscribingTests() : base(new Fixture(AdoNetInvariants.InvariantNameMySql))
@@ -36,6 +40,8 @@ public class MySqlAdoNetSubscriptionObserverWithImplicitSubscribingTests : AdoNe
 /// Tests for PostgreSQL ADO.NET subscription observer with implicit subscribing.
 /// </summary>
 [TestCategory("PostgreSql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("PostgreSql")]
+[TestSuite("Functional")]
 public class PostgreSqlAdoNetSubscriptionObserverWithImplicitSubscribingTests() : AdoNetSubscriptionObserverWithImplicitSubscribingTests(new Fixture(AdoNetInvariants.InvariantNamePostgreSql))
 {
 }
@@ -44,6 +50,8 @@ public class PostgreSqlAdoNetSubscriptionObserverWithImplicitSubscribingTests() 
 /// Base class for ADO.NET subscription observer with implicit subscribing tests.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming"), TestCategory("Functional")]
+[TestSuite("Functional")]
+[TestArea("Streaming")]
 public abstract class AdoNetSubscriptionObserverWithImplicitSubscribingTests(AdoNetSubscriptionObserverWithImplicitSubscribingTests.Fixture fixture) : SubscriptionObserverWithImplicitSubscribingTestRunner(fixture), IAsyncLifetime
 {
     private const string TestDatabaseName = "OrleansStreamTest";

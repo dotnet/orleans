@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Orleans.TestingHost;
+using TestExtensions;
 using Xunit;
 
 namespace Orleans.Connections.Security.Tests
@@ -24,7 +25,11 @@ namespace Orleans.Connections.Security.Tests
     /// - Preventing man-in-the-middle attacks
     /// - Authenticating clients and silos
     /// </summary>
+    [TestCategory("BVT")]
     [Trait("Category", "BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Security")]
     public class TlsConnectionTests
     {
         private const string CertificateSubjectName = "fakedomain.faketld";

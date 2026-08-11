@@ -9,6 +9,9 @@ namespace ServiceBus.Tests.StreamingTests
     /// <summary>
     /// Tests for EventHub subscription multiplicity scenarios with batched message processing.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("EventHub")]
+    [TestArea("Streaming")]
     public class EHBatchedSubscriptionMultiplicityTests : OrleansTestingBase, IClassFixture<EHBatchedSubscriptionMultiplicityTests.Fixture>
     {
         private const string StreamProviderName = "EHStreamPerPartition";

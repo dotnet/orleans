@@ -10,6 +10,9 @@ namespace DefaultCluster.Tests
     /// Tests for the in-memory lease provider implementation following the golden path test patterns.
     /// </summary>
     [TestCategory("BVT"), TestCategory("Lease")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class GoldenPathInMemoryLeaseProviderTests : GoldenPathLeaseProviderTestRunner, IClassFixture<GoldenPathInMemoryLeaseProviderTests.Fixture>
     {
         public GoldenPathInMemoryLeaseProviderTests(Fixture fixture, ITestOutputHelper output)

@@ -12,6 +12,8 @@ using Xunit;
 
 namespace UnitTests.GrainDirectory;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT"), TestCategory("Directory")]
 public sealed class GrainDirectoryShutdownMigrationTests
 {

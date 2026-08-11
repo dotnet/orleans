@@ -13,6 +13,8 @@ namespace Tester.AdoNet.Streaming;
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against Sql Server.
 /// </summary>
 [TestCategory("SqlServer"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("SqlServer")]
+[TestSuite("Functional")]
 public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueriesTests(AdoNetInvariants.InvariantNameSqlServer, 90)
 {
 }
@@ -21,6 +23,8 @@ public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueries
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against MySQL.
 /// </summary>
 [TestCategory("MySql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("MySql")]
+[TestSuite("Functional")]
 public class MySqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 {
     public MySqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNameMySql, 20)
@@ -33,6 +37,8 @@ public class MySqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against PostgreSQL.
 /// </summary>
 [TestCategory("PostgreSql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("PostgreSql")]
+[TestSuite("Functional")]
 public class PostgreSqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 {
     public PostgreSqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNamePostgreSql, 99)
@@ -45,6 +51,8 @@ public class PostgreSqlRelationalOrleansQueriesTests : RelationalOrleansQueriesT
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/>.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestSuite("Functional")]
+[TestArea("Streaming")]
 public abstract class RelationalOrleansQueriesTests(string invariant, int concurrency = 100) : IAsyncLifetime
 {
     private const string TestDatabaseName = "OrleansStreamTest";
@@ -124,6 +132,8 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// <summary>
     /// Tests that many messages are queued in parallel on the same queue.
     /// </summary>
+    [TestSuite("Stress")]
+    [TestCategory("Stress")]
     [SkippableFact]
     public async Task RelationalOrleansQueries_QueuesManyMessagesInParallel()
     {
@@ -200,6 +210,8 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// <summary>
     /// Tests that many messages are queued in parallel on many queues.
     /// </summary>
+    [TestSuite("Stress")]
+    [TestCategory("Stress")]
     [SkippableFact]
     public async Task RelationalOrleansQueries_QueuesManyMessagesInParallelOnManyQueues()
     {
@@ -751,6 +763,8 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// For MySQL in particular, this test also detected deadlocks with the driver connection pool itself, which required a package upgrade.
     /// See: https://bugs.mysql.com/bug.php?id=114272
     /// </remarks>
+    [TestSuite("Stress")]
+    [TestCategory("Stress")]
     [SkippableFact]
     public async Task RelationalOrleansQueries_ChaosTest()
     {

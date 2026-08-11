@@ -5,6 +5,8 @@ using Xunit;
 
 namespace UnitTests.ActivationRepartitioningTests;
 
+[TestSuite("Functional")]
+[TestProvider("None")]
 [TestCategory("Functional"), TestCategory("ActivationRepartitioning")]
 public class DeactivatedGrainQueueTests
 {

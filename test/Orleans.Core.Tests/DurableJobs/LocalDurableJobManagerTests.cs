@@ -23,6 +23,9 @@ using Xunit;
 
 namespace NonSilo.Tests.DurableJobs;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableJobs")]
 [TestCategory("BVT"), TestCategory("DurableJobs")]
 public class LocalDurableJobManagerTests
 {

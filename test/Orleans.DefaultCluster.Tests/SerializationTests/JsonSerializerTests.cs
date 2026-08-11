@@ -15,6 +15,9 @@ namespace DefaultCluster.Tests;
 /// Tests System.Text.Json serialization of Orleans types including GrainId with various collection types.
 /// </summary>
 [TestCategory("Serialization"), TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Serialization")]
 public class JsonSerializerTests : HostedTestClusterEnsureDefaultStarted
 {
     public JsonSerializerTests(DefaultClusterFixture fixture) : base(fixture)

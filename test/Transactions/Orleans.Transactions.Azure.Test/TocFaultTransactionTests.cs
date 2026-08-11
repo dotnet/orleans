@@ -9,6 +9,9 @@ namespace Orleans.Transactions.AzureStorage.Tests
     /// Tests for Transfer of Coordination (TOC) fault scenarios with Azure Storage.
     /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Transactions"), TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Transactions")]
     public class TocFaultTransactionTests : TocFaultTransactionTestRunnerxUnit, IClassFixture<TestFixture>
     {
         public TocFaultTransactionTests(TestFixture fixture, ITestOutputHelper output)

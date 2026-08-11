@@ -15,6 +15,9 @@ namespace Tester.Redis.GrainDirectory
     /// </summary>
     [TestCategory("Redis"), TestCategory("Directory"), TestCategory("Functional")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
+    [TestSuite("Functional")]
+    [TestProvider("Redis")]
+    [TestArea("GrainDirectory")]
     public class RedisGrainDirectoryTests : GrainDirectoryTests<RedisGrainDirectory>
     {
         public RedisGrainDirectoryTests(ITestOutputHelper testOutput) : base(testOutput)

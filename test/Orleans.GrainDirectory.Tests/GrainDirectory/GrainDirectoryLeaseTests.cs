@@ -25,6 +25,9 @@ public class LeaseTestGrain : Grain, ILeaseTestGrain
     public Task<SiloAddress> GetAddress() => Task.FromResult(Runtime.SiloAddress);
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Lease")]
 [TestCategory("BVT"), TestCategory("Lease"), TestCategory("Directory")]
 public class GrainDirectoryLeaseTests
 {

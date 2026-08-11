@@ -9,6 +9,9 @@ namespace UnitTests.OrleansRuntime
     /// Tests for Orleans exception serialization and round-trip testing.
     /// </summary>
     [Collection(TestEnvironmentFixture.DefaultCollection)]
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Serialization")]
     public class ExceptionsTests
     {
         private readonly TestEnvironmentFixture fixture;

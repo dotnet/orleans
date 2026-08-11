@@ -29,6 +29,9 @@ namespace Orleans.Serialization.UnitTests
     /// to Orleans that already have complex Newtonsoft.Json configurations.
     /// </summary>
     [Trait("Category", "BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Serialization")]
     public class NewtonsoftJsonCodecTests : FieldCodecTester<MyNewtonsoftJsonClass, IFieldCodec<MyNewtonsoftJsonClass>>, IClassFixture<SerializationTesterFixture>
     {
         public NewtonsoftJsonCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
@@ -119,6 +122,9 @@ namespace Orleans.Serialization.UnitTests
         }
     }
     [Trait("Category", "BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Serialization")]
     public class NewtonsoftJsonCodecCopierTests : CopierTester<MyNewtonsoftJsonClass, IDeepCopier<MyNewtonsoftJsonClass>>, IClassFixture<SerializationTesterFixture>
     {
         public NewtonsoftJsonCodecCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)

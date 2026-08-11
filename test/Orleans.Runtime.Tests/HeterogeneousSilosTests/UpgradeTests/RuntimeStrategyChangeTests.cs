@@ -10,6 +10,9 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     /// <summary>
     /// Tests for runtime changes to versioning strategies including compatibility and selector strategy modifications.
     /// </summary>
+    [TestSuite("SlowBVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT")]
     public class RuntimeStrategyChangeTests : UpgradeTestsBase
     {

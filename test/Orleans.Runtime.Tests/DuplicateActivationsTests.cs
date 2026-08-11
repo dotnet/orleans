@@ -16,6 +16,9 @@ namespace UnitTests.CatalogTests
     /// The catalog is responsible for ensuring that concurrent activation requests for the same grain
     /// don't result in multiple activations within a single silo.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class DuplicateActivationsTests : IClassFixture<DuplicateActivationsTests.Fixture>
     {
         private readonly Fixture fixture;

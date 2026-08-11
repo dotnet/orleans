@@ -29,6 +29,8 @@ namespace Orleans.Journaling.Tests;
 ///    HEX baseline — any wire-format drift fails on that single line.
 /// </para>
 /// </remarks>
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT")]
 public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
 {

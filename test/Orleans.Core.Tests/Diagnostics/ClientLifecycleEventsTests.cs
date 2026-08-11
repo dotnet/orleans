@@ -13,6 +13,9 @@ using Xunit;
 
 namespace UnitTests.Diagnostics;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public class ClientLifecycleEventsTests
 {
     [Fact, TestCategory("BVT")]

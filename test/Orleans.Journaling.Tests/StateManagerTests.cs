@@ -19,6 +19,8 @@ namespace Orleans.Journaling.Tests;
 /// recovered together. It manages the lifecycle of states, handles persistence through
 /// WriteStateAsync calls, and ensures consistent recovery after failures.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT")]
 public class StateManagerTests : JournalingTestBase
 {

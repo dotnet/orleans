@@ -9,6 +9,9 @@ namespace UnitTests.General;
 /// This component aggregates counter values from multiple sources and is used throughout Orleans for collecting
 /// performance metrics such as message counts, activation counts, and other operational statistics.
 /// </summary>
+[TestSuite("Functional")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public class CounterAggregatorGroupTests
 {
     private readonly ITestOutputHelper _output;

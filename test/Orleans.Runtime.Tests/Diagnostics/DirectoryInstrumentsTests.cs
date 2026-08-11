@@ -8,6 +8,8 @@ namespace Tester.Diagnostics;
 
 public class DirectoryInstrumentsTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void DirectoryInstruments_RecordsMetricsUsingMeterFactory()
     {

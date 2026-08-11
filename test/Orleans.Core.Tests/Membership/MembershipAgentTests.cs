@@ -17,6 +17,9 @@ namespace NonSilo.Tests.Membership
     /// Tests for membership agent functionality including lifecycle stages, IAmAlive updates, and connectivity validation.
     /// </summary>
     [TestCategory("BVT"), TestCategory("Membership")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class MembershipAgentTests
     {
         private readonly ITestOutputHelper output;

@@ -15,6 +15,9 @@ namespace UnitTests.MembershipTests
     /// Tests for operation of Orleans Membership Table using MySQL
     /// </summary>
     [TestCategory("Membership"), TestCategory("MySql"), TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("MySql")]
+    [TestArea("Membership")]
     public class MySqlMembershipTableTests : MembershipTableTestsBase
     {
         public MySqlMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())

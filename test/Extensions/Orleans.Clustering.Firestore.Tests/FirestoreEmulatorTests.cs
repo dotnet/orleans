@@ -3,6 +3,8 @@ using Google.Cloud.Firestore;
 
 namespace Orleans.Clustering.Firestore.Tests;
 
+[TestSuite("Functional")]
+[TestProvider("GoogleCloud")]
 [TestCategory("GoogleCloud"), TestCategory("Functional")]
 public class FirestoreEmulatorTests
 {

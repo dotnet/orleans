@@ -10,6 +10,9 @@ namespace Analyzers.Tests;
 /// This analyzer prevents runtime errors by catching invalid serialization configurations at compile time.
 /// </summary>
 [TestCategory("BVT"), TestCategory("Analyzer")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Analyzer")]
 public class AbstractPropertiesCannotBeSerializedAnalyzerTest : DiagnosticAnalyzerTestBase<AbstractPropertiesCannotBeSerializedAnalyzer>
 {
     private async Task VerifyGeneratedDiagnostic(string code)

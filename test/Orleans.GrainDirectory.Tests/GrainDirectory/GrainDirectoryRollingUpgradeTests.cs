@@ -40,6 +40,8 @@ internal class RollingUpgradeTestGrain : Grain, IRollingUpgradeTestGrain
 /// Starts a cluster with only LocalGrainDirectory, then adds silos with DistributedGrainDirectory
 /// while removing old silos, verifying grain calls succeed after each step.
 /// </summary>
+[TestSuite("Functional")]
+[TestProvider("None")]
 [TestCategory("Directory"), TestCategory("Functional")]
 public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
 {

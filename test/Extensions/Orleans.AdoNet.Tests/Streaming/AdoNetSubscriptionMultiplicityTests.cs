@@ -13,6 +13,8 @@ namespace Tester.AdoNet.Streaming;
 /// Tests for SQL Server ADO.NET subscription multiplicity.
 /// </summary>
 [TestCategory("SqlServer"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("SqlServer")]
+[TestSuite("Functional")]
 public class SqlServerAdoNetSubscriptionMultiplicityTests() : AdoNetSubscriptionMultiplicityTests(AdoNetInvariants.InvariantNameSqlServer)
 {
 }
@@ -21,6 +23,8 @@ public class SqlServerAdoNetSubscriptionMultiplicityTests() : AdoNetSubscription
 /// Tests for MySQL ADO.NET subscription multiplicity.
 /// </summary>
 [TestCategory("MySql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("MySql")]
+[TestSuite("Functional")]
 public class MySqlAdoNetSubscriptionMultiplicityTests : AdoNetSubscriptionMultiplicityTests
 {
     public MySqlAdoNetSubscriptionMultiplicityTests() : base(AdoNetInvariants.InvariantNameMySql)
@@ -33,6 +37,8 @@ public class MySqlAdoNetSubscriptionMultiplicityTests : AdoNetSubscriptionMultip
 /// Tests for PostgreSQL ADO.NET subscription multiplicity.
 /// </summary>
 [TestCategory("PostgreSql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("PostgreSql")]
+[TestSuite("Functional")]
 public class PostgreSqlAdoNetSubscriptionMultiplicityTests() : AdoNetSubscriptionMultiplicityTests(AdoNetInvariants.InvariantNamePostgreSql)
 {
 }
@@ -41,6 +47,8 @@ public class PostgreSqlAdoNetSubscriptionMultiplicityTests() : AdoNetSubscriptio
 /// Base class for ADO.NET subscription multiplicity tests.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestSuite("Functional")]
+[TestArea("Streaming")]
 public abstract class AdoNetSubscriptionMultiplicityTests : TestClusterPerTest
 {
     private const string TestDatabaseName = "OrleansStreamTest";

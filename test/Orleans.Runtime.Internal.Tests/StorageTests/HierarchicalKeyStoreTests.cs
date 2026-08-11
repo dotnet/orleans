@@ -7,6 +7,9 @@ namespace UnitTests.StorageTests
     /// <summary>
     /// Tests for hierarchical key-value store operations including multi-key storage.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class HierarchicalKeyStoreTests : IClassFixture<HierarchicalKeyStoreTests.Fixture>
     {
         public class Fixture

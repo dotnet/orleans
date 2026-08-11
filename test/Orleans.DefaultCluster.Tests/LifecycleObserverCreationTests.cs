@@ -13,6 +13,9 @@ namespace DefaultCluster.Tests.General
     /// (grain context), preventing CreateObjectReference from working.
     /// </summary>
     [TestCategory("BVT"), TestCategory("Lifecycle"), TestCategory("Observer")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class LifecycleObserverCreationTests
     {
         /// <summary>

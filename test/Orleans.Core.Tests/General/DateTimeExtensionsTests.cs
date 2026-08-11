@@ -5,6 +5,8 @@ namespace UnitTests.UtilsTests;
 
 public class DateTimeExtensionsTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Theory, TestCategory("BVT")]
     [InlineData(DateTimeKind.Unspecified)]
     [InlineData(DateTimeKind.Utc)]

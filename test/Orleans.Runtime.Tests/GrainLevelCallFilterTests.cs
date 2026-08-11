@@ -5,6 +5,9 @@ using Xunit;
 
 namespace UnitTests.General
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("BVT"), TestCategory("GrainLevelCallFilter")]
     public class GrainLevelCallFilterTests : OrleansTestingBase, IClassFixture<GrainLevelCallFilterTests.Fixture>
     {

@@ -5,6 +5,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Orleans.Clustering.Firestore.Tests;
 
 [TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("GoogleCloud")]
+[TestArea("Clustering")]
 public class FirestoreDataManagerCancellationTests
 {
     [Fact]

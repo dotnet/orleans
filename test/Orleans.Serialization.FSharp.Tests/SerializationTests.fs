@@ -28,6 +28,7 @@ type DefaultClusterTestCollection() = interface ICollectionFixture<DefaultCluste
 /// leveraging functional programming patterns while maintaining
 /// full compatibility with Orleans' distributed computing model.
 /// </summary>
+[<TestSuite("BVT"); TestProvider("None"); TestArea("Serialization")>]
 type FSharpSerializationTests(fixture: DefaultClusterFixture) =
     inherit HostedTestClusterEnsureDefaultStarted(fixture)
 

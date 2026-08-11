@@ -13,6 +13,9 @@ namespace NonSilo.Tests
     /// </summary>
     [TestCategory("BVT")]
     [TestCategory("Providers")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ProviderErrorMessageTests
     {
         /// <summary>

@@ -1,4 +1,4 @@
-﻿
+
 using Orleans.Runtime;
 using Xunit;
 
@@ -8,6 +8,9 @@ namespace UnitTests
     /// Tests for Orleans management and monitoring components, particularly the SystemStatus enumeration.
     /// SystemStatus is used throughout Orleans to track the lifecycle state of silos and other runtime components.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ManagementAgentTests
     {
         /// <summary>

@@ -12,6 +12,9 @@ using Xunit;
 
 namespace Orleans.Streaming.Kinesis.Tests;
 
+[TestSuite("BVT")]
+[TestArea("Streaming")]
+[TestProvider("Kinesis")]
 [TestCategory("AWS"), TestCategory("Kinesis")]
 public sealed class DynamoDBStreamQueueCheckpointerTests : StreamQueueCheckpointerTests
 {
@@ -49,6 +52,9 @@ public sealed class DynamoDBStreamQueueCheckpointerTests : StreamQueueCheckpoint
     }
 }
 
+[TestSuite("BVT")]
+[TestArea("Streaming")]
+[TestProvider("Kinesis")]
 [TestCategory("AWS"), TestCategory("Kinesis")]
 public sealed class DynamoDBStreamCheckpointStoreTests
 {
@@ -450,6 +456,9 @@ public sealed class DynamoDBStreamCheckpointStoreTests
         };
 }
 
+[TestSuite("BVT")]
+[TestArea("Streaming")]
+[TestProvider("Kinesis")]
 [TestCategory("AWS"), TestCategory("Kinesis")]
 public sealed class DynamoDBStreamQueueCheckpointerIntegrationTests
 {

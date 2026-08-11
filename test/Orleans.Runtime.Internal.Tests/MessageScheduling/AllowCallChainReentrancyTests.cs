@@ -7,6 +7,9 @@ namespace UnitTests.General
     /// <summary>
     /// Tests for allowed call chain reentrancy scenarios on non-reentrant grains.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class AllowCallChainReentrancyTests : OrleansTestingBase, IClassFixture<AllowCallChainReentrancyTests.Fixture>
     {
         private const int NumIterations = 30;

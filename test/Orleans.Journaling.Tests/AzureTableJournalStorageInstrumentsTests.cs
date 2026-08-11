@@ -4,6 +4,8 @@ using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 
 namespace Orleans.Journaling.Tests;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT")]
 public sealed class AzureTableJournalStorageInstrumentsTests
 {

@@ -8,6 +8,9 @@ using Xunit.Abstractions;
 
 namespace Tester.Redis.Streaming;
 
+[TestSuite("Functional")]
+[TestProvider("Redis")]
+[TestArea("Streaming")]
 [TestCategory("Redis"), TestCategory("Streaming"), TestCategory("Functional"), TestCategory("StreamingCacheMiss")]
 public sealed class RedisStreamCacheMissTests : StreamingCacheMissTests
 {

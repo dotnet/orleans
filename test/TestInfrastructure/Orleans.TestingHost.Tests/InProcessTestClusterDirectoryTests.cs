@@ -7,6 +7,8 @@ namespace Orleans.TestingHost.Tests;
 
 public sealed class InProcessTestClusterDirectoryTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task DefaultUsesTestDirectory()
     {
@@ -18,6 +20,8 @@ public sealed class InProcessTestClusterDirectoryTests
         Assert.Equal("InProcessGrainDirectory", GetDefaultDirectory(cluster).GetType().Name);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task DistributedDirectoryCanBeEnabled()
     {
@@ -32,6 +36,8 @@ public sealed class InProcessTestClusterDirectoryTests
         Assert.Equal("DistributedGrainDirectory", GetDefaultDirectory(cluster).GetType().Name);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public async Task DistributedDirectoryCanBeEnabledWhenNamedDirectoryExists()
     {
@@ -60,6 +66,8 @@ public sealed class InProcessTestClusterDirectoryTests
 public sealed class OrleansInProcessTestClusterDirectoryTests(
     OrleansInProcessTestClusterFixture fixture) : IClassFixture<OrleansInProcessTestClusterFixture>
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void OrleansFixtureUsesDistributedDirectory()
     {

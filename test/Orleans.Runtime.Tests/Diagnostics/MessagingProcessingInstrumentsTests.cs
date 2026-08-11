@@ -8,6 +8,8 @@ namespace Tester.Diagnostics;
 
 public class MessagingProcessingInstrumentsTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void MessagingProcessingInstruments_RecordsMetricsUsingMeterFactory()
     {

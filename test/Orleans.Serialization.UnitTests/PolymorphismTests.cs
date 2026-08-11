@@ -47,6 +47,9 @@ namespace Orleans.Serialization.UnitTests
     /// - Exception propagation across grain boundaries
     /// - Flexible API designs with interface parameters
     /// </summary>
+    [Trait("Suite", "BVT")]
+    [Trait("Provider", "None")]
+    [Trait("Area", "Serialization")]
     public class PolymorphismTests
     {
         private readonly ServiceProvider _serviceProvider;

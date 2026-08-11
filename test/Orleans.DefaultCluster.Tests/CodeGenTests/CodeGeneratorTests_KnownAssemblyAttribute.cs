@@ -8,6 +8,9 @@ namespace DefaultCluster.Tests.General
     /// <summary>
     /// Unit tests for grains implementing generic interfaces
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("CodeGen")]
     public class KnownAssemblyAttributeTests : HostedTestClusterEnsureDefaultStarted
     {
         public KnownAssemblyAttributeTests(DefaultClusterFixture fixture) : base(fixture)

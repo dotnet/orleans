@@ -12,6 +12,9 @@ namespace DefaultCluster.Tests.General
     /// This enables object-oriented patterns where grains expose different levels
     /// of functionality through interface inheritance.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class PolymorphicInterfaceTest : HostedTestClusterEnsureDefaultStarted
     {
         public PolymorphicInterfaceTest(DefaultClusterFixture fixture) : base(fixture)

@@ -8,6 +8,9 @@ namespace UnitTests.StorageTests.Relational
     /// Persistence tests for MySQL with the delete-state-on-clear option enabled.
     /// </summary>
     [TestCategory("MySql"), TestCategory("Persistence")]
+    [TestSuite("Functional")]
+    [TestProvider("MySql")]
+    [TestArea("Persistence")]
     public class MySqlStorageDeleteOnClearTests : RelationalStorageTests, IClassFixture<CommonFixture>
     {
         private const string AdoNetInvariant = AdoNetInvariants.InvariantNameMySql;

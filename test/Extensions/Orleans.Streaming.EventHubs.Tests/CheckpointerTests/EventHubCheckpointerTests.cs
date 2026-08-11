@@ -15,6 +15,8 @@ namespace ServiceBus.Tests.CheckpointerTests;
 /// <summary>
 /// Tests for EventHub delivery-based checkpointing via pulling-agent progress snapshots.
 /// </summary>
+[TestProvider("EventHub")]
+[TestArea("Streaming")]
 [TestCategory("EventHub"), TestCategory("Streaming")]
 public class EventHubCheckpointerTests
 {
@@ -245,6 +247,7 @@ public class EventHubCheckpointerTests
         return receiver;
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public async Task Initialize_WhenCheckpointDoesNotExist_UsesStartOfStream()
     {
@@ -262,6 +265,7 @@ public class EventHubCheckpointerTests
         Assert.Equal(EventHubConstants.StartOfStream, receiverOffset);
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public async Task GetQueueMessagesAsync_TreatsNullReceiverResultAsEmpty()
     {
@@ -276,6 +280,7 @@ public class EventHubCheckpointerTests
         Assert.Equal(0, cache.AddCount);
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public async Task GetQueueMessagesAsync_ForwardsCancellationToken()
     {
@@ -293,6 +298,7 @@ public class EventHubCheckpointerTests
         Assert.Equal(cancellation.Token, exception.CancellationToken);
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public async Task CancellationOverloads_FallBackToLegacyReceiver()
     {
@@ -306,6 +312,7 @@ public class EventHubCheckpointerTests
         Assert.Equal(1, ((TestEventHubReceiver)receiver).CloseCount);
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public async Task CursorRefresh_DelegatesToEventHubCache()
     {
@@ -320,6 +327,7 @@ public class EventHubCheckpointerTests
         Assert.Same(refreshToken, cache.RefreshToken);
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public async Task Shutdown_DisposesCacheAndClosesReceiver_WhenFlushFails()
     {
@@ -335,6 +343,7 @@ public class EventHubCheckpointerTests
         Assert.Equal(1, eventHubReceiver.CloseCount);
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public async Task Shutdown_CancelsBlockedReceiverClose()
     {
@@ -351,6 +360,7 @@ public class EventHubCheckpointerTests
         Assert.Equal(1, eventHubReceiver.CloseCount);
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public async Task FlushBeforeLoad_DoesNotPersistUninitializedOffset()
     {
@@ -362,6 +372,7 @@ public class EventHubCheckpointerTests
         Assert.Equal(string.Empty, GetLatestOffset(checkpointer));
     }
 
+    [TestSuite("BVT")]
     [Theory, TestCategory("BVT")]
     [InlineData("20")]
     [InlineData("10")]
@@ -379,6 +390,7 @@ public class EventHubCheckpointerTests
         Assert.Equal("20", GetEntityOffset(checkpointer));
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public void Update_WhenOffsetAdvances_TracksLatestCheckpoint()
     {
@@ -392,6 +404,7 @@ public class EventHubCheckpointerTests
         Assert.Equal("21", GetEntityOffset(checkpointer));
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public void Update_WithNoComparer_TracksOpaqueCheckpoint()
     {
@@ -404,6 +417,7 @@ public class EventHubCheckpointerTests
         Assert.Equal("opaque-checkpoint", GetEntityOffset(checkpointer));
     }
 
+    [TestSuite("BVT")]
     [Theory, TestCategory("BVT")]
     [InlineData("", "provider_service")]
     [InlineData("EventHubCheckpoints_", "EventHubCheckpoints_provider_service")]
@@ -414,6 +428,7 @@ public class EventHubCheckpointerTests
         Assert.Equal(expected, GetEntityPartitionKey(checkpointer));
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public void EventHubCheckpointEntity_PreservesLegacyAzureTableSchema()
     {
@@ -434,6 +449,7 @@ public class EventHubCheckpointerTests
         Assert.Equal(typeof(ETag), entityType.GetProperty("ETag")?.PropertyType);
     }
 
+    [TestSuite("BVT")]
     [Theory, TestCategory("BVT")]
     [InlineData(false, "", EventHubConstants.StartOfStream)]
     [InlineData(true, "123", "123")]
@@ -458,6 +474,7 @@ public class EventHubCheckpointerTests
         Assert.Equal(expected, await checkpointer.Load(CancellationToken.None));
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public async Task SingleSubscription_CheckpointsProcessedOffset()
     {
@@ -470,6 +487,7 @@ public class EventHubCheckpointerTests
         Assert.Equal("100", checkpointer.LastOffset);
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public async Task Shutdown_FlushesLatestDeliveryProgress()
     {
@@ -486,6 +504,7 @@ public class EventHubCheckpointerTests
         Assert.Equal("100", checkpointer.FlushedOffset);
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public async Task MultipleSubscriptions_CheckpointsMinimumWatermark()
     {
@@ -498,6 +517,7 @@ public class EventHubCheckpointerTests
         Assert.Equal("95", checkpointer.LastOffset);
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public async Task SubscriptionRemoved_NoLongerHoldsWatermark()
     {
@@ -513,6 +533,7 @@ public class EventHubCheckpointerTests
         Assert.Equal("200", checkpointer.LastOffset);
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public async Task WatermarkAdvances_AsSubscriptionsCatchUp()
     {
@@ -532,6 +553,7 @@ public class EventHubCheckpointerTests
         Assert.Equal("120", checkpointer.LastOffset);
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public async Task ReplayingSubscription_DoesNotMoveCheckpointBackward()
     {
@@ -547,6 +569,7 @@ public class EventHubCheckpointerTests
         Assert.Equal("200", checkpointer.LastOffset);
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public async Task NoSubscriptions_NoCheckpoint()
     {
@@ -557,6 +580,7 @@ public class EventHubCheckpointerTests
         Assert.Equal(0, checkpointer.UpdateCount);
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public async Task NoActiveSubscriptions_NoCheckpoint()
     {
@@ -569,6 +593,7 @@ public class EventHubCheckpointerTests
         Assert.Null(checkpointer.LastOffset);
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public async Task CachePurge_UpdatesCheckpointDirectly()
     {
@@ -581,6 +606,7 @@ public class EventHubCheckpointerTests
         Assert.Equal("100", checkpointer.LastOffset);
     }
 
+    [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
     public async Task DeliveryProgress_UpdatesCheckpoint()
     {

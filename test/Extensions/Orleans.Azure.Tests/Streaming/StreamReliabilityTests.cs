@@ -29,6 +29,8 @@ using System.Diagnostics;
 
 namespace UnitTests.Streaming.Reliability
 {
+    [TestArea("Streaming")]
+    [TestProvider("AzureStorage")]
     [TestCategory("Streaming"), TestCategory("Reliability")]
     public class StreamReliabilityTests : BaseInProcessTestClusterFixture
     {
@@ -144,6 +146,7 @@ namespace UnitTests.Streaming.Reliability
             catch (SkipException) { }
         }
 
+        [TestSuite("Functional")]
         [SkippableFact, TestCategory("Functional")]
         public void Baseline_StreamRel()
         {
@@ -153,6 +156,7 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogEndTest(testName, Logger);
         }
 
+        [TestSuite("Functional")]
         [SkippableFact, TestCategory("Functional")]
         public async Task Baseline_StreamRel_RestartSilos()
         {
@@ -171,6 +175,7 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogEndTest(testName, Logger);
         }
 
+        [TestSuite("Functional")]
         [SkippableFact, TestCategory("Functional")]
         public async Task SMS_Baseline_StreamRel()
         {
@@ -191,6 +196,8 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogEndTest(testName, Logger);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("AzureStorage")]
         [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage")]
         public async Task AQ_Baseline_StreamRel()
         {
@@ -209,6 +216,7 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogEndTest(testName, Logger);
         }
 
+        [TestArea("Streaming")]
         [SkippableFact(Skip ="Ignore"), TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability")]
         public async Task SMS_AddMany_Consumers()
         {
@@ -216,6 +224,8 @@ namespace UnitTests.Streaming.Reliability
             await Test_AddMany_Consumers(testName, MEMORY_STREAM_PROVIDER_NAME);
         }
 
+        [TestProvider("AzureStorage")]
+        [TestArea("Streaming")]
         [SkippableFact(Skip = "Ignore"), TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("AzureStorage")]
         public async Task AQ_AddMany_Consumers()
         {
@@ -223,6 +233,7 @@ namespace UnitTests.Streaming.Reliability
             await Test_AddMany_Consumers(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
+        [TestSuite("Functional")]
         [SkippableFact, TestCategory("Functional")]
         public async Task SMS_PubSub_MultiConsumerSameGrain()
         {
@@ -231,6 +242,7 @@ namespace UnitTests.Streaming.Reliability
         }
         // AQ_PubSub_MultiConsumerSameGrain not required - does not use PubSub
 
+        [TestSuite("Functional")]
         [SkippableFact, TestCategory("Functional")]
         public async Task SMS_PubSub_MultiProducerSameGrain()
         {
@@ -239,6 +251,7 @@ namespace UnitTests.Streaming.Reliability
         }
         // AQ_PubSub_MultiProducerSameGrain not required - does not use PubSub
 
+        [TestSuite("Functional")]
         [SkippableFact, TestCategory("Functional")]
         public async Task SMS_PubSub_Unsubscribe()
         {
@@ -248,6 +261,7 @@ namespace UnitTests.Streaming.Reliability
         // AQ_PubSub_Unsubscribe not required - does not use PubSub
 
         //TODO: This test fails because the resubscribe to streams after restart creates a new subscription, losing the events on the previous subscription.  Should be fixed when 'renew' subscription feature is added. - jbragg
+        [TestSuite("Functional")]
         [SkippableFact, TestCategory("Functional"), TestCategory("Failures")]
         public async Task SMS_StreamRel_AllSilosRestart_PubSubCounts()
         {
@@ -256,6 +270,7 @@ namespace UnitTests.Streaming.Reliability
         }
         // AQ_StreamRel_AllSilosRestart_PubSubCounts not required - does not use PubSub
 
+        [TestSuite("Functional")]
         [SkippableFact, TestCategory("Functional")]
         public async Task SMS_StreamRel_AllSilosRestart()
         {
@@ -263,6 +278,8 @@ namespace UnitTests.Streaming.Reliability
 
             await Test_AllSilosRestart(testName, MEMORY_STREAM_PROVIDER_NAME);
         }
+        [TestSuite("Functional")]
+        [TestProvider("AzureStorage")]
         [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_AllSilosRestart()
         {
@@ -271,6 +288,8 @@ namespace UnitTests.Streaming.Reliability
             await Test_AllSilosRestart(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("AzureStorage")]
         [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloJoins()
         {
@@ -279,12 +298,15 @@ namespace UnitTests.Streaming.Reliability
             await Test_SiloJoins(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
+        [TestSuite("Functional")]
         [SkippableFact, TestCategory("Functional")]
         public async Task SMS_StreamRel_SiloDies_Consumer()
         {
             const string testName = "SMS_StreamRel_SiloDies_Consumer";
             await Test_SiloDies_Consumer(testName, MEMORY_STREAM_PROVIDER_NAME);
         }
+        [TestSuite("Functional")]
+        [TestProvider("AzureStorage")]
         [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloDies_Consumer()
         {
@@ -292,12 +314,15 @@ namespace UnitTests.Streaming.Reliability
             await Test_SiloDies_Consumer(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
+        [TestSuite("Functional")]
         [SkippableFact, TestCategory("Functional")]
         public async Task SMS_StreamRel_SiloDies_Producer()
         {
             const string testName = "SMS_StreamRel_SiloDies_Producer";
             await Test_SiloDies_Producer(testName, MEMORY_STREAM_PROVIDER_NAME);
         }
+        [TestSuite("Functional")]
+        [TestProvider("AzureStorage")]
         [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloDies_Producer()
         {
@@ -305,12 +330,15 @@ namespace UnitTests.Streaming.Reliability
             await Test_SiloDies_Producer(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
+        [TestSuite("Functional")]
         [SkippableFact, TestCategory("Functional")]
         public async Task SMS_StreamRel_SiloRestarts_Consumer()
         {
             const string testName = "SMS_StreamRel_SiloRestarts_Consumer";
             await Test_SiloRestarts_Consumer(testName, MEMORY_STREAM_PROVIDER_NAME);
         }
+        [TestSuite("Functional")]
+        [TestProvider("AzureStorage")]
         [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloRestarts_Consumer()
         {
@@ -318,12 +346,15 @@ namespace UnitTests.Streaming.Reliability
             await Test_SiloRestarts_Consumer(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
+        [TestSuite("Functional")]
         [SkippableFact, TestCategory("Functional")]
         public async Task SMS_StreamRel_SiloRestarts_Producer()
         {
             const string testName = "SMS_StreamRel_SiloRestarts_Producer";
             await Test_SiloRestarts_Producer(testName, MEMORY_STREAM_PROVIDER_NAME);
         }
+        [TestSuite("Functional")]
+        [TestProvider("AzureStorage")]
         [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloRestarts_Producer()
         {
@@ -624,6 +655,7 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogEndTest(testName, Logger);
         }
 
+        [TestSuite("Functional")]
         [SkippableFact, TestCategory("Functional")]
         public async Task SMS_AllSilosRestart_UnsubscribeConsumer()
         {

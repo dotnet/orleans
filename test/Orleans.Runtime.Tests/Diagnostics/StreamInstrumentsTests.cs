@@ -8,6 +8,8 @@ namespace Tester.Diagnostics;
 
 public class StreamInstrumentsTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void StreamInstruments_RecordsMetricsUsingMeterFactory()
     {

@@ -11,6 +11,9 @@ namespace Tester.AzureUtils
     /// Tests for Azure Table Storage data manager CRUD operations and conditional updates.
     /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Storage")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Persistence")]
     public class AzureTableDataManagerTests : AzureStorageBasicTests
     {
         private readonly string PartitionKey;

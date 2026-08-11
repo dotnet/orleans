@@ -12,6 +12,9 @@ namespace ServiceBus.Tests.StreamingTests
     /// Tests for EventHub subscription multiplicity scenarios including parallel, linear, and resubscription behaviors.
     /// </summary>
     [TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("EventHub")]
+    [TestArea("Streaming")]
     public class EHSubscriptionMultiplicityTests : OrleansTestingBase, IClassFixture<EHSubscriptionMultiplicityTests.Fixture>
     {
         private const string StreamProviderName = "EventHubStreamProvider";

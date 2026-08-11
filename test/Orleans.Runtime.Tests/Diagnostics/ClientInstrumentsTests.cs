@@ -8,6 +8,8 @@ namespace Tester.Diagnostics;
 
 public class ClientInstrumentsTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void ClientInstruments_RecordsMetricsUsingMeterFactory()
     {

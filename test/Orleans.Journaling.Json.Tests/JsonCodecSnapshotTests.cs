@@ -22,6 +22,8 @@ namespace Orleans.Journaling.Json.Tests;
 ///    (file <c>snapshots/&lt;TestName&gt;.verified.jsonl</c>). The snapshot is the canonical
 ///    human-readable view: any wire-format drift fails as a JSON-line text diff.
 /// </remarks>
+[TestSuite("BVT")]
+[TestProvider("None")]
 [TestCategory("BVT")]
 public sealed class JsonCodecSnapshotTests
 {

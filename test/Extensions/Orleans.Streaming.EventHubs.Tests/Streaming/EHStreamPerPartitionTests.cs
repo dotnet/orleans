@@ -15,6 +15,9 @@ namespace ServiceBus.Tests.StreamingTests
     /// Tests for EventHub stream-per-partition data adapter functionality.
     /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("EventHub")]
+    [TestArea("Streaming")]
     public class EHStreamPerPartitionTests : OrleansTestingBase, IClassFixture<EHStreamPerPartitionTests.Fixture>
     {
         private readonly Fixture fixture;
