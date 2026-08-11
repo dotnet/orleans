@@ -38,7 +38,7 @@ namespace Orleans.Runtime.Membership
     {
         private readonly ILogger logger;
 
-        private const int ZOOKEEPER_CONNECTION_TIMEOUT = 2000;
+        private const int ZOOKEEPER_SESSION_TIMEOUT = 10_000;
 
         private readonly ZooKeeperWatcher watcher;
 
@@ -297,12 +297,12 @@ namespace Orleans.Runtime.Membership
 
         private static Task<T> UsingZookeeper<T>(Func<ZooKeeper, Task<T>> zkMethod, string deploymentConnectionString, ZooKeeperWatcher watcher, bool canBeReadOnly = false)
         {
-            return ZooKeeper.Using(deploymentConnectionString, ZOOKEEPER_CONNECTION_TIMEOUT, watcher, zkMethod, canBeReadOnly);
+            return ZooKeeper.Using(deploymentConnectionString, ZOOKEEPER_SESSION_TIMEOUT, watcher, zkMethod, canBeReadOnly);
         }
 
         private Task UsingZookeeper(string connectString, Func<ZooKeeper, Task> zkMethod)
         {
-            return ZooKeeper.Using(connectString, ZOOKEEPER_CONNECTION_TIMEOUT, watcher, zkMethod);
+            return ZooKeeper.Using(connectString, ZOOKEEPER_SESSION_TIMEOUT, watcher, zkMethod);
         }
 
         private static string ConvertToRowPath(SiloAddress siloAddress)
