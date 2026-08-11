@@ -356,6 +356,13 @@ jobs:
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;TrustServerCertificate=True;"
+    - name: Diagnose SQL Server
+      if: failure()
+      shell: bash
+      run: |
+        docker inspect --format 'status={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} restartCount={{.RestartCount}} oomKilled={{.State.OOMKilled}} exitCode={{.State.ExitCode}} error={{json .State.Error}}' mssql || true
+        docker inspect --format '{{if .State.Health}}{{range .State.Health.Log}}{{println .Start "exitCode=" .ExitCode .Output}}{{end}}{{end}}' mssql || true
+        docker logs --timestamps mssql || true
     - name: Clean up SQL Server
       if: always()
       run: docker rm -f mssql || true
