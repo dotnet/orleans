@@ -9,16 +9,16 @@ namespace Orleans.Runtime.Messaging
 {
     internal sealed class ClientOutboundConnectionFactory(
         IOptions<ConnectionOptions> connectionOptions,
-        IOptions<ClientConnectionOptions> clientConnectionOptions,
-        IOptions<ClusterOptions> clusterOptions,
+        IOptions<ClientConnectionOptions> clientConnectionOptionsAccessor,
+        IOptions<ClusterOptions> clusterOptionsAccessor,
         ConnectionCommon connectionShared,
         ConnectionPreambleHelper connectionPreambleHelper)
         : ConnectionFactory(connectionShared.ServiceProvider.GetRequiredKeyedService<IConnectionFactory>(ServicesKey),
             connectionShared.ServiceProvider, connectionOptions)
     {
         internal static readonly object ServicesKey = new object();
-        private readonly ClientConnectionOptions clientConnectionOptions = clientConnectionOptions.Value;
-        private readonly ClusterOptions clusterOptions = clusterOptions.Value;
+        private readonly ClientConnectionOptions clientConnectionOptions = clientConnectionOptionsAccessor.Value;
+        private readonly ClusterOptions clusterOptions = clusterOptionsAccessor.Value;
 #if NET9_0_OR_GREATER
         private readonly Lock initializationLock = new();
 #else

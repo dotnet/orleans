@@ -12,11 +12,11 @@ namespace Orleans.Messaging
     /// <remarks>
     /// Initializes a new instance of the <see cref="StaticGatewayListProvider"/> class.
     /// </remarks>
-    /// <param name="options">The specific options.</param>
+    /// <param name="optionsAccessor">The specific options.</param>
     /// <param name="gatewayOptions">The general gateway options.</param>
-    public class StaticGatewayListProvider(IOptions<StaticGatewayListProviderOptions> options, IOptions<GatewayOptions> gatewayOptions) : IGatewayListProvider
+    public class StaticGatewayListProvider(IOptions<StaticGatewayListProviderOptions> optionsAccessor, IOptions<GatewayOptions> gatewayOptions) : IGatewayListProvider
     {
-        private readonly StaticGatewayListProviderOptions options = options.Value;
+        private readonly StaticGatewayListProviderOptions options = optionsAccessor.Value;
         private readonly TimeSpan maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
 
         /// <inheritdoc />
