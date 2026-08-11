@@ -334,21 +334,11 @@ public class ShardExecutorTests
     [Fact]
     public async Task RunShardAsync_WhenOverloaded_UsesTimeProviderForBackoff()
     {
-        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var timeProvider = new TimerTrackingFakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         var options = CreateOptions(maxConcurrentJobs: 10, overloadBackoffDelay: TimeSpan.FromSeconds(5));
         var overloadDetector = Substitute.For<IOverloadDetector>();
         var overloaded = true;
-        var delayStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var overloadChecks = 0;
-        overloadDetector.IsOverloaded.Returns(_ =>
-        {
-            if (Interlocked.Increment(ref overloadChecks) == 2)
-            {
-                delayStarted.SetResult();
-            }
-
-            return Volatile.Read(ref overloaded);
-        });
+        overloadDetector.IsOverloaded.Returns(_ => Volatile.Read(ref overloaded));
         var jobs = CreateJobs(1, timeProvider.GetUtcNow().AddSeconds(-1));
         var shard = CreateJobShard(jobs, startTime: timeProvider.GetUtcNow().AddMinutes(-1));
         var grainFactory = CreateGrainFactory();
@@ -362,11 +352,11 @@ public class ShardExecutorTests
 
         var runTask = executor.RunShardAsync(shard, CancellationToken.None);
 
-        await delayStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await timeProvider.TimerCreated.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.False(jobHandled.Task.IsCompleted);
 
         Volatile.Write(ref overloaded, false);
-        await AdvanceUntilCompletedAsync(timeProvider, jobHandled.Task, options.Value.OverloadBackoffDelay);
+        timeProvider.Advance(options.Value.OverloadBackoffDelay);
 
         await jobHandled.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await runTask.WaitAsync(TimeSpan.FromSeconds(5));
@@ -607,15 +597,6 @@ public class ShardExecutorTests
         var detector = Substitute.For<IOverloadDetector>();
         detector.IsOverloaded.Returns(isOverloaded);
         return detector;
-    }
-
-    private static async Task AdvanceUntilCompletedAsync(FakeTimeProvider timeProvider, Task task, TimeSpan advanceBy)
-    {
-        for (var i = 0; i < 10 && !task.IsCompleted; i++)
-        {
-            await Task.Yield();
-            timeProvider.Advance(advanceBy);
-        }
     }
 
     private static List<DurableJob> CreateJobs(int count, DateTimeOffset? dueTime = null)
@@ -883,5 +864,19 @@ public class ShardExecutorTests
         factory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
         
         return (factory, callBox);
+    }
+
+    private sealed class TimerTrackingFakeTimeProvider(DateTimeOffset startDateTime) : FakeTimeProvider(startDateTime)
+    {
+        private readonly TaskCompletionSource _timerCreated = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task TimerCreated => _timerCreated.Task;
+
+        public override ITimer CreateTimer(TimerCallback callback, object state, TimeSpan dueTime, TimeSpan period)
+        {
+            var timer = base.CreateTimer(callback, state, dueTime, period);
+            _timerCreated.TrySetResult();
+            return timer;
+        }
     }
 }
