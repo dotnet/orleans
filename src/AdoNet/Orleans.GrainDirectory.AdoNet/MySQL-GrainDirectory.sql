@@ -85,7 +85,8 @@ BEGIN
     WHERE
         ClusterId = _ClusterId
         AND ProviderId = _ProviderId
-        AND GrainId = _GrainId;
+        AND GrainId = _GrainId
+    FOR UPDATE;
 
     COMMIT;
 
