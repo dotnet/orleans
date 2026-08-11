@@ -1,7 +1,7 @@
 ---
 title: Develop Orleans grains
 description: Define grain contracts, implement grains, and call them in Orleans.
-ms.date: 08/07/2026
+ms.date: 08/11/2026
 ms.topic: article
 ---
 
@@ -29,12 +29,12 @@ public interface IShoppingCartGrain : IGrainWithStringKey
 
 [GenerateSerializer]
 public sealed record CartItem(
-    [property: Id(0)] string ProductId,
-    [property: Id(1)] int Quantity);
+    [Id(0)] string ProductId,
+    [Id(1)] int Quantity);
 
 [GenerateSerializer]
 public sealed record Receipt(
-    [property: Id(0)] string OrderId);
+    [Id(0)] string OrderId);
 ```
 
 Orleans supports these grain method return types:

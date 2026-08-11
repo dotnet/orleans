@@ -326,6 +326,24 @@ public readonly record struct DemoRecord(int Value, string Name);
     }
 
     [Fact]
+    public async Task ExtractSerializableTypeModel_RecordWithParameterTargetedIds_OverridesImplicitFieldIds()
+    {
+        var code = @"
+using Orleans;
+namespace TestProject;
+
+[GenerateSerializer(GenerateFieldIds = GenerateFieldIds.PublicProperties)]
+public record DemoRecord([Id(42)] string Value);
+";
+        var (model, _) = await ExtractFirstSerializableType(code);
+        var member = Assert.Single(model.Members);
+
+        Assert.Equal((uint)42, member.FieldId);
+        Assert.Equal("Value", member.BackingPropertyName);
+        Assert.True(member.IsPrimaryConstructorParameter);
+    }
+
+    [Fact]
     public async Task FieldIdAssignmentHelper_TypeWithComputedPropertyAndNoIds_RemainsValidWithoutSerializableCandidates()
     {
         const string code = """

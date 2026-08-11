@@ -253,11 +253,13 @@ namespace Orleans
     /// </summary>
     /// <remarks>
     /// Every serializable member in a type which has <see cref="GenerateSerializerAttribute"/> applied to it must have one <see cref="IdAttribute"/> attribute applied with a unique <see cref="IdAttribute.Id"/> value.
+    /// For positional records, this attribute can be applied directly to a primary constructor parameter instead of its generated property.
     /// </remarks>
     /// <seealso cref="System.Attribute" />
     [AttributeUsage(
         AttributeTargets.Field
         | AttributeTargets.Property
+        | AttributeTargets.Parameter
         | AttributeTargets.Class
         | AttributeTargets.Struct
         | AttributeTargets.Enum

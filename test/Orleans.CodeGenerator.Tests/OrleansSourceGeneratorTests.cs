@@ -187,6 +187,28 @@ public record class DemoDataRecordClass([property: Id(0)] string Value);
 public record DemoDataRecord([property: Id(0)] string Value);");
 
     /// <summary>
+    /// Tests serializer generation for records with [Id] attributes on primary constructor parameters.
+    /// </summary>
+    [Fact]
+    public Task TestRecordsWithParameterIdAttributes() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public record SimpleRecord([Id(10)] int Value, [Id(20)] string Name);
+
+[GenerateSerializer]
+public record RecordWithExtraProperty([Id(30)] int Id, [Id(40)] string Name)
+{
+    [Id(50)]
+    public string Description { get; init; }
+}
+
+[GenerateSerializer]
+public record struct RecordStructWithParameterId([Id(60)] string Value);");
+
+    /// <summary>
     /// Tests serializer generation for generic types.
     /// Generic types require:
     /// - Generating specialized serializers for each concrete type usage
