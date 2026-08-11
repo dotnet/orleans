@@ -22,6 +22,7 @@ namespace Orleans.Analyzers;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
 {
+    public const string EnableAnalyzerPropertyName = "EnableOrleansContractsAnalyzer";
     public const string RuleId0016 = "ORLEANS0016";
     public const string RuleId0017 = "ORLEANS0017";
     public const string RuleId0018 = "ORLEANS0018";
@@ -163,6 +164,14 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
 
     private void OnCompilationStart(CompilationStartAnalysisContext context)
     {
+        if (!context.Options.AnalyzerConfigOptionsProvider.GlobalOptions.TryGetValue(
+                $"build_property.{EnableAnalyzerPropertyName}",
+                out var enabled)
+            || !string.Equals(enabled, "true", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
         // Try to find the OrleansContracts.txt file
         var grainInterfacesFile = context.Options.AdditionalFiles
             .FirstOrDefault(file =>

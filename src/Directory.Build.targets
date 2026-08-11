@@ -5,6 +5,15 @@
 
   <Import Project="$(_ParentDirectoryBuildTargetsPath)" Condition="Exists('$(_ParentDirectoryBuildTargetsPath)')"/>
 
+  <ItemGroup>
+    <CompilerVisibleProperty Include="EnableOrleansContractsAnalyzer" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EnableOrleansContractsAnalyzer)' == 'true' and Exists('$(OrleansContractsPath)')">
+    <AdditionalFiles Include="$(OrleansContractsPath)" OrleansContractsFile="true" />
+    <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="OrleansContractsFile" />
+  </ItemGroup>
+
   <ItemGroup Condition="'$(IsPackable)'=='true' and '$(SourceLinkCreate)'=='true' and '$(IncludeBuildOutput)'=='true'">
     <PackageReference Include="Microsoft.SourceLink.AzureRepos.Git" PrivateAssets="All"/>
     <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all" />

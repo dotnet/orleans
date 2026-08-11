@@ -29,7 +29,17 @@
       <PackagePath>%(Identity)</PackagePath>
       <Visible>true</Visible>
     </Content>
+    <Content Include="build\Microsoft.Orleans.Analyzers.targets">
+      <Pack>true</Pack>
+      <PackagePath>%(Identity)</PackagePath>
+      <Visible>true</Visible>
+    </Content>
     <Content Include="buildTransitive\Microsoft.Orleans.Analyzers.props">
+      <Pack>true</Pack>
+      <PackagePath>%(Identity)</PackagePath>
+      <Visible>true</Visible>
+    </Content>
+    <Content Include="buildTransitive\Microsoft.Orleans.Analyzers.targets">
       <Pack>true</Pack>
       <PackagePath>%(Identity)</PackagePath>
       <Visible>true</Visible>

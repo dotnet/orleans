@@ -35,7 +35,10 @@ public class GrainInterfaceVersionAnalyzerTest
 
     #region Test Infrastructure
 
-    private async Task<Diagnostic[]> GetDiagnosticsAsync(string source, string? grainInterfacesFileContent = null)
+    private async Task<Diagnostic[]> GetDiagnosticsAsync(
+        string source,
+        string? grainInterfacesFileContent = null,
+        bool analyzerEnabled = true)
     {
         var project = CreateProjectWithAdditionalFiles(source, grainInterfacesFileContent);
         var compilation = await project.GetCompilationAsync();
@@ -50,7 +53,7 @@ public class GrainInterfaceVersionAnalyzerTest
             ? ImmutableArray.Create<AdditionalText>(new TestAdditionalText(OrleansContractsFileName, grainInterfacesFileContent))
             : ImmutableArray<AdditionalText>.Empty;
 
-        var analyzerOptions = new AnalyzerOptions(additionalFiles);
+        var analyzerOptions = CreateAnalyzerOptions(additionalFiles, analyzerEnabled);
 
         var compilationWithAnalyzers = compilation
             .WithOptions(compilation.Options.WithSpecificDiagnosticOptions(
@@ -129,9 +132,50 @@ public class GrainInterfaceVersionAnalyzerTest
         public override SourceText? GetText(CancellationToken cancellationToken = default) => _text;
     }
 
+    private static AnalyzerOptions CreateAnalyzerOptions(
+        ImmutableArray<AdditionalText> additionalFiles,
+        bool analyzerEnabled)
+        => new(additionalFiles, new TestAnalyzerConfigOptionsProvider(analyzerEnabled));
+
+    private sealed class TestAnalyzerConfigOptionsProvider(bool analyzerEnabled) : AnalyzerConfigOptionsProvider
+    {
+        private readonly AnalyzerConfigOptions _globalOptions = new TestAnalyzerConfigOptions(
+            ImmutableDictionary<string, string>.Empty.Add(
+                $"build_property.{GrainInterfaceVersionAnalyzer.EnableAnalyzerPropertyName}",
+                analyzerEnabled.ToString()));
+
+        public override AnalyzerConfigOptions GlobalOptions => _globalOptions;
+
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => TestAnalyzerConfigOptions.Empty;
+
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => TestAnalyzerConfigOptions.Empty;
+    }
+
+    private sealed class TestAnalyzerConfigOptions(ImmutableDictionary<string, string> values) : AnalyzerConfigOptions
+    {
+        public static TestAnalyzerConfigOptions Empty { get; } = new(ImmutableDictionary<string, string>.Empty);
+
+        public override bool TryGetValue(string key, out string value) => values.TryGetValue(key, out value!);
+    }
+
     #endregion
 
     #region ORLEANS0016 - Interface Not Declared
+
+    [Fact]
+    public async Task AnalyzerDisabled_NoDiagnostic()
+    {
+        const string source = @"
+public interface IMyGrain : IGrain
+{
+    Task DoSomething();
+}
+";
+
+        var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFileContent: null, analyzerEnabled: false);
+
+        Assert.Empty(diagnostics);
+    }
 
     [Fact]
     public async Task InterfaceNotInFile_WithExistingFile_ReportsDiagnostic()
@@ -946,7 +990,7 @@ public class MyGrain : Grain, IGrainWithStringKey
             ? ImmutableArray.Create<AdditionalText>(new TestAdditionalText(OrleansContractsFileName, grainInterfacesFileContent))
             : ImmutableArray<AdditionalText>.Empty;
 
-        var analyzerOptions = new AnalyzerOptions(additionalFiles);
+        var analyzerOptions = CreateAnalyzerOptions(additionalFiles, analyzerEnabled: true);
 
         var compilationWithAnalyzers = compilation
             .WithOptions(compilation.Options.WithSpecificDiagnosticOptions(
