@@ -61,6 +61,10 @@ Therefore, grain state is protected from parallel access by the scheduler but ca
 
 The user-facing rules are documented in [request scheduling](../grains/request-scheduling.md). Internally, request admission and task serialization remain separate layers.
 
+Admission is a state machine, not a second thread pool. `ActivationData` keeps pending requests and running requests, evaluates the current interleaving policy, and starts an eligible request by enqueueing its work on the activation scheduler. Completion signals admission to reevaluate the queue. A request which is waiting on an incomplete task therefore occupies a logical slot according to the request policy, while its executing thread returns to the pool.
+
+Call-chain reentrancy is narrower than grain-wide reentrancy: it permits progress for calls which belong to the current chain while preserving the non-interleaving default for unrelated calls. `AlwaysInterleave` and `MayInterleave` are explicit opt-ins because they trade simpler invariants for throughput or avoidance of dependency cycles.
+
 ## Runtime context and inline execution
 
 `ActivationTaskScheduler.TryExecuteTaskInline` permits inline execution only when the current `RuntimeContext` belongs to the same `WorkItemGroup` and the task was not already queued. Runtime helpers follow the same rule: execute inline in the matching grain context, otherwise enqueue.
@@ -78,3 +82,5 @@ Blocking a turn prevents every queued continuation and admitted request for that
 `WorkItemGroup` drains work subject to runtime scheduling limits so one busy activation does not permanently own a thread-pool worker. Long synchronous turns still delay other work and are reported by runtime scheduling diagnostics. The [.NET diagnostics tools](https://learn.microsoft.com/dotnet/core/diagnostics/) provide the underlying runtime traces, counters, and dumps used alongside Orleans telemetry.
 
 Scheduling guarantees are local to an activation. They do not order calls across grains, create a distributed lock, or provide message exactly-once behavior.
+
+The scheduler also does not provide fairness across activations. A long synchronous turn consumes a thread-pool worker and delays that activation's requests; a burst of work across many activations competes for the process-wide pool. Queue length and turn-duration diagnostics are therefore capacity signals, not proof that a grain is deadlocked.

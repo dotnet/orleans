@@ -285,10 +285,18 @@ items:
         href: implementation/scheduler.md
       - name: Messaging and delivery semantics
         href: implementation/messaging-delivery-guarantees.md
+      - name: Transport and networking internals
+        href: implementation/messaging-networking.md
       - name: Placement and activation balancing
         href: implementation/load-balancing.md
       - name: Serialization and code generation
         href: implementation/serialization.md
+      - name: Reminders
+        href: implementation/reminders.md
+      - name: Transactions
+        href: implementation/transactions.md
+      - name: Rolling version skew
+        href: implementation/rolling-version-skew.md
       - name: Persistent streams
         items:
           - name: Architecture
