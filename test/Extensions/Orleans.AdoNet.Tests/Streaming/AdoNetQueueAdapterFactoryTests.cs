@@ -15,6 +15,7 @@ namespace Tester.AdoNet.Streaming;
 /// <summary>
 /// Tests for <see cref="AdoNetQueueAdapterFactory"/> against SQL Server.
 /// </summary>
+[TestCategory("SqlServer"), TestCategory("BVT"), TestCategory("AdoNet"), TestCategory("Streaming")]
 public class SqlServerAdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : AdoNetQueueAdapterFactoryTests(AdoNetInvariants.InvariantNameSqlServer, fixture)
 {
 }
@@ -22,6 +23,7 @@ public class SqlServerAdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixt
 /// <summary>
 /// Tests for <see cref="AdoNetQueueAdapterFactory"/> against MySQL.
 /// </summary>
+[TestCategory("MySql"), TestCategory("BVT"), TestCategory("AdoNet"), TestCategory("Streaming")]
 public class MySqlAdoNetQueueAdapterFactoryTests : AdoNetQueueAdapterFactoryTests
 {
     public MySqlAdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : base(AdoNetInvariants.InvariantNameMySql, fixture)
@@ -33,6 +35,7 @@ public class MySqlAdoNetQueueAdapterFactoryTests : AdoNetQueueAdapterFactoryTest
 /// <summary>
 /// Tests for <see cref="AdoNetQueueAdapterFactory"/> against PostgreSQL.
 /// </summary>
+[TestCategory("PostgreSql"), TestCategory("BVT"), TestCategory("AdoNet"), TestCategory("Streaming")]
 public class PostgreSqlAdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : AdoNetQueueAdapterFactoryTests(AdoNetInvariants.InvariantNamePostgreSql, fixture)
 {
 }

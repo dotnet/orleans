@@ -188,7 +188,8 @@ jobs:
           --health-interval 10s \
           --health-timeout 5s \
           --health-retries 5 \
-          "$POSTGRES_IMAGE"
+          "$POSTGRES_IMAGE" \
+          -c max_connections=200
 
         bash .github/scripts/docker-wait-for-health.sh postgres
     - name: Setup .NET
