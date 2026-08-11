@@ -14,13 +14,7 @@ Serialization configuration in Orleans is a crucial part of the overall system d
 
 To configure Orleans to serialize certain types using `Newtonsoft.Json`, first reference the [Microsoft.Orleans.Serialization.NewtonsoftJson](https://nuget.org/packages/Microsoft.Orleans.Serialization.NewtonsoftJson) NuGet package. Then, configure the serializer, specifying which types it will be responsible for. In the following example, we specify that the `Newtonsoft.Json` serializer is responsible for all types in the `Example.Namespace` namespace.
 
-``` csharp
-siloBuilder.Services.AddSerializer(serializerBuilder =>
-{
-    serializerBuilder.AddNewtonsoftJsonSerializer(
-        isSupported: type => type.Namespace.StartsWith("Example.Namespace"));
-});
-```
+:::code language="csharp" source="snippets/serialization/TypeNameResolutionExamples.cs" id="configure_newtonsoft_json":::
 
 In the preceding example, the call to <xref:Orleans.Serialization.SerializationHostingExtensions.AddNewtonsoftJsonSerializer*> adds support for serializing and deserializing values using `Newtonsoft.Json.JsonSerializer`. You must perform similar configuration on all clients that need to handle those types.
 
@@ -35,13 +29,7 @@ Alternatively, to configure Orleans to use `System.Text.Json` to serialize your 
 
 Consider the following example when interacting with the <xref:Orleans.Hosting.ISiloBuilder>:
 
-```csharp
-siloBuilder.Services.AddSerializer(serializerBuilder =>
-{
-    serializerBuilder.AddJsonSerializer(
-        isSupported: type => type.Namespace.StartsWith("Example.Namespace"));
-});
-```
+:::code language="csharp" source="snippets/serialization/TypeNameResolutionExamples.cs" id="configure_system_text_json":::
 
 ## Authorize type-name resolution
 
@@ -75,34 +63,17 @@ Assembly trust applies component by component. Allowing a generic type definitio
 
 For policy-based trust, register <xref:Orleans.Serialization.ITypeNameFilter> to evaluate names before Orleans loads the corresponding type:
 
-```csharp
-public sealed class ApplicationTypeNameFilter : ITypeNameFilter
-{
-    public bool? IsTypeNameAllowed(string typeName, string assemblyName)
-    {
-        if (assemblyName == "MyApp.Contracts"
-            || assemblyName.StartsWith("MyApp.Contracts,", StringComparison.Ordinal))
-        {
-            return true;
-        }
+:::code language="csharp" source="snippets/serialization/TypeNameResolutionExamples.cs" id="application_type_name_filter":::
 
-        return null;
-    }
-}
+Register the filter with dependency injection:
 
-siloBuilder.Services.AddSingleton<ITypeNameFilter, ApplicationTypeNameFilter>();
-```
+:::code language="csharp" source="snippets/serialization/TypeNameResolutionExamples.cs" id="register_type_name_filter":::
 
 A filter returns `true` to allow, `false` to deny, or `null` when it has no opinion. Types explicitly added to `AllowedTypes` are authoritative. For other names, a denial from any `ITypeNameFilter` takes precedence over other type-name filters and assembly trust. <xref:Orleans.Serialization.ITypeFilter> provides a resolved-`Type` fallback when name-based checks have no affirmative result; a denial wins within that fallback. Both formatting and parsing apply these checks, including to constructed generic components and array element types.
 
 As a compatibility escape hatch, you can disable the boundary:
 
-```csharp
-siloBuilder.Services.AddSerializer(serializerBuilder =>
-{
-    serializerBuilder.Configure(options => options.AllowAllTypes = true);
-});
-```
+:::code language="csharp" source="snippets/serialization/TypeNameResolutionExamples.cs" id="allow_all_types":::
 
 > [!WARNING]
 > `AllowAllTypes` bypasses type-name validation, including custom filters, and permits any resolvable type. Use it only when serialized input is fully trusted. Prefer allowing individual types or trusted assemblies.

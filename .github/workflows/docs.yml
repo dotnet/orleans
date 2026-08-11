@@ -104,8 +104,8 @@ jobs:
           ./docs/site/src/content/docs/validate-snippets.ps1 -PolicyOnly
           ./samples/Validate-Samples.ps1 -NoBuild
 
-      - name: Build documentation projects
-        run: dotnet build docs/Docs.slnx --configuration Release --no-incremental -p:BuildExternalAssets=false -bl:docs-projects.binlog
+      - name: Build and test documentation projects
+        run: dotnet test docs/Docs.slnx --configuration Release --framework net10.0 -p:BuildExternalAssets=false -bl:docs-projects.binlog --nologo -- -parallel none -noshadow
 
       - name: Build samples against local Orleans packages
         shell: pwsh

@@ -71,10 +71,10 @@ Orleans package reference to resolve to `10.2.2`. Historical package versions ar
 accepted only in a migration project with a used, meaningful
 `OrleansDocumentationVersionException` property. A sample awaiting publication
 may use a prerelease of `10.2.2` with the same property and a specific reason. To
-compile the documentation projects locally, run:
+build and test the documentation projects locally, run:
 
 ```powershell
-dotnet build ../Docs.slnx --configuration Release -p:BuildExternalAssets=false
+dotnet test ../Docs.slnx --configuration Release --framework net10.0 -p:BuildExternalAssets=false -- -parallel none -noshadow
 ```
 
 Build samples through `samples/Build-Samples.ps1`, which packs the current Orleans

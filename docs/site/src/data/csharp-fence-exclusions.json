@@ -308,10 +308,10 @@
       ]
     },
     "host/configuration-guide/serialization-configuration.md": {
-      "reason": "Serialization-configuration fences are independent registration fragments which rely on a builder defined outside each excerpt.",
+      "reason": "AddAllowedType and AddAllowedAssembly are current-source APIs not available in the required 10.2.2 packages; keep these two fragments inline until publication.",
       "hashes": [
-        "659787380d2634b81e612dd0e78e473890f704327ee33bc8d4d78208600120da",
-        "080cdfa425625ff2a8cb7eea3fa348a75c8601d874ec37e893312be9affb2e19"
+        "0e2921b2fbad2d245d423505097438902e816a56ee6db880954a15cc1f4bc494",
+        "9272865724e92fc6ceec8624c19fb0b0aed6e2d62e1ec5f986f5658ce21d2980"
       ]
     },
     "host/configuration-guide/serialization-customization.md": {
