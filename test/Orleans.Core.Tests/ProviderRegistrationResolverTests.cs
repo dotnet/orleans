@@ -53,6 +53,8 @@ namespace NonSilo.Tests
         [Fact]
         public void LegacyAssemblyWithoutProviderMetadata_UsesRegisterProviderAttributeFallback()
         {
+            OldGeneratorMetadataProvider.InstantiationCount = 0;
+
             var assembly = CreateAssemblyWithAttributes(
                 // An older generator still emits a generated type manifest provider, but it predates
                 // IProviderMetadataProvider so it does not implement it.
@@ -70,6 +72,7 @@ namespace NonSilo.Tests
             // The silo-targeted legacy registration is discovered via the same fallback path.
             Assert.Equal(typeof(LegacySiloProviderBuilder), siloProviders[("GrainStorage", "LegacyStorage")]);
             Assert.False(siloProviders.ContainsKey(("Clustering", "LegacyClustering")));
+            Assert.Equal(0, OldGeneratorMetadataProvider.InstantiationCount);
         }
 
         /// <summary>
@@ -167,6 +170,13 @@ namespace NonSilo.Tests
         [GeneratedCode("OrleansCodeGen", "1.0.0")]
         public sealed class OldGeneratorMetadataProvider : TypeManifestProviderBase
         {
+            public static int InstantiationCount;
+
+            public OldGeneratorMetadataProvider()
+            {
+                Interlocked.Increment(ref InstantiationCount);
+            }
+
             protected override void ConfigureInner(TypeManifestOptions options)
             {
             }

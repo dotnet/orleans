@@ -35,7 +35,8 @@ namespace Orleans
                 var attrs = asm.GetCustomAttributes<TypeManifestProviderAttribute>();
                 foreach (var attr in attrs)
                 {
-                    if (attr.ProviderType.GetCustomAttribute<System.CodeDom.Compiler.GeneratedCodeAttribute>() is { Tool: "OrleansCodeGen" }
+                    if (typeof(IProviderMetadataProvider).IsAssignableFrom(attr.ProviderType)
+                        && attr.ProviderType.GetCustomAttribute<System.CodeDom.Compiler.GeneratedCodeAttribute>() is { Tool: "OrleansCodeGen" }
                         && Activator.CreateInstance(attr.ProviderType) is IProviderMetadataProvider provider)
                     {
                         provider.ConfigureProviders(registeredProviders);
