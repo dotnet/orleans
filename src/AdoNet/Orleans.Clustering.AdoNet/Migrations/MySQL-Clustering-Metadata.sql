@@ -1,4 +1,4 @@
-ALTER TABLE OrleansMembershipTable ADD COLUMN MetadataJson TEXT NULL;
+ALTER TABLE OrleansMembershipTable ADD COLUMN IF NOT EXISTS MetadataJson TEXT NULL;
 
 DROP PROCEDURE IF EXISTS InsertMembershipKey;
 
