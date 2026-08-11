@@ -2,10 +2,12 @@
 
 using System.Collections.Concurrent;
 using System.Text;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
+using Orleans.Runtime.ReminderService;
 using Orleans.Testing.Reminders;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
@@ -744,24 +746,26 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
     {
         while (true)
         {
-            while (observer.GetActiveReminderCount(grain.GetGrainId(), reminderName) > 0)
+            if (observer.GetActiveReminderCount(grain.GetGrainId(), reminderName) > 0)
             {
                 var quiescenceTask = observer.WaitForReminderQuiescenceAsync(grain, reminderName, cancellationToken);
-                if (quiescenceTask.IsCompleted)
-                {
-                    await quiescenceTask;
-                    break;
-                }
-
-                await AdvanceReminderTimeAsync(ReminderClock.RefreshReminderListPeriod, cancellationToken);
+                await RefreshReminderServicesAsync(cancellationToken);
+                await quiescenceTask;
             }
 
-            await AdvanceReminderTimeAsync(ReminderClock.RefreshReminderListPeriod, cancellationToken);
+            await RefreshReminderServicesAsync(cancellationToken);
             if (observer.GetActiveReminderCount(grain.GetGrainId(), reminderName) == 0)
             {
                 return;
             }
         }
+    }
+
+    private async Task RefreshReminderServicesAsync(CancellationToken cancellationToken)
+    {
+        var refreshTasks = HostedCluster.Silos.Select(silo =>
+            silo.ServiceProvider.GetRequiredService<LocalReminderService>().TestOnlyRefresh());
+        await Task.WhenAll(refreshTasks).WaitAsync(cancellationToken);
     }
 
     private async Task<bool> HandleError(Exception ex, long i)

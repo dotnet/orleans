@@ -89,24 +89,21 @@ namespace Tester.AzureUtils.TimerTests
             await Test_Reminders_ReminderNotFound();
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/9344"), TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_Basic()
         {
-            // start up a test grain and get the period that it's programmed to use.
-            IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            TimeSpan period = await grain.GetReminderPeriod(DR);
-            // start up the 'DR' reminder and wait for two ticks to pass.
+            using var cts = new CancellationTokenSource(ENDWAIT);
+            var grain = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            var period = await grain.GetReminderPeriod(DR);
+
             await grain.StartReminder(DR);
-            await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), 2);
-            // retrieve the value of the counter-- it should match the sequence number which is the number of periods
-            // we've waited.
-            long last = await grain.GetCounter(DR);
+            await AdvanceRemindersByTicksAsync(2, cts.Token, GetReminderIdentities([grain], DR));
+            var last = await grain.GetCounter(DR);
             Assert.Equal(2, last);
-            // stop the timer and wait for a whole period.
-            await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder);
-            await AdvanceReminderTimeAsync(period);
-            // the counter should not have changed.
-            long curr = await grain.GetCounter(DR);
+
+            await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder, cts.Token);
+            await AdvanceReminderTimeAsync(period, cts.Token);
+            var curr = await grain.GetCounter(DR);
             Assert.Equal(last, curr);
         }
 
