@@ -132,34 +132,53 @@ namespace Tester.AzureUtils
             await Task.WhenAll(promises);
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/9552"), TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task AQ_Standalone_4()
         {
-            TimeSpan visibilityTimeout = TimeSpan.FromSeconds(2);
+            var visibilityTimeout = TimeSpan.FromSeconds(2);
 
             queueName = "Test-5-".ToLower() + Guid.NewGuid();
-            AzureQueueDataManager manager = await GetTableManager(queueName, visibilityTimeout);
-            Assert.Equal(0, await manager.GetApproximateMessageCount());
+            var manager = await GetTableManager(queueName, visibilityTimeout);
 
             var inMessage = "Hello, World";
             await manager.AddQueueMessage(inMessage);
-            Assert.Equal(1, await manager.GetApproximateMessageCount());
 
             var outMessage = await manager.GetQueueMessage();
             Assert.NotNull(outMessage);
             logger.LogInformation("GetQueueMessage: {Message}", PrintQueueMessage(outMessage));
             Assert.Equal(inMessage, outMessage.MessageText);
+            Assert.Equal(1, outMessage.DequeueCount);
+            Assert.NotNull(outMessage.NextVisibleOn);
 
-            await Task.Delay(visibilityTimeout);
+            // Azure owns the visibility transition, so observe it instead of racing the exact timeout boundary.
+            await TestingUtils.WaitUntilAsync(
+                async (lastTry, _) =>
+                {
+                    if (await manager.PeekQueueMessage() is not null)
+                    {
+                        return true;
+                    }
 
-            Assert.Equal(1, await manager.GetApproximateMessageCount());
+                    if (lastTry)
+                    {
+                        Assert.Fail(
+                            $"Queue message {outMessage.MessageId} did not become visible. "
+                            + $"Azure reported {outMessage.NextVisibleOn:O} as the next visible time; "
+                            + $"the current time is {DateTimeOffset.UtcNow:O}.");
+                    }
+
+                    return false;
+                },
+                TimeSpan.FromSeconds(30),
+                TimeSpan.FromMilliseconds(100));
 
             var outMessage2 = await manager.GetQueueMessage();
             Assert.NotNull(outMessage2);
+            Assert.Equal(outMessage.MessageId, outMessage2.MessageId);
             Assert.Equal(inMessage, outMessage2.MessageText);
+            Assert.Equal(2, outMessage2.DequeueCount);
 
             await manager.DeleteQueueMessage(outMessage2);
-            Assert.Equal(0, await manager.GetApproximateMessageCount());
         }
 
         private static string PrintQueueMessage(QueueMessage message)
