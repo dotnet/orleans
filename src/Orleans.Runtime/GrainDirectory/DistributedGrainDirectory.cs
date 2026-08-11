@@ -291,9 +291,10 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
             if (invokeResult.RetryAfterDelay > TimeSpan.Zero)
             {
                 // A safety lease hold is active for this grain or range.
-                // Wait for the suggested duration before retrying.
+                // Arm the delay before notifying observers so the event can be used as a synchronization barrier.
+                var retryDelay = Task.Delay(invokeResult.RetryAfterDelay, _timeProvider, cancellationToken);
                 GrainDirectoryEvents.EmitOperationDelayedByLeaseHold(Silo, grainId, operation, invokeResult.RetryAfterDelay);
-                await Task.Delay(invokeResult.RetryAfterDelay, _timeProvider, cancellationToken);
+                await retryDelay;
                 continue;
             }
 
