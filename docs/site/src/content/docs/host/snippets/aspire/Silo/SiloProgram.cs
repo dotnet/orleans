@@ -115,6 +115,56 @@ public static class SiloProgram
         builder.Build().Run();
     }
     // </reminders_inmemory_silo>
+
+    // <adonet_silo>
+    public static void AdoNetSilo(string[] args)
+    {
+        var builder = Host.CreateApplicationBuilder(args);
+
+        builder.AddServiceDefaults();
+
+        // Configure Orleans manually because Aspire cannot automatically wire ADO.NET
+        // providers — provider type inference produces "SqlServerDatabase" instead of
+        // the "AdoNet" provider name Orleans expects.
+        builder.UseOrleans(siloBuilder =>
+        {
+            var connectionString = builder.Configuration.GetConnectionString("orleans-db")!;
+
+            siloBuilder.UseAdoNetClustering(options =>
+            {
+                options.Invariant = "Microsoft.Data.SqlClient";
+                options.ConnectionString = connectionString;
+            });
+
+            siloBuilder.AddAdoNetGrainStorageAsDefault(options =>
+            {
+                options.Invariant = "Microsoft.Data.SqlClient";
+                options.ConnectionString = connectionString;
+            });
+
+            siloBuilder.UseAdoNetReminderService(options =>
+            {
+                options.Invariant = "Microsoft.Data.SqlClient";
+                options.ConnectionString = connectionString;
+            });
+        });
+
+        builder.Build().Run();
+    }
+    // </adonet_silo>
+
+    // <grain_directory_silo>
+    public static void GrainDirectorySilo(string[] args)
+    {
+        var builder = Host.CreateApplicationBuilder(args);
+
+        builder.AddServiceDefaults();
+        builder.AddKeyedRedisClient("orleans-redis");
+        builder.UseOrleans();
+
+        builder.Build().Run();
+    }
+    // </grain_directory_silo>
 }
 
 // Stub health check classes for documentation examples

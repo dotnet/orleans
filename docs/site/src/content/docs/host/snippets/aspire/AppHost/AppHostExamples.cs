@@ -194,4 +194,75 @@ public static class AppHostExamples
         builder.Build().Run();
     }
     // </reminders_inmemory_apphost>
+
+    // <adonet_apphost>
+    public static void AdoNetAppHost(string[] args)
+    {
+        var builder = DistributedApplication.CreateBuilder(args);
+
+        // Add a SQL Server instance and database.
+        // Note: Aspire infers the Orleans provider type from the resource class name
+        // (SqlServerDatabaseResource → "SqlServerDatabase"), which does not match
+        // the Orleans provider name "AdoNet".
+        //
+        // There is no public API to override this inference in the current version
+        // of Aspire.Hosting.Orleans. As a workaround, configure the Orleans providers
+        // manually in the silo using UseOrleans(siloBuilder => {...}) and read the
+        // connection string from IConfiguration.
+        var sql = builder.AddSqlServer("sql");
+        var db = sql.AddDatabase("orleans-db");
+
+        // Pass the database resource so Aspire injects ConnectionStrings__orleans-db.
+        // Then configure Orleans manually in the silo (see silo example).
+        builder.AddProject<Projects.Silo>("silo")
+            .WithReference(db)
+            .WaitFor(sql);
+
+        builder.Build().Run();
+    }
+    // </adonet_apphost>
+
+    // <grain_directory_apphost>
+    public static void GrainDirectoryAppHost(string[] args)
+    {
+        var builder = DistributedApplication.CreateBuilder(args);
+
+        var redis = builder.AddRedis("orleans-redis");
+
+        var orleans = builder.AddOrleans("cluster")
+            .WithClustering(redis)
+            .WithGrainDirectory("MyDirectory", redis);
+
+        builder.AddProject<Projects.Silo>("silo")
+            .WithReference(orleans)
+            .WaitFor(redis);
+
+        builder.Build().Run();
+    }
+    // </grain_directory_apphost>
+
+    // <explicit_cluster_ids>
+    public static void ExplicitClusterIds(string[] args)
+    {
+        var builder = DistributedApplication.CreateBuilder(args);
+
+        var redis = builder.AddRedis("orleans-redis");
+
+        var orleans = builder.AddOrleans("cluster")
+            // Set stable IDs for rolling deployments and cross-restart compatibility.
+            // If omitted, random IDs are generated per run — fine for development,
+            // but problematic in production because silos from different runs
+            // will not recognize each other.
+            .WithClusterId("my-cluster")
+            .WithServiceId("my-service")
+            .WithClustering(redis);
+
+        builder.AddProject<Projects.Silo>("silo")
+            .WithReference(orleans)
+            .WaitFor(redis)
+            .WithReplicas(3);
+
+        builder.Build().Run();
+    }
+    // </explicit_cluster_ids>
 }
