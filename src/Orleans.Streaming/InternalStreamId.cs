@@ -1,5 +1,4 @@
 using System;
-using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Serialization;
 using System.Text;
@@ -121,28 +120,13 @@ namespace Orleans.Runtime
 
         public override QualifiedStreamId ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            scoped ReadOnlySpan<byte> value;
-
-            if (reader.HasValueSequence)
-            {
-                var buffer = reader.ValueSequence.Length <= MaxBufferSize ?
-                             stackalloc byte[(int)reader.ValueSequence.Length] :
-                             new byte[reader.ValueSequence.Length];
-
-                reader.ValueSequence.CopyTo(buffer);
-                value = buffer;
-            }
-            else
-            {
-                value = reader.ValueSpan;
-            }
-
-            var i = value.IndexOf((byte)':');
+            var value = reader.GetString() ?? throw new JsonException("Failed to parse QualifiedStreamId from property name.");
+            var i = value.IndexOf(':');
 
             ArgumentOutOfRangeException.ThrowIfLessThan(i, 0);
 
-            var providerName = Encoding.UTF8.GetString(value[0..i]);
-            var streamId = StreamId.Parse(value[(i + 1)..]);
+            var providerName = value[..i];
+            var streamId = StreamId.Parse(Encoding.UTF8.GetBytes(value[(i + 1)..]));
             return new QualifiedStreamId(providerName, streamId);
         }
 
@@ -151,6 +135,7 @@ namespace Orleans.Runtime
             Span<byte> buffer = stackalloc byte[MaxBufferSize];
 
             if (Encoding.UTF8.TryGetBytes(value.ProviderName, buffer, out var bytesWritten)
+                && bytesWritten < buffer.Length
                 && ((IUtf8SpanFormattable)value.StreamId).TryFormat(buffer[(bytesWritten + 1)..], out var moreBytesWritten, [], null))
             {
                 buffer[bytesWritten] = (byte)':';

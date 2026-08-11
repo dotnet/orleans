@@ -133,6 +133,13 @@ namespace UnitTests.StorageTests
         }
 
         [Fact]
+        public void IpEndPointConverterDefaultsMissingPort()
+        {
+            var result = _systemTextJson.Deserialize<IPEndPoint>(BinaryData.FromString("""{"Address":"127.0.0.1"}"""));
+            Assert.Equal(new IPEndPoint(IPAddress.Loopback, 0), result);
+        }
+
+        [Fact]
         public void EventSequenceTokenV2Converter() => Roundtrip(new EventSequenceTokenV2(35242, 24298), supportsDictionaryKey: false);
 
         [Fact]
@@ -156,10 +163,16 @@ namespace UnitTests.StorageTests
         public void StreamIdConverter() => Roundtrip(StreamId.Create("namespace", "key"));
 
         [Fact]
+        public void StreamIdConverterDictionaryKeyWithEscapedCharacters() => Roundtrip(StreamId.Create("na\u00efve", "key\"value"));
+
+        [Fact]
         public void StreamIdNullNamespaceConverter() => Roundtrip(StreamId.Create(null!, "key"));
 
         [Fact]
         public void QualifiedStreamIdConverter() => Roundtrip(new QualifiedStreamId("provider", StreamId.Create("namespace", "key")));
+
+        [Fact]
+        public void QualifiedStreamIdConverterLongDictionaryKey() => Roundtrip(new QualifiedStreamId(new string('a', 128), StreamId.Create("namespace", "key")));
 
         [Fact]
         public void GuidIdRoundtrip() => Roundtrip(GuidId.GetNewGuidId());

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers;
 using System.Buffers.Text;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -360,17 +359,8 @@ namespace Orleans.Runtime
         }
         public override StreamId ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            if (reader.HasValueSequence)
-            {
-                Span<byte> buffer = reader.ValueSequence.Length < 128 ? stackalloc byte[(int)reader.ValueSequence.Length] :
-                                                                        new byte[reader.ValueSequence.Length];
-                reader.ValueSequence.CopyTo(buffer);
-                return StreamId.Parse(buffer);
-            }
-            else
-            {
-                return StreamId.Parse(reader.ValueSpan);
-            }
+            var value = reader.GetString() ?? throw new JsonException("Failed to parse StreamId from property name.");
+            return StreamId.Parse(Encoding.UTF8.GetBytes(value));
         }
 
         /// <inheritdoc />

@@ -16,7 +16,7 @@ namespace Orleans.Serialization
         public override IPEndPoint? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             IPAddress? address = null;
-            var port = -1;
+            var port = 0;
 
             while (reader.Read())
             {
