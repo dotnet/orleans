@@ -5,6 +5,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 using Orleans.Testing.Reminders;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
@@ -334,6 +335,9 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
     protected async Task PrepareForGrainFailureAsync(CancellationToken cancellationToken, params IAddressable[] grains)
     {
         ArgumentNullException.ThrowIfNull(grains);
+        Assert.NotEmpty(grains);
+
+        await WaitForGrainsReachableAsync(cancellationToken, grains);
 
         foreach (var grain in grains)
         {
@@ -351,12 +355,59 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         ArgumentNullException.ThrowIfNull(grains);
         Assert.NotEmpty(grains);
 
+        await WaitForGrainsReachableAsync(cancellationToken, grains);
         await AdvanceRemindersByTicksAsync((int)(failCheckAfter - failAfter), cancellationToken, GetReminderIdentities(grains, DR));
         await AssertReminderCountersAsync(grains, (DR, failCheckAfter));
 
         await StopRemindersAsync(grains, DR, cancellationToken);
         await AdvanceReminderTimeAsync(await GetReminderPeriodAsync(grains[0], DR), cancellationToken);
         await AssertReminderCountersAsync(grains, (DR, failCheckAfter));
+    }
+
+    private async Task WaitForGrainsReachableAsync(CancellationToken cancellationToken, params IAddressable[] grains)
+    {
+        Exception? lastException = null;
+        try
+        {
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    await Task.WhenAll(grains.Select(grain => GetReminderPeriodAsync(grain, DR))).WaitAsync(cancellationToken);
+                    return;
+                }
+                catch (Exception exception) when (IsTransientLifecycleException(exception))
+                {
+                    lastException = exception;
+                    log.LogInformation(
+                        exception,
+                        "Waiting for reminder grains to become reachable after topology change: {Grains}",
+                        string.Join(", ", grains.Select(grain => grain.GetGrainId())));
+                }
+
+                try
+                {
+                    await WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken);
+                }
+                catch (Exception exception) when (IsTransientLifecycleException(exception))
+                {
+                    lastException = exception;
+                }
+            }
+        }
+        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
+        {
+            throw new InvalidOperationException(
+                $"Timed out waiting for reminder grains to become reachable after a topology change: {string.Join(", ", grains.Select(grain => grain.GetGrainId()))}.",
+                lastException ?? exception);
+        }
+    }
+
+    private static bool IsTransientLifecycleException(Exception exception)
+    {
+        return exception is SiloUnavailableException or OrleansMessageRejectionException or ConnectionFailedException
+            || exception.InnerException is not null && IsTransientLifecycleException(exception.InnerException);
     }
 
     protected async Task AdvanceRemindersByTicksAsync(

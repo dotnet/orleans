@@ -110,29 +110,26 @@ namespace Tester.AzureUtils.TimerTests
             Assert.Equal(last, curr);
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/9557"), TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_Basic_Restart()
         {
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             TimeSpan period = await grain.GetReminderPeriod(DR);
-            await grain.StartReminder(DR);
-            await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), 2);
-            long last = await grain.GetCounter(DR);
-            Assert.Equal(2, last);
+            using var cts = new CancellationTokenSource(ENDWAIT);
 
-            await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder);
-            TimeSpan sleepFor = period.Multiply(1) + LEEWAY;
-            await AdvanceReminderTimeAsync(sleepFor);
-            long curr = await grain.GetCounter(DR);
-            Assert.Equal(last, curr);
-            AssertIsInRange(curr, last, last + 1, grain, DR, sleepFor);
+            await grain.StartReminder(DR);
+            await AdvanceRemindersByTicksAsync(2, cts.Token, (grain, DR));
+            await AssertReminderCountersAsync([grain], (DR, 2));
+
+            await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder, cts.Token);
+            await AdvanceReminderTimeAsync(period, cts.Token);
+            await AssertReminderCountersAsync([grain], (DR, 2));
 
             // start the same reminder again
             await grain.StartReminder(DR);
-            sleepFor = period.Multiply(2) + LEEWAY;
-            curr = await WaitForAdditionalReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), 1);
-            AssertIsInRange(curr, 2, 3, grain, DR, sleepFor);
-            await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder); // cleanup
+            await AdvanceRemindersByTicksAsync(2, cts.Token, (grain, DR));
+            await AssertReminderCountersAsync([grain], (DR, 2));
+            await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder, cts.Token);
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -286,29 +283,26 @@ namespace Tester.AzureUtils.TimerTests
             // TODO: write tests where period of a reminder is changed
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/9557"), TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_GT_Basic()
         {
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestCopyGrain g2 = this.GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
+            using var cts = new CancellationTokenSource(ENDWAIT);
 
             await g1.StartReminder(DR);
-            await WaitForReminderCounterAsync(g1, DR, () => g1.GetCounter(DR), 2);
-            await g2.StartReminder(DR);
-            await WaitForReminderCounterAsync(g1, DR, () => g1.GetCounter(DR), 4);
-            await WaitForReminderCounterAsync(g2, DR, () => g2.GetCounter(DR), 2);
-            long last1 = await g1.GetCounter(DR);
-            Assert.Equal(4, last1);
-            long last2 = await g2.GetCounter(DR);
-            Assert.Equal(2, last2); // CopyGrain fault
+            await AdvanceRemindersByTicksAsync(2, cts.Token, (g1, DR));
+            await AssertReminderCountersAsync([g1], (DR, 2));
 
-            await StopReminderAndWaitForQuiescenceAsync(g1, DR, g1.StopReminder);
-            await WaitForReminderCounterAsync(g2, DR, () => g2.GetCounter(DR), 4);
-            await StopReminderAndWaitForQuiescenceAsync(g2, DR, g2.StopReminder);
-            long curr1 = await g1.GetCounter(DR);
-            Assert.Equal(last1, curr1);
-            long curr2 = await g2.GetCounter(DR);
-            Assert.Equal(4, curr2); // CopyGrain fault
+            await g2.StartReminder(DR);
+            await AdvanceRemindersByTicksAsync(2, cts.Token, (g1, DR), (g2, DR));
+            await AssertReminderCountersAsync([g1], (DR, 4));
+            await AssertReminderCountersAsync([g2], (DR, 2));
+
+            await StopReminderAndWaitForQuiescenceAsync(g1, DR, g1.StopReminder, cts.Token);
+            await AdvanceRemindersByTicksAsync(2, cts.Token, (g2, DR));
+            await AssertReminderCountersAsync([g1, g2], (DR, 4));
+            await StopReminderAndWaitForQuiescenceAsync(g2, DR, g2.StopReminder, cts.Token);
         }
 
         [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4319"), TestCategory("Functional")]
