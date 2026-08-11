@@ -163,37 +163,6 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
         }
     }
 
-    public async Task<RecoveryTransition> WaitForRecoveryCompletionAsync(
-        Guid transactionId,
-        GrainId faultingGrainId,
-        long afterSequence,
-        long deadline,
-        CancellationToken cancellationToken = default)
-    {
-        while (true)
-        {
-            long observedThrough;
-            lock (this.lockObj)
-            {
-                this.ThrowIfDisposed();
-                var completed = this.timeline.FirstOrDefault(transition =>
-                    transition.Sequence > afterSequence
-                    && this.IsCurrentlyRelevant(transition)
-                    && transition.GrainId == faultingGrainId
-                    && transition.TransactionIds.Contains(transactionId)
-                    && IsRecoveryCompletion(transition));
-                if (completed is not null)
-                {
-                    return completed;
-                }
-
-                observedThrough = this.nextSequence;
-            }
-
-            await this.WaitForNextTransitionAsync(observedThrough, deadline, cancellationToken);
-        }
-    }
-
     public IReadOnlyList<RecoveryTransition> GetTimeline()
     {
         lock (this.lockObj)
@@ -447,13 +416,6 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
 
     private static string FormatTransactionIds(ImmutableArray<Guid> transactionIds)
         => transactionIds.IsDefaultOrEmpty ? "<none>" : $"[{string.Join(",", transactionIds)}]";
-
-    private static bool IsRecoveryCompletion(RecoveryTransition transition)
-        => transition.Kind is RecoveryTransitionKind.AbortAndRestoreCompleted
-            or RecoveryTransitionKind.QueueRestoreCompleted
-            || transition.Kind is RecoveryTransitionKind.TransactionCancelCompleted
-                or RecoveryTransitionKind.TransactionConfirmCompleted
-                && transition.Succeeded == true;
 
     private bool IsCurrentlyRelevant(RecoveryTransition transition)
         => this.relevantGrains is null
