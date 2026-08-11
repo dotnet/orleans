@@ -132,6 +132,68 @@ public class TransactionRecoveryLatencyTests
     }
 
     [Fact]
+    public async Task AbortingQueuedTransactionRemovesAllPendingOperations()
+    {
+        var queue = new GatedCancelTransactionQueue(
+            CreateParticipant("resource", ParticipantId.Role.Resource),
+            new TestActivationLifetime());
+        var currentTransactionId = Guid.NewGuid();
+        var abortedTransactionId = Guid.NewGuid();
+        var nextTransactionId = Guid.NewGuid();
+        var priority = DateTime.UtcNow;
+        var abortedOperationCount = 0;
+
+        await queue.RWLock.EnterLock(
+            currentTransactionId,
+            priority,
+            new AccessCounter(),
+            isRead: false,
+            exclusiveLock: false,
+            static () => 0);
+        var firstAbortedOperation = queue.RWLock.EnterLock(
+            abortedTransactionId,
+            priority,
+            new AccessCounter(),
+            isRead: false,
+            exclusiveLock: false,
+            () => ++abortedOperationCount);
+        var secondAbortedOperation = queue.RWLock.EnterLock(
+            abortedTransactionId,
+            priority,
+            new AccessCounter { Writes = 1 },
+            isRead: false,
+            exclusiveLock: false,
+            () => ++abortedOperationCount);
+
+        Assert.False(firstAbortedOperation.IsCompleted);
+        Assert.False(secondAbortedOperation.IsCompleted);
+
+        queue.RWLock.Rollback(abortedTransactionId);
+
+        await Assert.ThrowsAsync<OrleansCascadingAbortException>(
+            () => firstAbortedOperation.WaitAsync(TimeSpan.FromSeconds(1)));
+        await Assert.ThrowsAsync<OrleansCascadingAbortException>(
+            () => secondAbortedOperation.WaitAsync(TimeSpan.FromSeconds(1)));
+        Assert.Equal(0, abortedOperationCount);
+
+        var nextOperation = queue.RWLock.EnterLock(
+            nextTransactionId,
+            priority,
+            new AccessCounter(),
+            isRead: false,
+            exclusiveLock: false,
+            static () => 42);
+
+        Assert.False(nextOperation.IsCompleted);
+
+        queue.RWLock.Rollback(currentTransactionId);
+        queue.RWLock.Notify();
+
+        Assert.Equal(42, await nextOperation.WaitAsync(TimeSpan.FromSeconds(1)));
+        Assert.Equal(0, abortedOperationCount);
+    }
+
+    [Fact]
     public async Task LocalAbortCompletesManagerDecisionAfterDispatchAndBeforeCleanupSettles()
     {
         var manager = CreateParticipant(

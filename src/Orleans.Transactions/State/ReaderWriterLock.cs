@@ -33,17 +33,19 @@ namespace Orleans.Transactions.State
         private class LockGroup : Dictionary<Guid, TransactionRecord<TState>>
         {
             public int FillCount;
-            public List<Action>? Tasks; // the tasks for executing the waiting operations
+            public List<PendingOperation>? PendingOperations;
             public LockGroup? Next; // queued-up transactions waiting to acquire lock
             public DateTime? Deadline;
             public void Reset()
             {
                 FillCount = 0;
-                Tasks = null;
+                PendingOperations = null;
                 Deadline = null;
                 Clear();
             }
         }
+
+        private readonly record struct PendingOperation(Guid TransactionId, Action Execute, Action Abort);
 
         public ReadWriteLock(
             IOptions<TransactionalStateOptions> options,
@@ -145,15 +147,16 @@ namespace Orleans.Transactions.State
                     result.TrySetException(exception);
                 }
             }
+            void abort() => result.TrySetException(new OrleansCascadingAbortException(transactionId.ToString()));
 
             if (group != currentGroup)
             {
                 // task will be executed once its group acquires the lock
 
-                if (group.Tasks == null)
-                    group.Tasks = new List<Action>();
+                if (group.PendingOperations == null)
+                    group.PendingOperations = new List<PendingOperation>();
 
-                group.Tasks.Add(completion);
+                group.PendingOperations.Add(new PendingOperation(transactionId, completion, abort));
             }
             else
             {
@@ -249,13 +252,13 @@ namespace Orleans.Transactions.State
             var pos = currentGroup?.Next;
             while (pos != null)
             {
-                if (pos.Tasks != null)
+                if (pos.PendingOperations != null)
                 {
-                    foreach (var t in pos.Tasks)
+                    foreach (var operation in pos.PendingOperations)
                     {
-                        // running the task will abort the transaction because it is not in currentGroup
-                        t();
+                        operation.Abort();
                     }
+                    pos.PendingOperations = null;
                 }
                 pos.Clear();
                 pos = pos.Next;
@@ -264,7 +267,23 @@ namespace Orleans.Transactions.State
                 currentGroup.Next = null;
         }
 
-        public void Rollback(Guid guid) => currentGroup?.Remove(guid);
+        public void Rollback(Guid guid)
+        {
+            var group = currentGroup;
+            while (group != null)
+            {
+                if (group.Remove(guid))
+                {
+                    if (group != currentGroup)
+                    {
+                        AbortPendingOperations(group, guid);
+                    }
+                    return;
+                }
+
+                group = group.Next;
+            }
+        }
 
         public Task Rollback(Guid guid, bool notify, TransactionDiagnosticEvents.LockBreakReason reason)
         {
@@ -367,20 +386,23 @@ namespace Orleans.Transactions.State
                             // discard expired waiters that have no chance to succeed
                             // because they have been waiting for the lock for a longer timespan than the
                             // total transaction timeout
-                            foreach (var kvp in currentGroup)
+                            var expiredWaiters = currentGroup
+                                .Where(kvp => now > kvp.Value.Deadline)
+                                .Select(kvp => kvp.Key)
+                                .ToList();
+                            foreach (var transactionId in expiredWaiters)
                             {
-                                if (now > kvp.Value.Deadline)
-                                {
-                                    TransactionDiagnosticEvents.EmitLockExpired(
-                                        queue.Resource,
-                                        kvp.Key,
-                                        kvp.Value.Deadline,
-                                        now,
-                                        TransactionDiagnosticEvents.LockExpirationKind.QueuedWaiter,
-                                        queue.DiagnosticIdentity);
-                                    currentGroup.Remove(kvp.Key);
-                                    LogTraceExpireLockWaiter(kvp.Key);
-                                }
+                                var deadline = currentGroup[transactionId].Deadline;
+                                TransactionDiagnosticEvents.EmitLockExpired(
+                                    queue.Resource,
+                                    transactionId,
+                                    deadline,
+                                    now,
+                                    TransactionDiagnosticEvents.LockExpirationKind.QueuedWaiter,
+                                    queue.DiagnosticIdentity);
+                                currentGroup.Remove(transactionId);
+                                AbortPendingOperations(currentGroup, transactionId);
+                                LogTraceExpireLockWaiter(transactionId);
                             }
 
                             LogTraceLockGroupSize(currentGroup.Count, new(currentGroup.Deadline));
@@ -391,11 +413,13 @@ namespace Orleans.Transactions.State
                             }
 
                             // execute all the read and update tasks
-                            if (currentGroup.Tasks != null)
+                            if (currentGroup.PendingOperations != null)
                             {
-                                foreach (var t in currentGroup.Tasks)
+                                var pendingOperations = currentGroup.PendingOperations;
+                                currentGroup.PendingOperations = null;
+                                foreach (var operation in pendingOperations)
                                 {
-                                    t();
+                                    operation.Execute();
                                 }
                             }
 
@@ -403,6 +427,29 @@ namespace Orleans.Transactions.State
                         }
                     }
                 }
+            }
+        }
+
+        private static void AbortPendingOperations(LockGroup group, Guid transactionId)
+        {
+            if (group.PendingOperations == null)
+            {
+                return;
+            }
+
+            for (var i = group.PendingOperations.Count - 1; i >= 0; i--)
+            {
+                var operation = group.PendingOperations[i];
+                if (operation.TransactionId == transactionId)
+                {
+                    group.PendingOperations.RemoveAt(i);
+                    operation.Abort();
+                }
+            }
+
+            if (group.PendingOperations.Count == 0)
+            {
+                group.PendingOperations = null;
             }
         }
 
