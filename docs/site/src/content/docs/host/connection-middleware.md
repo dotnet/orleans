@@ -1,76 +1,33 @@
 ---
 title: Connection middleware
 description: Plug custom logic, such as authentication or custom framing, into Orleans silo-to-silo and client-to-silo connections.
-ms.date: 08/10/2026
+ms.date: 08/11/2026
 ms.topic: how-to
 ---
 
 # Connection middleware
 
-Orleans connections (silo-to-silo, client-to-gateway, and gateway-inbound) are built from a chain of middleware, similar to an ASP.NET Core request pipeline. <xref:Orleans.Runtime.Messaging.IConnectionMiddleware> lets you insert custom logic, such as authentication, custom framing, or connection-level diagnostics, into that pipeline without reimplementing connection setup.
+Orleans silo-to-silo and client-to-gateway connections are built from a chain of middleware, similar to an ASP.NET Core request pipeline. <xref:Orleans.Runtime.Messaging.IConnectionMiddleware> lets you insert custom logic, such as authentication, custom framing, or connection-level diagnostics, into that pipeline without reimplementing connection setup.
 
 Orleans itself uses this abstraction for TLS. See [Secure Orleans connections with TLS](transport-layer-security.md) for the built-in TLS middleware.
 
 ## The middleware interface
 
-```csharp
-public interface IConnectionMiddleware
-{
-    Task OnConnectionAsync(ConnectionContext context, ConnectionDelegate next);
-}
-```
-
-A middleware instance can be invoked concurrently for multiple connections, so store per-connection state in local variables or on the <xref:Microsoft.AspNetCore.Connections.ConnectionContext>, not on the middleware instance. Implementations should call `next(context)` to continue the pipeline after performing their work; not calling `next` terminates the connection.
+The interface defines `OnConnectionAsync(ConnectionContext, ConnectionDelegate)`. A middleware instance can be invoked concurrently for multiple connections, so store per-connection state in local variables or on the <xref:Microsoft.AspNetCore.Connections.ConnectionContext>, not on the middleware instance. Implementations should call `next(context)` to continue the pipeline after performing their work; not calling `next` terminates the connection.
 
 ## Register middleware
 
-Use `UseMiddleware` on an <xref:Microsoft.AspNetCore.Connections.IConnectionBuilder> to add middleware to a connection pipeline:
+Use <xref:Orleans.ConnectionMiddlewareExtensions.UseMiddleware*> on an <xref:Microsoft.AspNetCore.Connections.IConnectionBuilder> to add middleware to a connection pipeline:
 
-```csharp
-// Resolves T from the application's dependency injection container.
-// T must be registered as a singleton and must be safe for concurrent use.
-builder.UseMiddleware<MyMiddleware>();
-
-// Adds a shared instance. The caller owns the instance and is responsible for disposing it.
-builder.UseMiddleware(new MyMiddleware(...));
-```
+:::code language="csharp" source="./snippets/connection-middleware/ConnectionMiddlewareExamples.cs" id="RegisterMiddleware":::
 
 Connection pipelines are configured through <xref:Orleans.Configuration.SiloConnectionOptions> (silo) and <xref:Orleans.Configuration.ClientConnectionOptions> (client). A silo has three distinct pipelines:
 
-```csharp
-siloBuilder.Configure<SiloConnectionOptions>(options =>
-{
-    // Connections this silo makes to other silos.
-    options.ConfigureSiloOutboundConnection(connectionBuilder =>
-    {
-        connectionBuilder.UseMiddleware<MyClientSideMiddleware>();
-    });
-
-    // Connections this silo accepts from other silos.
-    options.ConfigureSiloInboundConnection(connectionBuilder =>
-    {
-        connectionBuilder.UseMiddleware<MyServerSideMiddleware>();
-    });
-
-    // Connections this silo accepts from Orleans clients through the gateway.
-    options.ConfigureGatewayInboundConnection(connectionBuilder =>
-    {
-        connectionBuilder.UseMiddleware<MyServerSideMiddleware>();
-    });
-});
-```
+:::code language="csharp" source="./snippets/connection-middleware/ConnectionMiddlewareExamples.cs" id="SiloPipelines":::
 
 An Orleans client has a single outbound pipeline, configured with <xref:Orleans.Configuration.ClientConnectionOptions>:
 
-```csharp
-clientBuilder.Configure<ClientConnectionOptions>(options =>
-{
-    options.ConfigureConnection(connectionBuilder =>
-    {
-        connectionBuilder.UseMiddleware<MyClientSideMiddleware>();
-    });
-});
-```
+:::code language="csharp" source="./snippets/connection-middleware/ConnectionMiddlewareExamples.cs" id="ClientPipeline":::
 
 Middleware added first runs first, wrapping every middleware added after it, matching the order `UseMiddleware` is called. Register the middleware type itself (for example `MyClientSideMiddleware`, `MyServerSideMiddleware`) as a singleton service when using the generic `UseMiddleware<T>()` overload.
 
@@ -83,25 +40,7 @@ Custom middleware that exchanges its own protocol data before calling `next` (fo
 
 The wire format per frame is `[4-byte little-endian length][1-byte frame type][payload]`, where the length equals `1 + payload.Length`.
 
-```csharp
-public class MyServerSideMiddleware : IConnectionMiddleware
-{
-    public async Task OnConnectionAsync(ConnectionContext context, ConnectionDelegate next)
-    {
-        // Read one frame of the custom handshake protocol.
-        var (frameType, payload) = await ConnectionFrameHelper.ReadFrameAsync(
-            context, context.ConnectionClosed);
-
-        // Validate the frame, e.g. an auth token, then respond.
-        var responsePayload = Encoding.UTF8.GetBytes("ok");
-        await ConnectionFrameHelper.WriteFrameAsync(
-            context, frameType: 0x01, responsePayload, context.ConnectionClosed);
-
-        // Continue the pipeline; Orleans's own handshake and framing run after this.
-        await next(context);
-    }
-}
-```
+:::code language="csharp" source="./snippets/connection-middleware/ConnectionMiddlewareExamples.cs" id="ServerMiddleware":::
 
 `ConnectionFrameHelper` also provides `WriteLengthPrefixedString`/`ReadLengthPrefixedString` helpers for encoding UTF-8 strings inside a frame payload, and a zero-copy `WriteFrameAsync` overload that writes the payload directly into the transport pipe buffer via an `Action<IBufferWriter<byte>>` delegate, avoiding an intermediate `byte[]` allocation.
 
