@@ -231,7 +231,7 @@
     "grains/index.md": {
       "reason": "The grain overview uses short contract, implementation, and call-site excerpts to teach concepts before introducing a complete application.",
       "hashes": [
-        "a72ed443f9f79c06ac4a60dd341d090d7c99258aa98fd2029b14b12a55e6146c",
+        "e27101cfb7472926ed8a895cbf795ef8e24be3f92a4fa7c0ee3ae375f812cb30",
         "5e2bf0bc0257f83463be2af855a490ed9b8d6ad70954efebb53e6e925c909769",
         "e663c64e6938a3b7a78f4cc4e9219a163017cc66b9f19d54e78cec15f770d204",
         "d9661ec8230203242ce130a2d6a0ac3d34ca08550e111ab5c5b56ebefcc3ea83",
