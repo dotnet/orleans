@@ -872,7 +872,7 @@ public class ShardExecutorTests
 
         public Task TimerCreated => _timerCreated.Task;
 
-        public override ITimer CreateTimer(TimerCallback callback, object state, TimeSpan dueTime, TimeSpan period)
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
         {
             var timer = base.CreateTimer(callback, state, dueTime, period);
             _timerCreated.TrySetResult();
