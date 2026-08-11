@@ -14,19 +14,22 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILogger<MembershipSystemTarget> log;
         private readonly IInternalGrainFactory grainFactory;
         private readonly MessagingInstruments _messagingInstruments;
+        private readonly TimeProvider _timeProvider;
 
         public MembershipSystemTarget(
             IMembershipManager membershipManager,
             ILogger<MembershipSystemTarget> log,
             IInternalGrainFactory grainFactory,
             MessagingInstruments messagingInstruments,
-            SystemTargetShared shared)
+            SystemTargetShared shared,
+            [FromKeyedServices(TimeProviderNames.Membership)] TimeProvider timeProvider)
             : base(Constants.MembershipServiceType, shared)
         {
             this.membershipManager = membershipManager;
             this.log = log;
             this.grainFactory = grainFactory;
             _messagingInstruments = messagingInstruments;
+            _timeProvider = timeProvider;
             shared.ActivationDirectory.RecordNewTarget(this);
         }
 
@@ -79,14 +82,16 @@ namespace Orleans.Runtime.MembershipService
         public async Task<IndirectProbeResponse> ProbeIndirectly(SiloAddress target, TimeSpan probeTimeout, int probeNumber)
         {
             IndirectProbeResponse result;
-            var healthScore = this.ActivationServices.GetRequiredService<LocalSiloHealthMonitor>().GetLocalHealthDegradationScore(DateTime.UtcNow);
-            var probeResponseTimer = ValueStopwatch.StartNew();
+            var healthScore = this.ActivationServices.GetRequiredService<ILocalSiloHealthMonitor>()
+                .GetLocalHealthStatus(probeTimeout, LocalSiloHealthCheckCategory.Local)
+                .Score;
+            var probeResponseTimestamp = _timeProvider.GetTimestamp();
             try
             {
                 var probeTask = this.ProbeInternal(target, probeNumber);
                 try
                 {
-                    await probeTask.WaitAsync(probeTimeout);
+                    await probeTask.WaitAsync(probeTimeout, _timeProvider);
                 }
                 catch (TimeoutException exception)
                 {
@@ -98,7 +103,7 @@ namespace Orleans.Runtime.MembershipService
                 {
                     Succeeded = true,
                     IntermediaryHealthScore = healthScore,
-                    ProbeResponseTime = probeResponseTimer.Elapsed,
+                    ProbeResponseTime = _timeProvider.GetElapsedTime(probeResponseTimestamp),
                 };
             }
             catch (Exception exception)
@@ -108,7 +113,7 @@ namespace Orleans.Runtime.MembershipService
                     Succeeded = false,
                     IntermediaryHealthScore = healthScore,
                     FailureMessage = $"Encountered exception {LogFormatter.PrintException(exception)}",
-                    ProbeResponseTime = probeResponseTimer.Elapsed,
+                    ProbeResponseTime = _timeProvider.GetElapsedTime(probeResponseTimestamp),
                 };
             }
 

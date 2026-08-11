@@ -4,9 +4,11 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Runtime
 {
@@ -17,7 +19,9 @@ namespace Orleans.Runtime
         IOptions<ClusterMembershipOptions> clusterMembershipOptions,
         IEnumerable<IHealthCheckParticipant> participants,
         ILogger<Watchdog> logger,
-        OrleansInstruments orleansInstruments) : IDisposable
+        OrleansInstruments orleansInstruments,
+        ILocalSiloHealthEventRecorder healthEventRecorder,
+        [FromKeyedServices(TimeProviderNames.Membership)] TimeProvider timeProvider) : IDisposable
     {
         private static readonly TimeSpan PlatformWatchdogHeartbeatPeriod = TimeSpan.FromMilliseconds(1000);
         private readonly CancellationTokenSource _cancellation = new();
@@ -25,8 +29,10 @@ namespace Orleans.Runtime
         private readonly List<IHealthCheckParticipant> _participants = participants.ToList();
         private readonly ILogger _logger = logger;
         private readonly WatchdogInstruments _watchdogInstruments = new(orleansInstruments);
-        private ValueStopwatch _platformWatchdogStopwatch;
-        private ValueStopwatch _componentWatchdogStopwatch;
+        private readonly ILocalSiloHealthEventRecorder _healthEventRecorder = healthEventRecorder;
+        private readonly TimeProvider _timeProvider = timeProvider;
+        private long _platformWatchdogTimestamp;
+        private long _componentWatchdogTimestamp;
 
         // GC pause duration since process start.
         private TimeSpan _cumulativeGCPauseDuration;
@@ -44,8 +50,7 @@ namespace Orleans.Runtime
                 throw new InvalidOperationException("Watchdog.Start may not be called more than once");
             }
 
-            var now = DateTime.UtcNow;
-            _platformWatchdogStopwatch = ValueStopwatch.StartNew();
+            _platformWatchdogTimestamp = _timeProvider.GetTimestamp();
             _cumulativeGCPauseDuration = GC.GetTotalPauseDuration();
 
             _platformWatchdogThread = new Thread(RunPlatformWatchdog)
@@ -55,8 +60,8 @@ namespace Orleans.Runtime
             };
             _platformWatchdogThread.Start();
 
-            _componentWatchdogStopwatch = ValueStopwatch.StartNew();
-            _lastComponentHealthCheckTime = DateTime.UtcNow;
+            _componentWatchdogTimestamp = _timeProvider.GetTimestamp();
+            _lastComponentHealthCheckTime = _timeProvider.GetUtcNow().UtcDateTime;
 
             _componentWatchdogThread = new Thread(RunComponentWatchdog)
             {
@@ -87,7 +92,7 @@ namespace Orleans.Runtime
                     LogErrorPlatformWatchdogInternalError(_logger, exc);
                 }
 
-                _platformWatchdogStopwatch.Restart();
+                _platformWatchdogTimestamp = _timeProvider.GetTimestamp();
                 _cumulativeGCPauseDuration = GC.GetTotalPauseDuration();
                 _cancellation.Token.WaitHandle.WaitOne(PlatformWatchdogHeartbeatPeriod);
             }
@@ -101,16 +106,35 @@ namespace Orleans.Runtime
             }
 
             var pauseDurationSinceLastTick = GC.GetTotalPauseDuration() - _cumulativeGCPauseDuration;
-            var timeSinceLastTick = _platformWatchdogStopwatch.Elapsed;
+            var timeSinceLastTick = _timeProvider.GetElapsedTime(_platformWatchdogTimestamp);
+            if (pauseDurationSinceLastTick > TimeSpan.Zero)
+            {
+                _healthEventRecorder.RecordHealthEvent(
+                    LocalSiloHealthCheckKind.GarbageCollectionPause,
+                    score: 0,
+                    complaint: $"The .NET runtime paused for garbage collection for {pauseDurationSinceLastTick}.",
+                    duration: pauseDurationSinceLastTick);
+            }
+
             if (timeSinceLastTick > PlatformWatchdogHeartbeatPeriod.Multiply(2))
             {
                 var gc = new[] { GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2) };
+                _healthEventRecorder.RecordHealthEvent(
+                    LocalSiloHealthCheckKind.RuntimeStall,
+                    score: 1,
+                    complaint: $".NET Runtime Platform stalled for {timeSinceLastTick}. Memory: {GC.GetTotalMemory(false) / (1024 * 1024)}MB. Collection counts: 0: {gc[0]}, 1: {gc[1]}, 2: {gc[2]}.",
+                    duration: timeSinceLastTick);
                 LogWarningSiloHeartbeatTimerStalled(_logger, timeSinceLastTick, pauseDurationSinceLastTick, GC.GetTotalMemory(false) / (1024 * 1024), gc[0], gc[1], gc[2]);
             }
 
-            var timeSinceLastParticipantCheck = _componentWatchdogStopwatch.Elapsed;
+            var timeSinceLastParticipantCheck = _timeProvider.GetElapsedTime(_componentWatchdogTimestamp);
             if (timeSinceLastParticipantCheck > _componentHealthCheckPeriod.Multiply(2))
             {
+                _healthEventRecorder.RecordHealthEvent(
+                    LocalSiloHealthCheckKind.ComponentHealthCheckStall,
+                    score: 1,
+                    complaint: $"Participant check thread has not completed for {timeSinceLastParticipantCheck}.",
+                    duration: timeSinceLastParticipantCheck);
                 LogWarningParticipantCheckThreadStalled(_logger, timeSinceLastParticipantCheck);
             }
         }
@@ -128,7 +152,7 @@ namespace Orleans.Runtime
                     LogErrorComponentHealthCheckInternalError(_logger, exc);
                 }
 
-                _componentWatchdogStopwatch.Restart();
+                _componentWatchdogTimestamp = _timeProvider.GetTimestamp();
                 _cancellation.Token.WaitHandle.WaitOne(_componentHealthCheckPeriod);
             }
         }
@@ -140,7 +164,7 @@ namespace Orleans.Runtime
             StringBuilder? complaints = null;
 
             // Restart the timer before the check to reduce false positives for the stall checker.
-            _componentWatchdogStopwatch.Restart();
+            _componentWatchdogTimestamp = _timeProvider.GetTimestamp();
             foreach (var participant in _participants)
             {
                 try
@@ -170,7 +194,7 @@ namespace Orleans.Runtime
                 LogWarningHealthCheckFailure(_logger, numFailedChecks, _participants.Count, complaints);
             }
 
-            _lastComponentHealthCheckTime = DateTime.UtcNow;
+            _lastComponentHealthCheckTime = _timeProvider.GetUtcNow().UtcDateTime;
         }
 
         public void Dispose()

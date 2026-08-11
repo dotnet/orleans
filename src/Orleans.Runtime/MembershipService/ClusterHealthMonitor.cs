@@ -31,6 +31,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILogger<ClusterHealthMonitor> log;
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly IOptionsMonitor<ClusterMembershipOptions> clusterMembershipOptions;
+        private readonly TimeProvider timeProvider;
         private ImmutableDictionary<SiloAddress, SiloHealthMonitor> monitoredSilos = ImmutableDictionary<SiloAddress, SiloHealthMonitor>.Empty;
         private MembershipVersion observedMembershipVersion;
         private Func<SiloAddress, SiloHealthMonitor> createMonitor;
@@ -54,7 +55,8 @@ namespace Orleans.Runtime.MembershipService
             IOptionsMonitor<ClusterMembershipOptions> clusterMembershipOptions,
             IFatalErrorHandler fatalErrorHandler,
             IServiceProvider serviceProvider,
-            ConnectionManager connectionManager)
+            ConnectionManager connectionManager,
+            [FromKeyedServices(TimeProviderNames.Membership)] TimeProvider timeProvider)
         {
             this.localSiloDetails = localSiloDetails;
             this.serviceProvider = serviceProvider;
@@ -63,6 +65,7 @@ namespace Orleans.Runtime.MembershipService
             this.log = log;
             this.fatalErrorHandler = fatalErrorHandler;
             this.clusterMembershipOptions = clusterMembershipOptions;
+            this.timeProvider = timeProvider;
             this.onProbeResult = this.OnProbeResultInternal;
             Func<SiloHealthMonitor, ProbeResult, Task> onProbeResultFunc = (siloHealthMonitor, probeResult) => this.onProbeResult(siloHealthMonitor, probeResult);
             this.createMonitor = silo => ActivatorUtilities.CreateInstance<SiloHealthMonitor>(serviceProvider, silo, onProbeResultFunc);
@@ -85,7 +88,7 @@ namespace Orleans.Runtime.MembershipService
                 LogDebugStartingToProcessMembershipUpdates(log);
                 await foreach (var tableSnapshot in this.membershipManager.MembershipUpdates.WithCancellation(this.shutdownCancellation.Token))
                 {
-                    var utcNow = DateTime.UtcNow;
+                    var utcNow = this.timeProvider.GetUtcNow().UtcDateTime;
 
                     var newMonitoredSilos = this.UpdateMonitoredSilos(tableSnapshot, this.monitoredSilos, utcNow);
 
@@ -98,7 +101,9 @@ namespace Orleans.Runtime.MembershipService
                     {
                         if (!newMonitoredSilos.ContainsKey(pair.Key))
                         {
-                            using var cancellation = new CancellationTokenSource(this.clusterMembershipOptions.CurrentValue.ProbeTimeout);
+                            using var cancellation = new CancellationTokenSource(
+                                this.clusterMembershipOptions.CurrentValue.ProbeTimeout,
+                                this.timeProvider);
                             await pair.Value.StopAsync(cancellation.Token);
                         }
                     }
@@ -291,7 +296,10 @@ namespace Orleans.Runtime.MembershipService
 
             Task OnValidateInitialConnectivityStart(CancellationToken ct)
             {
-                this.monitoredSilos = this.UpdateMonitoredSilos(this.membershipManager.CurrentSnapshot, this.monitoredSilos, DateTime.UtcNow);
+                this.monitoredSilos = this.UpdateMonitoredSilos(
+                    this.membershipManager.CurrentSnapshot,
+                    this.monitoredSilos,
+                    this.timeProvider.GetUtcNow().UtcDateTime);
                 tasks.Add(Task.Run(() => this.ProcessMembershipUpdates()));
                 return Task.CompletedTask;
             }
@@ -308,7 +316,9 @@ namespace Orleans.Runtime.MembershipService
                 this.monitoredSilos = ImmutableDictionary<SiloAddress, SiloHealthMonitor>.Empty;
 
                 // Allow some minimum time for graceful shutdown.
-                var shutdownGracePeriod = Task.WhenAll(Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod), ct.WhenCancelled());
+                var shutdownGracePeriod = Task.WhenAll(
+                    Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod, this.timeProvider),
+                    ct.WhenCancelled());
                 await Task.WhenAny(shutdownGracePeriod, Task.WhenAll(tasks));
             }
         }

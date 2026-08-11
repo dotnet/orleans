@@ -27,6 +27,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly IMembershipManager _membershipService;
         private readonly MessagingInstruments? _messagingInstruments;
         private readonly ILocalSiloDetails _localSiloDetails;
+        private readonly TimeProvider _timeProvider;
         private readonly CancellationTokenSource _stoppingCancellation = new();
 #if NET9_0_OR_GREATER
         private readonly Lock _lockObj = new();
@@ -34,7 +35,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly object _lockObj = new();
 #endif
         private readonly IAsyncTimer _pingTimer;
-        private ValueStopwatch _elapsedSinceLastSuccessfulResponse;
+        private long? _lastSuccessfulResponseTimestamp;
         private readonly Func<SiloHealthMonitor, ProbeResult, Task> _onProbeResult;
         private Task? _runTask;
 
@@ -51,7 +52,8 @@ namespace Orleans.Runtime.MembershipService
         /// <summary>
         /// The time since the last ping response was received from either the node being monitored or an intermediary.
         /// </summary>
-        public TimeSpan? ElapsedSinceLastResponse => _elapsedSinceLastSuccessfulResponse.IsRunning ? (TimeSpan?)_elapsedSinceLastSuccessfulResponse.Elapsed : null;
+        public TimeSpan? ElapsedSinceLastResponse
+            => _lastSuccessfulResponseTimestamp is { } timestamp ? _timeProvider.GetElapsedTime(timestamp) : null;
 
         /// <summary>
         /// The duration of time measured from just prior to sending the last probe which received a response until just after receiving and processing the response.
@@ -78,13 +80,14 @@ namespace Orleans.Runtime.MembershipService
             _membershipService = membershipService;
             _messagingInstruments = messagingInstruments;
             _localSiloDetails = localSiloDetails;
+            _timeProvider = timeProvider;
             _log = loggerFactory.CreateLogger<SiloHealthMonitor>();
             _pingTimer = asyncTimerFactory.Create(
                 _clusterMembershipOptions.CurrentValue.ProbeTimeout,
                 nameof(SiloHealthMonitor),
                 timeProvider);
             _onProbeResult = onProbeResult;
-            _elapsedSinceLastSuccessfulResponse = ValueStopwatch.StartNew();
+            _lastSuccessfulResponseTimestamp = _timeProvider.GetTimestamp();
         }
 
         internal interface ITestAccessor
@@ -172,7 +175,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 ProbeResult probeResult;
                 overrideDelay = default;
-                var now = DateTime.UtcNow;
+                var now = _timeProvider.GetUtcNow().UtcDateTime;
 
                 try
                 {
@@ -192,7 +195,7 @@ namespace Orleans.Runtime.MembershipService
 
                     var isDirectProbe = !options.EnableIndirectProbes || _failedProbes < options.NumMissedProbesLimit - 1 || otherNodes.Length == 0;
                     var timeout = GetTimeout(isDirectProbe);
-                    using var cancellation = new CancellationTokenSource(timeout);
+                    using var cancellation = new CancellationTokenSource(timeout, _timeProvider);
 
                     if (isDirectProbe)
                     {
@@ -237,8 +240,10 @@ namespace Orleans.Runtime.MembershipService
                 if (options.ExtendProbeTimeoutDuringDegradation)
                 {
                     // Attempt to account for local health degradation by extending the timeout period.
-                    var localDegradationScore = _localSiloHealthMonitor.GetLocalHealthDegradationScore(DateTime.UtcNow);
-                    additionalTimeout += localDegradationScore;
+                    var localHealth = _localSiloHealthMonitor.GetLocalHealthStatus(
+                        options.ProbeTimeout,
+                        LocalSiloHealthCheckCategory.Local);
+                    additionalTimeout += localHealth.Score;
                 }
 
                 if (!isDirectProbe)
@@ -268,7 +273,7 @@ namespace Orleans.Runtime.MembershipService
             var id = ++_nextProbeId;
             LogTraceGoingToSendPing(_log, id, TargetSiloAddress);
 
-            var roundTripTimer = ValueStopwatch.StartNew();
+            var roundTripTimestamp = _timeProvider.GetTimestamp();
             ProbeResult probeResult;
             Exception? failureException;
             try
@@ -278,26 +283,25 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (OperationCanceledException exception)
             {
-                failureException = new OperationCanceledException($"The ping attempt was cancelled after {roundTripTimer.Elapsed}. Ping #{id}", exception);
+                failureException = new OperationCanceledException(
+                    $"The ping attempt was cancelled after {_timeProvider.GetElapsedTime(roundTripTimestamp)}. Ping #{id}",
+                    exception);
             }
             catch (Exception exception)
             {
                 failureException = exception;
             }
-            finally
-            {
-                roundTripTimer.Stop();
-            }
+            var roundTripTime = _timeProvider.GetElapsedTime(roundTripTimestamp);
 
             if (failureException is null)
             {
                 _messagingInstruments?.OnPingReplyReceived(TargetSiloAddress);
 
-                LogTraceGotSuccessfulPingResponse(_log, id, TargetSiloAddress, roundTripTimer.Elapsed);
+                LogTraceGotSuccessfulPingResponse(_log, id, TargetSiloAddress, roundTripTime);
 
                 _failedProbes = 0;
-                _elapsedSinceLastSuccessfulResponse.Restart();
-                LastRoundTripTime = roundTripTimer.Elapsed;
+                _lastSuccessfulResponseTimestamp = _timeProvider.GetTimestamp();
+                LastRoundTripTime = roundTripTime;
                 probeResult = ProbeResult.CreateDirect(0, ProbeResultStatus.Succeeded);
             }
             else
@@ -305,7 +309,7 @@ namespace Orleans.Runtime.MembershipService
                 _messagingInstruments?.OnPingReplyMissed(TargetSiloAddress);
 
                 var failedProbes = ++_failedProbes;
-                LogWarningDidNotGetResponseForProbe(_log, failureException, id, TargetSiloAddress, roundTripTimer.Elapsed, failedProbes);
+                LogWarningDidNotGetResponseForProbe(_log, failureException, id, TargetSiloAddress, roundTripTime, failedProbes);
 
                 probeResult = ProbeResult.CreateDirect(failedProbes, ProbeResultStatus.Failed);
             }
@@ -325,22 +329,22 @@ namespace Orleans.Runtime.MembershipService
             var id = ++_nextProbeId;
             LogTraceGoingToSendIndirectPing(_log, id, TargetSiloAddress, intermediary);
 
-            var roundTripTimer = ValueStopwatch.StartNew();
+            var roundTripTimestamp = _timeProvider.GetTimestamp();
             ProbeResult probeResult;
             try
             {
                 using var cancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellation, _stoppingCancellation.Token);
                 var indirectResult = await _prober.ProbeIndirectly(intermediary, TargetSiloAddress, directProbeTimeout, id, cancellationSource.Token).WaitAsync(cancellationSource.Token);
-                roundTripTimer.Stop();
-                var roundTripTime = roundTripTimer.Elapsed - indirectResult.ProbeResponseTime;
+                var elapsed = _timeProvider.GetElapsedTime(roundTripTimestamp);
+                var roundTripTime = elapsed - indirectResult.ProbeResponseTime;
 
                 // Record timing regardless of the result.
-                _elapsedSinceLastSuccessfulResponse.Restart();
+                _lastSuccessfulResponseTimestamp = _timeProvider.GetTimestamp();
                 LastRoundTripTime = roundTripTime;
 
                 if (indirectResult.Succeeded)
                 {
-                    LogInformationIndirectProbeSucceeded(_log, id, TargetSiloAddress, intermediary, roundTripTimer.Elapsed, indirectResult.ProbeResponseTime);
+                    LogInformationIndirectProbeSucceeded(_log, id, TargetSiloAddress, intermediary, elapsed, indirectResult.ProbeResponseTime);
 
                     _messagingInstruments?.OnPingReplyReceived(TargetSiloAddress);
 
@@ -358,7 +362,7 @@ namespace Orleans.Runtime.MembershipService
                     }
                     else
                     {
-                        LogWarningIndirectProbeFailed(_log, id, TargetSiloAddress, intermediary, roundTripTimer.Elapsed, indirectResult.ProbeResponseTime, indirectResult.FailureMessage, indirectResult.IntermediaryHealthScore);
+                        LogWarningIndirectProbeFailed(_log, id, TargetSiloAddress, intermediary, elapsed, indirectResult.ProbeResponseTime, indirectResult.FailureMessage, indirectResult.IntermediaryHealthScore);
 
                         var missed = ++_failedProbes;
                         probeResult = ProbeResult.CreateIndirect(missed, ProbeResultStatus.Failed, indirectResult, intermediary);

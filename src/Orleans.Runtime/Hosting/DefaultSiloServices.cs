@@ -192,6 +192,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IProbeHealthMonitor, ProbingSiloHealthMonitor>();
             services.AddSingleton<LocalSiloHealthMonitor>();
             services.AddFromExisting<ILocalSiloHealthMonitor, LocalSiloHealthMonitor>();
+            services.AddFromExisting<ILocalSiloHealthEventRecorder, LocalSiloHealthMonitor>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalSiloHealthMonitor>();
             services.AddSingleton<MembershipAgent>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipAgent>();
