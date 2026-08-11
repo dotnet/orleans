@@ -140,7 +140,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         TimeSpan rangeLeaseDuration,
         ClusterMembershipOptions membershipOptions)
     {
-        var failureDetectionDuration = membershipOptions.ProbeTimeout * membershipOptions.NumMissedProbesLimit;
+        var failureDetectionDuration = membershipOptions.GetFailureDetectionTimeout();
         return rangeLeaseDuration > failureDetectionDuration
             ? rangeLeaseDuration - failureDetectionDuration
             : TimeSpan.Zero;

@@ -153,6 +153,65 @@ namespace NonSilo.Tests
                         .Configure<ClusterMembershipOptions>(options => options.MaxDefunctSiloEntries = -1);
                 }).RunConsoleAsync();
             });
+
+            await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
+            {
+                await new HostBuilder().UseOrleans((ctx, siloBuilder) =>
+                {
+                    siloBuilder
+                        .UseLocalhostClustering()
+                        .Configure<ClusterMembershipOptions>(options => options.ProbeInterval = TimeSpan.Zero);
+                }).RunConsoleAsync();
+            });
+
+            await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
+            {
+                await new HostBuilder().UseOrleans((ctx, siloBuilder) =>
+                {
+                    siloBuilder
+                        .UseLocalhostClustering()
+                        .Configure<ClusterMembershipOptions>(options => options.MinProbeTimeout = TimeSpan.FromSeconds(6));
+                }).RunConsoleAsync();
+            });
+
+            await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
+            {
+                await new HostBuilder().UseOrleans((ctx, siloBuilder) =>
+                {
+                    siloBuilder
+                        .UseLocalhostClustering()
+                        .Configure<ClusterMembershipOptions>(options =>
+                        {
+                            options.MinProbeTimeout = TimeSpan.FromSeconds(1);
+                            options.MaxProbeTimeout = TimeSpan.FromSeconds(4);
+                        });
+                }).RunConsoleAsync();
+            });
+
+            await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
+            {
+                await new HostBuilder().UseOrleans((ctx, siloBuilder) =>
+                {
+                    siloBuilder
+                        .UseLocalhostClustering()
+                        .Configure<ClusterMembershipOptions>(options => options.MaxProbeTimeout = TimeSpan.FromDays(50));
+                }).RunConsoleAsync();
+            });
+
+            await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
+            {
+                await new HostBuilder().UseOrleans((ctx, siloBuilder) =>
+                {
+                    siloBuilder
+                        .UseLocalhostClustering()
+                        .Configure<ClusterMembershipOptions>(options =>
+                        {
+                            options.InitialProbeTimeout = TimeSpan.FromDays(1);
+                            options.MaxProbeTimeout = TimeSpan.FromDays(49);
+                            options.NumMissedProbesLimit = int.MaxValue;
+                        });
+                }).RunConsoleAsync();
+            });
         }
 
         /// <summary>

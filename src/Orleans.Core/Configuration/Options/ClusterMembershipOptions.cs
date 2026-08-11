@@ -7,6 +7,12 @@ namespace Orleans.Configuration
     /// </summary>
     public class ClusterMembershipOptions
     {
+        private static readonly TimeSpan DefaultProbeInterval = TimeSpan.FromSeconds(5);
+        private TimeSpan _probeInterval = DefaultProbeInterval;
+        private TimeSpan _initialProbeTimeout = DefaultProbeInterval;
+        private TimeSpan? _minProbeTimeout;
+        private TimeSpan? _maxProbeTimeout;
+
         /// <summary>
         /// Gets or sets the number of missed "I am alive" updates in the table from a silo that causes warning to be logged.
         /// </summary>
@@ -23,10 +29,68 @@ namespace Orleans.Configuration
         public bool LivenessEnabled { get; set; } = true;
 
         /// <summary>
-        /// Gets or sets both the period between sending a liveness probe to any given host as well as the timeout for each probe.
+        /// Gets or sets both the period between sending a liveness probe to any given host and the initial timeout for each probe.
         /// </summary>
-        /// <value>Probes time out and a new probe is sent every 5 seconds by default.</value>
-        public TimeSpan ProbeTimeout { get; set; } = TimeSpan.FromSeconds(5);
+        /// <remarks>
+        /// Setting this property sets both <see cref="ProbeInterval"/> and <see cref="InitialProbeTimeout"/>.
+        /// The getter returns <see cref="InitialProbeTimeout"/>.
+        /// </remarks>
+        [Obsolete($"Use {nameof(ProbeInterval)} and {nameof(InitialProbeTimeout)} instead.")]
+        public TimeSpan ProbeTimeout
+        {
+            get => InitialProbeTimeout;
+            set
+            {
+                ProbeInterval = value;
+                InitialProbeTimeout = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the period between sending liveness probes to any given host.
+        /// </summary>
+        /// <value>A new probe is sent every 5 seconds by default.</value>
+        public TimeSpan ProbeInterval
+        {
+            get => _probeInterval;
+            set => _probeInterval = value;
+        }
+
+        /// <summary>
+        /// Gets or sets the initial timeout for a liveness probe.
+        /// </summary>
+        /// <remarks>
+        /// The effective probe timeout is adjusted independently for each monitored silo based on observed direct-probe
+        /// response times.
+        /// </remarks>
+        /// <value>The initial probe timeout is 5 seconds by default.</value>
+        public TimeSpan InitialProbeTimeout
+        {
+            get => _initialProbeTimeout;
+            set => _initialProbeTimeout = value;
+        }
+
+        /// <summary>
+        /// Gets or sets the minimum effective timeout for a liveness probe.
+        /// </summary>
+        /// <value>Half of <see cref="InitialProbeTimeout"/> by default.</value>
+        public TimeSpan MinProbeTimeout
+        {
+            get => _minProbeTimeout ?? TimeSpan.FromTicks(InitialProbeTimeout.Ticks / 2);
+            set => _minProbeTimeout = value;
+        }
+
+        /// <summary>
+        /// Gets or sets the maximum effective timeout for a liveness probe.
+        /// </summary>
+        /// <value>Twice <see cref="InitialProbeTimeout"/> by default.</value>
+        public TimeSpan MaxProbeTimeout
+        {
+            get => _maxProbeTimeout ?? (InitialProbeTimeout.Ticks <= TimeSpan.MaxValue.Ticks / 2
+                ? TimeSpan.FromTicks(InitialProbeTimeout.Ticks * 2)
+                : TimeSpan.MaxValue);
+            set => _maxProbeTimeout = value;
+        }
 
         /// <summary>
         /// Gets or sets the period between fetching updates from the membership table.
@@ -131,7 +195,7 @@ namespace Orleans.Configuration
         public TimeSpan LocalHealthDegradationMonitoringPeriod { get; set; } = TimeSpan.FromSeconds(10);
 
         /// <summary>
-        /// Gets or sets a value indicating whether to extend the effective <see cref="ProbeTimeout"/> value based upon current local health degradation.
+        /// Gets or sets a value indicating whether to extend the effective probe timeout based upon current local health degradation.
         /// </summary>
         public bool ExtendProbeTimeoutDuringDegradation { get; set; } = true;
 

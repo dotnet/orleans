@@ -181,7 +181,7 @@ public class GrainDirectoryLeaseTests
         Assert.Equal(TimeSpan.FromSeconds(30), new GrainDirectoryOptions().RangeLeaseDuration);
 
     [Fact]
-    public void DefaultRangeLeaseDuration_LeavesFifteenSecondsAfterFailureDetection()
+    public void DefaultRangeLeaseDuration_IsConsumedByWorstCaseFailureDetection()
     {
         var membershipOptions = new ClusterMembershipOptions();
 
@@ -189,7 +189,7 @@ public class GrainDirectoryLeaseTests
             new GrainDirectoryOptions().RangeLeaseDuration,
             membershipOptions);
 
-        Assert.Equal(TimeSpan.FromSeconds(15), duration);
+        Assert.Equal(TimeSpan.Zero, duration);
     }
 
     [Fact]
@@ -400,7 +400,9 @@ public class GrainDirectoryLeaseTests
             siloBuilder.Services.AddKeyedSingleton(TimeProviderNames.Membership, TimeProvider.System);
             siloBuilder.Services.Configure<ClusterMembershipOptions>(options =>
             {
-                options.ProbeTimeout = TimeSpan.FromSeconds(1);
+                options.ProbeInterval = TimeSpan.FromSeconds(1);
+                options.InitialProbeTimeout = TimeSpan.FromSeconds(1);
+                options.MaxProbeTimeout = TimeSpan.FromSeconds(1);
                 options.NumMissedProbesLimit = 1;
             });
             siloBuilder.Services.PostConfigure<GrainDirectoryOptions>(o => o.RangeLeaseDuration = rangeLeaseDuration ?? RangeLeaseDuration);

@@ -1,7 +1,7 @@
 ---
 title: Cluster membership protocol
 description: Understand Orleans membership storage, failure detection, ordered views, and death-vote invariants.
-ms.date: 08/02/2026
+ms.date: 08/11/2026
 ms.topic: concept-article
 ---
 
@@ -41,6 +41,10 @@ The periodic `IAmAlive` value is not the peer heartbeat. It is a timestamp writt
 
 Active silos monitor peers selected from the membership view. `ClusterHealthMonitor` sends probes over silo-to-silo messaging, tracks consecutive failures, and can use indirect probes to distinguish a failed target from an unhealthy observer. A failed monitor writes a timestamped vote into the target's membership row.
 
+Each observer maintains a [Phi Accrual failure detector](https://paperhub.s3.amazonaws.com/f516fdfa940caa08c679d3946b273128.pdf) for each peer. The detector models successful direct-probe round-trip times and estimates the timeout at which the probability of a later response is sufficiently low. The timeout starts at <xref:Orleans.Configuration.ClusterMembershipOptions.InitialProbeTimeout?displayProperty=nameWithType> and adapts after enough observations. Failures are excluded because they only show that the response exceeded the current timeout, while indirect results are excluded because they measure a different observer's network path.
+
+Probe cadence remains fixed at <xref:Orleans.Configuration.ClusterMembershipOptions.ProbeInterval?displayProperty=nameWithType>. Local-health and indirect-hop extensions are applied to the learned timeout before it is clamped between <xref:Orleans.Configuration.ClusterMembershipOptions.MinProbeTimeout?displayProperty=nameWithType> and <xref:Orleans.Configuration.ClusterMembershipOptions.MaxProbeTimeout?displayProperty=nameWithType>. Debugger-specific extensions are applied after the clamp so a paused process is not accused because of the configured production bound.
+
 ```mermaid
 sequenceDiagram
     participant A as Monitoring silo A
@@ -70,7 +74,10 @@ The defaults are defined by <xref:Orleans.Configuration.ClusterMembershipOptions
 | Option | Default | Protocol role |
 | --- | ---: | --- |
 | <xref:Orleans.Configuration.ClusterMembershipOptions.NumProbedSilos?displayProperty=nameWithType> | 10 | Number of peers monitored by each silo |
-| <xref:Orleans.Configuration.ClusterMembershipOptions.ProbeTimeout?displayProperty=nameWithType> | 5 seconds | Baseline direct probe timeout |
+| <xref:Orleans.Configuration.ClusterMembershipOptions.ProbeInterval?displayProperty=nameWithType> | 5 seconds | Fixed interval between probes of a peer |
+| <xref:Orleans.Configuration.ClusterMembershipOptions.InitialProbeTimeout?displayProperty=nameWithType> | 5 seconds | Timeout before the peer has supplied enough evidence |
+| <xref:Orleans.Configuration.ClusterMembershipOptions.MinProbeTimeout?displayProperty=nameWithType> | Half the initial timeout (2.5 seconds by default) | Lower bound for an effective probe timeout |
+| <xref:Orleans.Configuration.ClusterMembershipOptions.MaxProbeTimeout?displayProperty=nameWithType> | Twice the initial timeout (10 seconds by default) | Upper bound for an effective probe timeout |
 | <xref:Orleans.Configuration.ClusterMembershipOptions.NumMissedProbesLimit?displayProperty=nameWithType> | 3 | Failed probes before a death vote |
 | <xref:Orleans.Configuration.ClusterMembershipOptions.NumVotesForDeathDeclaration?displayProperty=nameWithType> | 2 | Fresh votes required to mark a member dead |
 | <xref:Orleans.Configuration.ClusterMembershipOptions.DeathVoteExpirationTimeout?displayProperty=nameWithType> | 2 minutes | Lifetime of a death vote |

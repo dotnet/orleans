@@ -20,6 +20,7 @@ namespace Orleans.Runtime.MembershipService
     /// </summary>
     internal partial class SiloHealthMonitor : ITestAccessor, IHealthCheckable, IDisposable, IAsyncDisposable
     {
+        private static readonly TimeSpan MaxSupportedTimerTimeout = TimeSpan.FromMilliseconds(0xfffffffe);
         private readonly ILogger _log;
         private readonly IOptionsMonitor<ClusterMembershipOptions> _clusterMembershipOptions;
         private readonly IRemoteSiloProber _prober;
@@ -37,6 +38,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly IAsyncTimer _pingTimer;
         private long? _lastSuccessfulResponseTimestamp;
         private readonly Func<SiloHealthMonitor, ProbeResult, Task> _onProbeResult;
+        private PhiAccrualFailureDetector? _failureDetector;
         private Task? _runTask;
 
         /// <summary>
@@ -83,7 +85,7 @@ namespace Orleans.Runtime.MembershipService
             _timeProvider = timeProvider;
             _log = loggerFactory.CreateLogger<SiloHealthMonitor>();
             _pingTimer = asyncTimerFactory.Create(
-                _clusterMembershipOptions.CurrentValue.ProbeTimeout,
+                _clusterMembershipOptions.CurrentValue.ProbeInterval,
                 nameof(SiloHealthMonitor),
                 timeProvider);
             _onProbeResult = onProbeResult;
@@ -93,6 +95,8 @@ namespace Orleans.Runtime.MembershipService
         internal interface ITestAccessor
         {
             int MissedProbes { get; }
+            int ProbeTimeoutSampleCount { get; }
+            TimeSpan CurrentProbeTimeout { get; }
         }
 
         /// <summary>
@@ -106,6 +110,8 @@ namespace Orleans.Runtime.MembershipService
         public bool IsCanceled => _stoppingCancellation.IsCancellationRequested;
 
         int ITestAccessor.MissedProbes => _failedProbes;
+        int ITestAccessor.ProbeTimeoutSampleCount => _failureDetector?.SampleCount ?? 0;
+        TimeSpan ITestAccessor.CurrentProbeTimeout => _failureDetector?.GetTimeout() ?? _clusterMembershipOptions.CurrentValue.InitialProbeTimeout;
 
         /// <summary>
         /// Start the monitor.
@@ -170,7 +176,8 @@ namespace Orleans.Runtime.MembershipService
             MembershipTableSnapshot? activeMembersSnapshot = default;
             SiloAddress[]? otherNodes = default;
             var options = _clusterMembershipOptions.CurrentValue;
-            TimeSpan? overrideDelay = RandomTimeSpan.Next(options.ProbeTimeout);
+            var failureDetector = _failureDetector = new PhiAccrualFailureDetector(options.InitialProbeTimeout);
+            TimeSpan? overrideDelay = RandomTimeSpan.Next(options.ProbeInterval);
             while (await _pingTimer.NextTick(overrideDelay))
             {
                 ProbeResult probeResult;
@@ -235,33 +242,42 @@ namespace Orleans.Runtime.MembershipService
 
             TimeSpan GetTimeout(bool isDirectProbe)
             {
-                var additionalTimeout = 0;
-
+                var localDegradationScore = 0;
                 if (options.ExtendProbeTimeoutDuringDegradation)
                 {
                     // This query must happen before the probe because its result determines the probe timeout.
                     // Outcome-reporting health checks, such as an intermediary's health score, run after probing.
-                    var localHealth = _localSiloHealthMonitor.GetLocalHealthStatus(
-                        options.ProbeTimeout,
-                        LocalSiloHealthCheckCategory.Local);
-                    additionalTimeout += localHealth.Score;
+                    localDegradationScore = _localSiloHealthMonitor.GetLocalHealthStatus(
+                        options.ProbeInterval,
+                        LocalSiloHealthCheckCategory.Local).Score;
                 }
 
-                if (!isDirectProbe)
-                {
-                    // Indirect probes need extra time to account for the additional hop.
-                    additionalTimeout += 1;
-                }
-
-                // When the debugger is attached, extend probe times so that silos are not terminated
-                // due to debugging pauses.
-                if (Debugger.IsAttached)
-                {
-                    additionalTimeout += 25;
-                }
-
-                return options.ProbeTimeout.Multiply(1 + additionalTimeout);
+                return CalculateProbeTimeout(failureDetector, options, localDegradationScore, isDirectProbe, Debugger.IsAttached);
             }
+        }
+
+        internal static TimeSpan CalculateProbeTimeout(
+            PhiAccrualFailureDetector failureDetector,
+            ClusterMembershipOptions options,
+            int localDegradationScore,
+            bool isDirectProbe,
+            bool isDebuggerAttached)
+        {
+            var extensionFactor = 1 + localDegradationScore;
+            if (!isDirectProbe)
+            {
+                extensionFactor++;
+            }
+
+            var timeout = failureDetector.GetTimeout(options.MinProbeTimeout, options.MaxProbeTimeout, extensionFactor);
+            if (isDebuggerAttached)
+            {
+                var debuggerExtensionTicks = failureDetector.GetTimeout().Ticks * 25d;
+                var extendedTimeoutTicks = Math.Min(MaxSupportedTimerTimeout.Ticks, timeout.Ticks + debuggerExtensionTicks);
+                timeout = TimeSpan.FromTicks((long)extendedTimeoutTicks);
+            }
+
+            return timeout;
         }
 
         /// <summary>
@@ -303,6 +319,7 @@ namespace Orleans.Runtime.MembershipService
                 _failedProbes = 0;
                 _lastSuccessfulResponseTimestamp = _timeProvider.GetTimestamp();
                 LastRoundTripTime = roundTripTime;
+                _failureDetector!.RecordResponseTime(roundTripTime);
                 probeResult = ProbeResult.CreateDirect(0, ProbeResultStatus.Succeeded);
             }
             else

@@ -326,7 +326,7 @@ namespace Orleans.Runtime.MembershipService
                 }
 
                 // Only consider certain checks if the silo has been a member of a multi-silo cluster for a certain period.
-                var recencyWindow = _clusterMembershipOptions.ProbeTimeout.Multiply(_clusterMembershipOptions.NumMissedProbesLimit);
+                var recencyWindow = _clusterMembershipOptions.GetFailureDetectionTimeout();
                 if (_clusteredSinceTimestamp is { } clusteredSince
                     && _timeProvider.GetElapsedTime(clusteredSince, timestamp) > recencyWindow)
                 {

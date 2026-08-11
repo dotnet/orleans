@@ -102,7 +102,7 @@ namespace Orleans.Runtime.MembershipService
                         if (!newMonitoredSilos.ContainsKey(pair.Key))
                         {
                             using var cancellation = new CancellationTokenSource(
-                                this.clusterMembershipOptions.CurrentValue.ProbeTimeout,
+                                this.clusterMembershipOptions.CurrentValue.MaxProbeTimeout,
                                 this.timeProvider);
                             await pair.Value.StopAsync(cancellation.Token);
                         }
@@ -359,7 +359,7 @@ namespace Orleans.Runtime.MembershipService
 
         /// <summary>
         /// Checks whether a connection to the specified silo has received a message within the monitoring window
-        /// (<see cref="ClusterMembershipOptions.ProbeTimeout"/> × <see cref="ClusterMembershipOptions.NumMissedProbesLimit"/>).
+        /// (the maximum probe cycle time multiplied by <see cref="ClusterMembershipOptions.NumMissedProbesLimit"/>).
         /// If so, the silo is demonstrably alive and the vote should be suppressed.
         /// </summary>
         private bool IsConnectionActiveWithinMonitoringWindow(SiloAddress targetSilo)
@@ -370,7 +370,7 @@ namespace Orleans.Runtime.MembershipService
                 return false;
             }
 
-            var monitoringWindow = options.ProbeTimeout.Multiply(options.NumMissedProbesLimit);
+            var monitoringWindow = options.GetFailureDetectionTimeout();
 
             if (this.connectionManager.GetElapsedSinceLastMessageReceived(targetSilo) is { } elapsed && elapsed <= monitoringWindow)
             {
