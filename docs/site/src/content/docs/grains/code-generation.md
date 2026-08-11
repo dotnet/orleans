@@ -62,4 +62,6 @@ For end-to-end interop examples, see the [Orleans F# sample](https://learn.micro
 
 Treat Orleans analyzer and generator diagnostics as contract errors, not warnings to suppress. Generated files can be inspected through normal compiler-generated-file tooling when debugging, but application code should depend on the public interfaces rather than generated implementation names.
 
+The optional [Orleans contract compatibility analyzer](grain-versioning/contract-compatibility-analyzer.md) records grain RPC identities and signatures in `OrleansContracts.txt` so contract drift can be reviewed before a rolling upgrade.
+
 For serialization rules and version tolerance, see [Orleans serialization](../host/configuration-guide/serialization.md).
