@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -106,13 +107,11 @@ namespace Orleans.Providers.Streams.AzureQueue
     /// This adapter is experimental and subject to change in future updates.
     /// </summary>
     [Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
-    [SerializationCallbacks(typeof(OnDeserializedCallbacks))]
-    public class AzureQueueJsonDataAdapter : IQueueDataAdapter<string, IBatchContainer>, IOnDeserialized
+    public class AzureQueueJsonDataAdapter : IQueueDataAdapter<string, IBatchContainer>
     {
         private readonly AzureQueueJsonDataAdapterOptions _options;
         private readonly ILogger<AzureQueueJsonDataAdapter> _logger;
-
-        private OrleansJsonSerializer _jsonSerializer;
+        private readonly OrleansJsonSerializer _jsonSerializer;
         private readonly IQueueDataAdapter<string, IBatchContainer> _fallbackAdapter;
 
         /// <summary>
@@ -137,28 +136,27 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary>
         /// Creates a cloud queue message from stream event data.
         /// </summary>
-        public string ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+        public string ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
         {
-            var azureQueueBatchMessage = new AzureQueueBatchContainerV2(streamId, events.Cast<object>().ToList(), requestContext);
+            var eventList = events.ToList();
+            var azureQueueBatchMessage = new AzureQueueBatchContainerV2(streamId, eventList.Cast<object>().ToList(), requestContext);
 
             try
             {
                 return _options.PreferJson
                     ? _jsonSerializer.Serialize(azureQueueBatchMessage, typeof(AzureQueueBatchContainerV2))
-                    : _fallbackAdapter.ToQueueMessage(streamId, events, token, requestContext);
+                    : _fallbackAdapter.ToQueueMessage(streamId, eventList, token, requestContext);
             }
-            catch (Exception ex) when (this._options.EnableFallback)
+            catch (Exception ex) when (_options.EnableFallback)
             {
                 if (_options.PreferJson)
                 {
                     _logger.LogDebug(ex, "JSON serialization failed for stream {StreamId}, falling back to binary serialization", streamId);
-                    return _fallbackAdapter.ToQueueMessage(streamId, events, token, requestContext);
+                    return _fallbackAdapter.ToQueueMessage(streamId, eventList, token, requestContext);
                 }
-                else
-                {
-                    _logger.LogDebug(ex, "Binary serialization failed for stream {StreamId}, falling back to JSON serialization", streamId);
-                    return _jsonSerializer.Serialize(azureQueueBatchMessage, typeof(AzureQueueBatchContainerV2));
-                }
+
+                _logger.LogDebug(ex, "Binary serialization failed for stream {StreamId}, falling back to JSON serialization", streamId);
+                return _jsonSerializer.Serialize(azureQueueBatchMessage, typeof(AzureQueueBatchContainerV2));
             }
         }
 
@@ -173,14 +171,10 @@ namespace Orleans.Providers.Streams.AzureQueue
             {
                 if (_options.PreferJson)
                 {
-                    var azureQueueBatch = (AzureQueueBatchContainerV2)_jsonSerializer.Deserialize(typeof(AzureQueueBatchContainerV2), cloudMsg);
-                    azureQueueBatch.RealSequenceToken = new EventSequenceTokenV2(sequenceId);
-                    return azureQueueBatch;
+                    return DeserializeJson(cloudMsg, sequenceId);
                 }
-                else
-                {
-                    return _fallbackAdapter.FromQueueMessage(cloudMsg, sequenceId);
-                }
+
+                return _fallbackAdapter.FromQueueMessage(cloudMsg, sequenceId);
             }
             catch (Exception ex) when (_options.EnableFallback)
             {
@@ -189,19 +183,31 @@ namespace Orleans.Providers.Streams.AzureQueue
                     _logger.LogDebug(ex, "Failed to deserialize cloud message using JSON, falling back to binary deserialization");
                     return _fallbackAdapter.FromQueueMessage(cloudMsg, sequenceId);
                 }
-                else
-                {
-                    _logger.LogDebug(ex, "Binary deserialization failed for cloudMsg {cloudMsg}, falling back to JSON deserialization", cloudMsg);
-                    var azureQueueBatch = (AzureQueueBatchContainerV2)_jsonSerializer.Deserialize(typeof(AzureQueueBatchContainerV2), cloudMsg);
-                    azureQueueBatch.RealSequenceToken = new EventSequenceTokenV2(sequenceId);
-                    return azureQueueBatch;
-                }
+
+                _logger.LogDebug(ex, "Binary deserialization failed, falling back to JSON deserialization");
+                return DeserializeJson(cloudMsg, sequenceId);
             }
         }
 
-        void IOnDeserialized.OnDeserialized(DeserializationContext context)
+        internal static AzureQueueJsonDataAdapter Create(IServiceProvider services, string name)
         {
-            _jsonSerializer = context.ServiceProvider.GetRequiredService<OrleansJsonSerializer>();
+            var jsonSerializer = new OrleansJsonSerializer(Options.Create(services.GetOptionsByName<OrleansJsonSerializerOptions>(name)));
+            var fallbackAdapter = ActivatorUtilities.CreateInstance<AzureQueueDataAdapterV2>(services);
+            var options = services.GetOptionsByName<AzureQueueJsonDataAdapterOptions>(name);
+            var logger = services.GetRequiredService<ILogger<AzureQueueJsonDataAdapter>>();
+
+            return new AzureQueueJsonDataAdapter(jsonSerializer, fallbackAdapter, options, logger);
+        }
+
+        private AzureQueueBatchContainerV2 DeserializeJson(string cloudMsg, long sequenceId)
+        {
+            if (_jsonSerializer.Deserialize(typeof(AzureQueueBatchContainerV2), cloudMsg) is not AzureQueueBatchContainerV2 azureQueueBatch)
+            {
+                throw new InvalidDataException("The queue message did not contain an Azure Queue batch.");
+            }
+
+            azureQueueBatch.RealSequenceToken = new EventSequenceTokenV2(sequenceId);
+            return azureQueueBatch;
         }
     }
 }

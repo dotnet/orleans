@@ -1,14 +1,11 @@
 #pragma warning disable StreamingJsonSerializationExperimental // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 
 using System.Buffers.Text;
-using System.Collections.Concurrent;
-using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
-using NSubstitute;
-using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
@@ -23,54 +20,43 @@ namespace Tester.AzureUtils.Streaming
 {
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     [TestCategory("AzureStorage"), TestCategory("Streaming")]
-    public class AzureQueueJsonDataAdapterTests : AzureStorageBasicTests, IAsyncLifetime
+    public class AzureQueueJsonDataAdapterTests
     {
+        private const string Orleans3JsonMessage =
+            "{\"$id\":\"1\",\"$type\":\"Orleans.Providers.Streams.AzureQueue.AzureQueueBatchContainerV2, Orleans.Streaming.AzureStorage\"," +
+            "\"events\":{\"$type\":\"System.Collections.Generic.List`1[[System.Object, System.Private.CoreLib]], System.Private.CoreLib\"," +
+            "\"$values\":[\"test-event\"]},\"requestContext\":{\"$id\":\"2\"," +
+            "\"$type\":\"System.Collections.Generic.Dictionary`2[[System.String, System.Private.CoreLib],[System.Object, System.Private.CoreLib]], System.Private.CoreLib\"," +
+            "\"key\":\"value\"},\"StreamId\":{\"$id\":\"3\",\"$type\":\"Orleans.Runtime.StreamId, Orleans.Streaming\"," +
+            "\"fk\":{\"$type\":\"System.Byte[], System.Private.CoreLib\"," +
+            "\"$value\":\"dGVzdC1uYW1lc3BhY2UwMDExMjIzMzQ0NTU2Njc3ODg5OWFhYmJjY2RkZWVmZg==\"}," +
+            "\"ki\":14,\"fh\":1821817189}}";
+
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture fixture;
-        private const int NumBatches = 20;
-        private const int NumMessagesPerBatch = 20;
-        public static readonly string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AQAdapterTests";
-        private readonly ILoggerFactory loggerFactory;
-        private static readonly List<string> azureQueueNames = AzureQueueUtilities.GenerateQueueNames($"AzureQueueAdapterTests-{Guid.NewGuid()}", 8);
 
         public AzureQueueJsonDataAdapterTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
             this.fixture = fixture;
-            this.loggerFactory = this.fixture.Services.GetService<ILoggerFactory>();
         }
 
-        public Task InitializeAsync() => Task.CompletedTask;
-
-        public async Task DisposeAsync()
+        private AzureQueueJsonDataAdapter InitializeQueueJsonDataAdapter(AzureQueueJsonDataAdapterOptions? options = null)
         {
-            try
-            {
-                TestUtils.CheckForAzureStorage();
-                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(this.loggerFactory, azureQueueNames, new AzureQueueOptions().ConfigureTestDefaults());
-            }
-            catch (SkipException) { }
-        }
-
-        private AzureQueueJsonDataAdapter InitializeQueueJsonDataAdapter(bool enableFallback, bool preferJson)
-        {
-            var serializer = this.fixture.Services.GetService<Serializer>();
+            var serializer = this.fixture.Services.GetRequiredService<Serializer>();
             var azureQueueDataAdapterV2 = new AzureQueueDataAdapterV2(serializer);
             var jsonOrleansSerializer = new OrleansJsonSerializer(Options.Create(new OrleansJsonSerializerOptions()));
-            var logger = Substitute.For<ILogger<AzureQueueJsonDataAdapter>>();
 
-            var jsonQueueDataAdapter = new AzureQueueJsonDataAdapter(
+            return new AzureQueueJsonDataAdapter(
                 jsonOrleansSerializer,
                 fallbackAdapter: azureQueueDataAdapterV2,
-                new AzureQueueJsonDataAdapterOptions() { EnableFallback = enableFallback, PreferJson = preferJson },
-                logger);
-
-            return jsonQueueDataAdapter;
+                options ?? new AzureQueueJsonDataAdapterOptions(),
+                NullLogger<AzureQueueJsonDataAdapter>.Instance);
         }
 
         private AzureQueueDataAdapterV2 InitializeBinaryOnlyAdapter()
         {
-            var serializer = this.fixture.Services.GetService<Serializer>();
+            var serializer = this.fixture.Services.GetRequiredService<Serializer>();
 
             var codec = serializer.SessionPool.CodecProvider.TryGetCodec<EventData>();
             Assert.NotNull(codec);
@@ -79,17 +65,10 @@ namespace Tester.AzureUtils.Streaming
             return new AzureQueueDataAdapterV2(serializer);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public void ToAndFromQueueMessage_SerializesAccordingToFormat()
         {
-            var options = new AzureQueueOptions
-            {
-                MessageVisibilityTimeout = TimeSpan.FromSeconds(30),
-                QueueNames = azureQueueNames
-            };
-            options.ConfigureTestDefaults();
-            var queueCacheOptions = new SimpleQueueCacheOptions();
-            var queueDataAdapter = InitializeQueueJsonDataAdapter(enableFallback: true, preferJson: true);
+            var queueDataAdapter = InitializeQueueJsonDataAdapter();
 
             var data = new EventData();
             var token = new EventSequenceTokenV2();
@@ -109,7 +88,7 @@ namespace Tester.AzureUtils.Streaming
             Assert.Equal(data, deserializedMsg.Item1);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public void BinaryOnlyAdapter_SerializesToBinaryFormat()
         {
             var binaryAdapter = InitializeBinaryOnlyAdapter();
@@ -125,11 +104,9 @@ namespace Tester.AzureUtils.Streaming
 
             this.output.WriteLine("Binary serialized message: {0}", msg);
             
-            // Should be base64 encoded binary data, not JSON
             Assert.False(IsValidJson(msg), "Binary adapter should not produce JSON");
             Assert.True(IsValidBase64String(msg), "Binary adapter should produce valid base64");
 
-            // Verify round-trip works
             var batchContainer = binaryAdapter.FromQueueMessage(msg, token.SequenceNumber);
             var deserializedEvent = batchContainer.GetEvents<EventData>().FirstOrDefault();
             
@@ -138,10 +115,9 @@ namespace Tester.AzureUtils.Streaming
             Assert.Equal(streamId, batchContainer.StreamId);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public void JsonAdapter_FallsBackToBinaryWhenDeserializingBinaryData()
         {
-            // First create a binary message using the V2 adapter
             var binaryAdapter = InitializeBinaryOnlyAdapter();
             var data = new EventData { Id = 456, Name = "FallbackTest" };
             var token = new EventSequenceTokenV2();
@@ -156,8 +132,7 @@ namespace Tester.AzureUtils.Streaming
             this.output.WriteLine("Original binary message: {0}", binaryMsg);
             Assert.True(IsValidBase64String(binaryMsg), "Should be valid base64 binary data");
 
-            // Now try to deserialize it with JSON adapter
-            var jsonAdapter = InitializeQueueJsonDataAdapter(enableFallback: true, preferJson: true);
+            var jsonAdapter = InitializeQueueJsonDataAdapter();
             
             var batchContainer = jsonAdapter.FromQueueMessage(binaryMsg, token.SequenceNumber);
             var deserializedEvent = batchContainer.GetEvents<EventData>().FirstOrDefault();
@@ -167,11 +142,39 @@ namespace Tester.AzureUtils.Streaming
             Assert.Equal(streamId, batchContainer.StreamId);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
+        public void JsonAdapter_DeserializesOrleans7BinaryMessage()
+        {
+            const string orleans727Message = "IMABIQADSQUPcGF5bG9hZODBASFAGWxlZ2FjeXN0cmVhbQENYTLyfF/g4A==";
+            var jsonAdapter = InitializeQueueJsonDataAdapter();
+
+            var batchContainer = jsonAdapter.FromQueueMessage(orleans727Message, sequenceId: 42);
+            var deserializedEvent = Assert.Single(batchContainer.GetEvents<string>());
+
+            Assert.Equal("payload", deserializedEvent.Item1);
+            Assert.Equal(new EventSequenceTokenV2(42), deserializedEvent.Item2);
+            Assert.Equal(StreamId.Create("legacy", "stream"), batchContainer.StreamId);
+        }
+
+        [Fact, TestCategory("BVT")]
+        public void JsonAdapter_DeserializesOrleans3JsonMessage()
+        {
+            var jsonAdapter = InitializeQueueJsonDataAdapter();
+
+            var batchContainer = jsonAdapter.FromQueueMessage(Orleans3JsonMessage, sequenceId: 43);
+            var deserializedEvent = Assert.Single(batchContainer.GetEvents<string>());
+
+            Assert.Equal("test-event", deserializedEvent.Item1);
+            Assert.Equal(new EventSequenceTokenV2(43), deserializedEvent.Item2);
+            Assert.Equal(
+                StreamId.Create("test-namespace", Guid.Parse("00112233-4455-6677-8899-aabbccddeeff")),
+                batchContainer.StreamId);
+        }
+
+        [Fact, TestCategory("BVT")]
         public void BinaryPreferredAdapter_FallsBackToJsonWhenDeserializingJsonData()
         {
-            // First create a JSON message using JSON-preferred adapter
-            var jsonFirstAdapter = InitializeQueueJsonDataAdapter(enableFallback: true, preferJson: true);
+            var jsonFirstAdapter = InitializeQueueJsonDataAdapter();
             var data = new EventData { Id = 789, Name = "JsonToJsonTest" };
             var token = new EventSequenceTokenV2();
             var streamId = StreamId.Create("json-fallback-ns", Guid.NewGuid());
@@ -185,8 +188,7 @@ namespace Tester.AzureUtils.Streaming
             this.output.WriteLine("Original JSON message: {0}", jsonMsg);
             Assert.True(IsValidJson(jsonMsg), "Should be valid JSON data");
 
-            // Now try to deserialize it with binary-preferred adapter
-            var binaryPreferredAdapter = InitializeQueueJsonDataAdapter(enableFallback: true, preferJson: false);
+            var binaryPreferredAdapter = InitializeQueueJsonDataAdapter(new AzureQueueJsonDataAdapterOptions { PreferJson = false });
             
             var batchContainer = binaryPreferredAdapter.FromQueueMessage(jsonMsg, token.SequenceNumber);
             var deserializedEvent = batchContainer.GetEvents<EventData>().FirstOrDefault();
@@ -196,10 +198,9 @@ namespace Tester.AzureUtils.Streaming
             Assert.Equal(streamId, batchContainer.StreamId);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public void JsonAdapter_WithoutFallback_FailsOnIncompatibleData()
         {
-            // Create a binary message
             var binaryAdapter = InitializeBinaryOnlyAdapter();
             var data = new EventData { Id = 999, Name = "FailureTest" };
             var token = new EventSequenceTokenV2();
@@ -210,27 +211,53 @@ namespace Tester.AzureUtils.Streaming
                 token,
                 new Dictionary<string, object>());
 
-            // Try to deserialize with JSON adapter that has fallback disabled
-            var jsonAdapterNoFallback = InitializeQueueJsonDataAdapter(enableFallback: false, preferJson: true);
+            var jsonAdapterNoFallback = InitializeQueueJsonDataAdapter(new AzureQueueJsonDataAdapterOptions { EnableFallback = false });
             
             Assert.ThrowsAny<Exception>(() => jsonAdapterNoFallback.FromQueueMessage(binaryMsg, token.SequenceNumber));
         }
 
+        [Fact, TestCategory("BVT")]
+        public void Configurators_UseProviderSpecificAdapterOptions()
+        {
+            const string binaryProviderName = "binary-preferred";
+            const string jsonProviderName = "json-preferred";
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddSingleton(this.fixture.Services.GetRequiredService<Serializer>());
+            services.AddSingleton(this.fixture.Services.GetRequiredService<IRuntimeClient>());
+
+            var binaryConfigurator = new SiloAzureQueueJsonStreamConfigurator(binaryProviderName, configure => configure(services));
+            binaryConfigurator.ConfigureJsonAdapter(options => options.PreferJson = false);
+            _ = new SiloAzureQueueJsonStreamConfigurator(jsonProviderName, configure => configure(services));
+
+            using var serviceProvider = services.BuildServiceProvider();
+            var binaryAdapter = serviceProvider.GetRequiredKeyedService<IQueueDataAdapter<string, IBatchContainer>>(binaryProviderName);
+            var jsonAdapter = serviceProvider.GetRequiredKeyedService<IQueueDataAdapter<string, IBatchContainer>>(jsonProviderName);
+            var streamId = StreamId.Create("options", Guid.NewGuid());
+            var events = new[] { new EventData { Id = 1, Name = "test" } };
+
+            var binaryMessage = binaryAdapter.ToQueueMessage(streamId, events, token: null, requestContext: null);
+            var jsonMessage = jsonAdapter.ToQueueMessage(streamId, events, token: null, requestContext: null);
+
+            Assert.False(IsValidJson(binaryMessage));
+            Assert.True(IsValidJson(jsonMessage));
+        }
+
         [GenerateSerializer]
-        public class EventData : IEquatable<EventData>
+        public sealed class EventData : IEquatable<EventData>
         {
             [Id(0)]
             public int Id { get; set; }
             
             [Id(1)]
-            public string Name { get; set; }
+            public string Name { get; set; } = string.Empty;
 
-            public override bool Equals(object obj) => Equals(obj as EventData);
-            public bool Equals(EventData other) => other is not null && Id == other.Id && Name == other.Name;
+            public override bool Equals(object? obj) => Equals(obj as EventData);
+            public bool Equals(EventData? other) => other is not null && Id == other.Id && Name == other.Name;
             public override int GetHashCode() => HashCode.Combine(Id, Name);
 
-            public static bool operator ==(EventData left, EventData right) => EqualityComparer<EventData>.Default.Equals(left, right);
-            public static bool operator !=(EventData left, EventData right) => !(left == right);
+            public static bool operator ==(EventData? left, EventData? right) => EqualityComparer<EventData>.Default.Equals(left, right);
+            public static bool operator !=(EventData? left, EventData? right) => !(left == right);
         }
 
         private static bool IsValidJson(string msg)
@@ -248,11 +275,7 @@ namespace Tester.AzureUtils.Streaming
 
         private static bool IsValidBase64String(string s)
         {
-            if (string.IsNullOrWhiteSpace(s))
-                return false;
-
-            // generated by copilot
-            return Base64.IsValid(s);
+            return !string.IsNullOrWhiteSpace(s) && Base64.IsValid(s);
         }
     }
 }

@@ -1,9 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Orleans.Streaming.AzureStorage.Providers.Streams.AzureQueue.Json;
 
@@ -23,5 +18,5 @@ public class AzureQueueJsonDataAdapterOptions
     /// Gets or sets a value indicating whether to prefer JSON serialization/deserialization first, then fallback to binary.
     /// When false, it will try binary serialization/deserialization first, then fallback to JSON.
     /// </summary>
-    public bool PreferJson { get; set; } = false;
+    public bool PreferJson { get; set; } = true;
 }
