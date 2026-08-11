@@ -35,3 +35,22 @@
 * Follow `.editorconfig`: C# uses file-scoped namespaces, system directives first, `var` preferences, braces on new lines, `_camelCase` private fields, and preview language features. Nullable is enabled for source projects and disabled for test projects.
 * Add XML docs for new or changed public APIs even though CS1591 is currently suppressed; package projects generate documentation files.
 * PR workflow from `AGENTS.md`: open PRs against `dotnet/orleans`, push feature branches to the `origin` fork, and create PRs with `gh pr create --repo dotnet/orleans --base main --head ReubenBond:<branch>`.
+
+
+<!-- github-knowledge-base-start -->
+## Knowledge Base
+
+### Purpose
+
+This repository uses the Knowledge Base at [https://github.com/dotnet/orleans](https://github.com/dotnet/orleans) on branch `main`.
+
+### Required behavior
+
+1. Before changing code, read `docs/index.md` from that branch.
+2. Use the index to open only the knowledge files relevant to the task.
+3. If the index is unavailable, stop and report that the Knowledge Base could not be loaded.
+
+### Source of truth
+
+Generated knowledge tracks the code. When the knowledge and code disagree, trust the code.
+<!-- github-knowledge-base-end -->

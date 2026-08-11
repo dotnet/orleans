@@ -1,0 +1,67 @@
+name: Attach Knowledge Base artifact
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the default branch
+        uses: actions/checkout@v4
+
+      - name: Attach Knowledge Base instructions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          [[ -f AGENTS.md ]] || { echo "::error file=AGENTS.md::Knowledge Base instructions are missing"; exit 1; }
+          [[ -f .github/knowledge-base.json ]] || { echo "::error file=.github/knowledge-base.json::Knowledge Base manifest is missing"; exit 1; }
+
+          knowledge_base_instructions="$(
+            awk -v start='<!-- github-knowledge-base-start -->' -v finish='<!-- github-knowledge-base-end -->' '
+              $0 == start { if (++starts == 1) copying = 1; else exit 1 }
+              copying { print }
+              $0 == finish { if (copying == 1 && ++ends == 1) copying = 0; else exit 1 }
+              END { if (starts == 1 && ends == 1 && copying == 0) exit 0; exit 1 }
+            ' AGENTS.md
+          )" || {
+            echo "::error file=AGENTS.md::Expected exactly one managed Knowledge Base section"
+            exit 1
+          }
+
+          docs_system="$(jq -er '.docs_system | select(type == "string" and length > 0)' .github/knowledge-base.json)" || {
+            echo "::error file=.github/knowledge-base.json::docs_system must be a non-empty string"
+            exit 1
+          }
+          artifact_name="Knowledge Base: $docs_system"
+          artifact_body="$knowledge_base_instructions"
+
+          artifacts="$(gh api "repos/$REPOSITORY/issues/$ISSUE_NUMBER/artifacts")"
+          mapfile -t matching_numbers < <(
+            jq -r --arg name "$artifact_name" '.[] | select(.type == "generic" and .name == $name) | .number' <<<"$artifacts"
+          )
+
+          if [[ "${#matching_numbers[@]}" -gt 0 ]]; then
+            artifact_number="${matching_numbers[0]}"
+            gh api --method PATCH "repos/$REPOSITORY/issues/$ISSUE_NUMBER/artifacts/$artifact_number" \
+              --raw-field name="$artifact_name" \
+              --raw-field body="$artifact_body"
+
+            for duplicate_number in "${matching_numbers[@]:1}"; do
+              gh api --method DELETE "repos/$REPOSITORY/issues/$ISSUE_NUMBER/artifacts/$duplicate_number"
+            done
+          else
+            gh api --method POST "repos/$REPOSITORY/issues/$ISSUE_NUMBER/artifacts" \
+              --raw-field type="generic" \
+              --raw-field name="$artifact_name" \
+              --raw-field body="$artifact_body"
+          fi
