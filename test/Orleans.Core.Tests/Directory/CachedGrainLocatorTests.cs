@@ -262,6 +262,88 @@ namespace UnitTests.Directory
             }
         }
 
+        [Theory]
+        [InlineData(SiloStatus.ShuttingDown)]
+        [InlineData(SiloStatus.Stopping)]
+        [InlineData(SiloStatus.Dead)]
+        public async Task LocalGrainDirectoryAppliesNewerMembershipBeforeLookupForwarding(SiloStatus status)
+        {
+            var localSilo = GenerateSiloAddress();
+            var remoteSilo = GenerateSiloAddress();
+            var membershipService = new MockClusterMembershipService(new()
+            {
+                [localSilo] = (SiloStatus.Active, "local"),
+                [remoteSilo] = (SiloStatus.Active, "remote")
+            });
+            var localSiloDetails = Substitute.For<ILocalSiloDetails>();
+            localSiloDetails.SiloAddress.Returns(localSilo);
+            localSiloDetails.GatewayAddress.Returns(localSilo);
+            localSiloDetails.DnsHostName.Returns("localhost");
+            localSiloDetails.Name.Returns("TestSilo");
+            localSiloDetails.ClusterId.Returns("TestCluster");
+            var siloStatusOracle = Substitute.For<ISiloStatusOracle>();
+            siloStatusOracle.IsFunctionalDirectory(Arg.Any<SiloAddress>()).Returns(
+                call => membershipService.Target.CurrentSnapshot.GetSiloStatus(call.Arg<SiloAddress>()) == SiloStatus.Active);
+            var grainFactory = Substitute.For<IInternalGrainFactory>();
+            var remoteDirectory = Substitute.For<IRemoteGrainDirectory>();
+            grainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceType, remoteSilo).Returns(remoteDirectory);
+            var services = new ServiceCollection()
+                .AddSingleton<GrainDirectoryResolver>(serviceProvider => new(
+                    serviceProvider,
+                    new GrainPropertiesResolver(new NoOpClusterManifestProvider()),
+                    Array.Empty<IGrainDirectoryResolver>()))
+                .BuildServiceProvider();
+            Factory<LocalGrainDirectoryPartition> partitionFactory = () => new LocalGrainDirectoryPartition(
+                membershipService.Target,
+                Options.Create(new GrainDirectoryOptions()),
+                this.loggerFactory);
+            var systemTargetShared = new SystemTargetShared(
+                runtimeClient: null!,
+                localSiloDetails: localSiloDetails,
+                loggerFactory: this.loggerFactory,
+                schedulingOptions: Options.Create(new SchedulingOptions()),
+                grainReferenceActivator: null!,
+                timerRegistry: null!,
+                activations: new ActivationDirectory(CreateCatalogInstruments()),
+                schedulerInstruments: CreateSchedulerInstruments(),
+                grainInstruments: CreateGrainInstruments(),
+                messagingInstruments: CreateMessagingInstruments(),
+                messagingProcessingInstruments: CreateMessagingProcessingInstruments());
+            var localGrainDirectory = new LocalGrainDirectory(
+                serviceProvider: services,
+                siloDetails: localSiloDetails,
+                siloStatusOracle: siloStatusOracle,
+                clusterMembershipService: membershipService.Target,
+                grainFactory: grainFactory,
+                grainDirectoryPartitionFactory: partitionFactory,
+                developmentClusterMembershipOptions: Options.Create(new DevelopmentClusterMembershipOptions()),
+                grainDirectoryOptions: Options.Create(new GrainDirectoryOptions()),
+                loggerFactory: this.loggerFactory,
+                directoryInstruments: CreateDirectoryInstruments(),
+                systemTargetShared: systemTargetShared)
+            {
+                Running = true
+            };
+            var address = GenerateGrainAddressOwnedBy(remoteSilo, localSilo, remoteSilo, membershipService.CurrentVersion);
+            remoteDirectory.RegisterAsync(address, null, 1).Returns(Task.FromResult(new AddressAndTag(address, 1)));
+
+            try
+            {
+                await localGrainDirectory.RegisterAsync(address, hopCount: 0);
+                membershipService.UpdateSiloStatus(remoteSilo, status, "remote");
+
+                var result = await localGrainDirectory.LookupAsync(address.GrainId);
+
+                Assert.Null(result.Address);
+                Assert.Equal(0, membershipService.RefreshCallCount);
+                await remoteDirectory.DidNotReceive().LookupAsync(address.GrainId, Arg.Any<int>());
+            }
+            finally
+            {
+                await localGrainDirectory.StopAsync();
+            }
+        }
+
         [Fact]
         public async Task LocalGrainDirectoryTryLocalLookupFindsLocalPartitionEntryOnCacheMiss()
         {
