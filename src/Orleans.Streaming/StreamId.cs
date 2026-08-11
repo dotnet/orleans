@@ -315,6 +315,8 @@ namespace Orleans.Runtime
 
                     switch (propertyName)
                     {
+                        case "$ref":
+                            throw new JsonException("Reference-preserving JSON is not supported by the System.Text.Json grain storage serializer.");
                         case "ki":
                             ki = reader.GetUInt32();
                             break;
@@ -329,7 +331,11 @@ namespace Orleans.Runtime
                                     propertyName = reader.GetString();
                                     reader.Read();
 
-                                    if (propertyName == "$value")
+                                    if (propertyName == "$ref")
+                                    {
+                                        throw new JsonException("Reference-preserving JSON is not supported by the System.Text.Json grain storage serializer.");
+                                    }
+                                    else if (propertyName == "$value")
                                     {
                                         value = reader.GetBytesFromBase64();
                                     }

@@ -54,7 +54,7 @@ namespace UnitTests.StorageTests
             });
             _testCluster = builder.Build();
 
-            _testCluster.DeployAsync().Wait();
+            _testCluster.DeployAsync().GetAwaiter().GetResult();
 
             _systemTextJson = (SystemTextJsonGrainStorageSerializer)_testCluster.Silos.First().ServiceProvider.GetRequiredService<IGrainStorageSerializer>();
             _newtonSoft = ActivatorUtilities.CreateInstance<JsonGrainStorageSerializer>(_testCluster.Silos.First().ServiceProvider);
@@ -115,6 +115,13 @@ namespace UnitTests.StorageTests
             supportsDictionaryKey: false);
 
         [Fact]
+        public void AsyncStreamReferenceConverterRejectsNonGenericType()
+        {
+            var stream = _testCluster.Silos.First().ServiceProvider.GetRequiredKeyedService<IStreamProvider>("test").GetStream<int>(StreamId.Create("Test_namespace", "Test_key"));
+            Assert.Throws<JsonException>(() => _systemTextJson.Deserialize<IAsyncStream>(_systemTextJson.Serialize(stream)));
+        }
+
+        [Fact]
         public void SiloAddressJsonConverter() => Roundtrip(SiloAddress.New(IPEndPoint.Parse("127.0.0.1:499"), 42));
 
         [Fact]
@@ -146,6 +153,10 @@ namespace UnitTests.StorageTests
         public void EventSequenceTokenConverter() => Roundtrip(new EventSequenceToken(2424, 1), supportsDictionaryKey: false);
 
         [Fact]
+        public void EventSequenceTokenConverterRejectsSharedReference()
+            => Assert.Throws<JsonException>(() => _systemTextJson.Deserialize<StreamSequenceToken>(BinaryData.FromString("""{"$ref":"1"}""")));
+
+        [Fact]
         public void EventSequenceTokenBaseTypeConverter()
         {
             Roundtrip<StreamSequenceToken>(new EventSequenceToken(2424, 1), supportsDictionaryKey: false);
@@ -161,6 +172,12 @@ namespace UnitTests.StorageTests
 
         [Fact]
         public void StreamIdConverter() => Roundtrip(StreamId.Create("namespace", "key"));
+
+        [Theory]
+        [InlineData("""{"$ref":"1"}""")]
+        [InlineData("""{"fk":{"$ref":"1"},"ki":0}""")]
+        public void StreamIdConverterRejectsSharedReference(string json)
+            => Assert.Throws<JsonException>(() => _systemTextJson.Deserialize<StreamId>(BinaryData.FromString(json)));
 
         [Fact]
         public void StreamIdConverterDictionaryKeyWithEscapedCharacters() => Roundtrip(StreamId.Create("na\u00efve", "key\"value"));
@@ -213,6 +230,10 @@ namespace UnitTests.StorageTests
             Assert.Equal(state.Value, newtonsoftResult.Value);
             Assert.Equal(state.Name, newtonsoftResult.Name);
         }
+
+        [Fact]
+        public void SerializerUsesCompactJsonByDefault()
+            => Assert.DoesNotContain('\n', _systemTextJson.Serialize(new FieldState { Value = 42, Name = "test" }).ToString());
 
         [Fact]
         public void GuidIdSharedReferenceFailsExplicitly()

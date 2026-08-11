@@ -57,12 +57,18 @@ namespace Orleans.Streaming.JsonConverters
 
             if (streamId.HasValue && isRewindable.HasValue && !string.IsNullOrWhiteSpace(providerName))
             {
-                var provider = runtimeClient.ServiceProvider
-                                             .GetRequiredKeyedService<IStreamProvider>(providerName)
-                                             as IInternalStreamProvider;
+                if (typeToConvert.GetGenericArguments() is not [var itemType])
+                {
+                    throw new JsonException($"Cannot deserialize a stream reference as non-generic type {typeToConvert}.");
+                }
+
+                if (runtimeClient.ServiceProvider.GetRequiredKeyedService<IStreamProvider>(providerName) is not IInternalStreamProvider provider)
+                {
+                    throw new JsonException($"Stream provider '{providerName}' does not support internal stream references.");
+                }
 
                 return (IAsyncStream)Activator.CreateInstance(
-                    typeof(StreamImpl<>).MakeGenericType(typeToConvert.GetGenericArguments()),
+                    typeof(StreamImpl<>).MakeGenericType(itemType),
                     new QualifiedStreamId(providerName, streamId.Value),
                     provider,
                     isRewindable.Value,

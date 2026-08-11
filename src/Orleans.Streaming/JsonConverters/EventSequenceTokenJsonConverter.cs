@@ -44,6 +44,8 @@ namespace Orleans.Streaming.JsonConverters
 
                     switch (propertyName)
                     {
+                        case "$ref":
+                            throw new JsonException("Reference-preserving JSON is not supported by the System.Text.Json grain storage serializer.");
                         case "EventIndex":
                             eventIndex = reader.GetInt32();
                             break;
