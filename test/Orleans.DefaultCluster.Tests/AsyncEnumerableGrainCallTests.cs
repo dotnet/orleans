@@ -688,7 +688,7 @@ public class AsyncEnumerableGrainCallTests
         var cleanupCount = listener.CleanupCount + 1;
         var timer = listener.Timer;
         var timerChangeCount = _fixture.GetTimerChangeCount(timer);
-        _fixture.AdvanceTimeByResponseTimeout();
+        await _fixture.AdvanceTimeByResponseTimeoutAsync();
         await listener.WaitForCleanupCountAsync(cleanupCount, cancellationToken);
 
         // Cleanup is reported from inside the callback, before the one-shot timer is rearmed.
@@ -717,8 +717,8 @@ public class AsyncEnumerableGrainCallTests
             });
         }
 
-        public void AdvanceTimeByResponseTimeout() =>
-            FakeTimeSilo.Advance(_timeProvider, HostedCluster.GetSiloServiceProvider().GetRequiredService<IOptions<SiloMessagingOptions>>().Value.ResponseTimeout);
+        public Task AdvanceTimeByResponseTimeoutAsync() =>
+            FakeTimeSilo.AdvanceAsync(_timeProvider, HostedCluster.GetSiloServiceProvider().GetRequiredService<IOptions<SiloMessagingOptions>>().Value.ResponseTimeout);
 
         public int GetTimerChangeCount(object timer) => _timeProvider.GetTimerChangeCount(timer);
 

@@ -45,6 +45,7 @@ namespace Orleans.TestingHost
             {
                 siloBuilder.Services
                     .Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(30));
+                TestClusterFatalErrorHandler.Configure(siloBuilder.Services);
             });
 
             ConfigureAppServices(configuration, hostBuilder);
@@ -66,6 +67,7 @@ namespace Orleans.TestingHost
 
             postConfigureHostBuilder?.Invoke(hostBuilder);
             var host = hostBuilder.Build();
+            TestClusterFatalErrorHandler.Attach(host);
             InitializeTestHooksSystemTarget(host);
             return host;
         }

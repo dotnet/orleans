@@ -31,6 +31,7 @@ namespace UnitTests.MembershipTests
             output.WriteLine("ClusterId= {0}", this.HostedCluster.Options.ClusterId);
 
             SiloHandle silo3 = await this.HostedCluster.StartAdditionalSiloAsync();
+            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             IManagementGrain mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
 
@@ -45,8 +46,7 @@ namespace UnitTests.MembershipTests
             IPEndPoint address = silo3.SiloAddress.Endpoint;
             output.WriteLine("About to stop {0}", address);
             await this.HostedCluster.StopSiloAsync(silo3);
-
-            // TODO: Should we be allowing time for changes to percolate?
+            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             output.WriteLine("----------------");
 

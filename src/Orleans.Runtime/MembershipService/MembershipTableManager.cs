@@ -627,7 +627,10 @@ namespace Orleans.Runtime.MembershipService
         {
             LogErrorKillMyselfLocally(this.log, reason);
             this.CurrentStatus = SiloStatus.Dead;
-            this.fatalErrorHandler.OnFatalException(this, $"I have been told I am dead, so this silo will stop! Reason: {reason}", null);
+            if (!this.IsStopping)
+            {
+                this.fatalErrorHandler.OnFatalException(this, $"I have been told I am dead, so this silo will stop! Reason: {reason}", null);
+            }
         }
 
         private async Task GossipToOthers(SiloAddress updatedSilo, SiloStatus updatedStatus)
