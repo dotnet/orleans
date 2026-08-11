@@ -43,8 +43,11 @@ Complete this checklist for each production environment. Record owners, expected
 
 ## Security and access
 
+- [ ] Owners have documented each boundary in the [Orleans security threat model](../security/index.md) and the controls which enforce it.
 - [ ] Only trusted workloads can reach silo and gateway ports.
 - [ ] Orleans transport security is configured when the network isn't already a trusted, isolated boundary. See [Orleans Transport Layer Security](../host/transport-layer-security.md).
+- [ ] Grain calls enforce application authentication and authorization; request-context values aren't trusted merely because a caller supplied them.
+- [ ] Serialization type policy remains restricted, and public callers can't send Orleans transport payloads directly to gateways.
 - [ ] Administrative endpoints, health details, metrics, and logs don't expose secrets or tenant data.
 - [ ] Provider identities have least privilege for membership, state, reminders, and streams.
 - [ ] Certificates and credentials have rotation and expiry alerts.

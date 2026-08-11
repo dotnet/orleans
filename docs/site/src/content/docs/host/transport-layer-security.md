@@ -9,6 +9,8 @@ ms.topic: how-to
 
 Orleans can protect client-to-silo and silo-to-silo connections with Transport Layer Security (TLS). TLS encrypts traffic and authenticates the endpoint acting as the TLS server. Mutual TLS (mTLS) additionally requires and authenticates the endpoint acting as the TLS client.
 
+TLS is one control in the broader [Orleans security model](../security/index.md). Keep silo and gateway endpoints private, and enforce application authorization independently.
+
 > [!IMPORTANT]
 > <xref:Orleans.Connections.Security.TlsOptions.RemoteCertificateMode> defaults to `RequireCertificate`. On a silo's inbound connections, this default requires the connecting silo or Orleans client to present a certificate. To configure server-authenticated TLS without client certificates, explicitly set it to `NoCertificate` on every silo.
 

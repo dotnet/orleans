@@ -43,4 +43,6 @@ Initial connection retries don't make grain calls idempotent. A call can fail af
 
 Configure gateway refresh and connection behavior through <xref:Orleans.Configuration.GatewayOptions> or `Orleans:Gateway`. Orleans refreshes the gateway list from the clustering provider and reconnects as gateways become unavailable. Expose gateway endpoints only to client networks that require them; silo-to-silo traffic uses a separate endpoint.
 
+For the security implications of external clients and gateway exposure, see [Security in Orleans](../../security/index.md).
+
 For a co-hosted client, use <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*> instead. The silo's client communicates directly with the cluster and doesn't require a gateway hop.

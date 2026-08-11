@@ -251,6 +251,18 @@ items:
         href: deployment/upgrades.md
       - name: Troubleshoot deployments
         href: deployment/troubleshooting-deployments.md
+  - name: Security
+    items:
+      - name: Security in Orleans
+        href: security/index.md
+      - name: Secure connections with TLS
+        href: host/transport-layer-security.md
+      - name: Secure the Orleans Dashboard
+        href: dashboard/index.md
+      - name: Grain call authorization
+        href: grains/interceptors.md
+      - name: Serialization type authorization
+        href: host/configuration-guide/serialization-configuration.md
   - name: Architecture and internals
     items:
       - name: Runtime architecture overview

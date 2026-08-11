@@ -24,6 +24,8 @@ Use these articles together:
 1. [Failure handling](handling-failures.md) - Design grain calls for unknown outcomes, idempotency, and bounded retries.
 1. [Troubleshoot deployments](troubleshooting-deployments.md) - Triage incidents using membership, networking, dependencies, and telemetry.
 
+For the security model and controls which the application and platform must supply, see [Security in Orleans](../security/index.md).
+
 ## Choose a platform
 
 - [Kubernetes](kubernetes.md)
