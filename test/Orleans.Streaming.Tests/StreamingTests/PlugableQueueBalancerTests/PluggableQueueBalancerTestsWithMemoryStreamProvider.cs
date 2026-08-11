@@ -23,7 +23,6 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = siloCount;
-                builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
                 builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
             }
@@ -39,7 +38,7 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
                             b=>
                             {
                                 b.ConfigurePartitioning(totalQueueCount);
-                                b.ConfigurePartitionBalancing((s, n) => ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancerForTest>(s, n));
+                                b.ConfigurePartitionBalancing((s, n) => ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancerForTest>(s, n, totalQueueCount / siloCount));
                             });
                         
                 }
@@ -61,7 +60,7 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
             this.fixture = fixture;
         }
 
-        [Fact(Skip = "https://github.com/dotnet/orleans/issues/4317"), TestCategory("BVT")]
+        [Fact, TestCategory("BVT")]
         public Task PluggableQueueBalancerTest_ShouldUseInjectedQueueBalancerAndBalanceCorrectly()
         {
             return base.ShouldUseInjectedQueueBalancerAndBalanceCorrectly(this.fixture, StreamProviderName, siloCount, totalQueueCount);

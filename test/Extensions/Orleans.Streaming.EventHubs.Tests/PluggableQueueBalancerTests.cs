@@ -1,5 +1,7 @@
 using Orleans.Configuration;
 using Orleans.Hosting.Developer;
+using Orleans.Streaming.EventHubs.Testing;
+using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
 using TestExtensions;
@@ -24,7 +26,6 @@ namespace ServiceBus.Tests
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = SiloCount;
-                builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             }
 
@@ -43,7 +44,8 @@ namespace ServiceBus.Tests
                                 {
                                     options.EventHubPartitionCount = TotalQueueCount;
                                 }));
-                                b.ConfigurePartitionBalancing((s, n) => ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancerForTest>(s, n));
+                                b.ConfigureComponent<IStreamQueueCheckpointerFactory>((s, n) => NoOpCheckpointerFactory.Instance);
+                                b.ConfigurePartitionBalancing((s, n) => ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancerForTest>(s, n, TotalQueueCount / SiloCount));
                             });
                 }
             }
@@ -54,7 +56,7 @@ namespace ServiceBus.Tests
             this.fixture = fixture;
         }
 
-        [Fact(Skip = "https://github.com/dotnet/orleans/issues/4317"), TestCategory("BVT")]
+        [Fact, TestCategory("BVT")]
         public Task PluggableQueueBalancerTest_ShouldUseInjectedQueueBalancerAndBalanceCorrectly()
         {
             return base.ShouldUseInjectedQueueBalancerAndBalanceCorrectly(this.fixture, StreamProviderName, SiloCount, TotalQueueCount);

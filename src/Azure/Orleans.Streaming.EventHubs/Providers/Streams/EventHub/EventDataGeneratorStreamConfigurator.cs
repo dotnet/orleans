@@ -32,7 +32,6 @@ namespace Orleans.Hosting.Developer
             this.ConfigureDelegate(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
                 .ConfigureNamedOptionForLogging<EventHubReceiverOptions>(name)
                 .ConfigureNamedOptionForLogging<EventHubStreamCachePressureOptions>(name)
-                .AddTransient<IConfigurationValidator>(sp => new EventHubOptionsValidator(sp.GetOptionsByName<EventHubOptions>(name), name))
                 .AddTransient<IConfigurationValidator>(sp => new StreamCheckpointerConfigurationValidator(sp, name)));
         }
     }

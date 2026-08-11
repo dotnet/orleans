@@ -7,12 +7,14 @@ namespace Tester.StreamingTests
     {
         private readonly string id;
         private readonly ILeaseManagerGrain leaseManagerGrain;
+        private readonly int _expectedResponsibility;
         private List<QueueId> ownedQueues = null!;
 
-        public LeaseBasedQueueBalancerForTest(string name, IGrainFactory grainFactory)
+        public LeaseBasedQueueBalancerForTest(string name, int expectedResponsibility, IGrainFactory grainFactory)
         {
             this.leaseManagerGrain = grainFactory.GetGrain<ILeaseManagerGrain>(name);
             this.id = $"{name}-{Guid.NewGuid()}";
+            _expectedResponsibility = expectedResponsibility;
         }
 
         public async Task Initialize(IStreamQueueMapper queueMapper)
@@ -33,9 +35,8 @@ namespace Tester.StreamingTests
 
         private async Task GetInitialLease()
         {
-            var responsibilty = await this.leaseManagerGrain.GetLeaseResposibility();
-            this.ownedQueues = new List<QueueId>(responsibilty);
-            for(int i = 0; i < responsibilty; i++)
+            this.ownedQueues = new List<QueueId>(_expectedResponsibility);
+            for(int i = 0; i < _expectedResponsibility; i++)
             {
                 try
                 {
