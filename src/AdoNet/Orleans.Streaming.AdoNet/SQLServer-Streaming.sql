@@ -333,7 +333,7 @@ WITH Batch AS
 		ModifiedOn,
 		Payload
 	FROM
-		OrleansStreamMessage WITH (UPDLOCK, READPAST, READCOMMITTEDLOCK, ROWLOCK)
+		OrleansStreamMessage WITH (UPDLOCK, READPAST, READCOMMITTEDLOCK)
 	WHERE
 		ServiceId = @ServiceId
         AND ProviderId = @ProviderId
@@ -576,7 +576,7 @@ WITH Batch AS
 		RemoveOn = @RemoveOn,
 		Payload
 	FROM
-		OrleansStreamMessage WITH (UPDLOCK, READPAST, READCOMMITTEDLOCK, ROWLOCK)
+		OrleansStreamMessage WITH (UPDLOCK, READPAST, READCOMMITTEDLOCK)
 	WHERE
 		ServiceId = @ServiceId
         AND ProviderId = @ProviderId
