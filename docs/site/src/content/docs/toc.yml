@@ -18,7 +18,7 @@ items:
         href: quickstarts/build-your-first-orleans-app.md
       - name: Deploy and scale on Azure
         href: quickstarts/deploy-scale-orleans-on-azure.md
-  - name: Tutorials
+  - name: Walkthroughs and tutorials
     items:
       - name: Model an adventure game
         href: tutorials-and-samples/adventure.md
@@ -32,6 +32,34 @@ items:
         href: tutorials-and-samples/streaming-walkthrough.md
       - name: Perform a rolling upgrade
         href: tutorials-and-samples/rolling-upgrade.md
+  - name: Concepts
+    items:
+      - name: Orleans overview
+        href: overview.md
+      - name: Why Orleans?
+        href: benefits.md
+      - name: Grain model and programming
+        href: grains/index.md
+      - name: Persistence and durability
+        href: grains/grain-persistence/index.md
+      - name: Streaming
+        href: streaming/index.md
+      - name: Versioning and compatibility
+        href: grains/grain-versioning/grain-versioning.md
+      - name: Orleans clients
+        href: host/client.md
+  - name: How-to guides
+    items:
+      - name: Recipe index
+        href: how-to/index.md
+      - name: Configure hosting and providers
+        href: host/configuration-guide/index.md
+      - name: Deploy and operate
+        href: deployment/index.md
+      - name: Use Orleans features
+        href: grains/index.md
+      - name: Diagnose and recover
+        href: host/monitoring/troubleshooting.md
   - name: Develop applications
     items:
       - name: Grains
@@ -325,10 +353,12 @@ items:
         href: /samples/
       - name: Samples repository
         href: https://github.com/dotnet/orleans/tree/main/samples
-  - name: Reference/API
+  - name: Reference
     items:
       - name: C# API reference
         href: /docs/api/csharp/
+      - name: API context and examples
+        href: resources/api-reference-guide.md
       - name: Frequently asked questions
         href: resources/frequently-asked-questions.md
       - name: Best practices
@@ -339,6 +369,18 @@ items:
         href: resources/student-projects.md
       - name: Community and external links
         href: resources/links.md
+  - name: FAQ and troubleshooting
+    items:
+      - name: Frequently asked questions
+        href: resources/frequently-asked-questions.md
+      - name: Troubleshooting workflow
+        href: host/monitoring/troubleshooting.md
+      - name: Troubleshoot deployments
+        href: deployment/troubleshooting-deployments.md
+      - name: Silo error codes
+        href: host/monitoring/silo-error-code-monitoring.md
+      - name: Client error codes
+        href: host/monitoring/client-error-code-monitoring.md
   - name: Upgrade to Orleans 10
     items:
       - name: Migration overview
