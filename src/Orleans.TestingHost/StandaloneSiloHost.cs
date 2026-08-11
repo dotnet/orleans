@@ -4,6 +4,8 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans.Runtime;
 
 namespace Orleans.TestingHost
@@ -38,6 +40,9 @@ namespace Orleans.TestingHost
             try
             {
                 var cts = new CancellationTokenSource();
+                using var stoppedRegistration = host.Services
+                    .GetRequiredService<IHostApplicationLifetime>()
+                    .ApplicationStopped.Register(cts.Cancel);
                 Console.CancelKeyPress += (sender, eventArgs) => cts.Cancel();
 
                 ListenForShutdownCommand(cts);

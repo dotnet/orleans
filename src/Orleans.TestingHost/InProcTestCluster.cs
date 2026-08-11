@@ -781,6 +781,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
 
                 siloBuilder.Services
                     .Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(30));
+                TestClusterFatalErrorHandler.Configure(siloBuilder.Services);
 
                 if (Options.UseTestClusterMembership)
                 {
@@ -811,6 +812,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             });
 
             var host = appBuilder.Build();
+            TestClusterFatalErrorHandler.Attach(host);
             InitializeTestHooksSystemTarget(host);
             await host.StartAsync();
             return host;

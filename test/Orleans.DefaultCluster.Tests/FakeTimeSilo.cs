@@ -55,43 +55,23 @@ internal static class FakeTimeSilo
     }
 
     /// <summary>
-    /// Advances the fake clock, guarded by a watchdog which fails fast if the call does not return
-    /// promptly. Advancing the fake clock should complete near-instantaneously; if infrastructure timers
-    /// are ever driven by the fake clock again (see <see cref="UseFakeTimeProviderForGrainTimers"/>),
-    /// they spin the CPU inline and never return. The watchdog converts that regression into an
-    /// immediate, diagnosable failure instead of a multi-minute CI hang.
+    /// Advances the fake clock, failing the test if the call does not return promptly.
     /// </summary>
-    public static void Advance(FakeTimeProvider timeProvider, TimeSpan duration)
+    public static async Task AdvanceAsync(FakeTimeProvider timeProvider, TimeSpan duration)
     {
-        using var watchdog = new AdvanceWatchdog(duration);
-        timeProvider.Advance(duration);
-    }
-
-    private sealed class AdvanceWatchdog : IDisposable
-    {
-        // Advancing the fake clock is a synchronous, in-memory operation and completes in well under a
-        // second in practice. This limit is generous while remaining far below CI's 10-minute blame-hang
-        // timeout, so a genuine spin surfaces quickly.
-        private static readonly TimeSpan Limit = TimeSpan.FromSeconds(60);
-
-        private readonly TimeSpan _duration;
-
-        // Uses the real system timer queue (not the fake provider), so it still fires while the calling
-        // thread is spinning inside Advance.
-        private readonly Timer _timer;
-
-        public AdvanceWatchdog(TimeSpan duration)
+        var advanceTask = Task.Run(() => timeProvider.Advance(duration));
+        try
         {
-            _duration = duration;
-            _timer = new Timer(static state => ((AdvanceWatchdog)state!).OnElapsed(), this, Limit, Timeout.InfiniteTimeSpan);
+            await advanceTask.WaitAsync(TimeSpan.FromSeconds(60));
         }
-
-        private void OnElapsed() => Environment.FailFast(
-            $"FakeTimeProvider.Advance({_duration}) did not return within {Limit}. This indicates that silo " +
-            "infrastructure timers are being driven by the test's fake clock and are spinning inline during " +
-            "Advance. Ensure infrastructure timers use TimeProvider.System (see FakeTimeSilo.UseFakeTimeProviderForGrainTimers).");
-
-        public void Dispose() => _timer.Dispose();
+        catch (TimeoutException exception)
+        {
+            throw new TimeoutException(
+                $"FakeTimeProvider.Advance({duration}) did not return within 00:01:00. This indicates that silo " +
+                "infrastructure timers are being driven by the test's fake clock and are spinning inline during " +
+                "Advance. Ensure infrastructure timers use TimeProvider.System (see FakeTimeSilo.UseFakeTimeProviderForGrainTimers).",
+                exception);
+        }
     }
 }
 

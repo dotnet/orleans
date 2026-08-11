@@ -1,6 +1,8 @@
 using AwesomeAssertions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Orleans.Runtime;
 using Orleans.TestingHost.Tests.Grains;
 using TestExtensions;
 using Xunit;
@@ -34,6 +36,27 @@ namespace Orleans.TestingHost.Tests
             await using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
+            var primary = Assert.IsType<InProcessSiloHandle>(testCluster.Primary);
+            Assert.Equal("TestClusterFatalErrorHandler", primary.ServiceProvider.GetRequiredService<IFatalErrorHandler>().GetType().Name);
+        }
+
+        [Fact, TestCategory("Functional")]
+        public async Task FatalErrorStopsSiloWithoutTerminatingTestHost()
+        {
+            var builder = new TestClusterBuilder(1);
+            builder.Options.ServiceId = Guid.NewGuid().ToString();
+            builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
+            await using var testCluster = builder.Build();
+            await testCluster.DeployAsync();
+
+            var primary = Assert.IsType<InProcessSiloHandle>(testCluster.Primary);
+            var applicationLifetime = primary.ServiceProvider.GetRequiredService<IHostApplicationLifetime>();
+            var stopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var registration = applicationLifetime.ApplicationStopped.Register(stopped.SetResult);
+
+            primary.ServiceProvider.GetRequiredService<IFatalErrorHandler>().OnFatalException(context: "Test");
+
+            await stopped.Task.WaitAsync(TimeSpan.FromSeconds(30));
         }
     }
 

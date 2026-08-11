@@ -434,6 +434,30 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
+        public async Task MembershipTableManager_DeclaredDead_DuringShutdown_DoesNotTerminate()
+        {
+            var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
+            var manager = this.CreateMembershipTableManager(membershipTable);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            await this.lifecycle.OnStart();
+            await manager.UpdateStatus(SiloStatus.Joining);
+            await this.lifecycle.OnStop();
+
+            while (true)
+            {
+                var table = await membershipTable.ReadAll();
+                var row = table.Members.Single(e => e.Item1.SiloAddress.Equals(this.localSilo));
+                if (await membershipTable.UpdateRow(row.Item1.WithStatus(SiloStatus.Dead), row.Item2, table.Version.Next()))
+                {
+                    break;
+                }
+            }
+
+            await manager.Refresh();
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+        }
+
+        [Fact]
         public async Task MembershipTableManager_ExplicitDeadSnapshot_Terminates()
         {
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
