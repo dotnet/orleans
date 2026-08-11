@@ -1,7 +1,7 @@
 ---
 title: Configure ADO.NET providers
 description: Configure Orleans clustering, reminders, storage, and grain directories with ADO.NET.
-ms.date: 08/02/2026
+ms.date: 08/10/2026
 ms.topic: how-to
 ---
 
@@ -15,6 +15,7 @@ Orleans ADO.NET providers use a relational database for one or more runtime capa
 | Grain storage | [`Microsoft.Orleans.Persistence.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AdoNet) | Silos |
 | Reminders | [`Microsoft.Orleans.Reminders.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.AdoNet) | Silos |
 | Grain directory | [`Microsoft.Orleans.GrainDirectory.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.AdoNet) | Silos |
+| Streaming | [`Microsoft.Orleans.Streaming.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.AdoNet) | Silos and external clients |
 
 Install only the packages for the capabilities the application uses. Also reference the database driver package.
 
@@ -55,6 +56,14 @@ The Orleans configuration shape is the same for PostgreSQL, MySQL/MariaDB, and O
 | Oracle | `Oracle.ManagedDataAccess.Core` | `Oracle.DataAccess.Client` |
 
 Orleans also recognizes `MySqlConnector` for the MySqlConnector driver. Verify that the selected capability has a script for the chosen database.
+
+## Use a data source
+
+Each ADO.NET provider option type accepts either a connection string or a <xref:System.Data.Common.DbDataSource>. A data source is useful when the database driver needs configuration which can't be represented in a connection string, such as a periodically refreshed authentication token.
+
+Configure exactly one connection source. Orleans rejects configurations which supply both `ConnectionString` and `DataSource`, or neither. Continue to set `Invariant` because Orleans uses it to select database-specific queries and behavior.
+
+Register the data source as a singleton and resolve it through the provider's `OptionsBuilder` configuration overload. Named Orleans providers can resolve distinct keyed data sources. The dependency injection container or application owns the data source and must keep it alive for the Orleans provider's lifetime; Orleans opens and disposes individual connections but doesn't dispose the data source.
 
 ## Configure declaratively
 

@@ -1,4 +1,6 @@
+using Microsoft.Data.SqlClient;
 using Orleans.Tests.SqlUtils;
+using UnitTests.StorageTests.Relational;
 using UnitTests.General;
 using Xunit;
 
@@ -50,6 +52,23 @@ namespace UnitTests.StorageTests.AdoNet
         public async Task CancellationToken_SqlServer_Test()
         {
             await CancellationTokenTest(_storage, CancellationTestTimeoutLimit);
+        }
+
+        [SkippableFact, TestCategory("Functional")]
+        public async Task DataSource_SqlServer_Test()
+        {
+            Skip.If(_storage is null || string.IsNullOrWhiteSpace(_storage.CurrentConnectionString), "Connection string not provided.");
+            using var dataSource = new ProviderDbDataSource(
+                _storage.CurrentConnectionString,
+                () => new SqlConnection(_storage.CurrentConnectionString));
+            var storage = RelationalStorage.CreateInstance(AdoNetInvariantName, dataSource);
+
+            var values = await storage.ReadAsync(
+                "SELECT 47;",
+                parameterProvider: null,
+                (record, _, _) => Task.FromResult(record.GetInt32(0)));
+
+            Assert.Equal([47], values);
         }
     }
 }

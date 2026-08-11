@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Persistence.AdoNet.Storage;
 using Orleans.Runtime;
 using Orleans.Storage;
+using System.Data.Common;
 
 namespace Orleans.Configuration
 {
@@ -14,7 +15,16 @@ namespace Orleans.Configuration
         /// Connection string for AdoNet storage.
         /// </summary>
         [Redact]
-        public string ConnectionString { get; set; } = null!;
+        public string? ConnectionString { get; set; }
+
+        /// <summary>
+        /// Gets or sets the data source used to open database connections.
+        /// </summary>
+        /// <remarks>
+        /// The data source is owned by the caller and is not disposed by Orleans.
+        /// </remarks>
+        [Redact]
+        public DbDataSource? DataSource { get; set; }
 
         /// <summary>
         /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
@@ -87,9 +97,9 @@ namespace Orleans.Configuration
                 throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} \"{name}\". {nameof(options.Invariant)} is required.");
             }
 
-            if (string.IsNullOrWhiteSpace(this.options.ConnectionString))
+            if (string.IsNullOrWhiteSpace(this.options.ConnectionString) == (this.options.DataSource is null))
             {
-                throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} \"{name}\". {nameof(options.ConnectionString)} is required.");
+                throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} \"{name}\". Configure exactly one of {nameof(options.ConnectionString)} or {nameof(options.DataSource)}.");
             }
 
             if (this.options.HashPicker == null)

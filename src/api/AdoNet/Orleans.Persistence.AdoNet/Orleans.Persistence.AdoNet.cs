@@ -13,7 +13,10 @@ namespace Orleans.Configuration
         public const string DEFAULT_ADONET_INVARIANT = "Microsoft.Data.SqlClient";
         public const int DEFAULT_INIT_STAGE = 10000;
         [Redact]
-        public string ConnectionString { get { throw null; } set { } }
+        public string? ConnectionString { get { throw null; } set { } }
+
+        [Redact]
+        public System.Data.Common.DbDataSource? DataSource { get { throw null; } set { } }
 
         public bool DeleteStateOnClear { get { throw null; } set { } }
 

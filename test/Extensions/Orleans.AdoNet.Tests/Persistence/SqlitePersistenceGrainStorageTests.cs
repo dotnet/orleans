@@ -173,5 +173,41 @@ namespace Tester.AdoNet.Persistence
             var versionAfterWritePostClear = int.Parse(Assert.IsType<string>(grainState.ETag), CultureInfo.InvariantCulture);
             Assert.Equal(versionAfterClear + 1, versionAfterWritePostClear);
         }
+
+        [Fact]
+        public async Task DataSource_WriteReadClear_LeavesCallerOwnedDataSourceUsable()
+        {
+            using var dataSource = new TrackingSqliteDataSource(this.fixture.ConnectionString);
+            var storage = await this.fixture.CreateGrainStorageAsync(dataSource, $"SqliteDataSource-{Guid.NewGuid():N}");
+            const string grainType = "sqlite-data-source-grain";
+            var grainId = GrainId.Create(GrainType.Create(grainType), GrainIdKeyExtensions.CreateIntegerKey(Random.Shared.NextInt64()));
+            var written = new GrainState<TestState1> { State = new TestState1 { A = "from-data-source", B = 17, C = 29 } };
+
+            await storage.WriteStateAsync(grainType, grainId, written);
+            var read = new GrainState<TestState1> { State = new TestState1() };
+            await storage.ReadStateAsync(grainType, grainId, read);
+
+            Assert.True(read.RecordExists);
+            Assert.Equal(written.State, read.State);
+            Assert.NotNull(read.ETag);
+
+            var etagBeforeClear = read.ETag;
+            await storage.ClearStateAsync(grainType, grainId, read);
+
+            Assert.False(read.RecordExists);
+            Assert.NotEqual(etagBeforeClear, read.ETag);
+            Assert.False(dataSource.IsDisposed);
+
+            await using (var connection = await dataSource.OpenConnectionAsync())
+            await using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "SELECT 43;";
+                Assert.Equal(43L, await command.ExecuteScalarAsync());
+            }
+
+            Assert.True(dataSource.OpenConnectionAsyncCallCount >= 5);
+            Assert.All(dataSource.Connections, connection => Assert.True(connection.IsDisposed));
+            Assert.False(dataSource.IsDisposed);
+        }
     }
 }

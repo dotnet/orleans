@@ -22,7 +22,7 @@ namespace Orleans.Runtime.ReminderService
 
         public async Task Init()
         {
-            this.orleansQueries = await RelationalOrleansQueries.CreateInstance(this.options.Invariant, this.options.ConnectionString);
+            this.orleansQueries = await RelationalOrleansQueries.CreateInstance(this.options.Invariant, this.options.ConnectionString, this.options.DataSource);
         }
 
         public Task<ReminderTableData> ReadRows(GrainId grainId)

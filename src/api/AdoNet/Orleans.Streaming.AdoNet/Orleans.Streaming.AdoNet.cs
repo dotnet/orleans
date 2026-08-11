@@ -11,7 +11,10 @@ namespace Orleans.Configuration
     public partial class AdoNetStreamOptions
     {
         [Redact]
-        public string ConnectionString { get { throw null; } set { } }
+        public string? ConnectionString { get { throw null; } set { } }
+
+        [Redact]
+        public System.Data.Common.DbDataSource? DataSource { get { throw null; } set { } }
 
         public System.TimeSpan DeadLetterEvictionTimeout { get { throw null; } set { } }
 

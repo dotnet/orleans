@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -66,10 +67,17 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="invariantName">The invariant name of the connector for this database.</param>
         /// <param name="connectionString">The connection string this database should use for database operations.</param>
-        internal static async Task<RelationalOrleansQueries> CreateInstance(string invariantName, string connectionString)
-        {
-            var storage = RelationalStorage.CreateInstance(invariantName, connectionString);
+        internal static Task<RelationalOrleansQueries> CreateInstance(string invariantName, string connectionString) =>
+            CreateInstance(RelationalStorage.CreateInstance(invariantName, connectionString));
 
+        /// <summary>
+        /// Creates an instance using exactly one configured connection source and initializes Orleans queries from the database.
+        /// </summary>
+        internal static Task<RelationalOrleansQueries> CreateInstance(string invariantName, string? connectionString, DbDataSource? dataSource) =>
+            CreateInstance(RelationalStorage.CreateInstance(invariantName, connectionString, dataSource));
+
+        private static async Task<RelationalOrleansQueries> CreateInstance(IRelationalStorage storage)
+        {
             var queries = await storage.ReadAsync(DbStoredQueries.GetQueriesKey, DbStoredQueries.Converters.GetQueryKeyAndValue, null);
 
             return new RelationalOrleansQueries(storage, new DbStoredQueries(queries.ToDictionary(q => q.Key, q => q.Value)));

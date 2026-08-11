@@ -1,3 +1,5 @@
+using System.Data.Common;
+
 namespace Orleans.Configuration;
 
 /// <summary>
@@ -14,7 +16,16 @@ public class AdoNetStreamOptions
     /// Gets or sets the connection string.
     /// </summary>
     [Redact]
-    public string ConnectionString { get; set; } = default!;
+    public string? ConnectionString { get; set; }
+
+    /// <summary>
+    /// Gets or sets the data source used to open database connections.
+    /// </summary>
+    /// <remarks>
+    /// The data source is owned by the caller and is not disposed by Orleans.
+    /// </remarks>
+    [Redact]
+    public DbDataSource? DataSource { get; set; }
 
     /// <summary>
     /// The maximum number of attempts to deliver a message.

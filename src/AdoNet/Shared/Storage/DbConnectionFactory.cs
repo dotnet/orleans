@@ -124,6 +124,25 @@ namespace Orleans.Tests.SqlUtils
             return connection;
         }
 
+        public static void ValidateDataSource(string invariantName, DbDataSource dataSource)
+        {
+            ArgumentNullException.ThrowIfNull(dataSource);
+
+            var factory = factoryCache.GetOrAdd(invariantName, GetFactory).Factory;
+            using var expectedConnection = factory.CreateConnection()
+                ?? throw new InvalidOperationException($"Database provider factory: '{invariantName}' did not return a connection object.");
+            using var actualConnection = dataSource.CreateConnection();
+
+            var expectedType = expectedConnection.GetType();
+            var actualType = actualConnection.GetType();
+            if (!expectedType.IsAssignableFrom(actualType))
+            {
+                throw new ArgumentException(
+                    $"The configured data source creates connections of type '{actualType.FullName}', but invariant '{invariantName}' uses '{expectedType.FullName}'.",
+                    nameof(dataSource));
+            }
+        }
+
         private class CachedFactory
         {
             public CachedFactory(DbProviderFactory factory, string factoryName, string factoryDescription, string factoryAssemblyQualifiedNameKey)

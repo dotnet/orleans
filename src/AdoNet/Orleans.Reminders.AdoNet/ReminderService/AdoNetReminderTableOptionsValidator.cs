@@ -24,9 +24,9 @@ namespace Orleans.Configuration
                 throw new OrleansConfigurationException($"Invalid {nameof(AdoNetReminderTableOptions)} values for {nameof(AdoNetReminderTable)}. {nameof(options.Invariant)} is required.");
             }
 
-            if (string.IsNullOrWhiteSpace(this.options.ConnectionString))
+            if (string.IsNullOrWhiteSpace(this.options.ConnectionString) == (this.options.DataSource is null))
             {
-                throw new OrleansConfigurationException($"Invalid {nameof(AdoNetReminderTableOptions)} values for {nameof(AdoNetReminderTable)}. {nameof(options.ConnectionString)} is required.");
+                throw new OrleansConfigurationException($"Invalid {nameof(AdoNetReminderTableOptions)} values for {nameof(AdoNetReminderTable)}. Configure exactly one of {nameof(options.ConnectionString)} or {nameof(options.DataSource)}.");
             }
         }
     }

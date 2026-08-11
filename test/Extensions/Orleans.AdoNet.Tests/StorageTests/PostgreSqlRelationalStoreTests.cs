@@ -52,5 +52,20 @@ namespace UnitTests.StorageTests.AdoNet
         {
             await CancellationTokenTest(_storage, CancellationTestTimeoutLimit);
         }
+
+        [SkippableFact, TestCategory("Functional")]
+        public async Task NativeDataSource_PostgreSql_Test()
+        {
+            Skip.If(_storage is null || string.IsNullOrWhiteSpace(_storage.CurrentConnectionString), "Connection string not provided.");
+            await using var dataSource = Npgsql.NpgsqlDataSource.Create(_storage.CurrentConnectionString);
+            var storage = RelationalStorage.CreateInstance(AdoNetInvariantName, dataSource);
+
+            var values = await storage.ReadAsync(
+                "SELECT 47;",
+                parameterProvider: null,
+                (record, _, _) => Task.FromResult(record.GetInt32(0)));
+
+            Assert.Equal([47], values);
+        }
     }
 }
