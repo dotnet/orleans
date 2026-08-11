@@ -11,6 +11,28 @@ The implementation track explains how Orleans realizes the virtual actor model. 
 
 The pages in this track use Orleans source and tests as the specification. Internal types are named so that readers can follow an operation through the repository, but those types are not public compatibility contracts unless the page explicitly identifies an extension point.
 
+## A runtime map
+
+An application call enters through generated proxy code, becomes a `Message`, and is routed by the grain directory and placement services. `MessageCenter` delivers it locally or through a `Connection` managed by `ConnectionManager`. The target `Catalog` resolves an activation, where `ActivationData` admits the request and `WorkItemGroup` executes one synchronous turn at a time. Responses travel back through the same messaging and callback pipeline.
+
+The runtime is intentionally layered:
+
+```mermaid
+flowchart LR
+    Proxy[Generated proxy and invokable] --> Factory[MessageFactory]
+    Factory --> Center[MessageCenter]
+    Center --> Directory[Grain directory and placement]
+    Center --> Network[ConnectionManager and transport]
+    Directory --> Activation[Catalog and ActivationData]
+    Activation --> Admission[Request admission]
+    Admission --> Scheduler[WorkItemGroup]
+    Scheduler --> Grain[Grain turn]
+    Grain --> Serialization[Generated codecs and wire format]
+    Serialization --> Network
+```
+
+Use the map below to choose the right depth. The [runtime architecture](runtime-architecture.md) page follows the normal call path; the messaging, serialization, reminder, transaction, and version-skew pages explain the boundaries where failure, persistence, and rolling upgrades change the guarantees.
+
 ## Runtime core
 
 - [Runtime architecture](runtime-architecture.md) follows a call through client, messaging, placement, directory, activation, and scheduling components.
@@ -19,12 +41,16 @@ The pages in this track use Orleans source and tests as the specification. Inter
 - [Grain directory](grain-directory.md) distinguishes the default `LocalGrainDirectory` DHT from the experimental distributed directory.
 - [Scheduling and turn execution](scheduler.md) explains `WorkItemGroup`, continuations, interleaving, and single-threaded execution.
 - [Messaging and delivery semantics](messaging-delivery-guarantees.md) traces requests and explains why a timeout has an unknown outcome.
+- [Transport and networking internals](messaging-networking.md) explains connection establishment, framing, backpressure, and shutdown behavior.
 - [Placement and activation balancing](load-balancing.md) covers the default resource-optimized policy and the opt-in movement protocols.
 
 ## Runtime services and extensibility
 
 - [Lifecycle implementation](orleans-lifecycle.md) describes ordered startup and shutdown.
 - [Serialization and code generation](serialization.md) covers generated codecs, proxies, manifests, wire identity, and custom components.
+- [Reminders](reminders.md) explains ring ownership, durable reminder rows, refresh, and tick delivery.
+- [Transactions](transactions.md) explains transaction agents, managers, participant queues, and recovery decisions.
+- [Rolling version skew](rolling-version-skew.md) connects interface version manifests, compatibility directors, selectors, and wire compatibility during mixed-version operation.
 - [Persistent streams](streams-implementation/index.md) explains pulling agents, queue ownership, caches, cursors, pub-sub, and recovery.
 - [Provider authoring](provider-authoring.md) describes named providers, configuration binding, lifecycle participation, and validation.
 - [TestingHost architecture](testing.md) explains the in-process cluster harness and its substitutions for production services.
