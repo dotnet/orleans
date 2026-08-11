@@ -4,7 +4,7 @@
     <Title>Microsoft Orleans reminders testing library</Title>
     <Description>Reminder testing utilities for Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) ReminderTestKit</PackageTags>
-    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <IsPackable>false</IsPackable>
   </PropertyGroup>

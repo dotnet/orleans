@@ -7,6 +7,7 @@ using System.Reactive.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Internal;
 using Orleans.Reminders;
+using Orleans.Runtime.ReminderService;
 using Orleans.Testing.Reminders;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -204,6 +205,41 @@ namespace UnitTests.TimerTests
 
             await grain.StopReminder(reminderName);
             Assert.Null(await grain.GetReminderObject(reminderName));
+        }
+
+        [Fact]
+        public async Task Rem_Grain_RefreshAtFiredTickDoesNotRedeliverOccurrence()
+        {
+            const string reminderName = "stale_refresh_at_fired_tick";
+            var grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            var grainId = grain.GetGrainId();
+            var dueTime = ReminderLoadingWindow + TimeSpan.FromSeconds(5);
+            var period = ReminderLoadingWindow + TimeSpan.FromSeconds(10);
+            var firstTickTime = ReminderUtcNow.UtcDateTime + dueTime;
+            using var cts = new CancellationTokenSource(TestConstants.InitTimeout);
+
+            await grain.StartReminder(reminderName, dueTime, period);
+
+            var activatedTask = observer.WaitForActiveReminderCountAsync(grainId, 1, cts.Token, reminderName);
+            await AdvanceUntilAsync(activatedTask, cts.Token);
+            await observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cts.Token);
+
+            var firstTickTask = observer.WaitForReminderTickAsync(grainId, cts.Token, reminderName);
+            var firstEvictionTask = observer.WaitForReminderQuiescenceAsync(grainId, reminderName, cts.Token);
+            await AdvanceReminderTimeAsync(firstTickTime - ReminderUtcNow.UtcDateTime, cts.Token);
+            var firstTick = await firstTickTask;
+            await firstEvictionTask;
+
+            Assert.Equal(firstTickTime, firstTick.Status.CurrentTickTime);
+            Assert.Equal(1, observer.GetTickCount(grainId, reminderName));
+
+            var reminderService = HostedCluster.Silos.Single().ServiceProvider.GetRequiredService<LocalReminderService>();
+            await reminderService.TestOnlyRefresh();
+
+            Assert.Equal(0, observer.GetActiveReminderCount(grainId, reminderName));
+            Assert.Equal(1, observer.GetTickCount(grainId, reminderName));
+
+            await grain.StopReminder(reminderName);
         }
 
         [Fact]
@@ -468,6 +504,40 @@ namespace UnitTests.TimerTests
         }
 
         [Fact]
+        public async Task Rem_Grain_StorageRecoveryAtExactDueTime_DeliversDueOccurrence()
+        {
+            const string reminderName = "exact_due_storage_recovery";
+            var grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            var grainId = grain.GetGrainId();
+            var dueTime = ReminderLoadingWindow + TimeSpan.FromSeconds(20);
+            var period = TimeSpan.FromSeconds(90);
+            var firstTickTime = ReminderUtcNow.UtcDateTime + dueTime;
+            using var cts = new CancellationTokenSource(TestConstants.InitTimeout);
+
+            await grain.StartReminder(reminderName, dueTime, period);
+            Assert.Equal(0, observer.GetActiveReminderCount(grainId, reminderName));
+
+            await using var outage = _readController.BlockNextRangeRead(grainId);
+            await AdvanceUntilBlockedAsync(outage, cts.Token);
+            await AdvanceReminderTimeAsync(firstTickTime - ReminderUtcNow.UtcDateTime, cts.Token);
+
+            var activatedTask = observer.WaitForActiveReminderCountAsync(grainId, 1, cts.Token, reminderName);
+            outage.Release();
+            await activatedTask;
+            await observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cts.Token);
+
+            var tickTask = observer.WaitForReminderTickAsync(grainId, cts.Token, reminderName);
+            var immediateDeliveryDelay = TimeSpan.FromMilliseconds(1);
+            await AdvanceReminderTimeAsync(immediateDeliveryDelay, cts.Token);
+            var tick = await tickTask;
+
+            Assert.Equal(firstTickTime, tick.Status.FirstTickTime);
+            Assert.Equal(firstTickTime + immediateDeliveryDelay, tick.Status.CurrentTickTime);
+
+            await grain.StopReminder(reminderName);
+        }
+
+        [Fact]
         public async Task Rem_Grain_DistantReminder_DeliveredLateAfterStorageOutageRecovers()
         {
             const string reminderName = "storage_outage_recovery";
@@ -475,6 +545,7 @@ namespace UnitTests.TimerTests
             var grainId = grain.GetGrainId();
             var dueTime = ReminderLoadingWindow + TimeSpan.FromSeconds(20);
             var period = TimeSpan.FromSeconds(90);
+            var firstTickTime = ReminderUtcNow.UtcDateTime + dueTime;
             using var cts = new CancellationTokenSource(TestConstants.InitTimeout);
 
             await grain.StartReminder(reminderName, dueTime, period);
@@ -492,13 +563,17 @@ namespace UnitTests.TimerTests
 
             var activatedTask = observer.WaitForActiveReminderCountAsync(grainId, 1, cts.Token, reminderName);
             await AdvanceUntilAsync(activatedTask, cts.Token);
+            await observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cts.Token);
 
             var tickTask = observer.WaitForReminderTickAsync(grainId, cts.Token, reminderName);
-            await AdvanceUntilAsync(tickTask, cts.Token);
+            var expectedTickTime = firstTickTime + period;
+            var timeUntilTick = expectedTickTime - ReminderUtcNow.UtcDateTime;
+            Assert.True(timeUntilTick > TimeSpan.Zero, $"Expected the recovered reminder to be armed before {expectedTickTime:O}, but reminder time was {ReminderUtcNow:O}.");
+            await AdvanceReminderTimeAsync(timeUntilTick, cts.Token);
             var tick = await tickTask;
 
             Assert.Equal(1, observer.GetTickCount(grainId, reminderName));
-            Assert.Equal(tick.Status.FirstTickTime + period, tick.Status.CurrentTickTime);
+            Assert.Equal(expectedTickTime, tick.Status.CurrentTickTime);
 
             await grain.StopReminder(reminderName);
         }

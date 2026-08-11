@@ -69,6 +69,8 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
 
     public IGrainFactory GrainFactory { get; }
 
+    protected DateTimeOffset ReminderUtcNow => ReminderClock.UtcNow;
+
     public void Dispose()
     {
         observer.Dispose();

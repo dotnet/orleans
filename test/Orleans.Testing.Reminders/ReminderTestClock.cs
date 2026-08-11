@@ -36,6 +36,11 @@ public sealed class ReminderTestClock : IDisposable
     internal FakeTimeProvider TimeProvider { get; }
 
     /// <summary>
+    /// Gets the current reminder clock time.
+    /// </summary>
+    public DateTimeOffset UtcNow => TimeProvider.GetUtcNow();
+
+    /// <summary>
     /// Gets the minimum reminder period configured for clusters using this clock.
     /// </summary>
     public TimeSpan MinimumReminderPeriod { get; }
