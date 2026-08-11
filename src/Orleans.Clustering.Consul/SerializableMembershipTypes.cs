@@ -62,7 +62,7 @@ namespace Orleans.Runtime.Host
         public List<SuspectingSilo>? SuspectingSilos { get; set; }
 
         [JsonProperty]
-        public Dictionary<string, string> Metadata { get; set; }
+        public Dictionary<string, string>? Metadata { get; set; }
 
         [JsonConstructor]
         internal ConsulSiloRegistration()
