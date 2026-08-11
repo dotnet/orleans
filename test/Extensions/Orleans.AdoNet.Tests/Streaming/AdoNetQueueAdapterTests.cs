@@ -126,11 +126,11 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
         var context = new Dictionary<string, object> { { "MyKey", "MyValue" } };
 
         // act - enqueue (via adapter) some messages
-        var beforeEnqueued = DateTime.UtcNow;
+        var beforeEnqueued = DateTime.UtcNow.AddSeconds(-1);
         await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(1) }, null!, context);
         await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(2) }, null!, context);
         await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(3) }, null!, context);
-        var afterEnqueued = DateTime.UtcNow;
+        var afterEnqueued = DateTime.UtcNow.AddSeconds(1);
 
         // assert - stored messages are as expected
         var stored = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage")).ToList();
@@ -192,18 +192,18 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
         var adapter = new AdoNetQueueAdapter(providerId, streamOptions, clusterOptions, cacheOptions, adoMapper, _queries, serializer, logger, _fixture.Services);
 
         // act - enqueue (via adapter) some messages
-        var beforeEnqueued = DateTime.UtcNow;
+        var beforeEnqueued = DateTime.UtcNow.AddSeconds(-1);
         await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(1) }, null!, new Dictionary<string, object> { { "MyKey", 1 } });
         await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(2) }, null!, new Dictionary<string, object> { { "MyKey", 2 } });
         await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(3) }, null!, new Dictionary<string, object> { { "MyKey", 3 } });
-        var afterEnqueued = DateTime.UtcNow;
+        var afterEnqueued = DateTime.UtcNow.AddSeconds(1);
 
         // act - grab receiver and dequeue messages
         var receiver = adapter.CreateReceiver(queueId);
         await receiver.Initialize(TimeSpan.FromSeconds(10));
-        var beforeDequeued = DateTime.UtcNow;
+        var beforeDequeued = DateTime.UtcNow.AddSeconds(-1);
         var messages = await receiver.GetQueueMessagesAsync(10, CancellationToken.None);
-        var afterDequeued = DateTime.UtcNow;
+        var afterDequeued = DateTime.UtcNow.AddSeconds(1);
 
         // assert - dequeued messages are as expected
         Assert.NotNull(messages);
