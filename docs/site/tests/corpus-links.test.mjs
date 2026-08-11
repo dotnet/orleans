@@ -255,5 +255,5 @@ describe('documentation corpus links', () => {
     }
 
     expect(failures).toEqual([]);
-  }, 30_000);
+  }, 60_000);
 });

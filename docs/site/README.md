@@ -65,15 +65,20 @@ The source audit reports a rule ID, file, line, and remediation. It enforces:
   environment variables to turn link validation into an internal-network request.
 
 `npm run build` and `npm run validate` discover every project under `docs/` and
-`samples/`, require exact one-to-one membership in `docs/Docs.slnx`, evaluate an
-exact `net10.0` target, and require every Orleans package reference to resolve to
-`10.2.2`. Historical package versions are accepted only in a migration project
-with a used, meaningful `OrleansDocumentationVersionException` property. To
-compile the complete aggregate locally, run:
+`samples/`, require exact membership in `docs/Docs.slnx` and
+`samples/Samples.slnx`, evaluate an exact `net10.0` target, and require every
+Orleans package reference to resolve to `10.2.2`. Historical package versions are
+accepted only in a migration project with a used, meaningful
+`OrleansDocumentationVersionException` property. A sample awaiting publication
+may use a prerelease of `10.2.2` with the same property and a specific reason. To
+compile the documentation projects locally, run:
 
 ```powershell
 dotnet build ../Docs.slnx --configuration Release -p:BuildExternalAssets=false
 ```
+
+Build samples through `samples/Build-Samples.ps1`, which packs the current Orleans
+sources to a local feed before building `samples/Samples.slnx`.
 
 To compile only the checked-in documentation snippet projects sequentially, run:
 
@@ -88,12 +93,12 @@ compiled snippet or document the exception and update its hash. For `DOCS005`,
 synchronize the authored reference with the named source inventory.
 Every packable Orleans source package must be documented or have a reasoned entry
 in `src/data/package-inventory-exclusions.json`.
-Fix `PROJECT001`-`PROJECT003` by adding or removing projects with `dotnet sln`
-until filesystem discovery and `docs/Docs.slnx` match exactly. Fix `PROJECT004`
-by targeting only `net10.0`, and fix `PROJECT005` by updating the effective
-Orleans package version to `10.2.2`. `PROJECT006` identifies an invalid, vague,
-or stale migration exception. Fix `SNIPPET001`/`SNIPPET002` in the
-reported snippet project before rebuilding.
+Fix `PROJECT001`-`PROJECT003` by adding or removing documentation projects in
+`docs/Docs.slnx` and sample projects in `samples/Samples.slnx` until filesystem
+discovery matches exactly. Fix `PROJECT004` by targeting only `net10.0`, and fix
+`PROJECT005` by updating the effective Orleans package version to `10.2.2`.
+`PROJECT006` identifies an invalid, vague, or stale version exception. Fix
+`SNIPPET001`/`SNIPPET002` in the reported snippet project before rebuilding.
 When adding a project, pass `--include-references false` and use a solution folder
 which matches its path under `docs/` or `samples/`; repository source dependencies
 build transitively and aren't direct `Docs.slnx` entries.

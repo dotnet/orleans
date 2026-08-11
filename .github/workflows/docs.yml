@@ -104,8 +104,12 @@ jobs:
           ./docs/site/src/content/docs/validate-snippets.ps1 -PolicyOnly
           ./samples/Validate-Samples.ps1 -NoBuild
 
-      - name: Build aggregate documentation solution
+      - name: Build documentation projects
         run: dotnet build docs/Docs.slnx --configuration Release --no-incremental -p:BuildExternalAssets=false -bl:docs-projects.binlog
+
+      - name: Build samples against local Orleans packages
+        shell: pwsh
+        run: ./samples/Build-Samples.ps1 -Configuration Release -NoIncremental -SkipExternalAssets
 
       - name: Upload build diagnostics
         if: always()

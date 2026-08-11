@@ -143,7 +143,7 @@ describe('documentation project policy', () => {
     ]);
   });
 
-  test('allows only used, reasoned migration package exceptions', () => {
+  test('allows only used, reasoned migration and sample package exceptions', () => {
     const project = 'docs/site/src/content/docs/migration/snippets/Legacy.csproj';
     const reason = 'Compiles the Orleans 9 source side of the migration example.';
     const accepted = validateProjectEvaluations({
@@ -160,6 +160,40 @@ describe('documentation project policy', () => {
       orleansPackageVersion: '10.2.2',
     });
     expect(accepted.issues).toEqual([]);
+
+    const prereleaseSample = validateProjectEvaluations({
+      projectEvaluations: [
+        {
+          project: 'samples/Experimental/Experimental.csproj',
+          evaluation: evaluation({
+            packages: [['Microsoft.Orleans.Experimental', '10.2.2-rc.2.alpha.1']],
+            versionException:
+              'Uses an unpublished prerelease package for an experimental sample.',
+          }),
+        },
+      ],
+      targetFramework: 'net10.0',
+      orleansPackageVersion: '10.2.2',
+    });
+    expect(prereleaseSample.issues).toEqual([]);
+
+    const olderSample = validateProjectEvaluations({
+      projectEvaluations: [
+        {
+          project: 'samples/Legacy/Legacy.csproj',
+          evaluation: evaluation({
+            packages: [['Microsoft.Orleans.Server', '10.2.1']],
+            versionException:
+              'Samples cannot use historical versions outside migration guidance.',
+          }),
+        },
+      ],
+      targetFramework: 'net10.0',
+      orleansPackageVersion: '10.2.2',
+    });
+    expect(olderSample.issues).toEqual([
+      expect.objectContaining({ rule: 'PROJECT005' }),
+    ]);
 
     const rejected = validateProjectEvaluations({
       projectEvaluations: [
@@ -201,12 +235,31 @@ describe('documentation project policy', () => {
 
   test('checked-in solution exactly covers a clean project discovery', async () => {
     const discoveredProjects = await discoverMaintainedProjects(repoRoot);
-    const solutionProjects = await readSolutionProjects({
+    const docsSolutionProjects = await readSolutionProjects({
       repoRoot,
       solutionFile: path.join(repoRoot, 'docs', 'Docs.slnx'),
     });
+    const sampleSolutionProjects = await readSolutionProjects({
+      repoRoot,
+      solutionFile: path.join(repoRoot, 'samples', 'Samples.slnx'),
+    });
     expect(
-      validateSolutionCoverage({ discoveredProjects, solutionProjects }),
+      validateSolutionCoverage({
+        discoveredProjects: discoveredProjects.filter((project) =>
+          project.startsWith('docs/'),
+        ),
+        solutionProjects: docsSolutionProjects,
+        solutionName: 'docs/Docs.slnx',
+      }),
+    ).toEqual([]);
+    expect(
+      validateSolutionCoverage({
+        discoveredProjects: discoveredProjects.filter((project) =>
+          project.startsWith('samples/'),
+        ),
+        solutionProjects: sampleSolutionProjects,
+        solutionName: 'samples/Samples.slnx',
+      }),
     ).toEqual([]);
     expect(discoveredProjects).not.toContainEqual(
       expect.stringContaining('/snippets-v3/'),

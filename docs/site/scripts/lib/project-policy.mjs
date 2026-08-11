@@ -88,7 +88,11 @@ export async function readSolutionProjects({
   });
 }
 
-export function validateSolutionCoverage({ discoveredProjects, solutionProjects }) {
+export function validateSolutionCoverage({
+  discoveredProjects,
+  solutionProjects,
+  solutionName = 'the configured solution',
+}) {
   const issues = [];
   const discovered = new Map(discoveredProjects.map((project) => [projectKey(project), project]));
   const membership = new Map();
@@ -102,8 +106,8 @@ export function validateSolutionCoverage({ discoveredProjects, solutionProjects 
       issues.push({
         rule: 'PROJECT001',
         project,
-        message: 'Maintained project is missing from docs/Docs.slnx.',
-        remediation: 'Add the project with dotnet sln and preserve its directory hierarchy.',
+        message: `Maintained project is missing from ${solutionName}.`,
+        remediation: `Add the project to ${solutionName} with dotnet sln and preserve its directory hierarchy.`,
       });
     }
   }
@@ -112,7 +116,7 @@ export function validateSolutionCoverage({ discoveredProjects, solutionProjects 
       issues.push({
         rule: 'PROJECT002',
         project: entries[0].project,
-        message: `Project occurs ${entries.length} times in docs/Docs.slnx.`,
+        message: `Project occurs ${entries.length} times in ${solutionName}.`,
         remediation: 'Remove duplicate solution entries.',
       });
     }
@@ -166,6 +170,17 @@ function isOlderVersion(value, requiredVersion) {
   return false;
 }
 
+function isPrereleaseOfVersion(value, requiredVersion) {
+  const actual = versionParts(value);
+  const required = versionParts(requiredVersion);
+  return (
+    actual &&
+    required &&
+    actual.every((part, index) => part === required[index]) &&
+    value.includes('-')
+  );
+}
+
 export function validateProjectEvaluations({
   projectEvaluations,
   targetFramework,
@@ -194,22 +209,24 @@ export function validateProjectEvaluations({
     const migrationProject = project.startsWith(
       'docs/site/src/content/docs/migration/',
     );
+    const sampleProject = project.startsWith('samples/');
     const validException =
-      migrationProject && exceptionReason.length >= 20;
+      (migrationProject || sampleProject) && exceptionReason.length >= 20;
     let exceptionUsed = false;
-    if (exceptionReason && !migrationProject) {
+    let exceptionCandidateFound = false;
+    if (exceptionReason && !migrationProject && !sampleProject) {
       issues.push({
         rule: 'PROJECT006',
         project,
-        message: 'OrleansDocumentationVersionException is restricted to migration projects.',
-        remediation: 'Remove the exception or move the intentional historical example under migration/.',
+        message: 'OrleansDocumentationVersionException is restricted to migration projects and samples awaiting unpublished packages.',
+        remediation: 'Remove the exception, move historical guidance under migration/, or keep an unpublished-package example under samples/.',
       });
     } else if (exceptionReason && exceptionReason.length < 20) {
       issues.push({
         rule: 'PROJECT006',
         project,
         message: 'OrleansDocumentationVersionException is missing a meaningful reason.',
-        remediation: 'Explain the migration scenario which requires the historical package release.',
+        remediation: 'Explain the migration or unpublished sample-package scenario which requires the exception.',
       });
     }
     for (const reference of evaluation.Items?.PackageReference ?? []) {
@@ -222,7 +239,12 @@ export function validateProjectEvaluations({
         centralPackageManagementEnabled,
       );
       if (version === orleansPackageVersion) continue;
-      if (validException && isOlderVersion(version, orleansPackageVersion)) {
+      exceptionCandidateFound = true;
+      if (
+        validException &&
+        ((migrationProject && isOlderVersion(version, orleansPackageVersion)) ||
+          (sampleProject && isPrereleaseOfVersion(version, orleansPackageVersion)))
+      ) {
         exceptionUsed = true;
         continue;
       }
@@ -230,15 +252,15 @@ export function validateProjectEvaluations({
         rule: 'PROJECT005',
         project,
         message: `Orleans package '${packageName}' evaluates to '${version || '(missing)'}'.`,
-        remediation: `Use exactly ${orleansPackageVersion}; an older migration snippet requires a meaningful OrleansDocumentationVersionException project property.`,
+        remediation: `Use exactly ${orleansPackageVersion}; an older migration snippet or same-version prerelease sample requires a meaningful OrleansDocumentationVersionException project property.`,
       });
     }
-    if (validException && !exceptionUsed) {
+    if (validException && !exceptionUsed && !exceptionCandidateFound) {
       issues.push({
         rule: 'PROJECT006',
         project,
-        message: 'OrleansDocumentationVersionException is stale because no older Orleans package reference uses it.',
-        remediation: 'Remove the exception or restore the intentional historical package reference.',
+        message: 'OrleansDocumentationVersionException is stale because no eligible package reference uses it.',
+        remediation: 'Remove the exception or restore the intentional migration or unpublished sample package reference.',
       });
     }
   }
@@ -292,13 +314,38 @@ async function mapConcurrent(items, concurrency, callback) {
 export async function auditProjectPolicy({
   repoRoot,
   solutionFile,
+  solutionFiles,
   policy,
   evaluate = evaluateProject,
   concurrency = 8,
 }) {
   const discoveredProjects = await discoverMaintainedProjects(repoRoot);
-  const solutionProjects = await readSolutionProjects({ repoRoot, solutionFile });
-  const issues = validateSolutionCoverage({ discoveredProjects, solutionProjects });
+  const inventories = solutionFiles ?? [
+    {
+      solutionFile,
+      projectPrefix: '',
+      solutionName: normalizeProjectPath(path.relative(repoRoot, solutionFile)),
+    },
+  ];
+  const issues = [];
+  let solutionEntries = 0;
+  for (const inventory of inventories) {
+    const scopedProjects = discoveredProjects.filter((project) =>
+      project.startsWith(inventory.projectPrefix),
+    );
+    const solutionProjects = await readSolutionProjects({
+      repoRoot,
+      solutionFile: inventory.solutionFile,
+    });
+    solutionEntries += solutionProjects.length;
+    issues.push(
+      ...validateSolutionCoverage({
+        discoveredProjects: scopedProjects,
+        solutionProjects,
+        solutionName: inventory.solutionName,
+      }),
+    );
+  }
   const projectEvaluations = await mapConcurrent(
     discoveredProjects,
     concurrency,
@@ -332,7 +379,7 @@ export async function auditProjectPolicy({
     projects: discoveredProjects,
     docsProjects: discoveredProjects.filter((project) => project.startsWith('docs/')).length,
     sampleProjects: discoveredProjects.filter((project) => project.startsWith('samples/')).length,
-    solutionEntries: solutionProjects.length,
+    solutionEntries,
     orleansPackageReferences: evaluationAudit.orleansPackageReferences,
   };
 }

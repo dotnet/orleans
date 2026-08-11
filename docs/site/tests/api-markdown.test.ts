@@ -16,6 +16,7 @@ import {
   memberSlug,
 } from '../src/lib/api/packages';
 import type { PackageApiDocument } from '../src/lib/api/types';
+import unpublishedApiPackages from '../src/data/unpublished-api-packages.json';
 
 const pkg = fixture as PackageApiDocument;
 const grain = pkg.types[0];
@@ -51,13 +52,15 @@ describe('native API Markdown companions', () => {
 
   test('omits NuGet links only for explicitly unpublished API assemblies', () => {
     const unpublished = structuredClone(pkg);
-    unpublished.package.name = 'Microsoft.Orleans.Reminders.Abstractions';
+    const unpublishedPackage = Object.keys(unpublishedApiPackages.packages).at(0);
+    if (!unpublishedPackage) throw new Error('Expected an unpublished API package fixture.');
+    unpublished.package.name = unpublishedPackage;
 
     expect(renderPackageMarkdown(unpublished)).not.toContain(
-      'https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Abstractions',
+      `https://www.nuget.org/packages/${unpublishedPackage}`,
     );
     expect(renderTypeMarkdown(unpublished, unpublished.types[0])).not.toContain(
-      'https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Abstractions',
+      `https://www.nuget.org/packages/${unpublishedPackage}`,
     );
   });
 

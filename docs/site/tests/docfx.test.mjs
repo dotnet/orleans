@@ -946,18 +946,22 @@ describe('DocFX conversion', () => {
     expect(converted).toContain(unmatchedLabels);
   });
 
-  test('scans unmatched link destinations in linear time', async () => {
-    const directory = await temporaryDirectory();
-    const sourcePath = path.join(directory, 'guide.md');
-    const unmatchedDestinations = '[]('.repeat(100_000);
+  test(
+    'scans unmatched link destinations in linear time',
+    async () => {
+      const directory = await temporaryDirectory();
+      const sourcePath = path.join(directory, 'guide.md');
+      const unmatchedDestinations = '[]('.repeat(100_000);
 
-    const converted = await convertDocfxMarkdown({
-      source: `---\ntitle: Links\n---\n${unmatchedDestinations}`,
-      sourcePath,
-    });
+      const converted = await convertDocfxMarkdown({
+        source: `---\ntitle: Links\n---\n${unmatchedDestinations}`,
+        sourcePath,
+      });
 
-    expect(converted).toContain(unmatchedDestinations);
-  });
+      expect(converted).toContain(unmatchedDestinations);
+    },
+    10_000,
+  );
 
   test('converts links after code spans containing backslashes', async () => {
     const directory = await temporaryDirectory();

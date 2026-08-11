@@ -5,7 +5,18 @@ import { auditProjectPolicy } from './lib/project-policy.mjs';
 
 const siteRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = path.resolve(siteRoot, '..', '..');
-const solutionFile = path.join(repoRoot, 'docs', 'Docs.slnx');
+const solutionFiles = [
+  {
+    solutionFile: path.join(repoRoot, 'docs', 'Docs.slnx'),
+    projectPrefix: 'docs/',
+    solutionName: 'docs/Docs.slnx',
+  },
+  {
+    solutionFile: path.join(repoRoot, 'samples', 'Samples.slnx'),
+    projectPrefix: 'samples/',
+    solutionName: 'samples/Samples.slnx',
+  },
+];
 const policy = JSON.parse(
   await readFile(path.join(repoRoot, 'docs', 'project-policy.json'), 'utf8'),
 );
@@ -19,7 +30,7 @@ const concurrency =
     : 8;
 const result = await auditProjectPolicy({
   repoRoot,
-  solutionFile,
+  solutionFiles,
   policy,
   concurrency,
 });
