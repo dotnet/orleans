@@ -39,7 +39,7 @@ namespace Orleans.Runtime.Messaging
         private Task? _processIncomingTask;
         private Task? _processOutgoingTask;
         private Task? _closeTask;
-        private CoarseStopwatch _lastMessageReceivedTimestamp;
+        private long _lastMessageReceivedTimestamp;
 
         protected Connection(
             ConnectionContext connection,
@@ -83,12 +83,13 @@ namespace Orleans.Runtime.Messaging
         {
             get
             {
-                if (!_lastMessageReceivedTimestamp.IsRunning) return null;
-                return _lastMessageReceivedTimestamp.Elapsed;
+                var timestamp = Volatile.Read(ref _lastMessageReceivedTimestamp);
+                if (timestamp == 0) return null;
+                return TimeSpan.FromMilliseconds(CoarseStopwatch.GetTimestamp() - timestamp);
             }
         }
 
-        protected void MarkMessageReceived() => _lastMessageReceivedTimestamp.Restart();
+        protected void MarkMessageReceived() => Volatile.Write(ref _lastMessageReceivedTimestamp, CoarseStopwatch.GetTimestamp());
 
         public static void ConfigureBuilder(ConnectionBuilder builder) => builder.Run(OnConnectedDelegate);
 
