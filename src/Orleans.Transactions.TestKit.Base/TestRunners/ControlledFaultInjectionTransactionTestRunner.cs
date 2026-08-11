@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using Orleans.Configuration;
+using Orleans.Runtime;
 
 namespace Orleans.Transactions.TestKit
 {
@@ -76,6 +77,7 @@ namespace Orleans.Transactions.TestKit
                 grains.Count,
                 recoveryEvents,
                 GetDeadline());
+            var faultAttemptSequence = recoveryEvents.LatestRelevantSequence;
             try
             {
                 await this.ExecuteAndWaitForCommit(
@@ -88,6 +90,18 @@ namespace Orleans.Transactions.TestKit
             {
                 this.testOutput($"Fault-injected transaction aborted: {exception}");
                 var deadline = GetDeadline();
+                var fault = await this.ObserveFaultInjection(
+                    faultObserved.Task,
+                    injectionPhase,
+                    injectionType,
+                    recoveryEvents,
+                    deadline);
+                await this.WaitForRecoveryCompletion(
+                    fault.TransactionId,
+                    fault.GrainId,
+                    faultAttemptSequence,
+                    recoveryEvents,
+                    deadline);
                 await this.RetryAfterRecovery(
                     () => this.ExecuteAndWaitForCommit(
                         () => coordinator.MultiGrainAddAndFaultInjection(grains, addval),
@@ -101,6 +115,18 @@ namespace Orleans.Transactions.TestKit
             {
                 this.testOutput($"Fault-injected transaction failed with an ambiguous outcome: {exception}");
                 var deadline = GetDeadline();
+                var fault = await this.ObserveFaultInjection(
+                    faultObserved.Task,
+                    injectionPhase,
+                    injectionType,
+                    recoveryEvents,
+                    deadline);
+                await this.WaitForRecoveryCompletion(
+                    fault.TransactionId,
+                    fault.GrainId,
+                    faultAttemptSequence,
+                    recoveryEvents,
+                    deadline);
                 expected = await this.RetryAfterRecovery(
                     async () =>
                     {
@@ -116,7 +142,7 @@ namespace Orleans.Transactions.TestKit
                     deadline);
             }
 
-            await this.VerifyFaultWasInjected(
+            await this.ObserveFaultInjection(
                 faultObserved.Task,
                 injectionPhase,
                 injectionType,
@@ -190,7 +216,7 @@ namespace Orleans.Transactions.TestKit
                 + recoveryEvents.FormatTimeline());
         }
 
-        private async Task VerifyFaultWasInjected(
+        private async Task<FaultInjectionEvent> ObserveFaultInjection(
             Task<FaultInjectionEvent> observation,
             TransactionFaultInjectPhase phase,
             FaultInjectionType type,
@@ -207,8 +233,10 @@ namespace Orleans.Transactions.TestKit
                         throw new TimeoutException();
                     }
 
-                    await observation.WaitAsync(Stopwatch.GetElapsedTime(now, deadline));
+                    return await observation.WaitAsync(Stopwatch.GetElapsedTime(now, deadline));
                 }
+
+                return await observation;
             }
             catch (TimeoutException)
             {
@@ -218,6 +246,23 @@ namespace Orleans.Transactions.TestKit
                     + Environment.NewLine
                     + recoveryEvents.FormatTimeline());
             }
+        }
+
+        private async Task WaitForRecoveryCompletion(
+            Guid transactionId,
+            GrainId faultingGrainId,
+            long afterSequence,
+            TransactionRecoveryEventObserver recoveryEvents,
+            long deadline)
+        {
+            var transition = await recoveryEvents.WaitForRecoveryCompletionAsync(
+                transactionId,
+                faultingGrainId,
+                afterSequence,
+                deadline);
+            this.testOutput(
+                $"Fault-injected transaction recovery completed. "
+                + TransactionRecoveryEventObserver.FormatTransition(transition).Trim());
         }
 
         private static long GetDeadline()

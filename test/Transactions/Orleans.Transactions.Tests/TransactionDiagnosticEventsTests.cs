@@ -500,6 +500,55 @@ public class TransactionDiagnosticEventsTests
     }
 
     [Fact]
+    public async Task RecoveryObserverWaitsForMatchingTransactionRecoveryCompletion()
+    {
+        var resource = CreateParticipant(
+            "resource",
+            CreateGrainReference("resource"),
+            ParticipantId.Role.Resource | ParticipantId.Role.Manager);
+        var otherResource = CreateParticipant(
+            "other-resource",
+            CreateGrainReference("other-resource"),
+            ParticipantId.Role.Resource);
+        var transactionId = Guid.NewGuid();
+        var unrelatedTransactionId = Guid.NewGuid();
+        using var observer = new TransactionRecoveryEventObserver(_ => true);
+        var recovery = observer.WaitForRecoveryCompletionAsync(
+            transactionId,
+            resource.Reference.GrainId,
+            afterSequence: 0,
+            GetDeadline(RecoveryObservationTimeout));
+
+        TransactionDiagnosticEvents.EmitAbortAndRestoreCompleted(
+            resource,
+            TransactionalStatus.UnknownException,
+            storageOutcomeInDoubt: false,
+            ImmutableArray.Create(unrelatedTransactionId));
+
+        await Task.Yield();
+        Assert.False(recovery.IsCompleted);
+
+        TransactionDiagnosticEvents.EmitAbortAndRestoreCompleted(
+            otherResource,
+            TransactionalStatus.UnknownException,
+            storageOutcomeInDoubt: false,
+            ImmutableArray.Create(transactionId));
+
+        await Task.Yield();
+        Assert.False(recovery.IsCompleted);
+
+        TransactionDiagnosticEvents.EmitAbortAndRestoreCompleted(
+            resource,
+            TransactionalStatus.UnknownException,
+            storageOutcomeInDoubt: false,
+            ImmutableArray.Create(transactionId));
+
+        var transition = await recovery;
+        Assert.Equal(TransactionRecoveryEventObserver.RecoveryTransitionKind.AbortAndRestoreCompleted, transition.Kind);
+        Assert.Equal(transactionId, Assert.Single(transition.TransactionIds));
+    }
+
+    [Fact]
     public async Task RecoveryObserverLockExpiredTransitionContainsTransactionId()
     {
         var resource = CreateParticipant("resource", ParticipantId.Role.Resource);
