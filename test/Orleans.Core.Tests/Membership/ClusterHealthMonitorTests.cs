@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Connections;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NonSilo.Tests.Utilities;
@@ -78,7 +79,7 @@ namespace NonSilo.Tests.Membership
             this.membershipTable = new InMemoryMembershipTable(new TableVersion(1, "1"));
             this.connectionManager = new ConnectionManager(
                 Options.Create(new ConnectionOptions()),
-                null,
+                null!,
                 this.loggerFactory.CreateLogger<ConnectionManager>());
         }
 
@@ -231,14 +232,14 @@ namespace NonSilo.Tests.Membership
 
             var canaryConnectionManager = new ConnectionManager(
                 Options.Create(new ConnectionOptions()),
-                null,
+                null!,
                 this.loggerFactory.CreateLogger<ConnectionManager>());
 
             var testRig = CreateClusterHealthMonitorTestRig(clusterMembershipOptions, canaryConnectionManager);
 
             // Set up probes to always fail.
             var probeCalls = new ConcurrentQueue<SiloAddress>();
-            this.prober.Probe(default, default).ReturnsForAnyArgs(info =>
+            this.prober.Probe(default!, default).ReturnsForAnyArgs(info =>
             {
                 probeCalls.Enqueue(info.ArgAt<SiloAddress>(0));
                 return Task.FromException(new Exception("probe failed"));
@@ -272,8 +273,8 @@ namespace NonSilo.Tests.Membership
                 await Task.Delay(50);
             }
 
-            // Let any pending async work complete.
-            testRig.Manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(5));
+            await Until(() => probeCalls.Count >= clusterMembershipOptions.NumMissedProbesLimit);
+            await Task.Delay(100);
 
             // The silo should NOT be dead because the canary detected active connection traffic.
             var table = await this.membershipTable.ReadAll();
@@ -313,13 +314,13 @@ namespace NonSilo.Tests.Membership
 
             var canaryConnectionManager = new ConnectionManager(
                 Options.Create(new ConnectionOptions()),
-                null,
+                null!,
                 this.loggerFactory.CreateLogger<ConnectionManager>());
 
             var testRig = CreateClusterHealthMonitorTestRig(clusterMembershipOptions, canaryConnectionManager);
 
             var probeCalls = new ConcurrentQueue<SiloAddress>();
-            this.prober.Probe(default, default).ReturnsForAnyArgs(info =>
+            this.prober.Probe(default!, default).ReturnsForAnyArgs(info =>
             {
                 probeCalls.Enqueue(info.ArgAt<SiloAddress>(0));
                 return Task.FromException(new Exception("probe failed"));
@@ -352,7 +353,11 @@ namespace NonSilo.Tests.Membership
                 await Task.Delay(50);
             }
 
-            testRig.Manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(5));
+            await Until(async () =>
+            {
+                var snapshot = await this.membershipTable.ReadAll();
+                return snapshot.Members.Any(m => m.Item1.SiloAddress.Equals(targetSilo) && m.Item1.Status == SiloStatus.Dead);
+            });
 
             // Despite an active connection, the silo SHOULD be dead because the option is disabled.
             var table = await this.membershipTable.ReadAll();
@@ -781,6 +786,13 @@ namespace NonSilo.Tests.Membership
             Assert.True(maxTimeout > 0);
         }
 
+        private static async Task Until(Func<Task<bool>> condition)
+        {
+            var maxTimeout = 40_000;
+            while (!await condition() && (maxTimeout -= 10) > 0) await Task.Delay(10);
+            Assert.True(maxTimeout > 0);
+        }
+
         private static async Task<MembershipTableSnapshot> WaitForMembershipSnapshot(DiagnosticEventCollector membershipEvents, Func<MembershipTableSnapshot, bool> condition)
         {
             var diagnosticEvent = await membershipEvents.WaitForEventAsync(
@@ -876,11 +888,24 @@ namespace NonSilo.Tests.Membership
             var context = Substitute.For<ConnectionContext>();
             context.Features.Returns(features);
             ConnectionDelegate middleware = _ => Task.CompletedTask;
-            var messagingTrace = new MessagingTrace(loggerFactory);
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<MessagingInstruments>();
+            services.AddSingleton<MessagingProcessingInstruments>();
+            var serviceProvider = services.BuildServiceProvider();
+            var orleansInstruments = serviceProvider.GetRequiredService<OrleansInstruments>();
+            var messagingInstruments = serviceProvider.GetRequiredService<MessagingInstruments>();
+            var messagingTrace = new MessagingTrace(
+                loggerFactory,
+                messagingInstruments,
+                serviceProvider.GetRequiredService<MessagingProcessingInstruments>());
             var shared = new ConnectionCommon(
-                Substitute.For<IServiceProvider>(),
-                null,
+                serviceProvider,
+                null!,
                 messagingTrace,
+                orleansInstruments,
+                messagingInstruments,
                 loggerFactory.CreateLogger<Connection>(),
                 new NoOpMessageStatisticsSink());
             return new TestConnection(context, middleware, shared);
@@ -890,7 +915,7 @@ namespace NonSilo.Tests.Membership
             : Connection(context, middleware, shared)
         {
             protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
-            protected override IMessageCenter MessageCenter => null;
+            protected override IMessageCenter MessageCenter => null!;
             protected override bool PrepareMessageForSend(Message msg) => true;
             protected override void OnReceivedMessage(Message msg) { }
             protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes) { }
