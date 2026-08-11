@@ -82,40 +82,34 @@ public class ReminderTests_Cosmos_Standalone
     {
         DateTime startedAt = DateTime.UtcNow;
 
-        try
+        List<Task<bool>> promises = new List<Task<bool>>();
+        for (int i = 0; i < numOfInserts; i++)
         {
-            List<Task<bool>> promises = new List<Task<bool>>();
-            for (int i = 0; i < numOfInserts; i++)
+            //"177BF46E-D06D-44C0-943B-C12F26DF5373"
+            string s = string.Format("177BF46E-D06D-44C0-943B-C12F26D{0:d5}", i);
+
+            var e = new ReminderEntry
             {
-                //"177BF46E-D06D-44C0-943B-C12F26DF5373"
-                string s = string.Format("177BF46E-D06D-44C0-943B-C12F26D{0:d5}", i);
+                //GrainId = LegacyGrainId.GetGrainId(new Guid(s)),
+                GrainId = _fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId()).GetGrainId(),
+                ReminderName = "MY_REMINDER_" + i,
+                Period = TimeSpan.FromSeconds(5),
+                StartAt = DateTime.UtcNow
+            };
 
-                var e = new ReminderEntry
-                {
-                    //GrainId = LegacyGrainId.GetGrainId(new Guid(s)),
-                    GrainId = _fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId()).GetGrainId(),
-                    ReminderName = "MY_REMINDER_" + i,
-                    Period = TimeSpan.FromSeconds(5),
-                    StartAt = DateTime.UtcNow
-                };
+            int capture = i;
+            Task<bool> promise = Task.Run(async () =>
+            {
+                await reminderTable.UpsertRow(e);
+                _output.WriteLine("Done " + capture);
+                return true;
+            });
+            promises.Add(promise);
+            _log.LogInformation("Started {Capture}", capture);
+        }
+        _log.LogInformation("Started all, now waiting...");
+        await Task.WhenAll(promises).WaitAsync(TimeSpan.FromSeconds(500));
 
-                int capture = i;
-                Task<bool> promise = Task.Run(async () =>
-                {
-                    await reminderTable.UpsertRow(e);
-                    _output.WriteLine("Done " + capture);
-                    return true;
-                });
-                promises.Add(promise);
-                _log.LogInformation("Started {Capture}", capture);
-            }
-            _log.LogInformation("Started all, now waiting...");
-            await Task.WhenAll(promises).WaitAsync(TimeSpan.FromSeconds(500));
-        }
-        catch (Exception exc)
-        {
-            _log.LogInformation(exc, "Exception caught");
-        }
         TimeSpan dur = DateTime.UtcNow - startedAt;
         _log.LogInformation(
             "Inserted {InsertCount} rows in {Duration}, i.e., {Rate} upserts/sec",

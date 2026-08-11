@@ -30,7 +30,7 @@ namespace AWSUtils.Tests.StorageTests
         }
 
         [SkippableFact]
-        public void DynamoDBDataManagerStressTests_WriteAlot_SinglePartition()
+        public async Task DynamoDBDataManagerStressTests_WriteAlot_SinglePartition()
         {
             const string testName = "DynamoDBDataManagerStressTests_WriteAlot_SinglePartition";
             const int iterations = 2000;
@@ -38,11 +38,11 @@ namespace AWSUtils.Tests.StorageTests
             const int numPartitions = 1;
 
             // Write some data
-            WriteAlot_Async(testName, numPartitions, iterations, batchSize);
+            await WriteAlot_Async(testName, numPartitions, iterations, batchSize);
         }
 
         [SkippableFact]
-        public void DynamoDBDataManagerStressTests_WriteAlot_MultiPartition()
+        public async Task DynamoDBDataManagerStressTests_WriteAlot_MultiPartition()
         {
             const string testName = "DynamoDBDataManagerStressTests_WriteAlot_MultiPartition";
             const int iterations = 2000;
@@ -50,31 +50,31 @@ namespace AWSUtils.Tests.StorageTests
             const int numPartitions = 100;
 
             // Write some data
-            WriteAlot_Async(testName, numPartitions, iterations, batchSize);
+            await WriteAlot_Async(testName, numPartitions, iterations, batchSize);
         }
 
         [SkippableFact]
-        public void DynamoDBDataManagerStressTests_ReadAll_SinglePartition()
+        public async Task DynamoDBDataManagerStressTests_ReadAll_SinglePartition()
         {
             const string testName = "DynamoDBDataManagerStressTests_ReadAll";
             const int iterations = 1000;
 
             // Write some data
-            WriteAlot_Async(testName, 1, iterations, iterations);
+            await WriteAlot_Async(testName, 1, iterations, iterations);
 
             Stopwatch sw = Stopwatch.StartNew();
 
             var keys = new Dictionary<string, AttributeValue> { { ":PK", new AttributeValue(PartitionKey) } };
-            var data = manager.QueryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, keys, $"PartitionKey = :PK", item => new UnitTestDynamoDBTableData(item)).Result;
+            var data = await manager.QueryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, keys, $"PartitionKey = :PK", item => new UnitTestDynamoDBTableData(item));
 
             sw.Stop();
             int count = data.results.Count;
             output.WriteLine("DynamoDBDataManagerStressTests_ReadAll completed. ReadAll {0} entries in {1} at {2} RPS", count, sw.Elapsed, count / sw.Elapsed.TotalSeconds);
 
-            //Assert.True(count >= iterations, $"ReadAllshould return some data: Found={count}");
+            Assert.Equal(iterations, count);
         }
 
-        private void WriteAlot_Async(string testName, int numPartitions, int iterations, int batchSize)
+        private async Task WriteAlot_Async(string testName, int numPartitions, int iterations, int batchSize)
         {
             output.WriteLine("Iterations={0}, Batch={1}, Partitions={2}", iterations, batchSize, numPartitions);
             List<Task> promises = new List<Task>();
@@ -93,13 +93,13 @@ namespace AWSUtils.Tests.StorageTests
                 promises.Add(promise);
                 if ((i % batchSize) == 0 && i > 0)
                 {
-                    Task.WhenAll(promises);
+                    await Task.WhenAll(promises);
                     promises.Clear();
                     output.WriteLine("{0} has written {1} rows in {2} at {3} RPS",
                         testName, i, sw.Elapsed, i / sw.Elapsed.TotalSeconds);
                 }
             }
-            Task.WhenAll(promises);
+            await Task.WhenAll(promises);
             sw.Stop();
             output.WriteLine("{0} completed. Wrote {1} entries to {2} partition(s) in {3} at {4} RPS",
                 testName, iterations, numPartitions, sw.Elapsed, iterations / sw.Elapsed.TotalSeconds);
