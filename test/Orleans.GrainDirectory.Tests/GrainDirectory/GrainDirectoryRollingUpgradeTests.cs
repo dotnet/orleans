@@ -12,6 +12,7 @@ using Orleans.GrainDirectory;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Messaging;
 using Orleans.TestingHost;
 using Xunit;
 using Xunit.Abstractions;
@@ -1751,7 +1752,6 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             long grainKey,
             CancellationToken cancellationToken)
         {
-            const int MaxAttempts = 2;
             for (var attempt = 1; ; attempt++)
             {
                 try
@@ -1762,18 +1762,31 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 {
                     throw;
                 }
-                catch (Exception exception) when (attempt < MaxAttempts && IsTransientUpgradeFailure(exception))
+                catch (Exception exception) when (ShouldRetryUpgradeFailure(exception, attempt))
                 {
                     _transientFailures.Enqueue(new(callPhase, worker, grainKey, exception, DateTimeOffset.UtcNow));
-                    await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken);
+                    await Task.Delay(GetTransientUpgradeRetryDelay(exception), cancellationToken);
                 }
             }
         }
 
+        private static bool ShouldRetryUpgradeFailure(Exception exception, int attempt) =>
+            IsTransientUpgradeFailure(exception)
+            && attempt < (ContainsConnectionFailure(exception) ? 3 : 2);
+
         private static bool IsTransientUpgradeFailure(Exception exception) =>
-            exception.GetBaseException() is TimeoutException
+            exception is TimeoutException
                 or SiloUnavailableException
-                or OrleansMessageRejectionException;
+                or OrleansMessageRejectionException
+                or ConnectionFailedException
+            || exception.InnerException is not null && IsTransientUpgradeFailure(exception.InnerException);
+
+        private static TimeSpan GetTransientUpgradeRetryDelay(Exception exception) =>
+            ContainsConnectionFailure(exception) ? TimeSpan.FromSeconds(1) : TimeSpan.FromMilliseconds(250);
+
+        private static bool ContainsConnectionFailure(Exception exception) =>
+            exception is ConnectionFailedException
+            || exception.InnerException is not null && ContainsConnectionFailure(exception.InnerException);
 
         private void SignalProgress()
         {
