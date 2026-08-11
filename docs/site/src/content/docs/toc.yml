@@ -231,6 +231,8 @@ items:
             href: host/monitoring/signals.md
           - name: Troubleshooting workflow
             href: host/monitoring/troubleshooting.md
+          - name: Symptom and signal catalog
+            href: host/monitoring/troubleshooting-symptom-catalog.md
           - name: Silo error codes
             href: host/monitoring/silo-error-code-monitoring.md
           - name: Client error codes

@@ -1,7 +1,7 @@
 ---
 title: Frequently asked questions
-description: Answers to common questions about Orleans.
-ms.date: 08/08/2026
+description: Answers to common questions about developing and operating Orleans applications.
+ms.date: 08/11/2026
 ms.topic: faq
 ---
 
@@ -84,3 +84,65 @@ Orleans uses cooperative scheduling and doesn't preempt grain code. Long synchro
 ### How do I upgrade an existing application?
 
 Follow the [migration guide](../migration-guide.md), which contains version-specific upgrade history. Conceptual and tutorial documentation describes the supported APIs without repeating upgrade history.
+
+### How should I retry failed grain calls?
+
+Retry only transient failures and only when the operation is idempotent or carries an application-level deduplication identity. Use a bounded retry budget with backoff and jitter at an appropriate boundary. Don't retry deterministic validation, serialization, or concurrency failures. A timeout or connection loss can leave the outcome unknown, so reconcile business state when duplicate execution would be unsafe.
+
+### Can reentrancy fix a grain call deadlock?
+
+Sometimes a call cycle can't progress because a non-reentrant grain is waiting for a call which eventually calls back into it. Reentrancy can allow that callback to run, but it also permits interleaving and can violate state invariants. First remove synchronous blocking and redesign avoidable cycles. Use <xref:Orleans.Concurrency.ReentrantAttribute> or <xref:Orleans.Concurrency.AlwaysInterleaveAttribute> only for operations whose interleavings are understood and tested. See [Long-running or deadlocked grain turns](../host/monitoring/troubleshooting-symptom-catalog.md#long-running-or-deadlocked-grain-turns).
+
+## Operations
+
+### How many silos do I need?
+
+There is no universal count. Keep enough silos to satisfy peak CPU, memory, connection, and dependency budgets after losing the largest planned failure domain and while a rollout is in progress. Measure with representative key distribution, payloads, fan-out, storage, streams, and failure recovery. See [Capacity planning](../deployment/capacity-planning.md).
+
+### Why didn't adding silos improve throughput?
+
+The bottleneck might be a hot grain, restrictive placement, a shared storage or stream provider, gateway admission, network bandwidth, or another dependency. An ordinary stateful grain has one activation and adding silos doesn't partition that key. Compare per-silo utilization, activation distribution, rejections, long-running turns, and dependency latency before scaling further.
+
+### What determines Orleans cost?
+
+Orleans itself has no license fee. Operational cost comes from compute, memory, network traffic, clustering and persistence providers, streams, telemetry, and redundancy. Grain boundaries affect cost: chatty cross-silo calls, large serialized payloads, frequent state writes, high activation counts, and high-cardinality telemetry can dominate. Measure a representative workload and include failure-domain spare capacity, rollout surge, backups, and observability retention.
+
+### Which grain storage provider should I choose?
+
+Choose from durability, consistency/concurrency behavior, latency, throughput and partition limits, regional availability, backup/restore, security, operational familiarity, and cost. Clustering, grain storage, reminders, and streams have different access patterns and don't need to share one backend. Validate the provider's failure and throttling behavior with your state size and key distribution.
+
+### Does storage throttling only affect persistence calls?
+
+No. A delayed state read can delay activation; a delayed write can hold a grain turn; retries consume more scheduler and backend capacity; and resulting queues can produce unrelated-looking request timeouts. Correlate storage latency, throttling, retries, activation rate, and request latency. See [Storage throttling](../host/monitoring/troubleshooting-symptom-catalog.md#storage-throttling).
+
+### Can one Orleans cluster span multiple regions?
+
+A single cluster requires reliable, sufficiently low-latency connectivity among silos and to its membership and directory dependencies. A wide-area network increases latency and the probability of partitions, and it expands the failure domain. Prefer independent regional clusters with explicit application-level routing, replication, ownership, and failover semantics unless testing proves that one stretched cluster meets the application's availability and consistency requirements.
+
+### How do I prevent split brain?
+
+Use one shared, durable membership provider per cluster, stable cluster identity, mutually reachable advertised endpoints, clock synchronization, and infrastructure which doesn't keep isolated silos serving indefinitely. During a suspected partition, isolate stale members before editing membership records. Applications which require cross-region survival should define ownership and reconciliation outside an assumed single cluster. See [Membership and directory churn](../host/monitoring/troubleshooting-symptom-catalog.md#membership-and-directory-churn).
+
+### Can membership churn create duplicate grain activations?
+
+During failure detection and directory convergence, transient duplicate activations can occur. The runtime resolves directory conflicts, but external side effects and custom directory implementations still need safe semantics. Grain storage concurrency tokens protect against blind conflicting writes, not duplicate non-storage side effects. Design important side effects to be idempotent or deduplicated and investigate repeated duplication as a membership, network, or directory health symptom.
+
+### What's the difference between a grain timer and a reminder?
+
+A timer belongs to an activation and stops when that activation deactivates or fails. A reminder is durable through the configured reminder provider and can reactivate a grain after a silo or activation restart. Neither is a precision real-time scheduler, and application work should tolerate delay and repetition. See [Reminder and timer timing](../host/monitoring/troubleshooting-symptom-catalog.md#reminder-and-timer-timing).
+
+### Why did reminders or timers run late?
+
+Scheduler pressure, CPU or GC pauses, a callback which takes longer than its period, silo restarts, membership changes, and reminder-provider latency can all delay callbacks. Determine which mechanism is in use, compare callback duration with its period, and correlate timing with runtime and provider health. Use durable application state to reconcile time-sensitive business work.
+
+### How do I make rolling upgrades safe?
+
+Keep adjacent versions compatible in both directions for grain interfaces, serializers, stored state, queued/streamed payloads, provider schemas, and configuration. Preserve stable serializer member IDs and aliases, limit rollout concurrency, maintain surge capacity, and define rollback before deployment. Test old-to-new and new-to-old calls plus reads of existing data. See [Graceful shutdown and upgrades](../deployment/upgrades.md).
+
+### Why did serialization start failing after deployment?
+
+Mixed versions might disagree about a type contract, serializer registration, member ID, alias, or package version, or the new version might be unable to read persisted or queued old data. Preserve the failing type and payload source, stop the rollout, and use a compatible reader or rollback before migrating data. See [Serialization failures after a version change](../host/monitoring/troubleshooting-symptom-catalog.md#serialization-failures-after-a-version-change).
+
+### What should I collect before restarting an unhealthy silo?
+
+Capture UTC timestamps, deployment and configuration changes, logs from relevant clients and silos, traces, metrics, membership views, advertised endpoints, provider health, and platform events. For scheduler, CPU, or memory problems, capture a bounded process trace or dump when safe. Redact secrets and grain state. Start with the [Orleans symptom and signal catalog](../host/monitoring/troubleshooting-symptom-catalog.md).

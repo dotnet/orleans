@@ -9,6 +9,8 @@ ms.topic: troubleshooting
 
 Use these runbooks as investigation sequences, not as automatic proof of one root cause. Capture the incident window, deployment changes, cluster topology, and traffic level before changing configuration. Prefer a rollback or traffic reduction when user impact is growing.
 
+If you're starting from an exception, log event, metric, or literal error text, use the [Orleans symptom and signal catalog](troubleshooting-symptom-catalog.md).
+
 ## Client can't connect
 
 **Evidence:** no connected gateways, repeated connection failures, <xref:Orleans.Runtime.Messaging.ConnectionFailedException>, or a dashboard/client reporting lost cluster connectivity.
