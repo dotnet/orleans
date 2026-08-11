@@ -95,6 +95,7 @@ const pathToRegexp = function(
   if (path instanceof Array) path = '(' + path.join('|') + ')';
   path = (path as string)
     .concat(strict ? '' : '/?')
+    .replace(/\\/g, '\\\\')
     .replace(/\/\(/g, '(?:/')
     .replace(/\+/g, '__plus__')
     .replace(/(\/)?(\.)?:(\w+)(?:(\(.*?\)))?(\?)?/g, function(
