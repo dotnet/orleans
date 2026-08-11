@@ -5,7 +5,8 @@ The conceptual Markdown sources live under `src/content/docs`;
 `npm run prepare:docs` emits ignored `.mdx` siblings under `/docs/` so Starlight
 can render the imported Microsoft Learn syntax.
 
-Use Node.js 24 or later:
+Use Node.js 24 or later and the .NET SDK selected by the repository's
+`global.json`. Source auditing invokes the Roslyn-based inline C# validator.
 
 ```powershell
 npm install
@@ -44,11 +45,13 @@ The source audit reports a rule ID, file, line, and remediation. It enforces:
   activity sources and lifecycle stages against source/API constants, documented
   metric names against `InstrumentNames.cs`, and sample paths against
   `samples/gallery.json`.
-- Content hashes and reasons for legacy inline C# fences in
-  `src/data/csharp-fence-exclusions.json`. Prefer a compiled `:::code` source for
-  new examples; after reviewing a justified opt-out, refresh the hashes with
-  `node scripts/audit-sources.mjs --update-csharp-fences`, then replace each new
-  `REQUIRED` placeholder with a specific rationale.
+- Roslyn syntax validation for inline C# fences in compilation-unit, type-member,
+  interface-member, method-body, expression, and attribute contexts. Prefer a
+  compiled `:::code` source when hidden scaffolding can provide semantic coverage.
+  Only intentionally invalid examples need a hash-bound reason in
+  `src/data/csharp-fence-exclusions.json`; after reviewing one, refresh the
+  manifest with `node scripts/audit-sources.mjs --update-csharp-fences` and replace
+  each new `REQUIRED` placeholder with a specific rationale.
 - Source-aware and rendered link validation. Migrated Microsoft Learn-relative
   links must use canonical `https://learn.microsoft.com/...` URLs; rendered
   routes, encoded paths, redirects, and anchors must resolve under `/orleans/`.
@@ -88,9 +91,10 @@ pwsh src/content/docs/validate-snippets.ps1
 
 Fix `DOCS001` by keeping current-release documentation versionless, moving
 version-specific guidance into `migration/` or upgrade pages, or linking to those
-pages. Fix `DOCS002`/`DOCS003` in `toc.yml`. For `DOCS004`, move the fence to a
-compiled snippet or document the exception and update its hash. For `DOCS005`,
-synchronize the authored reference with the named source inventory.
+pages. Fix `DOCS002`/`DOCS003` in `toc.yml`. For `DOCS004`, correct the syntax,
+move the fence to a compiled snippet with hidden context, or document an
+intentionally invalid example and update its hash. For `DOCS005`, synchronize the
+authored reference with the named source inventory.
 Every packable Orleans source package must be documented or have a reasoned entry
 in `src/data/package-inventory-exclusions.json`.
 Fix `PROJECT001`-`PROJECT003` by adding or removing documentation projects in

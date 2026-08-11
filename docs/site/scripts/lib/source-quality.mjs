@@ -421,16 +421,28 @@ export function collectCsharpFences(source) {
     .filter((node) => /^(?:c#|csharp|cs)$/i.test(node.lang ?? ''))
     .map((node) => ({
       line: node.position.start.line,
+      source: node.value,
       hash: createHash('sha256')
         .update(node.value.replaceAll('\r\n', '\n').replace(/\s+$/g, ''))
         .digest('hex'),
     }));
 }
 
-export function createCsharpFenceManifest(pages, existing = {}) {
+export function createCsharpFenceManifest(
+  pages,
+  existing = {},
+  invalidFenceHashes,
+) {
+  if (!(invalidFenceHashes instanceof Set)) {
+    throw new TypeError(
+      'createCsharpFenceManifest requires parser-produced invalidFenceHashes.',
+    );
+  }
   const files = {};
   for (const page of pages) {
-    const fences = collectCsharpFences(page.source);
+    const fences = collectCsharpFences(page.source).filter(
+      (fence) => invalidFenceHashes.has(fence.hash),
+    );
     if (fences.length === 0) {
       continue;
     }
@@ -441,32 +453,40 @@ export function createCsharpFenceManifest(pages, existing = {}) {
   }
   return {
     description:
-      'Explicit opt-outs for inline C# fences which cannot yet be compiled. Hashes make additions and edits fail closed.',
+      'Explicit opt-outs for inline C# fences which are invalid in every supported C# syntax context. Hashes make additions and edits fail closed.',
     files,
   };
 }
 
-export function validateCsharpFences(pages, manifest) {
+export function validateCsharpFences(pages, manifest, invalidFenceHashes) {
+  if (!(invalidFenceHashes instanceof Set)) {
+    throw new TypeError(
+      'validateCsharpFences requires parser-produced invalidFenceHashes.',
+    );
+  }
   const issues = [];
   const pagePaths = new Set(pages.map((page) => page.relativePath));
   for (const page of pages) {
     const fences = collectCsharpFences(page.source);
+    const invalidFences = fences.filter(
+      (fence) => invalidFenceHashes.has(fence.hash),
+    );
     const exclusion = manifest.files?.[page.relativePath];
     const expected = exclusion?.hashes ?? [];
-    for (let index = 0; index < fences.length; index += 1) {
-      if (fences[index].hash !== expected[index]) {
+    for (let index = 0; index < invalidFences.length; index += 1) {
+      if (invalidFences[index].hash !== expected[index]) {
         issues.push(
           diagnostic(
             'DOCS004',
             page.relativePath,
-            fences[index].line,
-            'Inline C# fence is not covered by the reviewed content-hash manifest.',
-            'Move the example into a net10.0 compiled snippet and use :::code, or add a narrow reason and refreshed hash to src/data/csharp-fence-exclusions.json.',
+            invalidFences[index].line,
+            'Inline C# fence is invalid in every supported syntax context and is not covered by the reviewed content-hash manifest.',
+            'Correct the C# syntax, move the example into a compiled :::code snippet with hidden context, or add a narrow reason and refreshed hash to src/data/csharp-fence-exclusions.json.',
           ),
         );
       }
     }
-    if (expected.length > fences.length) {
+    if (invalidFences.length > 0 && expected.length > invalidFences.length) {
       issues.push(
         diagnostic(
           'DOCS004',
@@ -478,7 +498,7 @@ export function validateCsharpFences(pages, manifest) {
       );
     }
     if (
-      fences.length > 0 &&
+      invalidFences.length > 0 &&
       (!exclusion?.reason ||
         exclusion.reason.trim().length < 20 ||
         exclusion.reason.trim() === missingFenceReason)
@@ -502,6 +522,22 @@ export function validateCsharpFences(pages, manifest) {
           'src/data/csharp-fence-exclusions.json',
           1,
           `C# fence opt-out references nonexistent or non-conceptual page '${file}'.`,
+          'Remove the stale manifest entry.',
+        ),
+      );
+      continue;
+    }
+    if (
+      !collectCsharpFences(
+        pages.find((page) => page.relativePath === file).source,
+      ).some((fence) => invalidFenceHashes.has(fence.hash))
+    ) {
+      issues.push(
+        diagnostic(
+          'DOCS004',
+          'src/data/csharp-fence-exclusions.json',
+          1,
+          `C# fence opt-out for '${file}' is stale because every fence is valid in a supported syntax context.`,
           'Remove the stale manifest entry.',
         ),
       );
@@ -1015,6 +1051,8 @@ export async function auditDocumentationSources({
   tocPath,
   fenceManifest,
   packageExclusions,
+  invalidFenceHashes,
+  skipCsharpFenceValidation = false,
 }) {
   const markdownFiles = await walk(sourceRoot, (file) => file.endsWith('.md'));
   const contentAudit = await auditDocumentationContent({
@@ -1022,6 +1060,8 @@ export async function auditDocumentationSources({
     sourceRoot,
     markdownFiles,
     fenceManifest,
+    invalidFenceHashes,
+    skipCsharpFenceValidation,
   });
   const { includeTargets, auditedMarkdown } = contentAudit;
   const pages = [];
@@ -1067,6 +1107,8 @@ export async function auditDocumentationContent({
   sourceRoot,
   markdownFiles,
   fenceManifest,
+  invalidFenceHashes,
+  skipCsharpFenceValidation = false,
   siteRoot = path.join(repositoryRoot, 'docs', 'site'),
 }) {
   const includeIssues = [];
@@ -1098,6 +1140,14 @@ export async function auditDocumentationContent({
     );
   });
   issues.push(...auditedMarkdown.flatMap(findReleaseVersionIssues));
-  issues.push(...validateCsharpFences(auditedMarkdown, fenceManifest));
+  if (!skipCsharpFenceValidation) {
+    issues.push(
+      ...validateCsharpFences(
+        auditedMarkdown,
+        fenceManifest,
+        invalidFenceHashes,
+      ),
+    );
+  }
   return { issues, auditedMarkdown, includeTargets };
 }
