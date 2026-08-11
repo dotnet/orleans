@@ -508,46 +508,7 @@ namespace Orleans.Hosting
             }
 
             static Dictionary<(string Kind, string Name), Type> GetRegisteredProviders()
-            {
-                var result = new Dictionary<(string, string), Type>();
-
-                // Collect providers from generated metadata
-                foreach (var asm in ReferencedAssemblyProvider.GetRelevantAssemblies())
-                {
-                    var options = new Orleans.Serialization.Configuration.TypeManifestOptions();
-                    var attrs = asm.GetCustomAttributes<Orleans.Serialization.Configuration.TypeManifestProviderAttribute>();
-                    foreach (var attr in attrs)
-                    {
-                        if (attr.ProviderType.GetCustomAttribute<System.CodeDom.Compiler.GeneratedCodeAttribute>() is { Tool: "OrleansCodeGen" }
-                            && Activator.CreateInstance(attr.ProviderType) is Orleans.Serialization.Configuration.ITypeManifestProvider provider)
-                        {
-                            provider.Configure(options);
-                        }
-                    }
-
-                    foreach (var kvp in options.RegisteredProviders)
-                    {
-                        if (string.Equals(kvp.Key.Target, "Silo", StringComparison.Ordinal))
-                        {
-                            result[(kvp.Key.Kind, kvp.Key.Name)] = kvp.Value;
-                        }
-                    }
-
-                    // Provider assemblies built with an older generator do not include provider metadata.
-                    if (options.RegisteredProviders.Count is 0 && asm.IsDefined(typeof(RegisterProviderAttribute)))
-                    {
-                        foreach (var attr in asm.GetCustomAttributes<RegisterProviderAttribute>())
-                        {
-                            if (string.Equals(attr.Target, "Silo", StringComparison.Ordinal))
-                            {
-                                result[(attr.Kind, attr.Name)] = attr.Type;
-                            }
-                        }
-                    }
-                }
-
-                return result;
-            }
+                => ProviderRegistrationResolver.GetRegisteredProviders(ReferencedAssemblyProvider.GetRelevantAssemblies(), "Silo");
 
             static void ApplySubsection(ISiloBuilder builder, IConfigurationSection cfg, Dictionary<(string Kind, string Name), Type> knownProviderTypes, string sectionName)
             {

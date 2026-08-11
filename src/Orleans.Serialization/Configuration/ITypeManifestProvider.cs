@@ -1,7 +1,21 @@
+using System;
+using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 
 namespace Orleans.Serialization.Configuration
 {
+    /// <summary>
+    /// Provides metadata for configuration-driven Orleans providers.
+    /// </summary>
+    public interface IProviderMetadataProvider
+    {
+        /// <summary>
+        /// Adds known providers to <paramref name="providers"/>.
+        /// </summary>
+        /// <param name="providers">The provider registrations, keyed by target, kind, and name.</param>
+        void ConfigureProviders(IDictionary<(string Target, string Kind, string Name), Type> providers);
+    }
+
     /// <summary>
     /// Provides type manifest information.
     /// </summary>

@@ -180,8 +180,13 @@ public class IncrementalCachingTests
         AssertTrackedStepModifiedOrNew(result2, OrleansSerializationSourceGenerator.MetadataOutputsTrackingName);
 
         const string generatedProviderType = "typeof(global::TestProject.Provider)";
-        Assert.DoesNotContain(generatedProviderType, ConcatenateGeneratedSources(result1), StringComparison.Ordinal);
-        Assert.Contains(generatedProviderType, ConcatenateGeneratedSources(result2), StringComparison.Ordinal);
+        var originalGeneratedSource = ConcatenateGeneratedSources(result1);
+        var modifiedGeneratedSource = ConcatenateGeneratedSources(result2);
+        Assert.DoesNotContain(generatedProviderType, originalGeneratedSource, StringComparison.Ordinal);
+        Assert.Contains(generatedProviderType, modifiedGeneratedSource, StringComparison.Ordinal);
+        Assert.Contains("global::Orleans.Serialization.Configuration.IProviderMetadataProvider", modifiedGeneratedSource, StringComparison.Ordinal);
+        Assert.Contains("public void ConfigureProviders(", modifiedGeneratedSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("config.RegisteredProviders", modifiedGeneratedSource, StringComparison.Ordinal);
     }
 
     [Fact]

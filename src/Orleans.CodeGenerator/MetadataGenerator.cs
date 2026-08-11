@@ -12,6 +12,9 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
 {
     private static readonly TypeSyntax TypeManifestOptionsType = ParseTypeName("global::Orleans.Serialization.Configuration.TypeManifestOptions");
     private static readonly TypeSyntax TypeManifestProviderBaseType = ParseTypeName("global::Orleans.Serialization.Configuration.TypeManifestProviderBase");
+    private static readonly TypeSyntax ProviderMetadataProviderType = ParseTypeName("global::Orleans.Serialization.Configuration.IProviderMetadataProvider");
+    private static readonly TypeSyntax ProviderDictionaryType = ParseTypeName(
+        "global::System.Collections.Generic.IDictionary<(string Target, string Kind, string Name), global::System.Type>");
 
     private readonly MetadataAggregateModel _metadataModel = metadataModel;
     private readonly string _assemblyName = assemblyName ?? "Assembly";
@@ -23,6 +26,7 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
     {
         var configParam = "config".ToIdentifierName();
         var body = new List<StatementSyntax>();
+        var providerBody = new List<StatementSyntax>();
         var model = _metadataModel;
         var orderedProxyInterfaces = GetOrderedProxyInterfaces(model.ProxyInterfaces);
         var generatedInvokableActivatorMetadataNames = new HashSet<string>(
@@ -130,19 +134,22 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
                 Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Kind))),
                 Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Name))),
             ]));
-            var registeredProvider = ElementAccessExpression(configParam.Member("RegisteredProviders"))
+            var registeredProvider = ElementAccessExpression(IdentifierName("providers"))
                 .WithArgumentList(BracketedArgumentList(SingletonSeparatedList(Argument(key))));
-            body.Add(ExpressionStatement(AssignmentExpression(
+            providerBody.Add(ExpressionStatement(AssignmentExpression(
                 SyntaxKind.SimpleAssignmentExpression,
                 registeredProvider,
                 TypeOfExpression(provider.Type.ToTypeSyntax()))));
         }
 
         AddCompoundTypeAliases(configParam, body, generatedInvokables);
-        return CreateMetadataClass(body, configParam);
+        return CreateMetadataClass(body, providerBody, configParam);
     }
 
-    private ClassDeclarationSyntax CreateMetadataClass(List<StatementSyntax> body, IdentifierNameSyntax configParam)
+    private ClassDeclarationSyntax CreateMetadataClass(
+        List<StatementSyntax> body,
+        List<StatementSyntax> providerBody,
+        IdentifierNameSyntax configParam)
     {
         var configureMethod = MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "ConfigureInner")
             .AddModifiers(Token(SyntaxKind.ProtectedKeyword), Token(SyntaxKind.OverrideKeyword))
@@ -150,11 +157,26 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
                 Parameter(configParam.Identifier).WithType(TypeManifestOptionsType))
             .AddBodyStatements([.. body]);
 
-        return ClassDeclaration("Metadata_" + SyntaxGeneration.Identifier.SanitizeIdentifierName(_assemblyName))
+        var result = ClassDeclaration("Metadata_" + SyntaxGeneration.Identifier.SanitizeIdentifierName(_assemblyName))
             .AddBaseListTypes(SimpleBaseType(TypeManifestProviderBaseType))
             .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
             .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
             .AddMembers(configureMethod);
+
+        if (providerBody.Count > 0)
+        {
+            var configureProvidersMethod = MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "ConfigureProviders")
+                .AddModifiers(Token(SyntaxKind.PublicKeyword))
+                .AddParameterListParameters(
+                    Parameter(Identifier("providers")).WithType(ProviderDictionaryType))
+                .AddBodyStatements([.. providerBody]);
+
+            result = result
+                .AddBaseListTypes(SimpleBaseType(ProviderMetadataProviderType))
+                .AddMembers(configureProvidersMethod);
+        }
+
+        return result;
     }
 
     private void AddCompoundTypeAliases(
