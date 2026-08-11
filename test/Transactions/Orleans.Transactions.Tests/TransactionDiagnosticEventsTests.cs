@@ -418,6 +418,88 @@ public class TransactionDiagnosticEventsTests
     }
 
     [Fact]
+    public async Task RecoveryObserverWaitsForSuccessfulConfirmationFromEveryRemoteParticipant()
+    {
+        var manager = CreateParticipant(
+            "manager",
+            CreateGrainReference("manager"),
+            ParticipantId.Role.Resource | ParticipantId.Role.Manager);
+        var remoteOne = CreateParticipant(
+            "remote-one",
+            CreateGrainReference("remote-one"),
+            ParticipantId.Role.Resource);
+        var remoteTwo = CreateParticipant(
+            "remote-two",
+            CreateGrainReference("remote-two"),
+            ParticipantId.Role.Resource);
+        var transactionId = Guid.NewGuid();
+        var unrelatedTransactionId = Guid.NewGuid();
+        var timestamp = DateTime.UtcNow;
+        using var observer = new TransactionRecoveryEventObserver(_ => true);
+        var confirmation = observer.WaitForCommitConfirmationAsync(
+            afterSequence: 0,
+            participantCount: 3,
+            GetDeadline(RecoveryObservationTimeout));
+
+        TransactionDiagnosticEvents.EmitStorageWriteCompleted(
+            manager,
+            "etag",
+            batchSize: 1,
+            commitCount: 1,
+            ImmutableArray.Create(transactionId));
+        TransactionDiagnosticEvents.EmitTransactionConfirmCompleted(
+            remoteOne,
+            transactionId,
+            timestamp,
+            TransactionalStatus.Ok,
+            queueEntryFound: true,
+            succeeded: true);
+        TransactionDiagnosticEvents.EmitTransactionConfirmCompleted(
+            remoteOne,
+            transactionId,
+            timestamp,
+            TransactionalStatus.Ok,
+            queueEntryFound: true,
+            succeeded: true);
+        TransactionDiagnosticEvents.EmitTransactionConfirmCompleted(
+            manager,
+            transactionId,
+            timestamp,
+            TransactionalStatus.Ok,
+            queueEntryFound: true,
+            succeeded: true);
+        TransactionDiagnosticEvents.EmitTransactionConfirmCompleted(
+            remoteTwo,
+            transactionId,
+            timestamp,
+            TransactionalStatus.UnknownException,
+            queueEntryFound: true,
+            succeeded: false);
+        TransactionDiagnosticEvents.EmitTransactionConfirmCompleted(
+            remoteTwo,
+            unrelatedTransactionId,
+            timestamp,
+            TransactionalStatus.Ok,
+            queueEntryFound: true,
+            succeeded: true);
+
+        await Task.Yield();
+        Assert.False(confirmation.IsCompleted);
+
+        TransactionDiagnosticEvents.EmitTransactionConfirmCompleted(
+            remoteTwo,
+            transactionId,
+            timestamp,
+            TransactionalStatus.Ok,
+            queueEntryFound: true,
+            succeeded: true);
+
+        var commit = await confirmation;
+        Assert.Equal(transactionId, Assert.Single(commit.TransactionIds));
+        Assert.Equal(manager.Reference.GrainId, commit.GrainId);
+    }
+
+    [Fact]
     public async Task RecoveryObserverLockExpiredTransitionContainsTransactionId()
     {
         var resource = CreateParticipant("resource", ParticipantId.Role.Resource);
