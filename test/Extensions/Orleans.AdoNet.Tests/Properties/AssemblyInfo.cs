@@ -1,4 +1,4 @@
 using Xunit;
 
-// Disable XUnit concurrency limit
-[assembly: CollectionBehavior(MaxParallelThreads = -1)]
+// ADO.NET tests recreate shared provider databases and cannot safely run in parallel.
+[assembly: CollectionBehavior(DisableTestParallelization = true)]

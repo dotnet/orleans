@@ -10,8 +10,24 @@ namespace Tester.RelationalUtilities
         protected override string ProviderMoniker => "PostgreSQL";
 
         public PostgreSqlStorageForTesting(string connectionString)
-            : base(AdoNetInvariants.InvariantNamePostgreSql, connectionString ?? TestDefaultConfiguration.PostgresConnectionString)
+            : base(AdoNetInvariants.InvariantNamePostgreSql, EnablePooling(connectionString ?? TestDefaultConfiguration.PostgresConnectionString))
         {
+        }
+
+        private static string EnablePooling(string? connectionString)
+        {
+            if (string.IsNullOrEmpty(connectionString))
+            {
+                throw new SkipException("ConnectionString not provided.");
+            }
+
+            var builder = new NpgsqlConnectionStringBuilder(connectionString)
+            {
+                Pooling = true
+            };
+
+            NpgsqlConnection.ClearAllPools();
+            return builder.ConnectionString;
         }
 
         public override string CancellationTestQuery { get { return "SELECT pg_sleep(10); SELECT 1; "; } }

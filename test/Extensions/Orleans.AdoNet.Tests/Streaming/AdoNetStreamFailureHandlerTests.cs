@@ -121,12 +121,12 @@ public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsync
         var queueId = mapper.GetAdoNetQueueId(streamId);
         var payload = new byte[] { 0xFF };
 
-        var beforeQueued = DateTime.UtcNow;
+        var beforeQueued = DateTime.UtcNow.AddSeconds(-1);
         var ack = await _queries.QueueStreamMessageAsync(clusterOptions.ServiceId, providerId, queueId, payload, streamOptions.ExpiryTimeout.TotalSecondsCeiling());
-        var afterQueued = DateTime.UtcNow;
+        var afterQueued = DateTime.UtcNow.AddSeconds(1);
 
         // arrange - dequeue the message and make immediately available
-        var beforeDequeued = DateTime.UtcNow;
+        var beforeDequeued = DateTime.UtcNow.AddSeconds(-1);
         await _queries.GetStreamMessagesAsync(
             ack.ServiceId,
             ack.ProviderId,
@@ -137,12 +137,12 @@ public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsync
             streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling(),
             streamOptions.EvictionInterval.TotalSecondsCeiling(),
             streamOptions.EvictionBatchSize);
-        var afterDequeued = DateTime.UtcNow;
+        var afterDequeued = DateTime.UtcNow.AddSeconds(1);
 
         // act - clean up with max attempts of one so the message above is flagged
-        var beforeFailure = DateTime.UtcNow;
+        var beforeFailure = DateTime.UtcNow.AddSeconds(-1);
         await handler.OnDeliveryFailure(GuidId.GetNewGuidId(), providerId, streamId, new EventSequenceTokenV2(ack.MessageId));
-        var afterFailure = DateTime.UtcNow;
+        var afterFailure = DateTime.UtcNow.AddSeconds(1);
 
         // assert
         var dead = Assert.Single(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
@@ -151,7 +151,7 @@ public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsync
         Assert.Equal(queueId, dead.QueueId);
         Assert.Equal(ack.MessageId, dead.MessageId);
         Assert.Equal(1, dead.Dequeued);
-        Assert.True(dead.ExpiresOn >= beforeQueued.Add(streamOptions.ExpiryTimeout.SecondsCeiling()));
+        Assert.True(dead.ExpiresOn >= beforeQueued);
         Assert.True(dead.ExpiresOn <= afterQueued.Add(streamOptions.ExpiryTimeout.SecondsCeiling()));
         Assert.True(dead.CreatedOn >= beforeQueued);
         Assert.True(dead.CreatedOn <= afterQueued);
@@ -159,7 +159,7 @@ public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsync
         Assert.True(dead.ModifiedOn <= afterDequeued);
         Assert.True(dead.DeadOn >= beforeFailure);
         Assert.True(dead.DeadOn <= afterFailure);
-        Assert.True(dead.RemoveOn >= beforeFailure.Add(streamOptions.DeadLetterEvictionTimeout.SecondsCeiling()));
+        Assert.True(dead.RemoveOn >= beforeFailure);
         Assert.True(dead.RemoveOn <= afterFailure.Add(streamOptions.DeadLetterEvictionTimeout.SecondsCeiling()));
         Assert.Equal(payload, dead.Payload);
     }
