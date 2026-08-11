@@ -19,6 +19,7 @@ namespace Orleans.Providers.Streams.Common
         protected readonly Queue<FixedSizeBuffer> inUseBuffers;
         private readonly ICacheMonitor? cacheMonitor;
         private readonly PeriodicAction? periodicMonitoring;
+        private IPurgeObservable? purgeObservable;
         private long cacheSizeInByte;
 
         /// <summary>
@@ -52,7 +53,11 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public IPurgeObservable PurgeObservable { private get; set; } = null!; // Set once by the owning cache immediately after construction.
+        public IPurgeObservable PurgeObservable
+        {
+            private get => purgeObservable!; // Set by the owning cache before purge operations.
+            set => purgeObservable = value;
+        }
 
         /// <inheritdoc />
         public Action<CachedMessage?, CachedMessage?>? OnPurged { get; set; }
@@ -165,7 +170,13 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public void Dispose() => ReleaseBuffers();
+        public void Dispose()
+        {
+            if (purgeObservable?.IsEmpty == true)
+            {
+                ReleaseBuffers();
+            }
+        }
 
         private void ReleaseBuffers()
         {
