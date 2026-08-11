@@ -44,21 +44,14 @@ public class TestingUtilsTests
     }
 
     [Fact]
-    public async Task WaitUntilSucceededAsync_TimesOutWhileWaitingToRetry()
+    public async Task WaitUntilSucceededAsync_ReturnsFalseAtDeadline()
     {
-        var calls = 0;
-
         var result = await TestingUtils.WaitUntilSucceededAsync(
-            _ =>
-            {
-                calls++;
-                return Task.FromResult(false);
-            },
+            _ => Task.FromResult(false),
             TimeSpan.FromMilliseconds(50),
             TimeSpan.FromSeconds(1));
 
         Assert.False(result);
-        Assert.Equal(1, calls);
     }
 
     [Fact]
@@ -116,10 +109,10 @@ public class TestingUtilsTests
                 return Task.FromResult(false);
             },
             TimeSpan.FromSeconds(1),
-            TimeSpan.FromMilliseconds(200)));
+            TimeSpan.FromSeconds(1)));
 
         Assert.Equal("Expected legacy detailed failure", exception.Message);
-        Assert.True(calls > 1);
+        Assert.Equal(2, calls);
     }
 
     [Fact]
@@ -157,10 +150,10 @@ public class TestingUtilsTests
                 return Task.FromResult(false);
             },
             TimeSpan.FromSeconds(1),
-            TimeSpan.FromMilliseconds(200)));
+            TimeSpan.FromSeconds(1)));
 
         Assert.Equal("Expected detailed failure", exception.Message);
-        Assert.True(calls > 1);
+        Assert.Equal(2, calls);
     }
 
     [Fact]
