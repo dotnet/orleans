@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Text;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Text.Json;
@@ -271,6 +272,9 @@ namespace Orleans.Runtime
 
     public sealed class StreamIdJsonConverter : JsonConverter<StreamId>
     {
+        // The versioned form preserves the raw key and namespace boundary. Legacy property names always contain '/'.
+        private const string PropertyNamePrefix = "$streamid:v1:";
+
         // This is backward compatible with Newtonsoft.JsonSerializer
         // which didn't have a JsonConverter for StreamId.
         // StreamId used the default serialization that Newtonsoft provided.
@@ -360,23 +364,52 @@ namespace Orleans.Runtime
         public override StreamId ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var value = reader.GetString() ?? throw new JsonException("Failed to parse StreamId from property name.");
-            return StreamId.Parse(Encoding.UTF8.GetBytes(value));
+            return ParsePropertyName(value);
         }
 
         /// <inheritdoc />
         public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] StreamId value, JsonSerializerOptions options)
-        {
-            Span<byte> buf = stackalloc byte[128];
+            => writer.WritePropertyName(FormatPropertyName(value));
 
-            if (value is IUtf8SpanFormattable formattable
-                && formattable.TryFormat(buf, out var written, [], null))
+        internal static string FormatPropertyName(StreamId value)
+            => string.Concat(
+                PropertyNamePrefix,
+                value.GetKeyIndex().ToString(CultureInfo.InvariantCulture),
+                ":",
+                Convert.ToHexString(value.FullKey.Span));
+
+        internal static StreamId ParsePropertyName(string value)
+        {
+            if (!value.StartsWith(PropertyNamePrefix, StringComparison.Ordinal)
+                || value.AsSpan(PropertyNamePrefix.Length).Contains('/'))
             {
-                writer.WritePropertyName(buf[..written]);
+                return StreamId.Parse(Encoding.UTF8.GetBytes(value));
             }
-            else
+
+            var encoded = value.AsSpan(PropertyNamePrefix.Length);
+            var separator = encoded.IndexOf(':');
+            if (separator <= 0
+                || !ushort.TryParse(encoded[..separator], NumberStyles.None, CultureInfo.InvariantCulture, out var keyIndex))
             {
-                writer.WritePropertyName(value.ToString());
+                throw new JsonException("Failed to parse StreamId from property name.");
             }
+
+            byte[] fullKey;
+            try
+            {
+                fullKey = Convert.FromHexString(encoded[(separator + 1)..]);
+            }
+            catch (FormatException exception)
+            {
+                throw new JsonException("Failed to parse StreamId from property name.", exception);
+            }
+
+            if (fullKey.Length == 0 || keyIndex > fullKey.Length)
+            {
+                throw new JsonException("Failed to parse StreamId from property name.");
+            }
+
+            return new StreamId(fullKey, keyIndex);
         }
     }
 }

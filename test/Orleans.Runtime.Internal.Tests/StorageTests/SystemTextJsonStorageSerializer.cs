@@ -166,6 +166,16 @@ namespace UnitTests.StorageTests
         public void StreamIdConverterDictionaryKeyWithEscapedCharacters() => Roundtrip(StreamId.Create("na\u00efve", "key\"value"));
 
         [Fact]
+        public void StreamIdConverterDictionaryKeyWithDelimiters() => Roundtrip(StreamId.Create("namespace/segment", "key/value"));
+
+        [Fact]
+        public void StreamIdConverterReadsLegacyDictionaryKey()
+        {
+            var result = _systemTextJson.Deserialize<Dictionary<StreamId, int>>(BinaryData.FromString("""{ "namespace/key": 42 }"""));
+            Assert.Equal(42, result![StreamId.Create("namespace", "key")]);
+        }
+
+        [Fact]
         public void StreamIdNullNamespaceConverter() => Roundtrip(StreamId.Create(null!, "key"));
 
         [Fact]
@@ -173,6 +183,17 @@ namespace UnitTests.StorageTests
 
         [Fact]
         public void QualifiedStreamIdConverterLongDictionaryKey() => Roundtrip(new QualifiedStreamId(new string('a', 128), StreamId.Create("namespace", "key")));
+
+        [Fact]
+        public void QualifiedStreamIdConverterDictionaryKeyWithDelimiters() => Roundtrip(
+            new QualifiedStreamId("provider:n\u00e4me", StreamId.Create("namespace/segment", "key/value")));
+
+        [Fact]
+        public void QualifiedStreamIdConverterReadsLegacyDictionaryKey()
+        {
+            var result = _systemTextJson.Deserialize<Dictionary<QualifiedStreamId, int>>(BinaryData.FromString("""{ "provider:namespace/key": 42 }"""));
+            Assert.Equal(42, result![new QualifiedStreamId("provider", StreamId.Create("namespace", "key"))]);
+        }
 
         [Fact]
         public void GuidIdRoundtrip() => Roundtrip(GuidId.GetNewGuidId());
