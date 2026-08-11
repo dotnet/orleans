@@ -1,18 +1,17 @@
 namespace Orleans.Transactions.AdoNet.Utils;
 
- internal static class Constants
+internal static class Constants
 {
-    public static string QueryKeySql = "queryKeySql";
-    public static string AddKeySql = "addKeySql";
-    public static string UpdateKeySql = "updateKeySql";
-    public static string DelKeySql = "delKeySql";
-    public static string QueryStateSql = "queryStateSql";
-    public static string AddStateSql = "addStateSql";
-    public static string UpdateStateSql = "updateStateSql";
-    public static string DelStateSql = "delStateSql";
+    public const string QueryKeySql = "queryKeySql";
+    public const string AddKeySql = "addKeySql";
+    public const string UpdateKeySql = "updateKeySql";
+    public const string DelKeySql = "delKeySql";
+    public const string QueryStateSql = "queryStateSql";
+    public const string AddStateSql = "addStateSql";
+    public const string UpdateStateSql = "updateStateSql";
+    public const string DelStateSql = "delStateSql";
+    public const string PreviousETag = "PreviousETag";
 
-    // sqlserver,mysql,postgre
-    public static string SqlParameterDot = "@";
-    // oracle
-    public static string OracleParameterDot = ":";
+    public const string SqlParameterDot = "@";
+    public const string OracleParameterDot = ":";
 }
