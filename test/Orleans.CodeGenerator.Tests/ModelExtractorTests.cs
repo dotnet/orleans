@@ -402,6 +402,7 @@ public record DemoRecord([Id(42)] string Value);
         Assert.Equal(
             [
                 new RegisteredProviderModel("Client", "Clustering", "Consumer", new TypeRef("global::ConsumerProject.ConsumerMarker")),
+                new RegisteredProviderModel("Client", "Clustering", "Generic", new TypeRef("global::LibraryB.GenericProvider<global::LibraryB.BetaType>")),
                 new RegisteredProviderModel("Client", "Clustering", "LibraryA", new TypeRef("global::LibraryA.AlphaType")),
                 new RegisteredProviderModel("Client", "Clustering", "LibraryB", new TypeRef("global::LibraryB.BetaType")),
             ],
@@ -627,6 +628,7 @@ public record DemoRecord([Id(42)] string Value);
             using System.Threading.Tasks;
 
             [assembly: RegisterProvider("LibraryB", "Clustering", "Client", typeof(LibraryB.BetaType))]
+            [assembly: RegisterProvider("Generic", "Clustering", "Client", typeof(LibraryB.GenericProvider<LibraryB.BetaType>))]
             [assembly: RegisterProvider("Hidden", "Clustering", "Client", typeof(LibraryB.HiddenProvider))]
 
             namespace LibraryB;
@@ -670,6 +672,10 @@ public record DemoRecord([Id(42)] string Value);
             }
 
             internal sealed class HiddenProvider
+            {
+            }
+
+            public sealed class GenericProvider<T>
             {
             }
             """;

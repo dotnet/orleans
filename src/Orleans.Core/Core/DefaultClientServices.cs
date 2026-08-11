@@ -243,7 +243,8 @@ namespace Orleans
                     var attrs = asm.GetCustomAttributes<Orleans.Serialization.Configuration.TypeManifestProviderAttribute>();
                     foreach (var attr in attrs)
                     {
-                        if (Activator.CreateInstance(attr.ProviderType) is Orleans.Serialization.Configuration.ITypeManifestProvider provider)
+                        if (attr.ProviderType.GetCustomAttribute<System.CodeDom.Compiler.GeneratedCodeAttribute>() is { Tool: "OrleansCodeGen" }
+                            && Activator.CreateInstance(attr.ProviderType) is Orleans.Serialization.Configuration.ITypeManifestProvider provider)
                         {
                             provider.Configure(options);
                         }

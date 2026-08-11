@@ -135,7 +135,7 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
             body.Add(ExpressionStatement(AssignmentExpression(
                 SyntaxKind.SimpleAssignmentExpression,
                 registeredProvider,
-                CreateTypeOfExpression(provider.Type))));
+                TypeOfExpression(provider.Type.ToTypeSyntax()))));
         }
 
         AddCompoundTypeAliases(configParam, body, generatedInvokables);

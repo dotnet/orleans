@@ -238,7 +238,11 @@ internal static class ReferenceAssemblyModelExtractor
                     continue;
                 }
 
-                var provider = new RegisteredProviderModel(target, kind, name, new TypeRef(type.ToOpenTypeSyntax().ToString()));
+                var provider = new RegisteredProviderModel(
+                    target,
+                    kind,
+                    name,
+                    new TypeRef(type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
                 registeredProviders[(target, kind, name)] = provider;
             }
         }
