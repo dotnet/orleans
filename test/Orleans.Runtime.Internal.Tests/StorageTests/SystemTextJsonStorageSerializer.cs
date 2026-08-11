@@ -26,8 +26,16 @@ namespace UnitTests.StorageTests
         public ValueTask<Guid> GetId() => ValueTask.FromResult(this.GetPrimaryKey());
     }
 
-    public sealed class SystemTextJsonStorageSerializerTests
+    public sealed class SystemTextJsonStorageSerializerTests : IDisposable
     {
+        private sealed class FieldState
+        {
+            public int Value;
+            public string? Name { get; set; }
+        }
+
+        private sealed class DerivedSequenceToken(long sequenceNumber, int eventIndex) : EventSequenceTokenV2(sequenceNumber, eventIndex);
+
         private readonly SystemTextJsonGrainStorageSerializer _systemTextJson;
         private readonly JsonGrainStorageSerializer _newtonSoft;
         private readonly InProcessTestCluster _testCluster;
@@ -51,6 +59,8 @@ namespace UnitTests.StorageTests
             _systemTextJson = (SystemTextJsonGrainStorageSerializer)_testCluster.Silos.First().ServiceProvider.GetRequiredService<IGrainStorageSerializer>();
             _newtonSoft = ActivatorUtilities.CreateInstance<JsonGrainStorageSerializer>(_testCluster.Silos.First().ServiceProvider);
         }
+
+        public void Dispose() => _testCluster.Dispose();
 
         private void Roundtrip<T>(T instance, bool supportsDictionaryKey = true) where T : notnull
         {
@@ -136,6 +146,13 @@ namespace UnitTests.StorageTests
         }
 
         [Fact]
+        public void DerivedEventSequenceTokenFailsExplicitly()
+        {
+            StreamSequenceToken token = new DerivedSequenceToken(35242, 24298);
+            Assert.Throws<NotSupportedException>(() => _systemTextJson.Serialize(token));
+        }
+
+        [Fact]
         public void StreamIdConverter() => Roundtrip(StreamId.Create("namespace", "key"));
 
         [Fact]
@@ -146,6 +163,22 @@ namespace UnitTests.StorageTests
 
         [Fact]
         public void GuidIdRoundtrip() => Roundtrip(GuidId.GetNewGuidId());
+
+        [Fact]
+        public void PublicFieldsRoundtrip()
+        {
+            var state = new FieldState { Value = 42, Name = "test" };
+
+            var systemTextJsonResult = _systemTextJson.Deserialize<FieldState>(_systemTextJson.Serialize(state));
+            var newtonsoftResult = _systemTextJson.Deserialize<FieldState>(_newtonSoft.Serialize(state));
+
+            Assert.NotNull(systemTextJsonResult);
+            Assert.Equal(state.Value, systemTextJsonResult.Value);
+            Assert.Equal(state.Name, systemTextJsonResult.Name);
+            Assert.NotNull(newtonsoftResult);
+            Assert.Equal(state.Value, newtonsoftResult.Value);
+            Assert.Equal(state.Name, newtonsoftResult.Name);
+        }
 
         [Fact]
         public void GuidIdSharedReferenceFailsExplicitly()

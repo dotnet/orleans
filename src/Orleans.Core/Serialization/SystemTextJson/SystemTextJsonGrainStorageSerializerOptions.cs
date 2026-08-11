@@ -18,6 +18,7 @@ namespace Orleans.Serialization
         public JsonSerializerOptions JsonSerializerOptions { get; } = new JsonSerializerOptions()
         {
             WriteIndented = true,
+            IncludeFields = true,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         };
     }

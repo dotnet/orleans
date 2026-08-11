@@ -84,13 +84,16 @@ namespace Orleans.Streaming.JsonConverters
 
         public override void Write(Utf8JsonWriter writer, StreamSequenceToken value, JsonSerializerOptions options)
         {
-            writer.WriteStartObject();
-            if (value is not null)
+            var runtimeType = value.GetType();
+            if (runtimeType != _eventSequenceTokenType && runtimeType != _eventSequenceTokenTypeV2)
             {
-                writer.WriteString("$type", value.GetType().AssemblyQualifiedName); // For backward compatibility with Newtonsoft
-                writer.WriteNumber("SequenceNumber", value.SequenceNumber);
-                writer.WriteNumber("EventIndex", value.EventIndex);
+                throw new NotSupportedException($"Unsupported {nameof(StreamSequenceToken)} type: {runtimeType}");
             }
+
+            writer.WriteStartObject();
+            writer.WriteString("$type", runtimeType.AssemblyQualifiedName); // For backward compatibility with Newtonsoft
+            writer.WriteNumber("SequenceNumber", value.SequenceNumber);
+            writer.WriteNumber("EventIndex", value.EventIndex);
             writer.WriteEndObject();
         }
     }
