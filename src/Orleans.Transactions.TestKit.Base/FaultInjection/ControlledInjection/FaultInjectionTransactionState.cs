@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Immutable;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
@@ -20,6 +22,74 @@ namespace Orleans.Transactions.TestKit
         {
             this.FaultInjectionType = FaultInjectionType.None;
             this.FaultInjectionPhase = TransactionFaultInjectPhase.None;
+        }
+
+        internal bool TryConsume(TransactionFaultInjectPhase phase, out FaultInjectionType injectionType)
+        {
+            if (this.FaultInjectionPhase != phase)
+            {
+                injectionType = FaultInjectionType.None;
+                return false;
+            }
+
+            injectionType = this.FaultInjectionType;
+            this.Reset();
+            return true;
+        }
+    }
+
+    internal readonly record struct FaultInjectionEvent(
+        GrainId GrainId,
+        Guid TransactionId,
+        TransactionFaultInjectPhase Phase,
+        FaultInjectionType Type);
+
+    internal static class FaultInjectionDiagnosticEvents
+    {
+        private static readonly object LockObj = new();
+        private static ImmutableArray<Action<FaultInjectionEvent>> observers = [];
+
+        public static IDisposable Subscribe(Action<FaultInjectionEvent> observer)
+        {
+            lock (LockObj)
+            {
+                observers = observers.Add(observer);
+            }
+
+            return new Subscription(observer);
+        }
+
+        public static void Emit(FaultInjectionEvent evt)
+        {
+            ImmutableArray<Action<FaultInjectionEvent>> snapshot;
+            lock (LockObj)
+            {
+                snapshot = observers;
+            }
+
+            foreach (var observer in snapshot)
+            {
+                observer(evt);
+            }
+        }
+
+        private sealed class Subscription(Action<FaultInjectionEvent> observer) : IDisposable
+        {
+            private Action<FaultInjectionEvent>? observer = observer;
+
+            public void Dispose()
+            {
+                var value = Interlocked.Exchange(ref this.observer, null);
+                if (value is null)
+                {
+                    return;
+                }
+
+                lock (LockObj)
+                {
+                    observers = observers.Remove(value);
+                }
+            }
         }
     }
 

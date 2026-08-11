@@ -105,7 +105,7 @@ namespace Orleans.Transactions.TestKit.xUnit
     {
         public ControlledFaultInjectionTransactionTestRunnerxUnit(IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) : base(default!, default!) { }
 
-        [SkippableTheory(new[] { }, Skip = "https://github.com/dotnet/orleans/issues/9551")]
+        [SkippableTheory(new[] { })]
         [Xunit.InlineData(new[] { TransactionFaultInjectPhase.AfterPrepare, FaultInjectionType.Deactivation })]
         [Xunit.InlineData(new[] { TransactionFaultInjectPhase.AfterConfirm, FaultInjectionType.Deactivation })]
         [Xunit.InlineData(new[] { TransactionFaultInjectPhase.AfterPrepared, FaultInjectionType.Deactivation })]

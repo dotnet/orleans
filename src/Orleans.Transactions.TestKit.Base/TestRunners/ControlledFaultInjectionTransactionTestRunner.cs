@@ -1,13 +1,21 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using AwesomeAssertions;
+using Orleans.Configuration;
 
 namespace Orleans.Transactions.TestKit
 {
     public class ControlledFaultInjectionTransactionTestRunner : TransactionTestRunnerBase
     {
+        private static readonly TimeSpan RecoveryWatchdog =
+            new ClientMessagingOptions().ResponseTimeout
+            + TransactionalStateOptions.DefaultPrepareTimeout
+            + TransactionalStateOptions.DefaultRemoteTransactionPingFrequency
+            + TransactionalStateOptions.DefaultLockTimeout;
+
         public ControlledFaultInjectionTransactionTestRunner(IGrainFactory grainFactory, Action<string> output)
          : base(grainFactory, output)
         { }
@@ -41,7 +49,7 @@ namespace Orleans.Transactions.TestKit
         {
             const int setval = 5;
             const int addval = 7;
-            int expected = setval + addval;
+            int? expected = setval + addval;
             const int grainCount = TransactionTestConstants.MaxCoordinatedTransactions;
             var faultInjectionControl = new FaultInjectionControl() { FaultInjectionPhase = injectionPhase, FaultInjectionType = injectionType };
             List<IFaultInjectionTransactionTestGrain> grains =
@@ -51,56 +59,143 @@ namespace Orleans.Transactions.TestKit
 
             IFaultInjectionTransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<IFaultInjectionTransactionCoordinatorGrain>(Guid.NewGuid());
 
-            await coordinator.MultiGrainSet(grains, setval);
-            // add delay between transactions so confirmation errors don't bleed into neighboring transactions
-            if (injectionPhase == TransactionFaultInjectPhase.BeforeConfirm || injectionPhase == TransactionFaultInjectPhase.AfterConfirm)
-                await Task.Delay(TimeSpan.FromSeconds(30));
+            var grainIds = grains.Select(grain => grain.GetGrainId()).ToHashSet();
+            using var recoveryEvents = new TransactionRecoveryEventObserver(grainIds);
+            var faultObserved = new TaskCompletionSource<FaultInjectionEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var faultSubscription = FaultInjectionDiagnosticEvents.Subscribe(evt =>
+            {
+                if (grainIds.Contains(evt.GrainId)
+                    && evt.Phase == injectionPhase
+                    && evt.Type == injectionType)
+                {
+                    faultObserved.TrySetResult(evt);
+                }
+            });
+            await this.ExecuteAndWaitForCommit(
+                () => coordinator.MultiGrainSet(grains, setval),
+                grains.Count,
+                recoveryEvents,
+                GetDeadline());
             try
             {
-                await coordinator.MultiGrainAddAndFaultInjection(grains, addval, faultInjectionControl);
-                // add delay between transactions so confirmation errors don't bleed into neighboring transactions
-                if (injectionPhase == TransactionFaultInjectPhase.BeforeConfirm || injectionPhase == TransactionFaultInjectPhase.AfterConfirm)
-                    await Task.Delay(TimeSpan.FromSeconds(30));
+                await this.ExecuteAndWaitForCommit(
+                    () => coordinator.MultiGrainAddAndFaultInjection(grains, addval, faultInjectionControl),
+                    grains.Count,
+                    recoveryEvents,
+                    GetDeadline());
             }
-            catch (OrleansTransactionAbortedException)
+            catch (OrleansTransactionAbortedException exception)
             {
-                // add delay between transactions so errors don't bleed into neighboring transactions
-                await coordinator.MultiGrainAddAndFaultInjection(grains, addval);
+                this.testOutput($"Fault-injected transaction aborted: {exception}");
+                expected = setval;
             }
-            catch (OrleansTransactionException e)
+            catch (OrleansTransactionException exception)
             {
-                this.testOutput($"Call failed with exception: {e}, retrying without fault");
-                bool cascadingAbort = false;
-                bool firstAttempt = true;
-
-                do
-                {
-                    cascadingAbort = false;
-                    try
-                    {
-                        expected = await grains[0].Get() + addval;
-                        await coordinator.MultiGrainAddAndFaultInjection(grains, addval);
-                    }
-                    catch (OrleansCascadingAbortException)
-                    {
-                        this.testOutput($"Retry failed with OrleansCascadingAbortException: {e}, retrying without fault");
-                        // should only encounter this when faulting after storage write
-                        injectionType.Should().Be(FaultInjectionType.ExceptionAfterStore);
-                        // only allow one retry
-                        firstAttempt.Should().BeTrue();
-                        // add delay prevent castcading abort.
-                        cascadingAbort = true;
-                        firstAttempt = false;
-                    }
-                } while (cascadingAbort);
+                this.testOutput($"Fault-injected transaction failed with an ambiguous outcome: {exception}");
+                expected = null;
             }
 
-            //if transactional state loaded correctly after reactivation, then following should pass
-            foreach (var grain in grains)
+            await this.ObserveFaultInjection(
+                faultObserved.Task,
+                injectionPhase,
+                injectionType,
+                recoveryEvents,
+                GetDeadline());
+
+            var actualValues = await this.ReadAfterRecovery(grains, recoveryEvents, GetDeadline());
+            actualValues.Should().OnlyContain(value => value == actualValues[0]);
+            if (expected is { } expectedValue)
             {
-                int actual = await grain.Get();
-                actual.Should().Be(expected);
+                actualValues.Should().OnlyContain(value => value == expectedValue);
+            }
+            else
+            {
+                actualValues.Should().OnlyContain(value => value == setval || value == setval + addval);
             }
         }
+
+        private async Task ExecuteAndWaitForCommit(
+            Func<Task> transaction,
+            int participantCount,
+            TransactionRecoveryEventObserver recoveryEvents,
+            long deadline)
+        {
+            var sequence = recoveryEvents.LatestRelevantSequence;
+            await transaction();
+            var commit = await recoveryEvents.WaitForCommitConfirmationAsync(sequence, participantCount, deadline);
+            this.testOutput(
+                $"Transaction commit and participant confirmations completed. "
+                + TransactionRecoveryEventObserver.FormatTransition(commit).Trim());
+        }
+
+        private async Task<int[]> ReadAfterRecovery(
+            List<IFaultInjectionTransactionTestGrain> grains,
+            TransactionRecoveryEventObserver recoveryEvents,
+            long deadline)
+        {
+            var attempt = 0;
+            while (Stopwatch.GetTimestamp() < deadline)
+            {
+                attempt++;
+                var sequence = recoveryEvents.LatestRelevantSequence;
+                try
+                {
+                    return await Task.WhenAll(grains.Select(grain => grain.Get()));
+                }
+                catch (Exception exception) when (exception is OrleansTransactionTransientFailureException
+                    or OrleansTransactionInDoubtException
+                    or TimeoutException)
+                {
+                    this.testOutput(
+                        $"Recovery read {attempt} failed with {exception.GetType().Name}; "
+                        + "waiting for transaction recovery progress.");
+                    var transition = await recoveryEvents.WaitForNextTransitionAsync(sequence, deadline);
+                    this.testOutput(
+                        $"Recovery read {attempt} observed progress. "
+                        + TransactionRecoveryEventObserver.FormatTransition(transition).Trim());
+                }
+            }
+
+            throw new TimeoutException(
+                $"The fault-injected transaction did not become readable within the protocol-derived "
+                + $"{RecoveryWatchdog} watchdog."
+                + Environment.NewLine
+                + recoveryEvents.FormatTimeline());
+        }
+
+        private async Task<FaultInjectionEvent> ObserveFaultInjection(
+            Task<FaultInjectionEvent> observation,
+            TransactionFaultInjectPhase phase,
+            FaultInjectionType type,
+            TransactionRecoveryEventObserver recoveryEvents,
+            long deadline)
+        {
+            try
+            {
+                if (!observation.IsCompleted)
+                {
+                    var now = Stopwatch.GetTimestamp();
+                    if (now >= deadline)
+                    {
+                        throw new TimeoutException();
+                    }
+
+                    return await observation.WaitAsync(Stopwatch.GetElapsedTime(now, deadline));
+                }
+
+                return await observation;
+            }
+            catch (TimeoutException)
+            {
+                throw new TimeoutException(
+                    $"The configured {type} fault at {phase} was not observed before the "
+                    + $"{RecoveryWatchdog} watchdog expired."
+                    + Environment.NewLine
+                    + recoveryEvents.FormatTimeline());
+            }
+        }
+
+        private static long GetDeadline()
+            => Stopwatch.GetTimestamp() + (long)(RecoveryWatchdog.TotalSeconds * Stopwatch.Frequency);
     }
 }

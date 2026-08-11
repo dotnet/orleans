@@ -136,6 +136,33 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
         }
     }
 
+    public async Task<RecoveryTransition> WaitForCommitConfirmationAsync(
+        long afterSequence,
+        int participantCount,
+        long deadline,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(participantCount, 1);
+
+        while (true)
+        {
+            long observedThrough;
+            lock (this.lockObj)
+            {
+                this.ThrowIfDisposed();
+                var completed = this.FindConfirmedCommitAfter(afterSequence, participantCount);
+                if (completed is not null)
+                {
+                    return completed;
+                }
+
+                observedThrough = this.nextSequence;
+            }
+
+            await this.WaitForNextTransitionAsync(observedThrough, deadline, cancellationToken);
+        }
+    }
+
     public IReadOnlyList<RecoveryTransition> GetTimeline()
     {
         lock (this.lockObj)
@@ -377,7 +404,13 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
             evt.SiloAddress,
             evt.ActivationId,
             status,
-            evt is TransactionDiagnosticEvents.StorageWriteCompleted storageWrite ? storageWrite.CommitCount : null);
+            evt is TransactionDiagnosticEvents.StorageWriteCompleted storageWrite ? storageWrite.CommitCount : null,
+            evt switch
+            {
+                TransactionDiagnosticEvents.TransactionConfirmCompleted confirmed => confirmed.Succeeded,
+                TransactionDiagnosticEvents.TransactionCancelCompleted canceled => canceled.Succeeded,
+                _ => null,
+            });
         return true;
     }
 
@@ -390,6 +423,42 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
 
     private RecoveryTransition? FindTransitionAfter(long sequence)
         => this.timeline.FirstOrDefault(transition => transition.Sequence > sequence && this.IsCurrentlyRelevant(transition));
+
+    private RecoveryTransition? FindConfirmedCommitAfter(long sequence, int participantCount)
+    {
+        foreach (var commit in this.timeline)
+        {
+            if (commit.Sequence <= sequence
+                || !this.IsCurrentlyRelevant(commit)
+                || commit.Kind != RecoveryTransitionKind.StorageWriteCompleted
+                || commit.CommitCount <= 0)
+            {
+                continue;
+            }
+
+            foreach (var transactionId in commit.TransactionIds)
+            {
+                var confirmedParticipants = this.timeline
+                    .Where(transition =>
+                        transition.Sequence > commit.Sequence
+                        && this.IsCurrentlyRelevant(transition)
+                        && transition.Kind == RecoveryTransitionKind.TransactionConfirmCompleted
+                        && transition.TransactionId == transactionId
+                        && transition.Succeeded == true
+                        && transition.GrainId != commit.GrainId)
+                    .Select(transition => transition.GrainId)
+                    .Where(grainId => grainId is not null)
+                    .Distinct()
+                    .Count();
+                if (confirmedParticipants >= participantCount - 1)
+                {
+                    return commit;
+                }
+            }
+        }
+
+        return null;
+    }
 
     private void RemoveWaiter(Waiter waiter)
     {
@@ -464,7 +533,8 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
         SiloAddress? SiloAddress,
         ActivationId ActivationId,
         string? Status,
-        int? CommitCount)
+        int? CommitCount,
+        bool? Succeeded)
     {
         public Guid? TransactionId => this.TransactionIds.Length == 1 ? this.TransactionIds[0] : null;
     }
