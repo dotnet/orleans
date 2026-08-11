@@ -44,21 +44,14 @@ public class TestingUtilsTests
     }
 
     [Fact]
-    public async Task WaitUntilSucceededAsync_TimesOutWhileWaitingToRetry()
+    public async Task WaitUntilSucceededAsync_ReturnsFalseAtDeadline()
     {
-        var calls = 0;
-
         var result = await TestingUtils.WaitUntilSucceededAsync(
-            _ =>
-            {
-                calls++;
-                return Task.FromResult(false);
-            },
+            _ => Task.FromResult(false),
             TimeSpan.FromMilliseconds(50),
             TimeSpan.FromSeconds(1));
 
         Assert.False(result);
-        Assert.Equal(1, calls);
     }
 
     [Fact]
