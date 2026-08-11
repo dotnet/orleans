@@ -896,7 +896,7 @@ namespace NonSilo.Tests.Membership
             protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes) { }
             protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes) { }
             protected override void OnSendMessageFailure(Message message, string error) { }
-            protected override void RetryMessage(Message msg, Exception ex = null) { }
+            protected override void RetryMessage(Message msg, Exception? ex = null) { }
             public void SimulateMessageReceived() => MarkMessageReceived();
         }
     }
