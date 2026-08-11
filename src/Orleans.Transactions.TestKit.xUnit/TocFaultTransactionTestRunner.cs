@@ -8,7 +8,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         protected TocFaultTransactionTestRunnerxUnit(IGrainFactory grainFactory, ITestOutputHelper output)
         : base(grainFactory, output.WriteLine) { }
 
-        [Theory(Skip = "https://github.com/dotnet/orleans/issues/9556")]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions / 2)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain, 1)]
