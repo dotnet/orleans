@@ -160,6 +160,8 @@ items:
             href: host/grain-directory.md
           - name: Transport Layer Security (TLS)
             href: host/transport-layer-security.md
+          - name: Connection middleware
+            href: host/connection-middleware.md
       - name: Configuration
         items:
           - name: Overview
