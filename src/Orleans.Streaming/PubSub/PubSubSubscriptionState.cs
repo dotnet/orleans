@@ -60,6 +60,7 @@ namespace Orleans.Streams
             state = SubscriptionStates.Active;
         }
 
+        [JsonConstructor]
         [System.Text.Json.Serialization.JsonConstructor]
         public PubSubSubscriptionState(
             GuidId subscriptionId,

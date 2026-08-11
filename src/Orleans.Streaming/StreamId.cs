@@ -276,7 +276,7 @@ namespace Orleans.Runtime
         // which didn't have a JsonConverter for StreamId.
         // StreamId used the default serialization that Newtonsoft provided.
 
-        // Ideally this STJ Converter would write Namespace/Key as a value 
+        // Ideally this STJ Converter would write Namespace/Key as a value
 
         // This implementation emulates Newtonsoft by both reading and writing
         // the same structure.

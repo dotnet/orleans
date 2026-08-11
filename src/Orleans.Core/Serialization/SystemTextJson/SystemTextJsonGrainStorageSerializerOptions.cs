@@ -12,15 +12,13 @@ namespace Orleans.Serialization
     /// </summary>
     public sealed class SystemTextJsonGrainStorageSerializerOptions
     {
+        /// <summary>
+        /// Gets the underlying System.Text.Json serializer options.
+        /// </summary>
         public JsonSerializerOptions JsonSerializerOptions { get; } = new JsonSerializerOptions()
         {
-            // System.Text.Json  => 9.0.0 adds AllowOutOfOrderMetadataProperties
-            // which allows ReferenceHandler.Preserve to work with GuidId from Newtonsoft
-
-            // ReferenceHandler = ReferenceHandler.Preserve,
-            //  AllowOutOfOrderMetadataProperties = true,
             WriteIndented = true,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault | JsonIgnoreCondition.WhenWritingNull,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         };
     }
 

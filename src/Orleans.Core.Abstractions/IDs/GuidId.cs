@@ -112,6 +112,7 @@ namespace Orleans.Runtime
         public override GuidId? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             Guid value = default;
+            var hasValue = false;
 
             if (reader.TokenType == JsonTokenType.StartObject)
             {
@@ -124,17 +125,21 @@ namespace Orleans.Runtime
                     switch (reader.TokenType)
                     {
                         case JsonTokenType.PropertyName:
-
                             if (reader.ValueTextEquals("Guid") && reader.Read())
                             {
                                 value = reader.GetGuid();
+                                hasValue = true;
+                            }
+                            else if (reader.ValueTextEquals("$ref"))
+                            {
+                                throw new JsonException("Reference-preserving JSON is not supported by the System.Text.Json grain storage serializer.");
                             }
                             break;
                     }
                 }
             }
 
-            return GuidId.GetGuidId(value);
+            return hasValue ? GuidId.GetGuidId(value) : throw new JsonException($"Could not deserialize {nameof(GuidId)}.");
         }
 
         public override void Write(Utf8JsonWriter writer, GuidId value, JsonSerializerOptions options)

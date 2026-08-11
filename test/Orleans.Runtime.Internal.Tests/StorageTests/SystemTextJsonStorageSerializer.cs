@@ -1,9 +1,9 @@
 #nullable enable
 using System.Net;
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Providers.StorageSerializer;
+using Orleans.Hosting;
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime.Hosting;
 using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.TestingHost;
@@ -52,7 +52,7 @@ namespace UnitTests.StorageTests
             _newtonSoft = ActivatorUtilities.CreateInstance<JsonGrainStorageSerializer>(_testCluster.Silos.First().ServiceProvider);
         }
 
-        private void Roundtrip<T>(T instance) where T : notnull
+        private void Roundtrip<T>(T instance, bool supportsDictionaryKey = true) where T : notnull
         {
             AssertEquivalent(instance, _systemTextJson.Deserialize<T>(_systemTextJson.Serialize(instance)));
             AssertEquivalent(instance, _newtonSoft.Deserialize<T>(_newtonSoft.Serialize(instance)));
@@ -60,7 +60,11 @@ namespace UnitTests.StorageTests
             AssertEquivalent(instance, _systemTextJson.Deserialize<T>(_newtonSoft.Serialize(instance)));
             AssertEquivalent(instance, _newtonSoft.Deserialize<T>(_systemTextJson.Serialize(instance)));
 
-            // Dictionary Key support is separately implemented in the SystemTextJson JsonConverters so requires its own testing
+            if (!supportsDictionaryKey)
+            {
+                return;
+            }
+
             var dict = new Dictionary<T, T>() { { instance, instance } };
             var deserializedDict = _systemTextJson.Deserialize<Dictionary<T, T>>(_systemTextJson.Serialize(dict));
             Assert.NotNull(deserializedDict);
@@ -96,7 +100,9 @@ namespace UnitTests.StorageTests
         public void ActivationIdConverter() => Roundtrip(new ActivationId(Guid.NewGuid()));
 
         [Fact]
-        public void AsyncStreamReferenceConverterTest() => Roundtrip(_testCluster.Silos.First().ServiceProvider.GetRequiredKeyedService<IStreamProvider>("test").GetStream<int>(StreamId.Create("Test_namespace", "Test_key")));
+        public void AsyncStreamReferenceConverterTest() => Roundtrip(
+            _testCluster.Silos.First().ServiceProvider.GetRequiredKeyedService<IStreamProvider>("test").GetStream<int>(StreamId.Create("Test_namespace", "Test_key")),
+            supportsDictionaryKey: false);
 
         [Fact]
         public void SiloAddressJsonConverter() => Roundtrip(SiloAddress.New(IPEndPoint.Parse("127.0.0.1:499"), 42));
@@ -117,10 +123,17 @@ namespace UnitTests.StorageTests
         }
 
         [Fact]
-        public void EventSequenceTokenV2Converter() => Roundtrip(new EventSequenceTokenV2(35242, 24298));
+        public void EventSequenceTokenV2Converter() => Roundtrip(new EventSequenceTokenV2(35242, 24298), supportsDictionaryKey: false);
 
         [Fact]
-        public void EventSequenceTokenConverter() => Roundtrip(new EventSequenceToken(2424, 1));
+        public void EventSequenceTokenConverter() => Roundtrip(new EventSequenceToken(2424, 1), supportsDictionaryKey: false);
+
+        [Fact]
+        public void EventSequenceTokenBaseTypeConverter()
+        {
+            Roundtrip<StreamSequenceToken>(new EventSequenceToken(2424, 1), supportsDictionaryKey: false);
+            Roundtrip<StreamSequenceToken>(new EventSequenceTokenV2(35242, 24298), supportsDictionaryKey: false);
+        }
 
         [Fact]
         public void StreamIdConverter() => Roundtrip(StreamId.Create("namespace", "key"));
@@ -135,7 +148,20 @@ namespace UnitTests.StorageTests
         public void GuidIdRoundtrip() => Roundtrip(GuidId.GetNewGuidId());
 
         [Fact]
-        public void PubSubSubscriptionStateRoundtrip() => Roundtrip(new PubSubSubscriptionState(GuidId.GetNewGuidId(), new QualifiedStreamId("test", default), GrainId.Parse("test/test")));
+        public void GuidIdSharedReferenceFailsExplicitly()
+        {
+            var id = GuidId.GetNewGuidId();
+            var values = new[] { id, id };
+
+            Assert.Throws<JsonException>(() => _systemTextJson.Deserialize<GuidId[]>(_newtonSoft.Serialize(values)));
+        }
+
+        [Fact]
+        public void PubSubSubscriptionStateRoundtrip() => Roundtrip(new PubSubSubscriptionState(
+            GuidId.GetNewGuidId(),
+            new QualifiedStreamId("test", StreamId.Create("namespace", "key")),
+            GrainId.Parse("test/test")),
+            supportsDictionaryKey: false);
 
         [Fact]
         public async Task GrainReferenceJsonConverter()
@@ -164,6 +190,7 @@ namespace UnitTests.StorageTests
         static async Task CheckResult<T, TValue>(Func<T, ValueTask<TValue>> propertyToCheck, T instance, IGrainStorageSerializer serializer, IGrainStorageSerializer deserializer)
         {
             var roundTrippedGrainReference = deserializer.Deserialize<T>(serializer.Serialize(instance));
+            Assert.NotNull(roundTrippedGrainReference);
 
             var originalValue = await propertyToCheck(instance);
             var newValue = await propertyToCheck(roundTrippedGrainReference);

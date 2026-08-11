@@ -1935,7 +1935,11 @@ namespace Orleans.Runtime
     {
         public override ActivationId Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
 
+        public override ActivationId ReadAsPropertyName(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
         public override void Write(System.Text.Json.Utf8JsonWriter writer, ActivationId value, System.Text.Json.JsonSerializerOptions options) { }
+
+        public override void WriteAsPropertyName(System.Text.Json.Utf8JsonWriter writer, ActivationId value, System.Text.Json.JsonSerializerOptions options) { }
     }
 
     public static partial class AsyncEnumerableExtensions
@@ -2395,6 +2399,7 @@ namespace Orleans.Runtime
 
     [Immutable]
     [GenerateSerializer]
+    [System.Text.Json.Serialization.JsonConverter(typeof(GuidIdConverter))]
     public sealed partial class GuidId : System.IEquatable<GuidId>, System.IComparable<GuidId>, System.Runtime.Serialization.ISerializable
     {
         internal GuidId() { }
@@ -2420,6 +2425,17 @@ namespace Orleans.Runtime
         public static bool operator !=(GuidId? left, GuidId? right) { throw null; }
 
         public override string ToString() { throw null; }
+    }
+
+    public sealed partial class GuidIdConverter : System.Text.Json.Serialization.JsonConverter<GuidId>
+    {
+        public override GuidId? Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
+        public override GuidId ReadAsPropertyName(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
+        public override void Write(System.Text.Json.Utf8JsonWriter writer, GuidId value, System.Text.Json.JsonSerializerOptions options) { }
+
+        public override void WriteAsPropertyName(System.Text.Json.Utf8JsonWriter writer, GuidId value, System.Text.Json.JsonSerializerOptions options) { }
     }
 
     [GenerateSerializer]
@@ -2783,7 +2799,11 @@ namespace Orleans.Runtime
     {
         public override MembershipVersion Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
 
+        public override MembershipVersion ReadAsPropertyName(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
         public override void Write(System.Text.Json.Utf8JsonWriter writer, MembershipVersion value, System.Text.Json.JsonSerializerOptions options) { }
+
+        public override void WriteAsPropertyName(System.Text.Json.Utf8JsonWriter writer, MembershipVersion value, System.Text.Json.JsonSerializerOptions options) { }
     }
 
     [GenerateSerializer]
@@ -3005,7 +3025,11 @@ namespace Orleans.Runtime
     {
         public override SiloAddress? Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
 
+        public override SiloAddress ReadAsPropertyName(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
         public override void Write(System.Text.Json.Utf8JsonWriter writer, SiloAddress value, System.Text.Json.JsonSerializerOptions options) { }
+
+        public override void WriteAsPropertyName(System.Text.Json.Utf8JsonWriter writer, SiloAddress value, System.Text.Json.JsonSerializerOptions options) { }
     }
 
     [GenerateSerializer]
@@ -3102,6 +3126,7 @@ namespace Orleans.Runtime
     [GenerateSerializer]
     [Immutable]
     [SuppressReferenceTracking]
+    [System.Text.Json.Serialization.JsonConverter(typeof(UniqueKeyJsonConverter))]
     public sealed partial class UniqueKey : System.IComparable<UniqueKey>, System.IEquatable<UniqueKey>
     {
         public int BaseTypeCode { get { throw null; } }
@@ -3164,6 +3189,17 @@ namespace Orleans.Runtime
             KeyExtGrain = 6,
             KeyExtSystemTarget = 8
         }
+    }
+
+    public sealed partial class UniqueKeyJsonConverter : System.Text.Json.Serialization.JsonConverter<UniqueKey>
+    {
+        public override UniqueKey? Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
+        public override UniqueKey ReadAsPropertyName(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
+        public override void Write(System.Text.Json.Utf8JsonWriter writer, UniqueKey value, System.Text.Json.JsonSerializerOptions options) { }
+
+        public override void WriteAsPropertyName(System.Text.Json.Utf8JsonWriter writer, UniqueKey value, System.Text.Json.JsonSerializerOptions options) { }
     }
 
     public static partial class Utils

@@ -15,9 +15,12 @@ namespace Orleans.Streaming.JsonConverters
     {
         private readonly Type _eventSequenceTokenType = typeof(EventSequenceToken);
         private readonly Type _eventSequenceTokenTypeV2 = typeof(EventSequenceTokenV2);
+        private readonly Type _streamSequenceTokenType = typeof(StreamSequenceToken);
 
-        public override bool CanConvert(Type typeToConvert) => _eventSequenceTokenType.Equals(typeToConvert)
-                                                               || _eventSequenceTokenTypeV2.Equals(typeToConvert);
+        public override bool CanConvert(Type typeToConvert) => typeToConvert == _streamSequenceTokenType
+                                                               || typeToConvert == _eventSequenceTokenType
+                                                               || typeToConvert == _eventSequenceTokenTypeV2;
+
         public override StreamSequenceToken? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType != JsonTokenType.StartObject)
@@ -27,7 +30,8 @@ namespace Orleans.Streaming.JsonConverters
 
             long? sequenceNumber = null;
             int? eventIndex = null;
-            
+            string? serializedType = null;
+
             while (reader.Read())
             {
                 if (reader.TokenType == JsonTokenType.EndObject)
@@ -46,29 +50,43 @@ namespace Orleans.Streaming.JsonConverters
                         case "SequenceNumber":
                             sequenceNumber = reader.GetInt64();
                             break;
+                        case "$type":
+                            serializedType = reader.GetString();
+                            break;
                     }
                 }
             }
 
-            return sequenceNumber is null 
+            return sequenceNumber is null
                 || eventIndex is null
                 ? null
-                : CreateToken(typeToConvert, sequenceNumber.Value, eventIndex.Value);
+                : CreateToken(typeToConvert, serializedType, sequenceNumber.Value, eventIndex.Value);
         }
 
-        private StreamSequenceToken CreateToken(Type typeToConvert, long sequenceNumber, int eventIndex)
+        private StreamSequenceToken CreateToken(Type typeToConvert, string? serializedType, long sequenceNumber, int eventIndex)
         {
             if (typeToConvert == _eventSequenceTokenType)
                 return new EventSequenceToken(sequenceNumber, eventIndex);
             if (typeToConvert == _eventSequenceTokenTypeV2)
                 return new EventSequenceTokenV2(sequenceNumber, eventIndex);
+
+            if (IsSerializedType(serializedType, _eventSequenceTokenType))
+                return new EventSequenceToken(sequenceNumber, eventIndex);
+            if (IsSerializedType(serializedType, _eventSequenceTokenTypeV2))
+                return new EventSequenceTokenV2(sequenceNumber, eventIndex);
+
             throw new NotSupportedException($"Unsupported {nameof(StreamSequenceToken)} type: {typeToConvert}");
         }
 
-        public override void Write(Utf8JsonWriter writer, StreamSequenceToken value, JsonSerializerOptions options) {
+        private static bool IsSerializedType(string? serializedType, Type expectedType)
+            => serializedType is not null
+               && serializedType.StartsWith($"{expectedType.FullName},", StringComparison.Ordinal);
+
+        public override void Write(Utf8JsonWriter writer, StreamSequenceToken value, JsonSerializerOptions options)
+        {
             writer.WriteStartObject();
             if (value is not null)
-            { 
+            {
                 writer.WriteString("$type", value.GetType().AssemblyQualifiedName); // For backward compatibility with Newtonsoft
                 writer.WriteNumber("SequenceNumber", value.SequenceNumber);
                 writer.WriteNumber("EventIndex", value.EventIndex);

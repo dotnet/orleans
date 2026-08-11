@@ -1738,6 +1738,28 @@ namespace Orleans.Serialization
         public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object? value, Newtonsoft.Json.JsonSerializer serializer) { }
     }
 
+    public sealed partial class GrainIdJsonConverter : System.Text.Json.Serialization.JsonConverter<Runtime.GrainId>
+    {
+        public override Runtime.GrainId Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
+        public override Runtime.GrainId ReadAsPropertyName(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
+        public override void Write(System.Text.Json.Utf8JsonWriter writer, Runtime.GrainId value, System.Text.Json.JsonSerializerOptions options) { }
+
+        public override void WriteAsPropertyName(System.Text.Json.Utf8JsonWriter writer, Runtime.GrainId value, System.Text.Json.JsonSerializerOptions options) { }
+    }
+
+    public sealed partial class GrainReferenceConverter : System.Text.Json.Serialization.JsonConverter<Runtime.IAddressable>
+    {
+        public GrainReferenceConverter(GrainReferences.GrainReferenceActivator referenceActivator) { }
+
+        public override bool CanConvert(System.Type typeToConvert) { throw null; }
+
+        public override Runtime.IAddressable? Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
+        public override void Write(System.Text.Json.Utf8JsonWriter writer, Runtime.IAddressable value, System.Text.Json.JsonSerializerOptions options) { }
+    }
+
     public partial class GrainReferenceJsonConverter : Newtonsoft.Json.JsonConverter
     {
         public GrainReferenceJsonConverter(GrainReferences.GrainReferenceActivator referenceActivator) { }
@@ -1758,6 +1780,17 @@ namespace Orleans.Serialization
         public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object? value, Newtonsoft.Json.JsonSerializer serializer) { }
     }
 
+    public sealed partial class IpAddressConverter : System.Text.Json.Serialization.JsonConverter<System.Net.IPAddress>
+    {
+        public override System.Net.IPAddress? Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
+        public override System.Net.IPAddress ReadAsPropertyName(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
+        public override void Write(System.Text.Json.Utf8JsonWriter writer, System.Net.IPAddress value, System.Text.Json.JsonSerializerOptions options) { }
+
+        public override void WriteAsPropertyName(System.Text.Json.Utf8JsonWriter writer, System.Net.IPAddress value, System.Text.Json.JsonSerializerOptions options) { }
+    }
+
     public partial class IPEndPointConverter : Newtonsoft.Json.JsonConverter
     {
         public override bool CanConvert(System.Type objectType) { throw null; }
@@ -1765,6 +1798,19 @@ namespace Orleans.Serialization
         public override object ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object? existingValue, Newtonsoft.Json.JsonSerializer serializer) { throw null; }
 
         public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object? value, Newtonsoft.Json.JsonSerializer serializer) { }
+    }
+
+    public sealed partial class IpEndPointConverter : System.Text.Json.Serialization.JsonConverter<System.Net.IPEndPoint>
+    {
+        public IpEndPointConverter(System.Text.Json.Serialization.JsonConverter<System.Net.IPAddress> addressConverter) { }
+
+        public override System.Net.IPEndPoint? Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
+        public override System.Net.IPEndPoint ReadAsPropertyName(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
+        public override void Write(System.Text.Json.Utf8JsonWriter writer, System.Net.IPEndPoint value, System.Text.Json.JsonSerializerOptions options) { }
+
+        public override void WriteAsPropertyName(System.Text.Json.Utf8JsonWriter writer, System.Net.IPEndPoint value, System.Text.Json.JsonSerializerOptions options) { }
     }
 
     public partial class MembershipVersionJsonConverter : Newtonsoft.Json.JsonConverter
@@ -1822,6 +1868,18 @@ namespace Orleans.Serialization
         public override object? ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object? existingValue, Newtonsoft.Json.JsonSerializer serializer) { throw null; }
 
         public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object? value, Newtonsoft.Json.JsonSerializer serializer) { }
+    }
+
+    public sealed partial class SystemTextJsonGrainStorageSerializerOptions
+    {
+        public System.Text.Json.JsonSerializerOptions JsonSerializerOptions { get { throw null; } }
+    }
+
+    public sealed partial class SystemTextJsonSerializerOptionsConfigure : Microsoft.Extensions.Options.IPostConfigureOptions<SystemTextJsonGrainStorageSerializerOptions>
+    {
+        public SystemTextJsonSerializerOptionsConfigure(GrainReferences.GrainReferenceActivator grainReferenceActivator) { }
+
+        public void PostConfigure(string? name, SystemTextJsonGrainStorageSerializerOptions options) { }
     }
 
     public partial class UniqueKeyConverter : Newtonsoft.Json.JsonConverter
@@ -1965,6 +2023,19 @@ namespace Orleans.Storage
         public System.BinaryData Serialize<T>(T? value) { throw null; }
 
         public System.Threading.Tasks.ValueTask SerializeAsync<T>(T? value, System.IO.Stream destination, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+    }
+
+    public sealed partial class SystemTextJsonGrainStorageSerializer : IGrainStorageStreamingSerializer, IGrainStorageSerializer
+    {
+        public SystemTextJsonGrainStorageSerializer(Microsoft.Extensions.Options.IOptions<Serialization.SystemTextJsonGrainStorageSerializerOptions> options) { }
+
+        public T? Deserialize<T>(System.BinaryData input) { throw null; }
+
+        public System.Threading.Tasks.ValueTask<T?> DeserializeAsync<T>(System.IO.Stream input, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.BinaryData Serialize<T>(T? input) { throw null; }
+
+        public System.Threading.Tasks.ValueTask SerializeAsync<T>(T? input, System.IO.Stream destination, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 }
 

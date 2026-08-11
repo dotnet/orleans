@@ -1034,6 +1034,7 @@ namespace Orleans.Runtime
 {
     [Immutable]
     [GenerateSerializer]
+    [System.Text.Json.Serialization.JsonConverter(typeof(QualifiedStreamIdJsonConverter))]
     public readonly partial struct QualifiedStreamId : System.IEquatable<QualifiedStreamId>, System.IComparable<QualifiedStreamId>, System.Runtime.Serialization.ISerializable, System.ISpanFormattable, System.IFormattable
     {
         [Id(1)]
@@ -1065,9 +1066,21 @@ namespace Orleans.Runtime
         public override readonly string ToString() { throw null; }
     }
 
+    public sealed partial class QualifiedStreamIdJsonConverter : System.Text.Json.Serialization.JsonConverter<QualifiedStreamId>
+    {
+        public override QualifiedStreamId Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
+        public override QualifiedStreamId ReadAsPropertyName(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
+        public override void Write(System.Text.Json.Utf8JsonWriter writer, QualifiedStreamId value, System.Text.Json.JsonSerializerOptions options) { }
+
+        public override void WriteAsPropertyName(System.Text.Json.Utf8JsonWriter writer, QualifiedStreamId value, System.Text.Json.JsonSerializerOptions options) { }
+    }
+
     [Immutable]
     [GenerateSerializer]
-    public readonly partial struct StreamId : System.IEquatable<StreamId>, System.IComparable<StreamId>, System.Runtime.Serialization.ISerializable, System.ISpanFormattable, System.IFormattable
+    [System.Text.Json.Serialization.JsonConverter(typeof(StreamIdJsonConverter))]
+    public readonly partial struct StreamId : System.IEquatable<StreamId>, System.IComparable<StreamId>, System.Runtime.Serialization.ISerializable, System.ISpanFormattable, System.IFormattable, System.IUtf8SpanFormattable
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
@@ -1111,7 +1124,20 @@ namespace Orleans.Runtime
 
         readonly bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
 
+        readonly bool System.IUtf8SpanFormattable.TryFormat(System.Span<byte> utf8Destination, out int bytesWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
+
         public override readonly string ToString() { throw null; }
+    }
+
+    public sealed partial class StreamIdJsonConverter : System.Text.Json.Serialization.JsonConverter<StreamId>
+    {
+        public override StreamId Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
+        public override StreamId ReadAsPropertyName(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
+        public override void Write(System.Text.Json.Utf8JsonWriter writer, StreamId value, System.Text.Json.JsonSerializerOptions options) { }
+
+        public override void WriteAsPropertyName(System.Text.Json.Utf8JsonWriter writer, StreamId value, System.Text.Json.JsonSerializerOptions options) { }
     }
 }
 
@@ -1186,14 +1212,6 @@ namespace Orleans.Streaming.Diagnostics
             public PullingAgentManagerState(string streamProvider, Runtime.SiloAddress? siloAddress, Streams.QueueId[] currentQueues, int runningAgents) : base(default!, default) { }
         }
 
-        public sealed partial class QueueBalancerMaturityCompleted : StreamingEvent
-        {
-            public readonly bool IsLocalSilo;
-            public readonly Runtime.SiloAddress MaturedSiloAddress;
-            public readonly Streams.IStreamQueueBalancer QueueBalancer;
-            public QueueBalancerMaturityCompleted(string streamProvider, Runtime.SiloAddress? siloAddress, Runtime.SiloAddress maturedSiloAddress, bool isLocalSilo, Streams.IStreamQueueBalancer queueBalancer) : base(default!, default) { }
-        }
-
         public sealed partial class PullingAgentStarted : StreamingEvent
         {
             public readonly System.TimeSpan DueTime;
@@ -1225,6 +1243,14 @@ namespace Orleans.Streaming.Diagnostics
             public PullingAgentStreamRegistrationFailed(string streamProvider, Runtime.SiloAddress? siloAddress, Streams.QueueId queueId, Runtime.StreamId streamId, System.Exception exception) : base(default!, default) { }
         }
 
+        public sealed partial class QueueBalancerMaturityCompleted : StreamingEvent
+        {
+            public readonly bool IsLocalSilo;
+            public readonly Runtime.SiloAddress MaturedSiloAddress;
+            public readonly Streams.IStreamQueueBalancer QueueBalancer;
+            public QueueBalancerMaturityCompleted(string streamProvider, Runtime.SiloAddress? siloAddress, Runtime.SiloAddress maturedSiloAddress, bool isLocalSilo, Streams.IStreamQueueBalancer queueBalancer) : base(default!, default) { }
+        }
+
         public sealed partial class QueueReceiverInitializationFailed : StreamingEvent
         {
             public readonly System.Exception Exception;
@@ -1235,7 +1261,7 @@ namespace Orleans.Streaming.Diagnostics
         public sealed partial class QueueReceiverInitialized : StreamingEvent
         {
             public readonly Streams.QueueId QueueId;
-            public QueueReceiverInitialized(string streamProvider, Runtime.SiloAddress? siloAddress, Streams.QueueId queueId) : base(default!, default) {             }
+            public QueueReceiverInitialized(string streamProvider, Runtime.SiloAddress? siloAddress, Streams.QueueId queueId) : base(default!, default) { }
         }
 
         public sealed partial class StreamInactive : StreamingEvent
@@ -1296,6 +1322,18 @@ namespace Orleans.Streaming.Diagnostics
             public readonly System.Guid SubscriptionId;
             public SubscriptionUnregistered(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress) : base(default!, default) { }
         }
+    }
+}
+
+namespace Orleans.Streaming.JsonConverters
+{
+    public sealed partial class EventSequenceTokenJsonConverter : System.Text.Json.Serialization.JsonConverter<Streams.StreamSequenceToken>
+    {
+        public override bool CanConvert(System.Type typeToConvert) { throw null; }
+
+        public override Streams.StreamSequenceToken? Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
+        public override void Write(System.Text.Json.Utf8JsonWriter writer, Streams.StreamSequenceToken value, System.Text.Json.JsonSerializerOptions options) { }
     }
 }
 
@@ -1430,15 +1468,15 @@ namespace Orleans.Streams
 
         public bool CheckpointExists { get { throw null; } }
 
-        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
-        public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string providerName, string partition, string serviceId, IClusterClient clusterClient, Configuration.GrainStreamQueueCheckpointerOptions options) { throw null; }
-
         public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string providerName, string partition, string serviceId, IClusterClient clusterClient, Configuration.GrainStreamQueueCheckpointerOptions options, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
-        public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string providerName, string partition, string serviceId, IClusterClient clusterClient) { throw null; }
+        public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string providerName, string partition, string serviceId, IClusterClient clusterClient, Configuration.GrainStreamQueueCheckpointerOptions options) { throw null; }
 
         public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string providerName, string partition, string serviceId, IClusterClient clusterClient, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
+        public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string providerName, string partition, string serviceId, IClusterClient clusterClient) { throw null; }
 
         public System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
@@ -1447,10 +1485,10 @@ namespace Orleans.Streams
 
         public System.Threading.Tasks.Task<string> Load(System.Threading.CancellationToken cancellationToken) { throw null; }
 
+        public void Update(string offset, System.DateTime utcNow, System.Threading.CancellationToken cancellationToken) { }
+
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         public void Update(string offset, System.DateTime utcNow) { }
-
-        public void Update(string offset, System.DateTime utcNow, System.Threading.CancellationToken cancellationToken) { }
     }
 
     public partial class GrainStreamQueueCheckpointerFactory : IStreamQueueCheckpointerFactory
@@ -1459,10 +1497,10 @@ namespace Orleans.Streams
 
         public GrainStreamQueueCheckpointerFactory(string providerName, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, IClusterClient clusterClient) { }
 
+        public System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string partition, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         public System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string partition) { throw null; }
-
-        public System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string partition, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public static IStreamQueueCheckpointerFactory CreateFactory(System.IServiceProvider services, string providerName) { throw null; }
     }
@@ -1591,13 +1629,13 @@ namespace Orleans.Streams
 
     public partial interface IQueueAdapterReceiver
     {
+        System.Threading.Tasks.Task<System.Collections.Generic.IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount, System.Threading.CancellationToken cancellationToken);
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         System.Threading.Tasks.Task<System.Collections.Generic.IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount);
-        System.Threading.Tasks.Task<System.Collections.Generic.IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task Initialize(System.TimeSpan timeout);
+        System.Threading.Tasks.Task MessagesDeliveredAsync(System.Collections.Generic.IList<IBatchContainer> messages, System.Threading.CancellationToken cancellationToken);
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         System.Threading.Tasks.Task MessagesDeliveredAsync(System.Collections.Generic.IList<IBatchContainer> messages);
-        System.Threading.Tasks.Task MessagesDeliveredAsync(System.Collections.Generic.IList<IBatchContainer> messages, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task Shutdown(System.TimeSpan timeout);
     }
 
@@ -1710,9 +1748,9 @@ namespace Orleans.Streams
 
     public partial interface IStreamQueueCheckpointerFactory
     {
+        System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string partition, System.Threading.CancellationToken cancellationToken);
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string partition);
-        System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string partition, System.Threading.CancellationToken cancellationToken);
     }
 
     public partial interface IStreamQueueCheckpointer<TCheckpoint>
@@ -1723,9 +1761,9 @@ namespace Orleans.Streams
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         System.Threading.Tasks.Task<TCheckpoint> Load();
         System.Threading.Tasks.Task<TCheckpoint> Load(System.Threading.CancellationToken cancellationToken);
+        void Update(TCheckpoint offset, System.DateTime utcNow, System.Threading.CancellationToken cancellationToken);
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         void Update(TCheckpoint offset, System.DateTime utcNow);
-        void Update(TCheckpoint offset, System.DateTime utcNow, System.Threading.CancellationToken cancellationToken);
     }
 
     public partial interface IStreamQueueMapper
@@ -1788,23 +1826,33 @@ namespace Orleans.Streams
     public sealed partial class PubSubSubscriptionState : System.IEquatable<PubSubSubscriptionState?>
     {
         [Newtonsoft.Json.JsonProperty]
+        [System.Text.Json.Serialization.JsonInclude]
         [Id(2)]
         public Runtime.GrainId Consumer;
         [Newtonsoft.Json.JsonProperty]
+        [System.Text.Json.Serialization.JsonInclude]
         [Id(3)]
         public string? FilterData;
         [Newtonsoft.Json.JsonProperty]
+        [System.Text.Json.Serialization.JsonInclude]
         [Id(4)]
         public SubscriptionStates state;
         [Newtonsoft.Json.JsonProperty]
+        [System.Text.Json.Serialization.JsonInclude]
         [Id(1)]
         public Runtime.QualifiedStreamId Stream;
         [Newtonsoft.Json.JsonProperty]
+        [System.Text.Json.Serialization.JsonInclude]
         [Id(0)]
         public Runtime.GuidId SubscriptionId;
+        [Newtonsoft.Json.JsonConstructor]
+        [System.Text.Json.Serialization.JsonConstructor]
+        public PubSubSubscriptionState(Runtime.GuidId subscriptionId, Runtime.QualifiedStreamId stream, Runtime.GrainId consumer, string? filterData, SubscriptionStates state) { }
+
         public PubSubSubscriptionState(Runtime.GuidId subscriptionId, Runtime.QualifiedStreamId streamId, Runtime.GrainId streamConsumer) { }
 
         [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
         public bool IsFaulted { get { throw null; } }
 
         public void AddFilter(string? filterData) { }
