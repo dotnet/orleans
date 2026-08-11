@@ -1,3 +1,5 @@
+using Orleans.Concurrency;
+
 namespace UnitTests.GrainInterfaces
 {
     public interface IErrorGrain : ISimpleGrain
@@ -8,6 +10,11 @@ namespace UnitTests.GrainInterfaces
         Task<int> GetAxBError();
         Task<int> GetAxBError(int a, int b);
         Task LongMethod(int waitTime);
+        Task LongMethodUntilReleased();
+        [AlwaysInterleave]
+        Task WaitForLongMethodToStart();
+        [AlwaysInterleave]
+        Task ReleaseLongMethod();
         Task LongMethodWithError(int waitTime);
         Task DelayMethod(int milliseconds);
         Task Dispose();

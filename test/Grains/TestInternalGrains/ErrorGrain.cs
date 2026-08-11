@@ -10,6 +10,8 @@ namespace UnitTests.Grains
     public class ErrorGrain : SimpleGrain, IErrorGrain
     {
         private int counter;
+        private readonly TaskCompletionSource _longMethodStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _longMethodReleased = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public ErrorGrain(ILoggerFactory loggerFactory) : base(loggerFactory)
         {
@@ -52,6 +54,20 @@ namespace UnitTests.Grains
         public async Task LongMethod(int waitTime)
         {
             await Task.Delay(waitTime);
+        }
+
+        public Task LongMethodUntilReleased()
+        {
+            _longMethodStarted.TrySetResult();
+            return _longMethodReleased.Task;
+        }
+
+        public Task WaitForLongMethodToStart() => _longMethodStarted.Task;
+
+        public Task ReleaseLongMethod()
+        {
+            _longMethodReleased.TrySetResult();
+            return Task.CompletedTask;
         }
 
         public async Task LongMethodWithError(int waitTime)
