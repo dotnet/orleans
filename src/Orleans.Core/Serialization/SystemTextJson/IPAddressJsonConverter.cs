@@ -8,7 +8,7 @@ using System.Text.Json.Serialization;
 
 namespace Orleans.Serialization
 {
-    public sealed class IpAddressConverter : JsonConverter<IPAddress>
+    public sealed class IPAddressJsonConverter : JsonConverter<IPAddress>
     {
         private const int MaxAddressSize = 65; // Maximum bytes or chars stackallocated, taken from IPAddressParser.MaxIPv6StringLength
 

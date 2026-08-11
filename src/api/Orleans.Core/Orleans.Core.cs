@@ -1780,7 +1780,7 @@ namespace Orleans.Serialization
         public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object? value, Newtonsoft.Json.JsonSerializer serializer) { }
     }
 
-    public sealed partial class IpAddressConverter : System.Text.Json.Serialization.JsonConverter<System.Net.IPAddress>
+    public sealed partial class IPAddressJsonConverter : System.Text.Json.Serialization.JsonConverter<System.Net.IPAddress>
     {
         public override System.Net.IPAddress? Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
 
@@ -1800,9 +1800,9 @@ namespace Orleans.Serialization
         public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object? value, Newtonsoft.Json.JsonSerializer serializer) { }
     }
 
-    public sealed partial class IpEndPointConverter : System.Text.Json.Serialization.JsonConverter<System.Net.IPEndPoint>
+    public sealed partial class IPEndPointJsonConverter : System.Text.Json.Serialization.JsonConverter<System.Net.IPEndPoint>
     {
-        public IpEndPointConverter(System.Text.Json.Serialization.JsonConverter<System.Net.IPAddress> addressConverter) { }
+        public IPEndPointJsonConverter(System.Text.Json.Serialization.JsonConverter<System.Net.IPAddress> addressConverter) { }
 
         public override System.Net.IPEndPoint? Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
 

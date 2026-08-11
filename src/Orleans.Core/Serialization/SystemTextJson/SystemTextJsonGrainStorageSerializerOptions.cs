@@ -26,10 +26,10 @@ namespace Orleans.Serialization
     {
         public void PostConfigure(string? name, SystemTextJsonGrainStorageSerializerOptions options)
         {
-            var ipAddressConverter = new IpAddressConverter();
+            var ipAddressConverter = new IPAddressJsonConverter();
             options.JsonSerializerOptions.Converters.Add(new GrainIdJsonConverter());
             options.JsonSerializerOptions.Converters.Add(ipAddressConverter);
-            options.JsonSerializerOptions.Converters.Add(new IpEndPointConverter(ipAddressConverter));
+            options.JsonSerializerOptions.Converters.Add(new IPEndPointJsonConverter(ipAddressConverter));
             options.JsonSerializerOptions.Converters.Add(new GrainReferenceConverter(grainReferenceActivator));
         }
     }
