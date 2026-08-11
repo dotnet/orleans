@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -119,7 +118,7 @@ namespace Tester.HeterogeneousSilosTests
             await MergeGrainResolverTestsImpl<IStatelessWorkerGrain>(typeof(PreferLocalPlacement), true, this.CallIStatelessWorkerGrainMethod, typeof(StatelessWorkerGrain));
         }
 
-        [Fact(Skip = "https://github.com/dotnet/orleans/issues/9560")]
+        [Fact]
         public async Task StatelessWorkerPlacementWithClientRefreshTests()
         {
             await MergeGrainResolverTestsImpl<IStatelessWorkerGrain>(typeof(RandomPlacement), false, this.CallIStatelessWorkerGrainMethod, typeof(StatelessWorkerGrain));
@@ -138,50 +137,40 @@ namespace Tester.HeterogeneousSilosTests
             await g.GetCallStats();
         }
 
-        /// <summary>
-        /// Waits until the grain factory can resolve an implementation for <typeparamref name="T"/>,
-        /// or until <paramref name="timeout"/> elapses.
-        /// </summary>
-        private async Task WaitForGrainTypeAvailable<T>(TimeSpan timeout) where T : IGrainWithIntegerKey
+        private async Task WaitForClusterStateToStabilizeAsync(bool restartClient)
         {
-            var sw = Stopwatch.StartNew();
-            while (sw.Elapsed < timeout)
+            await cluster!.WaitForLivenessToStabilizeAsync();
+            await cluster.WaitForClusterManifestToStabilizeAsync();
+
+            if (restartClient)
             {
-                try
-                {
-                    this.cluster!.GrainFactory!.GetGrain<T>(0);
-                    return;
-                }
-                catch (ArgumentException)
-                {
-                    // Not yet available; keep polling.
-                }
-
-                await Task.Delay(TimeSpan.FromMilliseconds(500));
+                await cluster.StopClusterClientAsync();
+                await cluster.InitializeClientAsync();
             }
-        }
 
-        /// <summary>
-        /// Waits until the grain factory can no longer resolve an implementation for <typeparamref name="T"/>
-        /// (i.e., the type has become unavailable), or until <paramref name="timeout"/> elapses.
-        /// </summary>
-        private async Task WaitForGrainTypeUnavailable<T>(TimeSpan timeout) where T : IGrainWithIntegerKey
-        {
-            var sw = Stopwatch.StartNew();
-            while (sw.Elapsed < timeout)
+            var expectedSilos = cluster.GetActiveSilos().Select(static silo => silo.SiloAddress).ToHashSet();
+            var manifestProvider = cluster.ServiceProvider.GetRequiredService<IClusterManifestProvider>();
+            var lastObservedSilos = Array.Empty<SiloAddress>();
+            using var cancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+            try
             {
-                try
+                await foreach (var manifest in manifestProvider.Updates.WithCancellation(cancellation.Token))
                 {
-                    this.cluster!.GrainFactory!.GetGrain<T>(0);
+                    lastObservedSilos = manifest.Silos.Keys.Where(static silo => !silo.IsClient).ToArray();
+                    if (expectedSilos.SetEquals(lastObservedSilos))
+                    {
+                        return;
+                    }
                 }
-                catch (ArgumentException)
-                {
-                    // The type is no longer available.
-                    return;
-                }
-
-                await Task.Delay(TimeSpan.FromMilliseconds(500));
             }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                throw new TimeoutException(
+                    $"The client cluster manifest did not converge. Expected silos: {string.Join(", ", expectedSilos.Select(static silo => silo.ToString()))}. "
+                    + $"Last observed silos: {string.Join(", ", lastObservedSilos.Select(static silo => silo.ToString()))}.");
+            }
+
+            throw new InvalidOperationException("The client cluster manifest update stream completed before the expected cluster state was observed.");
         }
 
         private async Task MergeGrainResolverTestsImpl<T>(Type defaultPlacementStrategy, bool restartClient, Func<IGrain, Task> func, params Type[] blackListedTypes)
@@ -189,26 +178,13 @@ namespace Tester.HeterogeneousSilosTests
         {
             SetupAndDeployCluster(defaultPlacementStrategy, blackListedTypes);
 
-            var delayTimeout = RefreshInterval.Add(RefreshInterval);
-
             // Should fail
             var exception = Assert.Throws<ArgumentException>(() => this.cluster!.GrainFactory!.GetGrain<T>(0));
             Assert.Contains("Could not find an implementation for interface", exception.Message);
 
             // Start a new silo with TestGrain
             await cluster!.StartAdditionalSiloAsync();
-            await Task.Delay(delayTimeout);
-
-            if (restartClient)
-            {
-                // Disconnect/Reconnect the client
-                await cluster.StopClusterClientAsync();
-                await cluster.InitializeClientAsync();
-            }
-            else
-            {
-                await WaitForGrainTypeAvailable<T>(TimeSpan.FromSeconds(30));
-            }
+            await WaitForClusterStateToStabilizeAsync(restartClient);
 
             for (var i = 0; i < 5; i++)
             {
@@ -219,18 +195,7 @@ namespace Tester.HeterogeneousSilosTests
 
             // Stop the latest silos
             await cluster.StopSecondarySilosAsync();
-            await Task.Delay(delayTimeout);
-
-            if (restartClient)
-            {
-                // Disconnect/Reconnect the client
-                await cluster.StopClusterClientAsync();
-                await cluster.InitializeClientAsync();
-            }
-            else
-            {
-                await WaitForGrainTypeUnavailable<T>(TimeSpan.FromSeconds(30));
-            }
+            await WaitForClusterStateToStabilizeAsync(restartClient);
 
             // Should fail
             exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory!.GetGrain<T>(0));
