@@ -19,8 +19,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Orleans.Azure.Tests" />
+    <InternalsVisibleTo Include="Orleans.AdoNet.Tests" />
     <InternalsVisibleTo Include="Orleans.Core.Tests" />
     <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
   </ItemGroup>
 </Project>
-
