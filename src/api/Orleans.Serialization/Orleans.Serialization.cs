@@ -3369,6 +3369,8 @@ namespace Orleans.Serialization.Configuration
 
         public System.Collections.Generic.HashSet<System.Type> Interfaces { get { throw null; } }
 
+        public System.Collections.Generic.Dictionary<(string Target, string Kind, string Name), System.Type> RegisteredProviders { get { throw null; } }
+
         public System.Collections.Generic.HashSet<System.Type> Serializers { get { throw null; } }
 
         public System.Collections.Generic.Dictionary<string, System.Type> WellKnownTypeAliases { get { throw null; } }

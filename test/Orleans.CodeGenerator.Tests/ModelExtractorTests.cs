@@ -399,6 +399,13 @@ public record DemoRecord([Id(42)] string Value);
         Assert.Contains("global::LibraryB.CopierType", registeredCodecTypes);
         Assert.Contains("global::LibraryB.ConverterType", registeredCodecTypes);
         Assert.Contains("global::LibraryB.SerializerType", registeredCodecTypes);
+        Assert.Equal(
+            [
+                new RegisteredProviderModel("Client", "Clustering", "Consumer", new TypeRef("global::ConsumerProject.ConsumerMarker")),
+                new RegisteredProviderModel("Client", "Clustering", "LibraryA", new TypeRef("global::LibraryA.AlphaType")),
+                new RegisteredProviderModel("Client", "Clustering", "LibraryB", new TypeRef("global::LibraryB.BetaType")),
+            ],
+            model.RegisteredProviders);
         Assert.Contains(model.InterfaceImplementations, implementation => implementation.ImplementationType.SyntaxString == "global::LibraryB.GeneratedInterfaceImplementation");
     }
 
@@ -619,6 +626,9 @@ public record DemoRecord([Id(42)] string Value);
             using Orleans;
             using System.Threading.Tasks;
 
+            [assembly: RegisterProvider("LibraryB", "Clustering", "Client", typeof(LibraryB.BetaType))]
+            [assembly: RegisterProvider("Hidden", "Clustering", "Client", typeof(LibraryB.HiddenProvider))]
+
             namespace LibraryB;
 
             [Id(200)]
@@ -658,6 +668,10 @@ public record DemoRecord([Id(42)] string Value);
             {
                 public Task Ping() => Task.CompletedTask;
             }
+
+            internal sealed class HiddenProvider
+            {
+            }
             """;
 
         const string libraryACode = """
@@ -667,6 +681,7 @@ public record DemoRecord([Id(42)] string Value);
             [assembly: ApplicationPart("Zeta.Part")]
             [assembly: ApplicationPart("Alpha.Part")]
             [assembly: GenerateCodeForDeclaringAssembly(typeof(LibraryB.BetaType))]
+            [assembly: RegisterProvider("LibraryA", "Clustering", "Client", typeof(LibraryA.AlphaType))]
 
             namespace LibraryA;
 
@@ -681,6 +696,7 @@ public record DemoRecord([Id(42)] string Value);
             using Orleans;
 
             [assembly: GenerateCodeForDeclaringAssembly(typeof(LibraryA.AlphaType))]
+            [assembly: RegisterProvider("Consumer", "Clustering", "Client", typeof(ConsumerProject.ConsumerMarker))]
 
             namespace ConsumerProject;
 

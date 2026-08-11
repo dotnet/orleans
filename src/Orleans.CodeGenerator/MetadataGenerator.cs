@@ -122,6 +122,22 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
                 ])))));
         }
 
+        foreach (var provider in model.ReferenceAssemblyData.RegisteredProviders)
+        {
+            var key = TupleExpression(SeparatedList(
+            [
+                Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Target))),
+                Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Kind))),
+                Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Name))),
+            ]));
+            var registeredProvider = ElementAccessExpression(configParam.Member("RegisteredProviders"))
+                .WithArgumentList(BracketedArgumentList(SingletonSeparatedList(Argument(key))));
+            body.Add(ExpressionStatement(AssignmentExpression(
+                SyntaxKind.SimpleAssignmentExpression,
+                registeredProvider,
+                CreateTypeOfExpression(provider.Type))));
+        }
+
         AddCompoundTypeAliases(configParam, body, generatedInvokables);
         return CreateMetadataClass(body, configParam);
     }

@@ -57,6 +57,11 @@ internal readonly record struct InterfaceImplementationModel
 }
 
 /// <summary>
+/// Describes a provider registration.
+/// </summary>
+internal readonly record struct RegisteredProviderModel(string Target, string Kind, string Name, TypeRef Type);
+
+/// <summary>
 /// Aggregated data extracted from referenced assemblies via <c>[GenerateCodeForDeclaringAssembly]</c>
 /// and <c>[ApplicationPart]</c> attributes. This model is produced by a <c>CompilationProvider</c>-based
 /// pipeline and cached via structural equality.
@@ -70,4 +75,5 @@ internal sealed record class ReferenceAssemblyModel(
     EquatableArray<SerializableTypeModel> ReferencedSerializableTypes,
     EquatableArray<ProxyInterfaceModel> ReferencedProxyInterfaces,
     EquatableArray<RegisteredCodecModel> RegisteredCodecs,
+    EquatableArray<RegisteredProviderModel> RegisteredProviders,
     EquatableArray<InterfaceImplementationModel> InterfaceImplementations);

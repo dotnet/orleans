@@ -44,8 +44,11 @@ internal static class ReferenceAssemblyModelExtractor
         var referencedSerializableTypes = new HashSet<SerializableTypeModel>();
         var referencedProxyInterfaces = new HashSet<ProxyInterfaceModel>();
         var registeredCodecs = new HashSet<RegisteredCodecModel>();
+        var registeredProviders = new Dictionary<(string Target, string Kind, string Name), RegisteredProviderModel>();
         var interfaceImplementations = new HashSet<InterfaceImplementationModel>();
         var diagnosticBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
+
+        CollectRegisteredProviders(compilation.Assembly);
 
         foreach (var reference in compilation.References)
         {
@@ -55,6 +58,8 @@ internal static class ReferenceAssemblyModelExtractor
             {
                 continue;
             }
+
+            CollectRegisteredProviders(asm);
 
             if (!asm.GetAttributes(libraryTypes.ApplicationPartAttribute, out var attrs))
             {
@@ -179,6 +184,12 @@ internal static class ReferenceAssemblyModelExtractor
             .ThenBy(static entry => entry.Kind)
             .ToImmutableArray();
 
+        var sortedRegisteredProviders = registeredProviders.Values
+            .OrderBy(static entry => entry.Target, StringComparer.Ordinal)
+            .ThenBy(static entry => entry.Kind, StringComparer.Ordinal)
+            .ThenBy(static entry => entry.Name, StringComparer.Ordinal)
+            .ToImmutableArray();
+
         var sortedInterfaceImplementations = interfaceImplementations
             .OrderBy(static entry => entry.ImplementationType.SyntaxString, StringComparer.Ordinal)
             .ToImmutableArray();
@@ -194,6 +205,7 @@ internal static class ReferenceAssemblyModelExtractor
             ReferencedSerializableTypes: sortedReferencedSerializableTypes,
             ReferencedProxyInterfaces: sortedReferencedProxyInterfaces,
             RegisteredCodecs: sortedRegisteredCodecs,
+            RegisteredProviders: sortedRegisteredProviders,
             InterfaceImplementations: sortedInterfaceImplementations);
 
         void AddApplicationPart(string applicationPart)
@@ -201,6 +213,33 @@ internal static class ReferenceAssemblyModelExtractor
             if (applicationPartSet.Add(applicationPart))
             {
                 applicationParts.Add(applicationPart);
+            }
+        }
+
+        void CollectRegisteredProviders(IAssemblySymbol assembly)
+        {
+            if (!assembly.GetAttributes(libraryTypes.RegisterProviderAttribute, out var attributes))
+            {
+                return;
+            }
+
+            foreach (var attribute in attributes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var arguments = attribute.ConstructorArguments;
+                if (arguments.Length < 4
+                    || arguments[0].Value is not string name
+                    || arguments[1].Value is not string kind
+                    || arguments[2].Value is not string target
+                    || arguments[3].Value is not INamedTypeSymbol type
+                    || !compilation.IsSymbolAccessibleWithin(type, compilation.Assembly))
+                {
+                    continue;
+                }
+
+                var provider = new RegisteredProviderModel(target, kind, name, new TypeRef(type.ToOpenTypeSyntax().ToString()));
+                registeredProviders[(target, kind, name)] = provider;
             }
         }
     }
@@ -321,4 +360,3 @@ internal static class ReferenceAssemblyModelExtractor
             kind);
     }
 }
-
