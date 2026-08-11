@@ -66,7 +66,7 @@ namespace Orleans.Hosting
                 optionsBuilder.PostConfigure<IOptionsMonitor<AzureQueueMigrationOptions>>((baseOptions, migrationMonitor) =>
                 {
                     var migrationOptions = migrationMonitor.Get(configurator.Name);
-                    
+
                     baseOptions.ClientOptions = migrationOptions.ClientOptions;
                     baseOptions.MessageVisibilityTimeout = migrationOptions.MessageVisibilityTimeout;
                     baseOptions.QueueNames = migrationOptions.QueueNames;
