@@ -76,6 +76,11 @@ namespace Orleans.Transactions.TestKit
                 grains.Count,
                 recoveryEvents,
                 GetDeadline());
+            var faultAttemptSequence = recoveryEvents.LatestRelevantSequence;
+            var hasStorageFault = injectionType is FaultInjectionType.ExceptionBeforeStore
+                or FaultInjectionType.ExceptionAfterStore
+                or FaultInjectionType.GenericExceptionAfterStore;
+            var waitForRecovery = false;
             try
             {
                 await this.ExecuteAndWaitForCommit(
@@ -88,19 +93,32 @@ namespace Orleans.Transactions.TestKit
             {
                 this.testOutput($"Fault-injected transaction aborted: {exception}");
                 expected = setval;
+                waitForRecovery = hasStorageFault;
             }
             catch (OrleansTransactionException exception)
             {
                 this.testOutput($"Fault-injected transaction failed with an ambiguous outcome: {exception}");
                 expected = null;
+                waitForRecovery = hasStorageFault;
             }
 
-            await this.ObserveFaultInjection(
+            var fault = await this.ObserveFaultInjection(
                 faultObserved.Task,
                 injectionPhase,
                 injectionType,
                 recoveryEvents,
                 GetDeadline());
+            if (waitForRecovery)
+            {
+                var recovery = await recoveryEvents.WaitForRecoveryCompletionAsync(
+                    fault.TransactionId,
+                    fault.GrainId,
+                    faultAttemptSequence,
+                    GetDeadline());
+                this.testOutput(
+                    $"Fault-injected transaction recovery completed. "
+                    + TransactionRecoveryEventObserver.FormatTransition(recovery).Trim());
+            }
 
             var actualValues = await this.ReadAfterRecovery(grains, recoveryEvents, GetDeadline());
             actualValues.Should().OnlyContain(value => value == actualValues[0]);
