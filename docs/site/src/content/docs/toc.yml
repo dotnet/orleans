@@ -24,6 +24,14 @@ items:
         href: tutorials-and-samples/adventure.md
       - name: Build custom grain storage
         href: tutorials-and-samples/custom-grain-storage.md
+      - name: Build and deploy a production-shaped application
+        href: tutorials-and-samples/production-application.md
+      - name: Test an Orleans application end to end
+        href: tutorials-and-samples/testing-walkthrough.md
+      - name: Build and recover a streaming application
+        href: tutorials-and-samples/streaming-walkthrough.md
+      - name: Perform a rolling upgrade
+        href: tutorials-and-samples/rolling-upgrade.md
   - name: Develop applications
     items:
       - name: Grains
