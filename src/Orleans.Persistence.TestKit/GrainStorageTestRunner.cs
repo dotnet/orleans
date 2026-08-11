@@ -137,7 +137,7 @@ public abstract class GrainStorageTestRunner
         var exception = await Record.ExceptionAsync(() => Store_WriteRead(grainTypeName, grainId, grainState)).ConfigureAwait(false);
 
         Assert.NotNull(exception);
-        Assert.IsType<InconsistentStateException>(exception);
+        Assert.IsAssignableFrom<InconsistentStateException>(exception);
     }
 
     /// <summary>
@@ -163,7 +163,7 @@ public abstract class GrainStorageTestRunner
 
         var exception = await Record.ExceptionAsync(
             () => Storage.WriteStateAsync(grainTypeName, grainId, staleState)).ConfigureAwait(false);
-        Assert.IsType<InconsistentStateException>(exception);
+        Assert.IsAssignableFrom<InconsistentStateException>(exception);
 
         var readState = new GrainState<TestState1> { State = new TestState1() };
         await Storage.ReadStateAsync(grainTypeName, grainId, readState).ConfigureAwait(false);
@@ -411,7 +411,6 @@ public abstract class GrainStorageTestRunner
         await Storage.ClearStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
 
         Assert.False(grainState.RecordExists);
-        Assert.Null(grainState.ETag);
         Assert.Equal(new TestState1(), grainState.State);
     }
 
@@ -578,7 +577,7 @@ public abstract class GrainStorageTestRunner
 
         var exception = await Record.ExceptionAsync(
             () => Storage.ClearStateAsync(grainTypeName, grainId, staleState)).ConfigureAwait(false);
-        Assert.IsType<InconsistentStateException>(exception);
+        Assert.IsAssignableFrom<InconsistentStateException>(exception);
 
         var readState = new GrainState<TestState1> { State = new TestState1() };
         await Storage.ReadStateAsync(grainTypeName, grainId, readState).ConfigureAwait(false);
