@@ -15,7 +15,9 @@ using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 using Tester.AzureUtils;
 using TestExtensions;
+using UnitTests.StorageTests.ModelBased;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Tester.AzureUtils.Persistence;
 
@@ -29,10 +31,12 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
     private readonly BlobContainerClient _container;
     private readonly string _containerName = $"test-grainstate-{Guid.NewGuid():N}";
     private readonly GrainId _grainId = GrainId.Create(GrainType, Guid.NewGuid().ToString("N"));
+    private readonly ITestOutputHelper _output;
     private readonly ServiceProvider _services;
 
-    public AzureBlobGrainStorageTests()
+    public AzureBlobGrainStorageTests(ITestOutputHelper output)
     {
+        _output = output;
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSerializer();
@@ -61,6 +65,15 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
     public async Task AzureBlobStorage_ReadState_PooledBinaryDeserializationFailure_DoesNotMutateGrainState()
     {
         await AssertFailedReadDoesNotMutateStateAsync(new ThrowingBinaryDeserializeSerializer(CreateSetupSerializer()));
+    }
+
+    [SkippableFact, TestCategory("Functional"), TestCategory("ModelBased")]
+    public async Task AzureBlobStorage_ModelBasedGeneratedConformance()
+    {
+        var storage = await CreateStorageAsync(CreateSetupSerializer());
+        var runner = new GrainStorageModelBasedTestRunner(storage, "AzureBlob", _output.WriteLine);
+
+        await runner.RunGeneratedConformanceTests();
     }
 
     private async Task AssertFailedReadDoesNotMutateStateAsync(IGrainStorageSerializer serializer)
