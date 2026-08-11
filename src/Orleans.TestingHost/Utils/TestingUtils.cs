@@ -195,7 +195,7 @@ namespace Orleans.TestingHost.Utils
                     return false;
                 }
 
-                if (invokeFinalAttempt && remaining <= finalAttemptWindow)
+                if (invokeFinalAttempt && remaining <= finalAttemptWindow + retryDelay)
                 {
                     finalAttempt = true;
                     continue;
