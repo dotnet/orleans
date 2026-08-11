@@ -53,6 +53,22 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
+        public void GetLocalHealthStatus_RejectsReversedInterval()
+        {
+            var participant = new TestHealthCheckParticipant(_ => (true, null));
+            var monitor = CreateMonitor(participant);
+
+            var exception = Assert.Throws<ArgumentOutOfRangeException>(
+                () => monitor.GetLocalHealthStatus(
+                    Start,
+                    Start - TimeSpan.FromTicks(1),
+                    LocalSiloHealthCheckCategory.All));
+
+            Assert.Equal("end", exception.ParamName);
+            Assert.Equal(0, participant.CallCount);
+        }
+
+        [Fact]
         public void GetLocalHealthStatus_RetentionAndQueryBoundsAreInclusive()
         {
             var monitor = CreateMonitor();
@@ -210,6 +226,58 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
+        public void GetLocalHealthStatus_LocalCacheDoesNotSuppressNetworkCheck()
+        {
+            var monitor = CreateMonitor();
+            _ = monitor.GetLocalHealthStatus(TimeSpan.Zero, LocalSiloHealthCheckCategory.Local);
+
+            var network = monitor.GetLocalHealthStatus(TimeSpan.Zero, LocalSiloHealthCheckCategory.Network);
+
+            var membershipEvent = Assert.Single(
+                network.Events,
+                item => item.Kind == LocalSiloHealthCheckKind.MembershipStatus);
+            Assert.Equal(LocalSiloHealthCheckCategory.Network, membershipEvent.Category);
+            Assert.Equal(0, membershipEvent.Score);
+        }
+
+        [Fact]
+        public void GetLocalHealthStatus_MembershipRecoveryReplacesPriorState()
+        {
+            var localSilo = _localSiloDetails.SiloAddress;
+            var membershipEntry = new MembershipEntry
+            {
+                SiloAddress = localSilo,
+                Status = SiloStatus.Joining,
+                StartTime = Start.UtcDateTime,
+                IAmAliveTime = Start.UtcDateTime,
+            };
+            _membershipManager.CurrentSnapshot.Returns(new MembershipTableSnapshot(
+                new MembershipVersion(1),
+                ImmutableDictionary<SiloAddress, MembershipEntry>.Empty.Add(localSilo, membershipEntry)));
+            var monitor = CreateMonitor();
+            var joining = monitor.GetLocalHealthStatus(TimeSpan.Zero, LocalSiloHealthCheckCategory.Network);
+            Assert.Equal(LocalSiloHealthMonitor.MaxScore, joining.Score);
+
+            _timeProvider.Advance(TimeSpan.FromSeconds(1));
+            membershipEntry.Status = SiloStatus.Active;
+            var active = monitor.GetLocalHealthStatus(TimeSpan.Zero, LocalSiloHealthCheckCategory.Network);
+            Assert.Equal(0, active.Score);
+
+            _timeProvider.Advance(TimeSpan.FromMilliseconds(500));
+            var carried = monitor.GetLocalHealthStatus(
+                Start.AddSeconds(1),
+                Start.AddSeconds(1.5),
+                LocalSiloHealthCheckCategory.Network);
+            Assert.Equal(0, carried.Score);
+            var membershipStatus = Assert.Single(
+                carried.Events,
+                item => item.Kind == LocalSiloHealthCheckKind.MembershipStatus);
+            Assert.Equal(0, membershipStatus.Score);
+            Assert.Null(membershipStatus.Source);
+            Assert.Null(membershipStatus.Complaint);
+        }
+
+        [Fact]
         public void GetLocalHealthStatus_PreservesDistinctStallKinds()
         {
             var monitor = CreateMonitor();
@@ -262,6 +330,74 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
+        public void GetLocalHealthStatus_IncludesDurationEventWhichOverlapsInterval()
+        {
+            var monitor = CreateMonitor();
+            var recorder = (ILocalSiloHealthEventRecorder)monitor;
+            _timeProvider.Advance(TimeSpan.FromSeconds(3));
+            recorder.RecordHealthEvent(
+                LocalSiloHealthCheckKind.RuntimeStall,
+                score: 2,
+                complaint: "overlapping runtime stall",
+                duration: TimeSpan.FromSeconds(2));
+
+            var status = monitor.GetLocalHealthStatus(
+                Start,
+                Start.AddSeconds(2),
+                LocalSiloHealthCheckCategory.Local);
+
+            var healthEvent = Assert.Single(
+                status.Events,
+                item => item.Kind == LocalSiloHealthCheckKind.RuntimeStall);
+            Assert.Equal(2, status.Score);
+            Assert.Equal(Start.AddSeconds(3), healthEvent.Timestamp);
+            Assert.Equal(TimeSpan.FromSeconds(2), healthEvent.Duration);
+        }
+
+        [Fact]
+        public void GetLocalHealthStatus_CarriesStateSampleIntoInterval()
+        {
+            var participant = new TestHealthCheckParticipant(_ => (false, "persistently unhealthy"));
+            var monitor = CreateMonitor(participant);
+            _ = monitor.GetLocalHealthStatus(TimeSpan.Zero, LocalSiloHealthCheckCategory.Local);
+            _timeProvider.Advance(TimeSpan.FromMilliseconds(500));
+
+            var status = monitor.GetLocalHealthStatus(
+                Start.AddMilliseconds(250),
+                Start.AddMilliseconds(500),
+                LocalSiloHealthCheckCategory.Local);
+
+            var participantEvent = Assert.Single(
+                status.Events,
+                item => item.Kind == LocalSiloHealthCheckKind.HealthCheckParticipant);
+            Assert.Equal(1, status.Score);
+            Assert.Equal(Start, participantEvent.Timestamp);
+            Assert.Contains("persistently unhealthy", participantEvent.Complaint, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void GetLocalHealthStatus_DoesNotCarryIncidentIntoLaterInterval()
+        {
+            var monitor = CreateMonitor();
+            var recorder = (ILocalSiloHealthEventRecorder)monitor;
+            recorder.RecordHealthEvent(
+                LocalSiloHealthCheckKind.RuntimeStall,
+                score: 2,
+                complaint: "completed runtime stall",
+                duration: TimeSpan.FromSeconds(1));
+            _timeProvider.Advance(TimeSpan.FromSeconds(2));
+
+            var status = monitor.GetLocalHealthStatus(
+                Start.AddSeconds(1),
+                Start.AddSeconds(2),
+                LocalSiloHealthCheckCategory.Local);
+
+            Assert.DoesNotContain(
+                status.Events,
+                item => item.Kind == LocalSiloHealthCheckKind.RuntimeStall);
+        }
+
+        [Fact]
         public void GetLocalHealthStatus_UsesOneSecondOnDemandCacheCadence()
         {
             var participant = new TestHealthCheckParticipant(_ => (true, null));
@@ -284,6 +420,22 @@ namespace NonSilo.Tests.Membership
 
             static bool IsParticipantEvent(LocalSiloHealthEvent item)
                 => item.Kind == LocalSiloHealthCheckKind.HealthCheckParticipant;
+        }
+
+        [Fact]
+        public void LocalSiloHealthMonitor_SchedulesHealthChecksOncePerSecond()
+        {
+            TimeSpan? period = null;
+            var timerFactory = new DelegateAsyncTimerFactory(
+                (value, _) =>
+                {
+                    period = value;
+                    return new DelegateAsyncTimer(_ => Task.FromResult(false));
+                });
+
+            _ = CreateMonitor(timerFactory);
+
+            Assert.Equal(TimeSpan.FromSeconds(1), period);
         }
 
         [Fact]
@@ -331,6 +483,7 @@ namespace NonSilo.Tests.Membership
                 Assert.Equal(1, Volatile.Read(ref activeCalls));
                 Assert.Equal(1, Volatile.Read(ref maximumActiveCalls));
                 Assert.All(workers, worker => Assert.False(worker.IsCompleted));
+                _timeProvider.Advance(TimeSpan.FromSeconds(2));
             }
             finally
             {
@@ -442,6 +595,13 @@ namespace NonSilo.Tests.Membership
         {
             var timerFactory = new DelegateAsyncTimerFactory(
                 (_, _) => new DelegateAsyncTimer(_ => Task.FromResult(false)));
+            return CreateMonitor(timerFactory, participants);
+        }
+
+        private LocalSiloHealthMonitor CreateMonitor(
+            IAsyncTimerFactory timerFactory,
+            params IHealthCheckParticipant[] participants)
+        {
             return new LocalSiloHealthMonitor(
                 participants,
                 _membershipManager,

@@ -109,7 +109,7 @@ namespace NonSilo.Tests.Membership
             remoteSiloProber.Probe(default!, default).ReturnsForAnyArgs(Task.CompletedTask);
 
             this.localSiloHealthMonitor = Substitute.For<ILocalSiloHealthMonitor>();
-            this.localSiloHealthMonitor.GetLocalHealthStatus(default, default).ReturnsForAnyArgs(new LocalSiloHealthStatus(0, []));
+            this.localSiloHealthMonitor.GetLocalHealthStatus(default, default, default).ReturnsForAnyArgs(new LocalSiloHealthStatus(0, []));
 
             this.onProbeResult = (Func<SiloHealthMonitor, SiloHealthMonitor.ProbeResult, Task>)((siloHealthMonitor, probeResult) => Task.CompletedTask);
 

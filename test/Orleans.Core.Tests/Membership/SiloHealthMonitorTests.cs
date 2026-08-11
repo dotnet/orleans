@@ -67,7 +67,7 @@ namespace NonSilo.Tests.Membership
                 });
 
             _localSiloHealthMonitor = Substitute.For<ILocalSiloHealthMonitor>();
-            _localSiloHealthMonitor.GetLocalHealthStatus(default, default).ReturnsForAnyArgs(new LocalSiloHealthStatus(0, []));
+            _localSiloHealthMonitor.GetLocalHealthStatus(default, default, default).ReturnsForAnyArgs(new LocalSiloHealthStatus(0, []));
 
             _prober = Substitute.For<IRemoteSiloProber>();
 
@@ -369,8 +369,8 @@ namespace NonSilo.Tests.Membership
             optionsMonitor.CurrentValue.Returns(options);
             var localHealthMonitor = Substitute.For<ILocalSiloHealthMonitor>();
             localHealthMonitor
-                .GetLocalHealthStatus(options.ProbeTimeout, LocalSiloHealthCheckCategory.Local)
-                .Returns(new LocalSiloHealthStatus(localHealthScore, []));
+                .GetLocalHealthStatus(default, default, default)
+                .ReturnsForAnyArgs(new LocalSiloHealthStatus(localHealthScore, []));
             var prober = Substitute.For<IRemoteSiloProber>();
             var probeEntered = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
             var pendingProbe = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -408,12 +408,13 @@ namespace NonSilo.Tests.Membership
                 if (extendProbeTimeout)
                 {
                     localHealthMonitor.Received(1).GetLocalHealthStatus(
-                        options.ProbeTimeout,
+                        timeProvider.GetUtcNow() - options.ProbeTimeout,
+                        timeProvider.GetUtcNow(),
                         LocalSiloHealthCheckCategory.Local);
                 }
                 else
                 {
-                    localHealthMonitor.DidNotReceiveWithAnyArgs().GetLocalHealthStatus(default, default);
+                    localHealthMonitor.DidNotReceiveWithAnyArgs().GetLocalHealthStatus(default, default, default);
                 }
 
                 await prober.Received(1).Probe(_targetSilo, 1, cancellationToken);

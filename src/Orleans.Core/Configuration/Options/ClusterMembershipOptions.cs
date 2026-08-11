@@ -123,9 +123,11 @@ namespace Orleans.Configuration
         internal static TimeSpan ClusteringShutdownGracePeriod => TimeSpan.FromSeconds(5);
 
         /// <summary>
-        /// Gets or sets the period between self-tests to log local health degradation status.
+        /// Gets or sets the minimum period between logs reporting local health degradation.
         /// </summary>
-        /// <value>The local host will perform a self-test every ten seconds by default.</value>
+        /// <value>
+        /// Local health is sampled every second and detected degradation is logged no more than once every ten seconds by default.
+        /// </value>
         public TimeSpan LocalHealthDegradationMonitoringPeriod { get; set; } = TimeSpan.FromSeconds(10);
 
         /// <summary>

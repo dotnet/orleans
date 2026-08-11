@@ -31,6 +31,7 @@ namespace NonSilo.Tests.Membership
             await rig.PingEntered.Task;
 
             Assert.False(responseTask.IsCompleted);
+            Assert.Empty(rig.LocalHealthMonitor.ReceivedCalls());
             rig.TimeProvider.Advance(elapsed);
             rig.PingRelease.SetResult();
 
@@ -41,7 +42,8 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(elapsed, response.ProbeResponseTime);
             Assert.Null(response.FailureMessage);
             rig.LocalHealthMonitor.Received(1).GetLocalHealthStatus(
-                probeTimeout,
+                Start,
+                Start + elapsed,
                 LocalSiloHealthCheckCategory.Local);
             rig.GrainFactory.Received(1).GetSystemTarget<IMembershipService>(
                 Constants.MembershipServiceType,
@@ -64,6 +66,7 @@ namespace NonSilo.Tests.Membership
                 var responseTask = rig.Target.ProbeIndirectly(targetSilo, probeTimeout, ProbeNumber);
                 await rig.PingEntered.Task;
 
+                Assert.Empty(rig.LocalHealthMonitor.ReceivedCalls());
                 rig.TimeProvider.Advance(probeTimeout - TimeSpan.FromTicks(1));
                 Assert.False(responseTask.IsCompleted);
 
@@ -75,7 +78,8 @@ namespace NonSilo.Tests.Membership
                 Assert.Equal(probeTimeout, response.ProbeResponseTime);
                 Assert.Contains(nameof(TimeoutException), response.FailureMessage, StringComparison.Ordinal);
                 rig.LocalHealthMonitor.Received(1).GetLocalHealthStatus(
-                    probeTimeout,
+                    Start,
+                    Start + probeTimeout,
                     LocalSiloHealthCheckCategory.Local);
                 rig.GrainFactory.Received(1).GetSystemTarget<IMembershipService>(
                     Constants.MembershipServiceType,
@@ -122,7 +126,7 @@ namespace NonSilo.Tests.Membership
         {
             var timeProvider = new FakeTimeProvider(Start);
             var localHealthMonitor = Substitute.For<ILocalSiloHealthMonitor>();
-            localHealthMonitor.GetLocalHealthStatus(default, default).ReturnsForAnyArgs(healthStatus);
+            localHealthMonitor.GetLocalHealthStatus(default, default, default).ReturnsForAnyArgs(healthStatus);
             var services = new ServiceCollection();
             services.AddSingleton(localHealthMonitor);
             services.AddMetrics();

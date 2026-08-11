@@ -79,7 +79,7 @@ namespace NonSilo.Tests.Membership
                 });
 
             this.localSiloHealthMonitor = Substitute.For<ILocalSiloHealthMonitor>();
-            this.localSiloHealthMonitor.GetLocalHealthStatus(default, default).ReturnsForAnyArgs(new LocalSiloHealthStatus(0, []));
+            this.localSiloHealthMonitor.GetLocalHealthStatus(default, default, default).ReturnsForAnyArgs(new LocalSiloHealthStatus(0, []));
 
             this.prober = Substitute.For<IRemoteSiloProber>();
             this.membershipTable = new InMemoryMembershipTable(new TableVersion(1, "1"));

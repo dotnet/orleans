@@ -81,11 +81,10 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task<IndirectProbeResponse> ProbeIndirectly(SiloAddress target, TimeSpan probeTimeout, int probeNumber)
         {
-            IndirectProbeResponse result;
-            var healthScore = this.ActivationServices.GetRequiredService<ILocalSiloHealthMonitor>()
-                .GetLocalHealthStatus(probeTimeout, LocalSiloHealthCheckCategory.Local)
-                .Score;
+            var probeStartTime = _timeProvider.GetUtcNow();
             var probeResponseTimestamp = _timeProvider.GetTimestamp();
+            var succeeded = false;
+            string? failureMessage = null;
             try
             {
                 var probeTask = this.ProbeInternal(target, probeNumber);
@@ -99,25 +98,25 @@ namespace Orleans.Runtime.MembershipService
                     throw;
                 }
 
-                result = new IndirectProbeResponse
-                {
-                    Succeeded = true,
-                    IntermediaryHealthScore = healthScore,
-                    ProbeResponseTime = _timeProvider.GetElapsedTime(probeResponseTimestamp),
-                };
+                succeeded = true;
             }
             catch (Exception exception)
             {
-                result = new IndirectProbeResponse
-                {
-                    Succeeded = false,
-                    IntermediaryHealthScore = healthScore,
-                    FailureMessage = $"Encountered exception {LogFormatter.PrintException(exception)}",
-                    ProbeResponseTime = _timeProvider.GetElapsedTime(probeResponseTimestamp),
-                };
+                failureMessage = $"Encountered exception {LogFormatter.PrintException(exception)}";
             }
 
-            return result;
+            var probeResponseTime = _timeProvider.GetElapsedTime(probeResponseTimestamp);
+            var probeEndTime = probeStartTime + probeResponseTime;
+            var healthScore = this.ActivationServices.GetRequiredService<ILocalSiloHealthMonitor>()
+                .GetLocalHealthStatus(probeStartTime, probeEndTime, LocalSiloHealthCheckCategory.Local)
+                .Score;
+            return new IndirectProbeResponse
+            {
+                Succeeded = succeeded,
+                IntermediaryHealthScore = healthScore,
+                FailureMessage = failureMessage,
+                ProbeResponseTime = probeResponseTime,
+            };
         }
 
         public Task GossipToRemoteSilos(

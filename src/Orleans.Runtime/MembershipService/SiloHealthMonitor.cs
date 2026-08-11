@@ -239,9 +239,12 @@ namespace Orleans.Runtime.MembershipService
 
                 if (options.ExtendProbeTimeoutDuringDegradation)
                 {
-                    // Attempt to account for local health degradation by extending the timeout period.
+                    // This query must happen before the probe because its result determines the probe timeout.
+                    // Outcome-reporting health checks, such as an intermediary's health score, run after probing.
+                    var end = _timeProvider.GetUtcNow();
                     var localHealth = _localSiloHealthMonitor.GetLocalHealthStatus(
-                        options.ProbeTimeout,
+                        end - options.ProbeTimeout,
+                        end,
                         LocalSiloHealthCheckCategory.Local);
                     additionalTimeout += localHealth.Score;
                 }
