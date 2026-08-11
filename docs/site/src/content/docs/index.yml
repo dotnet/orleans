@@ -35,6 +35,15 @@ highlightedContent:
         - itemType: overview
           title: Orleans transactions
           url: grains/transactions.md
+        - itemType: how-to-guide
+          title: Orleans how-to guides
+          url: how-to/index.md
+        - itemType: architecture
+          title: Orleans architecture and internals
+          url: implementation/index.md
+        - itemType: reference
+          title: C# API reference
+          url: /docs/api/csharp/
 
 conceptualContent:
     title: Featured content

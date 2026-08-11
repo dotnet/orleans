@@ -68,3 +68,5 @@ The Generic Host combines [.NET configuration providers](https://learn.microsoft
 - Validate provider connectivity and credentials before rollout.
 
 For option types and API entry points, see [Core configuration options](list-of-options-classes.md) and <xref:Orleans.Configuration>.
+
+For task-oriented configuration recipes, see the [Orleans how-to guide index](../../how-to/index.md). For the exact signatures and defaults of configuration APIs, use the [C# API reference](https://dotnet.github.io/orleans/docs/api/csharp/).

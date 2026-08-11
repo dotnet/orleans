@@ -43,3 +43,5 @@ The pages in this track use Orleans source and tests as the specification. Inter
 | Automatic call retry after response timeout | None |
 
 Configuration values affect failure detection and resource use. This track explains their role in protocols, while the [hosting configuration guide](../host/configuration-guide/index.md) and [deployment guidance](../deployment/index.md) own operational recommendations.
+
+For the application mental model, start with [Orleans overview](../overview.md). For task-oriented recipes which apply these components, use the [how-to guide index](../how-to/index.md); for public type contracts, use the [C# API reference](https://dotnet.github.io/orleans/docs/api/csharp/).
