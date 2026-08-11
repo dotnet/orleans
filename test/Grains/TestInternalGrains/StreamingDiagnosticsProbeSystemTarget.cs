@@ -54,7 +54,8 @@ internal sealed class StreamingDiagnosticsProbeSystemTarget : SystemTarget, IStr
     public Task<string> GetRecentStreamingDiagnostics() => Task.FromResult(_recorder.GetSummary());
 }
 
-public sealed class StreamingDiagnosticEventRecorder : IStartupTask, IDisposable
+public sealed class StreamingDiagnosticEventRecorder(
+    ILocalSiloDetails localSiloDetails) : IStartupTask, IDisposable
 {
     private const int MaxRecentEvents = 64;
     private const int MaxSummaryItems = 8;
@@ -70,6 +71,7 @@ public sealed class StreamingDiagnosticEventRecorder : IStartupTask, IDisposable
     private readonly HashSet<SubscriptionKey> _cursorDrains = [];
     private readonly Queue<string> _recentEvents = new();
     private readonly List<Waiter> _waiters = [];
+    private readonly SiloAddress _localSiloAddress = localSiloDetails.SiloAddress;
 
     private IDisposable? _subscription;
 
@@ -177,8 +179,13 @@ public sealed class StreamingDiagnosticEventRecorder : IStartupTask, IDisposable
         }
     }
 
-    private void OnEvent(StreamingEvents.StreamingEvent evt)
+    internal void OnEvent(StreamingEvents.StreamingEvent evt)
     {
+        if (evt.SiloAddress is { } siloAddress && !siloAddress.Equals(_localSiloAddress))
+        {
+            return;
+        }
+
         List<Waiter>? completedWaiters = null;
 
         lock (_lock)
