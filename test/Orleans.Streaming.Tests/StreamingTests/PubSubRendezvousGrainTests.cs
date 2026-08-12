@@ -118,7 +118,7 @@ namespace UnitTests.StreamingTests
             var replacementProducer = SystemTargetGrainId.Create(
                 Constants.StreamPullingAgentType,
                 activeSilo,
-                "ProviderName_2_test-queue").GrainId;
+                "ProviderName_1_test-queue").GrainId;
 
             await pubSubGrain.RegisterProducer(streamId, defunctProducer);
             Assert.Equal(1, await pubSubGrain.ProducerCount(streamId));
