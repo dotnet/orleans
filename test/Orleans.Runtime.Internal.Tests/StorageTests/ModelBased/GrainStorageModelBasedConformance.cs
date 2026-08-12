@@ -31,8 +31,6 @@ internal sealed class GrainStorageModelBasedConformanceOptions
     public bool ClearedRecordExistsOnRead { get; set; }
 
     public bool RereadsClearedRecordBeforeClear { get; set; }
-
-    public bool AllowUnchangedETagOnNoOp { get; set; }
 }
 
 internal sealed class GrainStorageModelBasedTestRunner
@@ -89,7 +87,7 @@ internal static class GrainStorageModelBasedConformance
             {
                 MaxDepth = options.MaxDepth,
                 SequentialTestCaseAlgorithm = SequentialTestCaseAlgorithms.CreateTransitionCoverage(maxSequenceLength: options.MaxSequenceLength),
-                ShouldApply = (input, state) => GrainStorageBehavioralSpec.CanApply((StorageRequest)input.Request, (GrainStorageBehavioralModelState)state)
+                ShouldApply = (input, state) => GrainStorageBehavioralSpec.CanApply((StorageRequest)input.Request, (GrainStorageBehavioralModelState)state, options)
             });
 
         var context = spec.CreateTestingContext();
@@ -154,7 +152,7 @@ internal static class GrainStorageModelBasedConformance
         public GrainStorageBehavioralSpec(GrainStorageModelBasedConformanceOptions options)
         {
             Read = new ReadOperation(options);
-            Write = new WriteOperation(options);
+            Write = new WriteOperation();
             Clear = new ClearOperation(options);
             Add(Read);
             Add(Write);
@@ -186,7 +184,7 @@ internal static class GrainStorageModelBasedConformance
             return inputSet;
         }
 
-        public static bool CanApply(StorageRequest? request, GrainStorageBehavioralModelState state)
+        public static bool CanApply(StorageRequest? request, GrainStorageBehavioralModelState state, GrainStorageModelBasedConformanceOptions options)
         {
             if (request == null)
             {
@@ -197,10 +195,17 @@ internal static class GrainStorageModelBasedConformance
             return request.ETagMode switch
             {
                 ETagMode.Null => true,
-                ETagMode.Current => hasRecord,
+                ETagMode.Current => hasRecord && record is not null && ChangesState(request, record),
                 ETagMode.Stale => hasRecord && record is not null && !string.IsNullOrEmpty(record.PreviousETag),
                 _ => false
             };
+
+            bool ChangesState(StorageRequest request, GrainStorageBehavioralRecord record)
+            {
+                return request.Value == StorageValue.None
+                    ? record.RecordExists || options.DeleteStateOnClear
+                    : request.Value != record.Value || !record.RecordExists;
+            }
         }
     }
 
@@ -244,11 +249,8 @@ internal static class GrainStorageModelBasedConformance
 
     private sealed class WriteOperation : Operation<StorageRequest, StorageOperationResult, GrainStorageBehavioralModelState>
     {
-        private readonly GrainStorageModelBasedConformanceOptions options;
-
-        public WriteOperation(GrainStorageModelBasedConformanceOptions options) : base("Write")
+        public WriteOperation() : base("Write")
         {
-            this.options = options;
         }
 
         public override ExpectedOutcomes Apply(StorageRequest request, GrainStorageBehavioralModelState state)
@@ -262,7 +264,7 @@ internal static class GrainStorageModelBasedConformance
             }
 
             return Expect.That(
-                    result => ValidateWriteResult(request, record, result, options))
+                    result => ValidateWriteResult(request, record, result))
                 .ThenState(
                     (result, nextState) =>
                     {
@@ -270,7 +272,7 @@ internal static class GrainStorageModelBasedConformance
                         {
                             Value = request.Value,
                             ETag = result.ETag,
-                            PreviousETag = AdvancePreviousETag(record, result.ETag),
+                            PreviousETag = record?.ETag,
                             RecordExists = true
                         };
                     },
@@ -326,7 +328,7 @@ internal static class GrainStorageModelBasedConformance
                         nextState.Records[request.Key] = new GrainStorageBehavioralRecord
                         {
                             ETag = result.ETag,
-                            PreviousETag = AdvancePreviousETag(record, result.ETag),
+                            PreviousETag = record.ETag,
                             Value = StorageValue.None,
                             RecordExists = false
                         };
@@ -407,7 +409,7 @@ internal static class GrainStorageModelBasedConformance
                 {
                     Value = request.Value,
                     ETag = grainState.ETag,
-                    PreviousETag = AdvancePreviousETag(priorRecord, grainState.ETag),
+                    PreviousETag = priorRecord?.ETag,
                     RecordExists = true
                 };
 
@@ -442,7 +444,7 @@ internal static class GrainStorageModelBasedConformance
                     {
                         Value = StorageValue.None,
                         ETag = grainState.ETag,
-                        PreviousETag = AdvancePreviousETag(priorRecord, grainState.ETag),
+                        PreviousETag = priorRecord?.ETag,
                         RecordExists = grainState.RecordExists
                     };
                 }
@@ -587,8 +589,7 @@ internal static class GrainStorageModelBasedConformance
     private static ValidationResult ValidateWriteResult(
         StorageRequest request,
         GrainStorageBehavioralRecord? previousRecord,
-        StorageOperationResult result,
-        GrainStorageModelBasedConformanceOptions options)
+        StorageOperationResult result)
     {
         if (!result.Succeeded)
         {
@@ -605,9 +606,7 @@ internal static class GrainStorageModelBasedConformance
             return ValidationResult.Invalid("Successful write did not return a non-empty ETag.");
         }
 
-        if (previousRecord is not null
-            && result.ETag == previousRecord.ETag
-            && !(options.AllowUnchangedETagOnNoOp && request.Value == previousRecord.Value))
+        if (previousRecord is not null && result.ETag == previousRecord.ETag)
         {
             return ValidationResult.Invalid($"Successful write reused ETag {result.ETag}.");
         }
@@ -642,7 +641,6 @@ internal static class GrainStorageModelBasedConformance
         }
 
         return result.ETag != previousRecord.ETag
-            || (options.AllowUnchangedETagOnNoOp && !previousRecord.RecordExists)
             ? ValidationResult.Valid()
             : ValidationResult.Invalid($"Clear reused ETag {result.ETag}.");
     }
@@ -669,13 +667,6 @@ internal static class GrainStorageModelBasedConformance
     private static int ToStorageValue(TestState1? state)
     {
         return state?.B ?? StorageValue.None;
-    }
-
-    private static string? AdvancePreviousETag(GrainStorageBehavioralRecord? record, string? nextETag)
-    {
-        return record is not null && nextETag != record.ETag
-            ? record.ETag
-            : record?.PreviousETag;
     }
 
     private static string NewMockETag() => Guid.NewGuid().ToString("N");
