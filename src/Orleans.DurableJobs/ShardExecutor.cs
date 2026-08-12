@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -70,6 +71,7 @@ internal sealed partial class ShardExecutor
         EnsureSlowStartRampUpStarted();
 
         var tasks = new ConcurrentDictionary<string, Task>();
+        var taskFailures = new ConcurrentQueue<ExceptionDispatchInfo>();
         var processingStarted = false;
         var processingStartTimestamp = 0L;
         var canceled = false;
@@ -98,7 +100,7 @@ internal sealed partial class ShardExecutor
                 await _jobConcurrencyLimiter.WaitAsync(cancellationToken);
 
                 // Start processing the job. ExecuteJobAsync will release the semaphore when done and remove itself from the tasks dictionary
-                tasks[jobContext.Job.Id] = ExecuteJobAsync(jobContext, shard, tasks, cancellationToken);
+                tasks[jobContext.Job.Id] = ExecuteJobAsync(jobContext, shard, tasks, taskFailures, cancellationToken);
             }
 
             LogCompletedProcessingShard(_logger, shard.Id);
@@ -120,6 +122,20 @@ internal sealed partial class ShardExecutor
             try
             {
                 await Task.WhenAll(tasks.Values);
+                if (taskFailures.TryDequeue(out var failure))
+                {
+                    failure.Throw();
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                if (!canceled)
+                {
+                    canceled = true;
+                    LogShardCancelled(_logger, shard.Id);
+                }
+
+                throw;
             }
             catch
             {
@@ -217,6 +233,7 @@ internal sealed partial class ShardExecutor
         IJobRunContext jobContext,
         IJobShard shard,
         ConcurrentDictionary<string, Task>? runningTasks,
+        ConcurrentQueue<ExceptionDispatchInfo> taskFailures,
         CancellationToken cancellationToken)
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
@@ -289,10 +306,15 @@ internal sealed partial class ShardExecutor
                 }
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
         {
             activity?.SetTag(ActivityTagKeys.DurableJobStatus, "canceled");
-            throw;
+            taskFailures.Enqueue(ExceptionDispatchInfo.Capture(exception));
+        }
+        catch (Exception exception)
+        {
+            DurableJobsDiagnostics.SetError(activity, exception);
+            taskFailures.Enqueue(ExceptionDispatchInfo.Capture(exception));
         }
         finally
         {
