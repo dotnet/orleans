@@ -1,0 +1,129 @@
+<Solution>
+  <Folder Name="/site/" />
+  <Folder Name="/site/src/" />
+  <Folder Name="/site/src/content/" />
+  <Folder Name="/site/src/content/docs/" />
+  <Folder Name="/site/src/content/docs/dashboard/" />
+  <Folder Name="/site/src/content/docs/dashboard/snippets/" />
+  <Folder Name="/site/src/content/docs/dashboard/snippets/secure-dashboard/">
+    <Project Path="site/src/content/docs/dashboard/snippets/secure-dashboard/SecureDashboard.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/deployment/" />
+  <Folder Name="/site/src/content/docs/deployment/snippets/" />
+  <Folder Name="/site/src/content/docs/deployment/snippets/service-fabric/">
+    <Project Path="site/src/content/docs/deployment/snippets/service-fabric/ServiceFabricSilo/ServiceFabricSilo.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/grains/" />
+  <Folder Name="/site/src/content/docs/grains/grain-persistence/" />
+  <Folder Name="/site/src/content/docs/grains/grain-persistence/snippets/">
+    <Project Path="site/src/content/docs/grains/grain-persistence/snippets/persistence/persistence.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/grains/grain-versioning/" />
+  <Folder Name="/site/src/content/docs/grains/grain-versioning/snippets/">
+    <Project Path="site/src/content/docs/grains/grain-versioning/snippets/versioning/versioning.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/grains/journaling/" />
+  <Folder Name="/site/src/content/docs/grains/journaling/snippets/" />
+  <Folder Name="/site/src/content/docs/grains/journaling/snippets/redis-journaling/">
+    <Project Path="site/src/content/docs/grains/journaling/snippets/redis-journaling/RedisJournaling.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/grains/snippets/">
+    <Project Path="site/src/content/docs/grains/snippets/async-enumerable-results/async-enumerable-results.csproj" />
+    <Project Path="site/src/content/docs/grains/snippets/interceptors/interceptors.csproj" />
+    <Project Path="site/src/content/docs/grains/snippets/placement/placement.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/grains/snippets/testing/" />
+  <Folder Name="/site/src/content/docs/grains/snippets/testing/orleans-testing/">
+    <Project Path="site/src/content/docs/grains/snippets/testing/orleans-testing/Sample.OrleansTesting/Sample.OrleansTesting.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/grains/snippets/timers/">
+    <Project Path="site/src/content/docs/grains/snippets/timers/Timers.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/grains/snippets/transactions/">
+    <Project Path="site/src/content/docs/grains/snippets/transactions/Abstractions/Abstractions.csproj" />
+    <Project Path="site/src/content/docs/grains/snippets/transactions/Client/Client.csproj" />
+    <Project Path="site/src/content/docs/grains/snippets/transactions/Grains/Grains.csproj" />
+    <Project Path="site/src/content/docs/grains/snippets/transactions/Server/Server.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/host/" />
+  <Folder Name="/site/src/content/docs/host/configuration-guide/" />
+  <Folder Name="/site/src/content/docs/host/configuration-guide/snippets/">
+    <Project Path="site/src/content/docs/host/configuration-guide/snippets/serialization/serialization.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/host/monitoring/" />
+  <Folder Name="/site/src/content/docs/host/monitoring/snippets/" />
+  <Folder Name="/site/src/content/docs/host/monitoring/snippets/observability/">
+    <Project Path="site/src/content/docs/host/monitoring/snippets/observability/Observability.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/host/snippets/">
+    <Project Path="site/src/content/docs/host/snippets/Client.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/host/snippets/aspire/">
+    <Project Path="site/src/content/docs/host/snippets/aspire/AppHost/AppHost.csproj" />
+    <Project Path="site/src/content/docs/host/snippets/aspire/Client/Client.csproj" />
+    <Project Path="site/src/content/docs/host/snippets/aspire/ServiceDefaults/ServiceDefaults.csproj" />
+    <Project Path="site/src/content/docs/host/snippets/aspire/SharedContracts/SharedContracts.csproj" />
+    <Project Path="site/src/content/docs/host/snippets/aspire/Silo/Silo.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/host/snippets/connection-middleware/">
+    <Project Path="site/src/content/docs/host/snippets/connection-middleware/ConnectionMiddleware.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/host/snippets/google-firestore/">
+    <Project Path="site/src/content/docs/host/snippets/google-firestore/Firestore.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/host/snippets/hosting/">
+    <Project Path="site/src/content/docs/host/snippets/hosting/Hosting.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/host/snippets/transport-layer-security/" />
+  <Folder Name="/site/src/content/docs/host/snippets/transport-layer-security/csharp/">
+    <Project Path="site/src/content/docs/host/snippets/transport-layer-security/csharp/ClientExample/ClientExample.csproj" />
+    <Project Path="site/src/content/docs/host/snippets/transport-layer-security/csharp/SiloExample/SiloExample.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/migration/" />
+  <Folder Name="/site/src/content/docs/migration/snippets/">
+    <Project Path="site/src/content/docs/migration/snippets/Orleans10MigrationSnippets.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/quickstarts/" />
+  <Folder Name="/site/src/content/docs/quickstarts/snippets/" />
+  <Folder Name="/site/src/content/docs/quickstarts/snippets/deploy-scale-orleans-on-azure/" />
+  <Folder Name="/site/src/content/docs/quickstarts/snippets/deploy-scale-orleans-on-azure/azure-storage/">
+    <Project Path="site/src/content/docs/quickstarts/snippets/deploy-scale-orleans-on-azure/azure-storage/AzureStorage.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/quickstarts/snippets/deploy-scale-orleans-on-azure/cosmos/">
+    <Project Path="site/src/content/docs/quickstarts/snippets/deploy-scale-orleans-on-azure/cosmos/Cosmos.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/quickstarts/snippets/hello-world/">
+    <Project Path="site/src/content/docs/quickstarts/snippets/hello-world/Client/Client.csproj" />
+    <Project Path="site/src/content/docs/quickstarts/snippets/hello-world/GrainInterfaces/GrainInterfaces.csproj" />
+    <Project Path="site/src/content/docs/quickstarts/snippets/hello-world/Grains/Grains.csproj" />
+    <Project Path="site/src/content/docs/quickstarts/snippets/hello-world/Silo/Silo.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/quickstarts/snippets/url-shortener/">
+    <Project Path="site/src/content/docs/quickstarts/snippets/url-shortener/orleansurlshortener/orleansurlshortener.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/snippets/" />
+  <Folder Name="/site/src/content/docs/snippets/compiled/">
+    <Project Path="site/src/content/docs/snippets/compiled/CompiledDocumentationSnippets.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/streaming/" />
+  <Folder Name="/site/src/content/docs/streaming/snippets/">
+    <Project Path="site/src/content/docs/streaming/snippets/streaming/streaming.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/streaming/snippets/broadcastchannel/">
+    <Project Path="site/src/content/docs/streaming/snippets/broadcastchannel/BroadcastChannel.Client/BroadcastChannel.Client.csproj" />
+    <Project Path="site/src/content/docs/streaming/snippets/broadcastchannel/BroadcastChannel.GrainInterfaces/BroadcastChannel.GrainInterfaces.csproj" />
+    <Project Path="site/src/content/docs/streaming/snippets/broadcastchannel/BroadcastChannel.Silo/BroadcastChannel.Silo.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/tutorials-and-samples/" />
+  <Folder Name="/site/src/content/docs/tutorials-and-samples/snippets/" />
+  <Folder Name="/site/src/content/docs/tutorials-and-samples/snippets/custom-grain-storage/">
+    <Project Path="site/src/content/docs/tutorials-and-samples/snippets/custom-grain-storage/GrainStorage.csproj" />
+  </Folder>
+  <Folder Name="/site/src/content/docs/tutorials-and-samples/snippets/hello-world/">
+    <Project Path="site/src/content/docs/tutorials-and-samples/snippets/hello-world/HelloWorld.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/PackageJsonGenerator.Tests/PackageJsonGenerator.Tests.csproj" />
+    <Project Path="tools/PackageJsonGenerator/PackageJsonGenerator.csproj" />
+  </Folder>
+</Solution>

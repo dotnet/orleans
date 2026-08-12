@@ -39,7 +39,7 @@ Install [Microsoft.Orleans.Client](https://www.nuget.org/packages/Microsoft.Orle
 
 The client connects during host startup and is available from [.NET dependency injection](https://learn.microsoft.com/dotnet/core/extensions/dependency-injection) afterward. Register hosted services that use Orleans after <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*> so the host starts them after the client:
 
-:::code language="csharp" source="snippets/ClusterClientHostedService.cs":::
+:::code language="csharp" source="snippets/ClusterClientHostedService.cs" id="cluster_client_hosted_service":::
 
 See [Client configuration](configuration-guide/client-configuration.md) for clustering and gateway settings.
 

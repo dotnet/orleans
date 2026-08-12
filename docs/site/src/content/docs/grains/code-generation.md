@@ -29,29 +29,14 @@ Supported grain method return types are <xref:System.Threading.Tasks.Task>, <xre
 
 Mark application data crossing grain boundaries or stored by Orleans with <xref:Orleans.GenerateSerializerAttribute>. Give serialized members stable field IDs:
 
-```csharp
-[GenerateSerializer]
-public sealed class PurchaseOrder
-{
-    [Id(0)]
-    public required string OrderId { get; init; }
-
-    [Id(1)]
-    public decimal Total { get; init; }
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/GeneralSnippets.cs" id="serializable_purchase_order":::
 IDs are part of the wire and storage contract. Don't reuse or renumber them after deployment. Use <xref:Orleans.AliasAttribute> when a stable serialized type alias is required independently of the CLR name.
 
 ## Generate code for external types
 
 When a project must generate serializers for accessible types declared elsewhere, use <xref:Orleans.GenerateCodeForDeclaringAssemblyAttribute>:
 
-```csharp
-[assembly: GenerateCodeForDeclaringAssembly(
-    typeof(ExternalContract))]
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/GeneralSnippets.cs" id="generate_external_contract":::
 Prefer owning serialization annotations with the type whenever possible. Generating for external declaring assemblies broadens the compatibility surface and can increase build output.
 
 ## Other .NET languages

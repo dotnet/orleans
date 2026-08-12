@@ -35,32 +35,13 @@ Add [Microsoft.Orleans.Dashboard](https://www.nuget.org/packages/Microsoft.Orlea
 
 Call <xref:Orleans.Dashboard.ServiceCollectionExtensions.AddDashboard*?displayProperty=nameWithType> on the silo builder and map the route after building the ASP.NET Core app. A route prefix is recommended to avoid claiming the web application's root:
 
-```csharp
-builder.UseOrleans(siloBuilder =>
-{
-    siloBuilder
-        .UseLocalhostClustering()
-        .AddDashboard();
-});
-
-var app = builder.Build();
-
-app.MapOrleansDashboard("/dashboard")
-    .RequireAuthorization();
-```
+:::code language="csharp" source="../snippets/compiled/Dashboard/DashboardSnippets.cs" id="map_dashboard":::
 
 The route group includes static dashboard assets and its backing APIs. Apply authentication, authorization, rate limits, headers, and other endpoint conventions to the returned group rather than protecting only the HTML page. Use the policy-based configuration in the preceding secure dashboard example when dashboard access is limited to an operator role.
 
 ## Configure collection
 
-```csharp
-siloBuilder.AddDashboard(options =>
-{
-    options.HideTrace = true;
-    options.CounterUpdateIntervalMs = 2_000;
-    options.HistoryLength = 100;
-});
-```
+:::code language="csharp" source="../snippets/compiled/Dashboard/DashboardSnippets.cs" id="configure_dashboard":::
 
 | Option | Default | Operational effect |
 |---|---:|---|
@@ -70,13 +51,7 @@ siloBuilder.AddDashboard(options =>
 
 The dashboard registers a logging provider and collects runtime metrics for display. Method profiling adds an incoming grain-call filter. By default, profiling becomes inactive after one minute without dashboard queries. Continuous profiling is available but has ongoing overhead:
 
-```csharp
-builder.Services.Configure<GrainProfilerOptions>(options =>
-{
-    options.TraceAlways = true;
-    options.DeactivationTime = TimeSpan.FromMinutes(5);
-});
-```
+:::code language="csharp" source="../snippets/compiled/Dashboard/DashboardSnippets.cs" id="configure_profiler":::
 
 Leave <xref:Orleans.Dashboard.GrainProfilerOptions.TraceAlways> disabled unless continuous method statistics justify the cost. Load test representative traffic with the dashboard configuration you plan to deploy. Use <xref:Orleans.Dashboard.NoProfilingAttribute> on a grain class or method only when omitting it from dashboard method statistics is acceptable.
 
@@ -90,14 +65,7 @@ Co-hosting is the simplest setup and gives the dashboard access to local silo se
 
 An Orleans client can host the web UI:
 
-```csharp
-dashboardBuilder.UseOrleansClient(clientBuilder =>
-{
-    clientBuilder
-        .UseStaticClustering(options => options.Gateways.Add(gatewayAddress))
-        .AddDashboard();
-});
-```
+:::code language="csharp" source="../snippets/compiled/Dashboard/DashboardSnippets.cs" id="configure_dashboard_client":::
 
 Every silo must still call `AddDashboard()` so cluster data and profiling are available. Protect the client host's route and its network access to gateways. A separate host reduces direct HTTP exposure on silos, but it doesn't make the dashboard data non-sensitive.
 

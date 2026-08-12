@@ -56,6 +56,7 @@ export default defineConfig({
       plugins: [
         starlightLinksValidator({
           errorOnRelativeLinks: false,
+          exclude: ['/orleans/docs/api/csharp/**'],
         }),
         starlightLlmsTxt(),
       ],

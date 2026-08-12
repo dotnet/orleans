@@ -29,44 +29,17 @@ In such a scenario, there's no need to copy either the request or response byte 
 
 For user-defined types, you can add the <xref:Orleans.ImmutableAttribute> to the type. This instructs the Orleans serializer to avoid copying instances of this type. The following code snippet demonstrates using <xref:Orleans.ImmutableAttribute> to denote an immutable type. This type won't be copied during transmission.
 
-```csharp
-[Immutable]
-public class MyImmutableType
-{
-    public int MyValue { get; }
-
-    public MyImmutableType(int value)
-    {
-        MyValue = value;
-    }
-}
-```
+:::code language="csharp" source="../../snippets/compiled/Host/HostSnippets.cs" id="immutable_type":::
 
 Sometimes, you might not control the object; for example, it might be a `List<int>` you're sending between grains. Other times, parts of your objects might be immutable while others aren't. For these cases, Orleans supports additional options.
 
 1. Method signatures can include <xref:Orleans.ImmutableAttribute> on a per-parameter basis:
 
-    ```csharp
-    public interface ISummerGrain : IGrain
-    {
-      // `values` will not be copied.
-      ValueTask<int> Sum([Immutable] List<int> values);
-    }
-    ```
+    :::code language="csharp" source="../../snippets/compiled/Host/HostSnippets.cs" id="immutable_parameter":::
 
 1. Mark individual properties and fields as <xref:Orleans.ImmutableAttribute> to prevent copies when instances of the containing type are copied.
 
-    ```csharp
-    [GenerateSerializer]
-    public sealed class MyType
-    {
-        [Id(0), Immutable]
-        public List<int> ReferenceData { get; set; }
-
-        [Id(1)]
-        public List<int> RunningTotals { get; set; }
-    }
-    ```
+    :::code language="csharp" source="../../snippets/compiled/Host/HostSnippets.cs" id="immutable_members":::
 
 ### Use <xref:Orleans.Concurrency.Immutable`1>
 
@@ -74,27 +47,19 @@ Use the <xref:Orleans.Concurrency.Immutable`1> wrapper class to indicate a value
 
 To use <xref:Orleans.Concurrency.Immutable`1> in your grain interface, pass <xref:Orleans.Concurrency.Immutable`1> instead of `T`. For instance, in the scenario described above, the grain method was:
 
-```csharp
-Task<byte[]> ProcessRequest(byte[] request);
-```
+:::code language="csharp" source="../../snippets/compiled/Host/HostSnippets.cs" id="mutable_request":::
 
 Which would then become:
 
-```csharp
-Task<Immutable<byte[]>> ProcessRequest(Immutable<byte[]> request);
-```
+:::code language="csharp" source="../../snippets/compiled/Host/HostSnippets.cs" id="immutable_request":::
 
 To create an <xref:Orleans.Concurrency.Immutable`1>, simply use its constructor:
 
-```csharp
-Immutable<byte[]> immutable = new(buffer);
-```
+:::code language="csharp" source="../../snippets/compiled/Host/HostSnippets.cs" id="create_immutable":::
 
 To get the value inside the immutable wrapper, use the `.Value` property:
 
-```csharp
-byte[] buffer = immutable.Value;
-```
+:::code language="csharp" source="../../snippets/compiled/Host/HostSnippets.cs" id="read_immutable":::
 
 ## Immutability in Orleans
 

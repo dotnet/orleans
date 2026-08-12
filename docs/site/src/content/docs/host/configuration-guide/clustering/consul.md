@@ -19,61 +19,13 @@ Every silo and client in a cluster must use:
 
 Configure <xref:Orleans.Configuration.ConsulClusteringOptions> with the Consul address and, when Consul ACLs are enabled, an ACL token:
 
-```csharp
-var builder = Host.CreateApplicationBuilder(args);
-
-var consulAddress = new Uri(
-    builder.Configuration["Consul:Address"]
-        ?? throw new InvalidOperationException("Consul:Address isn't configured."));
-var consulToken = builder.Configuration["Consul:Token"];
-
-builder.UseOrleans(siloBuilder =>
-{
-    siloBuilder
-        .Configure<ClusterOptions>(options =>
-        {
-            options.ServiceId = "orders";
-            options.ClusterId = "production";
-        })
-        .UseConsulSiloClustering(options =>
-        {
-            options.ConfigureConsulClient(consulAddress, consulToken);
-            options.KvRootFolder = "orleans/orders";
-        });
-});
-
-await builder.Build().RunAsync();
-```
+:::code language="csharp" source="../../../snippets/compiled/Host/HostSnippets.cs" id="configure_consul_silo":::
 
 ## Configure a client
 
 Configure Orleans clients with the same Consul settings and cluster identity:
 
-```csharp
-var builder = Host.CreateApplicationBuilder(args);
-
-var consulAddress = new Uri(
-    builder.Configuration["Consul:Address"]
-        ?? throw new InvalidOperationException("Consul:Address isn't configured."));
-var consulToken = builder.Configuration["Consul:Token"];
-
-builder.UseOrleansClient(clientBuilder =>
-{
-    clientBuilder
-        .Configure<ClusterOptions>(options =>
-        {
-            options.ServiceId = "orders";
-            options.ClusterId = "production";
-        })
-        .UseConsulClientClustering(options =>
-        {
-            options.ConfigureConsulClient(consulAddress, consulToken);
-            options.KvRootFolder = "orleans/orders";
-        });
-});
-
-await builder.Build().RunAsync();
-```
+:::code language="csharp" source="../../../snippets/compiled/Host/HostSnippets.cs" id="configure_consul_client":::
 
 ## Inspect membership data
 

@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿// <file_grain_storage_factory>
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration.Overrides;
 using Orleans.Storage;
@@ -20,3 +21,4 @@ internal static class FileGrainStorageFactory
             services.GetProviderClusterOptions(name));
     }
 }
+// </file_grain_storage_factory>

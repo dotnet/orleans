@@ -1,3 +1,4 @@
+// <file_silo_builder_extensions>
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
@@ -41,3 +42,4 @@ public static class FileSiloBuilderExtensions
         return services;
     }
 }
+// </file_silo_builder_extensions>

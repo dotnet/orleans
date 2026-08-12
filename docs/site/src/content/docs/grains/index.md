@@ -15,27 +15,7 @@ Projects defining grain contracts or implementations reference [Microsoft.Orlean
 
 A grain interface derives from one of the grain key interfaces and declares asynchronous methods:
 
-```csharp
-public interface IShoppingCartGrain : IGrainWithStringKey
-{
-    ValueTask AddItem(CartItem item);
-
-    ValueTask<IReadOnlyList<CartItem>> GetItems();
-
-    Task Checkout();
-
-    Task<Receipt> GetReceipt();
-}
-
-[GenerateSerializer]
-public sealed record CartItem(
-    [Id(0)] string ProductId,
-    [Id(1)] int Quantity);
-
-[GenerateSerializer]
-public sealed record Receipt(
-    [Id(0)] string OrderId);
-```
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="grain_interface":::
 
 Orleans supports these grain method return types:
 
@@ -53,26 +33,7 @@ Arguments, return values, and exceptions cross process boundaries. Make applicat
 
 A grain class usually derives from <xref:Orleans.Grain> and implements one or more grain interfaces:
 
-```csharp
-public sealed class ShoppingCartGrain : Grain, IShoppingCartGrain
-{
-    private readonly List<CartItem> _items = [];
-
-    public ValueTask AddItem(CartItem item)
-    {
-        _items.Add(item);
-        return ValueTask.CompletedTask;
-    }
-
-    public ValueTask<IReadOnlyList<CartItem>> GetItems() =>
-        ValueTask.FromResult<IReadOnlyList<CartItem>>(_items.ToArray());
-
-    public Task Checkout() => Task.CompletedTask;
-
-    public Task<Receipt> GetReceipt() =>
-        Task.FromResult(new Receipt($"order-{this.GetPrimaryKeyString()}"));
-}
-```
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="grain_implementation":::
 
 Orleans creates grain classes through dependency injection. Constructor injection is available for application services, and <xref:Orleans.IGrainFactory> is available through <xref:Orleans.Grain.GrainFactory?displayProperty=nameWithType>.
 
@@ -83,13 +44,7 @@ Orleans creates grain classes through dependency injection. Constructor injectio
 
 Use <xref:Orleans.IGrainFactory.GetGrain*> with the interface and key:
 
-```csharp
-IShoppingCartGrain cart =
-    grainFactory.GetGrain<IShoppingCartGrain>("customer-42");
-
-await cart.AddItem(new CartItem("SKU-123", 2));
-IReadOnlyList<CartItem> items = await cart.GetItems();
-```
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="get_grain":::
 
 Getting a reference doesn't create or activate a grain. The first call that needs an activation causes Orleans to place and activate it. The reference remains valid if the activation moves, deactivates, or is recreated on another silo.
 
@@ -109,13 +64,7 @@ Distributed calls can be retried by application code or infrastructure after an 
 
 Configure a per-method timeout on the interface:
 
-```csharp
-public interface IReportGrain : IGrainWithGuidKey
-{
-    [ResponseTimeout("00:00:10")]
-    Task<Report> Generate(CancellationToken cancellationToken = default);
-}
-```
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="response_timeout":::
 
 Global defaults are configured through <xref:Orleans.Configuration.ClientMessagingOptions> and <xref:Orleans.Configuration.SiloMessagingOptions>. See [client configuration](../host/configuration-guide/client-configuration.md), [server configuration](../host/configuration-guide/server-configuration.md), and [cancellation tokens](cancellation-tokens.md).
 
@@ -123,19 +72,7 @@ Global defaults are configured through <xref:Orleans.Configuration.ClientMessagi
 
 Override the current lifecycle methods when a grain needs activation-scoped setup or cleanup:
 
-```csharp
-public override Task OnActivateAsync(CancellationToken cancellationToken)
-{
-    return base.OnActivateAsync(cancellationToken);
-}
-
-public override Task OnDeactivateAsync(
-    DeactivationReason reason,
-    CancellationToken cancellationToken)
-{
-    return base.OnDeactivateAsync(reason, cancellationToken);
-}
-```
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="activation_overrides":::
 
 <xref:Orleans.Grain.OnActivateAsync*> accepts a <xref:System.Threading.CancellationToken>; there is no parameterless overload. Deactivation callbacks are best effort and don't run after process termination or some failures, so don't rely on them to persist critical state.
 

@@ -1,0 +1,12 @@
+{
+  "description": "Packable source packages intentionally omitted from the user-facing package inventory.",
+  "packages": {
+    "Microsoft.Orleans.Analyzers": "Build-time analyzer implementation delivered transitively by Microsoft.Orleans.Sdk, not a direct application dependency.",
+    "Microsoft.Orleans.CodeGenerator": "Build-time source-generator implementation delivered transitively by Microsoft.Orleans.Sdk, not a direct application dependency.",
+    "Microsoft.Orleans.Core": "Low-level runtime dependency composed by the client and server metapackages; application authors should not select it as an entry point.",
+    "Microsoft.Orleans.Core.Abstractions": "Low-level contract assembly composed by Microsoft.Orleans.Sdk and the metapackages; direct use is reserved for narrow library scenarios.",
+    "Microsoft.Orleans.Runtime": "Low-level silo runtime implementation composed by Microsoft.Orleans.Server; application hosts should use the server metapackage.",
+    "Microsoft.Orleans.Serialization": "Low-level serializer runtime composed by Microsoft.Orleans.Sdk; applications select the SDK or a format integration package.",
+    "Microsoft.Orleans.Serialization.Abstractions": "Low-level serializer contracts composed by Microsoft.Orleans.Sdk; direct use is intended for serializer integration authors."
+  }
+}

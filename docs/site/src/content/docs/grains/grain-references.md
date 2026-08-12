@@ -15,17 +15,8 @@ References remain valid when Orleans deactivates, recreates, or migrates the tar
 
 Use <xref:Orleans.IGrainFactory.GetGrain*> from a client, hosted service, or grain:
 
-```csharp
-public interface ICounterGrain : IGrainWithStringKey
-{
-    ValueTask<int> Add(int amount);
-}
-
-ICounterGrain counter =
-    grainFactory.GetGrain<ICounterGrain>("orders-processed");
-
-int value = await counter.Add(1);
-```
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="counter_interface":::
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="get_counter_reference":::
 
 Within a class deriving from <xref:Orleans.Grain>, use its `GrainFactory` property. In other services, inject <xref:Orleans.IGrainFactory> or <xref:Orleans.IClusterClient>.
 
@@ -37,40 +28,9 @@ The interface and key are usually enough for Orleans to identify the grain type.
 
 When multiple classes implement the same interface, prefer distinct marker interfaces:
 
-```csharp
-public interface ICounterGrain : IGrainWithStringKey
-{
-    ValueTask<int> Add(int amount);
-}
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="marker_interfaces":::
 
-public interface IUpCounterGrain : ICounterGrain;
-
-public interface IDownCounterGrain : ICounterGrain;
-
-public sealed class UpCounterGrain : Grain, IUpCounterGrain
-{
-    private int _value;
-
-    public ValueTask<int> Add(int amount) =>
-        ValueTask.FromResult(_value += amount);
-}
-
-public sealed class DownCounterGrain : Grain, IDownCounterGrain
-{
-    private int _value;
-
-    public ValueTask<int> Add(int amount) =>
-        ValueTask.FromResult(_value -= amount);
-}
-```
-
-```csharp
-IUpCounterGrain up =
-    grainFactory.GetGrain<IUpCounterGrain>("counter");
-
-IDownCounterGrain down =
-    grainFactory.GetGrain<IDownCounterGrain>("counter");
-```
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="get_marker_references":::
 
 The two references have the same key but different grain types, so they address different logical grains.
 
@@ -80,18 +40,13 @@ For compatibility scenarios, <xref:Orleans.Metadata.DefaultGrainTypeAttribute> c
 
 If the same grain implementation supports another grain interface or extension interface, use <xref:Orleans.GrainExtensions.AsReference*>:
 
-```csharp
-IUserGrain user = grainFactory.GetGrain<IUserGrain>("user-42");
-IUserProfileGrain profile = user.AsReference<IUserProfileGrain>();
-```
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="cast_grain_reference":::
 
 This doesn't create a different grain. It creates another typed proxy for the same grain identity. The target grain type must support the requested interface.
 
 Within a grain, pass a reference to itself instead of passing `this`:
 
-```csharp
-IUserGrain self = this.AsReference<IUserGrain>();
-```
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="self_reference":::
 
 ## Reference equality and storage
 

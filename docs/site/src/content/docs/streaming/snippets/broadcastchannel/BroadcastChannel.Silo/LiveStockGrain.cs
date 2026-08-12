@@ -1,4 +1,5 @@
-﻿using System.Collections.Concurrent;
+﻿// <broadcast_channel_live_stock_grain>
+using System.Collections.Concurrent;
 using BroadcastChannel.GrainInterfaces;
 using Orleans.BroadcastChannel;
 
@@ -38,3 +39,4 @@ public sealed class LiveStockGrain :
         return Task.CompletedTask;
     }
 }
+// </broadcast_channel_live_stock_grain>

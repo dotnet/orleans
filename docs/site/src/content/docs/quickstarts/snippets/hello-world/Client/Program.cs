@@ -1,3 +1,4 @@
+// <first_orleans_app_client_program>
 using GrainInterfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -20,3 +21,4 @@ var response = await friend.SayHello("Hi friend");
 Console.WriteLine(response);
 
 await host.StopAsync();
+// </first_orleans_app_client_program>

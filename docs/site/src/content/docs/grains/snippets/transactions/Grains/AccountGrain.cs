@@ -1,4 +1,5 @@
-﻿namespace TransactionalExample.Grains;
+﻿// <transactions_account_grain>
+namespace TransactionalExample.Grains;
 
 [Reentrant]
 public class AccountGrain : Grain, IAccountGrain
@@ -31,3 +32,4 @@ public class AccountGrain : Grain, IAccountGrain
     public Task<decimal> GetBalance() =>
         _balance.PerformRead(balance => balance.Value);
 }
+// </transactions_account_grain>

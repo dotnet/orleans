@@ -83,7 +83,7 @@ The implementation inherits from <xref:Orleans.Grain> and implements `IHello`. O
 
 Replace _Silo/Program.cs_ with the following code:
 
-:::code source="snippets/hello-world/Silo/Program.cs":::
+:::code source="snippets/hello-world/Silo/Program.cs" id="first_orleans_app_silo_program":::
 
 <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*> adds the Orleans silo to the [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensions/generic-host). <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalhostClustering*> configures development-only clustering and gateway endpoints on the local machine.
 
@@ -93,7 +93,7 @@ The silo project references **Grains**, so the runtime can discover and activate
 
 Replace _Client/Program.cs_ with the following code:
 
-:::code source="snippets/hello-world/Client/Program.cs":::
+:::code source="snippets/hello-world/Client/Program.cs" id="first_orleans_app_client_program":::
 
 <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*> adds an external Orleans client to the Generic Host. The client uses the same localhost clustering configuration as the silo. After the host starts, the client resolves <xref:Orleans.IGrainFactory> from dependency injection, obtains a grain reference, and invokes the grain.
 

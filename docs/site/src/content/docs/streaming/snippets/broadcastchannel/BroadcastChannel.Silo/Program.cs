@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿// <broadcast_channel_silo_program>
+using System.Text.Json;
 using BroadcastChannel.GrainInterfaces;
 using BroadcastChannel.Silo.Options;
 using BroadcastChannel.Silo.Services;
@@ -30,3 +31,4 @@ await Host.CreateDefaultBuilder(args)
                 options => options.FireAndForgetDelivery = false));
     })
     .RunConsoleAsync();
+// </broadcast_channel_silo_program>

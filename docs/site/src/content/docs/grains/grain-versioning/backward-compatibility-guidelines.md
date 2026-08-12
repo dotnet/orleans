@@ -15,21 +15,7 @@ Don't remove or change the signature of a method while callers using it remain d
 
 Add a new method instead of repurposing an existing one:
 
-```csharp
-[Version(2)]
-public interface IInventoryGrain : IGrainWithStringKey
-{
-    // Retained for version 1 callers.
-    Task<int> ReserveAsync(string sku, int quantity);
-
-    // Added for version 2 callers.
-    Task<ReservationResult> ReserveWithIdAsync(
-        string operationId,
-        string sku,
-        int quantity);
-}
-```
-
+:::code language="csharp" source="../../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="versioned_inventory_interface":::
 Mark the old method `[Obsolete]` to stop new usage, but keep it until telemetry and deployment state show no older callers remain.
 
 ## Preserve payload contracts

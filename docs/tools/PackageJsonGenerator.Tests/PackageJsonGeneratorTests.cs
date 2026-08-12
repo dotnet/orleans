@@ -596,7 +596,7 @@ public sealed class PackageJsonGeneratorTests
     }
 
     [Fact]
-    public void GeneratePackageJson_EmitsOnlyPublicTypesAndMembersDeclaredByTheirOwningType()
+    public void GeneratePackageJson_EmitsPublicTypesAndExternallyVisibleMembersDeclaredByTheirOwningType()
     {
         using var assembly = TestAssembly.Create(
             """
@@ -606,7 +606,9 @@ public sealed class PackageJsonGeneratorTests
             {
                 public void Inherited() { }
                 protected void Protected() { }
+                protected internal void ProtectedInternal() { }
                 internal void Internal() { }
+                private protected void PrivateProtected() { }
                 private void Private() { }
             }
 
@@ -645,8 +647,8 @@ public sealed class PackageJsonGeneratorTests
                 "Sample.Library.Derived.VisibleNested",
             ],
             types.Select(type => type.GetProperty("fullName").GetString()));
-        Assert.Equal([".ctor", "Inherited"], GetMemberNames(types, "Sample.Library.Base"));
-        Assert.Equal([".ctor", "Own"], GetMemberNames(types, "Sample.Library.Derived"));
+        Assert.Equal([".ctor", "Inherited", "Protected", "ProtectedInternal"], GetMemberNames(types, "Sample.Library.Base"));
+        Assert.Equal([".ctor", "Own", "ProtectedOwn"], GetMemberNames(types, "Sample.Library.Derived"));
         Assert.Equal([".ctor", "NestedOwn"], GetMemberNames(types, "Sample.Library.Derived.VisibleNested"));
     }
 

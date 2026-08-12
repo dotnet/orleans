@@ -44,7 +44,7 @@ When the workload certificate is installed in an operating system certificate st
 
 Set `allowInvalid` to `false` outside isolated development environments. The store overload requires an accessible private key and selects a certificate suitable for the workload role. Ensure the selected certificate has every EKU required by the authentication model; in particular, a silo certificate used for mTLS needs both Server Authentication and Client Authentication.
 
-Choose <xref:System.Security.Cryptography.X509Certificates.StoreLocation.CurrentUser> or <xref:System.Security.Cryptography.X509Certificates.StoreLocation.LocalMachine> according to the identity which runs the process, and grant that identity access to the private key. If a subject name can match more than one deployment certificate, load the intended certificate explicitly or use a certificate selector with an issuer, thumbprint, or other deployment-specific identity check.
+Choose [CurrentUser](xref:System.Security.Cryptography.X509Certificates.StoreLocation) or [LocalMachine](xref:System.Security.Cryptography.X509Certificates.StoreLocation) according to the identity which runs the process, and grant that identity access to the private key. If a subject name can match more than one deployment certificate, load the intended certificate explicitly or use a certificate selector with an issuer, thumbprint, or other deployment-specific identity check.
 
 ### PKCS#12/PFX file
 

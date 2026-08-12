@@ -16,7 +16,7 @@ Orleans provides two serializer implementations:
 - [Microsoft.Orleans.Serialization.SystemTextJson](https://nuget.org/packages/Microsoft.Orleans.Serialization.SystemTextJson)
 - [Microsoft.Orleans.Serialization.NewtonsoftJson](https://nuget.org/packages/Microsoft.Orleans.Serialization.NewtonsoftJson)
 
-To configure either of these packages, see [Serialization configuration in Orleans](serialization-configuration.md?pivots=orleans-7-0).
+To configure either of these packages, see [Serialization configuration in Orleans](serialization-configuration.md).
 
 ## Custom serializer implementation
 
@@ -30,31 +30,7 @@ Start by implementing the following Orleans serialization interfaces:
 
 Consider the following example of a custom serializer implementation:
 
-```csharp
-internal sealed class CustomOrleansSerializer :
-    IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
-{
-    void IFieldCodec.WriteField<TBufferWriter>(
-        ref Writer<TBufferWriter> writer,
-        uint fieldIdDelta,
-        Type expectedType,
-        object value) =>
-        throw new NotImplementedException();
-
-    object IFieldCodec.ReadValue<TInput>(
-        ref Reader<TInput> reader, Field field) =>
-        throw new NotImplementedException();
-
-    bool IGeneralizedCodec.IsSupportedType(Type type) =>
-        throw new NotImplementedException();
-
-    object IDeepCopier.DeepCopy(object input, CopyContext context) =>
-        throw new NotImplementedException();
-
-    bool IGeneralizedCopier.IsSupportedType(Type type) =>
-        throw new NotImplementedException();
-}
-```
+:::code language="csharp" source="../../snippets/compiled/Host/HostSnippets.cs" id="custom_serializer":::
 
 In the preceding example implementation:
 
@@ -63,27 +39,6 @@ In the preceding example implementation:
 
 The next step is to register your serializer with the Orleans runtime. This is typically achieved by extending <xref:Orleans.Serialization.ISerializerBuilder> and exposing a custom `AddCustomSerializer` extension method. The following example demonstrates the typical pattern:
 
-```csharp
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Serialization;
-using Orleans.Serialization.Serializers;
-using Orleans.Serialization.Cloning;
-
-public static class SerializationHostingExtensions
-{
-    public static ISerializerBuilder AddCustomSerializer(
-        this ISerializerBuilder builder)
-    {
-        var services = builder.Services;
-
-        services.AddSingleton<CustomOrleansSerializer>();
-        services.AddSingleton<IGeneralizedCodec, CustomOrleansSerializer>();
-        services.AddSingleton<IGeneralizedCopier, CustomOrleansSerializer>();
-        services.AddSingleton<ITypeFilter, CustomOrleansSerializer>();
-
-        return builder;
-    }
-}
-```
+:::code language="csharp" source="../../snippets/compiled/Host/SerializationRegistrationSnippets.cs" id="register_custom_serializer":::
 
 Additional considerations would be to expose an overload that accepts custom serialization options specific to your custom implementation. These options could be configured along with the registration in the builder. These options could be dependency injected into your custom serializer implementation.

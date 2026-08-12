@@ -23,13 +23,7 @@ The Bicep entry point `infra/linux/main.bicep` creates:
 
 App Service's HTTP front end can't route Orleans silo-to-silo connections. Each worker reads `WEBSITE_PRIVATE_IP` and the first value in `WEBSITE_PRIVATE_PORTS`, then advertises that dynamically allocated silo endpoint. It uses the read-only `WEBSITE_INSTANCE_ID` as its Orleans silo name for diagnostics. It listens on all local interfaces because the advertised address isn't guaranteed to be locally bindable:
 
-```csharp
-siloBuilder.ConfigureEndpoints(
-    privateIp,
-    siloPort,
-    gatewayPort: 0,
-    listenOnAnyHostAddress: true);
-```
+:::code language="csharp" source="../snippets/compiled/Deployment/DeploymentSnippets.cs" id="configure_app_service_endpoints":::
 
 The private address and ports are documented common App Service settings, not Windows-only settings. However, Microsoft doesn't document an Orleans-specific Linux mapping guarantee. Treat deployment validation as mandatory:
 

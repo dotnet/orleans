@@ -1,3 +1,4 @@
+// <service_fabric_orleans_stateless_service>
 using System.Fabric;
 using Microsoft.Extensions.Hosting;
 using Microsoft.ServiceFabric.Services.Communication.Runtime;
@@ -19,3 +20,4 @@ internal sealed class OrleansStatelessService(
             "Orleans");
     }
 }
+// </service_fabric_orleans_stateless_service>

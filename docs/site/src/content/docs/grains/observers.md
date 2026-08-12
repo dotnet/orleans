@@ -15,86 +15,24 @@ Observers aren't durable subscriptions. A client can disconnect without notice, 
 
 Observer interfaces derive from <xref:Orleans.IGrainObserver>:
 
-```csharp
-public interface IChatObserver : IGrainObserver
-{
-    Task ReceiveMessage(string room, string message);
-}
-
-public sealed class ChatObserver : IChatObserver
-{
-    public Task ReceiveMessage(string room, string message)
-    {
-        Console.WriteLine($"[{room}] {message}");
-        return Task.CompletedTask;
-    }
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/ServicesAndObserversSnippets.cs" id="chat_observer":::
 Use asynchronous return types. Avoid `async void`. Apply <xref:Orleans.Concurrency.OneWayAttribute> only when notifications are deliberately best effort and the publisher doesn't need exceptions or completion.
 
 ## Create and remove a client observer reference
 
 Convert the local object into an addressable reference:
 
-```csharp
-var observer = new ChatObserver();
-IChatObserver observerReference =
-    grainFactory.CreateObjectReference<IChatObserver>(observer);
-
-IChatRoomGrain room =
-    grainFactory.GetGrain<IChatRoomGrain>("general");
-
-await room.Subscribe(observerReference);
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/ServicesAndObserversSnippets.cs" id="subscribe_observer":::
 Keep a strong reference to the local observer for as long as it should receive calls. When finished, unsubscribe and delete the object reference:
 
-```csharp
-await room.Unsubscribe(observerReference);
-grainFactory.DeleteObjectReference<IChatObserver>(observerReference);
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/ServicesAndObserversSnippets.cs" id="unsubscribe_observer":::
 Deleting the reference releases the client-side registration. Failing to delete long-lived registrations can leak resources.
 
 ## Manage subscriptions in a grain
 
 <xref:Orleans.Utilities.ObserverManager`1> tracks observers, expires stale entries, and removes observers whose notifications fail:
 
-```csharp
-public sealed class ChatRoomGrain : Grain, IChatRoomGrain
-{
-    private readonly ObserverManager<IChatObserver> _observers;
-
-    public ChatRoomGrain(ILogger<ChatRoomGrain> logger)
-    {
-        _observers = new(
-            TimeSpan.FromMinutes(5),
-            logger);
-    }
-
-    public Task Subscribe(IChatObserver observer)
-    {
-        _observers.Subscribe(observer, observer);
-        return Task.CompletedTask;
-    }
-
-    public Task Unsubscribe(IChatObserver observer)
-    {
-        _observers.Unsubscribe(observer);
-        return Task.CompletedTask;
-    }
-
-    public Task Publish(string message)
-    {
-        return _observers.Notify(
-            observer => observer.ReceiveMessage(
-                this.GetPrimaryKeyString(),
-                message));
-    }
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/ServicesAndObserversSnippets.cs" id="chat_room_observer_manager":::
 The current API is <xref:Orleans.Utilities.ObserverManager`2.Notify*>, including the overload that accepts <xref:System.Func`2> returning a <xref:System.Threading.Tasks.Task>. There is no `NotifyAsync` method.
 
 Subscriptions expire lazily after <xref:Orleans.Utilities.ObserverManager`2.ExpirationDuration>. Clients should renew before expiry. A notification exception causes <xref:Orleans.Utilities.ObserverManager`1> to remove that observer; it doesn't fail the entire publish operation.
@@ -105,13 +43,7 @@ Use <xref:Orleans.Utilities.ObserverManager`2> when the subscription identity sh
 
 A grain can implement an observer interface and pass a reference to itself:
 
-```csharp
-IChatObserver observer =
-    this.AsReference<IChatObserver>();
-
-await room.Subscribe(observer);
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/ServicesAndObserversSnippets.cs" id="subscribe_grain_observer":::
 Don't call <xref:Orleans.IGrainFactory.CreateObjectReference*> for a grain. Grains are already addressable.
 
 ## Execution and cancellation

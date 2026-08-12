@@ -5,7 +5,8 @@ The conceptual Markdown sources live under `src/content/docs`;
 `npm run prepare:docs` emits ignored `.mdx` siblings under `/docs/` so Starlight
 can render the imported Microsoft Learn syntax.
 
-Use Node.js 24 or later:
+Use Node.js 24 or later and the .NET SDK selected by the repository's
+`global.json`.
 
 ```powershell
 npm install
@@ -27,11 +28,92 @@ npm run preview
 ```
 
 Run the focused conversion tests, Astro type checks, strict snippet expansion,
-Starlight link validation, Pagefind indexing, and production build with:
+source-quality and aggregate project policy audits, Starlight link validation,
+Pagefind indexing, and production build with:
 
 ```powershell
 npm run validate
 ```
+
+The source audit reports a rule ID, file, line, and remediation. It enforces:
+
+- Orleans 10 guidance outside migration pages and explicitly versioned compatibility zones.
+- Exactly one `toc.yml` entry per maintained conceptual page, with `includes` and
+  snippet support files excluded; Architecture and internals and Event Sourcing
+  remain first-class navigation sections.
+- Package and stream-provider inventories against source project metadata,
+  activity sources and lifecycle stages against source/API constants, documented
+  metric names against `InstrumentNames.cs`, and sample paths against
+  `samples/gallery.json`.
+- Compiler-checked C# examples referenced with `:::code` named regions. Inline C#
+  fences fail source auditing; put partial examples in shared source files and
+  supply hidden scaffolding outside the displayed region.
+- Source-aware and rendered link validation. Migrated Microsoft Learn-relative
+  links must use canonical `https://learn.microsoft.com/...` URLs; rendered
+  routes, encoded paths, redirects, and anchors must resolve under `/orleans/`.
+  Source diagnostics include file/line provenance.
+- Generated links to this repository are checked against the local checkout.
+  Remaining external HTTP(S) validation uses bounded concurrency, redirects,
+  timeouts, retries, and host-specific HEAD-to-GET fallback. Definitive broken
+  targets fail. Rate limits and transient network failures are reported explicitly
+  without making CI nondeterministic. Pull-request content is untrusted: the probe
+  rejects credentials, non-default ports, and any hostname/IP which can reach
+  private, loopback, link-local, metadata, or other non-public networks. DNS
+  answers are validated and pinned into the actual TLS connection at every
+  redirect hop, so contributors cannot use redirects, rebinding, or proxy
+  environment variables to turn link validation into an internal-network request.
+
+`npm run build` and `npm run validate` discover every project under `docs/` and
+`samples/`, require exact membership in `docs/Docs.slnx` and
+`samples/Samples.slnx`, evaluate an exact `net10.0` target, and require every
+Orleans package reference to resolve to `10.2.2`. Historical package versions are
+accepted only in a migration project with a used, meaningful
+`OrleansDocumentationVersionException` property. A sample awaiting publication
+may use a prerelease of `10.2.2` with the same property and a specific reason. To
+build and test the documentation projects locally, run:
+
+```powershell
+dotnet test ../Docs.slnx --configuration Release --framework net10.0 -p:BuildExternalAssets=false -- -parallel none -noshadow
+```
+
+Build samples through `samples/Build-Samples.ps1`, which packs the current Orleans
+sources to a local feed before building `samples/Samples.slnx`.
+
+To compile only the checked-in documentation snippet projects sequentially, run:
+
+```powershell
+pwsh src/content/docs/validate-snippets.ps1
+```
+
+Fix `DOCS001` by keeping current-release documentation versionless, moving
+version-specific guidance into `migration/` or upgrade pages, or linking to those
+pages. Fix `DOCS002`/`DOCS003` in `toc.yml`. For `DOCS004`, move the inline C#
+example to a named region in a compiled snippet project and add hidden context
+outside the region. For `DOCS005`, synchronize the authored reference with the
+named source inventory.
+Every packable Orleans source package must be documented or have a reasoned entry
+in `src/data/package-inventory-exclusions.json`.
+Fix `PROJECT001`-`PROJECT003` by adding or removing documentation projects in
+`docs/Docs.slnx` and sample projects in `samples/Samples.slnx` until filesystem
+discovery matches exactly. Fix `PROJECT004` by targeting only `net10.0`, and fix
+`PROJECT005` by updating the effective Orleans package version to `10.2.2`.
+`PROJECT006` identifies an invalid, vague, or stale version exception. Fix
+`SNIPPET001`/`SNIPPET002` in the reported snippet project before rebuilding.
+When adding a project, pass `--include-references false` and use a solution folder
+which matches its path under `docs/` or `samples/`; repository source dependencies
+build transitively and aren't direct `Docs.slnx` entries.
+Fix `LINK001` using the canonical URL in its remediation. Rendered-link failures
+name the source file/line when the authored link can be mapped, otherwise the
+rendered route. `src/data/external-link-allowlist.json` accepts exact URLs only;
+each entry needs a narrow reason and remains actively probed, so reachable or
+unreferenced entries fail as stale. A generated API package awaiting its first
+NuGet publication also needs a temporary entry in
+`src/data/unpublished-api-packages.json`; remove both entries after publication.
+
+Options remain an intentionally curated shortlist rather than a generated
+catalog; the audit requires that page to identify the generated API reference as
+the exhaustive source. Metric prose is similarly selective, but every metric
+identifier it names must exist in runtime source.
 
 The samples page reads `samples/gallery.json` from the repository root. When the
 catalog is absent, development builds render an explanatory empty state.
@@ -52,8 +134,9 @@ Generate API data before previewing API pages or running a complete local build:
 npm run api:generate
 ```
 
-GitHub Actions generates API data on demand, compiles documentation snippets and
-samples, builds the complete site, and deploys `dist` to GitHub Pages from `main`.
+GitHub Actions generates API data on demand, builds `docs/Docs.slnx` with a
+diagnostic binlog, builds the complete site, and deploys `dist` to GitHub Pages
+from `main`.
 Pull requests receive a downloadable site artifact but never receive deployment
 permissions.
 
@@ -67,6 +150,10 @@ site owns it; retired documentation and blog URLs redirect to the nearest
 current documentation entry point. Explicit replacements in
 `src/data/redirects.json` preserve inbound anchors and override the automatic
 legacy-path matching.
+
+`npm run audit:links` validates source-authored external links and every rendered
+internal route and anchor. It runs automatically from both `npm run build` and
+`npm run validate`.
 
 `npm run audit:output` scans the complete rendered site for duplicate or missing
 page headings, leaked Microsoft Learn directives, malformed API signatures and

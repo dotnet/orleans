@@ -13,10 +13,7 @@ ms.topic: concept-article
 
 Await <xref:Orleans.EventSourcing.JournaledGrain`2.ConfirmEvents*> before returning when the grain method promises a confirmed result:
 
-```csharp
-RaiseEvent(new Deposited(amount));
-await ConfirmEvents();
-```
+:::code language="csharp" source="../../snippets/compiled/EventSourcing/EventSourcingSnippets.cs" id="immediate_confirmation":::
 
 Also await conditional-event tasks. Without reentrant or interleavable calls, this prevents another turn from observing the grain between submission and confirmation.
 

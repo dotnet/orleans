@@ -1,3 +1,4 @@
+// <custom_grain_storage_program>
 using GrainStorage;
 using Microsoft.Extensions.Hosting;
 
@@ -16,3 +17,4 @@ builder.UseOrleans(siloBuilder =>
 
 using var host = builder.Build();
 await host.RunAsync();
+// </custom_grain_storage_program>

@@ -13,19 +13,7 @@ Reference `Microsoft.Orleans.EventSourcing` from the grain implementation projec
 
 Register one or more providers on the silo:
 
-```csharp
-builder.UseOrleans(siloBuilder =>
-{
-    siloBuilder
-        .AddAzureBlobGrainStorage("eventStore", options =>
-        {
-            options.ConfigureBlobServiceClient(
-                builder.Configuration.GetConnectionString("eventStore"));
-        })
-        .AddStateStorageBasedLogConsistencyProvider("snapshots")
-        .AddLogStorageBasedLogConsistencyProvider("shortLogs");
-});
-```
+:::code language="csharp" source="../../snippets/compiled/EventSourcing/EventSourcingSnippets.cs" id="register_log_consistency":::
 
 Available registration methods are:
 
@@ -39,29 +27,13 @@ Each also has an `AsDefault` form. If a default log-consistency provider and def
 
 State storage and log storage use a standard grain storage provider:
 
-```csharp
-[LogConsistencyProvider(ProviderName = "snapshots")]
-[StorageProvider(ProviderName = "eventStore")]
-public sealed class AccountGrain
-    : JournaledGrain<AccountState, AccountEvent>, IAccountGrain
-{
-}
-```
+:::code language="csharp" source="../../snippets/compiled/EventSourcing/EventSourcingSnippets.cs" id="select_log_consistency_provider":::
 
 The provider names must exactly match registrations on every silo capable of activating the grain.
 
 Custom storage doesn't use <xref:Orleans.Storage.IGrainStorage>. The grain implements <xref:Orleans.EventSourcing.CustomStorage.ICustomStorageInterface`2> and owns the storage operations:
 
-```csharp
-[LogConsistencyProvider(ProviderName = "custom")]
-public sealed class AccountGrain
-    : JournaledGrain<AccountState, AccountEvent>,
-      IAccountGrain,
-      ICustomStorageInterface<AccountState, AccountEvent>
-{
-    // Implement ReadStateFromStorage and ApplyUpdatesToStorage.
-}
-```
+:::code language="csharp" source="../../snippets/compiled/EventSourcing/EventSourcingSnippets.cs" id="custom_storage_grain":::
 
 ## Multi-cluster responsibility
 

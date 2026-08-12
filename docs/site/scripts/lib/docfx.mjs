@@ -1,7 +1,14 @@
-import { access, readFile, realpath } from 'node:fs/promises';
+import { access, readFile, readdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
+import { collectIncludeTargets as collectIncludeTargetsWithoutYaml } from './include-closure.mjs';
+import {
+  lineOverlapsRanges,
+  markdownBlockquoteLineRanges,
+  markdownDirectiveProtectedLineRanges,
+  markdownLiteralLineRanges,
+} from './markdown-ranges.mjs';
 
 const markdownExtensions = new Set(['.md', '.markdown', '.mdown', '.mkdn', '.mkd', '.mdwn']);
 const directiveAttributePattern = /([\w-]+)="([^"]*)"/g;
@@ -9,6 +16,21 @@ const learnDocsPrefix = '/dotnet/orleans';
 const contentRoot = '/docs';
 const deploymentBase = '/orleans';
 const siteBase = `${deploymentBase}${contentRoot}`;
+
+export function isSnippetSupportMarkdown(relativePath) {
+  const segments = relativePath.split(/[\\/]/);
+  return (
+    path.basename(relativePath).toLowerCase() === 'readme.md' &&
+    segments.some((segment) => /^snippets(?:-v3)?$/i.test(segment))
+  );
+}
+
+export function isDocumentationFragmentMarkdown(relativePath) {
+  return (
+    relativePath.split(/[\\/]/).some((segment) => segment.toLowerCase() === 'includes') ||
+    isSnippetSupportMarkdown(relativePath)
+  );
+}
 
 function toPath(value) {
   return value instanceof URL ? fileURLToPath(value) : path.resolve(value);
@@ -126,6 +148,58 @@ function toPosix(value) {
   return value.split(path.sep).join('/');
 }
 
+function isPathWithin(root, target) {
+  const relative = path.relative(root, target);
+  return (
+    relative === '' ||
+    (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
+  );
+}
+
+async function resolveCodeSource({ requestedSource, sourcePath, sourceLine, allowedRoots }) {
+  const roots = allowedRoots.map((root) => path.resolve(root));
+  const boundary = roots.join(', ');
+  const context = `${sourcePath}:${sourceLine}`;
+  if (path.isAbsolute(requestedSource)) {
+    throw new Error(
+      `Code source '${requestedSource}' in ${context} must be relative and remain within allowed snippet root(s): ${boundary}.`,
+    );
+  }
+
+  const logicalPath = path.resolve(path.dirname(sourcePath), requestedSource);
+  const containingRootIndexes = roots
+    .map((root, index) => (isPathWithin(root, logicalPath) ? index : -1))
+    .filter((index) => index >= 0);
+  if (containingRootIndexes.length === 0) {
+    throw new Error(
+      `Code source '${requestedSource}' in ${context} resolves outside allowed snippet root(s): ${boundary}.`,
+    );
+  }
+  try {
+    await access(logicalPath);
+  } catch {
+    throw new Error(
+      `Code source '${requestedSource}' in ${context} does not exist (${logicalPath}). Allowed snippet root(s): ${boundary}.`,
+    );
+  }
+
+  const [physicalPath, ...physicalRoots] = await Promise.all([
+    realpath(logicalPath),
+    ...roots.map((root) => realpath(root)),
+  ]);
+  if (
+    !containingRootIndexes.some((rootIndex) =>
+      isPathWithin(physicalRoots[rootIndex], physicalPath),
+    )
+  ) {
+    throw new Error(
+      `Code source '${requestedSource}' in ${context} resolves through a link outside allowed snippet root(s): ${boundary}.`,
+    );
+  }
+
+  return logicalPath;
+}
+
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -197,14 +271,6 @@ async function resolveIncludePath(sourcePath, reference, includeRoot) {
   return target;
 }
 
-export function isSnippetSupportMarkdown(relativePath) {
-  const segments = relativePath.split(/[\\/]/);
-  return (
-    path.basename(relativePath).toLowerCase() === 'readme.md' &&
-    segments.some((segment) => /^snippets(?:-v3)?$/i.test(segment))
-  );
-}
-
 function rebaseReference(reference, fromFile, toFile) {
   if (
     reference.length === 0 ||
@@ -254,7 +320,7 @@ export function splitFrontmatter(source) {
   const normalized = source.replace(/^\uFEFF/, '');
   const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(normalized);
   if (!match) {
-    return { metadata: {}, body: normalized };
+    return { metadata: {}, body: normalized, bodyStartLine: 1 };
   }
 
   const metadata = YAML.parse(match[1]) ?? {};
@@ -265,6 +331,7 @@ export function splitFrontmatter(source) {
   return {
     metadata,
     body: normalized.slice(match[0].length),
+    bodyStartLine: match[0].split(/\r?\n/).length,
   };
 }
 
@@ -355,17 +422,34 @@ export function parseDirectiveAttributes(value, context) {
   return attributes;
 }
 
-async function expandIncludesInternal(source, sourcePath, stack, includeRoot) {
+async function expandIncludesInternal(source, sourcePath, stack, includeRoot, codeOptions) {
   const lines = source.replaceAll('\r\n', '\n').split('\n');
   const output = [];
+  const protectedLineRanges = /\[!INCLUDE|:::code/.test(source)
+    ? markdownDirectiveProtectedLineRanges(source)
+    : [];
 
-  for (const line of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (lineOverlapsRanges(index + 1, protectedLineRanges)) {
+      output.push(line);
+      continue;
+    }
     const match = /^(\s*)\[!INCLUDE\s+\[([^\]]+)\]\(([^)]+)\)\]\s*$/.exec(line);
     if (!match) {
       if (line.includes('[!INCLUDE')) {
         throw new Error(`Unsupported INCLUDE syntax in ${sourcePath}: ${line.trim()}`);
       }
-      output.push(line);
+      output.push(
+        codeOptions
+          ? await convertCodeDirectives(
+              line,
+              sourcePath,
+              codeOptions.allowedRoots,
+              codeOptions.firstSourceLine + index,
+            )
+          : line,
+      );
       continue;
     }
 
@@ -376,9 +460,15 @@ async function expandIncludesInternal(source, sourcePath, stack, includeRoot) {
     }
 
     const includeSource = await readFile(includePath, 'utf8');
-    const { body } = splitFrontmatter(includeSource);
+    const { body, bodyStartLine } = splitFrontmatter(includeSource);
     const expanded = rebaseIncludedReferences(
-      await expandIncludesInternal(body, includePath, [...stack, includePath], includeRoot),
+      await expandIncludesInternal(
+        body,
+        includePath,
+        [...stack, includePath],
+        includeRoot,
+        codeOptions ? { ...codeOptions, firstSourceLine: bodyStartLine } : undefined,
+      ),
       includePath,
       sourcePath,
     );
@@ -410,48 +500,13 @@ export async function expandIncludes(source, sourcePath, includeRoot = path.dirn
   return expandIncludesInternal(source, resolvedSource, [resolvedSource], includeRoot);
 }
 
-export async function collectIncludeTargets(
-  markdownFiles,
-  includeRoot = path.dirname(markdownFiles[0] ?? '.'),
-) {
-  const targets = new Set();
-  const visited = new Set();
-  const resolvedRoot = await realpath(includeRoot);
-
-  async function collect(filePath, stack = []) {
-    const resolvedPath = await realpath(filePath);
-    if (!isWithinRoot(resolvedRoot, resolvedPath)) {
-      throw new Error(`Documentation source '${resolvedPath}' is outside ${resolvedRoot}.`);
-    }
-    if (stack.includes(resolvedPath)) {
-      throw new Error(`Circular INCLUDE detected: ${[...stack, resolvedPath].join(' -> ')}`);
-    }
-    if (visited.has(resolvedPath)) {
-      return;
-    }
-    visited.add(resolvedPath);
-
-    const source = await readFile(resolvedPath, 'utf8');
-    const { body } = splitFrontmatter(source);
-    for (const line of body.replaceAll('\r\n', '\n').split('\n')) {
-      const match = /^\s*\[!INCLUDE\s+\[[^\]]+\]\(([^)]+)\)\]\s*$/.exec(line);
-      if (!match) {
-        if (line.includes('[!INCLUDE')) {
-          throw new Error(`Unsupported INCLUDE syntax in ${resolvedPath}: ${line.trim()}`);
-        }
-        continue;
-      }
-
-      const target = await resolveIncludePath(resolvedPath, match[1], resolvedRoot);
-      targets.add(target);
-      await collect(target, [...stack, resolvedPath]);
-    }
-  }
-
-  for (const file of markdownFiles) {
-    await collect(file);
-  }
-  return targets;
+export async function collectIncludeTargets(markdownFiles, optionsOrRoot = {}) {
+  const options =
+    typeof optionsOrRoot === 'string' ? { allowedRoot: optionsOrRoot } : optionsOrRoot;
+  return collectIncludeTargetsWithoutYaml(markdownFiles, {
+    ...options,
+    splitFrontmatter,
+  });
 }
 
 function findRegion(lines, id, sourcePath) {
@@ -496,7 +551,11 @@ function findRegion(lines, id, sourcePath) {
       }
       if (style.nestedClose.test(lines[index])) {
         if (depth === 0 && style.close.test(lines[index])) {
-          return lines.slice(start + 1, index);
+          return lines
+            .slice(start + 1, index)
+            .filter(
+              (line) => !style.nestedOpen.test(line) && !style.nestedClose.test(line),
+            );
         }
         depth -= 1;
       }
@@ -587,13 +646,16 @@ function codeFenceFor(lines) {
   return '`'.repeat(Math.max(3, maximum + 1));
 }
 
-async function convertCodeDirectives(source, sourcePath) {
+async function convertCodeDirectives(source, sourcePath, allowedRoots, firstSourceLine) {
   const output = [];
-  for (const line of source.replaceAll('\r\n', '\n').split('\n')) {
+  const sourceLines = source.replaceAll('\r\n', '\n').split('\n');
+  for (let index = 0; index < sourceLines.length; index += 1) {
+    const line = sourceLines[index];
+    const sourceLine = firstSourceLine + index;
     const match = /^(\s*):::code\s+(.+?)\s*$/.exec(line);
     if (!match) {
       if (line.includes(':::code')) {
-        throw new Error(`Unsupported code directive in ${sourcePath}: ${line.trim()}`);
+        throw new Error(`Unsupported code directive in ${sourcePath}:${sourceLine}: ${line.trim()}`);
       }
       output.push(line);
       continue;
@@ -603,23 +665,30 @@ async function convertCodeDirectives(source, sourcePath) {
     const attributeSource = rawAttributeSource.endsWith(':::')
       ? rawAttributeSource.slice(0, -3).trimEnd()
       : rawAttributeSource;
-    const attributes = parseDirectiveAttributes(attributeSource, `code directive in ${sourcePath}`);
+    const attributes = parseDirectiveAttributes(
+      attributeSource,
+      `code directive in ${sourcePath}:${sourceLine}`,
+    );
     const unknown = Object.keys(attributes).filter(
       (key) => !['highlight', 'id', 'language', 'range', 'source'].includes(key),
     );
     if (unknown.length > 0) {
-      throw new Error(`Unsupported code attributes '${unknown.join(', ')}' in ${sourcePath}.`);
-    }
-    if (!attributes.source) {
-      throw new Error(`A code directive in ${sourcePath} is missing its source attribute.`);
-    }
-
-    const snippetPath = path.resolve(path.dirname(sourcePath), attributes.source);
-    if (!(await pathExists(snippetPath))) {
       throw new Error(
-        `Code source '${attributes.source}' in ${sourcePath} does not exist (${snippetPath}).`,
+        `Unsupported code attributes '${unknown.join(', ')}' in ${sourcePath}:${sourceLine}.`,
       );
     }
+    if (!attributes.source) {
+      throw new Error(
+        `A code directive in ${sourcePath}:${sourceLine} is missing its source attribute.`,
+      );
+    }
+
+    const snippetPath = await resolveCodeSource({
+      requestedSource: attributes.source,
+      sourcePath,
+      sourceLine,
+      allowedRoots,
+    });
 
     let lines = (await readFile(snippetPath, 'utf8'))
       .replace(/^\uFEFF/, '')
@@ -655,8 +724,14 @@ async function convertCodeDirectives(source, sourcePath) {
 }
 
 function convertCallouts(source, sourcePath) {
-  const lines = source.split('\n');
+  const lines = source.replaceAll('\r\n', '\n').split('\n');
   const output = [];
+  const blockquoteLineRanges = />\s*\[!(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/.test(source)
+    ? markdownBlockquoteLineRanges(source)
+    : [];
+  const literalLineRanges = blockquoteLineRanges.length > 0
+    ? markdownLiteralLineRanges(source)
+    : [];
   const kinds = {
     CAUTION: ['danger', 'Caution'],
     IMPORTANT: ['note', 'Important'],
@@ -666,9 +741,16 @@ function convertCallouts(source, sourcePath) {
   };
 
   for (let index = 0; index < lines.length; index += 1) {
+    if (lineOverlapsRanges(index + 1, literalLineRanges)) {
+      output.push(lines[index]);
+      continue;
+    }
     const match = /^(\s*)>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*$/.exec(lines[index]);
     if (!match) {
-      if (/>\s*\[![A-Z]+\]/.test(lines[index])) {
+      if (
+        />\s*\[![A-Z]+\]/.test(lines[index]) &&
+        !/>\s*\[!INCLUDE\b/.test(lines[index])
+      ) {
         throw new Error(`Unsupported callout in ${sourcePath}: ${lines[index].trim()}`);
       }
       output.push(lines[index]);
@@ -677,17 +759,19 @@ function convertCallouts(source, sourcePath) {
 
     const [, indent, kind] = match;
     const [variant, title] = kinds[kind];
-    const body = [];
-    while (index + 1 < lines.length) {
-      const contentMatch = new RegExp(`^${escapeRegExp(indent)}> ?(.*)$`).exec(lines[index + 1]);
-      if (!contentMatch) {
-        break;
-      }
-      body.push(contentMatch[1]);
-      index += 1;
-    }
+    const body = collectBlockquoteBody(
+      lines,
+      index,
+      indent,
+      blockquoteLineRanges,
+    );
+    index = body.endIndex;
     output.push(`${indent}:::${variant}[${title}]`);
-    output.push(...body.map((bodyLine) => `${indent}${bodyLine}`));
+    output.push(
+      ...escapeExposedLiteralDirectives(body.lines).map(
+        (bodyLine) => `${indent}${bodyLine}`,
+      ),
+    );
     output.push(`${indent}:::`);
   }
 
@@ -695,10 +779,20 @@ function convertCallouts(source, sourcePath) {
 }
 
 function convertLearnBlocks(source, sourcePath) {
-  const lines = source.split('\n');
+  const lines = source.replaceAll('\r\n', '\n').split('\n');
   const output = [];
+  const blockquoteLineRanges = source.includes('[!div')
+    ? markdownBlockquoteLineRanges(source)
+    : [];
+  const literalLineRanges = /\[!(?:div|VIDEO)\b/.test(source)
+    ? markdownLiteralLineRanges(source)
+    : [];
 
   for (let index = 0; index < lines.length; index += 1) {
+    if (lineOverlapsRanges(index + 1, literalLineRanges)) {
+      output.push(lines[index]);
+      continue;
+    }
     const video = /^(\s*)>\s*\[!VIDEO\s+(\S+)\]\s*$/.exec(lines[index]);
     if (video) {
       const [, indent, videoUrl] = video;
@@ -726,26 +820,67 @@ function convertLearnBlocks(source, sourcePath) {
     }
 
     const [, indent, className] = container;
-    const body = [];
-    while (index + 1 < lines.length) {
-      const content = new RegExp(`^${escapeRegExp(indent)}> ?(.*)$`).exec(lines[index + 1]);
-      if (!content) {
-        break;
-      }
-      body.push(content[1]);
-      index += 1;
-    }
+    const body = collectBlockquoteBody(
+      lines,
+      index,
+      indent,
+      blockquoteLineRanges,
+    );
+    index = body.endIndex;
+    const escapedBody = escapeExposedLiteralDirectives(body.lines);
 
     if (className === 'nextstepaction') {
-      output.push(`${indent}:::tip[Next step]`, ...body.map((line) => `${indent}${line}`), `${indent}:::`);
+      output.push(
+        `${indent}:::tip[Next step]`,
+        ...escapedBody.map((line) => `${indent}${line}`),
+        `${indent}:::`,
+      );
     } else if (className === 'checklist') {
-      output.push(...body.map((line) => `${indent}${line}`));
+      output.push(...escapedBody.map((line) => `${indent}${line}`));
     } else {
       throw new Error(`Unsupported Learn div class '${className}' in ${sourcePath}.`);
     }
   }
 
   return output.join('\n');
+}
+
+function collectBlockquoteBody(lines, startIndex, indent, protectedLineRanges) {
+  const startLine = startIndex + 1;
+  const blockquoteEnd =
+    Math.max(
+      startLine,
+      ...protectedLineRanges
+        .filter(([rangeStart, rangeEnd]) => rangeStart <= startLine && startLine <= rangeEnd)
+        .map(([, rangeEnd]) => rangeEnd),
+    ) - 1;
+  const body = [];
+  let endIndex = startIndex;
+  while (endIndex + 1 < lines.length && endIndex + 1 <= blockquoteEnd) {
+    const nextLine = lines[endIndex + 1];
+    const contentMatch = new RegExp(`^${escapeRegExp(indent)}> ?(.*)$`).exec(nextLine);
+    body.push(
+      contentMatch
+        ? contentMatch[1]
+        : nextLine.slice(
+            Math.min(indent.length, /^ */.exec(nextLine)[0].length),
+          ),
+    );
+    endIndex += 1;
+  }
+  return { lines: body, endIndex };
+}
+
+function escapeExposedLiteralDirectives(lines) {
+  const protectedLineRanges = markdownDirectiveProtectedLineRanges(lines.join('\n'));
+  return lines.map((line, index) => {
+    if (lineOverlapsRanges(index + 1, protectedLineRanges)) {
+      return line;
+    }
+    return line
+      .replaceAll('[!INCLUDE', '&#91;!INCLUDE')
+      .replaceAll(':::code', '&#58;&#58;&#58;code');
+  });
 }
 
 async function convertImages(source, sourcePath) {
@@ -825,9 +960,20 @@ function formatPivot(pivot) {
 function convertZones(source, sourcePath) {
   const output = [];
   const stack = [];
-  for (const line of source.split('\n')) {
+  const protectedLineRanges = markdownDirectiveProtectedLineRanges(source);
+  const lines = source.split('\n');
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (lineOverlapsRanges(index + 1, protectedLineRanges)) {
+      output.push(line);
+      continue;
+    }
+
     const start = /^(\s*):::\s*zone\s+(.+?)\s*$/.exec(line);
     if (start) {
+      if (stack.length > 0) {
+        throw new Error(`Nested version zones are not supported in ${sourcePath}.`);
+      }
       const [, indent, attributeSource] = start;
       const attributes = parseDirectiveAttributes(attributeSource, `version zone in ${sourcePath}`);
       const unknown = Object.keys(attributes).filter((key) => !['pivot', 'target'].includes(key));
@@ -857,6 +1003,9 @@ function convertZones(source, sourcePath) {
       continue;
     }
 
+    if (/:::\s*zone(?:-end)?\b/.test(line)) {
+      throw new Error(`Unsupported version zone in ${sourcePath}: ${line.trim()}`);
+    }
     output.push(line);
   }
   if (stack.length > 0) {
@@ -875,7 +1024,7 @@ function humanizeXref(uid, displayProperty) {
         ? parts.slice(-2).join('.')
         : parts.at(-1);
   }
-  return display.replace(/`(\d+)/g, (_, count) => {
+  return display.replace(/`{1,2}(\d+)/g, (_, count) => {
     const arity = Number(count);
     const conventionalNames = ['T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
     const names = Array.from(
@@ -887,11 +1036,21 @@ function humanizeXref(uid, displayProperty) {
 }
 
 function xrefUrl(uid, uidMap) {
-  if (uidMap.has(uid)) {
-    return uidMap.get(uid);
+  const withoutWildcard = uid.replace(/\*$/, '');
+  const withoutSignature = withoutWildcard.replace(/\(.*$/, '');
+  const withoutMethodArity = withoutSignature.replace(/``\d+$/, '');
+  for (const candidate of [
+    uid,
+    withoutWildcard,
+    withoutSignature,
+    withoutMethodArity,
+    `${withoutMethodArity}*`,
+  ]) {
+    if (uidMap.has(candidate)) {
+      return uidMap.get(candidate);
+    }
   }
-  const withoutSignature = uid.replace(/\*$/, '').replace(/\(.*$/, '');
-  const slug = withoutSignature.replace(/`(\d+)/g, '-$1').toLowerCase();
+  const slug = withoutMethodArity.replace(/`(\d+)/g, '-$1').toLowerCase();
   return `https://learn.microsoft.com/dotnet/api/${encodeURI(slug)}`;
 }
 
@@ -1131,18 +1290,27 @@ function convertLinks(line, sourcePath, sourceRoot) {
   });
 }
 
+function openCodeFence(line) {
+  const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
+  return marker ? { character: marker[0], length: marker.length } : undefined;
+}
+
+function closesCodeFence(line, fence) {
+  return new RegExp(`^\\s*${fence.character}{${fence.length},}\\s*$`).test(line);
+}
+
 function transformOutsideCodeFences(source, transform) {
   let fence;
   return source
     .split('\n')
     .map((line) => {
-      const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
-      if (marker) {
-        if (!fence) {
-          fence = marker[0];
-        } else if (marker[0] === fence) {
-          fence = undefined;
+      if (!fence) {
+        fence = openCodeFence(line);
+        if (fence) {
+          return line;
         }
+      } else if (closesCodeFence(line, fence)) {
+        fence = undefined;
         return line;
       }
       return fence ? line : transform(line);
@@ -1165,13 +1333,15 @@ function transformOutsideCodeBlocks(source, transform) {
   }
 
   for (const line of source.split('\n')) {
-    const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
-    if (marker && !fence) {
-      flush(false);
-      fence = marker[0];
+    if (!fence) {
+      const opening = openCodeFence(line);
+      if (opening) {
+        flush(false);
+        fence = opening;
+      }
     }
     buffer.push(line);
-    if (marker && fence && marker[0] === fence && buffer.length > 1) {
+    if (fence && closesCodeFence(line, fence) && buffer.length > 1) {
       flush(true);
       fence = undefined;
     }
@@ -1220,9 +1390,13 @@ function extractPageTitle(body, fallbackTitle) {
   const lines = body.split('\n');
   let fence;
   for (let index = 0; index < lines.length; index += 1) {
-    const marker = /^\s*(`{3,}|~{3,})/.exec(lines[index])?.[1];
-    if (marker) {
-      fence = fence ? undefined : marker[0];
+    if (!fence) {
+      fence = openCodeFence(lines[index]);
+      if (fence) {
+        continue;
+      }
+    } else if (closesCodeFence(lines[index], fence)) {
+      fence = undefined;
       continue;
     }
     if (fence) {
@@ -1247,17 +1421,23 @@ function extractPageTitle(body, fallbackTitle) {
 }
 
 function assertNoUnconvertedConstructs(body, sourcePath) {
+  const protectedLineRanges = /\[!INCLUDE|:::code/.test(body)
+    ? markdownDirectiveProtectedLineRanges(body)
+    : [];
+  const activeBody = body
+    .split('\n')
+    .filter((_line, index) => !lineOverlapsRanges(index + 1, protectedLineRanges))
+    .join('\n');
   const checks = [
-    [/\[!INCLUDE/, 'INCLUDE'],
-    [/\[!VIDEO\b/, 'VIDEO block'],
-    [/\[!div\b/, 'Learn div block'],
-    [/:::code\b/, 'code directive'],
+    [/\[!INCLUDE/, 'INCLUDE', activeBody],
+    [/\[!VIDEO\b/, 'VIDEO block', activeBody],
+    [/\[!div\b/, 'Learn div block', activeBody],
+    [/:::code\b/, 'code directive', activeBody],
     [/:::image\b/, 'image directive'],
-    [/:::\s*zone(?:-end)?\b/, 'version zone'],
     [/<xref:|\(xref:/, 'xref'],
   ];
-  for (const [pattern, name] of checks) {
-    if (pattern.test(body)) {
+  for (const [pattern, name, source = body] of checks) {
+    if (pattern.test(source)) {
       throw new Error(`An unconverted ${name} remains in ${sourcePath}.`);
     }
   }
@@ -1273,18 +1453,37 @@ export async function convertDocfxMarkdown({
   source,
   sourcePath,
   sourceRoot = path.dirname(sourcePath),
+  snippetRoots = [sourceRoot],
   includeRoot = path.dirname(sourceRoot),
   uidMap = new Map(),
   editUrl,
 }) {
-  const { metadata, body: originalBody } = splitFrontmatter(source);
+  const { metadata, body: originalBody, bodyStartLine } = splitFrontmatter(source);
   const metadataTitle = typeof metadata.title === 'string' ? metadata.title : inferTitle(sourcePath);
-  let body = await expandIncludes(originalBody, sourcePath, includeRoot);
-  body = await convertCodeDirectives(body, sourcePath);
+  const resolvedIncludeRoot = await realpath(includeRoot);
+  let resolvedSourcePath;
+  try {
+    resolvedSourcePath = await realpath(sourcePath);
+  } catch {
+    resolvedSourcePath = path.resolve(sourcePath);
+  }
+  if (!isWithinRoot(resolvedIncludeRoot, resolvedSourcePath)) {
+    throw new Error(`Documentation source '${resolvedSourcePath}' is outside ${resolvedIncludeRoot}.`);
+  }
+  let body = await expandIncludesInternal(
+    originalBody,
+    resolvedSourcePath,
+    [resolvedSourcePath],
+    resolvedIncludeRoot,
+    {
+      allowedRoots: snippetRoots,
+      firstSourceLine: bodyStartLine,
+    },
+  );
+  body = convertZones(body, sourcePath);
   body = await convertImages(body, sourcePath);
   body = convertLearnBlocks(body, sourcePath);
   body = convertCallouts(body, sourcePath);
-  body = convertZones(body, sourcePath);
   const tabs = convertTabs(body, sourcePath);
   body = tabs.source;
   body = normalizeFenceLanguages(body);
@@ -1323,7 +1522,38 @@ export function routeFromSourcePath(sourcePath, sourceRoot) {
   return `${siteBase}/${route}${route ? '/' : ''}`.replace(/\/{2,}/g, '/');
 }
 
-export async function collectUidMap(markdownFiles, sourceRoot) {
+function apiTypeUid(type) {
+  const arity = type.genericParameters?.length ?? 0;
+  let identity = type.fullName ?? type.name;
+  while (/<[^<>]*>/.test(identity)) {
+    identity = identity.replace(/<[^<>]*>/g, '');
+  }
+  return arity > 0 ? `${identity}\`${arity}` : identity;
+}
+
+function apiTypeSlug(type) {
+  const arity = type.genericParameters?.length ?? 0;
+  let identity = type.fullName ?? type.name;
+  while (/<[^<>]*>/.test(identity)) {
+    identity = identity.replace(/<[^<>]*>/g, '');
+  }
+  const slug = identity
+    .toLowerCase()
+    .replace(/[^a-z0-9.]+/g, '-')
+    .replace(/^-|-$/g, '');
+  return arity > 0 ? `${slug}-${arity}` : slug;
+}
+
+const apiMemberKindSlugs = {
+  constructor: 'constructors',
+  event: 'events',
+  field: 'fields',
+  indexer: 'indexers',
+  method: 'methods',
+  property: 'properties',
+};
+
+export async function collectUidMap(markdownFiles, sourceRoot, apiPackageRoot) {
   const result = new Map();
   for (const file of markdownFiles) {
     const { metadata } = splitFrontmatter(await readFile(file, 'utf8'));
@@ -1334,6 +1564,42 @@ export async function collectUidMap(markdownFiles, sourceRoot) {
       throw new Error(`Duplicate DocFX uid '${metadata.uid}'.`);
     }
     result.set(metadata.uid, routeFromSourcePath(file, sourceRoot));
+  }
+  if (apiPackageRoot && (await pathExists(apiPackageRoot))) {
+    const entries = await readdir(apiPackageRoot, { withFileTypes: true });
+    for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+      if (!entry.isFile() || path.extname(entry.name).toLowerCase() !== '.json') continue;
+      const packageDocument = JSON.parse(
+        await readFile(path.join(apiPackageRoot, entry.name), 'utf8'),
+      );
+      const packageSlug = String(packageDocument.package?.name ?? '').toLowerCase();
+      if (!packageSlug) continue;
+      for (const type of packageDocument.types ?? []) {
+        const uid = apiTypeUid(type);
+        const typeRoute = `${deploymentBase}/docs/api/csharp/${packageSlug}/${apiTypeSlug(type)}/`;
+        if (!result.has(uid)) result.set(uid, typeRoute);
+
+        const kindsByName = new Map();
+        for (const member of type.members ?? []) {
+          const name = member.name === '.ctor' ? '#ctor' : member.name;
+          const kinds = kindsByName.get(name) ?? new Set();
+          kinds.add(member.kind);
+          kindsByName.set(name, kinds);
+        }
+        for (const [name, kinds] of kindsByName) {
+          if (kinds.size !== 1) continue;
+          const [kind] = kinds;
+          const kindSlug = apiMemberKindSlugs[kind];
+          if (!kindSlug) continue;
+          const route = `${typeRoute}${kindSlug}/`;
+          result.set(`${uid}.${name}`, route);
+          result.set(`${uid}.${name}*`, route);
+        }
+        for (const member of type.enumMembers ?? []) {
+          result.set(`${uid}.${member.name}`, `${typeRoute}#fields`);
+        }
+      }
+    }
   }
   return result;
 }
@@ -1373,14 +1639,20 @@ async function sidebarItem(item, rootDirectory) {
   return { label: item.name, link: sidebarLink(item.href) };
 }
 
-export async function createSidebar(tocPath) {
+export async function readTocItems(tocPath) {
   const resolvedPath = toPath(tocPath);
   const toc = YAML.parse(await readFile(resolvedPath, 'utf8'));
   if (!toc || !Array.isArray(toc.items)) {
     throw new Error(`${resolvedPath} does not contain a DocFX items array.`);
   }
-  const items =
-    toc.items[0]?.homepage || toc.items[0]?.href === 'index.yml' ? toc.items.slice(1) : toc.items;
+  return toc.items[0]?.homepage || toc.items[0]?.href === 'index.yml'
+    ? toc.items.slice(1)
+    : toc.items;
+}
+
+export async function createSidebar(tocPath) {
+  const resolvedPath = toPath(tocPath);
+  const items = await readTocItems(resolvedPath);
   return Promise.all(items.map((item) => sidebarItem(item, path.dirname(resolvedPath))));
 }
 

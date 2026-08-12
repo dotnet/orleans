@@ -11,31 +11,10 @@ A normal grain identity has at most one activation in the cluster. A stateless w
 
 Apply <xref:Orleans.Concurrency.StatelessWorkerAttribute> to the implementation:
 
-```csharp
-public interface IImageWorker : IGrainWithStringKey
-{
-    Task<byte[]> Resize(byte[] image, int width);
-}
-
-[StatelessWorker]
-public sealed class ImageWorkerGrain : Grain, IImageWorker
-{
-    public Task<byte[]> Resize(byte[] image, int width)
-    {
-        return Task.FromResult(image);
-    }
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/WorkersAndTimersSnippets.cs" id="image_worker":::
 Call it like any other grain:
 
-```csharp
-IImageWorker worker =
-    grainFactory.GetGrain<IImageWorker>("default");
-
-byte[] resized = await worker.Resize(image, width: 320);
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/WorkersAndTimersSnippets.cs" id="call_image_worker":::
 The key identifies a worker pool, not an individual activation. Consecutive calls to the same reference can run on different activations.
 
 ## Scaling behavior
@@ -44,13 +23,7 @@ Orleans prefers a local compatible activation. If all local activations are busy
 
 Set a limit explicitly:
 
-```csharp
-[StatelessWorker(maxLocalWorkers: 4)]
-public sealed class ImageWorkerGrain : Grain, IImageWorker
-{
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/WorkersAndTimersSnippets.cs" id="limited_image_worker":::
 Idle workers are removed by default. The two-argument attribute constructor can disable idle-worker removal for specialized workloads.
 
 ## State and concurrency

@@ -9,6 +9,8 @@
     <PackageReference Include="Microsoft.Orleans.Sdk" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Server" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Serialization.MessagePack" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Serialization.NewtonsoftJson" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.2" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
     <PackageReference Include="MessagePack" Version="3.1.7" />

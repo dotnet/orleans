@@ -13,42 +13,11 @@ Orleans supports <xref:System.Threading.CancellationToken> parameters on grain m
 
 Add at most one <xref:System.Threading.CancellationToken> parameter. Put it last and make it optional when callers commonly don't need cancellation:
 
-```csharp
-public interface IImportGrain : IGrainWithGuidKey
-{
-    Task<int> Import(
-        IReadOnlyList<string> records,
-        CancellationToken cancellationToken = default);
-}
-```
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="cancellable_grain_interface":::
 
 Observe the token in the implementation and pass it to cancellation-aware APIs:
 
-```csharp
-public sealed class ImportGrain : Grain, IImportGrain
-{
-    public async Task<int> Import(
-        IReadOnlyList<string> records,
-        CancellationToken cancellationToken = default)
-    {
-        var imported = 0;
-
-        foreach (string record in records)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            await SaveRecord(record, cancellationToken);
-            imported++;
-        }
-
-        return imported;
-    }
-
-    private static Task SaveRecord(
-        string record,
-        CancellationToken cancellationToken) =>
-        Task.Delay(TimeSpan.FromMilliseconds(10), cancellationToken);
-}
-```
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="observe_cancellation":::
 
 If a token is already canceled before the call is sent, Orleans doesn't issue the request. If cancellation arrives while the request is queued, Orleans can remove it before execution. Once execution starts, the grain method must observe the token.
 
@@ -56,23 +25,7 @@ If a token is already canceled before the call is sent, Orleans doesn't issue th
 
 Pass a token from a <xref:System.Threading.CancellationTokenSource>:
 
-```csharp
-IImportGrain importer =
-    grainFactory.GetGrain<IImportGrain>(Guid.NewGuid());
-
-using var cancellation = new CancellationTokenSource(
-    TimeSpan.FromSeconds(30));
-
-try
-{
-    await importer.Import(records, cancellation.Token);
-}
-catch (OperationCanceledException)
-    when (cancellation.IsCancellationRequested)
-{
-    // The caller requested cancellation.
-}
-```
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="cancel_grain_call":::
 
 Cancellation can cross client-to-grain and grain-to-grain calls. Delivery is best effort under network failure, and cancellation doesn't roll back side effects that completed before the grain observed the token.
 
@@ -85,17 +38,7 @@ A response timeout and cancellation answer different questions:
 
 By default, a timed-out call isn't canceled. <xref:Orleans.Configuration.MessagingOptions.CancelRequestOnTimeout> defaults to `false`. Enable it explicitly when timed-out operations should receive a cancellation signal:
 
-```csharp
-siloBuilder.Configure<SiloMessagingOptions>(options =>
-{
-    options.CancelRequestOnTimeout = true;
-});
-
-clientBuilder.Configure<ClientMessagingOptions>(options =>
-{
-    options.CancelRequestOnTimeout = true;
-});
-```
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="cancel_request_on_timeout":::
 
 Even when enabled, the timeout doesn't prove that the operation stopped. The cancellation message can be delayed, the method might not observe its token, or side effects might already have completed.
 

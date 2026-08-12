@@ -44,32 +44,8 @@ Place clients in the same environment or in a connected private network that can
 
 Pass the environment's `properties.staticIp` and the app's unique exposed ports to every silo. Bind the listening endpoints to the container target ports:
 
-```csharp
-using System.Net;
-using Orleans.Configuration;
-
-var advertisedAddress = IPAddress.Parse(
-    builder.Configuration["ORLEANS_ADVERTISED_IP"]
-        ?? throw new InvalidOperationException("ORLEANS_ADVERTISED_IP isn't configured."));
-var advertisedSiloPort = int.Parse(
-    builder.Configuration["ORLEANS_ADVERTISED_SILO_PORT"]
-        ?? throw new InvalidOperationException("ORLEANS_ADVERTISED_SILO_PORT isn't configured."));
-var advertisedGatewayPort = int.Parse(
-    builder.Configuration["ORLEANS_ADVERTISED_GATEWAY_PORT"]
-        ?? throw new InvalidOperationException("ORLEANS_ADVERTISED_GATEWAY_PORT isn't configured."));
-
-builder.Host.UseOrleans(siloBuilder =>
-{
-    siloBuilder.Configure<EndpointOptions>(options =>
-    {
-        options.AdvertisedIPAddress = advertisedAddress;
-        options.SiloPort = advertisedSiloPort;
-        options.GatewayPort = advertisedGatewayPort;
-        options.SiloListeningEndpoint = new IPEndPoint(IPAddress.Any, 11_111);
-        options.GatewayListeningEndpoint = new IPEndPoint(IPAddress.Any, 30_000);
-    });
-});
-```
+:::code language="csharp" source="../snippets/compiled/Deployment/DeploymentSnippets.cs" id="container_apps_endpoint_usings":::
+:::code language="csharp" source="../snippets/compiled/Deployment/DeploymentSnippets.cs" id="configure_container_apps_endpoints":::
 
 A **listening endpoint** is where the process binds inside its container. An **advertised endpoint** is what Orleans writes to membership for peers and clients. Binding to `0.0.0.0` doesn't discover an address to advertise. If ingress maps different exposed and target ports, configure <xref:Orleans.Configuration.EndpointOptions> directly so that:
 
@@ -86,34 +62,8 @@ Use an external clustering provider so that silos and clients discover the same 
 
 The following configuration uses Microsoft Entra ID instead of a storage account key:
 
-```csharp
-using Azure.Data.Tables;
-using Azure.Identity;
-using Orleans.Configuration;
-
-var tableEndpoint = new Uri(
-    builder.Configuration["AZURE_TABLE_STORAGE_ENDPOINT"]
-        ?? throw new InvalidOperationException("AZURE_TABLE_STORAGE_ENDPOINT isn't configured."));
-var tableServiceClient = new TableServiceClient(
-    tableEndpoint,
-    new DefaultAzureCredential());
-
-builder.Host.UseOrleans(siloBuilder =>
-{
-    siloBuilder
-        .Configure<ClusterOptions>(options =>
-        {
-            options.ServiceId = "orders";
-            options.ClusterId = builder.Configuration["ORLEANS_CLUSTER_ID"]
-                ?? throw new InvalidOperationException("ORLEANS_CLUSTER_ID isn't configured.");
-        })
-        .UseAzureStorageClustering(
-            options => options.TableServiceClient = tableServiceClient)
-        .AddAzureTableGrainStorage(
-            name: "default",
-            options => options.TableServiceClient = tableServiceClient);
-});
-```
+:::code language="csharp" source="../snippets/compiled/Deployment/DeploymentSnippets.cs" id="container_apps_storage_usings":::
+:::code language="csharp" source="../snippets/compiled/Deployment/DeploymentSnippets.cs" id="configure_container_apps_storage":::
 
 Install `Microsoft.Orleans.Clustering.AzureStorage`, `Microsoft.Orleans.Persistence.AzureStorage`, and `Azure.Identity` for this configuration. Configure the same `ServiceId`, `ClusterId`, clustering table, and credentials on Orleans clients. Keep `ServiceId` stable for the application and use a distinct `ClusterId` for each environment or isolated blue-green cluster.
 

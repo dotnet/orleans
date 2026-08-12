@@ -28,14 +28,8 @@ Declare the key shape on the grain interface:
 
 Choose keys from the application's domain, such as a customer ID, device ID, or account number. Grain keys are scoped by grain type, so two different grain types can use the same key without referring to the same grain.
 
-```csharp
-public interface IDeviceGrain : IGrainWithStringKey
-{
-    ValueTask<string> GetStatus();
-}
-
-IDeviceGrain device = grainFactory.GetGrain<IDeviceGrain>("device-17");
-```
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="string_key_interface":::
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="get_string_key_grain":::
 
 Use a fixed key such as `"default"` when the application intentionally addresses one logical grain of a type. This is a convention, not a separate singleton feature.
 
@@ -43,16 +37,7 @@ Use a fixed key such as `"default"` when the application intentionally addresses
 
 Inside a grain, use the key helper matching its interface:
 
-```csharp
-public sealed class DeviceGrain : Grain, IDeviceGrain
-{
-    public ValueTask<string> GetStatus()
-    {
-        string deviceId = this.GetPrimaryKeyString();
-        return ValueTask.FromResult($"Device {deviceId} is online");
-    }
-}
-```
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="read_string_key":::
 
 Other helpers include `GetPrimaryKey()`, `GetPrimaryKeyLong()`, and overloads that return a compound key's string extension.
 
@@ -62,12 +47,7 @@ The runtime identity is also available from `this.GetGrainId()` or `((IGrainBase
 
 By convention, Orleans derives a grain type name from the implementation class. Use <xref:Orleans.GrainTypeAttribute> when the type name must be stable independently of the CLR class name:
 
-```csharp
-[GrainType("shopping-cart")]
-public sealed class ShoppingCartGrain : Grain, IShoppingCartGrain
-{
-}
-```
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="stable_grain_type":::
 
 Treat explicit grain type names as durable identifiers. Changing a deployed type name creates a different logical grain namespace and can disconnect existing references or persisted data from the new implementation.
 
@@ -75,11 +55,7 @@ Treat explicit grain type names as durable identifiers. Changing a deployed type
 
 Advanced infrastructure can parse or create an untyped identity:
 
-```csharp
-GrainId grainId = GrainId.Create(
-    GrainType.Create("shopping-cart"),
-    IdSpan.Create("customer-42"));
-```
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="create_grain_id":::
 
 Prefer `IGrainFactory.GetGrain<TGrainInterface>(key)` in application code. A typed reference carries both the logical identity and the interface used to call it, while a bare `GrainId` doesn't provide a callable contract.
 

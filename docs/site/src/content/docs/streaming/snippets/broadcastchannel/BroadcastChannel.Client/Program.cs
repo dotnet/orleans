@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿// <broadcast_channel_client_program>
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using BroadcastChannel.GrainInterfaces;
 
@@ -27,3 +28,4 @@ foreach (StockSymbol symbol in Enum.GetValues<StockSymbol>())
 }
 
 await host.WaitForShutdownAsync();
+// </broadcast_channel_client_program>

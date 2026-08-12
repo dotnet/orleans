@@ -32,7 +32,7 @@ dotnet package add Microsoft.Extensions.Hosting --version 10.0.9
 
 Create _IHello.cs_ and define a grain interface:
 
-:::code source="snippets/hello-world/IHello.cs":::
+:::code source="snippets/hello-world/IHello.cs" id="hello_world_grain_interface":::
 
 <xref:Orleans.IGrainWithStringKey> identifies the grain by a string key. Grain contracts use asynchronous return types because calls can cross process and network boundaries.
 
@@ -40,13 +40,13 @@ Create _IHello.cs_ and define a grain interface:
 
 Create _HelloGrain.cs_ and implement the grain interface:
 
-:::code source="snippets/hello-world/HelloGrain.cs":::
+:::code source="snippets/hello-world/HelloGrain.cs" id="hello_world_grain":::
 
 ## Configure Orleans and call the grain
 
 Replace _Program.cs_ with the following code:
 
-:::code source="snippets/hello-world/Program.cs":::
+:::code source="snippets/hello-world/Program.cs" id="hello_world_program":::
 
 <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*> adds a silo and its in-process client to the [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensions/generic-host). <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalhostClustering*> configures development-only clustering on the local machine.
 

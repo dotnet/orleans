@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\'))</RepositoryRoot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Identity" Version="1.18.0" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Server\Orleans.Server.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.EventSourcing\Orleans.EventSourcing.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Transactions\Orleans.Transactions.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Azure\Orleans.Transactions.AzureStorage\Orleans.Transactions.AzureStorage.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Dashboard\Orleans.Dashboard\Orleans.Dashboard.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\AdoNet\Orleans.Clustering.AdoNet\Orleans.Clustering.AdoNet.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\AdoNet\Orleans.Persistence.AdoNet\Orleans.Persistence.AdoNet.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\AWS\Orleans.Persistence.DynamoDB\Orleans.Persistence.DynamoDB.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Azure\Orleans.Clustering.Cosmos\Orleans.Clustering.Cosmos.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Azure\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Azure\Orleans.Persistence.Cosmos\Orleans.Persistence.Cosmos.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Azure\Orleans.Persistence.AzureStorage\Orleans.Persistence.AzureStorage.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Clustering.Consul\Orleans.Clustering.Consul.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Hosting.Kubernetes\Orleans.Hosting.Kubernetes.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Serialization.SystemTextJson\Orleans.Serialization.SystemTextJson.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\AWS\Orleans.Streaming.Kinesis\Orleans.Streaming.Kinesis.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
+  </ItemGroup>
+</Project>

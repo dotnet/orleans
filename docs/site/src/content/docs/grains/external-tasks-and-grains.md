@@ -9,14 +9,7 @@ ms.topic: concept-article
 
 Normal `await` keeps grain code in the activation's turn-based scheduling model. The continuation resumes on the grain scheduler, so it can safely access grain state:
 
-```csharp
-public async Task Refresh()
-{
-    Item value = await repository.Load();
-    _cachedItem = value;
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/GeneralSnippets.cs" id="refresh_from_repository":::
 Async libraries don't need <xref:System.Threading.Tasks.Task.Run*>. Await them directly.
 
 ## Don't block the grain scheduler
@@ -34,19 +27,7 @@ Avoid `async void`, including async lambdas passed to APIs expecting <xref:Syste
 
 Capture immutable input, do the external work, then update grain state after awaiting:
 
-```csharp
-public async Task<int> Compress(byte[] input)
-{
-    byte[] copy = input.ToArray();
-
-    int size = await Task.Run(
-        () => CompressSynchronously(copy));
-
-    _lastCompressedSize = size;
-    return size;
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/GeneralSnippets.cs" id="compress_on_thread_pool":::
 Don't read or mutate grain fields inside the <xref:System.Threading.Tasks.Task.Run*> delegate. That code isn't protected by the grain scheduler.
 
 ## ConfigureAwait
@@ -59,14 +40,7 @@ Don't use `ConfigureAwait(false)` directly in grain methods. It can resume the c
 
 If an advanced integration passes an async delegate to <xref:System.Threading.Tasks.TaskFactory.StartNew*>, unwrap the nested task:
 
-```csharp
-Task work = Task.Factory
-    .StartNew(WorkerAsync)
-    .Unwrap();
-
-await work;
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/GeneralSnippets.cs" id="start_async_worker":::
 Don't start unobserved background work that outlives the request. Use [grain timers](timers-and-reminders.md), reminders, a durable job abstraction, or a hosted service depending on the required lifetime and reliability.
 
 ## Reentrancy still applies

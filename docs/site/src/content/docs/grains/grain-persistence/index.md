@@ -109,12 +109,7 @@ The <xref:Orleans.Grain`1> base class and <xref:Orleans.Providers.StorageProvide
 
 Custom providers implement <xref:Orleans.Storage.IGrainStorage>. Register a named provider using Orleans' storage registration helper, which uses .NET keyed services:
 
-```csharp
-siloBuilder.Services.AddGrainStorage<MyGrainStorage>(
-    "custom",
-    (services, name) => new MyGrainStorage(name));
-```
-
+:::code language="csharp" source="../../snippets/compiled/Grains/PersistenceSnippets.cs" id="register_custom_grain_storage":::
 Providers must:
 
 - Populate <xref:Orleans.IGrainState`1.State>, <xref:Orleans.IGrainState`1.RecordExists>, and <xref:Orleans.IGrainState`1.ETag> when reading.
