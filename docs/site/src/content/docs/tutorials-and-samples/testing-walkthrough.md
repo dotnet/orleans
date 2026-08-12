@@ -7,7 +7,7 @@ ms.topic: tutorial
 
 # Test an Orleans application end to end
 
-This walkthrough builds a test suite in layers: pure logic tests, a real in-process Orleans cluster, a shared cluster fixture, and a topology change. The complete compiling source is in the documentation's `snippets/testing/orleans-testing` project.
+This walkthrough builds a test suite in layers: pure logic tests, a real in-process Orleans cluster, a shared cluster fixture, and a topology change. The complete compiling source is in the documentation's `grains/snippets/testing/orleans-testing` project.
 
 ## Choose the right boundary
 
@@ -22,7 +22,7 @@ Clone the repository, then run the maintained test project:
 ```powershell
 git clone https://github.com/dotnet/orleans.git
 cd orleans
-dotnet test .\docs\site\src\content\docs\snippets\testing\orleans-testing\Sample.OrleansTesting
+dotnet test .\docs\site\src\content\docs\grains\snippets\testing\orleans-testing\Sample.OrleansTesting
 ```
 
 The first test creates a cluster, deploys it, obtains a grain reference from the client, makes a call, and disposes the cluster:
