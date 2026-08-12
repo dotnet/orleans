@@ -227,9 +227,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BuildExternalAssets: "false"
-      # The official MariaDB 10.6 image is not published to GHCR. Use Google's Docker Hub mirror
-      # pinned to the official Docker Hub digest.
+      # The official MariaDB 10.6 image is not published to GHCR. Prefer Google's Docker Hub
+      # mirror, with Docker Hub as a fallback, and pin both references to the same digest.
       MARIADB_IMAGE: mirror.gcr.io/library/mariadb:10.6@sha256:daacc2f260f8ec999daa5e03a017a23a7e6fa3fb982aaf26e8b72f24daf03bc9
+      MARIADB_FALLBACK_IMAGE: docker.io/library/mariadb:10.6@sha256:daacc2f260f8ec999daa5e03a017a23a7e6fa3fb982aaf26e8b72f24daf03bc9
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
       MARIADB_ROOT_PASSWORD: "mariadb"
     strategy:
@@ -252,7 +253,12 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash .github/scripts/docker-pull-with-retry.sh "$MARIADB_IMAGE"
+        mariadb_image="$MARIADB_IMAGE"
+        if ! bash .github/scripts/docker-pull-with-retry.sh "$mariadb_image"; then
+          echo "Pulling MariaDB from Docker Hub after the mirror failed."
+          mariadb_image="$MARIADB_FALLBACK_IMAGE"
+          bash .github/scripts/docker-pull-with-retry.sh "$mariadb_image"
+        fi
 
         docker run -d --pull=never --name mariadb \
           -p 3306:3306 \
@@ -261,7 +267,7 @@ jobs:
           --health-interval 5s \
           --health-timeout 5s \
           --health-retries 24 \
-          "$MARIADB_IMAGE"
+          "$mariadb_image"
 
         for attempt in $(seq 1 60); do
           status="$(docker inspect --format '{{.State.Health.Status}}' mariadb)"
