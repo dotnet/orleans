@@ -447,9 +447,9 @@ namespace Orleans.Runtime.Messaging
         /// Reroute a message coming in through a gateway
         /// </summary>
         /// <param name="message"></param>
-        internal void RerouteMessage(Message message)
+        internal void RerouteMessage(Message message, Action<Message> onAddressed)
         {
-            ResendMessageImpl(message, trackGatewayRequest: true);
+            ResendMessageImpl(message, onAddressed: onAddressed);
         }
 
         private bool TryForwardMessage(Message message, SiloAddress? forwardingAddress)
@@ -463,7 +463,7 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        private void ResendMessageImpl(Message message, SiloAddress? forwardingAddress = null, bool trackGatewayRequest = false)
+        private void ResendMessageImpl(Message message, SiloAddress? forwardingAddress = null, Action<Message>? onAddressed = null)
         {
             LogDebugResend(log, message);
 
@@ -480,7 +480,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 message.TargetSilo = null;
-                _ = AddressAndSendMessage(message, trackGatewayRequest);
+                _ = AddressAndSendMessage(message, onAddressed);
             }
         }
 
@@ -498,7 +498,7 @@ namespace Orleans.Runtime.Messaging
         /// - add ordering info and maintain send order
         ///
         /// </summary>
-        internal Task AddressAndSendMessage(Message message, bool trackGatewayRequest = false)
+        internal Task AddressAndSendMessage(Message message, Action<Message>? onAddressed = null)
         {
             try
             {
@@ -508,11 +508,7 @@ namespace Orleans.Runtime.Messaging
                     return SendMessageAsync(messageAddressingTask, message);
                 }
 
-                if (trackGatewayRequest)
-                {
-                    Gateway!.TrackRequest(message);
-                }
-
+                onAddressed?.Invoke(message);
                 SendMessage(message);
             }
             catch (Exception ex)
@@ -534,11 +530,7 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                if (trackGatewayRequest)
-                {
-                    Gateway!.TrackRequest(m);
-                }
-
+                onAddressed?.Invoke(m);
                 SendMessage(m);
             }
 
