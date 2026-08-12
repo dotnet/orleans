@@ -343,7 +343,7 @@ namespace Orleans.Transactions.TestKit
                 $"Recovery phase=silo-shutdown completed, timestamp={DateTime.UtcNow:O}. Silo={siloToTerminate.SiloAddress}, "
                 + $"mode={shutdownMode}, elapsed={shutdownElapsed}.");
 
-            this.Log("Waiting for transactions to stop completing successfully");
+            this.Log("Observing transaction activity after silo shutdown");
             var failureDetectionStartedAt = Stopwatch.GetTimestamp();
             var failureObservationWindow = gracefulShutdown ? TimeSpan.Zero : this.clientResponseTimeout;
             var failureObservationTimeout = failureObservationWindow + FailureDetectionSchedulingMargin;
