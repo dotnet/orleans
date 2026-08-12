@@ -20,7 +20,7 @@ An exception or event identifies where Orleans noticed a problem, not necessaril
 | <xref:Orleans.Runtime.GatewayTooBusyException>, rejected or load-shed messages | [Gateway or cluster overload](#gateway-or-cluster-overload) |
 | <xref:System.TimeoutException>, `orleans-app-requests-timedout` | [Request timeouts](#request-timeouts) |
 | `orleans-scheduler-long-running-turns`, calls to one grain stop progressing | [Long-running or deadlocked grain turns](#long-running-or-deadlocked-grain-turns) |
-| `InconsistentStateException`, ETag or version conflict | [Storage consistency failures](#storage-consistency-failures) |
+| <xref:Orleans.Storage.InconsistentStateException>, ETag or version conflict | [Storage consistency failures](#storage-consistency-failures) |
 | Storage errors or latency rise with backend throttling | [Storage throttling](#storage-throttling) |
 | Serializer or codec exception after deployment | [Serialization failures after a version change](#serialization-failures-after-a-version-change) |
 | Repeated membership changes, missed pings, duplicate activations | [Membership and directory churn](#membership-and-directory-churn) |
@@ -91,7 +91,7 @@ An exception or event identifies where Orleans noticed a problem, not necessaril
 
 ## Storage consistency failures
 
-**Signals:** `InconsistentStateException`, an ETag/version/precondition conflict, or repeated failure to write grain state.
+**Signals:** <xref:Orleans.Storage.InconsistentStateException>, an ETag/version/precondition conflict, or repeated failure to write grain state.
 
 **Likely causes:** concurrent writers, duplicate activations during a membership or custom-directory failure, application code reusing stale state, or an out-of-band writer modifying the same record.
 
@@ -184,4 +184,3 @@ An exception or event identifies where Orleans noticed a problem, not necessaril
 **Remedy:** stop admission before silo shutdown, make the blocking participant bounded and cancellation-aware, and leave platform time after the host deadline for process cleanup.
 
 **Prevent:** test shutdown under load and dependency failure, preserve rollout surge capacity, and monitor forced terminations. Follow [Shutdown doesn't complete](troubleshooting.md#shutdown-doesnt-complete).
-
