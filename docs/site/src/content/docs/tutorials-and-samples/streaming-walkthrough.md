@@ -31,7 +31,7 @@ Without `Secrets.json`, both hosts register the named in-memory stream provider.
 Observe these transitions in the silo log:
 
 1. `ConsumerGrain` activates when the first matching event arrives.
-1. Orleans supplies an <xref:Orleans.Streams.IStreamSubscriptionHandleFactory>.
+1. Orleans supplies an <xref:Orleans.Streams.Core.IStreamSubscriptionHandleFactory>.
 1. The grain resumes the subscription with its observer.
 1. `OnNextAsync` logs the event and its sequence token.
 
