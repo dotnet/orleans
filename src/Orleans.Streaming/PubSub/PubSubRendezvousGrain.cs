@@ -86,14 +86,20 @@ namespace Orleans.Streams
         private readonly PubSubGrainStateStorageFactory _storageFactory;
         private readonly StateStorageBridge<PubSubGrainState> _storage;
         private readonly StreamInstruments _streamInstruments;
+        private readonly IClusterMembershipService _clusterMembershipService;
 
         private PubSubGrainState State => _storage.State!; // OnActivateAsync reads state before grain calls are dispatched.
 
-        public PubSubRendezvousGrain(PubSubGrainStateStorageFactory storageFactory, ILogger<PubSubRendezvousGrain> logger, StreamInstruments streamInstruments)
+        public PubSubRendezvousGrain(
+            PubSubGrainStateStorageFactory storageFactory,
+            ILogger<PubSubRendezvousGrain> logger,
+            StreamInstruments streamInstruments,
+            IClusterMembershipService clusterMembershipService)
         {
             _storageFactory = storageFactory;
             _logger = logger;
             _streamInstruments = streamInstruments;
+            _clusterMembershipService = clusterMembershipService;
             _storage = _storageFactory.GetStorage(this);
         }
 
@@ -121,6 +127,7 @@ namespace Orleans.Streams
 
             try
             {
+                RemoveDefunctSystemTargetProducers();
                 var publisherState = new PubSubPublisherState(streamId, streamProducer);
                 State.Producers.Add(publisherState);
                 LogPubSubCounts("RegisterProducer {0}", streamProducer);
@@ -142,6 +149,32 @@ namespace Orleans.Streams
             }
             // The LINQ query is non-null, so ToSet cannot return null.
             return State.Consumers.Where(c => !c.IsFaulted).ToSet()!;
+        }
+
+        private void RemoveDefunctSystemTargetProducers()
+        {
+            List<PubSubPublisherState>? removedProducers = null;
+            foreach (var producer in State.Producers)
+            {
+                if (SystemTargetGrainId.TryParse(producer.Producer, out var systemTarget)
+                    && _clusterMembershipService.CurrentSnapshot.GetSiloStatus(systemTarget.GetSiloAddress()).IsTerminating())
+                {
+                    removedProducers ??= [];
+                    removedProducers.Add(producer);
+                }
+            }
+
+            if (removedProducers is null)
+            {
+                return;
+            }
+
+            foreach (var producer in removedProducers)
+            {
+                RemoveProducer(producer);
+            }
+
+            RecordRemovedProducers(removedProducers);
         }
 
         public async Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
