@@ -12,7 +12,7 @@ ms.topic: reference
 - [Orleans documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Orleans repository](https://github.com/dotnet/orleans)
 - [Maintained Orleans samples](https://github.com/dotnet/orleans/tree/main/samples)
-- [.NET API reference for Orleans](https://learn.microsoft.com/dotnet/api/)
+- [.NET API reference for Orleans](https://dotnet.github.io/orleans/docs/api/csharp/)
 - [Orleans NuGet packages](https://www.nuget.org/profiles/Orleans)
 - [Release notes](https://github.com/dotnet/orleans/releases)
 - [Migration guide](../migration-guide.md)

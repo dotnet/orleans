@@ -813,10 +813,7 @@ async function validateReferenceInventories(repositoryRoot, sourceRoot, packageE
   const optionsPage = await readFile(optionsPath, 'utf8');
   if (
     !optionsPage.includes('This page is a curated starting point, not an exhaustive property catalog.') ||
-    !(
-      optionsPage.includes('<xref:Orleans.Configuration>') ||
-      optionsPage.includes('https://learn.microsoft.com/dotnet/api/orleans.configuration')
-    )
+    !optionsPage.includes('<xref:Orleans.Configuration>')
   ) {
     issues.push(
       diagnostic(
