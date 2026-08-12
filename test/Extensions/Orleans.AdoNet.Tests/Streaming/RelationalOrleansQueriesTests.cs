@@ -88,6 +88,29 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         return payload;
     }
 
+    private async Task<AdoNetStreamMessageAck[]> QueueMessagesAsync(
+        string serviceId,
+        string providerId,
+        string queueId,
+        byte[] payload,
+        int expiryTimeout,
+        int count)
+    {
+        using var semaphore = new SemaphoreSlim(concurrency);
+        return await Task.WhenAll(Enumerable.Range(0, count).Select(async _ =>
+        {
+            await semaphore.WaitAsync();
+            try
+            {
+                return await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }));
+    }
+
     public Task DisposeAsync() => Task.CompletedTask;
 
     protected async Task VerifyProviderResultsAreOrdered()
@@ -105,9 +128,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         var queueId = RandomQueueId();
         var payload = new byte[] { 0xFF };
 
-        await Task.WhenAll(Enumerable
-            .Range(0, 100)
-            .Select(_ => _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, 100)));
+        await QueueMessagesAsync(serviceId, providerId, queueId, payload, 100, 100);
 
         await _storage.ExecuteAsync(
             "UPDATE OrleansQuery SET QueryText = @QueryText WHERE QueryKey = 'GetStreamMessagesKey'",
@@ -416,10 +437,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
 
         // arrange - enqueue messages concurrently
         var beforeQueueing = DateTime.UtcNow.AddSeconds(-1);
-        var acks = await Task.WhenAll(Enumerable
-            .Range(0, total)
-            .Select(i => _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout))
-            .ToList());
+        var acks = await QueueMessagesAsync(serviceId, providerId, queueId, payload, expiryTimeout, total);
         var afterQueueing = DateTime.UtcNow.AddSeconds(1);
 
         // act - dequeue all messages
