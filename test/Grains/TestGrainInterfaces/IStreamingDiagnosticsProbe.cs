@@ -11,7 +11,7 @@ public static class StreamingDiagnosticsProbeConstants
 public interface IStreamingDiagnosticsProbe : ISystemTarget
 {
     Task<SiloAddress> GetLocation();
-    Task WaitForProviderReady(string providerName, int expectedQueueCount, TimeSpan timeout);
+    Task WaitForProviderReady(string providerName, TimeSpan timeout);
     Task WaitForProducerRegistered(string providerName, StreamId streamId, TimeSpan timeout);
     Task WaitForPullingAgentStreamRegistered(string providerName, StreamId streamId, TimeSpan timeout);
     Task WaitForSubscriptionRegistered(string providerName, StreamId streamId, Guid subscriptionId, TimeSpan timeout);

@@ -19,6 +19,7 @@ public class StreamingDiagnosticEventRecorderTests
         var localSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 13000), 1);
         var otherSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 13001), 1);
         var queue = QueueId.GetQueueId("queue", 1, 1);
+        var otherQueue = QueueId.GetQueueId("other-queue", 2, 1);
         using var recorder = new StreamingDiagnosticEventRecorder(new TestLocalSiloDetails(localSilo));
 
         recorder.OnEvent(new StreamingEvents.PullingAgentStarted(
@@ -28,14 +29,119 @@ public class StreamingDiagnosticEventRecorderTests
             TimeSpan.Zero,
             TimeSpan.FromSeconds(1)));
         recorder.OnEvent(new StreamingEvents.QueueReceiverInitialized(providerName, localSilo, queue));
+        recorder.OnEvent(new StreamingEvents.PullingAgentManagerState(
+            providerName,
+            localSilo,
+            [queue],
+            runningAgents: 1));
         recorder.OnEvent(new StreamingEvents.BalancerChanged(
             providerName,
             otherSilo,
-            [queue],
             [],
+            [otherQueue],
             new TestQueueBalancer()));
 
-        await recorder.WaitForProviderReady(providerName, expectedQueueCount: 1, TimeSpan.FromSeconds(1));
+        await recorder.WaitForProviderReady(providerName, TimeSpan.FromSeconds(1));
+    }
+
+    [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+    public async Task ProviderReadinessRequiresManagerState()
+    {
+        const string providerName = "provider";
+        var localSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 13000), 1);
+        var queue = QueueId.GetQueueId("queue", 1, 1);
+        using var recorder = new StreamingDiagnosticEventRecorder(new TestLocalSiloDetails(localSilo));
+
+        recorder.OnEvent(new StreamingEvents.PullingAgentStarted(
+            providerName,
+            localSilo,
+            queue,
+            TimeSpan.Zero,
+            TimeSpan.FromSeconds(1)));
+        recorder.OnEvent(new StreamingEvents.QueueReceiverInitialized(providerName, localSilo, queue));
+
+        var readiness = recorder.WaitForProviderReady(providerName, TimeSpan.FromSeconds(1));
+        Assert.False(readiness.IsCompleted);
+
+        recorder.OnEvent(new StreamingEvents.PullingAgentManagerState(
+            providerName,
+            localSilo,
+            [queue],
+            runningAgents: 1));
+        await readiness;
+    }
+
+    [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+    public async Task ProviderReadinessAcceptsNoAssignedQueues()
+    {
+        const string providerName = "provider";
+        var localSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 13000), 1);
+        using var recorder = new StreamingDiagnosticEventRecorder(new TestLocalSiloDetails(localSilo));
+
+        recorder.OnEvent(new StreamingEvents.PullingAgentManagerState(
+            providerName,
+            localSilo,
+            [],
+            runningAgents: 0));
+
+        await recorder.WaitForProviderReady(providerName, TimeSpan.FromSeconds(1));
+    }
+
+    [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+    public async Task ProviderReadinessWaitsForAssignedQueueReceiverInitialization()
+    {
+        const string providerName = "provider";
+        var localSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 13000), 1);
+        var queue = QueueId.GetQueueId("queue", 1, 1);
+        using var recorder = new StreamingDiagnosticEventRecorder(new TestLocalSiloDetails(localSilo));
+
+        recorder.OnEvent(new StreamingEvents.PullingAgentManagerState(
+            providerName,
+            localSilo,
+            [queue],
+            runningAgents: 1));
+
+        var readiness = recorder.WaitForProviderReady(providerName, TimeSpan.FromSeconds(1));
+        Assert.False(readiness.IsCompleted);
+
+        recorder.OnEvent(new StreamingEvents.QueueReceiverInitialized(providerName, localSilo, queue));
+        await readiness;
+    }
+
+    [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+    public async Task ProviderReadinessDoesNotReuseInitializationFromPreviousAssignment()
+    {
+        const string providerName = "provider";
+        var localSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 13000), 1);
+        var queue = QueueId.GetQueueId("queue", 1, 1);
+        using var recorder = new StreamingDiagnosticEventRecorder(new TestLocalSiloDetails(localSilo));
+
+        recorder.OnEvent(new StreamingEvents.PullingAgentManagerState(
+            providerName,
+            localSilo,
+            [queue],
+            runningAgents: 1));
+        recorder.OnEvent(new StreamingEvents.QueueReceiverInitialized(providerName, localSilo, queue));
+        await recorder.WaitForProviderReady(providerName, TimeSpan.FromSeconds(1));
+
+        recorder.OnEvent(new StreamingEvents.PullingAgentStopped(providerName, localSilo, queue));
+        recorder.OnEvent(new StreamingEvents.QueueReceiverInitialized(providerName, localSilo, queue));
+        recorder.OnEvent(new StreamingEvents.PullingAgentManagerState(
+            providerName,
+            localSilo,
+            [],
+            runningAgents: 0));
+        recorder.OnEvent(new StreamingEvents.PullingAgentManagerState(
+            providerName,
+            localSilo,
+            [queue],
+            runningAgents: 1));
+
+        var readiness = recorder.WaitForProviderReady(providerName, TimeSpan.FromSeconds(1));
+        Assert.False(readiness.IsCompleted);
+
+        recorder.OnEvent(new StreamingEvents.QueueReceiverInitialized(providerName, localSilo, queue));
+        await readiness;
     }
 
     private sealed class TestLocalSiloDetails(SiloAddress siloAddress) : ILocalSiloDetails

@@ -27,8 +27,8 @@ internal sealed class StreamingDiagnosticsProbeSystemTarget : SystemTarget, IStr
     public Task<SiloAddress> GetLocation()
         => Task.FromResult(Silo);
 
-    public Task WaitForProviderReady(string providerName, int expectedQueueCount, TimeSpan timeout)
-        => _recorder.WaitForProviderReady(providerName, expectedQueueCount, timeout);
+    public Task WaitForProviderReady(string providerName, TimeSpan timeout)
+        => _recorder.WaitForProviderReady(providerName, timeout);
 
     public Task WaitForProducerRegistered(string providerName, StreamId streamId, TimeSpan timeout)
         => _recorder.WaitForProducerRegistered(providerName, streamId, timeout);
@@ -63,6 +63,7 @@ public sealed class StreamingDiagnosticEventRecorder(
     private readonly object _lock = new();
     private readonly Dictionary<string, HashSet<QueueId>> _startedQueues = new(StringComparer.Ordinal);
     private readonly Dictionary<string, HashSet<QueueId>> _initializedQueues = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _observedManagerStates = new(StringComparer.Ordinal);
     private readonly HashSet<StreamKey> _producerRegistrations = [];
     private readonly HashSet<StreamKey> _pullingAgentStreamRegistrations = [];
     private readonly HashSet<SubscriptionKey> _subscriptionRegistrations = [];
@@ -85,11 +86,11 @@ public sealed class StreamingDiagnosticEventRecorder(
         return Task.CompletedTask;
     }
 
-    public Task WaitForProviderReady(string providerName, int expectedQueueCount, TimeSpan timeout)
+    public Task WaitForProviderReady(string providerName, TimeSpan timeout)
         => WaitUntil(
-            () => QueueCount(_startedQueues, providerName) >= expectedQueueCount
-                && QueueCount(_initializedQueues, providerName) >= expectedQueueCount,
-            $"provider '{providerName}' to have {expectedQueueCount} started and initialized queue(s)",
+            () => _observedManagerStates.Contains(providerName)
+                && AllStartedQueuesAreInitialized(providerName),
+            $"provider '{providerName}' to report its pulling-agent manager state and initialize all assigned queues",
             timeout);
 
     public Task WaitForProducerRegistered(string providerName, StreamId streamId, TimeSpan timeout)
@@ -194,7 +195,14 @@ public sealed class StreamingDiagnosticEventRecorder(
             {
                 case StreamingEvents.BalancerChanged e:
                     SetQueues(_startedQueues, e.StreamProvider, e.CurrentQueues);
+                    RetainQueues(_initializedQueues, e.StreamProvider, e.CurrentQueues);
                     AddRecent($"BalancerChanged provider={e.StreamProvider} silo={e.SiloAddress} currentQueues={e.CurrentQueues.Length}");
+                    break;
+                case StreamingEvents.PullingAgentManagerState e:
+                    SetQueues(_startedQueues, e.StreamProvider, e.CurrentQueues);
+                    RetainQueues(_initializedQueues, e.StreamProvider, e.CurrentQueues);
+                    _observedManagerStates.Add(e.StreamProvider);
+                    AddRecent($"PullingAgentManagerState provider={e.StreamProvider} silo={e.SiloAddress} currentQueues={e.CurrentQueues.Length} runningAgents={e.RunningAgents}");
                     break;
                 case StreamingEvents.PullingAgentStarted e:
                     AddQueue(_startedQueues, e.StreamProvider, e.QueueId);
@@ -270,6 +278,7 @@ public sealed class StreamingDiagnosticEventRecorder(
         var recent = string.Join(" | ", _recentEvents);
         return $"StartedQueues=[{started}] "
             + $"InitializedQueues=[{initialized}] "
+            + $"ObservedManagerStates=[{string.Join(", ", _observedManagerStates)}] "
             + $"ProducerRegistrations=[{FormatCollection(_producerRegistrations)}] "
             + $"PullingAgentStreamRegistrations=[{FormatCollection(_pullingAgentStreamRegistrations)}] "
             + $"SubscriptionRegistrations=[{FormatCollection(_subscriptionRegistrations)}] "
@@ -289,9 +298,16 @@ public sealed class StreamingDiagnosticEventRecorder(
         _recentEvents.Enqueue(message);
     }
 
-    private static int QueueCount(Dictionary<string, HashSet<QueueId>> queuesByProvider, string providerName)
+    private bool AllStartedQueuesAreInitialized(string providerName)
     {
-        return queuesByProvider.TryGetValue(providerName, out var queues) ? queues.Count : 0;
+        if (!_startedQueues.TryGetValue(providerName, out var startedQueues))
+        {
+            return false;
+        }
+
+        return _initializedQueues.TryGetValue(providerName, out var initializedQueues)
+            ? startedQueues.IsSubsetOf(initializedQueues)
+            : startedQueues.Count == 0;
     }
 
     private static void AddQueue(Dictionary<string, HashSet<QueueId>> queuesByProvider, string providerName, QueueId queueId)
@@ -315,6 +331,14 @@ public sealed class StreamingDiagnosticEventRecorder(
     private static void SetQueues(Dictionary<string, HashSet<QueueId>> queuesByProvider, string providerName, IEnumerable<QueueId> queues)
     {
         queuesByProvider[providerName] = [.. queues];
+    }
+
+    private static void RetainQueues(Dictionary<string, HashSet<QueueId>> queuesByProvider, string providerName, IEnumerable<QueueId> queues)
+    {
+        if (queuesByProvider.TryGetValue(providerName, out var currentQueues))
+        {
+            currentQueues.IntersectWith(queues);
+        }
     }
 
     private static string FormatCollection<T>(IReadOnlyCollection<T> values)
