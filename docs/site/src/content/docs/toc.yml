@@ -2,7 +2,7 @@ items:
   - name: Microsoft Orleans documentation
     href: index.yml
     homepage: index.yml
-  - name: Overview
+  - name: Concepts
     items:
       - name: Introduction to Orleans
         href: overview.md
@@ -32,32 +32,10 @@ items:
         href: tutorials-and-samples/streaming-walkthrough.md
       - name: Perform a rolling upgrade
         href: tutorials-and-samples/rolling-upgrade.md
-  - name: Concepts
-    items:
-      - name: Orleans overview
-        href: overview.md
-      - name: Why Orleans?
-        href: benefits.md
-      - name: Grain model and programming
-        href: grains/index.md
-      - name: Persistence and durability
-        href: grains/grain-persistence/index.md
-      - name: Streaming
-        href: streaming/index.md
-      - name: Versioning and compatibility
-        href: grains/grain-versioning/grain-versioning.md
-      - name: Orleans clients
-        href: host/client.md
   - name: How-to guides
     items:
       - name: Recipe index
         href: how-to/index.md
-      - name: Configure hosting and providers
-        href: host/configuration-guide/index.md
-      - name: Deploy and operate
-        href: deployment/index.md
-      - name: Diagnose and recover
-        href: host/monitoring/troubleshooting.md
   - name: Develop applications
     items:
       - name: Grains
@@ -257,8 +235,6 @@ items:
             href: host/monitoring/signals.md
           - name: Troubleshooting workflow
             href: host/monitoring/troubleshooting.md
-          - name: Symptom and signal catalog
-            href: host/monitoring/troubleshooting-symptom-catalog.md
           - name: Silo error codes
             href: host/monitoring/silo-error-code-monitoring.md
           - name: Client error codes
@@ -277,10 +253,6 @@ items:
         href: security/secrets.md
       - name: Network hardening
         href: security/networking.md
-      - name: Transport Layer Security (TLS)
-        href: host/transport-layer-security.md
-      - name: Secure the Orleans Dashboard
-        href: dashboard/index.md
   - name: Deploy and operate
     items:
       - name: Overview
@@ -373,8 +345,6 @@ items:
         href: /docs/api/csharp/
       - name: API context and examples
         href: resources/api-reference-guide.md
-      - name: Frequently asked questions
-        href: resources/frequently-asked-questions.md
       - name: Best practices
         href: resources/best-practices.md
       - name: NuGet packages
@@ -387,14 +357,8 @@ items:
     items:
       - name: Frequently asked questions
         href: resources/frequently-asked-questions.md
-      - name: Troubleshooting workflow
-        href: host/monitoring/troubleshooting.md
-      - name: Troubleshoot deployments
-        href: deployment/troubleshooting-deployments.md
-      - name: Silo error codes
-        href: host/monitoring/silo-error-code-monitoring.md
-      - name: Client error codes
-        href: host/monitoring/client-error-code-monitoring.md
+      - name: Symptom and signal catalog
+        href: host/monitoring/troubleshooting-symptom-catalog.md
   - name: Upgrade to Orleans 10
     items:
       - name: Migration overview
