@@ -464,7 +464,7 @@ namespace Orleans.Tests.SqlUtils
                     EvictionInterval = evictionInterval,
                     EvictionBatchSize = evictionBatchSize
                 },
-                result => result.ToList());
+                result => result.OrderBy(static message => message.MessageId).ToList());
         }
 
         /// <summary>

@@ -31,6 +31,9 @@ public class MySqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
     {
         MySqlConnection.ClearAllPools();
     }
+
+    [SkippableFact]
+    public Task RelationalOrleansQueries_OrdersProviderResults() => VerifyProviderResultsAreOrdered();
 }
 
 /// <summary>
@@ -86,6 +89,41 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
+
+    protected async Task VerifyProviderResultsAreOrdered()
+    {
+        const string reverseQuery = """
+            SELECT ServiceId, ProviderId, QueueId, MessageId, Dequeued, VisibleOn, ExpiresOn, CreatedOn, ModifiedOn, Payload
+            FROM OrleansStreamMessage
+            WHERE ServiceId = @ServiceId AND ProviderId = @ProviderId AND QueueId = @QueueId
+            ORDER BY MessageId DESC
+            LIMIT @MaxCount
+            """;
+
+        var serviceId = RandomServiceId();
+        var providerId = RandomProviderId();
+        var queueId = RandomQueueId();
+        var payload = new byte[] { 0xFF };
+
+        await Task.WhenAll(Enumerable
+            .Range(0, 100)
+            .Select(_ => _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, 100)));
+
+        await _storage.ExecuteAsync(
+            "UPDATE OrleansQuery SET QueryText = @QueryText WHERE QueryKey = 'GetStreamMessagesKey'",
+            command =>
+            {
+                var parameter = command.CreateParameter();
+                parameter.ParameterName = "QueryText";
+                parameter.Value = reverseQuery;
+                command.Parameters.Add(parameter);
+            });
+
+        var queries = await RelationalOrleansQueries.CreateInstance(invariant, _storage.ConnectionString);
+        var messages = await queries.GetStreamMessagesAsync(serviceId, providerId, queueId, 100, 3, 10, 100, 10, 1000);
+
+        Assert.Equal(messages.OrderBy(message => message.MessageId), messages);
+    }
 
     /// <summary>
     /// Tests that a single message is queued.
@@ -366,17 +404,17 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         var serviceId = RandomServiceId();
         var providerId = RandomProviderId();
         var queueId = RandomQueueId();
-        var payload = RandomPayload();
+        var payload = new byte[] { 0xFF };
         var expiryTimeout = 100;
-        var maxCount = 3;
+        var maxCount = 60;
         var maxAttempts = 3;
         var visibilityTimeout = 10;
         var removalTimeout = 100;
         var evictionInterval = 10;
         var evictionBatchSize = 1000;
-        var total = 5;
+        var total = 100;
 
-        // arrange - enqueue five messages
+        // arrange - enqueue messages concurrently
         var beforeQueueing = DateTime.UtcNow.AddSeconds(-1);
         var acks = await Task.WhenAll(Enumerable
             .Range(0, total)
@@ -384,7 +422,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
             .ToList());
         var afterQueueing = DateTime.UtcNow.AddSeconds(1);
 
-        // act - dequeue three batches of three messages
+        // act - dequeue all messages
         var beforeDequeuing = DateTime.UtcNow.AddSeconds(-1);
         var first = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
         var second = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
@@ -396,9 +434,11 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         Assert.Equal(total - maxCount, second.Count);
         Assert.Empty(third);
 
+        var messages = first.Concat(second).Concat(third).ToList();
+        Assert.Equal(messages.OrderBy(message => message.MessageId), messages);
+
         // assert - dequeued messages are consistent with acks
         var ackLookup = acks.ToDictionary(x => (x.ServiceId, x.ProviderId, x.QueueId, x.MessageId));
-        var messages = first.Concat(second).Concat(third).ToList();
         foreach (var message in messages)
         {
             Assert.True(ackLookup.TryGetValue((message.ServiceId, message.ProviderId, message.QueueId, message.MessageId), out var ack), "Ack not found");
