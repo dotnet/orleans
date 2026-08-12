@@ -484,7 +484,6 @@ namespace NonSilo.Tests.Membership
                 Assert.Equal(1, Volatile.Read(ref activeCalls));
                 Assert.Equal(1, Volatile.Read(ref maximumActiveCalls));
                 Assert.All(workers, worker => Assert.False(worker.IsCompleted));
-                _timeProvider.Advance(TimeSpan.FromSeconds(2));
             }
             finally
             {
