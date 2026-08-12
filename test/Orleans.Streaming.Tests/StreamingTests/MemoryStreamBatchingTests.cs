@@ -25,7 +25,7 @@ namespace UnitTests.StreamingTests
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 // This fixture tests batching, not rebalancing. Keep one owner for the destructive in-memory queue.
-                builder.Options.InitialSilosCount = partitionCount;
+                builder.Options.InitialSilosCount = 1;
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
                 builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
             }
