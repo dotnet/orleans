@@ -10,6 +10,9 @@ namespace Orleans.EntityFrameworkCore.Tests.Clustering;
 [TestCategory("EFCore")]
 [TestCategory(EFCoreTestCategories.SqlServer)]
 [TestCategory(EFCoreTestCategories.Functional)]
+[TestSuite("Functional")]
+[TestProvider(EFCoreTestCategories.SqlServer)]
+[TestArea("Membership")]
 public sealed class EFCoreSqlServerMembershipTableTests :
     EFCoreMembershipTableTestsBase<SqlServerClusterDbContext, byte[]>
 {

@@ -8,6 +8,9 @@ namespace Orleans.EntityFrameworkCore.Tests.Reminders;
 [TestCategory("EFCore")]
 [TestCategory(EFCoreTestCategories.MySql)]
 [TestCategory(EFCoreTestCategories.MySqlProvider)]
+[TestSuite("Functional")]
+[TestProvider(EFCoreTestCategories.MySqlProvider)]
+[TestArea("Reminders")]
 public sealed class ReminderTests_EFCoreMySql :
     EFCoreReminderServiceTestsBase<
         MySqlReminderDbContext,
