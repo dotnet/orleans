@@ -456,6 +456,8 @@ namespace Orleans.Runtime.Messaging
                         return;
                     }
 
+                    // Assume that the addressed silo will execute the request. It could forward the request elsewhere and then fail,
+                    // causing us to reject a request which may still complete, but allowing the client to retry is preferable to timing out.
                     _pendingRequests[message.Id] = CreateRequestSnapshot(message);
                 }
             }
