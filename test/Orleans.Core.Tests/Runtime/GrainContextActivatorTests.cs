@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using NSubstitute;
 using Orleans.Metadata;
 using Orleans.Runtime;
@@ -27,7 +28,7 @@ public class GrainContextActivatorTests
 
     private sealed class TestGrainContextActivatorProvider(IGrainContextActivator activator) : IGrainContextActivatorProvider
     {
-        public bool TryGet(GrainType grainType, out IGrainContextActivator result)
+        public bool TryGet(GrainType grainType, [NotNullWhen(true)] out IGrainContextActivator? result)
         {
             result = activator;
             return true;
@@ -36,7 +37,10 @@ public class GrainContextActivatorTests
 
     private sealed class TestConfigureGrainContextProvider(List<string> events) : IConfigureGrainContextProvider
     {
-        public bool TryGetConfigurator(GrainType grainType, GrainProperties properties, out IConfigureGrainContext configurator)
+        public bool TryGetConfigurator(
+            GrainType grainType,
+            GrainProperties properties,
+            [NotNullWhen(true)] out IConfigureGrainContext? configurator)
         {
             configurator = new TestConfigureGrainContext(events);
             return true;

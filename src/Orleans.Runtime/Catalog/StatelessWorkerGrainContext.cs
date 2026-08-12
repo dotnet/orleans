@@ -43,11 +43,17 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
     public StatelessWorkerGrainContext(
         GrainAddress address,
         StatelessWorkerGrainTypeSharedContext sharedContext,
-        IGrainContextActivator innerActivator)
+        IGrainContextActivator innerActivator,
+        IConfigureGrainContext[] configureActions)
     {
         Address = address;
         _shared = sharedContext;
         _innerActivator = innerActivator;
+
+        foreach (var configure in configureActions)
+        {
+            configure.Configure(this);
+        }
 
         if (_shared.RemoveIdleWorkers)
         {

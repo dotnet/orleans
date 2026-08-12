@@ -135,7 +135,7 @@ namespace UnitTests.General
             {
                 // Selectively register this activator only for ExplicitlyRegisteredSimpleDIGrain types
                 // Other grain types will continue using the default DI-based activator
-                if (_grainClassMap.TryGetGrainClass(grainType, out var grainClass) && grainClass.IsAssignableFrom(typeof(ExplicitlyRegisteredSimpleDIGrain)))
+                if (_grainClassMap.TryGetGrainClass(grainType, out var grainClass) && grainClass == typeof(ExplicitlyRegisteredSimpleDIGrain))
                 {
                     shared.SetComponent<IGrainActivator>(this);
                 }
@@ -168,7 +168,7 @@ namespace UnitTests.General
                 [NotNullWhen(true)] out IConfigureGrainContext? configurator)
             {
                 if (grainClassMap.TryGetGrainClass(grainType, out var grainClass)
-                    && grainClass.IsAssignableFrom(typeof(ExplicitlyRegisteredSimpleDIGrain)))
+                    && grainClass == typeof(ExplicitlyRegisteredSimpleDIGrain))
                 {
                     configurator = ActivationOrderingState.Instance;
                     return true;
@@ -182,14 +182,15 @@ namespace UnitTests.General
         private sealed class ActivationOrderingState : IConfigureGrainContext
         {
             private int _armed;
+            private int _wasConfiguredAtConstruction;
 
             public static ActivationOrderingState Instance { get; } = new();
 
-            public bool WasConfiguredAtConstruction { get; private set; }
+            public bool WasConfiguredAtConstruction => Volatile.Read(ref _wasConfiguredAtConstruction) != 0;
 
             public void Arm()
             {
-                WasConfiguredAtConstruction = false;
+                Volatile.Write(ref _wasConfiguredAtConstruction, 0);
                 Volatile.Write(ref _armed, 1);
             }
 
@@ -210,7 +211,9 @@ namespace UnitTests.General
                     return;
                 }
 
-                WasConfiguredAtConstruction = context.GetComponent<ConfiguredContextMarker>() is not null;
+                Volatile.Write(
+                    ref _wasConfiguredAtConstruction,
+                    context.GetComponent<ConfiguredContextMarker>() is not null ? 1 : 0);
             }
         }
 

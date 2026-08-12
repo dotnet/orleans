@@ -104,13 +104,5 @@ internal partial class ActivationDataActivatorProvider(
 internal class StatelessWorkerActivator(StatelessWorkerGrainTypeSharedContext sharedContext, IGrainContextActivator innerActivator) : IGrainContextActivator
 {
     public IGrainContext CreateContext(GrainAddress address, IConfigureGrainContext[] configureActions)
-    {
-        var result = new StatelessWorkerGrainContext(address, sharedContext, innerActivator);
-        foreach (var configure in configureActions)
-        {
-            configure.Configure(result);
-        }
-
-        return result;
-    }
+        => new StatelessWorkerGrainContext(address, sharedContext, innerActivator, configureActions);
 }
