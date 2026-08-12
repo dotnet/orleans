@@ -52,4 +52,3 @@ For every credential:
 
 Credential rotation doesn't replace authorization review. Periodically verify that provider identities still have least privilege and that removed clients, silos, and operators can no longer connect.
 For network boundaries around credentials and provider connections, see [network hardening](networking.md).
-For network boundaries around credentials and provider connections, see [network hardening](networking.md).
