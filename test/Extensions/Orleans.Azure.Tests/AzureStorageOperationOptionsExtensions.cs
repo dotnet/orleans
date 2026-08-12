@@ -8,7 +8,7 @@ namespace Tester.AzureUtils
 {
     public static class AzureStorageOperationOptionsExtensions
     {
-        // Keep a stalled emulator request within Orleans' 30-second response timeout.
+        // Keep stalled table storage requests within Orleans' 30-second response timeout.
         private const int TableStorageMaxRetries = 2;
         private static readonly TimeSpan TableStorageNetworkTimeout = TimeSpan.FromSeconds(5);
 

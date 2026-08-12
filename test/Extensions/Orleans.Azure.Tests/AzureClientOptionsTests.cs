@@ -18,7 +18,7 @@ public class AzureClientOptionsTests
     }
 
     [Fact]
-    public void TestTableServiceClient_HasBoundedRetryBudget()
+    public void TestTableClientOptions_HasBoundedRetryBudget()
     {
         var options = AzureStorageOperationOptionsExtensions.GetTableClientOptions();
 
