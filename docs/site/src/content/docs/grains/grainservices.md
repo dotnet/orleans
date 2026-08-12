@@ -38,7 +38,7 @@ Register both the service and its client:
 Inject the client into a normal grain:
 
 :::code language="csharp" source="../snippets/compiled/Grains/ServicesAndObserversSnippets.cs" id="use_index_grain_service":::
-Register and inject the same client interface. For example, registering `IIndexServiceClient` but requesting `IIndexService` in the grain constructor fails dependency resolution because those are distinct service types.
+Register and inject the same client interface. In this example, both registration and constructor injection use `IIndexServiceClient`. Registering `IIndexServiceClient` but requesting `IIndexService` in the grain constructor fails dependency resolution because those are distinct service types.
 
 The client can route to a remote silo; don't assume calls stay local.
 
