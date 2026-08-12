@@ -141,7 +141,7 @@ namespace UnitTests.TimerTests
         /// <summary>
         /// Tests basic reminder list operations including creation and retrieval.
         /// </summary>
-        [Fact(Skip = "https://github.com/dotnet/orleans/issues/9555")]
+        [Fact]
         public async Task Rem_Grain_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();
