@@ -5,7 +5,6 @@
     <!-- Frontend paths -->
     <NpmAppRootDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Orleans.Dashboard.App'))</NpmAppRootDirectory>
     <NpmBuildOutput>$([System.IO.Path]::GetFullPath('$(NpmAppRootDirectory)\dist\'))</NpmBuildOutput>
-    <NpmCiScript>$([System.IO.Path]::Combine('$(NpmAppRootDirectory)', 'scripts', 'npm-ci.js'))</NpmCiScript>
     <AzureDevOpsNpmrcFile>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\.azdo\.npmrc'))</AzureDevOpsNpmrcFile>
   </PropertyGroup>
 
@@ -13,7 +12,6 @@
   <ItemGroup Condition="'$(BuildExternalAssets)' != 'false'">
     <NpmAppSources Include="$(NpmAppRootDirectory)\src\**\*" />
     <NpmAppSources Include="$(NpmAppRootDirectory)\public\**\*" />
-    <NpmAppSources Include="$(NpmCiScript)" />
     <NpmAppSources Include="$(NpmAppRootDirectory)\package.json" />
     <NpmAppSources Include="$(NpmAppRootDirectory)\package-lock.json" />
     <NpmAppSources Include="$(NpmAppRootDirectory)\vite.config.ts" />
@@ -45,11 +43,20 @@
     <!-- Use Azure DevOps npmrc if running in CI -->
     <PropertyGroup>
       <NpmConfigArg Condition="'$(TF_BUILD)' == 'true'">--userconfig "$(AzureDevOpsNpmrcFile)"</NpmConfigArg>
+      <!-- npm defaults to two fetch retries, which was insufficient when the package
+           registry reset a connection during CI. Allow five retries, starting at five
+           seconds and capping the backoff at fifteen seconds. -->
+      <NpmFetchRetryArgs>--fetch-retries=5 --fetch-retry-factor=3 --fetch-retry-mintimeout=5000 --fetch-retry-maxtimeout=15000</NpmFetchRetryArgs>
     </PropertyGroup>
 
-    <!-- Install dependencies -->
+    <!-- npm's fetch retry settings apply only to idempotent registry reads which fail
+         because of network errors or HTTP 5xx responses. Increasing that bounded retry
+         budget makes CI resilient to brief registry interruptions without retrying
+         deterministic dependency, lockfile, authentication, or lifecycle-script failures.
+         Keep these options on this command instead of in the app's local-development
+         .npmrc so direct frontend development retains npm's defaults. -->
     <Exec
-      Command="node &quot;$(NpmCiScript)&quot; --prefer-offline --no-audit $(NpmConfigArg)"
+      Command="npm ci --prefer-offline --no-audit $(NpmFetchRetryArgs) $(NpmConfigArg)"
       WorkingDirectory="$(NpmAppRootDirectory)"
       ConsoleToMsBuild="true" />
 
