@@ -14,7 +14,7 @@ namespace UnitTests;
 public class UnknownSiloStatusCacheTests
 {
     [Fact]
-    public async Task UnknownSiloRequiresTwoSequentialSourceRefreshes()
+    public async Task UnknownSilosShareSourceRefresh()
     {
         var membershipManager = new TestMembershipManager(CreateMembershipTableSnapshot(1));
         var cache = new UnknownSiloStatusCache(membershipManager, NullLogger<UnknownSiloStatusCache>.Instance);
@@ -26,7 +26,7 @@ public class UnknownSiloStatusCacheTests
 
         Assert.Equal(SiloStatus.Dead, statuses[firstSilo]);
         Assert.Equal(SiloStatus.Dead, statuses[secondSilo]);
-        Assert.Equal(2, membershipManager.RefreshCount);
+        Assert.Equal(1, membershipManager.SourceRefreshCount);
     }
 
     [Fact]
@@ -41,7 +41,7 @@ public class UnknownSiloStatusCacheTests
         var activeSnapshot = CreateSnapshot(1, new ClusterMember(silo, SiloStatus.Active, "silo"));
         Assert.Equal(SiloStatus.Active, (await cache.GetSiloStatuses(activeSnapshot, [silo]))[silo]);
         Assert.Equal(SiloStatus.Dead, (await cache.GetSiloStatuses(unknownSnapshot, [silo]))[silo]);
-        Assert.Equal(4, membershipManager.RefreshCount);
+        Assert.Equal(2, membershipManager.SourceRefreshCount);
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public class UnknownSiloStatusCacheTests
         var snapshot = CreateSnapshot(1, new ClusterMember(silo, SiloStatus.Dead, "silo"));
 
         Assert.Equal(SiloStatus.Dead, (await cache.GetSiloStatuses(snapshot, [silo]))[silo]);
-        Assert.Equal(0, membershipManager.RefreshCount);
+        Assert.Equal(0, membershipManager.SourceRefreshCount);
     }
 
     private static ClusterMembershipSnapshot CreateSnapshot(long version, params ClusterMember[] members) =>
@@ -67,7 +67,7 @@ public class UnknownSiloStatusCacheTests
 
     private sealed class TestMembershipManager(MembershipTableSnapshot snapshot) : IMembershipManager
     {
-        public int RefreshCount { get; private set; }
+        public int SourceRefreshCount { get; private set; }
 
         public MembershipTableSnapshot CurrentSnapshot { get; } = snapshot;
 
@@ -76,8 +76,11 @@ public class UnknownSiloStatusCacheTests
         public SiloStatus LocalSiloStatus => SiloStatus.Active;
 
         public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+
+        public Task RefreshFromSource(CancellationToken cancellationToken)
         {
-            RefreshCount++;
+            SourceRefreshCount++;
             return Task.CompletedTask;
         }
 

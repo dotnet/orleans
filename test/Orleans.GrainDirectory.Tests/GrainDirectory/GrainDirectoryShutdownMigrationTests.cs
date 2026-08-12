@@ -266,6 +266,9 @@ internal sealed class DelayedMembershipManager(MembershipTableManager inner) : I
     public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) =>
         ((IMembershipManager)inner).Refresh(targetVersion, cancellationToken);
 
+    public Task RefreshFromSource(CancellationToken cancellationToken) =>
+        ((IMembershipManager)inner).RefreshFromSource(cancellationToken);
+
     public Task<bool> TryKillSilo(SiloAddress silo, CancellationToken cancellationToken) =>
         ((IMembershipManager)inner).TryKillSilo(silo, cancellationToken);
 

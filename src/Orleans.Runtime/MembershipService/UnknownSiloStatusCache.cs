@@ -56,10 +56,7 @@ internal sealed partial class UnknownSiloStatusCache
 
         try
         {
-            // The first call can join a refresh which began before the silos were observed as unknown.
-            // The second call starts after that work completed and therefore establishes the causal barrier.
-            await _membershipManager.Refresh(targetVersion: null, CancellationToken.None);
-            await _membershipManager.Refresh(targetVersion: null, CancellationToken.None);
+            await _membershipManager.RefreshFromSource(CancellationToken.None);
 
             var refreshedSnapshot = _membershipManager.CurrentSnapshot;
             foreach (var siloAddress in unknownSilos)

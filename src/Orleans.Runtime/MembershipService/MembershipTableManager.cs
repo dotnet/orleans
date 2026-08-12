@@ -115,6 +115,7 @@ namespace Orleans.Runtime.MembershipService
         Task<bool> IMembershipManager.TryKillSilo(SiloAddress silo, CancellationToken cancellationToken) => this.TryKill(silo, cancellationToken);
         Task<bool> IMembershipManager.TrySuspectSilo(SiloAddress silo, SiloAddress? indirectProbingSilo, CancellationToken cancellationToken) => this.TryToSuspectOrKill(silo, indirectProbingSilo, cancellationToken);
         Task IMembershipManager.Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) => this.Refresh(targetVersion, cancellationToken);
+        Task IMembershipManager.RefreshFromSource(CancellationToken cancellationToken) => this.RefreshFromSource(cancellationToken);
         Task IMembershipManager.ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) =>
             this.RefreshFromSnapshot(snapshot, cancellationToken);
         Task IMembershipManager.UpdateIAmAlive(CancellationToken cancellationToken) => this.UpdateIAmAlive(cancellationToken);
@@ -145,6 +146,13 @@ namespace Orleans.Runtime.MembershipService
                     break;
                 }
             }
+        }
+
+        private Task RefreshFromSource(CancellationToken cancellationToken)
+        {
+            // A concurrent write which publishes a full view could also satisfy this fence. Issue an
+            // independent read here so that the operation makes progress without relying on other activity.
+            return RefreshInternal(requireCleanup: false, _lifetimeCts.Token).WaitAsync(cancellationToken);
         }
 
         public async Task RefreshFromSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken)
