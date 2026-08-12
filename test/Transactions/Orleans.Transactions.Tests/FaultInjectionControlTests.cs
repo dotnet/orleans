@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Immutable;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Transactions.TestKit;
 using Xunit;
 
@@ -41,5 +44,67 @@ public class FaultInjectionControlTests
         Assert.Equal(FaultInjectionType.None, consumedType);
         Assert.Equal(TransactionFaultInjectPhase.BeforePrepareAndCommit, control.FaultInjectionPhase);
         Assert.Equal(FaultInjectionType.ExceptionAfterStore, control.FaultInjectionType);
+    }
+
+    [Theory]
+    [InlineData(FaultInjectionType.ExceptionBeforeStore)]
+    [InlineData(FaultInjectionType.ExceptionAfterStore)]
+    [InlineData(FaultInjectionType.GenericExceptionAfterStore)]
+    public void ScopedStorageFaultIgnoresUnrelatedBatches(FaultInjectionType injectionType)
+    {
+        var targetTransactionId = Guid.NewGuid();
+        var injector = new SimpleAzureStorageExceptionInjector(
+            NullLogger<SimpleAzureStorageExceptionInjector>.Instance);
+        var scopedInjector = Assert.IsAssignableFrom<ITransactionScopedFaultInjector>(injector);
+        scopedInjector.Arm(targetTransactionId, injectionType, requireTransactionMatch: true);
+
+        var unrelatedTransactionIds = ImmutableArray.Create(Guid.NewGuid());
+        scopedInjector.BeforeStore(unrelatedTransactionIds);
+        scopedInjector.AfterStore(unrelatedTransactionIds);
+
+        var targetTransactionIds = ImmutableArray.Create(targetTransactionId);
+        AssertFaultInjected(scopedInjector, injectionType, targetTransactionIds);
+
+        scopedInjector.BeforeStore(targetTransactionIds);
+        scopedInjector.AfterStore(targetTransactionIds);
+    }
+
+    [Theory]
+    [InlineData(FaultInjectionType.ExceptionBeforeStore)]
+    [InlineData(FaultInjectionType.ExceptionAfterStore)]
+    [InlineData(FaultInjectionType.GenericExceptionAfterStore)]
+    public void UnscopedStorageFaultInjectsIntoUnidentifiedBatch(FaultInjectionType injectionType)
+    {
+        var injector = new SimpleAzureStorageExceptionInjector(
+            NullLogger<SimpleAzureStorageExceptionInjector>.Instance);
+        var scopedInjector = Assert.IsAssignableFrom<ITransactionScopedFaultInjector>(injector);
+        scopedInjector.Arm(Guid.NewGuid(), injectionType, requireTransactionMatch: false);
+
+        AssertFaultInjected(scopedInjector, injectionType, ImmutableArray<Guid>.Empty);
+
+        scopedInjector.BeforeStore(ImmutableArray<Guid>.Empty);
+        scopedInjector.AfterStore(ImmutableArray<Guid>.Empty);
+    }
+
+    private static void AssertFaultInjected(
+        ITransactionScopedFaultInjector faultInjector,
+        FaultInjectionType injectionType,
+        ImmutableArray<Guid> transactionIds)
+    {
+        if (injectionType == FaultInjectionType.ExceptionBeforeStore)
+        {
+            Assert.Throws<SimpleAzureStorageException>(() => faultInjector.BeforeStore(transactionIds));
+            return;
+        }
+
+        faultInjector.BeforeStore(transactionIds);
+        if (injectionType == FaultInjectionType.ExceptionAfterStore)
+        {
+            Assert.Throws<SimpleAzureStorageException>(() => faultInjector.AfterStore(transactionIds));
+        }
+        else
+        {
+            Assert.Throws<InvalidOperationException>(() => faultInjector.AfterStore(transactionIds));
+        }
     }
 }

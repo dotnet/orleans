@@ -42,9 +42,12 @@ namespace Orleans.Transactions.TestKit
             long? abortAfter
         )
         {
-            faultInjector.BeforeStore();
+            var transactionIds = ControlledTransactionFaultInjectorExtensions.GetTransactionIds(
+                metadata,
+                statesToPrepare);
+            faultInjector.BeforeStore(transactionIds);
             var result = await this.stateStorage.Store(expectedETag, metadata, statesToPrepare, commitUpTo, abortAfter);
-            faultInjector.AfterStore();
+            faultInjector.AfterStore(transactionIds);
             return result;
         }
     }
