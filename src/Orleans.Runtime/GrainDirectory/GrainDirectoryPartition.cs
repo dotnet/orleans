@@ -788,13 +788,23 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             {
                 DebugAssertOwnership(current, entry.GrainId);
                 LogTraceRecoveredEntry(_logger, entry, current.Version);
-                _directory[entry.GrainId] = entry;
+                RecoverEntry(_directory, entry);
             }
         }
 
         _directoryInstruments.RangeRecoveryCount.Add(1);
         _directoryInstruments.RangeRecoveryDuration.Record((long)stopwatch.Elapsed.TotalMilliseconds);
         LogDebugCompletedRecoveringActivations(_logger, addedRange, current.Version, stopwatch.Elapsed);
+    }
+
+    internal static void RecoverEntry(Dictionary<GrainId, GrainAddress> directory, GrainAddress recovered)
+    {
+        // Concurrent recovery responses can include an activation which was superseded in a newer membership view.
+        if (!directory.TryGetValue(recovered.GrainId, out var existing)
+            || recovered.MembershipVersion > existing.MembershipVersion)
+        {
+            directory[recovered.GrainId] = recovered;
+        }
     }
 
     private async IAsyncEnumerable<List<GrainAddress>> GetRegisteredActivations(DirectoryMembershipSnapshot current, RingRange range, bool isValidation)

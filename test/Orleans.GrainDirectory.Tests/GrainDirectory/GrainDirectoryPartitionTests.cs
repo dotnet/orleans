@@ -173,6 +173,37 @@ public sealed class GrainDirectoryPartitionTests
             addedRange: RingRange.Create(30, 40));
     }
 
+    [Fact]
+    public void RecoverEntry_PreservesNewestRegistrationRegardlessOfResponseOrder()
+    {
+        var grainId = GrainId.Create("recovery-test", "grain");
+        var oldRegistration = new GrainAddress
+        {
+            GrainId = grainId,
+            ActivationId = ActivationId.NewId(),
+            SiloAddress = TestSiloAddress,
+            MembershipVersion = new MembershipVersion(1),
+        };
+        var newRegistration = new GrainAddress
+        {
+            GrainId = grainId,
+            ActivationId = ActivationId.NewId(),
+            SiloAddress = ReplacementSiloAddress,
+            MembershipVersion = new MembershipVersion(2),
+        };
+
+        Dictionary<GrainId, GrainAddress> oldThenNew = [];
+        GrainDirectoryPartition.RecoverEntry(oldThenNew, oldRegistration);
+        GrainDirectoryPartition.RecoverEntry(oldThenNew, newRegistration);
+
+        Dictionary<GrainId, GrainAddress> newThenOld = [];
+        GrainDirectoryPartition.RecoverEntry(newThenOld, newRegistration);
+        GrainDirectoryPartition.RecoverEntry(newThenOld, oldRegistration);
+
+        Assert.Same(newRegistration, oldThenNew[grainId]);
+        Assert.Same(newRegistration, newThenOld[grainId]);
+    }
+
     private static void AssertRanges(RingRange previousOwnerRange, RingRange addedRange, params RingRange[] expected)
     {
         var actual = GrainDirectoryPartition.GetSnapshotTransferRanges(previousOwnerRange, addedRange).ToArray();
