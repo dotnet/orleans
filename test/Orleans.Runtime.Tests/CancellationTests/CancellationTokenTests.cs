@@ -107,20 +107,41 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
     public async Task MultipleGrainsTaskCancellation(int delay)
     {
         using var cts = new CancellationTokenSource();
-        var callId = Guid.NewGuid();
         var grains = Enumerable.Range(0, 5).Select(_ => fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid())).ToList();
-        var grainTasks = grains.Select(grain =>
-            Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-                grain.LongWaitInterleaving(cts.Token, TimeSpan.FromSeconds(10), callId)))
-            .ToList();
-        cts.CancelAfter(delay);
-        await Task.WhenAll(grainTasks);
-        if (delay > 0)
+        var callIds = grains.Select(_ => Guid.NewGuid()).ToArray();
+        var observer = new LongRunningTaskObserver();
+        var observerReference = fixture.GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
+        try
         {
-            foreach (var grain in grains)
+            var grainTasks = grains.Select((grain, index) =>
+                delay > 0
+                    ? grain.LongWaitInterleavingWithStartNotification(
+                        TimeSpan.FromSeconds(10),
+                        callIds[index],
+                        observerReference,
+                        cts.Token)
+                    : grain.LongWaitInterleaving(
+                        cts.Token,
+                        TimeSpan.FromSeconds(10),
+                        callIds[index]))
+                .ToArray();
+            if (delay > 0)
             {
-                await WaitForCallCancellation(grain, callId);
+                await Task.WhenAll(callIds.Select(observer.WaitForCallToStart));
             }
+
+            cts.CancelAfter(delay);
+            await Task.WhenAll(grainTasks.Select(task =>
+                Assert.ThrowsAnyAsync<OperationCanceledException>(() => task)));
+            if (delay > 0)
+            {
+                await Task.WhenAll(grains.Select((grain, index) =>
+                    WaitForCallCancellation(grain, callIds[index])));
+            }
+        }
+        finally
+        {
+            fixture.GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
         }
     }
 
