@@ -453,9 +453,28 @@ namespace Orleans.Runtime.Messaging
 
                 lock (_pendingRequests)
                 {
-                    _pendingRequests[message.Id] = new(message, targetSilo, _gateway.timeProvider.GetTimestamp(), timeToLive);
+                    _pendingRequests[message.Id] = new(
+                        CreateRequestSnapshot(message),
+                        targetSilo,
+                        _gateway.timeProvider.GetTimestamp(),
+                        timeToLive);
                 }
             }
+
+            private static Message CreateRequestSnapshot(Message message) => new()
+            {
+                IsSystemMessage = message.IsSystemMessage,
+                Direction = message.Direction,
+                Id = message.Id,
+                IsReadOnly = message.IsReadOnly,
+                IsAlwaysInterleave = message.IsAlwaysInterleave,
+                TargetSilo = message.TargetSilo,
+                TargetGrain = message.TargetGrain,
+                SendingSilo = message.SendingSilo,
+                SendingGrain = message.SendingGrain,
+                CacheInvalidationHeader = message.CacheInvalidationHeader,
+                TimeToLive = message.TimeToLive,
+            };
 
             public void CompleteRequest(CorrelationId correlationId)
             {
