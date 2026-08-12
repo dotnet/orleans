@@ -16,28 +16,21 @@ namespace Orleans.Runtime
         private readonly IMembershipManager membershipManager;
         private readonly ILogger<ClusterMembershipService> log;
         private readonly IFatalErrorHandler fatalErrorHandler;
-        private readonly UnknownSiloStatusCache unknownSiloStatusCache;
         private ClusterMembershipSnapshot snapshot;
 
         public ClusterMembershipService(
             IMembershipManager membershipManager,
             ILogger<ClusterMembershipService> log,
-            IFatalErrorHandler fatalErrorHandler,
-            UnknownSiloStatusCache unknownSiloStatusCache)
+            IFatalErrorHandler fatalErrorHandler)
         {
             this.snapshot = membershipManager.CurrentSnapshot.CreateClusterMembershipSnapshot();
-            this.membershipManager = membershipManager;
-            this.log = log;
-            this.fatalErrorHandler = fatalErrorHandler;
-            this.unknownSiloStatusCache = unknownSiloStatusCache;
             this.updates = new AsyncEnumerable<ClusterMembershipSnapshot>(
                 initialValue: this.snapshot,
                 updateValidator: (previous, proposed) => proposed.Version > previous.Version,
-                onPublished: update =>
-                {
-                    Interlocked.Exchange(ref this.snapshot, update);
-                    this.unknownSiloStatusCache.Observe(update);
-                });
+                onPublished: update => Interlocked.Exchange(ref this.snapshot, update));
+            this.membershipManager = membershipManager;
+            this.log = log;
+            this.fatalErrorHandler = fatalErrorHandler;
         }
 
         public ClusterMembershipSnapshot CurrentSnapshot
