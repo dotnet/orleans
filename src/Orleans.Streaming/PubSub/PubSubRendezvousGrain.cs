@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Core;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Runtime.MembershipService;
 using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 using Orleans.Streaming;
@@ -87,6 +88,7 @@ namespace Orleans.Streams
         private readonly StateStorageBridge<PubSubGrainState> _storage;
         private readonly StreamInstruments _streamInstruments;
         private readonly IClusterMembershipService _clusterMembershipService;
+        private readonly UnknownSiloStatusCache _unknownSiloStatusCache;
 
         private PubSubGrainState State => _storage.State!; // OnActivateAsync reads state before grain calls are dispatched.
 
@@ -94,12 +96,14 @@ namespace Orleans.Streams
             PubSubGrainStateStorageFactory storageFactory,
             ILogger<PubSubRendezvousGrain> logger,
             StreamInstruments streamInstruments,
-            IClusterMembershipService clusterMembershipService)
+            IClusterMembershipService clusterMembershipService,
+            UnknownSiloStatusCache unknownSiloStatusCache)
         {
             _storageFactory = storageFactory;
             _logger = logger;
             _streamInstruments = streamInstruments;
             _clusterMembershipService = clusterMembershipService;
+            _unknownSiloStatusCache = unknownSiloStatusCache;
             _storage = _storageFactory.GetStorage(this);
         }
 
@@ -153,11 +157,16 @@ namespace Orleans.Streams
 
         private void RemoveDefunctSystemTargetProducers()
         {
+            var membershipSnapshot = _clusterMembershipService.CurrentSnapshot;
             List<PubSubPublisherState>? removedProducers = null;
             foreach (var producer in State.Producers)
             {
-                if (SystemTargetGrainId.TryParse(producer.Producer, out var systemTarget)
-                    && _clusterMembershipService.CurrentSnapshot.GetSiloStatus(systemTarget.GetSiloAddress()).IsTerminating())
+                if (!SystemTargetGrainId.TryParse(producer.Producer, out var systemTarget))
+                {
+                    continue;
+                }
+
+                if (_unknownSiloStatusCache.GetSiloStatus(membershipSnapshot, systemTarget.GetSiloAddress()).IsTerminating())
                 {
                     removedProducers ??= [];
                     removedProducers.Add(producer);
