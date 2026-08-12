@@ -132,20 +132,10 @@ public abstract class AdoNetStreamingTests : TestClusterPerTest
             grainFactory.GetSystemTarget<IStreamingDiagnosticsProbe>(
                 StreamingDiagnosticsProbeConstants.SystemTargetType,
                 siloAddress)
-            .WaitForProviderReady(AdoNetStreamProviderName, expectedQueueCount: 1, StreamingDiagnosticTimeout))
+            .WaitForProviderReady(AdoNetStreamProviderName, StreamingDiagnosticTimeout))
             .ToArray();
 
-        foreach (var wait in waits)
-        {
-            _ = wait.ContinueWith(
-                static completed => _ = completed.Exception,
-                CancellationToken.None,
-                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
-                TaskScheduler.Default);
-        }
-
-        // ADO.NET uses one queue by default, so readiness on its owning silo is sufficient.
-        await await Task.WhenAny(waits);
+        await Task.WhenAll(waits);
     }
 
     //------------------------ One to One -----------------------------------------------------//

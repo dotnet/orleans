@@ -1168,7 +1168,7 @@ namespace UnitTests.Streaming.Reliability
             }
 
             var waits = probes
-                .Select(probe => probe.WaitForProviderReady(_streamProviderName, expectedQueueCount: 1, StreamingDiagnosticTimeout))
+                .Select(probe => probe.WaitForProviderReady(_streamProviderName, StreamingDiagnosticTimeout))
                 .ToArray();
             await WaitForAllStreamingSignalsAsync(
                 when,
