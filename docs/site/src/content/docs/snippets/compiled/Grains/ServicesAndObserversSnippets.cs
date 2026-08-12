@@ -57,9 +57,12 @@ public sealed class IndexServiceClient :
 
     public Task Add(string key)
     {
+        var grainReference = CurrentGrainReference
+            ?? throw new InvalidOperationException(
+                "Grain service clients can only be called from a grain.");
         IIndexService service =
-            GetGrainService(CurrentGrainReference.GrainId);
-
+            GetGrainService(grainReference.GrainId);
+  
         return service.Add(key);
     }
 }
