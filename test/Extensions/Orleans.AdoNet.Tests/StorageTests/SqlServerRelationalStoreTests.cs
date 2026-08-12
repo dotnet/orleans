@@ -28,6 +28,7 @@ namespace UnitTests.StorageTests.AdoNet
 
             internal Fixture(Func<RelationalStorageForTesting> storageFactory)
             {
+                ArgumentNullException.ThrowIfNull(storageFactory);
                 Storage = storageFactory();
             }
 
@@ -84,6 +85,15 @@ namespace UnitTests.StorageTests.AdoNet
                 () => new SqlServerRelationalStoreTests.Fixture(() => throw expectedException));
 
             Assert.Same(expectedException, exception);
+        }
+
+        [Fact]
+        public void NullStorageFactoryIsRejected()
+        {
+            var exception = Assert.Throws<ArgumentNullException>(
+                () => new SqlServerRelationalStoreTests.Fixture(null!));
+
+            Assert.Equal("storageFactory", exception.ParamName);
         }
     }
 }
