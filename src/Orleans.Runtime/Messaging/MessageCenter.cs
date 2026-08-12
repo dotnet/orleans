@@ -186,6 +186,8 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
+                Gateway?.TrackRequest(msg);
+
                 // First check to see if it's really destined for a proxied client, instead of a local grain.
                 if (TryDeliverToProxy(msg))
                 {
