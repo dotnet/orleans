@@ -1,5 +1,10 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
 using Orleans.Persistence.TestKit;
+using Orleans.Runtime;
+using Orleans.Serialization.Serializers;
+using Orleans.Storage;
 using Xunit;
 
 namespace Orleans.Persistence.Memory.Tests;
@@ -15,6 +20,18 @@ public class MemoryGrainStorageTestFixture : GrainStorageTestFixture
     {
         siloBuilder.AddMemoryGrainStorage("MemoryStore");
     }
+
+    public IGrainStorage CreateStorageWithLatency()
+    {
+        var services = Cluster.Silos[0].ServiceProvider;
+        return new MemoryGrainStorageWithLatency(
+            "MemoryStoreWithLatency",
+            new MemoryStorageWithLatencyOptions { Latency = TimeSpan.Zero },
+            services.GetRequiredService<ILoggerFactory>(),
+            services.GetRequiredService<IGrainFactory>(),
+            services.GetRequiredService<IActivatorProvider>(),
+            services.GetRequiredService<IGrainStorageSerializer>());
+    }
 }
 
 /// <summary>
@@ -24,9 +41,12 @@ public class MemoryGrainStorageTestFixture : GrainStorageTestFixture
 [TestCategory("Persistence"), TestCategory("MemoryStore")]
 public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<MemoryGrainStorageTestFixture>
 {
+    private readonly MemoryGrainStorageTestFixture _fixture;
+
     public MemoryGrainStorageTests(MemoryGrainStorageTestFixture fixture)
         : base(fixture.Storage)
     {
+        _fixture = fixture;
     }
 
     [Fact]
@@ -147,5 +167,129 @@ public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<Mem
     public override Task PersistenceStorage_ClearInconsistentFailsWithInconsistentStateException()
     {
         return base.PersistenceStorage_ClearInconsistentFailsWithInconsistentStateException();
+    }
+
+    [Fact, TestCategory("ModelBased")]
+    public Task GrainStorage_ModelBasedGeneratedConformance()
+    {
+        var runner = new GrainStorageModelBasedTestRunner(Storage, "MemoryStore");
+        return runner.RunGeneratedConformanceTests();
+    }
+
+    [Fact, TestCategory("ModelBased")]
+    public Task GrainStorageWithLatency_ModelBasedGeneratedConformance()
+    {
+        var runner = new GrainStorageModelBasedTestRunner(_fixture.CreateStorageWithLatency(), "MemoryStoreWithLatency");
+        return runner.RunGeneratedConformanceTests();
+    }
+
+    [Fact, TestCategory("ModelBased")]
+    public async Task GrainStorage_ModelBasedGeneratedConformance_ReportsInvalidProviderBehavior()
+    {
+        string? failureOutput = null;
+        var runner = new GrainStorageModelBasedTestRunner(
+            new InvalidGrainStorage(),
+            "InvalidStorage",
+            message => failureOutput = message);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(runner.RunGeneratedConformanceTests);
+
+        Assert.Contains("Model-based grain storage conformance test failed.", exception.Message);
+        Assert.NotNull(failureOutput);
+        Assert.Contains("Successful write did not return a non-empty ETag.", failureOutput);
+    }
+
+    [Fact, TestCategory("ModelBased")]
+    public async Task GrainStorage_ModelBasedGeneratedConformance_ExcludesCurrentETagSameValueWrites()
+    {
+        var storage = new StableNoOpETagGrainStorage();
+        var runner = new GrainStorageModelBasedTestRunner(storage, "StableNoOpETagStorage");
+
+        await runner.RunGeneratedConformanceTests();
+
+        Assert.Equal(0, storage.SameValueWriteCount);
+    }
+
+    private sealed class InvalidGrainStorage : IGrainStorage
+    {
+        public Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState) => Task.CompletedTask;
+
+        public Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        {
+            grainState.RecordExists = true;
+            return Task.CompletedTask;
+        }
+
+        public Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState) => Task.CompletedTask;
+    }
+
+    private sealed class StableNoOpETagGrainStorage : IGrainStorage
+    {
+        private readonly Dictionary<GrainId, (TestState1 State, string ETag)> records = [];
+        private int etag;
+
+        public int SameValueWriteCount { get; private set; }
+
+        public Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        {
+            if (records.TryGetValue(grainId, out var record))
+            {
+                grainState.State = (T)(object)Clone(record.State);
+                grainState.ETag = record.ETag;
+                grainState.RecordExists = true;
+            }
+            else
+            {
+                grainState.ETag = null;
+                grainState.RecordExists = false;
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        {
+            var state = (TestState1)(object)grainState.State!;
+            if (records.TryGetValue(grainId, out var record))
+            {
+                if (grainState.ETag != record.ETag)
+                {
+                    throw new InconsistentStateException("ETag mismatch.");
+                }
+
+                if (state.Equals(record.State))
+                {
+                    SameValueWriteCount++;
+                    grainState.ETag = record.ETag;
+                    grainState.RecordExists = true;
+                    return Task.CompletedTask;
+                }
+            }
+            else if (grainState.ETag is not null)
+            {
+                throw new InconsistentStateException("ETag mismatch.");
+            }
+
+            var nextETag = $"etag-{++etag}";
+            records[grainId] = (Clone(state), nextETag);
+            grainState.ETag = nextETag;
+            grainState.RecordExists = true;
+            return Task.CompletedTask;
+        }
+
+        public Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        {
+            if (!records.TryGetValue(grainId, out var record) || grainState.ETag != record.ETag)
+            {
+                throw new InconsistentStateException("ETag mismatch.");
+            }
+
+            records.Remove(grainId);
+            grainState.ETag = null;
+            grainState.RecordExists = false;
+            return Task.CompletedTask;
+        }
+
+        private static TestState1 Clone(TestState1 state) => new() { A = state.A, B = state.B, C = state.C };
     }
 }

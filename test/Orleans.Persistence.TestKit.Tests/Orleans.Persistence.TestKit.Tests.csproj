@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Orleans.Persistence.TestKit\Orleans.Persistence.TestKit.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Persistence.TestKit\Orleans.Persistence.TestKit.csproj" PrivateAssets="all" />
     <ProjectReference Include="..\..\src\Orleans.Persistence.Memory\Orleans.Persistence.Memory.csproj" />
     <ProjectReference Include="..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>

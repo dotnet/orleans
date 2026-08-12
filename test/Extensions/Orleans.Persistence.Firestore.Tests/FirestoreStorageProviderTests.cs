@@ -10,7 +10,7 @@ using Orleans.Storage;
 using Orleans.Providers;
 using TestExtensions;
 using UnitTests.Persistence;
-using UnitTests.StorageTests.ModelBased;
+using Orleans.Persistence.TestKit;
 using Orleans.Persistence.Firestore;
 using UnitTests.StorageTests.Relational;
 
@@ -305,7 +305,6 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
             },
             _output.WriteLine);
         await runner.RunGeneratedConformanceTests();
-    }
     }
 
     [TestSuite("Functional")]

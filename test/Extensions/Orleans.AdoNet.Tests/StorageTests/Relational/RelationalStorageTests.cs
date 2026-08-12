@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
-using UnitTests.StorageTests.ModelBased;
+using Orleans.Persistence.TestKit;
 using UnitTests.StorageTests.Relational.TestDataSets;
 using Xunit;
 

@@ -109,6 +109,42 @@ The `GrainStorageTestRunner` base class provides the following test methods:
 
 - **`PersistenceStorage_WriteReadWriteReadStatesInParallel()`**: Tests parallel write and read operations with multiple grains
 
+## Generated Model-Based Tests
+
+`GrainStorageModelBasedTestRunner` complements the direct `GrainStorageTestRunner` tests by generating sequences of read, write, and clear operations and checking the provider against a behavioral model.
+
+```csharp
+[Fact]
+public Task GrainStorage_ModelBasedGeneratedConformance()
+{
+    var runner = new GrainStorageModelBasedTestRunner(
+        Storage,
+        new GrainStorageModelBasedConformanceOptions
+        {
+            ProviderName = "MyStorage",
+            MaxDepth = 4,
+            MaxSequenceLength = 4
+        });
+
+    return runner.RunGeneratedConformanceTests();
+}
+```
+
+For the defaults, the shorter `new GrainStorageModelBasedTestRunner(fixture.Storage, "MyStorage")` overload is sufficient. An optional `Action<string>` constructor argument can receive failure details.
+
+### Model-Based Options
+
+- **`ProviderName`**: Identifies the provider and is used to create a unique default key prefix.
+- **`GrainType`**: Grain type name passed to `IGrainStorage` operations.
+- **`KeyPrefix`**: Optional fixed prefix for generated grain keys; when omitted, a unique prefix is generated.
+- **`MaxDepth`**: Maximum generated model traversal depth.
+- **`MaxSequenceLength`**: Maximum number of operations in each generated sequence.
+- **`IncludeInconsistentETagCases`**: Includes duplicate-write and stale-ETag scenarios.
+- **`IncludeInconsistentClearETagCases`**: Includes stale-ETag clear scenarios when inconsistent ETag cases are enabled.
+- **`DeleteStateOnClear`**: Set to `true` when clear deletes the record, or `false` when it retains a cleared record with a new ETag.
+- **`ClearedRecordExistsOnRead`**: Set to `true` when reading retained cleared state reports `RecordExists` as `true`.
+- **`RereadsClearedRecordBeforeClear`**: Set to `true` for providers which re-read retained cleared state before a subsequent clear.
+
 ## Testing Approach
 
 This test kit provides **direct IGrainStorage testing**, which differs from grain-based tests:

@@ -15,7 +15,7 @@ using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 using Tester.AzureUtils;
 using TestExtensions;
-using UnitTests.StorageTests.ModelBased;
+using Orleans.Persistence.TestKit;
 using Xunit;
 using Xunit.Abstractions;
 

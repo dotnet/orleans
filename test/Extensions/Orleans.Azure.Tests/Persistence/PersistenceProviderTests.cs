@@ -15,7 +15,7 @@ using Orleans.Storage;
 using Samples.StorageProviders;
 using TestExtensions;
 using UnitTests.Persistence;
-using UnitTests.StorageTests.ModelBased;
+using Orleans.Persistence.TestKit;
 using UnitTests.StorageTests;
 using Xunit;
 using Xunit.Abstractions;

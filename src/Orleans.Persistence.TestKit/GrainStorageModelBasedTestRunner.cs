@@ -6,44 +6,91 @@ using System.Threading.Tasks;
 using Microsoft.Accordant;
 using Orleans.Runtime;
 using Orleans.Storage;
-using UnitTests.StorageTests.Relational.TestDataSets;
 
-namespace UnitTests.StorageTests.ModelBased;
+namespace Orleans.Persistence.TestKit;
 
-internal sealed class GrainStorageModelBasedConformanceOptions
+/// <summary>
+/// Configures the generated model-based tests for an <see cref="IGrainStorage"/> implementation.
+/// </summary>
+public sealed class GrainStorageModelBasedConformanceOptions
 {
+    /// <summary>
+    /// Gets or sets the storage provider name used to identify generated test data.
+    /// </summary>
     public string ProviderName { get; set; } = "Storage";
 
-    public string GrainType { get; set; } = "UnitTests.ModelBasedStorageConformanceGrain";
+    /// <summary>
+    /// Gets or sets the grain type name passed to storage operations.
+    /// </summary>
+    public string GrainType { get; set; } = "Orleans.Persistence.TestKit.ModelBasedStorageConformanceGrain";
 
+    /// <summary>
+    /// Gets or sets an optional fixed prefix for generated grain keys.
+    /// </summary>
     public string? KeyPrefix { get; set; }
 
+    /// <summary>
+    /// Gets or sets the maximum depth explored while generating operation sequences.
+    /// </summary>
     public int MaxDepth { get; set; } = 4;
 
+    /// <summary>
+    /// Gets or sets the maximum number of operations in a generated test sequence.
+    /// </summary>
     public int MaxSequenceLength { get; set; } = 4;
 
+    /// <summary>
+    /// Gets or sets a value indicating whether duplicate-write and stale-ETag cases are generated.
+    /// </summary>
     public bool IncludeInconsistentETagCases { get; set; } = true;
 
+    /// <summary>
+    /// Gets or sets a value indicating whether stale-ETag clear cases are generated.
+    /// </summary>
     public bool IncludeInconsistentClearETagCases { get; set; } = true;
 
+    /// <summary>
+    /// Gets or sets a value indicating whether clearing state deletes the stored record.
+    /// </summary>
     public bool DeleteStateOnClear { get; set; } = true;
 
+    /// <summary>
+    /// Gets or sets a value indicating whether reading retained cleared state reports that a record exists.
+    /// </summary>
     public bool ClearedRecordExistsOnRead { get; set; }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the provider re-reads retained cleared state before clearing it again.
+    /// </summary>
     public bool RereadsClearedRecordBeforeClear { get; set; }
 }
 
-internal sealed class GrainStorageModelBasedTestRunner
+/// <summary>
+/// Generates sequences of storage operations and verifies an <see cref="IGrainStorage"/> implementation against a behavioral model.
+/// </summary>
+public sealed class GrainStorageModelBasedTestRunner
 {
     private readonly IGrainStorage storage;
     private readonly GrainStorageModelBasedConformanceOptions options;
     private readonly Action<string>? output;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="GrainStorageModelBasedTestRunner"/> class.
+    /// </summary>
+    /// <param name="storage">The storage provider to test.</param>
+    /// <param name="providerName">The storage provider name used to identify generated test data.</param>
+    /// <param name="output">An optional callback which receives failure details.</param>
     public GrainStorageModelBasedTestRunner(IGrainStorage storage, string providerName, Action<string>? output = null)
         : this(storage, new GrainStorageModelBasedConformanceOptions { ProviderName = providerName }, output)
     {
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="GrainStorageModelBasedTestRunner"/> class.
+    /// </summary>
+    /// <param name="storage">The storage provider to test.</param>
+    /// <param name="options">The generated test configuration.</param>
+    /// <param name="output">An optional callback which receives failure details.</param>
     public GrainStorageModelBasedTestRunner(IGrainStorage storage, GrainStorageModelBasedConformanceOptions options, Action<string>? output = null)
     {
         this.storage = storage ?? throw new ArgumentNullException(nameof(storage));
@@ -51,6 +98,11 @@ internal sealed class GrainStorageModelBasedTestRunner
         this.output = output;
     }
 
+    /// <summary>
+    /// Generates and executes storage operation sequences.
+    /// </summary>
+    /// <returns>A task which represents the asynchronous test run.</returns>
+    /// <exception cref="InvalidOperationException">One or more generated test cases failed.</exception>
     public async Task RunGeneratedConformanceTests()
     {
         var results = await GrainStorageModelBasedConformance.RunGeneratedTests(storage, options, output);

@@ -9,7 +9,7 @@ using Orleans.Serialization;
 using Orleans.Storage;
 using TestExtensions;
 using UnitTests.Persistence;
-using UnitTests.StorageTests.ModelBased;
+using Orleans.Persistence.TestKit;
 using Xunit;
 using Xunit.Abstractions;
 using static Orleans.Storage.DynamoDBGrainStorage;

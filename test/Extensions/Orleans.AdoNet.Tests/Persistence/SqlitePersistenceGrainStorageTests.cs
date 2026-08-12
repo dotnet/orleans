@@ -3,9 +3,10 @@ using Microsoft.Data.Sqlite;
 using Orleans.Runtime;
 using Orleans.Storage;
 using TestExtensions;
-using UnitTests.StorageTests.ModelBased;
+using Orleans.Persistence.TestKit;
 using UnitTests.StorageTests.Relational;
 using UnitTests.StorageTests.Relational.TestDataSets;
+using TestState1 = UnitTests.StorageTests.Relational.TestDataSets.TestState1;
 using Xunit;
 
 namespace Tester.AdoNet.Persistence

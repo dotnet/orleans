@@ -1,6 +1,6 @@
 using Orleans.Storage;
 using TestExtensions;
-using UnitTests.StorageTests.ModelBased;
+using Orleans.Persistence.TestKit;
 using UnitTests.StorageTests.Relational;
 using UnitTests.StorageTests.Relational.TestDataSets;
 using Xunit;

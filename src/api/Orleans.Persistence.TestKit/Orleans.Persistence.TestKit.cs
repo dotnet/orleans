@@ -8,6 +8,39 @@
 //------------------------------------------------------------------------------
 namespace Orleans.Persistence.TestKit
 {
+    public sealed partial class GrainStorageModelBasedConformanceOptions
+    {
+        public bool ClearedRecordExistsOnRead { get { throw null; } set { } }
+
+        public bool DeleteStateOnClear { get { throw null; } set { } }
+
+        public string GrainType { get { throw null; } set { } }
+
+        public bool IncludeInconsistentClearETagCases { get { throw null; } set { } }
+
+        public bool IncludeInconsistentETagCases { get { throw null; } set { } }
+
+        public string? KeyPrefix { get { throw null; } set { } }
+
+        public int MaxDepth { get { throw null; } set { } }
+
+        public int MaxSequenceLength { get { throw null; } set { } }
+
+        public string ProviderName { get { throw null; } set { } }
+
+        public bool RereadsClearedRecordBeforeClear { get { throw null; } set { } }
+    }
+
+    public sealed partial class GrainStorageModelBasedTestRunner
+    {
+        public GrainStorageModelBasedTestRunner(Storage.IGrainStorage storage, GrainStorageModelBasedConformanceOptions options, System.Action<string>? output = null) { }
+
+        public GrainStorageModelBasedTestRunner(Storage.IGrainStorage storage, string providerName, System.Action<string>? output = null) { }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public System.Threading.Tasks.Task RunGeneratedConformanceTests() { throw null; }
+    }
+
     public abstract partial class GrainStorageTestFixture : Xunit.IAsyncLifetime
     {
         protected TestingHost.InProcessTestCluster Cluster { get { throw null; } }

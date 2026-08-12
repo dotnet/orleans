@@ -10,7 +10,7 @@ using Orleans.Providers;
 using Orleans.Configuration;
 using Orleans.Persistence.Cosmos;
 using UnitTests.Persistence;
-using UnitTests.StorageTests.ModelBased;
+using Orleans.Persistence.TestKit;
 using Microsoft.Extensions.Options;
 
 namespace Tester.Cosmos.Persistence;
