@@ -104,6 +104,30 @@ namespace UnitTests.StreamingTests
             Assert.Equal(0, consumers);
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
+        public async Task RegisterProducer_ReplacesStalePullingAgentFromDefunctSilo()
+        {
+            var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
+            var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
+            var activeSilo = this.fixture.HostedCluster.GetActiveSilos().First().SiloAddress;
+            var defunctSilo = SiloAddress.New(activeSilo.Endpoint, activeSilo.Generation - 1);
+            var defunctProducer = SystemTargetGrainId.Create(
+                Constants.StreamPullingAgentType,
+                defunctSilo,
+                "ProviderName_1_test-queue").GrainId;
+            var replacementProducer = SystemTargetGrainId.Create(
+                Constants.StreamPullingAgentType,
+                activeSilo,
+                "ProviderName_2_test-queue").GrainId;
+
+            await pubSubGrain.RegisterProducer(streamId, defunctProducer);
+            Assert.Equal(1, await pubSubGrain.ProducerCount(streamId));
+
+            await pubSubGrain.RegisterProducer(streamId, replacementProducer);
+
+            Assert.Equal(1, await pubSubGrain.ProducerCount(streamId));
+        }
+
         /// <summary>
         /// This test fails because the producer must be grain reference which is not implied by the IStreamProducerExtension in the producer management calls.
         /// TODO: Fix rendezvous implementation.
