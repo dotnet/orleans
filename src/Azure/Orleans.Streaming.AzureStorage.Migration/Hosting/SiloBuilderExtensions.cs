@@ -8,11 +8,18 @@ using Orleans.Streams;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Extension methods for configuring Azure Queue migration streams on an Orleans silo.
+    /// </summary>
     public static class SiloBuilderMigrationExtensions
     {
         /// <summary>
-        /// Configure silo to use azure queue persistent migration streams.
+        /// Configures a silo to use Azure Queue persistent streams for migration.
         /// </summary>
+        /// <param name="builder">The silo builder.</param>
+        /// <param name="name">The name of the stream provider.</param>
+        /// <param name="configure">The delegate used to configure the stream provider.</param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddAzureQueueMigrationStreams(
             this ISiloBuilder builder,
             string name,

@@ -17,8 +17,17 @@ using Orleans.Streams;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Configures an Azure Queue migration stream provider for an Orleans silo.
+    /// </summary>
     public class SiloAzureQueueMigrationStreamConfigurator : SiloPersistentStreamConfigurator, ISiloAzureQueueStreamConfigurator
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SiloAzureQueueMigrationStreamConfigurator"/> class.
+        /// </summary>
+        /// <param name="name">The name of the stream provider.</param>
+        /// <param name="configureServicesDelegate">The delegate used to configure silo services.</param>
+        /// <param name="configureAppPartsDelegate">The delegate used to configure application parts.</param>
         public SiloAzureQueueMigrationStreamConfigurator(string name, Action<Action<IServiceCollection>> configureServicesDelegate, Action<Action<IApplicationPartManager>> configureAppPartsDelegate)
             : base(name, configureServicesDelegate, AzureQueueMigrationAdapterFactory.Create)
         {
@@ -53,8 +62,16 @@ namespace Orleans.Hosting
         }
     }
 
+    /// <summary>
+    /// Extension methods for configuring Azure Queue migration stream providers.
+    /// </summary>
     public static class SiloAzureQueueMigrationStreamConfiguratorExtensions
     {
+        /// <summary>
+        /// Configures Azure Queue options for a migration stream provider.
+        /// </summary>
+        /// <param name="configurator">The migration stream provider configurator.</param>
+        /// <param name="configureOptions">The delegate used to configure the provider options.</param>
         public static void ConfigureAzureQueue(this SiloAzureQueueMigrationStreamConfigurator configurator, Action<OptionsBuilder<AzureQueueMigrationOptions>> configureOptions)
         {
             // Configure AzureQueueMigrationOptions
@@ -84,6 +101,12 @@ namespace Orleans.Hosting
     /// </summary>
     public static class AzureQueueMigrationAdapterFactory
     {
+        /// <summary>
+        /// Creates an Azure Queue adapter factory for the named migration stream provider.
+        /// </summary>
+        /// <param name="services">The service provider.</param>
+        /// <param name="name">The name of the stream provider.</param>
+        /// <returns>The initialized Azure Queue adapter factory.</returns>
         public static AzureQueueAdapterFactory Create(IServiceProvider services, string name)
         {
             var azureQueueOptions = services.GetOptionsByName<AzureQueueMigrationOptions>(name);

@@ -7,18 +7,24 @@ namespace Orleans.Streaming.Migration.Configuration;
 /// </summary>
 public class AzureQueueMigrationOptions : AzureQueueOptions
 {
+    /// <summary>
+    /// Gets or sets the format used to serialize queue messages.
+    /// </summary>
     public SerializationMode SerializationMode { get; set; } = SerializationMode.Binary;
 
+    /// <summary>
+    /// Gets or sets the preferred format used to deserialize queue messages.
+    /// </summary>
     public DeserializationMode DeserializationMode { get; set; } = DeserializationMode.PreferBinary;
 }
 
 /// <summary>
-/// Serialization mode used in the Migration Azure Queue stream provider.
+/// Specifies the serialization format used by the Azure Queue migration stream provider.
 /// </summary>
 public enum SerializationMode
 {
     /// <summary>
-    /// Uses the 3.x payload serialization format by default.
+    /// Uses the Orleans 3.x binary payload format.
     /// </summary>
     Binary = 0,
 
@@ -28,24 +34,23 @@ public enum SerializationMode
     Json = 1,
 
     /// <summary>
-    /// Uses the JSON format for payload serialization, and if fails on read/writes it will try to read/write the payload in the binary format.
+    /// Uses JSON serialization and falls back to the Orleans 3.x binary format if serialization fails.
     /// </summary>
     JsonWithFallback = 2
 }
 
 /// <summary>
-/// Deserialization mode used in the Migration Azure Queue stream provider.
-/// It will also have a fallback to other format than preferred.
+/// Specifies the preferred deserialization format used by the Azure Queue migration stream provider.
 /// </summary>
 public enum DeserializationMode
 {
     /// <summary>
-    /// Firstly deserialization happens via binary format and fallbacks to the JSON format if fails.
+    /// Attempts binary deserialization first and falls back to JSON.
     /// </summary>
     PreferBinary = 0,
 
     /// <summary>
-    /// Firstly deserialization happens via JSON format and fallbacks to the binary format if fails.
+    /// Attempts JSON deserialization first and falls back to the Orleans 3.x binary format.
     /// </summary>
     PreferJson = 1
 }

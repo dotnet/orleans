@@ -20,7 +20,7 @@ using Orleans.Streams;
 namespace Orleans.Providers.Streams.AzureQueue.Migration;
 
 /// <summary>
-/// Data adapter that uses types that support custom serializers (like json).
+/// Converts Azure Queue stream messages between the Orleans 3.x binary format and a migration-compatible JSON format.
 /// </summary>
 public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatchContainer>, IOnDeserialized
 {
@@ -41,10 +41,10 @@ public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatch
     /// <summary>
     /// Initializes a new instance of the <see cref="AzureQueueDataAdapterMigrationV1"/> class.
     /// </summary>
-    /// <param name="logger"></param>
-    /// <param name="serializationManager"></param>
-    /// <param name="orleansMigrationJsonSerializer"></param>
-    /// <param name="options"></param>
+    /// <param name="logger">The logger.</param>
+    /// <param name="serializationManager">The Orleans binary serialization manager.</param>
+    /// <param name="orleansMigrationJsonSerializer">The JSON serializer used for migration payloads.</param>
+    /// <param name="options">The Azure Queue migration options.</param>
     public AzureQueueDataAdapterMigrationV1(
         ILogger<AzureQueueDataAdapterMigrationV1> logger,
         SerializationManager serializationManager,
@@ -61,6 +61,13 @@ public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatch
     /// <summary>
     /// Creates a cloud queue message from stream event data.
     /// </summary>
+    /// <typeparam name="T">The stream event type.</typeparam>
+    /// <param name="streamGuid">The stream identifier.</param>
+    /// <param name="streamNamespace">The stream namespace.</param>
+    /// <param name="events">The events to include in the message.</param>
+    /// <param name="token">The stream sequence token.</param>
+    /// <param name="requestContext">The request context to propagate with the events.</param>
+    /// <returns>The serialized queue message.</returns>
     public string ToQueueMessage<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
     {
         var azureQueueBatchMessage = new AzureQueueBatchContainerV2(streamGuid, streamNamespace, events.Cast<object>().ToList(), requestContext);
@@ -95,8 +102,11 @@ public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatch
     }
 
     /// <summary>
-    /// Creates a batch container from a cloud queue message
+    /// Creates a batch container from a cloud queue message.
     /// </summary>
+    /// <param name="cloudMsg">The serialized queue message.</param>
+    /// <param name="sequenceId">The queue sequence identifier.</param>
+    /// <returns>The deserialized batch container.</returns>
     public IBatchContainer FromQueueMessage(string cloudMsg, long sequenceId)
     {
         AzureQueueBatchContainerV2 azureQueueBatch;
