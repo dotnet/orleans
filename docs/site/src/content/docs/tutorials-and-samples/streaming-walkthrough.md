@@ -69,7 +69,7 @@ For deployed applications, replace local secrets with managed identity or your p
 1. Publish more events and verify that the consumer resumes without recreating the subscription.
 1. Confirm that processing continues from the stored checkpoint rather than replaying the complete partition.
 
-Orleans stream delivery is at-least-once. A consumer can observe duplicates around failures, so production handlers should be idempotent or deduplicate using an application-owned event identity. Don't treat a sequence token as a globally meaningful business identifier.
+Delivery guarantees are provider-specific. In this Event Hubs scenario, a consumer can observe duplicates around failures, so production handlers should be idempotent or deduplicate using an application-owned event identity. Don't treat a sequence token as a globally meaningful business identifier.
 
 ## Test failure boundaries
 

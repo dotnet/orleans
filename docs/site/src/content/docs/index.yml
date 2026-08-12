@@ -46,7 +46,7 @@ highlightedContent:
           url: implementation/index.md
         - itemType: reference
           title: C# API reference
-          url: /docs/api/csharp/
+          url: https://dotnet.github.io/orleans/docs/api/csharp/
 
 conceptualContent:
     title: Featured content
