@@ -1,8 +1,11 @@
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
+using System.Threading.Channels;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using NonSilo.Tests.Utilities;
 using NSubstitute;
 using Orleans.Configuration;
@@ -76,7 +79,7 @@ namespace NonSilo.Tests.Membership
                 });
 
             this.localSiloHealthMonitor = Substitute.For<ILocalSiloHealthMonitor>();
-            this.localSiloHealthMonitor.GetLocalHealthDegradationScore(default).ReturnsForAnyArgs(0);
+            this.localSiloHealthMonitor.GetLocalHealthStatus(default, default, default).ReturnsForAnyArgs(new LocalSiloHealthStatus(0, []));
 
             this.prober = Substitute.For<IRemoteSiloProber>();
             this.membershipTable = new InMemoryMembershipTable(new TableVersion(1, "1"));
@@ -859,7 +862,8 @@ namespace NonSilo.Tests.Membership
                 optionsMonitor,
                 this.fatalErrorHandler,
                 null!,
-                connManager);
+                connManager,
+                TimeProvider.System);
 
             ((ILifecycleParticipant<ISiloLifecycle>)monitor).Participate(this.lifecycle);
 
@@ -926,6 +930,158 @@ namespace NonSilo.Tests.Membership
             protected override void OnSendMessageFailure(Message message, string error) { }
             protected override void RetryMessage(Message msg, Exception? ex = null) { }
             public void SimulateMessageReceived() => MarkMessageReceived();
+        }
+
+        [Fact]
+        public async Task ClusterHealthMonitor_StaleJoinEvictionUsesInjectedTimeProvider()
+        {
+            var start = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+            var maxJoinAttemptTime = TimeSpan.FromMinutes(5);
+            var timeProvider = new FakeTimeProvider(start);
+            var updates = new ControlledMembershipUpdateStream();
+            var manager = Substitute.For<IMembershipManager>();
+            manager.CurrentSnapshot.Returns(new MembershipTableSnapshot(
+                MembershipVersion.MinValue,
+                ImmutableDictionary<SiloAddress, MembershipEntry>.Empty));
+            manager.MembershipUpdates.Returns(updates);
+            manager.TrySuspectSilo(default!, default, default).ReturnsForAnyArgs(true);
+            var options = new ClusterMembershipOptions
+            {
+                EvictWhenMaxJoinAttemptTimeExceeded = true,
+                MaxJoinAttemptTime = maxJoinAttemptTime,
+            };
+            var optionsMonitor = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
+            optionsMonitor.CurrentValue.Returns(options);
+            var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            using var services = new ServiceCollection().BuildServiceProvider();
+            await using var monitor = new ClusterHealthMonitor(
+                this.localSiloDetails,
+                manager,
+                this.loggerFactory.CreateLogger<ClusterHealthMonitor>(),
+                optionsMonitor,
+                this.fatalErrorHandler,
+                services,
+                this.connectionManager,
+                timeProvider);
+            ((ILifecycleParticipant<ISiloLifecycle>)monitor).Participate(lifecycle);
+            var accessor = (ClusterHealthMonitor.ITestAccessor)monitor;
+            var joiningSilo = Silo("127.0.0.200:111@100");
+            var joiningEntry = Entry(joiningSilo, SiloStatus.Joining, start);
+
+            await lifecycle.OnStart();
+            try
+            {
+                await updates.WaitForReadAsync(1);
+                timeProvider.Advance(maxJoinAttemptTime);
+                updates.Publish(CreateSnapshot(1, joiningEntry));
+                await updates.WaitForReadAsync(2);
+
+                Assert.Equal(new MembershipVersion(1), accessor.ObservedVersion);
+                await manager.DidNotReceive().TrySuspectSilo(
+                    Arg.Any<SiloAddress>(),
+                    Arg.Any<SiloAddress?>(),
+                    Arg.Any<CancellationToken>());
+
+                timeProvider.Advance(TimeSpan.FromTicks(1));
+                updates.Publish(CreateSnapshot(2, joiningEntry));
+                await updates.WaitForReadAsync(3);
+
+                Assert.Equal(new MembershipVersion(2), accessor.ObservedVersion);
+                await manager.Received(1).TrySuspectSilo(
+                    joiningSilo,
+                    null,
+                    Arg.Is<CancellationToken>(token => token.CanBeCanceled && !token.IsCancellationRequested));
+            }
+            finally
+            {
+                var stopTask = lifecycle.OnStop();
+                updates.Complete();
+                await stopTask;
+                await updates.Completed;
+            }
+
+            static MembershipTableSnapshot CreateSnapshot(long version, MembershipEntry joiningEntry)
+                => new(
+                    new MembershipVersion(version),
+                    ImmutableDictionary<SiloAddress, MembershipEntry>.Empty.Add(joiningEntry.SiloAddress, joiningEntry));
+        }
+
+        private sealed class ControlledMembershipUpdateStream : IAsyncEnumerable<MembershipTableSnapshot>
+        {
+            private readonly Channel<MembershipTableSnapshot> _updates = Channel.CreateUnbounded<MembershipTableSnapshot>();
+            private readonly Dictionary<int, TaskCompletionSource> _readWaiters = [];
+            private readonly TaskCompletionSource _completed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            private readonly object _lock = new();
+            private int _readCount;
+
+            public Task Completed => _completed.Task;
+
+            public void Publish(MembershipTableSnapshot snapshot) => Assert.True(_updates.Writer.TryWrite(snapshot));
+
+            public void Complete() => _updates.Writer.TryComplete();
+
+            public Task WaitForReadAsync(int readCount)
+            {
+                lock (_lock)
+                {
+                    if (_readCount >= readCount)
+                    {
+                        return Task.CompletedTask;
+                    }
+
+                    if (!_readWaiters.TryGetValue(readCount, out var waiter))
+                    {
+                        waiter = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                        _readWaiters.Add(readCount, waiter);
+                    }
+
+                    return waiter.Task;
+                }
+            }
+
+            public IAsyncEnumerator<MembershipTableSnapshot> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+                => new Enumerator(this, _updates.Reader, cancellationToken);
+
+            private void OnReadStarted()
+            {
+                TaskCompletionSource? waiter;
+                lock (_lock)
+                {
+                    _readCount++;
+                    _readWaiters.Remove(_readCount, out waiter);
+                }
+
+                waiter?.TrySetResult();
+            }
+
+            private sealed class Enumerator(
+                ControlledMembershipUpdateStream owner,
+                ChannelReader<MembershipTableSnapshot> reader,
+                CancellationToken cancellationToken) : IAsyncEnumerator<MembershipTableSnapshot>
+            {
+                public MembershipTableSnapshot Current { get; private set; } = null!;
+
+                public async ValueTask<bool> MoveNextAsync()
+                {
+                    owner.OnReadStarted();
+                    while (await reader.WaitToReadAsync(cancellationToken))
+                    {
+                        if (reader.TryRead(out var item))
+                        {
+                            Current = item;
+                            return true;
+                        }
+                    }
+
+                    return false;
+                }
+
+                public ValueTask DisposeAsync()
+                {
+                    owner._completed.TrySetResult();
+                    return ValueTask.CompletedTask;
+                }
+            }
         }
     }
 }

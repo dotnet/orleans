@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -13,7 +14,13 @@ namespace Orleans.Runtime.Messaging
 #else
         private readonly object _lock = new();
 #endif
-        private ValueStopwatch _probeRequestStopwatch;
+        private readonly TimeProvider _timeProvider;
+        private long? _lastProbeRequestTimestamp;
+
+        public ProbeRequestMonitor([FromKeyedServices(TimeProviderNames.Membership)] TimeProvider timeProvider)
+        {
+            _timeProvider = timeProvider;
+        }
 
         /// <summary>
         /// Called when this silo receives a health probe request.
@@ -22,13 +29,22 @@ namespace Orleans.Runtime.Messaging
         {
             lock (_lock)
             {
-                _probeRequestStopwatch.Restart();
+                _lastProbeRequestTimestamp = _timeProvider.GetTimestamp();
             }
         }
 
         /// <summary>
         /// The duration which has elapsed since the most recently received health probe request.
         /// </summary>
-        public TimeSpan? ElapsedSinceLastProbeRequest => _probeRequestStopwatch.IsRunning ? (Nullable<TimeSpan>)_probeRequestStopwatch.Elapsed : null;
+        public TimeSpan? ElapsedSinceLastProbeRequest
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _lastProbeRequestTimestamp is { } timestamp ? _timeProvider.GetElapsedTime(timestamp) : null;
+                }
+            }
+        }
     }
 }

@@ -67,7 +67,7 @@ namespace NonSilo.Tests.Membership
                 });
 
             _localSiloHealthMonitor = Substitute.For<ILocalSiloHealthMonitor>();
-            _localSiloHealthMonitor.GetLocalHealthDegradationScore(default).ReturnsForAnyArgs(0);
+            _localSiloHealthMonitor.GetLocalHealthStatus(default, default, default).ReturnsForAnyArgs(new LocalSiloHealthStatus(0, []));
 
             _prober = Substitute.For<IRemoteSiloProber>();
 
@@ -347,6 +347,147 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(_targetSilo, _monitor.TargetSiloAddress);
 
             await Shutdown();
+        }
+
+        [Theory]
+        [InlineData(true, 2, 3)]
+        [InlineData(false, 8, 1)]
+        public async Task SiloHealthMonitor_DirectProbeTimeoutUsesConfiguredLocalHealthDilation(
+            bool extendProbeTimeout,
+            int localHealthScore,
+            int expectedTimeoutFactor)
+        {
+            var timeProvider = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(
+                new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero));
+            var options = new ClusterMembershipOptions
+            {
+                ProbeTimeout = TimeSpan.FromSeconds(5),
+                ExtendProbeTimeoutDuringDegradation = extendProbeTimeout,
+                EnableIndirectProbes = false,
+            };
+            var optionsMonitor = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
+            optionsMonitor.CurrentValue.Returns(options);
+            var localHealthMonitor = Substitute.For<ILocalSiloHealthMonitor>();
+            localHealthMonitor
+                .GetLocalHealthStatus(default, default)
+                .ReturnsForAnyArgs(new LocalSiloHealthStatus(localHealthScore, []));
+            var prober = Substitute.For<IRemoteSiloProber>();
+            var probeEntered = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var pendingProbe = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            prober.Probe(default!, default, default).ReturnsForAnyArgs(call =>
+            {
+                probeEntered.TrySetResult(call.ArgAt<CancellationToken>(2));
+                return pendingProbe.Task;
+            });
+            var probeResult = new TaskCompletionSource<ProbeResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var timer = new DilationProbeTimer();
+            var timerFactory = new DelegateAsyncTimerFactory((_, _) => timer);
+            var monitor = new SiloHealthMonitor(
+                _targetSilo,
+                (_, result) =>
+                {
+                    probeResult.TrySetResult(result);
+                    return Task.CompletedTask;
+                },
+                optionsMonitor,
+                _loggerFactory,
+                prober,
+                timerFactory,
+                localHealthMonitor,
+                _membershipService,
+                _localSiloDetails,
+                timeProvider);
+
+            try
+            {
+                monitor.Start();
+                var firstTick = await timer.Ticks.ReadAsync();
+                firstTick.SetResult(true);
+                var cancellationToken = await probeEntered.Task;
+
+                if (extendProbeTimeout)
+                {
+                    localHealthMonitor.Received(1).GetLocalHealthStatus(
+                        options.ProbeTimeout,
+                        LocalSiloHealthCheckCategory.Local);
+                }
+                else
+                {
+                    localHealthMonitor.DidNotReceiveWithAnyArgs().GetLocalHealthStatus(default, default);
+                }
+
+                await prober.Received(1).Probe(_targetSilo, 1, cancellationToken);
+
+                var dilatedTimeout = options.ProbeTimeout.Multiply(expectedTimeoutFactor);
+                timeProvider.Advance(dilatedTimeout - TimeSpan.FromTicks(1));
+                Assert.False(cancellationToken.IsCancellationRequested);
+                Assert.False(probeResult.Task.IsCompleted);
+
+                timeProvider.Advance(TimeSpan.FromTicks(1));
+                Assert.True(cancellationToken.IsCancellationRequested);
+
+                var result = await probeResult.Task;
+                Assert.Equal(ProbeResultStatus.Failed, result.Status);
+                Assert.Equal(1, result.FailedProbeCount);
+                Assert.True(result.IsDirectProbe);
+                Assert.Equal(0, result.IntermediaryHealthDegradationScore);
+            }
+            finally
+            {
+                await monitor.StopAsync(CancellationToken.None);
+            }
+        }
+
+        private sealed class DilationProbeTimer : IAsyncTimer
+        {
+            private readonly object _lock = new();
+            private readonly Channel<TaskCompletionSource<bool>> _ticks = Channel.CreateUnbounded<TaskCompletionSource<bool>>();
+            private bool _disposed;
+
+            public ChannelReader<TaskCompletionSource<bool>> Ticks => _ticks.Reader;
+
+            public Task<bool> NextTick(TimeSpan? overrideDelay = null)
+            {
+                lock (_lock)
+                {
+                    if (_disposed)
+                    {
+                        return Task.FromResult(false);
+                    }
+
+                    var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    if (!_ticks.Writer.TryWrite(completion))
+                    {
+                        throw new InvalidOperationException("Unable to publish the next timer tick.");
+                    }
+
+                    return completion.Task;
+                }
+            }
+
+            public bool CheckHealth(DateTime lastCheckTime, out string reason)
+            {
+                reason = string.Empty;
+                return true;
+            }
+
+            public void Dispose()
+            {
+                lock (_lock)
+                {
+                    if (_disposed)
+                    {
+                        return;
+                    }
+
+                    _disposed = true;
+                    _ticks.Writer.TryComplete();
+                    while (_ticks.Reader.TryRead(out var completion))
+                    {
+                        completion.TrySetResult(false);
+                    }
+                }
+            }
         }
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);

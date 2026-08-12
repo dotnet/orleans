@@ -13,19 +13,76 @@ using Orleans.Internal;
 
 namespace Orleans.Runtime.MembershipService
 {
+    [Flags]
+    internal enum LocalSiloHealthCheckCategory
+    {
+        None = 0,
+        Local = 1,
+        Network = 2,
+        All = Local | Network,
+    }
+
+    internal enum LocalSiloHealthCheckKind
+    {
+        MembershipStatus,
+        SiloSuspected,
+        HealthCheckParticipant,
+        ThreadPoolQueueDelay,
+        ProbeRequests,
+        ProbeResponses,
+        GarbageCollectionPause,
+        RuntimeStall,
+        ComponentHealthCheckStall,
+    }
+
+    internal readonly record struct LocalSiloHealthEvent(
+        long Timestamp,
+        LocalSiloHealthCheckKind Kind,
+        LocalSiloHealthCheckCategory Category,
+        string? Source,
+        int Score,
+        string? Complaint,
+        TimeSpan? Duration,
+        LogLevel LogLevel = LogLevel.Warning);
+
+    internal readonly record struct LocalSiloHealthStatus(int Score, ImmutableArray<LocalSiloHealthEvent> Events)
+    {
+        public ImmutableArray<string> Complaints
+            => [.. Events.Where(static status => status.Complaint is not null).Select(static status => status.Complaint!)];
+    }
+
     internal interface ILocalSiloHealthMonitor
     {
         /// <summary>
-        /// Returns the local health degradation score, which is a value between 0 (healthy) and <see cref="LocalSiloHealthMonitor.MaxScore"/> (unhealthy).
+        /// Returns the aggregate local health status over the provided interval.
         /// </summary>
-        /// <param name="checkTime">The time which the check is taking place.</param>
-        /// <returns>The local health degradation score, which is a value between 0 (healthy) and <see cref="LocalSiloHealthMonitor.MaxScore"/> (unhealthy).</returns>
-        int GetLocalHealthDegradationScore(DateTime checkTime);
+        /// <param name="startTimestamp">The inclusive start of the interval to aggregate.</param>
+        /// <param name="endTimestamp">The inclusive end of the interval to aggregate.</param>
+        /// <param name="categories">The categories of health checks to include.</param>
+        /// <returns>The aggregate health status.</returns>
+        LocalSiloHealthStatus GetLocalHealthStatus(
+            long startTimestamp,
+            long endTimestamp,
+            LocalSiloHealthCheckCategory categories);
+
+        LocalSiloHealthStatus GetLocalHealthStatus(
+            TimeSpan period,
+            LocalSiloHealthCheckCategory categories);
 
         /// <summary>
         /// The most recent list of detected health issues.
         /// </summary>
         ImmutableArray<string> Complaints { get; }
+    }
+
+    internal interface ILocalSiloHealthEventRecorder
+    {
+        void RecordHealthEvent(
+            LocalSiloHealthCheckKind kind,
+            int score,
+            string? complaint,
+            TimeSpan? duration = null,
+            string? source = null);
     }
 
     /// <summary>
@@ -48,10 +105,17 @@ namespace Orleans.Runtime.MembershipService
     ///   <item><description>Check that local async timers have been firing on-time (within 3 seconds of their due time).</description></item>
     /// </list>
     /// </remarks>
-    internal partial class LocalSiloHealthMonitor : ILifecycleParticipant<ISiloLifecycle>, ILifecycleObserver, ILocalSiloHealthMonitor
+    internal partial class LocalSiloHealthMonitor :
+        ILifecycleParticipant<ISiloLifecycle>,
+        ILifecycleObserver,
+        ILocalSiloHealthMonitor,
+        ILocalSiloHealthEventRecorder
     {
-        private const int MaxScore = 8;
+        internal const int MaxScore = 8;
+        private static readonly TimeSpan HistoryDuration = TimeSpan.FromMinutes(1);
+        private static readonly TimeSpan MinimumCheckPeriod = TimeSpan.FromSeconds(1);
         private readonly List<IHealthCheckParticipant> _healthCheckParticipants;
+        private readonly LocalSiloHealthEventHistory _healthHistory;
         private readonly IMembershipManager _membershipManager;
         private readonly IProbeHealthMonitor _probeHealthMonitor;
         private readonly ILocalSiloDetails _localSiloDetails;
@@ -59,10 +123,25 @@ namespace Orleans.Runtime.MembershipService
         private readonly ClusterMembershipOptions _clusterMembershipOptions;
         private readonly IAsyncTimer _degradationCheckTimer;
         private readonly ThreadPoolMonitor _threadPoolMonitor;
-        private ValueStopwatch _clusteredDuration;
+        private readonly TimeProvider _timeProvider;
+#if NET9_0_OR_GREATER
+        private readonly Lock _historyLock = new();
+        private readonly Lock _samplingLock = new();
+#else
+        private readonly object _historyLock = new();
+        private readonly object _samplingLock = new();
+#endif
         private Task? _runTask;
         private bool _isActive;
         private DateTime _lastHealthCheckTime;
+        private long? _clusteredSinceTimestamp;
+        private long? _lastHealthCheckTimestamp;
+        private long? _lastNetworkHealthCheckTimestamp;
+        private long? _lastDegradationLogTimestamp;
+        private int _healthCheckVersion;
+        private int _networkHealthCheckVersion;
+        private LocalSiloHealthStatus _latestStatus;
+        private LocalSiloHealthStatus _latestNetworkStatus;
 
         public LocalSiloHealthMonitor(
             IEnumerable<IHealthCheckParticipant> healthCheckParticipants,
@@ -81,89 +160,247 @@ namespace Orleans.Runtime.MembershipService
             _localSiloDetails = localSiloDetails;
             _log = log;
             _clusterMembershipOptions = clusterMembershipOptions.Value;
+            _timeProvider = timeProvider;
+            _healthHistory = new(timeProvider, HistoryDuration, MinimumCheckPeriod);
             _degradationCheckTimer = timerFactory.Create(
-                _clusterMembershipOptions.LocalHealthDegradationMonitoringPeriod,
+                MinimumCheckPeriod,
                 nameof(LocalSiloHealthMonitor),
                 timeProvider);
-            _threadPoolMonitor = new ThreadPoolMonitor(loggerFactory.CreateLogger<ThreadPoolMonitor>());
+            _threadPoolMonitor = new ThreadPoolMonitor(loggerFactory.CreateLogger<ThreadPoolMonitor>(), timeProvider);
         }
 
         /// <inheritdoc />
-        public ImmutableArray<string> Complaints { get; private set; } = ImmutableArray<string>.Empty;
+        public ImmutableArray<string> Complaints { get; private set; } = [];
 
         /// <inheritdoc />
-        public int GetLocalHealthDegradationScore(DateTime checkTime) => GetLocalHealthDegradationScore(checkTime, null);
-
-        /// <summary>
-        /// Returns the local health degradation score, which is a value between 0 (healthy) and <see cref="MaxScore"/> (unhealthy).
-        /// </summary>
-        /// <param name="checkTime">The time which the check is taking place.</param>
-        /// <param name="complaints">If not null, will be populated with the current set of detected health issues.</param>
-        /// <returns>The local health degradation score, which is a value between 0 (healthy) and <see cref="MaxScore"/> (unhealthy).</returns>
-        public int GetLocalHealthDegradationScore(DateTime checkTime, List<string>? complaints)
+        public LocalSiloHealthStatus GetLocalHealthStatus(
+            long startTimestamp,
+            long endTimestamp,
+            LocalSiloHealthCheckCategory categories)
         {
-            var score = 0;
-            score += CheckSuspectingNodes(checkTime, complaints);
-            score += CheckLocalHealthCheckParticipants(checkTime, complaints);
-            score += CheckThreadPoolQueueDelay(checkTime, complaints);
+            if (endTimestamp < startTimestamp)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(endTimestamp),
+                    endTimestamp,
+                    "The interval end must not precede its start.");
+            }
+
+            var healthCheckVersion = Volatile.Read(ref _healthCheckVersion);
+            var networkHealthCheckVersion = Volatile.Read(ref _networkHealthCheckVersion);
+            lock (_samplingLock)
+            {
+                EnsureHealthCheck(
+                    _timeProvider.GetUtcNow(),
+                    endTimestamp,
+                    includeNetworkChecks: (categories & LocalSiloHealthCheckCategory.Network) != 0,
+                    healthCheckVersion,
+                    networkHealthCheckVersion,
+                    out _);
+            }
+
+            lock (_historyLock)
+            {
+                return _healthHistory.Aggregate(
+                    startTimestamp,
+                    endTimestamp,
+                    _timeProvider.GetTimestamp(),
+                    categories,
+                    MaxScore);
+            }
+        }
+
+        public LocalSiloHealthStatus GetLocalHealthStatus(
+            TimeSpan period,
+            LocalSiloHealthCheckCategory categories)
+        {
+            if (period < TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(nameof(period), period, "The aggregation period must not be negative.");
+            }
+
+            var endTimestamp = _timeProvider.GetTimestamp();
+            var lookback = period > HistoryDuration ? HistoryDuration : period;
+            return GetLocalHealthStatus(
+                SubtractTimestamp(endTimestamp, lookback),
+                endTimestamp,
+                categories);
+        }
+
+        void ILocalSiloHealthEventRecorder.RecordHealthEvent(
+            LocalSiloHealthCheckKind kind,
+            int score,
+            string? complaint,
+            TimeSpan? duration,
+            string? source)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(score);
+            var timestamp = _timeProvider.GetTimestamp();
+            lock (_historyLock)
+            {
+                _healthHistory.Add(new(timestamp, kind, GetCategory(kind), source, score, complaint, duration));
+            }
+        }
+
+        private LocalSiloHealthStatus EnsureHealthCheck(
+            DateTimeOffset now,
+            long timestamp,
+            bool includeNetworkChecks,
+            int healthCheckVersion,
+            int networkHealthCheckVersion,
+            out bool sampled)
+        {
+            LocalSiloHealthStatus localStatus;
+            var sampledLocalHealth = false;
+            if (Volatile.Read(ref _healthCheckVersion) != healthCheckVersion
+                || (_lastHealthCheckTimestamp is { } lastCheck
+                    && _timeProvider.GetElapsedTime(lastCheck, timestamp) < MinimumCheckPeriod))
+            {
+                localStatus = _latestStatus;
+            }
+            else
+            {
+                sampledLocalHealth = true;
+                _lastHealthCheckTimestamp = timestamp;
+                var events = new List<LocalSiloHealthEvent>(_healthCheckParticipants.Count + 1);
+                var complaints = new List<string>();
+                CheckLocalHealthCheckParticipants(now.UtcDateTime, timestamp, events, complaints);
+                CheckThreadPoolQueueDelay(timestamp, events, complaints);
+                AddEvents(timestamp, events);
+
+                var score = GetScore(events);
+                Complaints = [.. complaints];
+                localStatus = _latestStatus = new(score, [.. events]);
+                Interlocked.Increment(ref _healthCheckVersion);
+            }
+
+            if (!includeNetworkChecks)
+            {
+                sampled = sampledLocalHealth;
+                return localStatus;
+            }
+
+            var networkStatus = EnsureNetworkHealthCheck(
+                now,
+                timestamp,
+                networkHealthCheckVersion,
+                out var sampledNetworkHealth);
+            sampled = sampledLocalHealth || sampledNetworkHealth;
+            var combined = new LocalSiloHealthStatus(
+                Math.Clamp(localStatus.Score + networkStatus.Score, 0, MaxScore),
+                [.. localStatus.Events, .. networkStatus.Events]);
+            Complaints = combined.Complaints;
+            return combined;
+        }
+
+        private LocalSiloHealthStatus EnsureNetworkHealthCheck(
+            DateTimeOffset now,
+            long timestamp,
+            int networkHealthCheckVersion,
+            out bool sampled)
+        {
+            if (Volatile.Read(ref _networkHealthCheckVersion) != networkHealthCheckVersion
+                || (_lastNetworkHealthCheckTimestamp is { } lastCheck
+                    && _timeProvider.GetElapsedTime(lastCheck, timestamp) < MinimumCheckPeriod))
+            {
+                sampled = false;
+                return _latestNetworkStatus;
+            }
+
+            sampled = true;
+            _lastNetworkHealthCheckTimestamp = timestamp;
+            var events = new List<LocalSiloHealthEvent>(4);
+            var complaints = new List<string>();
+            CheckMembershipStatus(now.UtcDateTime, timestamp, events, complaints);
 
             if (_isActive)
             {
                 var membershipSnapshot = _membershipManager.CurrentSnapshot;
                 if (membershipSnapshot.ActiveNodeCount <= 1)
                 {
-                    _clusteredDuration.Reset();
+                    _clusteredSinceTimestamp = null;
                 }
-                else if (!_clusteredDuration.IsRunning)
+                else
                 {
-                    _clusteredDuration.Restart();
+                    _clusteredSinceTimestamp ??= timestamp;
                 }
 
                 // Only consider certain checks if the silo has been a member of a multi-silo cluster for a certain period.
                 var recencyWindow = _clusterMembershipOptions.ProbeTimeout.Multiply(_clusterMembershipOptions.NumMissedProbesLimit);
-                if (_clusteredDuration.Elapsed > recencyWindow)
+                if (_clusteredSinceTimestamp is { } clusteredSince
+                    && _timeProvider.GetElapsedTime(clusteredSince, timestamp) > recencyWindow)
                 {
-                    score += CheckReceivedProbeResponses(checkTime, complaints);
-                    score += CheckReceivedProbeRequests(checkTime, complaints);
+                    CheckReceivedProbeResponses(now.UtcDateTime, timestamp, events, complaints);
+                    CheckReceivedProbeRequests(now.UtcDateTime, timestamp, events, complaints);
                 }
             }
 
-            // Clamp the score between 0 and the maximum allowed score.
-            score = Math.Max(0, Math.Min(MaxScore, score));
-            return score;
+            AddEvents(timestamp, events);
+            var score = GetScore(events);
+            var result = _latestNetworkStatus = new(score, [.. events]);
+            Interlocked.Increment(ref _networkHealthCheckVersion);
+            return result;
         }
 
-        private int CheckThreadPoolQueueDelay(DateTime checkTime, List<string>? complaints)
+        private void AddEvents(long timestamp, List<LocalSiloHealthEvent> events)
         {
-            var threadPoolDelaySeconds = _threadPoolMonitor.MeasureQueueDelay().TotalSeconds;
-
-            if ((int)threadPoolDelaySeconds >= 1)
+            lock (_historyLock)
             {
-                // Log as an error if the delay is massive.
-                var logLevel = (int)threadPoolDelaySeconds >= 10 ? LogLevel.Error : LogLevel.Warning;
-                LogThreadPoolDelay(logLevel, threadPoolDelaySeconds);
+                _healthHistory.AddRange(events, timestamp);
+            }
+        }
 
-                complaints?.Add(
-                    $".NET Thread Pool is exhibiting delays of {threadPoolDelaySeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses.");
+        private void CheckThreadPoolQueueDelay(
+            long timestamp,
+            List<LocalSiloHealthEvent> events,
+            List<string> complaints)
+        {
+            var delay = _threadPoolMonitor.MeasureQueueDelay();
+            var score = (int)delay.TotalSeconds;
+            string? complaint = null;
+            if (score >= 1)
+            {
+                complaint = $".NET Thread Pool is exhibiting delays of {delay.TotalSeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses.";
+                complaints.Add(complaint);
             }
 
-            // Each second of delay contributes to the score.
-            return (int)threadPoolDelaySeconds;
+            events.Add(new(
+                timestamp,
+                LocalSiloHealthCheckKind.ThreadPoolQueueDelay,
+                GetCategory(LocalSiloHealthCheckKind.ThreadPoolQueueDelay),
+                Source: null,
+                score,
+                complaint,
+                delay,
+                score >= 10 ? LogLevel.Error : LogLevel.Warning));
         }
 
-        private int CheckSuspectingNodes(DateTime now, List<string>? complaints)
+        private void CheckMembershipStatus(
+            DateTime now,
+            long timestamp,
+            List<LocalSiloHealthEvent> events,
+            List<string> complaints)
         {
-            var score = 0;
             var membershipSnapshot = _membershipManager.CurrentSnapshot;
             if (membershipSnapshot.Entries.TryGetValue(_localSiloDetails.SiloAddress, out var membershipEntry))
             {
+                var statusScore = 0;
+                string? statusComplaint = null;
                 if (membershipEntry.Status != SiloStatus.Active)
                 {
-                    LogSiloNotActive(membershipEntry.Status);
-                    complaints?.Add($"This silo is not active (Status: {membershipEntry.Status}) and is therefore not healthy.");
-
-                    score = MaxScore;
+                    statusComplaint = $"This silo is not active (Status: {membershipEntry.Status}) and is therefore not healthy.";
+                    complaints.Add(statusComplaint);
+                    statusScore = MaxScore;
                 }
+
+                events.Add(new(
+                    timestamp,
+                    LocalSiloHealthCheckKind.MembershipStatus,
+                    GetCategory(LocalSiloHealthCheckKind.MembershipStatus),
+                    Source: null,
+                    statusScore,
+                    statusComplaint,
+                    Duration: null));
 
                 // Check if there are valid votes against this node.
                 var expiration = _clusterMembershipOptions.DeathVoteExpirationTimeout;
@@ -172,37 +409,63 @@ namespace Orleans.Runtime.MembershipService
                 {
                     if (membershipSnapshot.GetSiloStatus(vote.Item1) == SiloStatus.Active)
                     {
-                        LogSiloSuspected(vote.Item1, vote.Item2);
-                        complaints?.Add($"Silo {vote.Item1} recently suspected this silo is dead at {vote.Item2}.");
-
-                        ++score;
+                        var complaint = $"Silo {vote.Item1} recently suspected this silo is dead at {vote.Item2}.";
+                        complaints.Add(complaint);
+                        events.Add(new(
+                            timestamp,
+                            LocalSiloHealthCheckKind.SiloSuspected,
+                            GetCategory(LocalSiloHealthCheckKind.SiloSuspected),
+                            vote.Item1.ToParsableString(),
+                            Score: 1,
+                            complaint,
+                            Duration: null));
                     }
                 }
             }
             else
             {
-                LogMembershipEntryNotFound();
-                complaints?.Add("Could not find a membership entry for this silo");
-
-                score = MaxScore;
+                const string Complaint = "Could not find a membership entry for this silo";
+                complaints.Add(Complaint);
+                events.Add(new(
+                    timestamp,
+                    LocalSiloHealthCheckKind.MembershipStatus,
+                    GetCategory(LocalSiloHealthCheckKind.MembershipStatus),
+                    Source: null,
+                    Score: MaxScore,
+                    Complaint,
+                    Duration: null,
+                    LogLevel: LogLevel.Error));
             }
-
-            return score;
         }
 
-        private int CheckReceivedProbeRequests(DateTime now, List<string>? complaints)
+        private void CheckReceivedProbeRequests(
+            DateTime now,
+            long timestamp,
+            List<LocalSiloHealthEvent> events,
+            List<string> complaints)
         {
             var membershipSnapshot = _membershipManager.CurrentSnapshot;
             var score = _probeHealthMonitor.CheckReceivedProbeRequests(now, membershipSnapshot.ActiveNodeCount, out var complaint);
             if (complaint is not null)
             {
-                complaints?.Add(complaint);
+                complaints.Add(complaint);
             }
 
-            return score;
+            events.Add(new(
+                timestamp,
+                LocalSiloHealthCheckKind.ProbeRequests,
+                GetCategory(LocalSiloHealthCheckKind.ProbeRequests),
+                Source: null,
+                score,
+                complaint,
+                Duration: null));
         }
 
-        private int CheckReceivedProbeResponses(DateTime now, List<string>? complaints)
+        private void CheckReceivedProbeResponses(
+            DateTime now,
+            long timestamp,
+            List<LocalSiloHealthEvent> events,
+            List<string> complaints)
         {
             var membershipSnapshot = _membershipManager.CurrentSnapshot;
             // Use ActiveNodeCount - 1 as a proxy for monitored node count (we don't monitor ourselves)
@@ -210,38 +473,83 @@ namespace Orleans.Runtime.MembershipService
             var score = _probeHealthMonitor.CheckReceivedProbeResponses(now, monitoredNodeCount, out var complaint);
             if (complaint is not null)
             {
-                complaints?.Add(complaint);
+                complaints.Add(complaint);
             }
 
-            return score;
+            events.Add(new(
+                timestamp,
+                LocalSiloHealthCheckKind.ProbeResponses,
+                GetCategory(LocalSiloHealthCheckKind.ProbeResponses),
+                Source: null,
+                score,
+                complaint,
+                Duration: null));
         }
 
-        private int CheckLocalHealthCheckParticipants(DateTime now, List<string>? complaints)
+        private void CheckLocalHealthCheckParticipants(
+            DateTime now,
+            long timestamp,
+            List<LocalSiloHealthEvent> events,
+            List<string> complaints)
         {
-            // Check for execution delays and other local health warning signs.
-            var score = 0;
-            foreach (var participant in _healthCheckParticipants)
+            for (var i = 0; i < _healthCheckParticipants.Count; i++)
             {
+                var participant = _healthCheckParticipants[i];
+                var score = 0;
+                var logLevel = LogLevel.Warning;
+                string? complaint = null;
                 try
                 {
                     if (!participant.CheckHealth(_lastHealthCheckTime, out var reason))
                     {
-                        LogHealthCheckParticipantUnhealthy(participant.GetType(), reason);
-                        complaints?.Add($"Health check participant {participant.GetType()} is reporting that it is unhealthy with complaint: {reason}");
-
-                        ++score;
+                        complaint = $"Health check participant {participant.GetType()} is reporting that it is unhealthy with complaint: {reason}";
+                        complaints.Add(complaint);
+                        score = 1;
                     }
                 }
                 catch (Exception exception)
                 {
-                    LogHealthCheckParticipantError(exception, participant.GetType());
-                    complaints?.Add($"Error checking health for participant {participant.GetType()}: {LogFormatter.PrintException(exception)}");
-
-                    ++score;
+                    logLevel = LogLevel.Error;
+                    complaint = $"Error checking health for participant {participant.GetType()}: {LogFormatter.PrintException(exception)}";
+                    complaints.Add(complaint);
+                    score = 1;
                 }
+
+                events.Add(new(
+                    timestamp,
+                    LocalSiloHealthCheckKind.HealthCheckParticipant,
+                    GetCategory(LocalSiloHealthCheckKind.HealthCheckParticipant),
+                    $"{participant.GetType().FullName}[{i}]",
+                    score,
+                    complaint,
+                    Duration: null,
+                    LogLevel: logLevel));
             }
 
             _lastHealthCheckTime = now;
+        }
+
+        private long SubtractTimestamp(long timestamp, TimeSpan duration)
+            => timestamp - (long)(duration.TotalSeconds * _timeProvider.TimestampFrequency);
+
+        private static LocalSiloHealthCheckCategory GetCategory(LocalSiloHealthCheckKind kind)
+            => kind switch
+            {
+                LocalSiloHealthCheckKind.MembershipStatus
+                    or LocalSiloHealthCheckKind.SiloSuspected
+                    or LocalSiloHealthCheckKind.ProbeRequests
+                    or LocalSiloHealthCheckKind.ProbeResponses => LocalSiloHealthCheckCategory.Network,
+                _ => LocalSiloHealthCheckCategory.Local,
+            };
+
+        private static int GetScore(List<LocalSiloHealthEvent> events)
+        {
+            var score = 0;
+            foreach (var healthEvent in events)
+            {
+                score = (int)Math.Min(MaxScore, (long)score + healthEvent.Score);
+            }
+
             return score;
         }
 
@@ -251,20 +559,64 @@ namespace Orleans.Runtime.MembershipService
             {
                 try
                 {
-                    var complaints = new List<string>();
-                    var now = DateTime.UtcNow;
-                    var score = GetLocalHealthDegradationScore(now, complaints);
-                    if (score > 0)
+                    var logDegradation = CanLogDegradation();
+                    LocalSiloHealthStatus status;
+                    var healthCheckVersion = Volatile.Read(ref _healthCheckVersion);
+                    var networkHealthCheckVersion = Volatile.Read(ref _networkHealthCheckVersion);
+                    lock (_samplingLock)
                     {
-                        var complaintsString = string.Join("\n", complaints);
-                        LogSelfMonitoringDegraded(score, MaxScore, complaintsString);
+                        status = EnsureHealthCheck(
+                            _timeProvider.GetUtcNow(),
+                            _timeProvider.GetTimestamp(),
+                            includeNetworkChecks: logDegradation,
+                            healthCheckVersion,
+                            networkHealthCheckVersion,
+                            out _);
                     }
 
-                    this.Complaints = ImmutableArray.CreateRange(complaints);
+                    if (status.Score > 0 && logDegradation)
+                    {
+                        _lastDegradationLogTimestamp = _timeProvider.GetTimestamp();
+                        LogHealthDetails(status.Events);
+                        var complaintsString = string.Join("\n", status.Complaints);
+                        LogSelfMonitoringDegraded(status.Score, MaxScore, complaintsString);
+                    }
                 }
                 catch (Exception exception)
                 {
                     LogErrorMonitoringLocalSiloHealth(exception);
+                }
+            }
+
+            bool CanLogDegradation()
+            {
+                var now = _timeProvider.GetTimestamp();
+                if (_lastDegradationLogTimestamp is not { } lastLog
+                    || _timeProvider.GetElapsedTime(lastLog, now) >= _clusterMembershipOptions.LocalHealthDegradationMonitoringPeriod)
+                {
+                    return true;
+                }
+
+                return false;
+            }
+        }
+
+        private void LogHealthDetails(ImmutableArray<LocalSiloHealthEvent> events)
+        {
+            foreach (var healthEvent in events)
+            {
+                if (healthEvent.Score <= 0 || healthEvent.Complaint is not { } complaint)
+                {
+                    continue;
+                }
+
+                if (healthEvent.Kind == LocalSiloHealthCheckKind.ThreadPoolQueueDelay)
+                {
+                    LogThreadPoolDelay(healthEvent.LogLevel, healthEvent.Duration?.TotalSeconds ?? 0);
+                }
+                else
+                {
+                    LogRecordedHealthIssue(healthEvent.LogLevel, healthEvent.Kind, healthEvent.Source, complaint);
                 }
             }
         }
@@ -304,13 +656,15 @@ namespace Orleans.Runtime.MembershipService
             private readonly object _lockObj = new();
 #endif
             private readonly ILogger<ThreadPoolMonitor> _log;
+            private readonly TimeProvider _timeProvider;
             private bool _scheduled;
             private TimeSpan _lastQueueDelay;
-            private ValueStopwatch _queueDelay;
+            private long _queueDelayTimestamp;
 
-            public ThreadPoolMonitor(ILogger<ThreadPoolMonitor> log)
+            public ThreadPoolMonitor(ILogger<ThreadPoolMonitor> log, TimeProvider timeProvider)
             {
                 _log = log;
+                _timeProvider = timeProvider;
             }
 
             public TimeSpan MeasureQueueDelay()
@@ -319,14 +673,14 @@ namespace Orleans.Runtime.MembershipService
                 TimeSpan delay;
                 lock (_lockObj)
                 {
-                    var currentQueueDelay = _queueDelay.Elapsed;
+                    var currentQueueDelay = _scheduled ? _timeProvider.GetElapsedTime(_queueDelayTimestamp) : TimeSpan.Zero;
                     delay = currentQueueDelay > _lastQueueDelay ? currentQueueDelay : _lastQueueDelay;
 
                     if (!_scheduled)
                     {
                         _scheduled = true;
                         shouldSchedule = true;
-                        _queueDelay.Restart();
+                        _queueDelayTimestamp = _timeProvider.GetTimestamp();
                     }
                     else
                     {
@@ -349,8 +703,7 @@ namespace Orleans.Runtime.MembershipService
                     lock (_lockObj)
                     {
                         _scheduled = false;
-                        _queueDelay.Stop();
-                        _lastQueueDelay = _queueDelay.Elapsed;
+                        _lastQueueDelay = _timeProvider.GetElapsedTime(_queueDelayTimestamp);
                     }
                 }
                 catch (Exception exception)
@@ -364,6 +717,15 @@ namespace Orleans.Runtime.MembershipService
             Message = ".NET Thread Pool is exhibiting delays of {ThreadPoolQueueDelaySeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses."
         )]
         private partial void LogThreadPoolDelay(LogLevel logLevel, double threadPoolQueueDelaySeconds);
+
+        [LoggerMessage(
+            Message = "{Kind} health check for {Source} reported: {Complaint}"
+        )]
+        private partial void LogRecordedHealthIssue(
+            LogLevel logLevel,
+            LocalSiloHealthCheckKind kind,
+            string? source,
+            string complaint);
 
         [LoggerMessage(
             Level = LogLevel.Warning,

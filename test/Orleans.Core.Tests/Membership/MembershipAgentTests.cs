@@ -101,14 +101,15 @@ namespace NonSilo.Tests.Membership
                 new ConnectionManager(
                     Options.Create(new ConnectionOptions()),
                     null!,
-                    this.loggerFactory.CreateLogger<ConnectionManager>()));
+                    this.loggerFactory.CreateLogger<ConnectionManager>()),
+                TimeProvider.System);
             ((ILifecycleParticipant<ISiloLifecycle>)this.clusterHealthMonitor).Participate(this.lifecycle);
 
             this.remoteSiloProber = Substitute.For<IRemoteSiloProber>();
             remoteSiloProber.Probe(default!, default).ReturnsForAnyArgs(Task.CompletedTask);
 
             this.localSiloHealthMonitor = Substitute.For<ILocalSiloHealthMonitor>();
-            this.localSiloHealthMonitor.GetLocalHealthDegradationScore(default).ReturnsForAnyArgs(0);
+            this.localSiloHealthMonitor.GetLocalHealthStatus(default, default, default).ReturnsForAnyArgs(new LocalSiloHealthStatus(0, []));
 
             this.onProbeResult = (Func<SiloHealthMonitor, SiloHealthMonitor.ProbeResult, Task>)((siloHealthMonitor, probeResult) => Task.CompletedTask);
 
