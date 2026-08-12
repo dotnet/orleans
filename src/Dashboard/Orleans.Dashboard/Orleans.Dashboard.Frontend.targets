@@ -5,6 +5,7 @@
     <!-- Frontend paths -->
     <NpmAppRootDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Orleans.Dashboard.App'))</NpmAppRootDirectory>
     <NpmBuildOutput>$([System.IO.Path]::GetFullPath('$(NpmAppRootDirectory)\dist\'))</NpmBuildOutput>
+    <NpmCiScript>$([System.IO.Path]::Combine('$(NpmAppRootDirectory)', 'scripts', 'npm-ci.js'))</NpmCiScript>
     <AzureDevOpsNpmrcFile>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\.azdo\.npmrc'))</AzureDevOpsNpmrcFile>
   </PropertyGroup>
 
@@ -12,7 +13,7 @@
   <ItemGroup Condition="'$(BuildExternalAssets)' != 'false'">
     <NpmAppSources Include="$(NpmAppRootDirectory)\src\**\*" />
     <NpmAppSources Include="$(NpmAppRootDirectory)\public\**\*" />
-    <NpmAppSources Include="$(NpmAppRootDirectory)\scripts\npm-ci.js" />
+    <NpmAppSources Include="$(NpmCiScript)" />
     <NpmAppSources Include="$(NpmAppRootDirectory)\package.json" />
     <NpmAppSources Include="$(NpmAppRootDirectory)\package-lock.json" />
     <NpmAppSources Include="$(NpmAppRootDirectory)\vite.config.ts" />
@@ -48,7 +49,7 @@
 
     <!-- Install dependencies -->
     <Exec
-      Command="node &quot;$(NpmAppRootDirectory)\scripts\npm-ci.js&quot; --prefer-offline --no-audit $(NpmConfigArg)"
+      Command="node &quot;$(NpmCiScript)&quot; --prefer-offline --no-audit $(NpmConfigArg)"
       WorkingDirectory="$(NpmAppRootDirectory)"
       ConsoleToMsBuild="true" />
 
