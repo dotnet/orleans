@@ -186,8 +186,6 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                Gateway?.TrackRequest(msg);
-
                 // First check to see if it's really destined for a proxied client, instead of a local grain.
                 if (TryDeliverToProxy(msg))
                 {
@@ -201,6 +199,8 @@ namespace Orleans.Runtime.Messaging
                     SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message to be sent does not have a target silo.");
                     return;
                 }
+
+                Gateway?.TrackRequest(msg);
 
                 if (targetSilo.Matches(_siloAddress))
                 {
