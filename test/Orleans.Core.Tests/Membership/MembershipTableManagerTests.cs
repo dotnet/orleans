@@ -1002,6 +1002,44 @@ namespace NonSilo.Tests.Membership
             await this.lifecycle.OnStop(cancellationToken);
         }
 
+        [Fact]
+        public async Task MembershipTableManager_RefreshFromSourceStartsNewReadWhileRefreshInFlight()
+        {
+            var membershipTable = new InMemoryMembershipTable();
+            var manager = CreateMembershipTableManager(membershipTable);
+            var firstReadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var releaseFirstRead = new ManualResetEventSlim();
+            var readCount = 0;
+            membershipTable.OnReadAll = () =>
+            {
+                if (Interlocked.Increment(ref readCount) == 1)
+                {
+                    firstReadStarted.TrySetResult();
+                    if (!releaseFirstRead.Wait(TimeSpan.FromSeconds(30)))
+                    {
+                        throw new TimeoutException("Timed out waiting to release the first membership-table read");
+                    }
+                }
+            };
+
+            var inFlightRefresh = Task.Run(() => manager.Refresh());
+            await firstReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            var causalRefresh = ((IMembershipManager)manager).RefreshFromSource(CancellationToken.None);
+
+            try
+            {
+                await causalRefresh.WaitAsync(TimeSpan.FromSeconds(30));
+                Assert.Equal(2, readCount);
+            }
+            finally
+            {
+                releaseFirstRead.Set();
+                await inFlightRefresh;
+            }
+
+            Assert.Equal(2, readCount);
+        }
+
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
         private MembershipTableManager CreateMembershipTableManager(IMembershipTable membershipTable)
