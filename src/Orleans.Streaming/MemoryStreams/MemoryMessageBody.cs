@@ -56,7 +56,7 @@ namespace Orleans.Providers
         public MemoryMessageBody Deserialize(ArraySegment<byte> bodyBytes)
         {
             // Serialize only accepts a non-null MemoryMessageBody.
-            return serializer.Deserialize(bodyBytes.ToArray())!;
+            return serializer.Deserialize(bodyBytes)!;
         }
 
         /// <inheritdoc />
