@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using Orleans.Runtime;
 
@@ -18,7 +20,8 @@ namespace Orleans.Reminders.Concurrency;
 public sealed class ReminderThrottleInstruments
 {
     private readonly Histogram<double> _acquireDuration;
-    private readonly UpDownCounter<int> _activeLeases;
+    private readonly ConcurrentDictionary<string, int> _activeLeasesByTier = new(StringComparer.Ordinal);
+    private readonly ObservableUpDownCounter<int> _activeLeases;
     private readonly Counter<int> _ticksSkipped;
     private readonly Counter<int> _coordinatorOutages;
 
@@ -33,8 +36,9 @@ public sealed class ReminderThrottleInstruments
             unit: "s",
             description: "Time a reminder tick spent waiting for a throttle lease, before admission or skip.");
 
-        _activeLeases = instruments.Meter.CreateUpDownCounter<int>(
+        _activeLeases = instruments.Meter.CreateObservableUpDownCounter<int>(
             name: "orleans-reminders-throttle-active-leases",
+            observeValues: ObserveActiveLeases,
             unit: "{lease}",
             description: "The number of currently-held reminder throttle leases.");
 
@@ -63,26 +67,26 @@ public sealed class ReminderThrottleInstruments
             new KeyValuePair<string, object?>(ReminderActivityAttributes.ThrottleOutcome, FormatOutcome(outcome)));
     }
 
-    /// <summary>Increments the active-leases gauge for an admitted lease.</summary>
+    /// <summary>Increments the active lease count for an admitted lease.</summary>
     public void OnLeaseAcquired(string? tier)
     {
-        if (!_activeLeases.Enabled)
-        {
-            return;
-        }
-
-        _activeLeases.Add(1, new KeyValuePair<string, object?>(ReminderActivityAttributes.ThrottleTier, tier ?? "(none)"));
+        _activeLeasesByTier.AddOrUpdate(tier ?? "(none)", 1, static (_, count) => count + 1);
     }
 
-    /// <summary>Decrements the active-leases gauge for a released lease.</summary>
+    /// <summary>Decrements the active lease count for a released lease.</summary>
     public void OnLeaseReleased(string? tier)
     {
-        if (!_activeLeases.Enabled)
-        {
-            return;
-        }
+        _activeLeasesByTier.AddOrUpdate(tier ?? "(none)", -1, static (_, count) => count - 1);
+    }
 
-        _activeLeases.Add(-1, new KeyValuePair<string, object?>(ReminderActivityAttributes.ThrottleTier, tier ?? "(none)"));
+    private IEnumerable<Measurement<int>> ObserveActiveLeases()
+    {
+        foreach (var (tier, count) in _activeLeasesByTier)
+        {
+            yield return new Measurement<int>(
+                count,
+                new KeyValuePair<string, object?>(ReminderActivityAttributes.ThrottleTier, tier));
+        }
     }
 
     /// <summary>Records a tick being skipped by a throttle.</summary>

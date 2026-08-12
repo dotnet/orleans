@@ -76,11 +76,11 @@ Choose the limiter behavior by passing one of these block modes when you configu
 
 | Block mode | Behavior when no permit is available | Trade-off |
 |---|---|---|
-| `ThrottleBlockMode.Wait` (default) | Wait indefinitely for a permit. | No ticks are dropped, but tardiness is unbounded. The grain may see a tick arrive much later than scheduled. |
+| `ThrottleBlockMode.Wait` (default) | Wait indefinitely for a permit unless an earlier composed gate established a shared `WaitUpTo` deadline. | When all gates use `Wait`, no ticks are dropped, but tardiness is unbounded. The grain may see a tick arrive much later than scheduled. |
 | `ThrottleBlockMode.WaitUpTo(timeout)` | Wait up to `timeout`, then skip the tick if no permit became available. | Bounded tardiness, bounded skip rate. Skips are classified as `ReminderSkipReason.AcquireTimeout` for observability. |
 | `ThrottleBlockMode.SkipImmediately` | Skip the tick if no permit is available right now. | Maximum downstream protection; minimum delivery guarantee. Best when "missing a tick" is materially better than "exceeding the limit". |
 
-All sequential waiting phases share a single `WaitUpTo` budget: a `WaitUpTo(500ms)` cap means the total wait across the composed gates is at most 500 ms, not 500 ms per gate.
+All sequential waiting phases share a single `WaitUpTo` budget: a `WaitUpTo(500ms)` cap means the total wait across the composed gates is at most 500 ms, not 500 ms per gate. Once established, that deadline also bounds later gates configured with `Wait`.
 
 **Reasoning prompts:**
 
@@ -154,7 +154,7 @@ All metrics flow through the existing Orleans `Microsoft.Orleans` meter. Tag key
 | Metric name | Type | Unit | Tags | What it tells you |
 |---|---|---|---|---|
 | `orleans-reminders-throttle-queued-duration` | Histogram | `s` | `orleans.reminder.throttle.tier`, `orleans.reminder.throttle.outcome` | How long each tick waited for a lease. Watch the P95/P99 to see whether your limit is binding. |
-| `orleans-reminders-throttle-active-leases` | UpDownCounter | `{lease}` | `orleans.reminder.throttle.tier` | Currently-held leases per tier. Saturates near `MaxConcurrent` when the concurrency cap is binding. |
+| `orleans-reminders-throttle-active-leases` | ObservableUpDownCounter | `{lease}` | `orleans.reminder.throttle.tier` | Currently-held leases per tier. Saturates near `MaxConcurrent` when the concurrency cap is binding. |
 | `orleans-reminders-ticks-skipped` | Counter | `{tick}` | `orleans.reminder.throttle.tier`, `orleans.reminder.throttle.skip_reason` | How many ticks were skipped, broken down by reason. The rate of this counter is your "how much tick delivery am I losing" signal. |
 | `orleans-reminders-ticks-delivered` | Counter | (existing) | — | Total ticks delivered. Compare against the skipped counter to compute a delivery ratio. |
 | `orleans-reminders-tardiness` | Histogram | (existing) | — | End-to-end tardiness. Throttle wait is a component of this; the dedicated `queued-duration` histogram lets you separate "downstream was slow" from "limiter was throttling". |

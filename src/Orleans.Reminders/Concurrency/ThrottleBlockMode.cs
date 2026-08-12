@@ -15,9 +15,11 @@ public abstract record ThrottleBlockMode
     }
 
     /// <summary>
-    /// Wait indefinitely for a permit to become available. The acquire only completes when
-    /// either a permit is granted or the supplied cancellation token is cancelled. This is
-    /// the safest mode for not losing ticks, at the cost of unbounded tardiness.
+    /// Wait indefinitely for a permit to become available. Unless an earlier composed gate
+    /// established a shared <see cref="WaitUpTo(TimeSpan)"/> deadline, the acquire only completes
+    /// when either a permit is granted or the supplied cancellation token is cancelled. This is
+    /// the safest mode for not losing ticks when all composed gates use <see cref="Wait"/>, at the
+    /// cost of unbounded tardiness.
     /// </summary>
     public static ThrottleBlockMode Wait { get; } = new WaitForever();
 
