@@ -1,8 +1,10 @@
 #nullable enable
 
 using System;
+using System.Diagnostics.Metrics;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Reminders.Concurrency;
 using Orleans.Runtime;
@@ -40,6 +42,55 @@ public sealed class ThrottleBlockModeTests
     public void WaitUpTo_ProducesDistinctValuesForDistinctTimeouts()
     {
         Assert.NotEqual(ThrottleBlockMode.WaitUpTo(TimeSpan.FromSeconds(1)), ThrottleBlockMode.WaitUpTo(TimeSpan.FromSeconds(2)));
+    }
+}
+
+public sealed class ReminderThrottleInstrumentsTests
+{
+    [Fact, TestCategory("BVT")]
+    public void ActiveLeases_ReportsCurrentValue_WhenListenerStartsAfterAcquire()
+    {
+        var services = new ServiceCollection();
+        services.AddMetrics();
+
+        using var serviceProvider = services.BuildServiceProvider();
+        var orleansInstruments = new OrleansInstruments(serviceProvider.GetRequiredService<IMeterFactory>());
+        var instruments = new ReminderThrottleInstruments(orleansInstruments);
+        instruments.OnLeaseAcquired("test");
+
+        int? activeLeases = null;
+        string? tier = null;
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (ReferenceEquals(instrument.Meter, orleansInstruments.Meter)
+                && instrument.Name == "orleans-reminders-throttle-active-leases")
+            {
+                meterListener.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<int>((_, measurement, tags, _) =>
+        {
+            activeLeases = measurement;
+            foreach (var tag in tags)
+            {
+                if (tag.Key == ReminderActivityAttributes.ThrottleTier)
+                {
+                    tier = tag.Value?.ToString();
+                }
+            }
+        });
+
+        listener.Start();
+        listener.RecordObservableInstruments();
+
+        Assert.Equal(1, activeLeases);
+        Assert.Equal("test", tier);
+
+        instruments.OnLeaseReleased("test");
+        listener.RecordObservableInstruments();
+
+        Assert.Equal(0, activeLeases);
     }
 }
 

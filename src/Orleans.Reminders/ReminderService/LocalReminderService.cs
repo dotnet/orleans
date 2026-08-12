@@ -490,7 +490,7 @@ namespace Orleans.Runtime.ReminderService
                 else
                 {
                     LogErrorInitialLoadFailed(ex, initialReadCallCount);
-                    startedTask.TrySetException(new OrleansException("ReminderService failed initial load of reminders and cannot guarantee that the service will be eventually start without manual intervention or restarting the silo. Please check the logs for details."));
+                    startedTask.TrySetException(new OrleansException("ReminderService failed initial load of reminders and cannot guarantee that the service will be eventually start without manual intervention or restarting the silo.", ex));
                 }
             }
         }
@@ -1192,8 +1192,7 @@ namespace Orleans.Runtime.ReminderService
                 {
                     while (await WaitForNextTick(previousTickTime, previousScheduleVersion) is { } scheduledTick)
                     {
-                        var entry = PrepareTick(scheduledTick.ScheduleVersion);
-                        if (entry is null || !_shared.TryBeginSingleReminderDelivery())
+                        if (!TryPrepareTick(scheduledTick.ScheduleVersion, out var entry, out var scheduleChangedToken) || !_shared.TryBeginSingleReminderDelivery())
                         {
                             continue;
                         }
@@ -1211,90 +1210,103 @@ namespace Orleans.Runtime.ReminderService
                             var provisionalStatus = new TickStatus(entry.StartAt, entry.Period, preThrottleNow);
                             var context = new ReminderDeliveryContext(entry.GrainId, entry.ReminderName, provisionalStatus);
                             ReminderDeliveryLease lease;
+                            using var acquireCancellation = CancellationTokenSource.CreateLinkedTokenSource(_stopCancellation.Token, scheduleChangedToken);
                             try
                             {
-                                lease = await _shared._deliveryThrottle.AcquireAsync(context, _stopCancellation.Token).ConfigureAwait(true);
+                                lease = await _shared._deliveryThrottle.AcquireAsync(context, acquireCancellation.Token).ConfigureAwait(true);
                             }
-                            catch (OperationCanceledException) when (_stopCancellation.IsCancellationRequested)
+                            catch (OperationCanceledException) when (acquireCancellation.IsCancellationRequested)
                             {
                                 continue;
                             }
 
-                            _shared._throttleInstruments.RecordAcquireDuration(lease.TierName, lease.Outcome, lease.WaitedFor);
-
-                            if (lease.Outcome == ReminderAdmissionOutcome.Skipped)
+                            var activeLeaseRecorded = false;
+                            try
                             {
-                                _shared._throttleInstruments.OnTickSkipped(lease.TierName, lease.SkipReason!.Value);
-                                ReminderEvents.EmitTickSkipped(entry.GrainId, entry.ReminderName, provisionalStatus, lease.SkipReason!.Value, lease.TierName, lease.WaitedFor, _shared.Silo);
-                                lease.Dispose();
-                                continue;
-                            }
+                                _shared._throttleInstruments.RecordAcquireDuration(lease.TierName, lease.Outcome, lease.WaitedFor);
 
-                            if (!IsTickStillValid(scheduledTick.ScheduleVersion, entry))
-                            {
-                                lease.Dispose();
-                                continue;
-                            }
-
-                            var before = _shared._timeProvider.GetUtcNow().UtcDateTime;
-                            var status = new TickStatus(entry.StartAt, entry.Period, before);
-
-                            LogTraceTriggeringTick(_shared.logger, this, status, before);
-                            ReminderEvents.EmitTickFiring(entry.GrainId, entry.ReminderName, status, _shared.Silo);
-                            if (_shared._reminderInstruments.TardinessSecondsEnabled)
-                            {
-                                var tardiness = CalculateTardiness(status);
-                                _shared._reminderInstruments.OnTardiness(tardiness);
-                            }
-
-                            _shared._throttleInstruments.OnLeaseAcquired(lease.TierName);
-                            using var activity = RemindersActivitySource.Source.HasListeners()
-                                ? RemindersActivitySource.Source.StartActivity("Reminder.Dispatch", System.Diagnostics.ActivityKind.Internal)
-                                : null;
-                            if (activity is { IsAllDataRequested: true })
-                            {
-                                activity.SetTag(ReminderActivityAttributes.ReminderName, entry.ReminderName);
-                                activity.SetTag(ReminderActivityAttributes.GrainId, entry.GrainId.ToString());
-                                activity.SetTag(ReminderActivityAttributes.GrainType, entry.GrainId.Type.ToString());
-                                activity.SetTag(ReminderActivityAttributes.Tardiness, CalculateTardiness(status).TotalSeconds);
-                                if (lease.TierName is not null)
+                                if (lease.Outcome == ReminderAdmissionOutcome.Skipped)
                                 {
-                                    activity.SetTag(ReminderActivityAttributes.ThrottleTier, lease.TierName);
-                                    activity.SetTag(ReminderActivityAttributes.ThrottleOutcome, "admitted");
+                                    _shared._throttleInstruments.OnTickSkipped(lease.TierName, lease.SkipReason!.Value);
+                                    ReminderEvents.EmitTickSkipped(entry.GrainId, entry.ReminderName, provisionalStatus, lease.SkipReason!.Value, lease.TierName, lease.WaitedFor, _shared.Silo);
+                                    continue;
                                 }
-                            }
 
-                            try
-                            {
-                                var grainRef = _shared.GetGrain(entry.GrainId);
-                                await grainRef.ReceiveReminder(entry.ReminderName, status);
+                                if (!IsTickStillValid(scheduledTick.ScheduleVersion, entry))
+                                {
+                                    continue;
+                                }
 
-                                if (_shared.logger.IsEnabled(LogLevel.Trace))
+                                var before = _shared._timeProvider.GetUtcNow().UtcDateTime;
+                                var status = new TickStatus(entry.StartAt, entry.Period, before);
+
+                                LogTraceTriggeringTick(_shared.logger, this, status, before);
+                                ReminderEvents.EmitTickFiring(entry.GrainId, entry.ReminderName, status, _shared.Silo);
+                                if (_shared._reminderInstruments.TardinessSecondsEnabled)
+                                {
+                                    var tardiness = CalculateTardiness(status);
+                                    _shared._reminderInstruments.OnTardiness(tardiness);
+                                }
+
+                                _shared._throttleInstruments.OnLeaseAcquired(lease.TierName);
+                                activeLeaseRecorded = true;
+                                using var activity = RemindersActivitySource.Source.HasListeners()
+                                    ? RemindersActivitySource.Source.StartActivity("Reminder.Dispatch", System.Diagnostics.ActivityKind.Internal)
+                                    : null;
+                                if (activity is { IsAllDataRequested: true })
+                                {
+                                    activity.SetTag(ReminderActivityAttributes.ReminderName, entry.ReminderName);
+                                    activity.SetTag(ReminderActivityAttributes.GrainId, entry.GrainId.ToString());
+                                    activity.SetTag(ReminderActivityAttributes.GrainType, entry.GrainId.Type.ToString());
+                                    activity.SetTag(ReminderActivityAttributes.Tardiness, CalculateTardiness(status).TotalSeconds);
+                                    if (lease.TierName is not null)
+                                    {
+                                        activity.SetTag(ReminderActivityAttributes.ThrottleTier, lease.TierName);
+                                        activity.SetTag(ReminderActivityAttributes.ThrottleOutcome, "admitted");
+                                    }
+                                }
+
+                                try
+                                {
+                                    var grainRef = _shared.GetGrain(entry.GrainId);
+                                    await grainRef.ReceiveReminder(entry.ReminderName, status);
+
+                                    if (_shared.logger.IsEnabled(LogLevel.Trace))
+                                    {
+                                        var after = _shared._timeProvider.GetUtcNow().UtcDateTime;
+                                        var elapsed = after - before;
+                                        var nextTick = CalculateFollowingTickTime(entry, scheduledTick.TickTime, after);
+                                        LogTraceTickTriggered(_shared.logger, this, elapsed.TotalSeconds, nextTick);
+                                    }
+
+                                    ReminderEvents.EmitTickCompleted(entry.GrainId, entry.ReminderName, status, _shared.Silo);
+                                    _shared._reminderInstruments.OnTickDelivered();
+                                    activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
+                                }
+                                catch (Exception exc)
                                 {
                                     var after = _shared._timeProvider.GetUtcNow().UtcDateTime;
-                                    var elapsed = after - before;
                                     var nextTick = CalculateFollowingTickTime(entry, scheduledTick.TickTime, after);
-                                    LogTraceTickTriggered(_shared.logger, this, elapsed.TotalSeconds, nextTick);
+                                    LogErrorDeliveringReminderTick(_shared.logger, this, nextTick, exc);
+                                    ReminderEvents.EmitTickFailed(entry.GrainId, entry.ReminderName, status, exc, _shared.Silo);
+                                    activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error);
+
+                                    // What to do with repeated failures to deliver a reminder's ticks?
                                 }
-
-                                ReminderEvents.EmitTickCompleted(entry.GrainId, entry.ReminderName, status, _shared.Silo);
-                                _shared._reminderInstruments.OnTickDelivered();
-                                activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
-                            }
-                            catch (Exception exc)
-                            {
-                                var after = _shared._timeProvider.GetUtcNow().UtcDateTime;
-                                var nextTick = CalculateFollowingTickTime(entry, scheduledTick.TickTime, after);
-                                LogErrorDeliveringReminderTick(_shared.logger, this, nextTick, exc);
-                                ReminderEvents.EmitTickFailed(entry.GrainId, entry.ReminderName, status, exc, _shared.Silo);
-                                activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error);
-
-                                // What to do with repeated failures to deliver a reminder's ticks?
                             }
                             finally
                             {
-                                _shared._throttleInstruments.OnLeaseReleased(lease.TierName);
-                                lease.Dispose();
+                                try
+                                {
+                                    if (activeLeaseRecorded)
+                                    {
+                                        _shared._throttleInstruments.OnLeaseReleased(lease.TierName);
+                                    }
+                                }
+                                finally
+                                {
+                                    lease.Dispose();
+                                }
                             }
                         }
                         catch (Exception exception)
@@ -1404,21 +1416,20 @@ namespace Orleans.Runtime.ReminderService
                 }
             }
 
-            private ReminderEntry? PrepareTick(long scheduleVersion)
+            private bool TryPrepareTick(long scheduleVersion, out ReminderEntry entry, out CancellationToken scheduleChangedToken)
             {
                 lock (_lock)
                 {
-                    if (_stopReason != (int)ReminderEvents.LocalReminderStopReason.Unknown)
+                    scheduleChangedToken = _scheduleChangedCancellation.Token;
+
+                    if (_stopReason != (int)ReminderEvents.LocalReminderStopReason.Unknown || _scheduleVersion != scheduleVersion)
                     {
-                        return null;
+                        entry = default!;
+                        return false;
                     }
 
-                    if (_scheduleVersion != scheduleVersion)
-                    {
-                        return null;
-                    }
-
-                    return _entry;
+                    entry = _entry;
+                    return true;
                 }
             }
 
