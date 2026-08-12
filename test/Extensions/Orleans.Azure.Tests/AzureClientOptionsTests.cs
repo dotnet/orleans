@@ -18,6 +18,15 @@ public class AzureClientOptionsTests
     }
 
     [Fact]
+    public void TestTableClientOptions_HasBoundedRetryBudget()
+    {
+        var options = AzureStorageOperationOptionsExtensions.GetTableClientOptions();
+
+        Assert.Equal(2, options.Retry.MaxRetries);
+        Assert.Equal(TimeSpan.FromSeconds(5), options.Retry.NetworkTimeout);
+    }
+
+    [Fact]
     public void BlobStorageServiceClient_RejectsNull()
     {
         var options = new AzureBlobStorageOptions();
