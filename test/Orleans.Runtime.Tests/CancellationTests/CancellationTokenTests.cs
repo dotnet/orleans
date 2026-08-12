@@ -135,10 +135,8 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
                 Assert.ThrowsAnyAsync<OperationCanceledException>(() => task)));
             if (delay > 0)
             {
-                for (var i = 0; i < grains.Count; i++)
-                {
-                    await WaitForCallCancellation(grains[i], callIds[i]);
-                }
+                await Task.WhenAll(grains.Select((grain, index) =>
+                    WaitForCallCancellation(grain, callIds[index])));
             }
         }
         finally
