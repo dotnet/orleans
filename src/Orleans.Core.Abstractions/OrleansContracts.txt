@@ -16,6 +16,21 @@ interface [GrainInterfaceType("Orleans.Core.Internal.IGrainManagementExtension")
   MigrateOnIdle: MigrateOnIdle() -> ValueTask
   4CC93B45: MigrateOnIdle(System.Threading.CancellationToken) -> ValueTask
 
+interface [GrainInterfaceType("IDurableTaskGrainExtension")] Orleans.DurableTasks.IDurableTaskGrainExtension [Version(0)]
+  GetRunningTasksAsync(System.Threading.CancellationToken) -> System.Collections.Generic.IAsyncEnumerable<System.Distributed.DurableTasks.TaskId>
+  GetTasksAsync(System.Threading.CancellationToken) -> System.Collections.Generic.IAsyncEnumerable<(System.Distributed.DurableTasks.TaskId, DurableTaskDiagnosticState)>
+
+# Orleans.DurableTasks.IDurableTaskObserver
+interface [GrainInterfaceType("IDurableTaskObserverGrainExtension")] Orleans.DurableTasks.IDurableTaskObserver [Version(0)]
+  # Orleans.DurableTasks.IDurableTaskObserver.OnResponseAsync(TaskId taskId, DurableTaskResponse response, CancellationToken cancellationToken) -> ValueTask
+  OnResponse(System.Distributed.DurableTasks.TaskId, System.Distributed.DurableTasks.DurableTaskResponse, System.Threading.CancellationToken) -> ValueTask
+
+# Orleans.DurableTasks.IDurableTaskServer
+interface [GrainInterfaceType("IDurableTaskServerGrainExtension")] Orleans.DurableTasks.IDurableTaskServer [Version(0)]
+  CancelAsync(System.Distributed.DurableTasks.TaskId, System.Threading.CancellationToken) -> ValueTask
+  ScheduleAsync(System.Distributed.DurableTasks.TaskId, Orleans.DurableTasks.IDurableTaskRequest, System.Threading.CancellationToken) -> ValueTask<System.Distributed.DurableTasks.DurableTaskResponse>
+  SubscribeOrPollAsync(System.Distributed.DurableTasks.TaskId, SubscribeOrPollOptions, System.Threading.CancellationToken) -> ValueTask<System.Distributed.DurableTasks.DurableTaskResponse>
+
 interface [GrainInterfaceType("Orleans.IGrain")] Orleans.IGrain [Version(0)]
 
 interface [GrainInterfaceType("Orleans.IGrainObserver")] Orleans.IGrainObserver [Version(0)]
