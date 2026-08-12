@@ -13,16 +13,21 @@ namespace UnitTests;
 public class UnknownSiloStatusCacheTests
 {
     [Fact]
-    public void UnknownSiloRequiresCausallyNewerSnapshotsBeforeBeingDeclaredDead()
+    public void UnknownSiloRequiresFullRefreshStartedAfterObservation()
     {
         var cache = new UnknownSiloStatusCache();
         var silo = CreateSiloAddress();
+        var inFlightRefresh = cache.OnFullRefreshStarted();
+        var snapshot = CreateSnapshot(1);
 
-        Assert.Equal(SiloStatus.None, cache.GetSiloStatus(CreateSnapshot(1), silo));
-        cache.Observe(CreateSnapshot(10));
-        Assert.Equal(SiloStatus.None, cache.GetSiloStatus(CreateSnapshot(10), silo));
-        cache.Observe(CreateSnapshot(11));
-        Assert.Equal(SiloStatus.Dead, cache.GetSiloStatus(CreateSnapshot(11), silo));
+        Assert.Equal(SiloStatus.None, cache.GetSiloStatus(snapshot, silo));
+        cache.OnFullRefreshCompleted(inFlightRefresh, snapshot);
+        Assert.Equal(SiloStatus.None, cache.GetSiloStatus(snapshot, silo));
+
+        var causalRefresh = cache.OnFullRefreshStarted();
+        cache.OnFullRefreshCompleted(causalRefresh, snapshot);
+
+        Assert.Equal(SiloStatus.Dead, cache.GetSiloStatus(snapshot, silo));
     }
 
     [Fact]
@@ -30,13 +35,18 @@ public class UnknownSiloStatusCacheTests
     {
         var cache = new UnknownSiloStatusCache();
         var silo = CreateSiloAddress();
+        var unknownSnapshot = CreateSnapshot(1);
 
-        Assert.Equal(SiloStatus.None, cache.GetSiloStatus(CreateSnapshot(1), silo));
-        Assert.Equal(SiloStatus.None, cache.GetSiloStatus(CreateSnapshot(2), silo));
-        Assert.Equal(SiloStatus.Active, cache.GetSiloStatus(CreateSnapshot(3, new ClusterMember(silo, SiloStatus.Active, "silo")), silo));
-        Assert.Equal(SiloStatus.None, cache.GetSiloStatus(CreateSnapshot(4), silo));
-        Assert.Equal(SiloStatus.None, cache.GetSiloStatus(CreateSnapshot(5), silo));
-        Assert.Equal(SiloStatus.Dead, cache.GetSiloStatus(CreateSnapshot(6), silo));
+        Assert.Equal(SiloStatus.None, cache.GetSiloStatus(unknownSnapshot, silo));
+        var refresh = cache.OnFullRefreshStarted();
+        var activeSnapshot = CreateSnapshot(1, new ClusterMember(silo, SiloStatus.Active, "silo"));
+        cache.OnFullRefreshCompleted(refresh, activeSnapshot);
+        Assert.Equal(SiloStatus.Active, cache.GetSiloStatus(activeSnapshot, silo));
+
+        Assert.Equal(SiloStatus.None, cache.GetSiloStatus(unknownSnapshot, silo));
+        refresh = cache.OnFullRefreshStarted();
+        cache.OnFullRefreshCompleted(refresh, unknownSnapshot);
+        Assert.Equal(SiloStatus.Dead, cache.GetSiloStatus(unknownSnapshot, silo));
     }
 
     [Fact]
