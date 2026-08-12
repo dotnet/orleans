@@ -8,6 +8,10 @@ namespace Tester.AzureUtils
 {
     public static class AzureStorageOperationOptionsExtensions
     {
+        // Keep a stalled emulator request within Orleans' 30-second response timeout.
+        private const int TableStorageMaxRetries = 2;
+        private static readonly TimeSpan TableStorageNetworkTimeout = TimeSpan.FromSeconds(5);
+
         public static DefaultAzureCredential Credential = new DefaultAzureCredential();
 
         public static Orleans.Clustering.AzureStorage.AzureStorageOperationOptions ConfigureTestDefaults(this Orleans.Clustering.AzureStorage.AzureStorageOperationOptions options)
@@ -19,9 +23,18 @@ namespace Tester.AzureUtils
 
         public static TableServiceClient GetTableServiceClient()
         {
+            var clientOptions = GetTableClientOptions();
             return TestDefaultConfiguration.UseAadAuthentication
-                ? new(TestDefaultConfiguration.TableEndpoint, TestDefaultConfiguration.TokenCredential)
-                : new(TestDefaultConfiguration.DataConnectionString);
+                ? new(TestDefaultConfiguration.TableEndpoint, TestDefaultConfiguration.TokenCredential, clientOptions)
+                : new(TestDefaultConfiguration.DataConnectionString, clientOptions);
+        }
+
+        internal static TableClientOptions GetTableClientOptions()
+        {
+            var options = new TableClientOptions();
+            options.Retry.MaxRetries = TableStorageMaxRetries;
+            options.Retry.NetworkTimeout = TableStorageNetworkTimeout;
+            return options;
         }
 
         public static Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions ConfigureTestDefaults(this Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions options)
