@@ -21,24 +21,22 @@ namespace UnitTests.StorageTests.AdoNet
 
         public class Fixture
         {
-            public Fixture()
+            public Fixture() : this(
+                () => RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName).GetAwaiter().GetResult())
             {
-                try
-                {
-                    Storage = RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName).GetAwaiter().GetResult();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Failed to initialize {AdoNetInvariantName} for testing: {ex}");
-                }
             }
 
-            public RelationalStorageForTesting? Storage { get; private set; }
+            internal Fixture(Func<RelationalStorageForTesting> storageFactory)
+            {
+                Storage = storageFactory();
+            }
+
+            public RelationalStorageForTesting Storage { get; }
         }
 
         public SqlServerRelationalStoreTests(Fixture fixture) : base(AdoNetInvariantName)
         {
-            _storage = fixture.Storage!;
+            _storage = fixture.Storage;
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -60,7 +58,7 @@ namespace UnitTests.StorageTests.AdoNet
         [SkippableFact, TestCategory("Functional")]
         public async Task DataSource_SqlServer_Test()
         {
-            Skip.If(_storage is null || string.IsNullOrWhiteSpace(_storage.CurrentConnectionString), "Connection string not provided.");
+            Skip.If(string.IsNullOrWhiteSpace(_storage.CurrentConnectionString), "Connection string not provided.");
             using var dataSource = new ProviderDbDataSource(
                 _storage.CurrentConnectionString,
                 () => new SqlConnection(_storage.CurrentConnectionString));
@@ -72,6 +70,20 @@ namespace UnitTests.StorageTests.AdoNet
                 (record, _, _) => Task.FromResult(record.GetInt32(0)));
 
             Assert.Equal([47], values);
+        }
+    }
+
+    public class SqlServerRelationalStoreFixtureTests
+    {
+        [Fact]
+        public void InitializationFailureIsPropagated()
+        {
+            var expectedException = new InvalidOperationException("Simulated SQL Server database initialization failure.");
+
+            var exception = Assert.Throws<InvalidOperationException>(
+                () => new SqlServerRelationalStoreTests.Fixture(() => throw expectedException));
+
+            Assert.Same(expectedException, exception);
         }
     }
 }
