@@ -749,7 +749,7 @@ namespace Orleans.Runtime
 
     public partial interface IGrainContextActivator
     {
-        IGrainContext CreateContext(GrainAddress address);
+        IGrainContext CreateContext(GrainAddress address, IConfigureGrainContext[] configureActions);
     }
 
     public partial interface IGrainContextActivatorProvider

@@ -76,13 +76,18 @@ internal partial class ActivationDataActivatorProvider(
             _startActivation = state => ((ActivationData)state!).Start(_grainActivator);
         }
 
-        public IGrainContext CreateContext(GrainAddress activationAddress)
+        public IGrainContext CreateContext(GrainAddress activationAddress, IConfigureGrainContext[] configureActions)
         {
             var context = new ActivationData(
                 activationAddress,
                 _createWorkItemGroup,
                 _serviceProvider,
                 _sharedComponents);
+
+            foreach (var configure in configureActions)
+            {
+                configure.Configure(context);
+            }
 
             using var ecSuppressor = ExecutionContext.SuppressFlow();
             _ = Task.Factory.StartNew(
@@ -98,5 +103,6 @@ internal partial class ActivationDataActivatorProvider(
 
 internal class StatelessWorkerActivator(StatelessWorkerGrainTypeSharedContext sharedContext, IGrainContextActivator innerActivator) : IGrainContextActivator
 {
-    public IGrainContext CreateContext(GrainAddress address) => new StatelessWorkerGrainContext(address, sharedContext, innerActivator);
+    public IGrainContext CreateContext(GrainAddress address, IConfigureGrainContext[] configureActions)
+        => new StatelessWorkerGrainContext(address, sharedContext, innerActivator, configureActions);
 }

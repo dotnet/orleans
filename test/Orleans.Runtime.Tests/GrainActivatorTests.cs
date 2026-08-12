@@ -1,12 +1,13 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
-using Orleans.Metadata;
 
 namespace UnitTests.General
 {
@@ -48,6 +49,7 @@ namespace UnitTests.General
                         // Register our custom grain activator as a grain type component configurator
                         // This allows it to selectively apply to specific grain types
                         services.AddSingleton<IConfigureGrainTypeComponents, HardcodedGrainActivator>();
+                        services.AddSingleton<IConfigureGrainContextProvider, ActivationOrderingConfiguratorProvider>();
                     });
                 }
             }
@@ -96,6 +98,20 @@ namespace UnitTests.General
             Assert.Equal(initialReleasedInstances + 1, finalReleasedInstances);
         }
 
+        [Fact, TestCategory("BVT")]
+        public async Task GrainContextIsConfiguredBeforeGrainConstruction()
+        {
+            var state = ActivationOrderingState.Instance;
+            state.Arm();
+            var grain = this.fixture.GrainFactory.GetGrain<ISimpleDIGrain>(
+                GetRandomGrainId(),
+                grainClassNamePrefix: "UnitTests.Grains.ExplicitlyRegistered");
+
+            await grain.GetStringValue();
+
+            Assert.True(state.WasConfiguredAtConstruction);
+        }
+
         /// <summary>
         /// Custom grain activator that bypasses dependency injection entirely.
         /// Implements both IGrainActivator (for creation/disposal) and IConfigureGrainTypeComponents
@@ -119,7 +135,7 @@ namespace UnitTests.General
             {
                 // Selectively register this activator only for ExplicitlyRegisteredSimpleDIGrain types
                 // Other grain types will continue using the default DI-based activator
-                if (_grainClassMap.TryGetGrainClass(grainType, out var grainClass) && grainClass.IsAssignableFrom(typeof(ExplicitlyRegisteredSimpleDIGrain)))
+                if (_grainClassMap.TryGetGrainClass(grainType, out var grainClass) && grainClass == typeof(ExplicitlyRegisteredSimpleDIGrain))
                 {
                     shared.SetComponent<IGrainActivator>(this);
                 }
@@ -127,6 +143,8 @@ namespace UnitTests.General
 
             public object CreateInstance(IGrainContext context)
             {
+                ActivationOrderingState.Instance.ObserveConstruction(context);
+
                 // Custom instantiation logic - creates grain with hardcoded dependencies
                 // In real scenarios, this could get objects from a pool, perform complex
                 // initialization, or integrate with external systems
@@ -140,6 +158,68 @@ namespace UnitTests.General
                 ++_released;
                 return default;
             }
+        }
+
+        private sealed class ActivationOrderingConfiguratorProvider(GrainClassMap grainClassMap) : IConfigureGrainContextProvider
+        {
+            public bool TryGetConfigurator(
+                GrainType grainType,
+                GrainProperties properties,
+                [NotNullWhen(true)] out IConfigureGrainContext? configurator)
+            {
+                if (grainClassMap.TryGetGrainClass(grainType, out var grainClass)
+                    && grainClass == typeof(ExplicitlyRegisteredSimpleDIGrain))
+                {
+                    configurator = ActivationOrderingState.Instance;
+                    return true;
+                }
+
+                configurator = null;
+                return false;
+            }
+        }
+
+        private sealed class ActivationOrderingState : IConfigureGrainContext
+        {
+            private int _armed;
+            private int _wasConfiguredAtConstruction;
+
+            public static ActivationOrderingState Instance { get; } = new();
+
+            public bool WasConfiguredAtConstruction => Volatile.Read(ref _wasConfiguredAtConstruction) != 0;
+
+            public void Arm()
+            {
+                Volatile.Write(ref _wasConfiguredAtConstruction, 0);
+                Volatile.Write(ref _armed, 1);
+            }
+
+            public void Configure(IGrainContext context)
+            {
+                if (Volatile.Read(ref _armed) == 0)
+                {
+                    return;
+                }
+
+                context.SetComponent(ConfiguredContextMarker.Instance);
+            }
+
+            public void ObserveConstruction(IGrainContext context)
+            {
+                if (Interlocked.Exchange(ref _armed, 0) == 0)
+                {
+                    return;
+                }
+
+                Volatile.Write(
+                    ref _wasConfiguredAtConstruction,
+                    context.GetComponent<ConfiguredContextMarker>() is not null ? 1 : 0);
+            }
+        }
+
+        private sealed class ConfiguredContextMarker
+        {
+            public static ConfiguredContextMarker Instance { get; } = new();
         }
     }
 }
