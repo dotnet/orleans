@@ -799,7 +799,9 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
     internal static void RecoverEntry(Dictionary<GrainId, GrainAddress> directory, GrainAddress recovered)
     {
-        // Concurrent recovery responses can include an activation which was superseded in a newer membership view.
+        // During a rolling upgrade, LocalGrainDirectory does not participate in DistributedGrainDirectory's
+        // recovery-registration barrier and can report an activation superseded in a newer membership view.
+        // Preserve the newest registration: conflicting registrations within one membership version remain invalid.
         if (!directory.TryGetValue(recovered.GrainId, out var existing)
             || recovered.MembershipVersion >= existing.MembershipVersion)
         {
