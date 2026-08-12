@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Runtime.Serialization;
 using Azure;
@@ -6,8 +7,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Transactions.TestKit
 {
-    public partial class SimpleAzureStorageExceptionInjector : IControlledTransactionFaultInjector
+    public partial class SimpleAzureStorageExceptionInjector : IControlledTransactionFaultInjector, ITransactionScopedFaultInjector
     {
+        private readonly object lockObj = new();
+        private Guid? targetTransactionId;
         public bool InjectBeforeStore { get; set; }
         public bool InjectAfterStore { get; set; }
         public bool InjectGenericAfterStore { get; set; }
@@ -22,36 +25,86 @@ namespace Orleans.Transactions.TestKit
 
         public void AfterStore()
         {
-            if (InjectAfterStore)
-            {
-                InjectAfterStore = false;
-                this.injectionAfterStoreCounter++;
-                var message = $"Storage exception thrown after store, thrown total {injectionAfterStoreCounter}";
-                LogInformationMessage(this.logger, message);
-                throw new SimpleAzureStorageException(message);
-            }
+            this.AfterStore(default);
+        }
 
-            if (InjectGenericAfterStore)
+        void ITransactionScopedFaultInjector.Arm(
+            Guid transactionId,
+            FaultInjectionType injectionType,
+            bool requireTransactionMatch)
+        {
+            lock (this.lockObj)
             {
-                InjectGenericAfterStore = false;
-                this.genericInjectionAfterStoreCounter++;
-                var message = $"Generic storage exception thrown after store, thrown total {genericInjectionAfterStoreCounter}";
-                LogInformationMessage(this.logger, message);
-                throw new InvalidOperationException(message);
+                this.targetTransactionId = requireTransactionMatch ? transactionId : null;
+                this.InjectBeforeStore = injectionType == FaultInjectionType.ExceptionBeforeStore;
+                this.InjectAfterStore = injectionType == FaultInjectionType.ExceptionAfterStore;
+                this.InjectGenericAfterStore = injectionType == FaultInjectionType.GenericExceptionAfterStore;
+            }
+        }
+
+        void ITransactionScopedFaultInjector.BeforeStore(ImmutableArray<Guid> transactionIds)
+            => this.BeforeStore(transactionIds);
+
+        void ITransactionScopedFaultInjector.AfterStore(ImmutableArray<Guid> transactionIds)
+            => this.AfterStore(transactionIds);
+
+        private void AfterStore(ImmutableArray<Guid> transactionIds)
+        {
+            lock (this.lockObj)
+            {
+                if (!this.IsTargetStore(transactionIds))
+                {
+                    return;
+                }
+
+                if (this.InjectAfterStore)
+                {
+                    this.InjectAfterStore = false;
+                    this.targetTransactionId = null;
+                    this.injectionAfterStoreCounter++;
+                    var message = $"Storage exception thrown after store, thrown total {injectionAfterStoreCounter}";
+                    LogInformationMessage(this.logger, message);
+                    throw new SimpleAzureStorageException(message);
+                }
+
+                if (this.InjectGenericAfterStore)
+                {
+                    this.InjectGenericAfterStore = false;
+                    this.targetTransactionId = null;
+                    this.genericInjectionAfterStoreCounter++;
+                    var message = $"Generic storage exception thrown after store, thrown total {genericInjectionAfterStoreCounter}";
+                    LogInformationMessage(this.logger, message);
+                    throw new InvalidOperationException(message);
+                }
             }
         }
 
         public void BeforeStore()
         {
-            if (InjectBeforeStore)
+            this.BeforeStore(default);
+        }
+
+        private void BeforeStore(ImmutableArray<Guid> transactionIds)
+        {
+            lock (this.lockObj)
             {
-                InjectBeforeStore = false;
+                if (!this.IsTargetStore(transactionIds) || !this.InjectBeforeStore)
+                {
+                    return;
+                }
+
+                this.InjectBeforeStore = false;
+                this.targetTransactionId = null;
                 this.injectionBeforeStoreCounter++;
                 var message = $"Storage exception thrown before store. Thrown total {injectionBeforeStoreCounter}";
                 LogInformationMessage(this.logger, message);
                 throw new SimpleAzureStorageException(message);
             }
         }
+
+        private bool IsTargetStore(ImmutableArray<Guid> transactionIds)
+            => this.targetTransactionId is not { } targetTransactionId
+                || (!transactionIds.IsDefaultOrEmpty && transactionIds.IndexOf(targetTransactionId) >= 0);
 
         [LoggerMessage(
             Level = LogLevel.Information,

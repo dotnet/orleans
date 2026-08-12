@@ -35,12 +35,7 @@ namespace Orleans.Transactions.TestKit
                 out var injectionType);
             if (injectBeforeStore)
             {
-                if (injectionType == FaultInjectionType.ExceptionBeforeStore)
-                    this.faultInjector.InjectBeforeStore = true;
-                if (injectionType == FaultInjectionType.ExceptionAfterStore)
-                    this.faultInjector.InjectAfterStore = true;
-                if (injectionType == FaultInjectionType.GenericExceptionAfterStore)
-                    this.faultInjector.InjectGenericAfterStore = true;
+                this.faultInjector.Arm(transactionId, injectionType, requireTransactionMatch: true);
                 LogInformationInjectedFaultBeforePrepareAndCommit(this.logger, context.GrainInstance, transactionId, injectionType);
                 FaultInjectionDiagnosticEvents.Emit(new(
                     this.context.GrainId,
@@ -235,12 +230,7 @@ namespace Orleans.Transactions.TestKit
                 out var injectionType);
             if (injectBeforeStore)
             {
-                if (injectionType == FaultInjectionType.ExceptionBeforeStore)
-                    this.faultInjector.InjectBeforeStore = true;
-                if (injectionType == FaultInjectionType.ExceptionAfterStore)
-                    this.faultInjector.InjectAfterStore = true;
-                if (injectionType == FaultInjectionType.GenericExceptionAfterStore)
-                    this.faultInjector.InjectGenericAfterStore = true;
+                this.faultInjector.Arm(transactionId, injectionType);
                 LogInformationInjectedFaultBeforeConfirm(this.logger, context.GrainInstance, transactionId, injectionType);
                 FaultInjectionDiagnosticEvents.Emit(new(
                     this.context.GrainId,
@@ -273,12 +263,7 @@ namespace Orleans.Transactions.TestKit
                 out var injectionType);
             if (injectBeforeStore)
             {
-                if (injectionType == FaultInjectionType.ExceptionBeforeStore)
-                    this.faultInjector.InjectBeforeStore = true;
-                if (injectionType == FaultInjectionType.ExceptionAfterStore)
-                    this.faultInjector.InjectAfterStore = true;
-                if (injectionType == FaultInjectionType.GenericExceptionAfterStore)
-                    this.faultInjector.InjectGenericAfterStore = true;
+                this.faultInjector.Arm(transactionId, injectionType);
                 LogInformationInjectedFaultBeforePrepare(this.logger, this.context.GrainInstance, transactionId, injectionType);
                 FaultInjectionDiagnosticEvents.Emit(new(
                     this.context.GrainId,
