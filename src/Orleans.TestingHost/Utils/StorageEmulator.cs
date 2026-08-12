@@ -7,11 +7,14 @@ using System.Text;
 namespace Orleans.TestingHost.Utils
 {
     /// <summary>
-    /// A wrapper on Azure Storage Emulator.
+    /// A wrapper on the legacy Windows Azure Storage Emulator.
     /// </summary>
-    /// <remarks>It might be tricky to implement this as a <see cref="IDisposable">IDisposable</see>, isolated, autonomous instance.
-    /// See <see href="https://learn.microsoft.com/azure/storage/common/storage-use-azurite">Use the Azurite emulator for local Azure Storage development</see>
-    /// for pointers.</remarks>
+    /// <remarks>
+    /// This helper manages only the legacy emulator executables listed below; it
+    /// doesn't start or stop Azurite. Use
+    /// <see href="https://learn.microsoft.com/azure/storage/common/storage-use-azurite">Azurite for local Azure Storage development</see>
+    /// for supported local emulation.
+    /// </remarks>
     public static class StorageEmulator
     {
         /// <summary>

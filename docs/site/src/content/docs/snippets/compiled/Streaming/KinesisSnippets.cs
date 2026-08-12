@@ -8,9 +8,6 @@ using Orleans.Streams;
 
 // </kinesis_streams_using>
 
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration;
-
 namespace Documentation.Streaming;
 
 internal static class KinesisSnippets
