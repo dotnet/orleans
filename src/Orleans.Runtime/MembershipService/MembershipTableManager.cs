@@ -42,7 +42,6 @@ namespace Orleans.Runtime.MembershipService
         private readonly SiloAddress myAddress;
         private readonly AsyncEnumerable<MembershipTableSnapshot> updates;
         private readonly IAsyncTimer membershipUpdateTimer;
-        private readonly UnknownSiloStatusCache unknownSiloStatusCache;
         private readonly CancellationTokenSource _shutdownCts = new();
 
         private readonly Task _suspectOrKillsListTask;
@@ -60,8 +59,7 @@ namespace Orleans.Runtime.MembershipService
             ILogger<MembershipTableManager> log,
             IAsyncTimerFactory timerFactory,
             SiloLifecycleSubject siloLifecycle,
-            [FromKeyedServices(TimeProviderNames.Membership)] TimeProvider timeProvider,
-            UnknownSiloStatusCache? unknownSiloStatusCache = null)
+            [FromKeyedServices(TimeProviderNames.Membership)] TimeProvider timeProvider)
         {
             this.localSiloDetails = localSiloDetails;
             this.membershipTableProvider = membershipTable;
@@ -71,7 +69,6 @@ namespace Orleans.Runtime.MembershipService
             this.myAddress = this.localSiloDetails.SiloAddress;
             this.log = log;
             this.siloLifecycle = siloLifecycle;
-            this.unknownSiloStatusCache = unknownSiloStatusCache ?? new();
             var initialSnapshot = new MembershipTableSnapshot(
                 MembershipVersion.MinValue,
                 ImmutableDictionary<SiloAddress, MembershipEntry>.Empty.SetItem(
@@ -155,7 +152,6 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task<bool> RefreshInternal(bool requireCleanup)
         {
-            var refreshEpoch = this.unknownSiloStatusCache.OnFullRefreshStarted();
             var table = await this.membershipTableProvider.ReadAll();
 
             bool success;
@@ -172,7 +168,6 @@ namespace Orleans.Runtime.MembershipService
             // Publish after cleanup so that other components do not observe
             // predecessor entries that are about to be declared dead.
             this.ProcessTableUpdate(table, "Refresh");
-            this.unknownSiloStatusCache.OnFullRefreshCompleted(refreshEpoch, this.snapshot.CreateClusterMembershipSnapshot());
 
             // If cleanup was not required then the cleanup result is ignored.
             return !requireCleanup || success;

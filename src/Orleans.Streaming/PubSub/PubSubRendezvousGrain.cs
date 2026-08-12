@@ -131,7 +131,7 @@ namespace Orleans.Streams
 
             try
             {
-                RemoveDefunctSystemTargetProducers();
+                await RemoveDefunctSystemTargetProducers();
                 var publisherState = new PubSubPublisherState(streamId, streamProducer);
                 State.Producers.Add(publisherState);
                 LogPubSubCounts("RegisterProducer {0}", streamProducer);
@@ -155,18 +155,31 @@ namespace Orleans.Streams
             return State.Consumers.Where(c => !c.IsFaulted).ToSet()!;
         }
 
-        private void RemoveDefunctSystemTargetProducers()
+        private async Task RemoveDefunctSystemTargetProducers()
         {
             var membershipSnapshot = _clusterMembershipService.CurrentSnapshot;
-            List<PubSubPublisherState>? removedProducers = null;
+            List<(PubSubPublisherState Producer, SiloAddress SiloAddress)>? systemTargetProducers = null;
             foreach (var producer in State.Producers)
             {
-                if (!SystemTargetGrainId.TryParse(producer.Producer, out var systemTarget))
+                if (SystemTargetGrainId.TryParse(producer.Producer, out var systemTarget))
                 {
-                    continue;
+                    systemTargetProducers ??= [];
+                    systemTargetProducers.Add((producer, systemTarget.GetSiloAddress()));
                 }
+            }
 
-                if (_unknownSiloStatusCache.GetSiloStatus(membershipSnapshot, systemTarget.GetSiloAddress()).IsTerminating())
+            if (systemTargetProducers is null)
+            {
+                return;
+            }
+
+            var statuses = await _unknownSiloStatusCache.GetSiloStatuses(
+                membershipSnapshot,
+                systemTargetProducers.Select(producer => producer.SiloAddress));
+            List<PubSubPublisherState>? removedProducers = null;
+            foreach (var (producer, siloAddress) in systemTargetProducers)
+            {
+                if (statuses[siloAddress].IsTerminating())
                 {
                     removedProducers ??= [];
                     removedProducers.Add(producer);
