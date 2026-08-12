@@ -126,7 +126,7 @@ namespace Orleans.Runtime.MembershipService
 
             // Continue attempting to validate connectivity until some reasonable timeout.
             var maxAttemptTime = this.clusterMembershipOptions.MaxJoinAttemptTime;
-            var retryDelay = this.clusterMembershipOptions.ProbeInterval;
+            var retryDelay = this.clusterMembershipOptions.ProbeTimeout;
             var attemptNumber = 1;
             var now = this.getUtcDateTime();
             var attemptUntil = now + maxAttemptTime;
@@ -195,7 +195,7 @@ namespace Orleans.Runtime.MembershipService
 
                 LogInformationAboutToSendPings(members.Length, new EnumerableToStringLogValue<SiloAddress>(members));
 
-                var timeout = this.clusterMembershipOptions.InitialProbeTimeout;
+                var timeout = this.clusterMembershipOptions.ProbeTimeout;
                 foreach (var silo in members)
                 {
                     tasks.Add(ProbeSilo(this.siloProber, silo, timeout, this.log, cancellationToken));

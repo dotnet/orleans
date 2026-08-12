@@ -160,7 +160,7 @@ namespace NonSilo.Tests
                 {
                     siloBuilder
                         .UseLocalhostClustering()
-                        .Configure<ClusterMembershipOptions>(options => options.ProbeInterval = TimeSpan.Zero);
+                        .Configure<ClusterMembershipOptions>(options => options.ProbeTimeout = TimeSpan.Zero);
                 }).RunConsoleAsync();
             });
 
@@ -206,7 +206,7 @@ namespace NonSilo.Tests
                         .UseLocalhostClustering()
                         .Configure<ClusterMembershipOptions>(options =>
                         {
-                            options.InitialProbeTimeout = TimeSpan.FromDays(1);
+                            options.ProbeTimeout = TimeSpan.FromDays(1);
                             options.MaxProbeTimeout = TimeSpan.FromDays(49);
                             options.NumMissedProbesLimit = int.MaxValue;
                         });
@@ -221,8 +221,8 @@ namespace NonSilo.Tests
                         .UseLocalhostClustering()
                         .Configure<ClusterMembershipOptions>(options =>
                         {
-                            options.InitialProbeTimeout = TimeSpan.FromTicks(4_611_686_018);
-                            options.MaxProbeTimeout = options.InitialProbeTimeout;
+                            options.ProbeTimeout = TimeSpan.FromTicks(4_611_686_018);
+                            options.MaxProbeTimeout = options.ProbeTimeout;
                             options.NumMissedProbesLimit = 2_000_000_000;
                         });
                 }).RunConsoleAsync();

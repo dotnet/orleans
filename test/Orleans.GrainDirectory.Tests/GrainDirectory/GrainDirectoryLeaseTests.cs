@@ -400,8 +400,7 @@ public class GrainDirectoryLeaseTests
             siloBuilder.Services.AddKeyedSingleton(TimeProviderNames.Membership, TimeProvider.System);
             siloBuilder.Services.Configure<ClusterMembershipOptions>(options =>
             {
-                options.ProbeInterval = TimeSpan.FromSeconds(1);
-                options.InitialProbeTimeout = TimeSpan.FromSeconds(1);
+                options.ProbeTimeout = TimeSpan.FromSeconds(1);
                 options.MaxProbeTimeout = TimeSpan.FromSeconds(1);
                 options.NumMissedProbesLimit = 1;
             });

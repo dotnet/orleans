@@ -85,7 +85,7 @@ namespace Orleans.Runtime.MembershipService
             _timeProvider = timeProvider;
             _log = loggerFactory.CreateLogger<SiloHealthMonitor>();
             _pingTimer = asyncTimerFactory.Create(
-                _clusterMembershipOptions.CurrentValue.ProbeInterval,
+                _clusterMembershipOptions.CurrentValue.ProbeTimeout,
                 nameof(SiloHealthMonitor),
                 timeProvider);
             _onProbeResult = onProbeResult;
@@ -111,7 +111,7 @@ namespace Orleans.Runtime.MembershipService
 
         int ITestAccessor.MissedProbes => _failedProbes;
         int ITestAccessor.ProbeTimeoutSampleCount => _failureDetector?.SampleCount ?? 0;
-        TimeSpan ITestAccessor.CurrentProbeTimeout => _failureDetector?.GetTimeout() ?? _clusterMembershipOptions.CurrentValue.InitialProbeTimeout;
+        TimeSpan ITestAccessor.CurrentProbeTimeout => _failureDetector?.GetTimeout() ?? _clusterMembershipOptions.CurrentValue.ProbeTimeout;
 
         /// <summary>
         /// Start the monitor.
@@ -176,12 +176,15 @@ namespace Orleans.Runtime.MembershipService
             MembershipTableSnapshot? activeMembersSnapshot = default;
             SiloAddress[]? otherNodes = default;
             var options = _clusterMembershipOptions.CurrentValue;
-            var failureDetector = _failureDetector = new PhiAccrualFailureDetector(options.InitialProbeTimeout);
-            TimeSpan? overrideDelay = RandomTimeSpan.Next(options.ProbeInterval);
-            while (await _pingTimer.NextTick(overrideDelay))
+            var failureDetector = _failureDetector = new PhiAccrualFailureDetector(options.ProbeTimeout);
+            var previousProbePeriod = options.ProbeTimeout;
+            TimeSpan? nextProbeDelay = RandomTimeSpan.Next(previousProbePeriod);
+            while (await _pingTimer.NextTick(nextProbeDelay))
             {
                 ProbeResult probeResult;
-                overrideDelay = default;
+                var isDirectProbe = true;
+                var localDegradationScore = 0;
+                long? probeStartTimestamp = null;
                 var now = _timeProvider.GetUtcNow().UtcDateTime;
 
                 try
@@ -200,9 +203,10 @@ namespace Orleans.Runtime.MembershipService
                             .ToArray();
                     }
 
-                    var isDirectProbe = !options.EnableIndirectProbes || _failedProbes < options.NumMissedProbesLimit - 1 || otherNodes.Length == 0;
-                    var localDegradationScore = GetLocalDegradationScore();
+                    isDirectProbe = !options.EnableIndirectProbes || _failedProbes < options.NumMissedProbesLimit - 1 || otherNodes.Length == 0;
+                    localDegradationScore = GetLocalDegradationScore(previousProbePeriod);
                     var timeout = CalculateProbeTimeout(failureDetector, options, localDegradationScore, isDirectProbe, Debugger.IsAttached);
+                    probeStartTimestamp = _timeProvider.GetTimestamp();
                     using var cancellation = new CancellationTokenSource(timeout, _timeProvider);
 
                     if (isDirectProbe)
@@ -227,7 +231,6 @@ namespace Orleans.Runtime.MembershipService
                         {
                             LogInformationRecusingUnhealthyIntermediary(_log, intermediary);
                             otherNodes = [.. otherNodes.Where(node => !node.Equals(intermediary))];
-                            overrideDelay = TimeSpan.FromMilliseconds(250);
                         }
                     }
 
@@ -240,9 +243,21 @@ namespace Orleans.Runtime.MembershipService
                 {
                     LogErrorExceptionMonitoringSilo(_log, exception, TargetSiloAddress);
                 }
+                finally
+                {
+                    previousProbePeriod = CalculateProbeTimeout(
+                        failureDetector,
+                        options,
+                        localDegradationScore,
+                        isDirectProbe,
+                        Debugger.IsAttached);
+                    nextProbeDelay = probeStartTimestamp is { } timestamp
+                        ? CalculateNextProbeDelay(previousProbePeriod, _timeProvider.GetElapsedTime(timestamp))
+                        : previousProbePeriod;
+                }
             }
 
-            int GetLocalDegradationScore()
+            int GetLocalDegradationScore(TimeSpan period)
             {
                 if (!options.ExtendProbeTimeoutDuringDegradation)
                 {
@@ -252,7 +267,7 @@ namespace Orleans.Runtime.MembershipService
                 // This query must happen before the probe because its result determines the probe timeout.
                 // Outcome-reporting health checks, such as an intermediary's health score, run after probing.
                 return _localSiloHealthMonitor.GetLocalHealthStatus(
-                    options.ProbeInterval,
+                    period,
                     LocalSiloHealthCheckCategory.Local).Score;
             }
         }
@@ -279,6 +294,17 @@ namespace Orleans.Runtime.MembershipService
             }
 
             return timeout;
+        }
+
+        internal static TimeSpan CalculateNextProbeDelay(TimeSpan probePeriod, TimeSpan elapsed)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(probePeriod, TimeSpan.Zero);
+            if (elapsed < TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(nameof(elapsed), elapsed, "Elapsed time must not be negative.");
+            }
+
+            return elapsed < probePeriod ? probePeriod - elapsed : TimeSpan.Zero;
         }
 
         internal static TimeSpan CalculateIndirectProbeTargetTimeout(TimeSpan timeout, int localDegradationScore)

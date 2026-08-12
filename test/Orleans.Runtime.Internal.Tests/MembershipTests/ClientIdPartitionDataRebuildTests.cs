@@ -144,8 +144,7 @@ namespace UnitTests.MembershipTests
                 hostBuilder.Configure<ClusterMembershipOptions>(options =>
                 {
                     options.NumMissedProbesLimit = 1;
-                    options.ProbeInterval = TimeSpan.FromMilliseconds(500);
-                    options.InitialProbeTimeout = TimeSpan.FromMilliseconds(500);
+                    options.ProbeTimeout = TimeSpan.FromMilliseconds(500);
                     options.MaxProbeTimeout = TimeSpan.FromMilliseconds(500);
                     options.NumVotesForDeathDeclaration = 1;
                 });

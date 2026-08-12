@@ -453,8 +453,6 @@ namespace Orleans.Configuration
 
         public System.TimeSpan IAmAliveTablePublishTimeout { get { throw null; } set { } }
 
-        public System.TimeSpan InitialProbeTimeout { get { throw null; } set { } }
-
         public bool LivenessEnabled { get { throw null; } set { } }
 
         public System.TimeSpan LocalHealthDegradationMonitoringPeriod { get { throw null; } set { } }
@@ -474,8 +472,6 @@ namespace Orleans.Configuration
         public int NumProbedSilos { get { throw null; } set { } }
 
         public int NumVotesForDeathDeclaration { get { throw null; } set { } }
-
-        public System.TimeSpan ProbeInterval { get { throw null; } set { } }
 
         public System.TimeSpan ProbeTimeout { get { throw null; } set { } }
 

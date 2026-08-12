@@ -169,7 +169,7 @@ namespace NonSilo.Tests.Membership
             Assert.InRange(
                 testAccessor.CurrentProbeTimeout,
                 _clusterMembershipOptions.MinProbeTimeout,
-                _clusterMembershipOptions.InitialProbeTimeout);
+                _clusterMembershipOptions.ProbeTimeout);
 
             await Shutdown();
         }
@@ -204,7 +204,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task SiloHealthMonitor_FailedProbe_Timeout()
         {
-            _clusterMembershipOptions.InitialProbeTimeout = TimeSpan.FromSeconds(2);
+            _clusterMembershipOptions.ProbeTimeout = TimeSpan.FromSeconds(2);
 
             _prober.Probe(default!, default, default).ReturnsForAnyArgs(info => Task.Delay(TimeSpan.FromSeconds(30)));
             _prober.ProbeIndirectly(default!, default!, default, default).ThrowsAsyncForAnyArgs(new InvalidOperationException("No"));
@@ -227,7 +227,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task SiloHealthMonitor_FailedProbe_Exception()
         {
-            _clusterMembershipOptions.InitialProbeTimeout = TimeSpan.FromSeconds(2);
+            _clusterMembershipOptions.ProbeTimeout = TimeSpan.FromSeconds(2);
 
             _prober.Probe(default!, default).ThrowsAsyncForAnyArgs(new Exception("nope"));
             _prober.ProbeIndirectly(default!, default!, default, default).ThrowsAsyncForAnyArgs(new InvalidOperationException("No"));
@@ -255,7 +255,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task SiloHealthMonitor_Indirect_FailedProbe()
         {
-            _clusterMembershipOptions.InitialProbeTimeout = TimeSpan.FromSeconds(2);
+            _clusterMembershipOptions.ProbeTimeout = TimeSpan.FromSeconds(2);
             _clusterMembershipOptions.EnableIndirectProbes = true;
 
             _prober.Probe(default!, default).ThrowsAsyncForAnyArgs(info => new Exception("nonono!"));
@@ -367,7 +367,7 @@ namespace NonSilo.Tests.Membership
         public async Task SiloHealthMonitor_IndirectProbe_SkipsStaleSilo()
         {
             _clusterMembershipOptions.EnableIndirectProbes = true;
-            _clusterMembershipOptions.InitialProbeTimeout = TimeSpan.FromSeconds(2);
+            _clusterMembershipOptions.ProbeTimeout = TimeSpan.FromSeconds(2);
 
             // Make direct probes fail.
             _prober.Probe(default!, default).ThrowsAsyncForAnyArgs(new Exception("Direct probe failing."));
@@ -416,8 +416,7 @@ namespace NonSilo.Tests.Membership
                 new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero));
             var options = new ClusterMembershipOptions
             {
-                ProbeInterval = TimeSpan.FromSeconds(5),
-                InitialProbeTimeout = TimeSpan.FromSeconds(5),
+                ProbeTimeout = TimeSpan.FromSeconds(5),
                 MaxProbeTimeout = TimeSpan.FromSeconds(45),
                 ExtendProbeTimeoutDuringDegradation = extendProbeTimeout,
                 EnableIndirectProbes = false,
@@ -459,13 +458,13 @@ namespace NonSilo.Tests.Membership
             {
                 monitor.Start();
                 var firstTick = await timer.Ticks.ReadAsync();
-                firstTick.SetResult(true);
+                firstTick.Completion.SetResult(true);
                 var cancellationToken = await probeEntered.Task;
 
                 if (extendProbeTimeout)
                 {
                     localHealthMonitor.Received(1).GetLocalHealthStatus(
-                        options.ProbeInterval,
+                        options.ProbeTimeout,
                         LocalSiloHealthCheckCategory.Local);
                 }
                 else
@@ -475,7 +474,7 @@ namespace NonSilo.Tests.Membership
 
                 await prober.Received(1).Probe(_targetSilo, 1, cancellationToken);
 
-                var dilatedTimeout = options.InitialProbeTimeout.Multiply(expectedTimeoutFactor);
+                var dilatedTimeout = options.ProbeTimeout.Multiply(expectedTimeoutFactor);
                 timeProvider.Advance(dilatedTimeout - TimeSpan.FromTicks(1));
                 Assert.False(cancellationToken.IsCancellationRequested);
                 Assert.False(probeResult.Task.IsCompleted);
@@ -488,6 +487,10 @@ namespace NonSilo.Tests.Membership
                 Assert.Equal(1, result.FailedProbeCount);
                 Assert.True(result.IsDirectProbe);
                 Assert.Equal(0, result.IntermediaryHealthDegradationScore);
+
+                var nextTick = await timer.Ticks.ReadAsync();
+                Assert.Equal(TimeSpan.Zero, nextTick.DelayOverride);
+                nextTick.Completion.SetResult(false);
             }
             finally
             {
@@ -495,13 +498,29 @@ namespace NonSilo.Tests.Membership
             }
         }
 
+        [Theory]
+        [InlineData(5, 1, 4)]
+        [InlineData(5, 5, 0)]
+        [InlineData(5, 6, 0)]
+        public void CalculateNextProbeDelay_MeasuresFromPreviousProbeStart(
+            int probePeriodSeconds,
+            int elapsedSeconds,
+            int expectedDelaySeconds)
+        {
+            var delay = CalculateNextProbeDelay(
+                TimeSpan.FromSeconds(probePeriodSeconds),
+                TimeSpan.FromSeconds(elapsedSeconds));
+
+            Assert.Equal(TimeSpan.FromSeconds(expectedDelaySeconds), delay);
+        }
+
         private sealed class DilationProbeTimer : IAsyncTimer
         {
             private readonly object _lock = new();
-            private readonly Channel<TaskCompletionSource<bool>> _ticks = Channel.CreateUnbounded<TaskCompletionSource<bool>>();
+            private readonly Channel<ProbeTimerTick> _ticks = Channel.CreateUnbounded<ProbeTimerTick>();
             private bool _disposed;
 
-            public ChannelReader<TaskCompletionSource<bool>> Ticks => _ticks.Reader;
+            public ChannelReader<ProbeTimerTick> Ticks => _ticks.Reader;
 
             public Task<bool> NextTick(TimeSpan? overrideDelay = null)
             {
@@ -513,7 +532,7 @@ namespace NonSilo.Tests.Membership
                     }
 
                     var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                    if (!_ticks.Writer.TryWrite(completion))
+                    if (!_ticks.Writer.TryWrite(new(overrideDelay, completion)))
                     {
                         throw new InvalidOperationException("Unable to publish the next timer tick.");
                     }
@@ -539,13 +558,15 @@ namespace NonSilo.Tests.Membership
 
                     _disposed = true;
                     _ticks.Writer.TryComplete();
-                    while (_ticks.Reader.TryRead(out var completion))
+                    while (_ticks.Reader.TryRead(out var tick))
                     {
-                        completion.TrySetResult(false);
+                        tick.Completion.TrySetResult(false);
                     }
                 }
             }
         }
+
+        private readonly record struct ProbeTimerTick(TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion);
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 

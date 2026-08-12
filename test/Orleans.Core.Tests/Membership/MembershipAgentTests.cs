@@ -312,8 +312,7 @@ namespace NonSilo.Tests.Membership
         {
             this.clusterMembershipOptions.Value.NumMissedProbesLimit = 1;
             this.clusterMembershipOptions.Value.NumVotesForDeathDeclaration = 1;
-            this.clusterMembershipOptions.Value.ProbeInterval = TimeSpan.FromMilliseconds(20);
-            this.clusterMembershipOptions.Value.InitialProbeTimeout = TimeSpan.FromMilliseconds(20);
+            this.clusterMembershipOptions.Value.ProbeTimeout = TimeSpan.FromMilliseconds(20);
             this.remoteSiloProber.Probe(default!, default).ReturnsForAnyArgs(Task.FromException(new Exception("no")));
 
             var staleSilo = Silo("127.0.0.200:100@100");

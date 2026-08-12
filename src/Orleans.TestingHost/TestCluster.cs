@@ -485,10 +485,7 @@ namespace Orleans.TestingHost
             if (didKill)
             {
                 // in case of hard kill (kill and not Stop), we should give silos time to detect failures first.
-                var maxProbeCycleTime = clusterMembershipOptions.ProbeInterval > clusterMembershipOptions.MaxProbeTimeout
-                    ? clusterMembershipOptions.ProbeInterval
-                    : clusterMembershipOptions.MaxProbeTimeout;
-                stabilizationTime = TestingUtils.Multiply(maxProbeCycleTime, clusterMembershipOptions.NumMissedProbesLimit);
+                stabilizationTime = TestingUtils.Multiply(clusterMembershipOptions.MaxProbeTimeout, clusterMembershipOptions.NumMissedProbesLimit);
             }
             if (clusterMembershipOptions.UseLivenessGossip)
             {

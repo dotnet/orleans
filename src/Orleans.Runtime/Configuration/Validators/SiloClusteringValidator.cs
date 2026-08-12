@@ -52,19 +52,14 @@ namespace Orleans.Runtime.Configuration
                 throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.MaxDefunctSiloEntries)} ({clusterMembershipOptions.MaxDefunctSiloEntries}) must be greater than or equal to 0, or null.");
             }
 
-            if (clusterMembershipOptions.ProbeInterval <= TimeSpan.Zero)
+            if (clusterMembershipOptions.ProbeTimeout <= TimeSpan.Zero)
             {
-                throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.ProbeInterval)} ({clusterMembershipOptions.ProbeInterval}) must be greater than 0.");
+                throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.ProbeTimeout)} ({clusterMembershipOptions.ProbeTimeout}) must be greater than 0.");
             }
 
-            if (clusterMembershipOptions.ProbeInterval.TotalMilliseconds > MaxSupportedTimeoutMilliseconds)
+            if (clusterMembershipOptions.ProbeTimeout.TotalMilliseconds > MaxSupportedTimeoutMilliseconds)
             {
-                throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.ProbeInterval)} ({clusterMembershipOptions.ProbeInterval}) must be less than or equal to {TimeSpan.FromMilliseconds(MaxSupportedTimeoutMilliseconds)}.");
-            }
-
-            if (clusterMembershipOptions.InitialProbeTimeout <= TimeSpan.Zero)
-            {
-                throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.InitialProbeTimeout)} ({clusterMembershipOptions.InitialProbeTimeout}) must be greater than 0.");
+                throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.ProbeTimeout)} ({clusterMembershipOptions.ProbeTimeout}) must be less than or equal to {TimeSpan.FromMilliseconds(MaxSupportedTimeoutMilliseconds)}.");
             }
 
             if (clusterMembershipOptions.MinProbeTimeout <= TimeSpan.Zero)
@@ -82,15 +77,13 @@ namespace Orleans.Runtime.Configuration
                 throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.MaxProbeTimeout)} ({clusterMembershipOptions.MaxProbeTimeout}) must be less than or equal to {TimeSpan.FromMilliseconds(MaxSupportedTimeoutMilliseconds)}.");
             }
 
-            if (clusterMembershipOptions.InitialProbeTimeout < clusterMembershipOptions.MinProbeTimeout
-                || clusterMembershipOptions.InitialProbeTimeout > clusterMembershipOptions.MaxProbeTimeout)
+            if (clusterMembershipOptions.ProbeTimeout < clusterMembershipOptions.MinProbeTimeout
+                || clusterMembershipOptions.ProbeTimeout > clusterMembershipOptions.MaxProbeTimeout)
             {
-                throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.InitialProbeTimeout)} ({clusterMembershipOptions.InitialProbeTimeout}) must be between {nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.MinProbeTimeout)} ({clusterMembershipOptions.MinProbeTimeout}) and {nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.MaxProbeTimeout)} ({clusterMembershipOptions.MaxProbeTimeout}).");
+                throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.ProbeTimeout)} ({clusterMembershipOptions.ProbeTimeout}) must be between {nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.MinProbeTimeout)} ({clusterMembershipOptions.MinProbeTimeout}) and {nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.MaxProbeTimeout)} ({clusterMembershipOptions.MaxProbeTimeout}).");
             }
 
-            var maxProbeCycleTime = clusterMembershipOptions.ProbeInterval > clusterMembershipOptions.MaxProbeTimeout
-                ? clusterMembershipOptions.ProbeInterval
-                : clusterMembershipOptions.MaxProbeTimeout;
+            var maxProbeCycleTime = clusterMembershipOptions.MaxProbeTimeout;
             var failureDetectionTimeoutTicks = 0L;
             if (clusterMembershipOptions.NumMissedProbesLimit > 0
                 && maxProbeCycleTime.Ticks > TimeSpan.MaxValue.Ticks / clusterMembershipOptions.NumMissedProbesLimit)
