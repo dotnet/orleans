@@ -27,7 +27,7 @@ namespace UnitTests.TimerTests
     [TestProvider("None")]
     [TestArea("Reminders")]
     [TestCategory("Functional"), TestCategory("Reminders")]
-    public class ReminderTests_TableGrain : ReminderTestsBase, IClassFixture<ReminderTests_TableGrain.Fixture>
+    public class ReminderTests_TableGrain : ReminderTestsBase, IClassFixture<ReminderTests_TableGrain.Fixture>, IAsyncLifetime
     {
         private static readonly TimeSpan ReminderLoadingWindow = TimeSpan.FromSeconds(40);
         private static readonly TimeSpan ReminderRefreshPeriod = TimeSpan.FromSeconds(1);
@@ -36,8 +36,12 @@ namespace UnitTests.TimerTests
         public class Fixture : BaseInProcessTestClusterFixture
         {
             private ReminderTestClock? _reminderClock;
+            private readonly ReminderDiagnosticObserver _startupObserver = ReminderDiagnosticObserver.Create();
+            private IReadOnlyList<SiloAddress>? _startedReminderServices;
             internal ReminderTestClock ReminderClock => _reminderClock ?? throw new InvalidOperationException($"{nameof(ReminderTestClock)} has not been configured.");
             internal ReminderTableReadController ReadController { get; } = new();
+            internal IReadOnlyList<SiloAddress> StartedReminderServices => _startedReminderServices
+                ?? throw new InvalidOperationException("Reminder services have not completed startup.");
 
             protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
@@ -59,6 +63,16 @@ namespace UnitTests.TimerTests
                 });
             }
 
+            public override async Task InitializeAsync()
+            {
+                await base.InitializeAsync();
+
+                using var cancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+                var started = HostedCluster.Silos.Select(silo =>
+                    _startupObserver.WaitForReminderServiceStartedAsync(cancellation.Token, silo.SiloAddress));
+                _startedReminderServices = (await Task.WhenAll(started)).Select(e => e.SiloAddress!).ToArray();
+            }
+
             public override async Task DisposeAsync()
             {
                 try
@@ -68,22 +82,39 @@ namespace UnitTests.TimerTests
                 finally
                 {
                     _reminderClock?.Dispose();
+                    _startupObserver.Dispose();
                 }
             }
         }
 
         public ReminderTests_TableGrain(Fixture fixture) : base(fixture.ReminderClock, fixture.HostedCluster)
         {
+            _fixture = fixture;
             _readController = fixture.ReadController;
-            // ReminderTable.Clear() cannot be called from a non-Orleans thread,
-            // so we must proxy the call through a grain.
-            var controlProxy = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            controlProxy.EraseReminderTable().WaitAsync(TestConstants.InitTimeout).Wait();
         }
 
+        private readonly Fixture _fixture;
         private readonly ReminderTableReadController _readController;
 
+        public async Task InitializeAsync()
+        {
+            // ReminderTable.Clear() cannot be called from a non-Orleans thread,
+            // so we must proxy the call through a grain.
+            var controlProxy = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            await controlProxy.EraseReminderTable().WaitAsync(TestConstants.InitTimeout);
+        }
+
+        Task IAsyncLifetime.DisposeAsync() => Task.CompletedTask;
+
         // Basic tests
+
+        [Fact]
+        public void Fixture_WaitsForReminderServicesToStart()
+        {
+            Assert.All(
+                HostedCluster.Silos,
+                silo => Assert.Contains(silo.SiloAddress, _fixture.StartedReminderServices));
+        }
 
         [Fact]
         public void ReminderTestClock_IsScopedToReminderService()
