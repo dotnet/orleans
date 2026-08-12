@@ -788,13 +788,26 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             {
                 DebugAssertOwnership(current, entry.GrainId);
                 LogTraceRecoveredEntry(_logger, entry, current.Version);
-                _directory[entry.GrainId] = entry;
+                RecoverEntry(_directory, entry);
             }
         }
 
         _directoryInstruments.RangeRecoveryCount.Add(1);
         _directoryInstruments.RangeRecoveryDuration.Record((long)stopwatch.Elapsed.TotalMilliseconds);
         LogDebugCompletedRecoveringActivations(_logger, addedRange, current.Version, stopwatch.Elapsed);
+    }
+
+    internal static void RecoverEntry(Dictionary<GrainId, GrainAddress> directory, GrainAddress recovered)
+    {
+        // During a rolling upgrade, LocalGrainDirectory does not participate in DistributedGrainDirectory's
+        // recovery-registration barrier and can report an activation superseded in a newer membership view.
+        // This is the only expected case where recovery returns different registrations for one grain. Preserve
+        // the newest view while retaining recovery's existing last-response tie-breaking within the same view.
+        if (!directory.TryGetValue(recovered.GrainId, out var existing)
+            || recovered.MembershipVersion >= existing.MembershipVersion)
+        {
+            directory[recovered.GrainId] = recovered;
+        }
     }
 
     private async IAsyncEnumerable<List<GrainAddress>> GetRegisteredActivations(DirectoryMembershipSnapshot current, RingRange range, bool isValidation)
