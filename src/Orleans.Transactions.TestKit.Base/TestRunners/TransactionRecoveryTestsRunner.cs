@@ -80,7 +80,10 @@ namespace Orleans.Transactions.TestKit
                 .GetRequiredService<IOptions<ClientMessagingOptions>>()
                 .Value
                 .ResponseTimeout;
-            this.failureDetectionTimeout = this.clientResponseTimeout + FailureDetectionSchedulingMargin;
+            this.failureDetectionTimeout = TransactionRecoveryFailureObservation.GetTimeouts(
+                gracefulShutdown: true,
+                this.clientResponseTimeout,
+                FailureDetectionSchedulingMargin).MaximumDuration;
             this.recoveryTimeout =
                 this.failureDetectionTimeout + TransactionalStateOptions.DefaultRemoteTransactionPingFrequency;
         }
@@ -345,18 +348,22 @@ namespace Orleans.Transactions.TestKit
 
             this.Log("Observing transaction activity after silo shutdown");
             var failureDetectionStartedAt = Stopwatch.GetTimestamp();
-            var failureObservationWindow = gracefulShutdown ? TimeSpan.Zero : this.clientResponseTimeout;
-            var failureObservationTimeout = failureObservationWindow + FailureDetectionSchedulingMargin;
+            var failureObservationTimeout = TransactionRecoveryFailureObservation.GetTimeouts(
+                gracefulShutdown,
+                this.clientResponseTimeout,
+                FailureDetectionSchedulingMargin);
             this.Log(
                 $"Recovery phase=failure-watchdog started. ObservationWindow="
-                + $"{failureObservationWindow}, clientResponseTimeout={this.clientResponseTimeout}, "
-                + $"schedulingMargin={FailureDetectionSchedulingMargin}, watchdog={failureObservationTimeout}.");
+                + $"{failureObservationTimeout.ObservationWindow}, clientResponseTimeout={this.clientResponseTimeout}, "
+                + $"producerDrainTimeout={failureObservationTimeout.ProducerDrainTimeout}, "
+                + $"schedulingMargin={FailureDetectionSchedulingMargin}, "
+                + $"watchdog={failureObservationTimeout.MaximumDuration}.");
             var failureDetection = await TransactionRecoveryFailureObservation.DetectAsync(
                 producer,
                 firstFailure.Task,
                 stopProducing,
-                failureObservationWindow,
-                FailureDetectionSchedulingMargin);
+                failureObservationTimeout.ObservationWindow,
+                failureObservationTimeout.ProducerDrainTimeout);
             this.Log(
                 $"Recovery phase=failure-watchdog completed, timestamp={DateTime.UtcNow:O}. "
                 + $"Outcome={failureDetection.Kind}, elapsed={failureDetection.Elapsed}, "
@@ -365,7 +372,7 @@ namespace Orleans.Transactions.TestKit
             if (failureDetection.Kind == TransactionRecoveryFailureObservation.OutcomeKind.AttemptTimedOut)
             {
                 throw new TimeoutException(
-                    $"The in-flight transaction attempt did not settle within the {failureObservationTimeout} "
+                    $"The in-flight transaction attempt did not settle within the {failureObservationTimeout.MaximumDuration} "
                     + $"failure-detection deadline after silo death. Shutdown elapsed={shutdownElapsed}, "
                     + $"failure detection elapsed={failureDetection.Elapsed}, drain elapsed={failureDetection.DrainElapsed}. "
                     + $"Performed {Volatile.Read(ref index)} transactions on each group.");
@@ -396,7 +403,7 @@ namespace Orleans.Transactions.TestKit
                 {
                     throw new TimeoutException(
                         $"A transaction failure was observed at index {interruption.Index}, but the in-flight batch did not "
-                        + $"settle within the {failureObservationTimeout} absolute deadline. No recovery probe was started "
+                        + $"settle within the {failureObservationTimeout.MaximumDuration} absolute deadline. No recovery probe was started "
                         + $"while that state-mutating attempt remained active. Drain elapsed={failureDetection.DrainElapsed}.");
                 }
 
@@ -409,10 +416,10 @@ namespace Orleans.Transactions.TestKit
                 }
 
                 if (interruption.ObservedAt >= failureDetectionStartedAt
-                    && Stopwatch.GetElapsedTime(failureDetectionStartedAt, interruption.ObservedAt) > failureObservationTimeout)
+                    && Stopwatch.GetElapsedTime(failureDetectionStartedAt, interruption.ObservedAt) > failureObservationTimeout.MaximumDuration)
                 {
                     throw new TimeoutException(
-                        $"No transaction failure was observed within the {failureObservationTimeout} watchdog after silo death. "
+                        $"No transaction failure was observed within the {failureObservationTimeout.MaximumDuration} watchdog after silo death. "
                         + $"The first later failure was at index {interruption.Index} after "
                         + $"{Stopwatch.GetElapsedTime(failureDetectionStartedAt, interruption.ObservedAt)}.");
                 }

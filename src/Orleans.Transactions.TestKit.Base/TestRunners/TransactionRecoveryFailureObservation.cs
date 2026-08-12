@@ -7,6 +7,13 @@ namespace Orleans.Transactions.TestKit;
 
 internal static class TransactionRecoveryFailureObservation
 {
+    internal sealed record Timeouts(
+        TimeSpan ObservationWindow,
+        TimeSpan ProducerDrainTimeout)
+    {
+        public TimeSpan MaximumDuration => ObservationWindow + ProducerDrainTimeout;
+    }
+
     internal enum OutcomeKind
     {
         FailureObserved,
@@ -37,20 +44,33 @@ internal static class TransactionRecoveryFailureObservation
 
     public static bool IsPremature(long observedAt, long shutdownRequestedAt) => observedAt < shutdownRequestedAt;
 
+    internal static Timeouts GetTimeouts(
+        bool gracefulShutdown,
+        TimeSpan clientResponseTimeout,
+        TimeSpan schedulingMargin)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(clientResponseTimeout, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThan(schedulingMargin, TimeSpan.Zero);
+
+        var observationWindow = gracefulShutdown ? TimeSpan.Zero : clientResponseTimeout;
+        var maximumDuration = clientResponseTimeout + schedulingMargin;
+        return new(observationWindow, maximumDuration - observationWindow);
+    }
+
     internal static async Task<Outcome<TFailure, TProducerResult>> DetectAsync<TFailure, TProducerResult>(
         Task<TProducerResult> producer,
         Task<TFailure> firstFailure,
         CancellationTokenSource stopProducing,
-        TimeSpan responseWindow,
-        TimeSpan schedulingMargin)
+        TimeSpan observationWindow,
+        TimeSpan producerDrainTimeout)
         where TFailure : class
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(responseWindow, TimeSpan.Zero);
-        ArgumentOutOfRangeException.ThrowIfLessThan(schedulingMargin, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThan(observationWindow, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThan(producerDrainTimeout, TimeSpan.Zero);
 
         var startedAt = Stopwatch.GetTimestamp();
-        var responseDeadline = GetDeadline(startedAt, responseWindow);
-        var drainDeadline = GetDeadline(responseDeadline, schedulingMargin);
+        var responseDeadline = GetDeadline(startedAt, observationWindow);
+        var drainDeadline = GetDeadline(responseDeadline, producerDrainTimeout);
 
         await WaitUntilAsync(firstFailure, producer, responseDeadline);
         if (firstFailure.IsCompleted)
