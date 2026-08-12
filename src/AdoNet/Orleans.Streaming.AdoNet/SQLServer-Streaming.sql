@@ -416,12 +416,13 @@ FROM
 DECLARE @Count INT = (SELECT COUNT(*) FROM @ItemsTable);
 
 /* delete messages in the exact same order as the clustered index to avoid deadlocks with other queries */
+/* skip messages being changed concurrently since their dequeue receipt may no longer match */
 WITH Batch AS
 (
 	SELECT TOP (@Count)
 		*
 	FROM
-		OrleansStreamMessage AS M WITH (UPDLOCK, HOLDLOCK, ROWLOCK)
+		OrleansStreamMessage AS M WITH (UPDLOCK, READPAST, READCOMMITTEDLOCK, ROWLOCK)
 	WHERE
 		ServiceId = @ServiceId
         AND ProviderId = @ProviderId
