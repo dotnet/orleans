@@ -318,7 +318,9 @@ FROM
         ON M.ServiceId = B.ServiceId
         AND M.ProviderId = B.ProviderId
         AND M.QueueId = B.QueueId
-        AND M.MessageId = B.MessageId;
+        AND M.MessageId = B.MessageId
+ORDER BY
+    M.MessageId;
 
 DROP TEMPORARY TABLE _Batch;
 
