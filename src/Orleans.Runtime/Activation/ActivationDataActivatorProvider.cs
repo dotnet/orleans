@@ -49,7 +49,7 @@ internal partial class ActivationDataActivatorProvider(
         return true;
     }
 
-    private partial class ActivationDataActivator : IGrainContextActivatorWithConfiguration
+    private partial class ActivationDataActivator : IGrainContextActivator
     {
         private readonly IOptions<SchedulingOptions> _schedulingOptions;
         private readonly IGrainActivator _grainActivator;
@@ -75,8 +75,6 @@ internal partial class ActivationDataActivatorProvider(
                 schedulerInstruments);
             _startActivation = state => ((ActivationData)state!).Start(_grainActivator);
         }
-
-        public IGrainContext CreateContext(GrainAddress activationAddress) => CreateContext(activationAddress, []);
 
         public IGrainContext CreateContext(GrainAddress activationAddress, IConfigureGrainContext[] configureActions)
         {
@@ -105,5 +103,14 @@ internal partial class ActivationDataActivatorProvider(
 
 internal class StatelessWorkerActivator(StatelessWorkerGrainTypeSharedContext sharedContext, IGrainContextActivator innerActivator) : IGrainContextActivator
 {
-    public IGrainContext CreateContext(GrainAddress address) => new StatelessWorkerGrainContext(address, sharedContext, innerActivator);
+    public IGrainContext CreateContext(GrainAddress address, IConfigureGrainContext[] configureActions)
+    {
+        var result = new StatelessWorkerGrainContext(address, sharedContext, innerActivator);
+        foreach (var configure in configureActions)
+        {
+            configure.Configure(result);
+        }
+
+        return result;
+    }
 }

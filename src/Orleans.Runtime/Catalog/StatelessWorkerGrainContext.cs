@@ -320,7 +320,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
     {
         Debug.Assert(!_terminated, "CreateWorker must not be called on a terminated stateless worker context.");
         var address = GrainAddress.GetAddress(Address.SiloAddress, Address.GrainId, ActivationId.NewId());
-        var newWorker = (ActivationData)_innerActivator.CreateContext(address);
+        var newWorker = (ActivationData)_innerActivator.CreateContext(address, []);
 
         // Observe the create/destroy lifecycle of the activation
         newWorker.SetComponent<IActivationLifecycleObserver>(this);

@@ -48,14 +48,8 @@ public class GrainContextActivatorTests
         public void Configure(IGrainContext context) => events.Add("configure");
     }
 
-    private sealed class TestGrainContextActivator(IGrainContext context, List<string> events) : IGrainContextActivatorWithConfiguration
+    private sealed class TestGrainContextActivator(IGrainContext context, List<string> events) : IGrainContextActivator
     {
-        public IGrainContext CreateContext(GrainAddress address)
-        {
-            events.Add("activate");
-            return context;
-        }
-
         public IGrainContext CreateContext(GrainAddress address, IConfigureGrainContext[] configureActions)
         {
             foreach (var configure in configureActions)
