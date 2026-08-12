@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.GrainDirectory.EntityFrameworkCore</PackageId>
-    <Title>Microsoft Orleans Entity Framework Core GrainD irectory Provider</Title>
+    <Title>Microsoft Orleans Entity Framework Core Grain Directory Provider</Title>
     <Description>Microsoft Orleans Grain Directory provider backed by Entity Framework Core</Description>
     <PackageTags>$(PackageTags) Entity Framework Core SQL MySQL PostgreSQL Oracle</PackageTags>
     <Nullable>enable</Nullable>

@@ -11,6 +11,9 @@ namespace Orleans.EntityFrameworkCore.Tests.Persistence;
 [TestCategory("Persistence")]
 [TestCategory("EFCore")]
 [TestCategory(EFCoreTestCategories.SqlServer)]
+[TestSuite("Functional")]
+[TestProvider(EFCoreTestCategories.SqlServer)]
+[TestArea("Persistence")]
 public sealed class EFCoreSqlServerPersistenceProviderTests :
     EFCorePersistenceProviderTestsBase<
         SqlServerGrainStateDbContext,
@@ -28,6 +31,9 @@ public sealed class EFCoreSqlServerPersistenceProviderTests :
 [TestCategory("EFCore")]
 [TestCategory(EFCoreTestCategories.MySql)]
 [TestCategory(EFCoreTestCategories.MySqlProvider)]
+[TestSuite("Functional")]
+[TestProvider(EFCoreTestCategories.MySqlProvider)]
+[TestArea("Persistence")]
 public sealed class EFCoreMySqlPersistenceProviderTests :
     EFCorePersistenceProviderTestsBase<
         MySqlGrainStateDbContext,
@@ -45,6 +51,9 @@ public sealed class EFCoreMySqlPersistenceProviderTests :
 [TestCategory("EFCore")]
 [TestCategory(EFCoreTestCategories.PostgreSql)]
 [TestCategory(EFCoreTestCategories.PostgreSqlProvider)]
+[TestSuite("Functional")]
+[TestProvider(EFCoreTestCategories.PostgreSqlProvider)]
+[TestArea("Persistence")]
 public sealed class EFCorePostgreSqlPersistenceProviderTests :
     EFCorePersistenceProviderTestsBase<
         PostgreSqlGrainStateDbContext,

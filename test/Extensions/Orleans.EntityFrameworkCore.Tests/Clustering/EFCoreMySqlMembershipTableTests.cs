@@ -10,6 +10,9 @@ namespace Orleans.EntityFrameworkCore.Tests.Clustering;
 [TestCategory(EFCoreTestCategories.MySql)]
 [TestCategory(EFCoreTestCategories.MySqlProvider)]
 [TestCategory(EFCoreTestCategories.Functional)]
+[TestSuite("Functional")]
+[TestProvider(EFCoreTestCategories.MySqlProvider)]
+[TestArea("Membership")]
 public sealed class EFCoreMySqlMembershipTableTests :
     EFCoreMembershipTableTestsBase<MySqlClusterDbContext, Guid>
 {

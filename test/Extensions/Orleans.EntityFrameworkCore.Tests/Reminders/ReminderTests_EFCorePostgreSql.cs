@@ -8,6 +8,9 @@ namespace Orleans.EntityFrameworkCore.Tests.Reminders;
 [TestCategory("EFCore")]
 [TestCategory(EFCoreTestCategories.PostgreSql)]
 [TestCategory(EFCoreTestCategories.PostgreSqlProvider)]
+[TestSuite("Functional")]
+[TestProvider(EFCoreTestCategories.PostgreSqlProvider)]
+[TestArea("Reminders")]
 public sealed class ReminderTests_EFCorePostgreSql :
     EFCoreReminderServiceTestsBase<
         PostgreSqlReminderDbContext,

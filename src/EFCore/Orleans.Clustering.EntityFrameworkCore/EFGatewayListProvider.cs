@@ -29,7 +29,7 @@ internal class EFGatewayListProvider<TDbContext, TEtag> : IGatewayListProvider w
         IOptions<GatewayOptions> gatewayOptions,
         IDbContextFactory<TDbContext> dbContextFactory)
     {
-        this._logger = loggerFactory.CreateLogger<EFMembershipTable<TDbContext, TEtag>>();
+        this._logger = loggerFactory.CreateLogger<EFGatewayListProvider<TDbContext, TEtag>>();
         this._clusterId = clusterOptions.Value.ClusterId;
         this._dbContextFactory = dbContextFactory;
         this.MaxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;

@@ -56,7 +56,7 @@ namespace Orleans.GrainDirectory.EntityFrameworkCore.SqlServer.Data.Migrations
                     SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("ClusterId", "GrainId"), false);
 
                     b.HasIndex("ClusterId", "SiloAddress")
-                        .HasDatabaseName("IDX_Activations_CusterId_SiloAddress");
+                        .HasDatabaseName("IDX_Activations_ClusterId_SiloAddress");
 
                     SqlServerIndexBuilderExtensions.IsClustered(b.HasIndex("ClusterId", "SiloAddress"), false);
 
