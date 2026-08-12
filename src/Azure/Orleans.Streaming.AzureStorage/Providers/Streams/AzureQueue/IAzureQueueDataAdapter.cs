@@ -139,12 +139,11 @@ namespace Orleans.Providers.Streams.AzureQueue
         public string ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
         {
             var eventList = events.ToList();
-            var azureQueueBatchMessage = new AzureQueueBatchContainerV2(streamId, eventList.Cast<object>().ToList(), requestContext);
 
             try
             {
                 return _options.PreferJson
-                    ? _jsonSerializer.Serialize(azureQueueBatchMessage, typeof(AzureQueueBatchContainerV2))
+                    ? SerializeJson()
                     : _fallbackAdapter.ToQueueMessage(streamId, eventList, token, requestContext);
             }
             catch (Exception ex) when (_options.EnableFallback)
@@ -156,7 +155,13 @@ namespace Orleans.Providers.Streams.AzureQueue
                 }
 
                 _logger.LogDebug(ex, "Binary serialization failed for stream {StreamId}, falling back to JSON serialization", streamId);
-                return _jsonSerializer.Serialize(azureQueueBatchMessage, typeof(AzureQueueBatchContainerV2));
+                return SerializeJson();
+            }
+
+            string SerializeJson()
+            {
+                var batchMessage = new AzureQueueBatchContainerV2(streamId, eventList.Cast<object>().ToList(), requestContext);
+                return _jsonSerializer.Serialize(batchMessage, typeof(AzureQueueBatchContainerV2));
             }
         }
 

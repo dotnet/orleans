@@ -45,7 +45,8 @@ namespace Tester.AzureUtils.Streaming
         {
             var serializer = this.fixture.Services.GetRequiredService<Serializer>();
             var azureQueueDataAdapterV2 = new AzureQueueDataAdapterV2(serializer);
-            var jsonOrleansSerializer = new OrleansJsonSerializer(Options.Create(new OrleansJsonSerializerOptions()));
+            var jsonOptions = this.fixture.Services.GetRequiredService<IOptions<OrleansJsonSerializerOptions>>();
+            var jsonOrleansSerializer = new OrleansJsonSerializer(jsonOptions);
 
             return new AzureQueueJsonDataAdapter(
                 jsonOrleansSerializer,
@@ -275,7 +276,7 @@ namespace Tester.AzureUtils.Streaming
 
         private static bool IsValidBase64String(string s)
         {
-            return !string.IsNullOrWhiteSpace(s) && Base64.IsValid(s);
+            return !string.IsNullOrWhiteSpace(s) && Base64.IsValid(s, out _);
         }
     }
 }
