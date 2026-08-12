@@ -9,21 +9,13 @@ ms.topic: concept-article
 
 Orleans distributes activations and work, but application behavior determines capacity. Grain count alone isn't a sizing metric: grains can be idle, CPU-intensive, memory-intensive, hot, or blocked on dependencies.
 
-## Understand scale limits
+## Plan for scale
 
-Orleans doesn't impose a configured numeric maximum on the number of grain identities, active grain activations, or silos in a cluster. This isn't a guarantee that any cluster size or throughput is practical. The supported operating envelope ends where the application can no longer meet its latency, throughput, availability, or recovery objectives.
+Orleans is designed to scale out by distributing grain activations and request processing across silos. It doesn't impose an inherent upper limit on the number of grain identities, active grain activations, or silos in a cluster. As silos are added, capacity can grow with the portion of the application workload that is distributed across grain activations.
 
-A possible grain identity consumes no activation or grain-directory entry until the grain is used. Therefore, millions of addressable identities can cost less than a much smaller set of simultaneously active, stateful, or frequently called grains. Measure active activations and their resource use instead of sizing from the number of keys which can exist.
+The practical operating envelope is application- and environment-dependent. Determine it using representative tests of the workload, host resources, network, storage and clustering providers, external dependencies, and recovery requirements. A grain identity consumes no activation resources until it's used, so size the cluster based on active workload and resource use rather than the number of possible grain keys.
 
-Adding silos doesn't make every workload scale linearly:
-
-- A single ordinary grain activation processes one turn at a time by default. Adding silos doesn't divide a hot grain's work.
-- Every silo participates in membership and maintains a cluster view. Every advertised silo endpoint must be reachable from every other silo.
-- Membership changes can move grain-directory ownership and other partitioned runtime responsibilities.
-- Inter-silo calls, serialization, gateways, clustering, storage, reminders, streams, and telemetry can reach their limits before silo CPU or memory.
-- Skewed keys, placement constraints, and shared dependencies can leave some silos saturated while others have capacity.
-
-These costs don't establish a universal maximum, but they make very large clusters and frequent membership changes distinct test scenarios. Don't extrapolate a thousand-silo design or a failure-recovery target from a small, steady cluster. For the relevant control-plane behavior, see [Topology, networking, and clustering](networking.md), [Cluster membership protocol](../implementation/cluster-management.md), and [Grain directory architecture](../implementation/grain-directory.md).
+For the mechanisms which support scale-out, see [Topology, networking, and clustering](networking.md), [Cluster membership protocol](../implementation/cluster-management.md), and [Grain directory architecture](../implementation/grain-directory.md).
 
 ## Establish a workload model
 

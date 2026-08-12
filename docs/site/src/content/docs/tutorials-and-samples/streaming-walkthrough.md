@@ -50,7 +50,14 @@ The `PubSubStore` name is significant. Persistent stream providers use it for su
 
 ## Switch to a persistent provider
 
-Create an Azure Event Hubs namespace, event hub, consumer group, and Azure Storage account in a nonproduction subscription. Copy the sample's `Secrets.example.json` shape if present in your checkout and create `Secrets.json` with the Event Hubs and storage connection values. Don't commit this file.
+Create an Azure Event Hubs namespace, an event hub named `my-path`, a consumer group named `my-group`, and an Azure Storage account in a nonproduction subscription. Create `Secrets.json` in the sample directory with this content, replacing both values with connection strings. Don't commit this file.
+
+```json
+{
+  "DataConnectionString": "<Azure Storage connection string>",
+  "EventHubConnectionString": "<Event Hubs namespace connection string>"
+}
+```
 
 Restart the silo and client. The startup log should now report Azure Event Hub streaming instead of in-memory streaming. The silo configures:
 
@@ -63,11 +70,13 @@ For deployed applications, replace local secrets with managed identity or your p
 
 ## Verify recovery
 
-1. Publish a sequence of identifiable events and record the latest observed item.
-1. Stop the silo gracefully, leaving Event Hubs and Azure Storage running.
+Before this exercise, replace `Guid.NewGuid()` in `Client/Program.cs` with a fixed GUID so that each client run publishes to the same stream.
+
+1. Run the silo and client, then record the latest sequence token observed by the consumer.
+1. Stop the client, then stop the silo gracefully, leaving Event Hubs and Azure Storage running.
 1. Restart the silo with the same service ID, cluster ID, provider name, hub, and consumer group.
-1. Publish more events and verify that the consumer resumes without recreating the subscription.
-1. Confirm that processing continues from the stored checkpoint rather than replaying the complete partition.
+1. Restart the client so that it calls `StartProducing` for the same stream and recreates the producer's activation-scoped timer.
+1. Verify that the consumer resumes without recreating the subscription and that it continues from the stored checkpoint instead of replaying the complete partition.
 
 Delivery guarantees are provider-specific. In this Event Hubs scenario, a consumer can observe duplicates around failures, so production handlers should be idempotent or deduplicate using an application-owned event identity. Don't treat a sequence token as a globally meaningful business identifier.
 

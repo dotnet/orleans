@@ -35,7 +35,7 @@ Useful starting signals include:
 
 | Concern | Signals to correlate |
 |---|---|
-| Requests | `orleans-app-requests-latency`, timed-out/canceled requests, application error rate |
+| Requests | `orleans-app-requests-latency` histogram components (`-bucket`/`-count`/`-sum`), timed-out/canceled requests, application error rate |
 | Connectivity | open/closed sockets, failed/dropped sends, connected gateways, ping replies missed |
 | Overload | rejected messages, gateway load shedding, activation working set, host CPU and thread-pool metrics |
 | Stuck turns | `orleans-scheduler-long-running-turns`, request latency, process CPU, traces |

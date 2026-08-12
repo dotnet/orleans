@@ -31,7 +31,7 @@ An exception or event identifies where Orleans noticed a problem, not necessaril
 
 ## Connection and gateway failures
 
-**Signals:** <xref:Orleans.Runtime.Messaging.ConnectionFailedException>, repeated connection attempts, no connected gateways, or client readiness remains false.
+**Signals:** <xref:Orleans.Runtime.Messaging.ConnectionFailedException>, repeated connection attempts, `orleans-client-connected-gateways` is 0, or client readiness remains false.
 
 **Likely causes:** client and silo cluster identities differ; the gateway provider returns no active silo; advertised gateway addresses aren't reachable from the client; DNS, firewall, NAT, or network policy blocks traffic; or TLS names, trust, or client-certificate requirements don't match.
 
@@ -55,9 +55,9 @@ An exception or event identifies where Orleans noticed a problem, not necessaril
 
 ## Gateway or cluster overload
 
-**Signals:** <xref:Orleans.Runtime.GatewayTooBusyException>, rejected messages, gateway load shedding, rising queue latency, or throughput falls while demand rises.
+**Signals:** <xref:Orleans.Runtime.GatewayTooBusyException>, a `Shedding load` rejection, rising `orleans-messaging-rejected` or `orleans-gateway-load-shedding`, increasing queue latency, or throughput falls while demand rises.
 
-**Likely causes:** gateway admission limits, saturated grain schedulers, a hot grain, thread-pool or CPU starvation, or a storage/stream dependency which can't keep up.
+**Likely causes:** gateway load shedding is enabled and CPU or memory crossed its configured threshold; grain schedulers are saturated; a grain is hot; the thread pool or CPU is starved; or a storage/stream dependency can't keep up.
 
 **Confirm:** compare ingress, completion, rejection, and timeout rates with CPU, thread-pool queues, long-running turns, activation count, and dependency latency. Compare silos: one outlier suggests skew or a host problem; a cluster-wide shift suggests shared capacity or dependency pressure.
 
@@ -67,7 +67,7 @@ An exception or event identifies where Orleans noticed a problem, not necessaril
 
 ## Request timeouts
 
-**Signals:** <xref:System.TimeoutException>, increasing `orleans-app-requests-timedout`, or high `orleans-app-requests-latency`.
+**Signals:** <xref:System.TimeoutException>, increasing `orleans-app-requests-timedout` (tagged by `grain_type`), or rising latency reported by the `orleans-app-requests-latency` histogram components (`-bucket`, `-count`, and `-sum`).
 
 **Likely causes:** queueing before execution, a long-running grain turn, cyclic calls, blocking work, slow storage or another dependency, membership recovery, or network loss.
 
@@ -85,7 +85,7 @@ An exception or event identifies where Orleans noticed a problem, not necessaril
 
 **Confirm:** capture a trace or dump while the issue is active. Identify the grain type and method, inspect managed stacks and scheduler queues, and draw the call graph. Check whether a non-reentrant activation is awaiting a call which eventually calls back into it.
 
-**Remedy:** remove blocking waits; use bounded asynchronous operations; break call cycles; move CPU-heavy work out of grain turns; or redesign the protocol. Apply <xref:Orleans.Concurrency.ReentrantAttribute> or <xref:Orleans.Concurrency.AlwaysInterleaveAttribute> only after proving that the interleaved state transitions are safe.
+**Remedy:** remove blocking waits; use bounded asynchronous operations; break call cycles; move CPU-heavy work out of grain turns; or redesign the protocol. For a known call path which must re-enter its initiator, scope <xref:Orleans.Runtime.RequestContext.AllowCallChainReentrancy*> to that chain. Apply <xref:Orleans.Concurrency.ReentrantAttribute> or <xref:Orleans.Concurrency.AlwaysInterleaveAttribute> only after proving that the interleaved state transitions are safe. See [Call-chain reentrancy](../../grains/request-scheduling.md#call-chain-reentrancy).
 
 **Prevent:** keep turns bounded, review inter-grain call graphs, test callback paths, and document grain invariants under interleaving. Follow [Grain turns appear stuck](troubleshooting.md#grain-turns-appear-stuck).
 
@@ -97,13 +97,13 @@ An exception or event identifies where Orleans noticed a problem, not necessaril
 
 **Confirm:** preserve the stored and expected version values, grain type/key, provider operation, and membership timeline. Determine whether more than one activation or an external process wrote the record. Don't log grain state or secrets.
 
-**Remedy:** stop unsafe writers and reconcile the record according to application semantics. Don't retry a deterministic concurrency conflict indefinitely or overwrite newer data blindly.
+**Remedy:** stop unsafe writers and reconcile the record according to application semantics. Don't retry a deterministic concurrency conflict indefinitely or overwrite newer data blindly. If an <xref:Orleans.Storage.InconsistentStateException> escapes the activation which raised it, Orleans deactivates that activation so a later call can reload state.
 
 **Prevent:** keep one authoritative writer per state record, use provider concurrency tokens, avoid out-of-band updates, and test recovery from ambiguous writes and activation churn.
 
 ## Storage throttling
 
-**Signals:** storage error instruments rise, provider exceptions report throttling or rate limits, storage spans lengthen, and request timeouts follow.
+**Signals:** `orleans-storage-read-errors`, `orleans-storage-write-errors`, or `orleans-storage-clear-errors` rise; the corresponding `orleans-storage-*-latency` instruments lengthen; provider exceptions report throttling or rate limits; and request timeouts follow.
 
 **Likely causes:** provisioned throughput is too low; partition keys are skewed; connection pools are exhausted; retries amplify load; or activation/recovery waves create a burst.
 
@@ -115,7 +115,7 @@ An exception or event identifies where Orleans noticed a problem, not necessaril
 
 ## Serialization failures after a version change
 
-**Signals:** an Orleans serialization/codec exception, "codec not found", "serializer not found", unsupported wire type, unknown field/type, or activation/storage reads begin failing after deployment.
+**Signals:** <xref:Orleans.Serialization.CodecNotFoundException> reports `Could not find a codec for type ...` or `Could not find a copier for type ...`; another serialization exception reports an unsupported wire type or unknown/required type or field; a `KeyNotFoundException` reports that a base-type or value serializer wasn't found; or activation/storage reads begin failing after deployment.
 
 **Likely causes:** mixed versions don't share a compatible contract; a serializable type or member identity changed; member IDs were reused or renumbered; a type was renamed without a stable alias; required serializer registration differs; or persisted/queued data contains an old representation.
 
@@ -133,7 +133,7 @@ An exception or event identifies where Orleans noticed a problem, not necessaril
 
 **Confirm:** compare membership views and timestamps from all silos with platform events, provider latency, pings, and advertised endpoints. For suspected split brain, determine whether isolated silos remained alive and could reach the membership store; don't infer a partition from one stale log line.
 
-**Remedy:** stop rollout/scale-in, preserve the larger healthy partition, restore membership-store and network health, and allow convergence. Isolate a stale partition before changing membership records. For custom directories, follow their documented repair procedure.
+**Remedy:** stop rollout/scale-in, preserve the larger healthy partition, restore membership-store and network health, and allow convergence. Isolate a stale partition before changing membership records: a running silo which reads its own membership entry as `Dead` terminates itself. For custom directories, follow their documented repair procedure.
 
 **Prevent:** use a shared, durable membership provider; keep endpoints stable and mutually reachable; maintain clock synchronization and failure-domain capacity; and test partitions and rolling replacement. Follow [Membership is unstable](troubleshooting.md#membership-is-unstable) and [Disaster recovery](../../deployment/disaster-recovery.md).
 
@@ -151,7 +151,7 @@ An exception or event identifies where Orleans noticed a problem, not necessaril
 
 ## Reminder and timer timing
 
-**Signals:** a callback runs late, callbacks bunch after a pause, a reminder appears to run more than once, or callbacks stop after deactivation/restart.
+**Signals:** `orleans-reminders-tardiness` rises, `orleans-reminders-ticks-delivered` stalls, a callback runs late, callbacks bunch after a pause, a reminder appears to run more than once, or callbacks stop after deactivation/restart.
 
 **Likely causes:** timer callbacks were expected to survive activation loss; a reminder provider or membership dependency is unavailable; scheduler/CPU pressure delays execution; callback duration exceeds the period; or application code assumes exactly-once delivery.
 
@@ -159,11 +159,11 @@ An exception or event identifies where Orleans noticed a problem, not necessaril
 
 **Remedy:** use reminders for work which must survive activation loss, restore provider health, reduce scheduler pressure, and make callbacks idempotent. Reconcile missed business work from durable application state rather than relying only on callback count.
 
-**Prevent:** choose timers only for activation-scoped scheduling, make reminder work idempotent, monitor provider health and scheduling delay, and don't use either mechanism as a precision real-time clock.
+**Prevent:** choose timers only for activation-scoped scheduling, make reminder work idempotent, monitor provider health and scheduling delay, and don't use either mechanism as a precision real-time clock. <xref:Orleans.Hosting.ReminderOptions.MinimumReminderPeriod> defaults to one minute; registering a shorter period fails.
 
 ## Memory pressure
 
-**Signals:** low `orleans-runtime-available-memory`, growing working set or GC heap, long GC pauses, activation churn, or container OOM kills.
+**Signals:** low `orleans-runtime-available-memory` (MB of GC-available memory, not process working set), growing working set or GC heap, long GC pauses, activation churn, or container OOM kills.
 
 **Likely causes:** unbounded grain state or caches, stream buffers, large request payloads, telemetry cardinality, activation growth, allocation-heavy code, or a container limit below the assumed host capacity.
 

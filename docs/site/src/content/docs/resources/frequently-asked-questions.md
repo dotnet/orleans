@@ -39,9 +39,9 @@ Orleans runs wherever its supported .NET targets run, including Linux and Window
 
 ### How many grains or silos can a cluster contain?
 
-Orleans doesn't impose a configured numeric maximum on grain identities, activations, or silos. The practical limit depends on the workload, active grain footprint, hot keys, lifecycle cost, network topology, providers, failure-recovery objectives, and host resources. Adding silos doesn't guarantee linear scaling because cluster coordination and shared dependencies also have costs.
+Orleans is designed to scale out by distributing grain activations and request processing across silos. It doesn't impose an inherent upper limit on grain identities, activations, or silos. The practical operating envelope depends on the application workload and deployment environment.
 
-Use production-like capacity tests to find a safe operating envelope rather than relying on a universal grain, silo, or activation-rate number. See [Capacity planning and scaling](../deployment/capacity-planning.md).
+Use production-like capacity tests to determine the appropriate cluster size and headroom for the application's performance and recovery objectives. See [Capacity planning and scaling](../deployment/capacity-planning.md).
 
 ### Is Orleans tied to Azure?
 
