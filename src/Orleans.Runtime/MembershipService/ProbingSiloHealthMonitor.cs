@@ -51,7 +51,7 @@ internal sealed partial class ProbingSiloHealthMonitor : IProbeHealthMonitor
         }
 
         var sinceLastProbeRequest = _probeRequestMonitor.ElapsedSinceLastProbeRequest;
-        var recencyWindow = _clusterMembershipOptions.ProbeTimeout.Multiply(_clusterMembershipOptions.NumMissedProbesLimit);
+        var recencyWindow = _clusterMembershipOptions.GetFailureDetectionTimeout();
 
         if (!sinceLastProbeRequest.HasValue)
         {
@@ -96,7 +96,7 @@ internal sealed partial class ProbingSiloHealthMonitor : IProbeHealthMonitor
             return 0;
         }
 
-        var recencyWindow = _clusterMembershipOptions.ProbeTimeout.Multiply(_clusterMembershipOptions.NumMissedProbesLimit);
+        var recencyWindow = _clusterMembershipOptions.GetFailureDetectionTimeout();
 
         if (!elapsedSinceLastResponse.HasValue)
         {

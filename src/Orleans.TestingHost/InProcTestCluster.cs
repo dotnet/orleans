@@ -413,7 +413,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         if (didKill)
         {
             // in case of hard kill (kill and not Stop), we should give silos time to detect failures first.
-            stabilizationTime = TestingUtils.Multiply(clusterMembershipOptions.ProbeTimeout, clusterMembershipOptions.NumMissedProbesLimit);
+            stabilizationTime = TestingUtils.Multiply(clusterMembershipOptions.MaxProbeTimeout, clusterMembershipOptions.NumMissedProbesLimit);
         }
         if (clusterMembershipOptions.UseLivenessGossip)
         {

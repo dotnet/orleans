@@ -461,6 +461,10 @@ namespace Orleans.Configuration
 
         public System.TimeSpan MaxJoinAttemptTime { get { throw null; } set { } }
 
+        public System.TimeSpan MaxProbeTimeout { get { throw null; } set { } }
+
+        public System.TimeSpan MinProbeTimeout { get { throw null; } set { } }
+
         public int NumMissedProbesLimit { get { throw null; } set { } }
 
         public int NumMissedTableIAmAliveLimit { get { throw null; } set { } }
