@@ -57,15 +57,7 @@ namespace Tester.AdoNet.Persistence
         [Fact, TestCategory("Functional"), TestCategory("ModelBased")]
         public async Task GrainStorage_ModelBasedGeneratedConformance()
         {
-            var runner = new GrainStorageModelBasedTestRunner(
-                this.fixture.Storage,
-                new GrainStorageModelBasedConformanceOptions
-                {
-                    ProviderName = "Sqlite",
-                    DeleteStateOnClear = false,
-                    ClearedRecordExistsOnRead = true,
-                    RereadsClearedRecordBeforeClear = true
-                });
+            var runner = new GrainStorageModelBasedTestRunner(this.fixture.Storage, "Sqlite");
 
             await runner.RunGeneratedConformanceTests();
         }

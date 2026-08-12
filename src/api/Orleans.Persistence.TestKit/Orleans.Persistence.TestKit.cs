@@ -10,15 +10,7 @@ namespace Orleans.Persistence.TestKit
 {
     public sealed partial class GrainStorageModelBasedConformanceOptions
     {
-        public bool ClearedRecordExistsOnRead { get { throw null; } set { } }
-
-        public bool DeleteStateOnClear { get { throw null; } set { } }
-
         public string GrainType { get { throw null; } set { } }
-
-        public bool IncludeInconsistentClearETagCases { get { throw null; } set { } }
-
-        public bool IncludeInconsistentETagCases { get { throw null; } set { } }
 
         public string? KeyPrefix { get { throw null; } set { } }
 
@@ -28,7 +20,6 @@ namespace Orleans.Persistence.TestKit
 
         public string ProviderName { get { throw null; } set { } }
 
-        public bool RereadsClearedRecordBeforeClear { get { throw null; } set { } }
     }
 
     public sealed partial class GrainStorageModelBasedTestRunner

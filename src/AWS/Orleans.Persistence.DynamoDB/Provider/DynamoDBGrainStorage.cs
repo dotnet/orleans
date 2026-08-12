@@ -203,16 +203,30 @@ namespace Orleans.Storage
             int newEtag = 0;
             if (clear)
             {
-                fields.Add(GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(record.GrainReference));
-                fields.Add(GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType));
-
                 int currentEtag;
                 int.TryParse(grainState.ETag, out currentEtag);
                 newEtag = currentEtag;
                 newEtag++;
                 fields.Add(ETAG_PROPERTY_NAME, new AttributeValue { N = newEtag.ToString() });
 
-                await this.storage.PutEntryAsync(this.options.TableName, fields).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(grainState.ETag))
+                {
+                    fields.Add(GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(record.GrainReference));
+                    fields.Add(GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType));
+                    var expression = $"attribute_not_exists({GRAIN_REFERENCE_PROPERTY_NAME}) AND attribute_not_exists({GRAIN_TYPE_PROPERTY_NAME})";
+                    await this.storage.PutEntryAsync(this.options.TableName, fields, expression).ConfigureAwait(false);
+                }
+                else
+                {
+                    var keys = new Dictionary<string, AttributeValue>
+                    {
+                        { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(record.GrainReference) },
+                        { GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType) }
+                    };
+                    var conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = currentEtag.ToString() } } };
+                    var expression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
+                    await this.storage.UpsertEntryAsync(this.options.TableName, keys, fields, expression, conditionalValues).ConfigureAwait(false);
+                }
             }
             else if (string.IsNullOrWhiteSpace(grainState.ETag))
             {
@@ -267,11 +281,20 @@ namespace Orleans.Storage
                 if (this.options.DeleteStateOnClear)
                 {
                     operation = "Deleting";
-                    var keys = new Dictionary<string, AttributeValue>();
-                    keys.Add(GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(record.GrainReference));
-                    keys.Add(GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType));
+                    var keys = new Dictionary<string, AttributeValue>
+                    {
+                        { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(record.GrainReference) },
+                        { GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType) }
+                    };
+                    var expression = $"attribute_not_exists({ETAG_PROPERTY_NAME})";
+                    Dictionary<string, AttributeValue>? conditionalValues = null;
+                    if (!string.IsNullOrWhiteSpace(grainState.ETag))
+                    {
+                        conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = record.ETag.ToString() } } };
+                        expression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
+                    }
 
-                    await this.storage.DeleteEntryAsync(this.options.TableName, keys).ConfigureAwait(false);
+                    await this.storage.DeleteEntryAsync(this.options.TableName, keys, expression, conditionalValues).ConfigureAwait(false);
                     ResetGrainState(grainState);
                 }
                 else
@@ -280,6 +303,10 @@ namespace Orleans.Storage
                     grainState.State = CreateInstance<T>();
                     grainState.RecordExists = false;
                 }
+            }
+            catch (ConditionalCheckFailedException exc)
+            {
+                throw new InconsistentStateException($"Inconsistent grain state: {exc}");
             }
             catch (Exception exc)
             {

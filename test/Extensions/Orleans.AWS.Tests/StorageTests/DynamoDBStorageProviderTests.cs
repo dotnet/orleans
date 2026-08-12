@@ -179,15 +179,21 @@ namespace AWSUtils.Tests.StorageTests
             }
 
             var storage = await InitDynamoDBGrainStorage();
-            var runner = new GrainStorageModelBasedTestRunner(
-                storage,
-                new GrainStorageModelBasedConformanceOptions
-                {
-                    ProviderName = "DynamoDB",
-                    DeleteStateOnClear = false,
-                    IncludeInconsistentClearETagCases = false
-                },
-                output.WriteLine);
+            var runner = new GrainStorageModelBasedTestRunner(storage, "DynamoDB", output.WriteLine);
+
+            await runner.RunGeneratedConformanceTests();
+        }
+
+        [SkippableFact, TestCategory("Functional"), TestCategory("ModelBased")]
+        public async Task DynamoDBStorage_DeleteStateOnClear_ModelBasedGeneratedConformance()
+        {
+            if (!AWSTestConstants.IsDynamoDbAvailable)
+            {
+                throw new SkipException("Unable to connect to AWS DynamoDB simulator");
+            }
+
+            var storage = await InitDynamoDBGrainStorage(deleteStateOnClear: true);
+            var runner = new GrainStorageModelBasedTestRunner(storage, "DynamoDBDeleteStateOnClear", output.WriteLine);
 
             await runner.RunGeneratedConformanceTests();
         }
@@ -201,11 +207,12 @@ namespace AWSUtils.Tests.StorageTests
             return store;
         }
 
-        private Task<DynamoDBGrainStorage> InitDynamoDBGrainStorage(bool useJson = false, bool useFallback = true)
+        private Task<DynamoDBGrainStorage> InitDynamoDBGrainStorage(bool useJson = false, bool useFallback = true, bool deleteStateOnClear = false)
         {
             var options = new DynamoDBStorageOptions
             {
                 Service = AWSTestConstants.DynamoDbService,
+                DeleteStateOnClear = deleteStateOnClear,
             };
 
             var jsonOptions = this.providerRuntime.ServiceProvider.GetService<IOptions<OrleansJsonSerializerOptions>>()!;

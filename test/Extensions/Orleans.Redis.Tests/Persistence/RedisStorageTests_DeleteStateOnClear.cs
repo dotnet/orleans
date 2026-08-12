@@ -91,14 +91,7 @@ namespace Tester.Redis.Persistence
         [SkippableFact, TestCategory("Functional"), TestCategory("ModelBased")]
         public async Task GrainStorage_ModelBasedGeneratedConformance()
         {
-            var runner = new GrainStorageModelBasedTestRunner(
-                storageProvider,
-                new GrainStorageModelBasedConformanceOptions
-                {
-                    ProviderName = "RedisDeleteStateOnClear",
-                    DeleteStateOnClear = true
-                },
-                output.WriteLine);
+            var runner = new GrainStorageModelBasedTestRunner(storageProvider, "RedisDeleteStateOnClear", output.WriteLine);
 
             await runner.RunGeneratedConformanceTests();
         }

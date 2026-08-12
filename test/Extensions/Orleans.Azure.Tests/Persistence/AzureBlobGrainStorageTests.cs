@@ -80,14 +80,7 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
     public async Task AzureBlobStorage_ClearWritesTombstone_ModelBasedGeneratedConformance()
     {
         var storage = await CreateStorageAsync(CreateSetupSerializer(), deleteStateOnClear: false);
-        var runner = new GrainStorageModelBasedTestRunner(
-            storage,
-            new GrainStorageModelBasedConformanceOptions
-            {
-                ProviderName = "AzureBlobClearWritesTombstone",
-                DeleteStateOnClear = false
-            },
-            _output.WriteLine);
+        var runner = new GrainStorageModelBasedTestRunner(storage, "AzureBlobClearWritesTombstone", _output.WriteLine);
 
         await runner.RunGeneratedConformanceTests();
     }

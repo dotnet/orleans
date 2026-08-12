@@ -296,14 +296,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
     public async Task FirestoreStorage_ClearWritesTombstone_ModelBasedGeneratedConformance()
     {
         var storage = await CreateStorage(deleteStateOnClear: false);
-        var runner = new GrainStorageModelBasedTestRunner(
-            storage,
-            new GrainStorageModelBasedConformanceOptions
-            {
-                ProviderName = "FirestoreClearWritesTombstone",
-                DeleteStateOnClear = false
-            },
-            _output.WriteLine);
+        var runner = new GrainStorageModelBasedTestRunner(storage, "FirestoreClearWritesTombstone", _output.WriteLine);
         await runner.RunGeneratedConformanceTests();
     }
 

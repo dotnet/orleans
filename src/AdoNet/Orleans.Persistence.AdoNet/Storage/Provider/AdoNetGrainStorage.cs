@@ -154,7 +154,7 @@ namespace Orleans.Storage
             var baseGrainType = ExtractBaseClass(grainType);
             LogTraceClearingGrainState(serviceId, name, baseGrainType, grainId, grainState.ETag);
 
-            if (!grainState.RecordExists)
+            if (!grainState.RecordExists && string.IsNullOrWhiteSpace(grainState.ETag))
             {
                 await ReadStateAsync(grainType, grainReference, grainState).ConfigureAwait(false);
                 if (!grainState.RecordExists)
@@ -250,14 +250,14 @@ namespace Orleans.Storage
                             storageState = Serializer.Deserialize<T>(new BinaryData(payload));
                         }
                         version = selector.GetNullableInt32("Version");
-                        var result = Tuple.Create(storageState, version?.ToString(CultureInfo.InvariantCulture));
+                        var result = Tuple.Create(storageState, version?.ToString(CultureInfo.InvariantCulture), payload is not null);
                         return Task.FromResult(result);
                     },
                     commandBehavior, CancellationToken.None).ConfigureAwait(false)).SingleOrDefault();
 
                 T? state = readRecords != null ? (T)readRecords.Item1! : default;
                 string? etag = readRecords != null ? readRecords.Item2 : null;
-                bool recordExists = readRecords != null;
+                bool recordExists = readRecords?.Item3 == true;
                 if (state == null)
                 {
                     LogTraceNullGrainStateRead(serviceId, name, baseGrainType, grainId, grainState.ETag);

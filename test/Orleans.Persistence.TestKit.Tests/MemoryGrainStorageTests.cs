@@ -225,7 +225,7 @@ public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<Mem
 
     private sealed class StableNoOpETagGrainStorage : IGrainStorage
     {
-        private readonly Dictionary<GrainId, (TestState1 State, string ETag)> records = [];
+        private readonly Dictionary<GrainId, (TestState1? State, string ETag)> records = [];
         private int etag;
 
         public int SameValueWriteCount { get; private set; }
@@ -234,9 +234,9 @@ public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<Mem
         {
             if (records.TryGetValue(grainId, out var record))
             {
-                grainState.State = (T)(object)Clone(record.State);
+                grainState.State = (T)(object)(record.State is null ? new TestState1() : Clone(record.State));
                 grainState.ETag = record.ETag;
-                grainState.RecordExists = true;
+                grainState.RecordExists = record.State is not null;
             }
             else
             {
@@ -257,7 +257,7 @@ public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<Mem
                     throw new InconsistentStateException("ETag mismatch.");
                 }
 
-                if (state.Equals(record.State))
+                if (record.State is not null && state.Equals(record.State))
                 {
                     SameValueWriteCount++;
                     grainState.ETag = record.ETag;
@@ -284,8 +284,10 @@ public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<Mem
                 throw new InconsistentStateException("ETag mismatch.");
             }
 
-            records.Remove(grainId);
-            grainState.ETag = null;
+            var nextETag = $"etag-{++etag}";
+            records[grainId] = (null, nextETag);
+            grainState.State = (T)(object)new TestState1();
+            grainState.ETag = nextETag;
             grainState.RecordExists = false;
             return Task.CompletedTask;
         }

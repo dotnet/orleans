@@ -90,15 +90,7 @@ namespace UnitTests.StorageTests.Relational
 
         internal Task Relational_ModelBasedGeneratedConformance(string providerName)
         {
-            var runner = new GrainStorageModelBasedTestRunner(
-                PersistenceStorageTests.Storage,
-                new GrainStorageModelBasedConformanceOptions
-                {
-                    ProviderName = providerName,
-                    DeleteStateOnClear = false,
-                    ClearedRecordExistsOnRead = true,
-                    RereadsClearedRecordBeforeClear = true
-                });
+            var runner = new GrainStorageModelBasedTestRunner(PersistenceStorageTests.Storage, providerName);
 
             return runner.RunGeneratedConformanceTests();
         }

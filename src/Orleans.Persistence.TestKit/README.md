@@ -139,11 +139,7 @@ For the defaults, the shorter `new GrainStorageModelBasedTestRunner(fixture.Stor
 - **`KeyPrefix`**: Optional fixed prefix for generated grain keys; when omitted, a unique prefix is generated.
 - **`MaxDepth`**: Maximum generated model traversal depth.
 - **`MaxSequenceLength`**: Maximum number of operations in each generated sequence.
-- **`IncludeInconsistentETagCases`**: Includes duplicate-write and stale-ETag scenarios.
-- **`IncludeInconsistentClearETagCases`**: Includes stale-ETag clear scenarios when inconsistent ETag cases are enabled.
-- **`DeleteStateOnClear`**: Set to `true` when clear deletes the record, or `false` when it retains a cleared record with a new ETag.
-- **`ClearedRecordExistsOnRead`**: Set to `true` when reading retained cleared state reports `RecordExists` as `true`.
-- **`RereadsClearedRecordBeforeClear`**: Set to `true` for providers which re-read retained cleared state before a subsequent clear.
+The runner always exercises duplicate writes and stale-ETag writes and clears. It discovers whether the provider deletes or retains cleared records using an isolated test key, while enforcing the same observable state and concurrency behavior for both representations.
 
 ## Testing Approach
 

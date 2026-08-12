@@ -69,14 +69,7 @@ public class PersistenceProviderTests_Cosmos
     public async Task CosmosStorage_ModelBasedGeneratedConformance()
     {
         var storage = await InitializeStorage(deleteStateOnClear: false);
-        var runner = new GrainStorageModelBasedTestRunner(
-            storage,
-            new GrainStorageModelBasedConformanceOptions
-            {
-                ProviderName = "Cosmos",
-                DeleteStateOnClear = false
-            },
-            output.WriteLine);
+        var runner = new GrainStorageModelBasedTestRunner(storage, "Cosmos", output.WriteLine);
 
         await runner.RunGeneratedConformanceTests();
     }
@@ -85,14 +78,7 @@ public class PersistenceProviderTests_Cosmos
     public async Task CosmosStorage_DeleteStateOnClear_ModelBasedGeneratedConformance()
     {
         var storage = await InitializeStorage(deleteStateOnClear: true);
-        var runner = new GrainStorageModelBasedTestRunner(
-            storage,
-            new GrainStorageModelBasedConformanceOptions
-            {
-                ProviderName = "CosmosDeleteStateOnClear",
-                DeleteStateOnClear = true
-            },
-            output.WriteLine);
+        var runner = new GrainStorageModelBasedTestRunner(storage, "CosmosDeleteStateOnClear", output.WriteLine);
 
         await runner.RunGeneratedConformanceTests();
     }
