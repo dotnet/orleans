@@ -17,7 +17,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed partial class Gateway : IConnectedClientCollection
+    internal sealed partial class Gateway : IConnectedClientCollection, ISiloStatusListener
     {
         // clients is the main authorative collection of all connected clients.
         // Any client currently in the system appears in this collection.
@@ -33,6 +33,8 @@ namespace Orleans.Runtime.Messaging
         private readonly ClientsReplyRoutingCache clientsReplyRoutingCache;
         private readonly MessageCenter messageCenter;
         private readonly MessagingInstruments _messagingInstruments;
+        private readonly ISiloStatusOracle siloStatusOracle;
+        private readonly TimeProvider timeProvider;
 
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
@@ -46,12 +48,15 @@ namespace Orleans.Runtime.Messaging
             ILoggerFactory loggerFactory,
             IOptions<SiloMessagingOptions> options,
             IAsyncTimerFactory timerFactory,
+            ISiloStatusOracle siloStatusOracle,
             OrleansInstruments orleansInstruments,
             MessagingInstruments messagingInstruments,
             [FromKeyedServices(TimeProviderNames.SystemTimers)] TimeProvider timeProvider)
         {
             this.messageCenter = messageCenter;
             _messagingInstruments = messagingInstruments;
+            this.siloStatusOracle = siloStatusOracle;
+            this.timeProvider = timeProvider;
             this.messagingOptions = options.Value;
             this.loggerFactory = loggerFactory;
             this.logger = this.loggerFactory.CreateLogger<Gateway>();
@@ -62,6 +67,7 @@ namespace Orleans.Runtime.Messaging
             this.GatewayInstruments = new(orleansInstruments);
             this.gatewayMaintenanceTimer = timerFactory.Create(messagingOptions.ClientDropTimeout, nameof(PerformGatewayMaintenance), timeProvider);
             this.gatewayMaintenanceTask = Task.Run(PerformGatewayMaintenance);
+            this.siloStatusOracle.SubscribeToSiloStatusEvents(this);
         }
 
         internal GatewayInstruments GatewayInstruments { get; }
@@ -89,6 +95,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     DropDisconnectedClients();
                     DropExpiredRoutingCachedEntries();
+                    DropExpiredRequests();
                 }
                 catch (Exception exception)
                 {
@@ -116,8 +123,13 @@ namespace Orleans.Runtime.Messaging
 
         internal async Task StopAsync()
         {
+            siloStatusOracle.UnSubscribeFromSiloStatusEvents(this);
             gatewayMaintenanceTimer.Dispose();
             await gatewayMaintenanceTask.ConfigureAwait(false);
+            foreach (var client in clients.Values)
+            {
+                client.ClearPendingRequests();
+            }
         }
 
         long IConnectedClientCollection.Version => Interlocked.Read(ref clientsCollectionVersion);
@@ -211,11 +223,46 @@ namespace Orleans.Runtime.Messaging
             return null;
         }
 
+        internal void TrackRequest(Message message)
+        {
+            if (message.Direction != Message.Directions.Request
+                || message.TargetSilo is not { } targetSilo
+                || targetSilo.Matches(siloAddress)
+                || !ClientGrainId.TryParse(message.SendingGrain, out var clientId)
+                || !clients.TryGetValue(clientId, out var client))
+            {
+                return;
+            }
+
+            client.TrackRequest(message, targetSilo);
+        }
+
+        public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
+        {
+            if (status != SiloStatus.Dead)
+            {
+                return;
+            }
+
+            foreach (var client in clients.Values)
+            {
+                client.RejectRequestsToSilo(updatedSilo);
+            }
+        }
+
         internal void DropExpiredRoutingCachedEntries()
         {
             lock (clients)
             {
                 clientsReplyRoutingCache.DropExpiredEntries();
+            }
+        }
+
+        internal void DropExpiredRequests()
+        {
+            foreach (var client in clients.Values)
+            {
+                client.DropExpiredRequests();
             }
         }
 
@@ -301,6 +348,11 @@ namespace Orleans.Runtime.Messaging
             msg.TargetSilo = null;
             msg.SendingSilo ??= gatewayAddress;
 
+            if (msg.Direction == Message.Directions.Response && msg.Result != Message.ResponseTypes.Status)
+            {
+                client.CompleteRequest(msg.Id);
+            }
+
             client.Send(msg);
             return true;
         }
@@ -310,6 +362,7 @@ namespace Orleans.Runtime.Messaging
             private readonly Gateway _gateway;
             private readonly Task _messageLoop;
             private readonly ConcurrentQueue<Message> _pendingToSend = new();
+            private readonly Dictionary<CorrelationId, PendingRequest> _pendingRequests = [];
             private readonly SingleWaiterAutoResetEvent _signal = new()
             {
                 RunContinuationsAsynchronously = true
@@ -349,6 +402,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 _disconnectedSince.Restart();
+                ClearPendingRequests();
                 _signal.Signal();
             }
 
@@ -387,6 +441,104 @@ namespace Orleans.Runtime.Messaging
                 _pendingToSend.Enqueue(msg);
                 _signal.Signal();
                 LogTraceQueuedMessage(_gateway.logger, msg, msg.TargetGrain);
+            }
+
+            public void TrackRequest(Message message, SiloAddress targetSilo)
+            {
+                var timeToLive = message.TimeToLive ?? _gateway.messagingOptions.ResponseTimeout;
+                if (timeToLive <= TimeSpan.Zero)
+                {
+                    return;
+                }
+
+                lock (_pendingRequests)
+                {
+                    _pendingRequests[message.Id] = new(message, targetSilo, _gateway.timeProvider.GetTimestamp(), timeToLive);
+                }
+            }
+
+            public void CompleteRequest(CorrelationId correlationId)
+            {
+                lock (_pendingRequests)
+                {
+                    _pendingRequests.Remove(correlationId);
+                }
+            }
+
+            public void ClearPendingRequests()
+            {
+                lock (_pendingRequests)
+                {
+                    _pendingRequests.Clear();
+                }
+            }
+
+            public void DropExpiredRequests()
+            {
+                var timestamp = _gateway.timeProvider.GetTimestamp();
+                lock (_pendingRequests)
+                {
+                    List<CorrelationId>? expiredRequests = null;
+                    foreach (var request in _pendingRequests)
+                    {
+                        if (_gateway.timeProvider.GetElapsedTime(request.Value.Timestamp, timestamp) >= request.Value.TimeToLive)
+                        {
+                            expiredRequests ??= [];
+                            expiredRequests.Add(request.Key);
+                        }
+                    }
+
+                    if (expiredRequests is not null)
+                    {
+                        foreach (var request in expiredRequests)
+                        {
+                            _pendingRequests.Remove(request);
+                        }
+                    }
+                }
+            }
+
+            public void RejectRequestsToSilo(SiloAddress deadSilo)
+            {
+                List<Message>? requests = null;
+                lock (_pendingRequests)
+                {
+                    List<CorrelationId>? requestIds = null;
+                    foreach (var request in _pendingRequests)
+                    {
+                        if (request.Value.TargetSilo.Equals(deadSilo))
+                        {
+                            requests ??= [];
+                            requests.Add(request.Value.Message);
+                            requestIds ??= [];
+                            requestIds.Add(request.Key);
+                        }
+                    }
+
+                    if (requestIds is not null)
+                    {
+                        foreach (var requestId in requestIds)
+                        {
+                            _pendingRequests.Remove(requestId);
+                        }
+                    }
+                }
+
+                if (requests is null)
+                {
+                    return;
+                }
+
+                foreach (var request in requests)
+                {
+                    var exception = new SiloUnavailableException(
+                        $"The target silo {deadSilo} became unavailable for message: {request}.");
+                    _gateway.messageCenter.RejectMessage(
+                        request,
+                        Message.RejectionTypes.Transient,
+                        exception,
+                        "Target silo became unavailable");
+                }
             }
 
             private async Task RunMessageLoop()
@@ -461,6 +613,12 @@ namespace Orleans.Runtime.Messaging
                     return false;
                 }
             }
+
+            private readonly record struct PendingRequest(
+                Message Message,
+                SiloAddress TargetSilo,
+                long Timestamp,
+                TimeSpan TimeToLive);
         }
 
         // this cache is used to record the addresses of Gateways from which clients connected to.
