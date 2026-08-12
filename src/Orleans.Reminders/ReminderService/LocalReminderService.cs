@@ -1560,13 +1560,15 @@ namespace Orleans.Runtime.ReminderService
                 {
                     scheduleChangedToken = _scheduleChangedCancellation.Token;
 
-                    if (_stopReason != (int)ReminderEvents.LocalReminderStopReason.Unknown || _scheduleVersion != scheduleVersion)
+                    if (_stopReason != (int)ReminderEvents.LocalReminderStopReason.Unknown
+                        || _scheduleVersion != scheduleVersion
+                        || _entry is not { } currentEntry)
                     {
                         entry = default!;
                         return false;
                     }
 
-                    entry = _entry;
+                    entry = currentEntry;
                     return true;
                 }
             }
@@ -1585,11 +1587,12 @@ namespace Orleans.Runtime.ReminderService
                         return false;
                     }
 
-                    return _entry.GrainId == entry.GrainId
-                        && StringComparer.Ordinal.Equals(_entry.ReminderName, entry.ReminderName)
-                        && _entry.StartAt == entry.StartAt
-                        && _entry.Period == entry.Period
-                        && StringComparer.Ordinal.Equals(_entry.ETag, entry.ETag);
+                    return _entry is { } currentEntry
+                        && currentEntry.GrainId == entry.GrainId
+                        && StringComparer.Ordinal.Equals(currentEntry.ReminderName, entry.ReminderName)
+                        && currentEntry.StartAt == entry.StartAt
+                        && currentEntry.Period == entry.Period
+                        && StringComparer.Ordinal.Equals(currentEntry.ETag, entry.ETag);
                 }
             }
 
