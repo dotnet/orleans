@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿// <broadcast_channel_stock_worker>
+using System.Diagnostics;
 using BroadcastChannel.GrainInterfaces;
 using Microsoft.Extensions.Hosting;
 using Orleans.BroadcastChannel;
@@ -43,3 +44,4 @@ internal sealed class StockWorker : BackgroundService
         }
     }
 }
+// </broadcast_channel_stock_worker>

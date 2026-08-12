@@ -257,7 +257,7 @@ describe('snippet project policy', { timeout: 30_000 }, () => {
     await writeFile(path.join(root, 'snippets', 'example', 'Program.cs'), 'class Program {}\n');
     await writeFile(
       path.join(root, 'guide.md'),
-      ':::code language="csharp" source="snippets/example/Program.cs":::\n',
+      ':::code language="csharp" source="snippets/example/Program.cs" id="program":::\n',
     );
 
     expect(await runPolicy(root)).toMatchObject({ exitCode: 0 });
@@ -309,7 +309,7 @@ describe('snippet project policy', { timeout: 30_000 }, () => {
           ':::code language="csharp" source="Missing.cs":::',
           '',
           '[!INCLUDE [active](includes/active.md)]',
-          ':::code language="csharp" source="snippets/example/Program.cs":::',
+          ':::code language="csharp" source="snippets/example/Program.cs" id="program":::',
           '',
         ].join(newline),
       );
@@ -335,10 +335,45 @@ describe('snippet project policy', { timeout: 30_000 }, () => {
     );
     await writeFile(
       path.join(root, 'guide.md'),
-      ':::code language="csharp" source="shared/Linked.cs":::\n',
+      ':::code language="csharp" source="shared/Linked.cs" id="linked":::\n',
     );
 
     expect(await runPolicy(root)).toMatchObject({ exitCode: 0 });
+  });
+
+  test('requires an id when a C# source contains named regions', async () => {
+    const root = await temporaryDirectory();
+    await writeValidatedProject(
+      root,
+      [
+        '<Project Sdk="Microsoft.NET.Sdk">',
+        '  <ItemGroup>',
+        '    <PackageReference Include="Microsoft.Orleans.Server" Version="10.2.2" />',
+        '    <Compile Include="../compiled/Program.cs" Link="Program.cs" />',
+        '  </ItemGroup>',
+        '</Project>',
+      ].join('\n'),
+    );
+    await mkdir(path.join(root, 'snippets', 'compiled'));
+    await writeFile(
+      path.join(root, 'snippets', 'compiled', 'Program.cs'),
+      [
+        'class HiddenScaffolding {}',
+        '// <displayed>',
+        'class Displayed {}',
+        '// </displayed>',
+      ].join('\n'),
+    );
+    await writeFile(
+      path.join(root, 'guide.md'),
+      ':::code language="csharp" source="snippets/compiled/Program.cs":::\n',
+    );
+
+    const result = await runPolicy(root);
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain(
+      'does not specify an id',
+    );
   });
 
   test('rejects a standalone C# directive target outside validated projects', async () => {
@@ -517,7 +552,7 @@ describe('snippet project policy', { timeout: 30_000 }, () => {
     );
     await writeFile(
       path.join(siteRoot, 'external.md'),
-      ':::code language="csharp" source="src/content/docs/snippets/example/Program.cs":::\n',
+      ':::code language="csharp" source="src/content/docs/snippets/example/Program.cs" id="program":::\n',
     );
 
     expect(await runPolicy(sourceRoot, siteRoot)).toMatchObject({ exitCode: 0 });

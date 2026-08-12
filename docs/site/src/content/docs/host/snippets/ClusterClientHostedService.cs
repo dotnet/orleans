@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿// <cluster_client_hosted_service>
+using Microsoft.Extensions.Hosting;
 
 namespace Client;
 
@@ -21,3 +22,4 @@ public sealed class ClusterClientHostedService : IHostedService
     public Task StopAsync(CancellationToken cancellationToken)
         => Task.CompletedTask;
 }
+// </cluster_client_hosted_service>

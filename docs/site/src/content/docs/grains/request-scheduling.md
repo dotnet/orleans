@@ -11,20 +11,7 @@ Each grain activation executes one turn at a time. Orleans runs a request until 
 
 By default, an activation doesn't start a different request while the current request is incomplete. This non-reentrant model makes mutable grain state easier to reason about:
 
-```csharp
-public sealed class CounterGrain : Grain, ICounterGrain
-{
-    private int _value;
-
-    public async ValueTask<int> AddAfterDelay(int amount)
-    {
-        await Task.Delay(TimeSpan.FromMilliseconds(100));
-        _value += amount;
-        return _value;
-    }
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="serialized_counter_grain":::
 Although the method yields at `await`, another request doesn't observe or change `_value` before this request completes.
 
 ## Avoid blocking
@@ -49,72 +36,26 @@ Use the narrowest mechanism that solves the problem. Reentrancy can improve thro
 
 ### Reentrant grains
 
-```csharp
-[Reentrant]
-public sealed class CatalogGrain : Grain, ICatalogGrain
-{
-    public async ValueTask<Product> GetProduct(string productId)
-    {
-        return await LoadProduct(productId);
-    }
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="reentrant_catalog_grain":::
 Code in different requests doesn't run simultaneously, but multiple incomplete calls can make progress by alternating turns.
 
 ### Method-level interleaving
 
-```csharp
-public interface IStatusGrain : IGrainWithStringKey
-{
-    Task Update(Status status);
-
-    [ReadOnly]
-    ValueTask<Status> Get();
-
-    [AlwaysInterleave]
-    ValueTask Ping();
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="interleaving_method_attributes":::
 `ReadOnly` is a scheduling promise. Don't mutate grain state from a read-only method.
 
 ### Predicate-based interleaving
 
 `MayInterleave` names a predicate that accepts <xref:Orleans.Serialization.Invocation.IInvokable>. Use its accessor methods; there is no `Arguments` property:
 
-```csharp
-[MayInterleave(nameof(CanInterleave))]
-public sealed class WorkGrain : Grain, IWorkGrain
-{
-    public static bool CanInterleave(IInvokable request)
-    {
-        return request.GetArgumentCount() == 1
-            && request.GetArgument(0) is WorkItem { IsReadOnly: true };
-    }
-
-    public Task Process(WorkItem item) => Task.CompletedTask;
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="may_interleave_grain":::
 Keep predicates deterministic, fast, and side-effect free.
 
 ### Call-chain reentrancy
 
 Use call-chain reentrancy when a known call path must call back into the initiating activation:
 
-```csharp
-public async Task JoinRoom(string roomName)
-{
-    using var scope = RequestContext.AllowCallChainReentrancy();
-
-    IChatRoomGrain room =
-        GrainFactory.GetGrain<IChatRoomGrain>(roomName);
-
-    await room.Join(this.AsReference<IUserGrain>());
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="call_chain_reentrancy":::
 The scope permits callbacks associated with that call chain until it is disposed. It is narrower than marking the entire grain reentrant.
 
 ## Timers and external work

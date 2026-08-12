@@ -15,45 +15,14 @@ Create the Kinesis data stream before starting Orleans. The provider discovers i
 
 Install the package and register a named provider:
 
-```csharp
-using Orleans.Hosting;
-
-siloBuilder
-    .AddDynamoDBGrainStorage("PubSubStore", options =>
-    {
-        options.Service = "us-east-1";
-        options.ServiceId = "orders";
-        options.TableName = "OrdersPubSub";
-        options.UseProvisionedThroughput = false;
-    })
-    .AddKinesisStreams("Orders", stream =>
-    {
-        stream.ConfigureKinesis(options =>
-        {
-            options.StreamName = "orders";
-            options.Region = "us-east-1";
-        });
-
-        stream.UseDynamoDBCheckpointer(options =>
-        {
-            options.Service = "us-east-1";
-            options.TableName = "OrdersStreamCheckpoints";
-            options.PersistInterval = TimeSpan.FromSeconds(30);
-        });
-    });
-```
+:::code language="csharp" source="../snippets/compiled/Streaming/KinesisSnippets.cs" id="kinesis_hosting_using":::
+:::code language="csharp" source="../snippets/compiled/Streaming/KinesisSnippets.cs" id="configure_kinesis_silo":::
 
 `PubSubStore` persists explicit Orleans stream subscriptions. The checkpoint table has a different purpose: it records the last delivered Kinesis sequence number for each shard.
 
 Configure every Orleans client which publishes through the provider with the same provider name, stream name, and region:
 
-```csharp
-clientBuilder.AddKinesisStreams("Orders", options =>
-{
-    options.StreamName = "orders";
-    options.Region = "us-east-1";
-});
-```
+:::code language="csharp" source="../snippets/compiled/Streaming/KinesisSnippets.cs" id="configure_kinesis_client":::
 
 When explicit credentials aren't configured, the provider uses the [AWS SDK for .NET credential resolution chain](https://docs.aws.amazon.com/sdk-for-net/v4/developer-guide/creds-assign.html). In production, prefer workload credentials such as an IAM role. Set <xref:Orleans.Streaming.Kinesis.KinesisStreamOptions.Service> when using a custom Kinesis-compatible endpoint.
 
@@ -76,25 +45,8 @@ Set <xref:Orleans.Configuration.DynamoDBStreamQueueCheckpointerOptions.UseProvis
 
 If no checkpointer is selected, the provider uses Orleans grain-backed checkpoints. Checkpoint grains use `PubSubStore` by default, so that provider must be durable in production:
 
-```csharp
-using Orleans.Streams;
-
-siloBuilder.AddKinesisStreams("Orders", stream =>
-{
-    stream.ConfigureKinesis(options =>
-    {
-        options.StreamName = "orders";
-        options.Region = "us-east-1";
-    });
-
-    stream.UseGrainCheckpointer(options =>
-    {
-        options.StorageProviderName = "PubSubStore";
-        options.CheckpointComparer = StreamCheckpointComparers.Numeric;
-        options.PersistInterval = TimeSpan.FromSeconds(30);
-    });
-});
-```
+:::code language="csharp" source="../snippets/compiled/Streaming/KinesisSnippets.cs" id="kinesis_streams_using":::
+:::code language="csharp" source="../snippets/compiled/Streaming/KinesisSnippets.cs" id="configure_grain_checkpoints":::
 
 Both implementations preserve monotonic Kinesis sequence numbers and can replay a small number of already delivered records after an unclean shutdown. Consumers must tolerate duplicate delivery.
 

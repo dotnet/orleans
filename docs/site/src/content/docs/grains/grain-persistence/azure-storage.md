@@ -15,32 +15,18 @@ Table storage keeps one state record in an entity and splits serialized state ac
 
 Configure a named provider with <xref:Orleans.Hosting.AzureTableSiloBuilderExtensions.AddAzureTableGrainStorage*>. Token credentials are preferred over secrets:
 
-```csharp
-using Azure.Identity;
+:::code language="csharp" source="../../snippets/compiled/Grains/PersistenceSnippets.cs" id="azure_identity_using_table":::
 
-siloBuilder.AddAzureTableGrainStorage(
-    "profileStore",
-    options => options.ConfigureTableServiceClient(
-        new Uri("https://account.table.core.windows.net"),
-        new DefaultAzureCredential()));
-```
-
+:::code language="csharp" source="../../snippets/compiled/Grains/PersistenceSnippets.cs" id="configure_azure_table_storage":::
 Assign the storage account identity the data-plane permissions required to read and write table entities.
 
 ## Azure Blob Storage
 
 Blob storage keeps each state record in a blob and is appropriate when state can exceed the Table Storage entity limit:
 
-```csharp
-using Azure.Identity;
+:::code language="csharp" source="../../snippets/compiled/Grains/PersistenceSnippets.cs" id="azure_identity_using_blob":::
 
-siloBuilder.AddAzureBlobGrainStorage(
-    "cartStore",
-    options => options.ConfigureBlobServiceClient(
-        new Uri("https://account.blob.core.windows.net"),
-        new DefaultAzureCredential()));
-```
-
+:::code language="csharp" source="../../snippets/compiled/Grains/PersistenceSnippets.cs" id="configure_azure_blob_storage":::
 Assign the storage account identity the data-plane permissions required to read and write blobs.
 
 ## Connection strings

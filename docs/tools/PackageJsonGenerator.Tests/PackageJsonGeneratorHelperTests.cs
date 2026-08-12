@@ -6,27 +6,6 @@ namespace PackageJsonGenerator.Tests;
 public sealed class PackageJsonGeneratorHelperTests
 {
     [Theory]
-    [InlineData("public sealed class Widget;")]
-    [InlineData("public string Name { get; set; }")]
-    [InlineData("ValueTask<string> GetValue();")]
-    [InlineData("await DoWorkAsync();")]
-    [InlineData("new Widget()")]
-    [InlineData("[Obsolete]")]
-    public void CSharpFenceSyntaxValidator_AcceptsCommonFragmentContexts(string source)
-    {
-        Assert.True(CSharpFenceSyntaxCommand.IsValidInAnyContext(source));
-    }
-
-    [Theory]
-    [InlineData("public class")]
-    [InlineData("if (...)")]
-    [InlineData("value ??? fallback")]
-    public void CSharpFenceSyntaxValidator_RejectsInvalidFragments(string source)
-    {
-        Assert.False(CSharpFenceSyntaxCommand.IsValidInAnyContext(source));
-    }
-
-    [Theory]
     [InlineData("/_/src/Orleans.Core/Foo.cs", "src/Orleans.Core/Foo.cs")]
     [InlineData("/agent/_work/orleans/src/Orleans.Core/Foo.cs", "src/Orleans.Core/Foo.cs")]
     [InlineData(@"C:\agent\_work\orleans\src\Orleans.Core\Foo.cs", "src/Orleans.Core/Foo.cs")]

@@ -1,4 +1,5 @@
-﻿using IHost host = Host.CreateDefaultBuilder(args)
+﻿// <transactions_client_program>
+using IHost host = Host.CreateDefaultBuilder(args)
     .UseOrleansClient((_, client) =>
     {
         client.UseLocalhostClustering()
@@ -67,3 +68,4 @@ while (!Console.KeyAvailable)
     // Sleep and run again
     await Task.Delay(TimeSpan.FromMilliseconds(200));
 }
+// </transactions_client_program>

@@ -1,3 +1,4 @@
+// <hello_world_program>
 using HelloWorld;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -20,3 +21,4 @@ var response = await friend.SayHello("Hi friend");
 Console.WriteLine(response);
 
 await host.StopAsync();
+// </hello_world_program>

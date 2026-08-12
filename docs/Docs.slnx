@@ -98,6 +98,10 @@
   <Folder Name="/site/src/content/docs/quickstarts/snippets/url-shortener/">
     <Project Path="site/src/content/docs/quickstarts/snippets/url-shortener/orleansurlshortener/orleansurlshortener.csproj" />
   </Folder>
+  <Folder Name="/site/src/content/docs/snippets/" />
+  <Folder Name="/site/src/content/docs/snippets/compiled/">
+    <Project Path="site/src/content/docs/snippets/compiled/CompiledDocumentationSnippets.csproj" />
+  </Folder>
   <Folder Name="/site/src/content/docs/streaming/" />
   <Folder Name="/site/src/content/docs/streaming/snippets/">
     <Project Path="site/src/content/docs/streaming/snippets/streaming/streaming.csproj" />

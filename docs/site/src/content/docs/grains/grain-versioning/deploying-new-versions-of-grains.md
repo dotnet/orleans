@@ -25,14 +25,7 @@ Apply a higher `[Version]` value only after defining this contract. The number a
 
 The default combination works for a backward-compatible rollout:
 
-```csharp
-siloBuilder.Configure<GrainVersioningOptions>(options =>
-{
-    options.DefaultCompatibilityStrategy = nameof(BackwardCompatible);
-    options.DefaultVersionSelectorStrategy = nameof(AllCompatibleVersions);
-});
-```
-
+:::code language="csharp" source="../../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="configure_grain_versioning":::
 Then:
 
 1. Start version 2 silos while version 1 silos and callers remain.

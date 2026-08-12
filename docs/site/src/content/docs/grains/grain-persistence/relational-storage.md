@@ -21,34 +21,10 @@ The invariant is an Orleans provider identifier and doesn't always match the dri
 
 ## Configure a provider
 
-```csharp
-var builder = Host.CreateApplicationBuilder(args);
-
-builder.UseOrleans(siloBuilder =>
-{
-    siloBuilder.AddAdoNetGrainStorage(
-        "stateStore",
-        options =>
-        {
-            options.Invariant = "Npgsql";
-            options.ConnectionString =
-                builder.Configuration.GetConnectionString("grainState");
-        });
-});
-```
-
+:::code language="csharp" source="../../snippets/compiled/Grains/PersistenceSnippets.cs" id="configure_ado_net_storage":::
 For SQLite:
 
-```csharp
-siloBuilder.AddAdoNetGrainStorage(
-    "localState",
-    options =>
-    {
-        options.Invariant = "System.Data.SQLite";
-        options.ConnectionString = "Data Source=orleans-state.db";
-    });
-```
-
+:::code language="csharp" source="../../snippets/compiled/Grains/PersistenceSnippets.cs" id="configure_sqlite_storage":::
 SQLite is useful for local, single-process scenarios. Its file locking, deployment topology, and availability characteristics generally don't fit a multi-silo production cluster.
 
 ## Serialization and schema evolution

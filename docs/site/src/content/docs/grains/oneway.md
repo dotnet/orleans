@@ -11,14 +11,7 @@ A regular grain call returns a task that completes when Orleans receives the met
 
 A method marked with <xref:Orleans.Concurrency.OneWayAttribute> returns to the caller after Orleans accepts the request for sending. The caller receives no completion signal, result, or exception:
 
-```csharp
-public interface IAuditGrain : IGrainWithStringKey
-{
-    [OneWay]
-    ValueTask Record(AuditEntry entry);
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/ServicesAndObserversSnippets.cs" id="one_way_audit":::
 One-way methods must return <xref:System.Threading.Tasks.Task> or <xref:System.Threading.Tasks.ValueTask>, not their generic forms.
 
 ## Delivery semantics

@@ -15,96 +15,27 @@ Reminders are an example of this pattern. Most application workloads should use 
 
 The service interface derives from <xref:Orleans.Services.IGrainService>:
 
-```csharp
-public interface IIndexService : IGrainService
-{
-    Task Add(string key);
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/ServicesAndObserversSnippets.cs" id="index_grain_service_interface":::
 Derive the implementation from <xref:Orleans.Runtime.GrainService>:
 
-```csharp
-[Reentrant]
-public sealed class IndexService :
-    GrainService,
-    IIndexService
-{
-    public IndexService(
-        GrainId id,
-        Silo silo,
-        ILoggerFactory loggerFactory)
-        : base(id, silo, loggerFactory)
-    {
-    }
-
-    public Task Add(string key)
-    {
-        return Task.CompletedTask;
-    }
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/ServicesAndObserversSnippets.cs" id="index_grain_service":::
 Override <xref:Orleans.Runtime.GrainService.Init*>, <xref:Orleans.Runtime.GrainService.Start*>, <xref:Orleans.Runtime.GrainService.StartInBackground*>, and <xref:Orleans.Runtime.GrainService.Stop*> only when the service needs work at those lifecycle points. Grain services aren't ordinary grains: they don't have a stable application identity, aren't collected when idle, and don't migrate.
 
 ## Create the grain-facing client
 
 Define a client interface and proxy:
 
-```csharp
-public interface IIndexServiceClient :
-    IGrainServiceClient<IIndexService>
-{
-    Task Add(string key);
-}
-
-public sealed class IndexServiceClient :
-    GrainServiceClient<IIndexService>,
-    IIndexServiceClient
-{
-    public IndexServiceClient(IServiceProvider services)
-        : base(services)
-    {
-    }
-
-    public Task Add(string key)
-    {
-        IIndexService service =
-            GetGrainService(CurrentGrainReference.GrainId);
-
-        return service.Add(key);
-    }
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/ServicesAndObserversSnippets.cs" id="index_grain_service_client":::
 <xref:Orleans.Runtime.Services.GrainServiceClient`1.GetGrainService*> consistently maps the calling grain to a service partition. Other overloads support explicit silo or hash routing for advanced implementations.
 
 ## Register and consume the service
 
 Register both the service and its client:
 
-```csharp
-siloBuilder.AddGrainService<IndexService>();
-siloBuilder.Services.AddSingleton<
-    IIndexServiceClient,
-    IndexServiceClient>();
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/ServicesAndObserversSnippets.cs" id="register_index_grain_service":::
 Inject the client into a normal grain:
 
-```csharp
-public sealed class DocumentGrain(
-    IIndexServiceClient indexService) :
-    Grain,
-    IDocumentGrain
-{
-    public Task Index()
-    {
-        return indexService.Add(this.GetPrimaryKeyString());
-    }
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/ServicesAndObserversSnippets.cs" id="use_index_grain_service":::
 The client can route to a remote silo; don't assume calls stay local.
 
 Grain service implementation APIs are provided by [Microsoft.Orleans.Runtime](https://www.nuget.org/packages/Microsoft.Orleans.Runtime), which silo applications receive through `Microsoft.Orleans.Server`.

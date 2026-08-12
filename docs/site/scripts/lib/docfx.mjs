@@ -551,7 +551,11 @@ function findRegion(lines, id, sourcePath) {
       }
       if (style.nestedClose.test(lines[index])) {
         if (depth === 0 && style.close.test(lines[index])) {
-          return lines.slice(start + 1, index);
+          return lines
+            .slice(start + 1, index)
+            .filter(
+              (line) => !style.nestedOpen.test(line) && !style.nestedClose.test(line),
+            );
         }
         depth -= 1;
       }

@@ -1,4 +1,5 @@
-﻿namespace TransactionalExample.Abstractions;
+﻿// <transactions_account_grain_interface>
+namespace TransactionalExample.Abstractions;
 
 public interface IAccountGrain : IGrainWithStringKey
 {
@@ -11,3 +12,4 @@ public interface IAccountGrain : IGrainWithStringKey
     [Transaction(TransactionOption.CreateOrJoin)]
     Task<decimal> GetBalance();
 }
+// </transactions_account_grain_interface>

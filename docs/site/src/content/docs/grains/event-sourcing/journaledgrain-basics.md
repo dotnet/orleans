@@ -9,12 +9,7 @@ ms.topic: concept-article
 
 Derive an event-sourced grain from <xref:Orleans.EventSourcing.JournaledGrain`2>:
 
-```csharp
-public sealed class AccountGrain
-    : JournaledGrain<AccountState, AccountEvent>, IAccountGrain
-{
-}
-```
+:::code language="csharp" source="../../snippets/compiled/EventSourcing/EventSourcingSnippets.cs" id="journaled_grain":::
 
 `TGrainState` must be a class with a public parameterless constructor. `TEventBase` is the common class or interface for the grain's events. State and event types must be serializable because providers can persist or send them.
 
@@ -33,20 +28,7 @@ Don't mutate <xref:Orleans.EventSourcing.JournaledGrain`2.State> or <xref:Orlean
 
 By default, Orleans dynamically invokes the closest `Apply` overload on the state:
 
-```csharp
-[GenerateSerializer]
-public sealed class AccountState
-{
-    [Id(0)]
-    public decimal Balance { get; private set; }
-
-    public void Apply(Deposited deposited) =>
-        Balance += deposited.Amount;
-
-    public void Apply(Withdrawn withdrawn) =>
-        Balance -= withdrawn.Amount;
-}
-```
+:::code language="csharp" source="../../snippets/compiled/EventSourcing/EventSourcingSnippets.cs" id="event_sourced_state":::
 
 Alternatively, override <xref:Orleans.EventSourcing.JournaledGrain`2.TransitionState*>. Transition logic must be deterministic and must only mutate the supplied state. Providers can replay transitions more than once, so don't perform I/O or other side effects from transition methods.
 
@@ -57,19 +39,13 @@ Alternatively, override <xref:Orleans.EventSourcing.JournaledGrain`2.TransitionS
 
 <xref:Orleans.EventSourcing.JournaledGrain`2.RaiseEvent*> submits an event but doesn't wait for durable confirmation:
 
-```csharp
-RaiseEvent(new Deposited(amount));
-await ConfirmEvents();
-```
+:::code language="csharp" source="../../snippets/compiled/EventSourcing/EventSourcingSnippets.cs" id="raise_and_confirm":::
 
 Await <xref:Orleans.EventSourcing.JournaledGrain`2.ConfirmEvents*> before returning when the grain method promises that its events are confirmed. If confirmation isn't awaited, Orleans continues confirmation in the background and callers can observe tentative behavior.
 
 Submit a related sequence atomically with <xref:Orleans.EventSourcing.JournaledGrain`2.RaiseEvents*>:
 
-```csharp
-RaiseEvents(events);
-await ConfirmEvents();
-```
+:::code language="csharp" source="../../snippets/compiled/EventSourcing/EventSourcingSnippets.cs" id="raise_many_and_confirm":::
 
 The provider submits the sequence as one log append. The confirmed version advances by the number of events.
 
@@ -77,12 +53,7 @@ The provider submits the sequence as one log append. The confirmed version advan
 
 Use <xref:Orleans.EventSourcing.JournaledGrain`2.RaiseConditionalEvent*> or <xref:Orleans.EventSourcing.JournaledGrain`2.RaiseConditionalEvents*> when an event is valid only against the version currently observed:
 
-```csharp
-if (!await RaiseConditionalEvent(new Withdrawn(amount)))
-{
-    return false;
-}
-```
+:::code language="csharp" source="../../snippets/compiled/EventSourcing/EventSourcingSnippets.cs" id="raise_conditional_event":::
 
 The returned task completes after the conditional append is resolved. `false` means another update won the version race and the event wasn't appended. Re-evaluate the command using the refreshed state; don't treat a conflict as success.
 
@@ -90,9 +61,7 @@ The returned task completes after the conditional append is resolved. `false` me
 
 <xref:Orleans.EventSourcing.JournaledGrain`2.RefreshNow*> confirms submitted events and refreshes the view from storage:
 
-```csharp
-await RefreshNow();
-```
+:::code language="csharp" source="../../snippets/compiled/EventSourcing/EventSourcingSnippets.cs" id="refresh_now":::
 
 <xref:Orleans.EventSourcing.JournaledGrain`2.RetrieveConfirmedEvents*> returns a confirmed segment only when the provider retains and exposes it. State storage and custom storage don't expose events through this API; log storage does.
 

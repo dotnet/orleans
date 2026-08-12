@@ -13,15 +13,7 @@ Grain interface versioning lets silos with different interface versions coexist 
 
 Apply <xref:Orleans.CodeGeneration.VersionAttribute> to a grain interface:
 
-```csharp
-[Version(2)]
-public interface ICartGrain : IGrainWithStringKey
-{
-    Task<Cart> GetAsync();
-    Task AddAsync(Item item);
-}
-```
-
+:::code language="csharp" source="../../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="versioned_cart_interface":::
 The value is an unsigned 16-bit integer. Interfaces without the attribute have version `0`. Use monotonically increasing values for successive contract revisions.
 
 ## How routing works

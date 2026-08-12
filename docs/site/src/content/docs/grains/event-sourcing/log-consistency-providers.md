@@ -29,20 +29,17 @@ It supports <xref:Orleans.EventSourcing.JournaledGrain`2.RetrieveConfirmedEvents
 
 ## Custom storage
 
-<xref:Orleans.EventSourcing.CustomStorage.LogConsistencyProvider> calls storage methods implemented by the grain:
+<xref:Orleans.EventSourcing.CustomStorage.LogConsistencyProvider> calls the real
+<xref:Orleans.EventSourcing.CustomStorage.ICustomStorageInterface`2> methods
+implemented by the grain:
 
-```csharp
-public interface ICustomStorageInterface<TState, TEvent>
-{
-    Task<KeyValuePair<int, TState>> ReadStateFromStorage();
-
-    Task<bool> ApplyUpdatesToStorage(
-        IReadOnlyList<TEvent> updates,
-        int expectedVersion);
-}
-```
+:::code language="csharp" source="../../snippets/compiled/EventSourcing/EventSourcingSnippets.cs" id="custom_storage_operations":::
 
 <xref:Orleans.EventSourcing.CustomStorage.ICustomStorageInterface`2.ReadStateFromStorage*> returns the confirmed version and state. <xref:Orleans.EventSourcing.CustomStorage.ICustomStorageInterface`2.ApplyUpdatesToStorage*> must atomically compare `expectedVersion` and append/apply the supplied sequence. Return `false` on a version conflict.
+
+<xref:Orleans.EventSourcing.CustomStorage.ICustomStorageInterface`2.ClearStoredState*>
+clears the application-owned state when the provider supports destructive log
+clearing.
 
 The provider retries after exceptions. If storage committed but the response was lost, the same update can be submitted again. The implementation must make retries idempotent or detect duplicate submissions. Returning success before the update is durable violates <xref:Orleans.EventSourcing.JournaledGrain`2.ConfirmEvents*> semantics.
 

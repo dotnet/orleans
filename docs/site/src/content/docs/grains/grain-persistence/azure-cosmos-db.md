@@ -13,22 +13,9 @@ The [`Microsoft.Orleans.Persistence.Cosmos`](https://www.nuget.org/packages/Micr
 
 Configure a named provider with <xref:Orleans.Hosting.HostingExtensions.AddCosmosGrainStorage*>. Microsoft Entra authentication avoids storing account keys:
 
-```csharp
-using Azure.Identity;
+:::code language="csharp" source="../../snippets/compiled/Grains/PersistenceSnippets.cs" id="azure_identity_using_cosmos":::
 
-siloBuilder.AddCosmosGrainStorage(
-    "profileStore",
-    options =>
-    {
-        options.ConfigureCosmosClient(
-            "https://account.documents.azure.com:443/",
-            new DefaultAzureCredential());
-        options.DatabaseName = "Orleans";
-        options.ContainerName = "OrleansStorage";
-        options.IsResourceCreationEnabled = false;
-    });
-```
-
+:::code language="csharp" source="../../snippets/compiled/Grains/PersistenceSnippets.cs" id="configure_cosmos_storage":::
 <xref:Orleans.Persistence.Cosmos.CosmosOptions.DatabaseName> defaults to `Orleans`, <xref:Orleans.Persistence.Cosmos.CosmosOptions.ContainerName> defaults to `OrleansStorage`, and <xref:Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.PartitionKeyPath> defaults to `/PartitionKey`. Provision the database and container before startup when <xref:Orleans.Persistence.Cosmos.CosmosOptions.IsResourceCreationEnabled> is `false`. Enabling resource creation is convenient for development but production provisioning is usually managed separately.
 
 ## Partitioning and indexing

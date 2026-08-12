@@ -9,31 +9,10 @@ ms.topic: concept-article
 
 <xref:Orleans.Runtime.RequestContext> carries application metadata with an Orleans request. Typical values include correlation IDs, tenant IDs, and authorization context established by trusted application code.
 
-```csharp
-RequestContext.Set("trace-id", Guid.NewGuid().ToString("N"));
-
-IOrderGrain order = grainFactory.GetGrain<IOrderGrain>("order-42");
-await order.Submit();
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="set_request_context":::
 The receiving grain reads the value:
 
-```csharp
-public sealed class OrderGrain(
-    ILogger<OrderGrain> logger) : Grain, IOrderGrain
-{
-    public Task Submit()
-    {
-        string? traceId = RequestContext.Get("trace-id") as string;
-        logger.LogInformation(
-            "Submitting order with trace ID {TraceId}",
-            traceId);
-
-        return Task.CompletedTask;
-    }
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="read_request_context":::
 Values must be serializable by Orleans. Keep them small because Orleans includes them in request messages.
 
 ## Propagation
@@ -44,13 +23,7 @@ Changes made by a callee don't flow back in the response. Treat request context 
 
 Use the static API to manage entries:
 
-```csharp
-object? value = RequestContext.Get("tenant-id");
-RequestContext.Set("tenant-id", "tenant-17");
-bool removed = RequestContext.Remove("tenant-id");
-RequestContext.Clear();
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="manage_request_context":::
 Set context as close as possible to the operation that needs it, and restore or clear values before unrelated operations execute in the same asynchronous flow.
 
 ## Security

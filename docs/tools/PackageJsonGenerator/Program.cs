@@ -12,6 +12,5 @@ if (!System.Diagnostics.Debugger.IsAttached)
 
 var rootCommand = RootGenerateCommand.GetCommand();
 rootCommand.Add(BatchGenerateCommand.GetCommand());
-rootCommand.Add(CSharpFenceSyntaxCommand.GetCommand());
 
 return await rootCommand.Parse(args).InvokeAsync().ConfigureAwait(false);

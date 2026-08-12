@@ -26,7 +26,7 @@ The <xref:Orleans.ILifecycleParticipant`1.Participate*?displayProperty=nameWithT
 
 Before starting the implementation, create an options class containing the root directory where grain state files are persisted. Create an options file named `FileGrainStorageOptions` containing the following:
 
-:::code source="snippets/custom-grain-storage/FileGrainStorageOptions.cs":::
+:::code source="snippets/custom-grain-storage/FileGrainStorageOptions.cs" id="file_grain_storage_options":::
 
 With the options class created, explore the constructor parameters of the `FileGrainStorage` class:
 
@@ -76,11 +76,11 @@ For the same reason as <xref:Orleans.Grain`1.WriteStateAsync*>, check for incons
 
 Next, create a factory that allows scoping the options to the provider name while creating an instance of `FileGrainStorage` to ease registration with the service collection.
 
-:::code source="snippets/custom-grain-storage/FileGrainStorageFactory.cs":::
+:::code source="snippets/custom-grain-storage/FileGrainStorageFactory.cs" id="file_grain_storage_factory":::
 
 Lastly, to register the grain storage, create an extension on <xref:Orleans.Hosting.ISiloBuilder>. This extension registers the grain storage as a keyed singleton using <xref:Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions.AddKeyedSingleton*?displayProperty=nameWithType>.
 
-:::code source="snippets/custom-grain-storage/FileSiloBuilderExtensions.cs":::
+:::code source="snippets/custom-grain-storage/FileSiloBuilderExtensions.cs" id="file_silo_builder_extensions":::
 
 The `FileGrainStorage` implements <xref:Orleans.Storage.IGrainStorage> and <xref:Orleans.ILifecycleParticipant`1> for <xref:Orleans.Runtime.ISiloLifecycle>. Therefore, register two keyed singleton services, one for each interface.
 
@@ -88,8 +88,8 @@ The `FileGrainStorage` implements <xref:Orleans.Storage.IGrainStorage> and <xref
 
 This enables adding the file storage using the extension on <xref:Orleans.Hosting.ISiloBuilder>:
 
-:::code source="snippets/custom-grain-storage/Program.cs":::
+:::code source="snippets/custom-grain-storage/Program.cs" id="custom_grain_storage_program":::
 
 Now you can select the provider using <xref:Orleans.Providers.StorageProviderAttribute>, for example, `[StorageProvider(ProviderName = "File")]`, and it stores the grain state in the root directory set in the options. Consider the full implementation of `FileGrainStorage`:
 
-:::code source="snippets/custom-grain-storage/FileGrainStorage.cs":::
+:::code source="snippets/custom-grain-storage/FileGrainStorage.cs" id="file_grain_storage":::

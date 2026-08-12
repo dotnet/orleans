@@ -9,18 +9,7 @@ ms.topic: how-to
 
 Install the [`Microsoft.Orleans.Persistence.DynamoDB`](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.DynamoDB) package and configure a named provider with <xref:Orleans.Hosting.DynamoDBGrainStorageSiloBuilderExtensions.AddDynamoDBGrainStorage*>:
 
-```csharp
-siloBuilder.AddDynamoDBGrainStorage(
-    "profileStore",
-    options =>
-    {
-        options.Service = "us-west-2";
-        options.ServiceId = "my-application";
-        options.TableName = "OrleansGrainState";
-        options.CreateIfNotExists = false;
-    });
-```
-
+:::code language="csharp" source="../../snippets/compiled/Grains/PersistenceSnippets.cs" id="configure_dynamodb_storage":::
 The [AWS SDK for .NET credential and profile resolution chain](https://docs.aws.amazon.com/sdk-for-net/v4/developer-guide/creds-assign.html) supplies credentials when <xref:Orleans.Persistence.DynamoDB.DynamoDBClientOptions.AccessKey> and <xref:Orleans.Persistence.DynamoDB.DynamoDBClientOptions.SecretKey> aren't set. In production, prefer workload credentials such as an IAM role over long-lived keys. <xref:Orleans.Persistence.DynamoDB.DynamoDBClientOptions.ProfileName>, <xref:Orleans.Persistence.DynamoDB.DynamoDBClientOptions.AccessKey>, <xref:Orleans.Persistence.DynamoDB.DynamoDBClientOptions.SecretKey>, and <xref:Orleans.Persistence.DynamoDB.DynamoDBClientOptions.Token> are available when the deployment environment requires explicit SDK configuration. See the [AWS CLI configuration-file reference](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html) for profile configuration.
 
 ## Capacity and lifecycle

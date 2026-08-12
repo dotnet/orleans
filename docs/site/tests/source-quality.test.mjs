@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -7,7 +7,6 @@ import {
   auditDocumentationContent,
   collectPackageProjects,
   collectCsharpFences,
-  createCsharpFenceManifest,
   findReleaseVersionIssues,
   parseDocumentedPackageTable,
   validateCsharpFences,
@@ -796,17 +795,9 @@ describe('documentation source quality', () => {
       ':::zone target="docs" pivot="orleans-9-0"\n[!INCLUDE [nested](nested.md)]\n',
     );
     await writeFile(nested, '```csharp\nConsole.WriteLine("uncompiled");\n```\n');
-    const invalidFenceHashes = new Set(
-      collectCsharpFences(await readFile(nested, 'utf8')).map(
-        (fence) => fence.hash,
-      ),
-    );
-
     const result = await auditDocumentationContent({
       ...fixture,
       markdownFiles: [guide],
-      fenceManifest: { files: {} },
-      invalidFenceHashes,
     });
 
     expect(result.issues).toEqual(
@@ -836,8 +827,6 @@ describe('documentation source quality', () => {
     const result = await auditDocumentationContent({
       ...fixture,
       markdownFiles: [guide],
-      fenceManifest: { files: {} },
-      invalidFenceHashes: new Set(),
     });
 
     expect(result.issues).toContainEqual(
@@ -859,8 +848,6 @@ describe('documentation source quality', () => {
     const result = await auditDocumentationContent({
       ...fixture,
       markdownFiles: [guide],
-      fenceManifest: { files: {} },
-      invalidFenceHashes: new Set(),
     });
 
     expect(result.issues).toContainEqual(
@@ -917,8 +904,6 @@ describe('documentation source quality', () => {
       const result = await auditDocumentationContent({
         ...fixture,
         markdownFiles: [guide],
-        fenceManifest: { files: {} },
-        invalidFenceHashes: new Set(),
       });
 
       expect(result.issues).toEqual([]);
@@ -1016,149 +1001,25 @@ describe('documentation source quality', () => {
     expect(issues.some((issue) => issue.message.includes('appears 2 times'))).toBe(true);
   });
 
-  test('hashes inline C# fences for explicit opt-outs', () => {
+  test('rejects inline C# fences and points authors to compiled regions', () => {
     const pages = [
       {
         relativePath: 'example.md',
         source: '# Example\n\n```csharp\nConsole.WriteLine("Hello");\n```\n',
       },
     ];
-    const fenceHashes = new Set(
-      collectCsharpFences(pages[0].source).map((fence) => fence.hash),
-    );
-    const manifest = createCsharpFenceManifest(pages, {}, fenceHashes);
 
     expect(collectCsharpFences(pages[0].source)).toHaveLength(1);
-    expect(manifest.files['example.md'].hashes[0]).toMatch(/^[a-f0-9]{64}$/);
-    expect(manifest.files['example.md'].reason).toContain('REQUIRED');
+    expect(validateCsharpFences(pages)).toEqual([
+      expect.objectContaining({
+        rule: 'DOCS004',
+        file: 'example.md',
+        line: 3,
+        remediation: expect.stringContaining(':::code'),
+      }),
+    ]);
     expect(collectCsharpFences(pages[0].source.replaceAll('\n', '\r\n'))).toEqual(
       collectCsharpFences(pages[0].source),
-    );
-  });
-
-  test('does not require opt-outs for parser-valid C# fragments', () => {
-    const pages = [
-      {
-        relativePath: 'fragments.md',
-        source: [
-          '```csharp',
-          'await RunAsync();',
-          '```',
-          '',
-          '```csharp',
-          'ValueTask<string> GetValue();',
-          '```',
-        ].join('\n'),
-      },
-    ];
-    const validFenceHashes = new Set();
-    const manifest = createCsharpFenceManifest(
-      pages,
-      {},
-      validFenceHashes,
-    );
-
-    expect(manifest.files).toEqual({});
-    expect(
-      validateCsharpFences(pages, manifest, validFenceHashes),
-    ).toEqual([]);
-  });
-
-  test('keeps only parser-invalid fences in the explicit manifest', () => {
-    const pages = [
-      {
-        relativePath: 'mixed.md',
-        source: [
-          '```csharp',
-          'await RunAsync();',
-          '```',
-          '',
-          '```csharp',
-          'if (...)',
-          '```',
-        ].join('\n'),
-      },
-    ];
-    const fences = collectCsharpFences(pages[0].source);
-    const invalidFenceHashes = new Set([fences[1].hash]);
-    const manifest = createCsharpFenceManifest(
-      pages,
-      {},
-      invalidFenceHashes,
-    );
-
-    expect(manifest.files['mixed.md'].hashes).toEqual([fences[1].hash]);
-    manifest.files['mixed.md'].reason =
-      'The ellipsis intentionally represents an application-specific condition.';
-    expect(
-      validateCsharpFences(pages, manifest, invalidFenceHashes),
-    ).toEqual([]);
-  });
-
-  test('preserves authored fence reasons and leaves new exceptions invalid', () => {
-    const pages = [
-      {
-        relativePath: 'existing.md',
-        source: '```csharp\nExisting();\n```\n',
-      },
-      {
-        relativePath: 'new.md',
-        source: '```csharp\nNew();\n```\n',
-      },
-    ];
-    const invalidFenceHashes = new Set(
-      pages.flatMap((page) =>
-        collectCsharpFences(page.source).map((fence) => fence.hash),
-      ),
-    );
-    const manifest = createCsharpFenceManifest(
-      pages,
-      {
-        files: {
-          'existing.md': {
-            reason:
-              'This excerpt depends on generated declarations shown in the surrounding article.',
-            hashes: [],
-          },
-        },
-      },
-      invalidFenceHashes,
-    );
-
-    expect(manifest.files['existing.md'].reason).toContain('generated declarations');
-    expect(manifest.files['new.md'].reason).toContain('REQUIRED');
-    expect(
-      validateCsharpFences(
-        pages,
-        manifest,
-        invalidFenceHashes,
-      ).some((issue) =>
-        issue.message.includes('missing a meaningful reason'),
-      ),
-    ).toBe(true);
-  });
-
-  test('reports one specific issue for an opt-out which becomes parser-valid', () => {
-    const pages = [
-      {
-        relativePath: 'valid-now.md',
-        source: '```csharp\nRun();\n```\n',
-      },
-    ];
-    const [fence] = collectCsharpFences(pages[0].source);
-    const manifest = {
-      files: {
-        'valid-now.md': {
-          reason: 'This fragment used to require an explicit syntax exception.',
-          hashes: [fence.hash],
-        },
-      },
-    };
-
-    const issues = validateCsharpFences(pages, manifest, new Set());
-    expect(issues).toHaveLength(1);
-    expect(issues[0].message).toContain(
-      'every fence is valid in a supported syntax context',
     );
   });
 
@@ -1204,7 +1065,7 @@ describe('documentation source quality', () => {
     ]);
   });
 
-  test('detects and hash-enforces blockquote, list, tilde, and ordinary C# fences', () => {
+  test('rejects blockquote, list, tilde, and ordinary C# fences', () => {
     const pages = [
       {
         relativePath: 'fence-shapes.md',
@@ -1227,17 +1088,6 @@ describe('documentation source quality', () => {
         ].join('\n'),
       },
     ];
-    const invalidFenceHashes = new Set(
-      collectCsharpFences(pages[0].source).map((fence) => fence.hash),
-    );
-    const manifest = createCsharpFenceManifest(
-      pages,
-      {},
-      invalidFenceHashes,
-    );
-    manifest.files['fence-shapes.md'].reason =
-      'These distinct Markdown container forms verify reviewed hash enforcement.';
-
     expect(collectCsharpFences(pages[0].source).map((fence) => fence.line)).toEqual([1, 5, 9, 13]);
     expect(
       findReleaseVersionIssues({
@@ -1245,38 +1095,15 @@ describe('documentation source quality', () => {
         source: pages[0].source,
       }),
     ).toEqual([]);
-    expect(
-      validateCsharpFences(pages, manifest, invalidFenceHashes),
-    ).toEqual([]);
-
-    for (const line of [1, 5, 9, 13]) {
-      const changedSource = pages[0].source.split('\n');
-      changedSource[line] = 'Changed();';
-      const changedPages = [
-        {
-          ...pages[0],
-          source: changedSource.join('\n'),
-        },
-      ];
-      const changedInvalidFenceHashes = new Set(
-        collectCsharpFences(changedPages[0].source).map(
-          (fence) => fence.hash,
-        ),
-      );
-      expect(
-        validateCsharpFences(
-          changedPages,
-          manifest,
-          changedInvalidFenceHashes,
-        ),
-      ).toContainEqual(
+    expect(validateCsharpFences(pages)).toEqual(
+      [1, 5, 9, 13].map((line) =>
         expect.objectContaining({
           rule: 'DOCS004',
           file: 'fence-shapes.md',
           line,
         }),
-      );
-    }
+      ),
+    );
   });
 
   test.each([

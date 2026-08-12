@@ -18,32 +18,7 @@ Use a timer for frequent, activation-scoped work. Use a reminder when the schedu
 
 Register timers with <xref:Orleans.GrainBaseExtensions.RegisterGrainTimer*>. <xref:Orleans.Grain.RegisterTimer*> is obsolete.
 
-```csharp
-public sealed class CacheGrain : Grain, ICacheGrain
-{
-    private IGrainTimer? _timer;
-
-    public override Task OnActivateAsync(
-        CancellationToken cancellationToken)
-    {
-        _timer = this.RegisterGrainTimer(
-            Refresh,
-            new GrainTimerCreationOptions
-            {
-                DueTime = TimeSpan.Zero,
-                Period = TimeSpan.FromMinutes(1)
-            });
-
-        return base.OnActivateAsync(cancellationToken);
-    }
-
-    private Task Refresh(CancellationToken cancellationToken)
-    {
-        return Task.CompletedTask;
-    }
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/WorkersAndTimersSnippets.cs" id="grain_timer":::
 <xref:Orleans.GrainBaseExtensions.RegisterGrainTimer*> returns <xref:Orleans.Runtime.IGrainTimer>. Dispose it to stop the timer, or call <xref:Orleans.Runtime.IGrainTimer.Change*> to change its due time and period.
 
 ### Timer behavior
@@ -65,44 +40,13 @@ The callback token is canceled when the timer is disposed or the grain begins de
 
 A grain receiving reminders implements <xref:Orleans.IRemindable>:
 
-```csharp
-public sealed class ReportGrain :
-    Grain,
-    IReportGrain,
-    IRemindable
-{
-    public Task ReceiveReminder(
-        string reminderName,
-        TickStatus status)
-    {
-        return GenerateReport();
-    }
-
-    private Task GenerateReport() => Task.CompletedTask;
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/WorkersAndTimersSnippets.cs" id="remindable_report_grain":::
 Register or update a reminder from the grain:
 
-```csharp
-IGrainReminder reminder = await this.RegisterOrUpdateReminder(
-    "daily-report",
-    dueTime: TimeSpan.FromMinutes(1),
-    period: TimeSpan.FromDays(1));
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/WorkersAndTimersSnippets.cs" id="register_reminder":::
 Cancel it explicitly:
 
-```csharp
-IGrainReminder? reminder =
-    await this.GetReminder("daily-report");
-
-if (reminder is not null)
-{
-    await this.UnregisterReminder(reminder);
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/WorkersAndTimersSnippets.cs" id="unregister_reminder":::
 Store the reminder name, not the <xref:Orleans.Runtime.IGrainReminder> handle, across activations. Handles aren't guaranteed to remain valid beyond the activation that retrieved them.
 
 ### Reminder behavior

@@ -45,15 +45,15 @@ The service manifest declares two dynamically allocated TCP endpoints:
 
 The stateless service creates an <xref:Microsoft.ServiceFabric.Services.Communication.Runtime.ICommunicationListener>:
 
-:::code language="csharp" source="snippets/service-fabric/ServiceFabricSilo/OrleansStatelessService.cs":::
+:::code language="csharp" source="snippets/service-fabric/ServiceFabricSilo/OrleansStatelessService.cs" id="service_fabric_orleans_stateless_service":::
 
 The listener owns the Orleans generic host. <xref:Microsoft.ServiceFabric.Services.Communication.Runtime.ICommunicationListener.OpenAsync*?displayProperty=nameWithType> starts it, <xref:Microsoft.ServiceFabric.Services.Communication.Runtime.ICommunicationListener.CloseAsync*?displayProperty=nameWithType> requests graceful shutdown, and <xref:Microsoft.ServiceFabric.Services.Communication.Runtime.ICommunicationListener.Abort*?displayProperty=nameWithType> disposes it without assuming graceful work can complete:
 
-:::code language="csharp" source="snippets/service-fabric/ServiceFabricSilo/OrleansCommunicationListener.cs":::
+:::code language="csharp" source="snippets/service-fabric/ServiceFabricSilo/OrleansCommunicationListener.cs" id="service_fabric_orleans_communication_listener":::
 
 Finally, the process registers the Service Fabric service type and constructs the Orleans host:
 
-:::code language="csharp" source="snippets/service-fabric/ServiceFabricSilo/Program.cs":::
+:::code language="csharp" source="snippets/service-fabric/ServiceFabricSilo/Program.cs" id="service_fabric_program":::
 
 The example uses:
 

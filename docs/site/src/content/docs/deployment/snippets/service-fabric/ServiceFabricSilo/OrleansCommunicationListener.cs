@@ -1,3 +1,4 @@
+// <service_fabric_orleans_communication_listener>
 using System.Fabric;
 using System.Text.Json;
 using Microsoft.Extensions.Hosting;
@@ -175,3 +176,4 @@ internal sealed class OrleansCommunicationListener(
         public bool Disposed { get; set; }
     }
 }
+// </service_fabric_orleans_communication_listener>

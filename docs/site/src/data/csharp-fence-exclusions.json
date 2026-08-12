@@ -1,4 +1,0 @@
-{
-  "description": "Explicit opt-outs for inline C# fences which are invalid in every supported C# syntax context. Hashes make additions and edits fail closed.",
-  "files": {}
-}

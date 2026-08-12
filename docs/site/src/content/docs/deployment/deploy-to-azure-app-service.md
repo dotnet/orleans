@@ -33,13 +33,7 @@ Orleans silos communicate directly with individual silos over long-lived TCP con
 1. Uses Azure Table Storage as the external clustering provider and durable grain store.
 1. Integrates production and staging with separate delegated subnets.
 
-```csharp
-siloBuilder.ConfigureEndpoints(
-    privateIp,
-    siloPort,
-    gatewayPort: 0,
-    listenOnAnyHostAddress: true);
-```
+:::code language="csharp" source="../snippets/compiled/Deployment/DeploymentSnippets.cs" id="configure_app_service_endpoints":::
 
 Every silo must reach every advertised silo endpoint. Disabling the gateway also ensures that catalog mutations enter through the Easy Auth-protected web application instead of an unauthenticated Orleans client connection.
 

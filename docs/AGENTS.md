@@ -5,7 +5,9 @@ These rules apply recursively to documentation, snippets, and samples under
 
 ## Code examples
 
-- Put reusable examples in a `snippets` project near the page that consumes them.
+- Put every C# example in a `snippets` project and include it with a named `:::code`
+  region. Add hidden declarations outside the region when a displayed fragment
+  needs context; don't use inline C# fences.
 - Include snippets with `:::code` and named snippet regions instead of duplicating fenced code in Markdown.
 - Keep snippets minimal, complete, and current. Make examples self-contained:
   declare builders, configuration, services, and values used by the displayed

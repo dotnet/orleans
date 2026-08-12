@@ -14,47 +14,8 @@ Kubernetes can host Orleans when pods have direct network connectivity and the a
 
 Reference `Microsoft.Orleans.Server` and a production clustering provider package. Configure the pod IP as the advertised address, listen on all pod interfaces, and use the pod name as the silo name:
 
-```csharp
-using System.Net;
-
-var builder = WebApplication.CreateBuilder(args);
-
-var podName = builder.Configuration["POD_NAME"]
-    ?? throw new InvalidOperationException("POD_NAME isn't configured.");
-var podIp = IPAddress.Parse(
-    builder.Configuration["POD_IP"]
-        ?? throw new InvalidOperationException("POD_IP isn't configured."));
-
-builder.Host.UseOrleans(siloBuilder =>
-{
-    siloBuilder
-        // Configure one production clustering provider here.
-        .Configure<ClusterOptions>(options =>
-        {
-            options.ServiceId = builder.Configuration["ORLEANS_SERVICE_ID"]
-                ?? throw new InvalidOperationException("ORLEANS_SERVICE_ID isn't configured.");
-            options.ClusterId = builder.Configuration["ORLEANS_CLUSTER_ID"]
-                ?? throw new InvalidOperationException("ORLEANS_CLUSTER_ID isn't configured.");
-        })
-        .Configure<SiloOptions>(options => options.SiloName = podName)
-        .ConfigureEndpoints(
-            advertisedIP: podIp,
-            siloPort: 11_111,
-            gatewayPort: 30_000,
-            listenOnAnyHostAddress: true);
-});
-
-builder.Services.Configure<HostOptions>(options =>
-{
-    options.ShutdownTimeout = TimeSpan.FromSeconds(120);
-});
-
-var app = builder.Build();
-
-// Map application-owned startup, readiness, and liveness endpoints.
-
-app.Run();
-```
+:::code language="csharp" source="../snippets/compiled/Deployment/DeploymentSnippets.cs" id="kubernetes_usings":::
+:::code language="csharp" source="../snippets/compiled/Deployment/DeploymentSnippets.cs" id="configure_kubernetes_silo":::
 
 All silos and clients must use the same service ID, cluster ID, and clustering provider. The example explicitly uses silo port `11111` and gateway port `30000`.
 

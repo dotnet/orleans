@@ -19,17 +19,7 @@ For design background on its resource scoring and signal smoothing, see [Resourc
 
 Configure its weights through <xref:Orleans.Configuration.ResourceOptimizedPlacementOptions>:
 
-```csharp
-siloBuilder.Configure<ResourceOptimizedPlacementOptions>(options =>
-{
-    options.CpuUsageWeight = 40;
-    options.MemoryUsageWeight = 20;
-    options.AvailableMemoryWeight = 20;
-    options.ActivationCountWeight = 15;
-    options.LocalSiloPreferenceMargin = 5;
-});
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/PlacementSnippets.cs" id="configure_resource_optimized_placement":::
 Weights are relative and don't need to total 100. Keep defaults until measurements show a workload-specific reason to change them.
 
 ## Per-grain strategies
@@ -48,27 +38,14 @@ Apply a placement attribute to a grain implementation when its requirements diff
 
 Activation-count-based placement applies the power-of-two-choices technique described in [The Power of Two Choices in Randomized Load Balancing](https://www.eecs.harvard.edu/~michaelm/postscripts/mythesis.pdf).
 
-```csharp
-[PreferLocalPlacement]
-public sealed class GatewayCacheGrain :
-    Grain,
-    IGatewayCacheGrain
-{
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/PlacementSnippets.cs" id="prefer_local_grain":::
 Placement happens when creating an activation. Changing cluster membership or a strategy doesn't move existing activations by itself.
 
 ## Override the cluster default
 
 Register a different default strategy only when all unannotated grains should use it:
 
-```csharp
-siloBuilder.Services.AddSingleton<
-    PlacementStrategy,
-    RandomPlacement>();
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/PlacementSnippets.cs" id="configure_random_placement":::
 Per-grain attributes still take precedence.
 
 ## Placement filters
@@ -81,27 +58,12 @@ See [Placement filters](grain-placement-filtering.md) for the built-in filters a
 
 A grain can ask Orleans to move its activation after current work completes:
 
-```csharp
-public Task Move()
-{
-    MigrateOnIdle();
-    return Task.CompletedTask;
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/PlacementSnippets.cs" id="move_grain":::
 Migration is advisory and occurs only if placement chooses another compatible silo. Custom activation state must participate in dehydration and rehydration; see [Grain activation and lifecycle](grain-lifecycle.md#grain-migration).
 
 Use <xref:Orleans.Placement.ImmovableAttribute> to exclude a grain class from automatic movement:
 
-```csharp
-[Immovable]
-public sealed class HardwareSessionGrain :
-    Grain,
-    IHardwareSessionGrain
-{
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/PlacementSnippets.cs" id="immovable_grain":::
 The attribute doesn't prevent explicit <xref:Orleans.Grain.MigrateOnIdle> calls.
 
 ## Experimental automatic movement
@@ -115,16 +77,7 @@ Orleans includes two opt-in experimental services:
 
 Enable them independently:
 
-```csharp
-#pragma warning disable ORLEANSEXP001
-siloBuilder.AddActivationRepartitioner();
-#pragma warning restore ORLEANSEXP001
-
-#pragma warning disable ORLEANSEXP002
-siloBuilder.AddActivationRebalancer();
-#pragma warning restore ORLEANSEXP002
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/PlacementSnippets.cs" id="configure_activation_rebalancing":::
 Both features migrate eligible activations and can operate together. They add cluster coordination and state-transfer costs, so benchmark representative workloads before production use. Stateless workers, system targets, grain services, client objects, and immovable activations aren't candidates.
 
 ## Implement custom placement

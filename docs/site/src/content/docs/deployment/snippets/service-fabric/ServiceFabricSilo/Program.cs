@@ -1,3 +1,4 @@
+// <service_fabric_program>
 using System.Fabric;
 using Azure.Data.Tables;
 using Azure.Identity;
@@ -75,3 +76,4 @@ internal static class Program
             : throw new InvalidOperationException(
                 $"The required setting '{name}' isn't configured.");
 }
+// </service_fabric_program>

@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -19,7 +18,6 @@ const renderedOrleansReleasePatterns = [
 const namedOrleansPivotPattern = /\borleans-(\d+)-(?:\d+|x)\b/gi;
 const versionSpecificPathPattern =
   /(?:^|\/)(?:migration(?:\/|-guide(?:\.md)?$)|upgrades?(?:\/|\.md$))/i;
-const missingFenceReason = 'REQUIRED: explain why this page cannot use compiled :::code snippets.';
 const execFileAsync = promisify(execFile);
 
 function toPosix(value) {
@@ -422,128 +420,21 @@ export function collectCsharpFences(source) {
     .map((node) => ({
       line: node.position.start.line,
       source: node.value,
-      hash: createHash('sha256')
-        .update(node.value.replaceAll('\r\n', '\n').replace(/\s+$/g, ''))
-        .digest('hex'),
     }));
 }
 
-export function createCsharpFenceManifest(
-  pages,
-  existing = {},
-  invalidFenceHashes,
-) {
-  if (!(invalidFenceHashes instanceof Set)) {
-    throw new TypeError(
-      'createCsharpFenceManifest requires parser-produced invalidFenceHashes.',
-    );
-  }
-  const files = {};
-  for (const page of pages) {
-    const fences = collectCsharpFences(page.source).filter(
-      (fence) => invalidFenceHashes.has(fence.hash),
-    );
-    if (fences.length === 0) {
-      continue;
-    }
-    files[page.relativePath] = {
-      reason: existing.files?.[page.relativePath]?.reason ?? missingFenceReason,
-      hashes: fences.map((fence) => fence.hash),
-    };
-  }
-  return {
-    description:
-      'Explicit opt-outs for inline C# fences which are invalid in every supported C# syntax context. Hashes make additions and edits fail closed.',
-    files,
-  };
-}
-
-export function validateCsharpFences(pages, manifest, invalidFenceHashes) {
-  if (!(invalidFenceHashes instanceof Set)) {
-    throw new TypeError(
-      'validateCsharpFences requires parser-produced invalidFenceHashes.',
-    );
-  }
-  const issues = [];
-  const pagePaths = new Set(pages.map((page) => page.relativePath));
-  for (const page of pages) {
-    const fences = collectCsharpFences(page.source);
-    const invalidFences = fences.filter(
-      (fence) => invalidFenceHashes.has(fence.hash),
-    );
-    const exclusion = manifest.files?.[page.relativePath];
-    const expected = exclusion?.hashes ?? [];
-    for (let index = 0; index < invalidFences.length; index += 1) {
-      if (invalidFences[index].hash !== expected[index]) {
-        issues.push(
-          diagnostic(
-            'DOCS004',
-            page.relativePath,
-            invalidFences[index].line,
-            'Inline C# fence is invalid in every supported syntax context and is not covered by the reviewed content-hash manifest.',
-            'Correct the C# syntax, move the example into a compiled :::code snippet with hidden context, or add a narrow reason and refreshed hash to src/data/csharp-fence-exclusions.json.',
-          ),
-        );
-      }
-    }
-    if (invalidFences.length > 0 && expected.length > invalidFences.length) {
-      issues.push(
-        diagnostic(
-          'DOCS004',
-          page.relativePath,
-          1,
-          'The C# fence manifest contains stale hashes.',
-          'Remove stale entries or refresh src/data/csharp-fence-exclusions.json after reviewing the remaining opt-outs.',
-        ),
-      );
-    }
-    if (
-      invalidFences.length > 0 &&
-      (!exclusion?.reason ||
-        exclusion.reason.trim().length < 20 ||
-        exclusion.reason.trim() === missingFenceReason)
-    ) {
-      issues.push(
-        diagnostic(
-          'DOCS004',
-          page.relativePath,
-          1,
-          'C# fence opt-out is missing a meaningful reason.',
-          'Explain why these examples cannot use shared compiled snippets.',
-        ),
-      );
-    }
-  }
-  for (const file of Object.keys(manifest.files ?? {})) {
-    if (!pagePaths.has(file)) {
-      issues.push(
-        diagnostic(
-          'DOCS004',
-          'src/data/csharp-fence-exclusions.json',
-          1,
-          `C# fence opt-out references nonexistent or non-conceptual page '${file}'.`,
-          'Remove the stale manifest entry.',
-        ),
-      );
-      continue;
-    }
-    if (
-      !collectCsharpFences(
-        pages.find((page) => page.relativePath === file).source,
-      ).some((fence) => invalidFenceHashes.has(fence.hash))
-    ) {
-      issues.push(
-        diagnostic(
-          'DOCS004',
-          'src/data/csharp-fence-exclusions.json',
-          1,
-          `C# fence opt-out for '${file}' is stale because every fence is valid in a supported syntax context.`,
-          'Remove the stale manifest entry.',
-        ),
-      );
-    }
-  }
-  return issues;
+export function validateCsharpFences(pages) {
+  return pages.flatMap((page) =>
+    collectCsharpFences(page.source).map((fence) =>
+      diagnostic(
+        'DOCS004',
+        page.relativePath,
+        fence.line,
+        'Inline C# fences are not compiler-checked.',
+        'Move the example into a named region in a compiled snippet project and reference it with :::code.',
+      ),
+    ),
+  );
 }
 
 function extractTableCodeValues(source, column) {
@@ -1049,19 +940,13 @@ export async function auditDocumentationSources({
   repositoryRoot,
   sourceRoot,
   tocPath,
-  fenceManifest,
   packageExclusions,
-  invalidFenceHashes,
-  skipCsharpFenceValidation = false,
 }) {
   const markdownFiles = await walk(sourceRoot, (file) => file.endsWith('.md'));
   const contentAudit = await auditDocumentationContent({
     repositoryRoot,
     sourceRoot,
     markdownFiles,
-    fenceManifest,
-    invalidFenceHashes,
-    skipCsharpFenceValidation,
   });
   const { includeTargets, auditedMarkdown } = contentAudit;
   const pages = [];
@@ -1106,9 +991,6 @@ export async function auditDocumentationContent({
   repositoryRoot,
   sourceRoot,
   markdownFiles,
-  fenceManifest,
-  invalidFenceHashes,
-  skipCsharpFenceValidation = false,
   siteRoot = path.join(repositoryRoot, 'docs', 'site'),
 }) {
   const includeIssues = [];
@@ -1140,14 +1022,6 @@ export async function auditDocumentationContent({
     );
   });
   issues.push(...auditedMarkdown.flatMap(findReleaseVersionIssues));
-  if (!skipCsharpFenceValidation) {
-    issues.push(
-      ...validateCsharpFences(
-        auditedMarkdown,
-        fenceManifest,
-        invalidFenceHashes,
-      ),
-    );
-  }
+  issues.push(...validateCsharpFences(auditedMarkdown));
   return { issues, auditedMarkdown, includeTargets };
 }

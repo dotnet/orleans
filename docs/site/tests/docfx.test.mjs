@@ -466,6 +466,34 @@ describe('DocFX conversion', () => {
     ).rejects.toThrow("Snippet region 'missing' was not found");
   });
 
+  test('omits nested region markers from a containing region', async () => {
+    const directory = await temporaryDirectory();
+    await writeFile(
+      path.join(directory, 'Example.cs'),
+      [
+        '// <complete>',
+        'public sealed class Example',
+        '{',
+        '    // <method>',
+        '    public void Run() { }',
+        '    // </method>',
+        '}',
+        '// </complete>',
+      ].join('\n'),
+    );
+    const sourcePath = path.join(directory, 'guide.md');
+    const converted = await convertDocfxMarkdown({
+      source:
+        '---\ntitle: Nested regions\n---\n:::code language="csharp" source="Example.cs" id="complete":::',
+      sourcePath,
+    });
+
+    expect(converted).toContain('public sealed class Example');
+    expect(converted).toContain('public void Run() { }');
+    expect(converted).not.toContain('// <method>');
+    expect(converted).not.toContain('// </method>');
+  });
+
   test('rejects unclosed tab groups', async () => {
     const directory = await temporaryDirectory();
     const sourcePath = path.join(directory, 'guide.md');

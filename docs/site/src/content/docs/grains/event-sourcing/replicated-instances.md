@@ -17,9 +17,7 @@ Unconditional events are eventually ordered by the provider. An event can be con
 
 When validity depends on the currently observed version, use <xref:Orleans.EventSourcing.JournaledGrain`2.RaiseConditionalEvent*>:
 
-```csharp
-var accepted = await RaiseConditionalEvent(new Withdrawn(amount));
-```
+:::code language="csharp" source="../../snippets/compiled/EventSourcing/EventSourcingSnippets.cs" id="conditional_update":::
 
 The provider compares the expected confirmed version with storage. If another update advanced the log, it doesn't append the event and returns `false`. The grain can then re-evaluate the command against the refreshed state.
 
@@ -27,9 +25,7 @@ The provider compares the expected confirmed version with storage. If another up
 
 Call <xref:Orleans.EventSourcing.JournaledGrain`2.RefreshNow*> to confirm local submissions and refresh from the global log:
 
-```csharp
-await RefreshNow();
-```
+:::code language="csharp" source="../../snippets/compiled/EventSourcing/EventSourcingSnippets.cs" id="refresh_replicated_instance":::
 
 This is useful before a decision that requires the latest confirmed view. It incurs storage/protocol work and can wait while the backing service is unavailable.
 

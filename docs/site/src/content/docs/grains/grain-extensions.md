@@ -15,51 +15,21 @@ Extensions are an advanced integration mechanism. Prefer a normal grain interfac
 
 The interface derives from <xref:Orleans.Runtime.IGrainExtension> and uses normal grain method return types:
 
-```csharp
-public interface IDiagnosticsExtension : IGrainExtension
-{
-    ValueTask<string> GetStatus();
-}
-
-public sealed class DiagnosticsExtension(
-    IGrainContext grainContext) : IDiagnosticsExtension
-{
-    public ValueTask<string> GetStatus()
-    {
-        return ValueTask.FromResult(
-            $"Active grain: {grainContext.GrainId}");
-    }
-}
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/GeneralSnippets.cs" id="diagnostics_extension":::
 Orleans generates extension request and reference code at build time.
 
 ## Register the extension
 
 Register a default implementation on the silo:
 
-```csharp
-siloBuilder.AddGrainExtension<
-    IDiagnosticsExtension,
-    DiagnosticsExtension>();
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/GeneralSnippets.cs" id="register_diagnostics_extension":::
 The implementation is created through dependency injection for the target grain context.
 
 ## Call the extension
 
 Cast an existing grain reference to the extension interface:
 
-```csharp
-IUserGrain user =
-    grainFactory.GetGrain<IUserGrain>("user-42");
-
-IDiagnosticsExtension diagnostics =
-    user.AsReference<IDiagnosticsExtension>();
-
-string status = await diagnostics.GetStatus();
-```
-
+:::code language="csharp" source="../snippets/compiled/Grains/GeneralSnippets.cs" id="use_diagnostics_extension":::
 The extension reference keeps the same grain identity. It doesn't address a separate grain.
 
 Incoming [grain call filters](interceptors.md) run for extension calls. Filters should not assume every `ImplementationMethod` belongs to the grain implementation class.

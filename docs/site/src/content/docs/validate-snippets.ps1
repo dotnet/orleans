@@ -386,6 +386,12 @@ foreach ($markdownDocument in $renderedMarkdown) {
             $language -ieq "csharp" -or
             $language -ieq "c#" -or
             $language -ieq "cs"
+        if (
+            $isCsharp -and
+            -not $attributes.id
+        ) {
+            $policyIssues += "${directiveRelative}:$($index + 1) [SNIPPET003] C# code directive target '$($attributes.source)' does not specify an id. Remediation: reference a named region so documentation and hidden scaffolding remain separate."
+        }
         if ($isCsharp -and -not $compiledSources.Contains($target)) {
             $policyIssues += "${directiveRelative}:$($index + 1) [SNIPPET003] C# code directive target '$($attributes.source)' is not an evaluated Compile item in any validated net10.0 Orleans 10 snippet project. Remediation: include the file in a validated snippet project (linked Compile items are supported) or use a non-C# source."
         }

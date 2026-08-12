@@ -24,11 +24,11 @@ The provider name and channel namespace are independent. They can use the same s
 
 Register a named broadcast provider on every silo with <xref:Orleans.Hosting.ChannelHostingExtensions.AddBroadcastChannel*>:
 
-:::code language="csharp" source="./snippets/broadcastchannel/BroadcastChannel.Silo/Program.cs":::
+:::code language="csharp" source="./snippets/broadcastchannel/BroadcastChannel.Silo/Program.cs" id="broadcast_channel_silo_program":::
 
 An Orleans client that publishes must register the same provider name and compatible options:
 
-:::code language="csharp" source="./snippets/broadcastchannel/BroadcastChannel.Client/Program.cs":::
+:::code language="csharp" source="./snippets/broadcastchannel/BroadcastChannel.Client/Program.cs" id="broadcast_channel_client_program":::
 
 <xref:Orleans.BroadcastChannel.BroadcastChannelOptions.FireAndForgetDelivery> defaults to `true`. In that mode, <xref:Orleans.BroadcastChannel.IBroadcastChannelWriter`1.Publish*> starts subscriber calls and returns without awaiting them; subscriber exceptions are logged and aren't returned to the publisher. Setting it to `false` awaits all subscriber callbacks and propagates failures as an aggregate exception. Neither mode adds persistence, retry, replay, or exactly-once processing.
 
@@ -38,7 +38,7 @@ An Orleans client that publishes must register the same provider name and compat
 
 Mark the grain class with an implicit channel subscription and implement <xref:Orleans.BroadcastChannel.IOnBroadcastChannelSubscribed>. Attach a callback when Orleans supplies the channel subscription:
 
-:::code language="csharp" source="./snippets/broadcastchannel/BroadcastChannel.Silo/LiveStockGrain.cs":::
+:::code language="csharp" source="./snippets/broadcastchannel/BroadcastChannel.Silo/LiveStockGrain.cs" id="broadcast_channel_live_stock_grain":::
 
 The parameterless attribute matches all nonempty channel namespaces. Pass a namespace to match exactly, use <xref:Orleans.RegexImplicitChannelSubscriptionAttribute> for a pattern, or provide a custom namespace predicate.
 
@@ -50,7 +50,7 @@ The parameterless attribute matches all nonempty channel namespaces. Pass a name
 
 Resolve <xref:Orleans.BroadcastChannel.IBroadcastChannelProvider> by provider name, construct a channel ID, get a typed writer, and publish:
 
-:::code language="csharp" source="./snippets/broadcastchannel/BroadcastChannel.Silo/Services/StockWorker.cs":::
+:::code language="csharp" source="./snippets/broadcastchannel/BroadcastChannel.Silo/Services/StockWorker.cs" id="broadcast_channel_stock_worker":::
 
 In this sample, the channel namespace is `live-stock-ticker` and the key is <xref:System.Guid.Empty>, so each matching GUID-keyed subscriber grain type receives the message at that grain identity. Use a customer, tenant, device, or other domain key to target the corresponding identity instead.
 

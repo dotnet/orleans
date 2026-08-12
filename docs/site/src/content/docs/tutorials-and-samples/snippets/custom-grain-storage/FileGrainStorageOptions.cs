@@ -1,4 +1,5 @@
-﻿using Orleans.Storage;
+﻿// <file_grain_storage_options>
+using Orleans.Storage;
 
 namespace GrainStorage;
 
@@ -8,3 +9,4 @@ public sealed class FileGrainStorageOptions : IStorageProviderSerializerOptions
 
     public required IGrainStorageSerializer GrainStorageSerializer { get; set; }
 }
+// </file_grain_storage_options>

@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Options;
+﻿// <file_grain_storage>
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Storage;
@@ -113,3 +114,4 @@ public sealed class FileGrainStorage : IGrainStorage, ILifecycleParticipant<ISil
         $"{_clusterOptions.ServiceId}.{grainId.Key}.{grainType}";
     // </getkeystring>
 }
+// </file_grain_storage>

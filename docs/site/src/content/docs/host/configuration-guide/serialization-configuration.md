@@ -37,27 +37,13 @@ Registering an external serializer selects which codec can handle a value. It do
 
 This distinction is especially visible for polymorphic signatures such as `IReadOnlyList<TriggerRule>`, where `TriggerRule` is abstract and values are handled by `System.Text.Json`. Register the JSON serializer and explicitly trust the application type:
 
-```csharp
-siloBuilder.Services.AddSerializer(serializerBuilder =>
-{
-    serializerBuilder.AddJsonSerializer(
-        isSupported: type => type.Namespace?.StartsWith("MyApp") == true);
-    serializerBuilder.Configure(options =>
-        options.AddAllowedType(typeof(TriggerRule)));
-});
-```
+:::code language="csharp" source="../../snippets/compiled/Host/HostSnippets.cs" id="allow_type":::
 
 <xref:Orleans.Serialization.Configuration.TypeManifestOptions.AddAllowedType*> uses Orleans' runtime type-name formatter, including for constructed and nested generic types. The <xref:Orleans.Serialization.Configuration.TypeManifestOptions.AllowedTypes> string set remains supported for compatibility and contains Orleans-formatted runtime type names. Prefer `AddAllowedType` instead of constructing those names manually.
 
 If every type in an application assembly is trusted, allow the assembly instead:
 
-```csharp
-siloBuilder.Services.AddSerializer(serializerBuilder =>
-{
-    serializerBuilder.Configure(options =>
-        options.AddAllowedAssembly(typeof(TriggerRule).Assembly));
-});
-```
+:::code language="csharp" source="../../snippets/compiled/Host/HostSnippets.cs" id="allow_assembly":::
 
 Assembly trust applies component by component. Allowing a generic type definition's assembly doesn't implicitly trust generic arguments from other assemblies.
 

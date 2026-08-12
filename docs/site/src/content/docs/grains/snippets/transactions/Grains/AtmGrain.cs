@@ -1,4 +1,5 @@
-﻿namespace TransactionalExample.Grains;
+﻿// <transactions_atm_grain>
+namespace TransactionalExample.Grains;
 
 [StatelessWorker]
 public class AtmGrain : Grain, IAtmGrain
@@ -11,3 +12,4 @@ public class AtmGrain : Grain, IAtmGrain
             GrainFactory.GetGrain<IAccountGrain>(fromId).Withdraw(amount),
             GrainFactory.GetGrain<IAccountGrain>(toId).Deposit(amount));
 }
+// </transactions_atm_grain>

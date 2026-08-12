@@ -9,23 +9,13 @@ ms.topic: concept-article
 
 Override <xref:Orleans.EventSourcing.JournaledGrain`2.OnStateChanged*> to react after the confirmed version can have increased:
 
-```csharp
-protected override void OnStateChanged()
-{
-    // Inspect State and Version.
-}
-```
+:::code language="csharp" source="../../snippets/compiled/EventSourcing/EventSourcingSnippets.cs" id="confirmed_state_changed":::
 
 It can run after loading a newer state, confirming a local event, or receiving a protocol notification. It isn't an exactly-once integration-event callback. Don't perform an external side effect here unless the application adds its own idempotency or outbox protocol.
 
 Override <xref:Orleans.EventSourcing.JournaledGrain`2.OnTentativeStateChanged*> to react when the tentative view changes:
 
-```csharp
-protected override void OnTentativeStateChanged()
-{
-    // Inspect TentativeState and UnconfirmedEvents.
-}
-```
+:::code language="csharp" source="../../snippets/compiled/EventSourcing/EventSourcingSnippets.cs" id="tentative_state_changed":::
 
 <xref:Orleans.EventSourcing.JournaledGrain`2.RaiseEvent*> triggers this callback. It can also run when confirmation or synchronization changes the tentative suffix.
 
