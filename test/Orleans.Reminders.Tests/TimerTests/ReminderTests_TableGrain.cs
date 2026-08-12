@@ -559,13 +559,15 @@ namespace UnitTests.TimerTests
             outage.Release();
             await activatedTask;
             await observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cts.Token);
+            // Complete a reminder-service round trip so the recovery reconciliation turn cannot overlap time advancement.
+            Assert.NotNull(await grain.GetReminderObject(reminderName));
 
             var tickTask = observer.WaitForReminderTickAsync(grainId, cts.Token, reminderName);
-            await AdvanceUntilAsync(tickTask, cts.Token);
+            await AdvanceReminderTimeAsync(ReminderRefreshPeriod, cts.Token);
             var tick = await tickTask;
 
             Assert.Equal(firstTickTime, tick.Status.FirstTickTime);
-            Assert.InRange(tick.Status.CurrentTickTime, firstTickTime, firstTickTime + period - TimeSpan.FromTicks(1));
+            Assert.Equal(firstTickTime + ReminderRefreshPeriod, tick.Status.CurrentTickTime);
 
             await grain.StopReminder(reminderName);
         }
