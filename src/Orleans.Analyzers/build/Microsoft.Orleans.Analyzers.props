@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <EnableOrleansContractsAnalyzer Condition="'$(EnableOrleansContractsAnalyzer)' == ''">false</EnableOrleansContractsAnalyzer>
+    <OrleansContractsPath Condition="'$(OrleansContractsPath)' == ''">$(MSBuildProjectDirectory)\OrleansContracts.txt</OrleansContractsPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <CompilerVisibleProperty Include="EnableOrleansContractsAnalyzer" />
+  </ItemGroup>
+</Project>

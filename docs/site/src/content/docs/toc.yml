@@ -70,6 +70,8 @@ items:
             href: grains/grain-placement-filtering.md
           - name: Interface versioning
             href: grains/grain-versioning/grain-versioning.md
+          - name: Contract compatibility analyzer
+            href: grains/grain-versioning/contract-compatibility-analyzer.md
           - name: Backward compatibility guidelines
             href: grains/grain-versioning/backward-compatibility-guidelines.md
           - name: Compatible grains

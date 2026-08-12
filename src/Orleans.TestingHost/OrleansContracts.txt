@@ -1,0 +1,9 @@
+interface Orleans.TestingHost.IStorageFaultGrain [Version(0)]
+  AddFaultOnClear(Orleans.Runtime.GrainId, System.Exception) -> Task
+  AddFaultOnRead(Orleans.Runtime.GrainId, System.Exception) -> Task
+  AddFaultOnWrite(Orleans.Runtime.GrainId, System.Exception) -> Task
+  OnClear(Orleans.Runtime.GrainId) -> Task
+  OnRead(Orleans.Runtime.GrainId) -> Task
+  OnWrite(Orleans.Runtime.GrainId) -> Task
+
+class Orleans.TestingHost.StorageFaultGrain

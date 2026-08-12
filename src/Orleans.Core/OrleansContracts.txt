@@ -1,0 +1,76 @@
+interface Orleans.ClientObservers.IClientGatewayObserver [Version(0)]
+  StopSendingToGateway(Orleans.Runtime.SiloAddress) -> void
+
+interface Orleans.IMembershipTableSystemTarget [Version(0)]
+
+interface Orleans.ISiloControl [Version(0)]
+  ForceActivationCollection(System.TimeSpan) -> Task
+  ForceGarbageCollection() -> Task
+  ForceRuntimeStatisticsCollection() -> Task
+  GetActivationCount() -> Task<int>
+  GetActiveGrains(Orleans.Runtime.GrainType) -> Task<System.Collections.Generic.List<Orleans.Runtime.GrainId>>
+  GetDetailedGrainReport(Orleans.Runtime.GrainId) -> Task<Orleans.Runtime.DetailedGrainReport>
+  GetDetailedGrainStatistics(string[]) -> Task<System.Collections.Generic.List<Orleans.Runtime.DetailedGrainStatistic>>
+  GetGrainStatistics() -> Task<System.Collections.Generic.List<System.Tuple<Orleans.Runtime.GrainId, string, int>>>
+  GetRuntimeStatistics() -> Task<Orleans.Runtime.SiloRuntimeStatistics>
+  GetSimpleGrainStatistics() -> Task<Orleans.Runtime.SimpleGrainStatistic[]>
+  MigrateRandomActivations(Orleans.Runtime.SiloAddress, int) -> Task
+  Ping(string) -> Task
+  SendControlCommandToProvider`1(string, int, object?) -> Task<object?>
+
+interface Orleans.Placement.Rebalancing.IActivationRebalancerMonitor [Version(0)]
+  Report(RebalancingReport) -> Task
+
+interface Orleans.Placement.Rebalancing.IActivationRebalancerWorker [Version(0)]
+  GetReport() -> ValueTask<RebalancingReport>
+  ResumeRebalancing() -> Task
+  SuspendRebalancing(System.TimeSpan?) -> Task
+
+interface Orleans.Placement.Repartitioning.IActivationRepartitionerSystemTarget [Version(0)]
+  AcceptExchangeRequest(Orleans.Placement.Repartitioning.AcceptExchangeRequest) -> ValueTask<Orleans.Placement.Repartitioning.AcceptExchangeResponse>
+  FlushBuffers() -> ValueTask
+  GetActivationCount() -> ValueTask<int>
+  GetGrainCallFrequencies() -> ValueTask<System.Collections.Immutable.ImmutableArray<(Orleans.Placement.Repartitioning.Edge, ulong)>>
+  ResetCounters() -> ValueTask
+  SetActivationCountOffset(int) -> ValueTask
+  TriggerExchangeRequest() -> ValueTask
+
+interface Orleans.Runtime.IClusterManifestSystemTarget [Version(0)]
+  GetClusterManifest() -> ValueTask<Orleans.Metadata.ClusterManifest>
+  GetClusterManifestUpdate(Orleans.Metadata.MajorMinorVersion) -> ValueTask<Orleans.Runtime.ClusterManifestUpdate?>
+
+interface Orleans.Runtime.IDeploymentLoadPublisher [Version(0)]
+  UpdateRuntimeStatistics(Orleans.Runtime.SiloAddress, Orleans.Runtime.SiloRuntimeStatistics) -> Task
+
+interface Orleans.Runtime.IGrainCallCancellationExtension [Version(0)]
+  CancelRequestAsync(Orleans.Runtime.GrainId, Orleans.Runtime.CorrelationId) -> ValueTask
+
+interface Orleans.Runtime.IManagementGrain [Version(0)]
+  ForceActivationCollection(Orleans.Runtime.SiloAddress[], System.TimeSpan) -> Task
+  ForceActivationCollection(System.TimeSpan) -> Task
+  ForceGarbageCollection(Orleans.Runtime.SiloAddress[]) -> Task
+  ForceRuntimeStatisticsCollection(Orleans.Runtime.SiloAddress[]) -> Task
+  GetActivationAddress(Orleans.Runtime.IAddressable) -> ValueTask<Orleans.Runtime.SiloAddress?>
+  GetActiveGrains(Orleans.Runtime.GrainType) -> ValueTask<System.Collections.Generic.List<Orleans.Runtime.GrainId>>
+  GetDetailedGrainStatistics(string[], Orleans.Runtime.SiloAddress[]) -> Task<Orleans.Runtime.DetailedGrainStatistic[]>
+  GetDetailedHosts(bool) -> Task<Orleans.MembershipEntry[]>
+  # Orleans.Runtime.IManagementGrain.GetGrainActivationCount(GrainReference grainReference) -> Task<int>
+  GetGrainActivationCount(GrainRef) -> Task<int>
+  GetGrainCallFrequencies(Orleans.Runtime.SiloAddress[]) -> Task<System.Collections.Generic.List<Orleans.Runtime.GrainCallFrequency>>
+  GetHosts(bool) -> Task<System.Collections.Generic.Dictionary<Orleans.Runtime.SiloAddress, Orleans.Runtime.SiloStatus>>
+  GetRuntimeStatistics(Orleans.Runtime.SiloAddress[]) -> Task<Orleans.Runtime.SiloRuntimeStatistics[]>
+  GetSimpleGrainStatistics() -> Task<Orleans.Runtime.SimpleGrainStatistic[]>
+  GetSimpleGrainStatistics(Orleans.Runtime.SiloAddress[]) -> Task<Orleans.Runtime.SimpleGrainStatistic[]>
+  GetTotalActivationCount() -> Task<int>
+  ResetGrainCallFrequencies(Orleans.Runtime.SiloAddress[]) -> ValueTask
+  SendControlCommandToProvider`1(string, int, object?) -> Task<object?[]>
+
+interface Orleans.Runtime.IMembershipService [Version(0)]
+  MembershipChangeNotification(Orleans.Runtime.MembershipTableSnapshot) -> Task
+  Ping(int) -> Task
+  ProbeIndirectly(Orleans.Runtime.SiloAddress, System.TimeSpan, int) -> Task<Orleans.Runtime.IndirectProbeResponse>
+
+interface Orleans.Storage.IMemoryStorageGrain [Version(0)]
+  DeleteStateAsync`1(string, string?) -> Task
+  ReadStateAsync`1(string) -> Task<Orleans.IGrainState<T>>
+  WriteStateAsync`1(string, Orleans.IGrainState<T>) -> Task<string>

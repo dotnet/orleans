@@ -1,0 +1,6 @@
+<Project>
+  <ItemGroup Condition="'$(EnableOrleansContractsAnalyzer)' == 'true' and Exists('$(OrleansContractsPath)')">
+    <AdditionalFiles Include="$(OrleansContractsPath)" OrleansContractsFile="true" />
+    <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="OrleansContractsFile" />
+  </ItemGroup>
+</Project>

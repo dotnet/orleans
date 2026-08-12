@@ -1,0 +1,59 @@
+interface Orleans.Providers.IMemoryStreamQueueGrain [Version(0)]
+  Dequeue(int) -> Task<System.Collections.Generic.List<Orleans.Providers.MemoryMessageData>>
+  Enqueue(Orleans.Providers.MemoryMessageData) -> Task
+
+class Orleans.Providers.MemoryStreamQueueGrain
+
+# Orleans.Streams.ConfiguredStreamCheckpointGrain
+class [GrainType("stream.checkpoint.configured")] Orleans.Streams.ConfiguredStreamCheckpointGrain
+
+interface Orleans.Streams.IConfiguredStreamCheckpointerGrain [Version(0)]
+
+interface Orleans.Streams.IPersistentStreamPullingAgent [Version(0)]
+  Initialize() -> Task
+  Shutdown() -> Task
+
+interface Orleans.Streams.IPersistentStreamPullingManager [Version(0)]
+  ExecuteCommand(Orleans.Providers.Streams.Common.PersistentStreamProviderCommand, object?) -> Task<object?>
+  Initialize() -> Task
+  StartAgents() -> Task
+  Stop() -> Task
+  StopAgents() -> Task
+
+interface Orleans.Streams.IPubSubRendezvousGrain [Version(0)]
+  ConsumerCount(Orleans.Runtime.QualifiedStreamId) -> Task<int>
+  DiagGetConsumers(Orleans.Runtime.QualifiedStreamId) -> Task<Orleans.Streams.PubSubSubscriptionState[]>
+  FaultSubscription(Orleans.Runtime.GuidId) -> Task
+  GetAllSubscriptions(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId) -> Task<System.Collections.Generic.List<Orleans.Streams.Core.StreamSubscription>>
+  ProducerCount(Orleans.Runtime.QualifiedStreamId) -> Task<int>
+  RegisterConsumer(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, string?) -> Task
+  RegisterProducer(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId) -> Task<System.Collections.Generic.ISet<Orleans.Streams.PubSubSubscriptionState>>
+  UnregisterConsumer(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId) -> Task
+  UnregisterProducer(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId) -> Task
+  Validate() -> Task
+
+interface Orleans.Streams.IStreamCheckpointerGrain [Version(0)]
+  Load(System.Threading.CancellationToken) -> ValueTask<string>
+  Update(string, string, System.Threading.CancellationToken) -> ValueTask<string>
+
+interface Orleans.Streams.IStreamConsumerExtension [Version(0)]
+  CompleteStream(Orleans.Runtime.GuidId) -> Task
+  DeliverBatch(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, Orleans.Streams.IBatchContainer, Orleans.Streams.StreamHandshakeToken?) -> Task<Orleans.Streams.StreamHandshakeToken?>
+  DeliverImmutable(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, object, Orleans.Streams.StreamSequenceToken, Orleans.Streams.StreamHandshakeToken?) -> Task<Orleans.Streams.StreamHandshakeToken?>
+  DeliverMutable(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, object, Orleans.Streams.StreamSequenceToken, Orleans.Streams.StreamHandshakeToken?) -> Task<Orleans.Streams.StreamHandshakeToken?>
+  ErrorInStream(Orleans.Runtime.GuidId, System.Exception) -> Task
+  GetSequenceToken(Orleans.Runtime.GuidId) -> Task<Orleans.Streams.StreamHandshakeToken?>
+
+interface Orleans.Streams.IStreamProducerExtension [Version(0)]
+  AddSubscriber(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, string?) -> Task
+  RemoveSubscriber(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId) -> Task
+
+class Orleans.Streams.PersistentStreamPullingAgent
+
+class Orleans.Streams.PersistentStreamPullingManager
+
+# Orleans.Streams.PubSubRendezvousGrain
+class [GrainType("pubsubrendezvous")] Orleans.Streams.PubSubRendezvousGrain
+
+# Orleans.Streams.StreamCheckpointGrain
+class [GrainType("stream.checkpoint")] Orleans.Streams.StreamCheckpointGrain

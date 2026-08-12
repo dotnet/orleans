@@ -36,7 +36,7 @@ Every versioned request carries the numeric interface version used by its caller
 If a request reaches an existing activation whose version is incompatible, Orleans deactivates it with reason `IncompatibleRequest`, invalidates the stale address, and retries placement for a compatible activation.
 
 > [!IMPORTANT]
-> The compatibility check compares version numbers only. Orleans doesn't inspect methods, parameter types, serializer contracts, or behavior to prove compatibility. The application must uphold the contract represented by the selected strategy.
+> The runtime compatibility check compares version numbers only. Orleans doesn't inspect methods, parameter types, serializer contracts, or behavior to prove compatibility. The application must uphold the contract represented by the selected strategy. During development, opt in to the [Orleans contract compatibility analyzer](contract-compatibility-analyzer.md) to track RPC signatures and identities in source control.
 
 ## Configure cluster defaults
 
