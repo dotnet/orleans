@@ -120,7 +120,7 @@ internal sealed class EntraOptions
         RequireGuid(TenantId, nameof(TenantId));
         RequireGuid(ResourceApplicationId, nameof(ResourceApplicationId));
         RequireGuid(WorkloadClientId, nameof(WorkloadClientId));
-        SampleOptions.RequireValue(FederatedTokenFile, nameof(FederatedTokenFile));
+        SampleOptions.RequireValue(FederatedTokenFile, $"Entra:{nameof(FederatedTokenFile)}");
 
         if (!File.Exists(FederatedTokenFile))
         {
