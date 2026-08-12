@@ -76,6 +76,22 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
         await runner.RunGeneratedConformanceTests();
     }
 
+    [SkippableFact, TestCategory("Functional"), TestCategory("ModelBased")]
+    public async Task AzureBlobStorage_ClearWritesTombstone_ModelBasedGeneratedConformance()
+    {
+        var storage = await CreateStorageAsync(CreateSetupSerializer(), deleteStateOnClear: false);
+        var runner = new GrainStorageModelBasedTestRunner(
+            storage,
+            new GrainStorageModelBasedConformanceOptions
+            {
+                ProviderName = "AzureBlobClearWritesTombstone",
+                DeleteStateOnClear = false
+            },
+            _output.WriteLine);
+
+        await runner.RunGeneratedConformanceTests();
+    }
+
     private async Task AssertFailedReadDoesNotMutateStateAsync(IGrainStorageSerializer serializer)
     {
         var storage = await CreateStorageAsync(serializer);
@@ -100,12 +116,13 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
         Assert.Equal(123, grainState.State.Value);
     }
 
-    private async Task<AzureBlobGrainStorage> CreateStorageAsync(IGrainStorageSerializer serializer)
+    private async Task<AzureBlobGrainStorage> CreateStorageAsync(IGrainStorageSerializer serializer, bool deleteStateOnClear = true)
     {
         var options = new AzureBlobStorageOptions
         {
             ContainerName = _containerName,
             GrainStorageSerializer = serializer,
+            DeleteStateOnClear = deleteStateOnClear,
         }.ConfigureTestDefaults();
 
         var activatorProvider = _services.GetRequiredService<IActivatorProvider>();

@@ -9,6 +9,7 @@ using Orleans.Serialization;
 using Orleans.Storage;
 using TestExtensions;
 using UnitTests.Persistence;
+using UnitTests.StorageTests.ModelBased;
 using Xunit;
 using Xunit.Abstractions;
 using static Orleans.Storage.DynamoDBGrainStorage;
@@ -167,6 +168,28 @@ namespace AWSUtils.Tests.StorageTests
             Assert.Equal(initialState.A, convertedState.A);
             Assert.Equal(initialState.B, convertedState.B);
             Assert.Equal(initialState.C, convertedState.C);
+        }
+
+        [SkippableFact, TestCategory("Functional"), TestCategory("ModelBased")]
+        public async Task DynamoDBStorage_ModelBasedGeneratedConformance()
+        {
+            if (!AWSTestConstants.IsDynamoDbAvailable)
+            {
+                throw new SkipException("Unable to connect to AWS DynamoDB simulator");
+            }
+
+            var storage = await InitDynamoDBGrainStorage();
+            var runner = new GrainStorageModelBasedTestRunner(
+                storage,
+                new GrainStorageModelBasedConformanceOptions
+                {
+                    ProviderName = "DynamoDB",
+                    DeleteStateOnClear = false,
+                    IncludeInconsistentClearETagCases = false
+                },
+                output.WriteLine);
+
+            await runner.RunGeneratedConformanceTests();
         }
 
         private async Task<DynamoDBGrainStorage> InitDynamoDBGrainStorage(DynamoDBStorageOptions options)

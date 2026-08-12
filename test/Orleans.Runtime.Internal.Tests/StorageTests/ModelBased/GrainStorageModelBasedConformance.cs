@@ -24,9 +24,13 @@ internal sealed class GrainStorageModelBasedConformanceOptions
 
     public bool IncludeInconsistentETagCases { get; set; } = true;
 
+    public bool IncludeInconsistentClearETagCases { get; set; } = true;
+
     public bool DeleteStateOnClear { get; set; } = true;
 
     public bool ClearedRecordExistsOnRead { get; set; }
+
+    public bool RereadsClearedRecordBeforeClear { get; set; }
 }
 
 internal sealed class GrainStorageModelBasedTestRunner
@@ -141,12 +145,14 @@ internal static class GrainStorageModelBasedConformance
 
     private sealed class GrainStorageBehavioralSpec : Spec<GrainStorageBehavioralModelState>
     {
-        public readonly ReadOperation Read = new();
-        public readonly WriteOperation Write = new();
+        public readonly ReadOperation Read;
+        public readonly WriteOperation Write;
         public readonly ClearOperation Clear;
 
         public GrainStorageBehavioralSpec(GrainStorageModelBasedConformanceOptions options)
         {
+            Read = new ReadOperation(options);
+            Write = new WriteOperation();
             Clear = new ClearOperation(options);
             Add(Read);
             Add(Write);
@@ -169,7 +175,10 @@ internal static class GrainStorageModelBasedConformance
             {
                 inputSet.Add(Write.With(new StorageRequest(StorageKey.Primary, StorageValue.Two, ETagMode.Null), "Write duplicate primary with null ETag"));
                 inputSet.Add(Write.With(new StorageRequest(StorageKey.Primary, StorageValue.One, ETagMode.Stale), "Write primary with stale ETag"));
-                inputSet.Add(Clear.With(new StorageRequest(StorageKey.Primary, etagMode: ETagMode.Stale), "Clear primary with stale ETag"));
+                if (options.IncludeInconsistentClearETagCases)
+                {
+                    inputSet.Add(Clear.With(new StorageRequest(StorageKey.Primary, etagMode: ETagMode.Stale), "Clear primary with stale ETag"));
+                }
             }
 
             return inputSet;
@@ -195,16 +204,34 @@ internal static class GrainStorageModelBasedConformance
 
     private sealed class ReadOperation : Operation<StorageRequest, StorageOperationResult, GrainStorageBehavioralModelState>
     {
-        public ReadOperation() : base("Read")
+        private readonly GrainStorageModelBasedConformanceOptions options;
+
+        public ReadOperation(GrainStorageModelBasedConformanceOptions options) : base("Read")
         {
+            this.options = options;
         }
 
         public override ExpectedOutcomes Apply(StorageRequest request, GrainStorageBehavioralModelState state)
         {
             state.Records.TryGetValue(request.Key, out var record);
-            return Expect.That(
-                    result => ValidateReadResult(request, record, result))
-                .SameState();
+            var expectation = Expect.That(result => ValidateReadResult(request, record, result, options));
+            if (record is not null && !record.RecordExists && options.ClearedRecordExistsOnRead)
+            {
+                return expectation.ThenState(
+                    (result, nextState) =>
+                    {
+                        nextState.Records[request.Key] = new GrainStorageBehavioralRecord
+                        {
+                            Value = result.Value,
+                            ETag = result.ETag,
+                            PreviousETag = record.PreviousETag,
+                            RecordExists = result.RecordExists
+                        };
+                    },
+                    () => StorageOperationResult.Success(record.ETag, true, StorageValue.None));
+            }
+
+            return expectation.SameState();
         }
 
         public override Task<StorageOperationResult> ExecuteAsync(TestingContext context, StorageRequest request)
@@ -264,30 +291,43 @@ internal static class GrainStorageModelBasedConformance
         {
             if (request.ETagMode == ETagMode.Stale)
             {
+                if (options.RereadsClearedRecordBeforeClear
+                    && state.Records.TryGetValue(request.Key, out var clearedRecord)
+                    && clearedRecord is not null
+                    && !clearedRecord.RecordExists)
+                {
+                    return ClearedState(clearedRecord);
+                }
+
                 return Expect.That(
                         result => ValidateInconsistentStateResult(result, request))
                     .SameState();
             }
 
             var record = state.Records[request.Key];
-            var expectation = Expect.That(result => ValidateClearResult(result, record, options));
-            if (options.DeleteStateOnClear)
-            {
-                return expectation.ThenState(nextState => nextState.Records.Remove(request.Key));
-            }
+            return ClearedState(record);
 
-            return expectation.ThenState(
-                (result, nextState) =>
+            ExpectedOutcomes ClearedState(GrainStorageBehavioralRecord record)
+            {
+                var expectation = Expect.That(result => ValidateClearResult(result, record, options));
+                if (options.DeleteStateOnClear)
                 {
-                    nextState.Records[request.Key] = new GrainStorageBehavioralRecord
+                    return expectation.ThenState(nextState => nextState.Records.Remove(request.Key));
+                }
+
+                return expectation.ThenState(
+                    (result, nextState) =>
                     {
-                        ETag = result.ETag,
-                        PreviousETag = record.ETag,
-                        Value = StorageValue.None,
-                        RecordExists = options.ClearedRecordExistsOnRead
-                    };
-                },
-                () => StorageOperationResult.Success(NewMockETag(), false, StorageValue.None));
+                        nextState.Records[request.Key] = new GrainStorageBehavioralRecord
+                        {
+                            ETag = result.ETag,
+                            PreviousETag = record.ETag,
+                            Value = StorageValue.None,
+                            RecordExists = false
+                        };
+                    },
+                    () => StorageOperationResult.Success(NewMockETag(), false, StorageValue.None));
+            }
         }
 
         public override Task<StorageOperationResult> ExecuteAsync(TestingContext context, StorageRequest request)
@@ -449,7 +489,7 @@ internal static class GrainStorageModelBasedConformance
 
     private sealed class StorageOperationResult
     {
-        private StorageOperationResult(bool succeeded, string? exceptionType, string? etag, bool recordExists, int value)
+        private StorageOperationResult(bool succeeded, Type? exceptionType, string? etag, bool recordExists, int value)
         {
             Succeeded = succeeded;
             ExceptionType = exceptionType;
@@ -460,7 +500,7 @@ internal static class GrainStorageModelBasedConformance
 
         public bool Succeeded { get; }
 
-        public string? ExceptionType { get; }
+        public Type? ExceptionType { get; }
 
         public string? ETag { get; }
 
@@ -475,15 +515,22 @@ internal static class GrainStorageModelBasedConformance
 
         public static StorageOperationResult Failure(Exception exception, string? etag, bool recordExists, int value)
         {
-            return new StorageOperationResult(false, exception.GetType().FullName, etag, recordExists, value);
+            return new StorageOperationResult(false, GetExceptionType(exception), etag, recordExists, value);
         }
 
         public override string ToString()
         {
             return Succeeded
                 ? $"success etag={ETag ?? "<null>"} exists={RecordExists} value={Value}"
-                : $"failure exception={ExceptionType} etag={ETag ?? "<null>"} exists={RecordExists} value={Value}";
+                : $"failure exception={ExceptionType?.FullName ?? "<null>"} etag={ETag ?? "<null>"} exists={RecordExists} value={Value}";
         }
+    }
+
+    private static Type GetExceptionType(Exception exception)
+    {
+        return exception is AggregateException { InnerExceptions.Count: 1 } aggregateException
+            ? aggregateException.InnerExceptions[0].GetType()
+            : exception.GetType();
     }
 
     private enum ETagMode
@@ -506,7 +553,7 @@ internal static class GrainStorageModelBasedConformance
         public const int Two = 2;
     }
 
-    private static ValidationResult ValidateReadResult(StorageRequest request, GrainStorageBehavioralRecord? record, StorageOperationResult result)
+    private static ValidationResult ValidateReadResult(StorageRequest request, GrainStorageBehavioralRecord? record, StorageOperationResult result, GrainStorageModelBasedConformanceOptions options)
     {
         if (!result.Succeeded)
         {
@@ -522,9 +569,9 @@ internal static class GrainStorageModelBasedConformance
 
         if (!record.RecordExists)
         {
-            return !result.RecordExists && result.ETag == record.ETag && result.Value == StorageValue.None
+            return result.RecordExists == options.ClearedRecordExistsOnRead && result.ETag == record.ETag && result.Value == StorageValue.None
                 ? ValidationResult.Valid()
-                : ValidationResult.Invalid($"Read cleared {request.Key} returned etag={result.ETag}, exists={result.RecordExists}, value={result.Value}; expected etag={record.ETag}, exists=false, value={StorageValue.None}");
+                : ValidationResult.Invalid($"Read cleared {request.Key} returned etag={result.ETag}, exists={result.RecordExists}, value={result.Value}; expected etag={record.ETag}, exists={options.ClearedRecordExistsOnRead}, value={StorageValue.None}");
         }
 
         return result.RecordExists && result.ETag == record.ETag && result.Value == record.Value
@@ -595,9 +642,9 @@ internal static class GrainStorageModelBasedConformance
             return ValidationResult.Invalid($"{request.ETagMode} ETag operation succeeded unexpectedly.");
         }
 
-        return result.ExceptionType == typeof(InconsistentStateException).FullName
+        return result.ExceptionType is not null && typeof(InconsistentStateException).IsAssignableFrom(result.ExceptionType)
             ? ValidationResult.Valid()
-            : ValidationResult.Invalid($"{request.ETagMode} ETag operation failed with {result.ExceptionType}; expected {typeof(InconsistentStateException).FullName}.");
+            : ValidationResult.Invalid($"{request.ETagMode} ETag operation failed with {result.ExceptionType?.FullName ?? "<null>"}; expected {typeof(InconsistentStateException).FullName}.");
     }
 
     private static TestState1 CreateState(int value)

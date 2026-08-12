@@ -1,5 +1,9 @@
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
+using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -34,6 +38,7 @@ namespace UnitTests;
 public class MemoryGrainStorageTests : GrainPersistenceTestsRunner, IClassFixture<MemoryGrainStorageTests.Fixture>
 {
     private const string MemoryStoreName = "MemoryStore";
+    private const string MemoryStoreWithLatencyName = "MemoryStoreWithLatency";
     private readonly ITestOutputHelper output;
 
     public class Fixture : BaseTestClusterFixture
@@ -70,6 +75,28 @@ public class MemoryGrainStorageTests : GrainPersistenceTestsRunner, IClassFixtur
     {
         var storage = HostedCluster.GetSiloServiceProvider().GetRequiredKeyedService<IGrainStorage>(MemoryStoreName);
         var runner = new GrainStorageModelBasedTestRunner(storage, MemoryStoreName, output.WriteLine);
+        await runner.RunGeneratedConformanceTests();
+    }
+
+    [Fact, TestCategory("BVT"), TestCategory("Persistence"), TestCategory("Memory"), TestCategory("ModelBased")]
+    public async Task GrainStorageWithLatency_ModelBasedGeneratedConformance()
+    {
+        var services = HostedCluster.GetSiloServiceProvider();
+        var storage = new MemoryGrainStorageWithLatency(
+            MemoryStoreWithLatencyName,
+            new MemoryStorageWithLatencyOptions { Latency = TimeSpan.Zero },
+            services.GetRequiredService<ILoggerFactory>(),
+            services.GetRequiredService<IGrainFactory>(),
+            services.GetRequiredService<IActivatorProvider>(),
+            services.GetRequiredService<IGrainStorageSerializer>());
+        var runner = new GrainStorageModelBasedTestRunner(
+            storage,
+            new GrainStorageModelBasedConformanceOptions
+            {
+                ProviderName = MemoryStoreWithLatencyName
+            },
+            output.WriteLine);
+
         await runner.RunGeneratedConformanceTests();
     }
 }

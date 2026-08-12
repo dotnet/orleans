@@ -10,6 +10,7 @@ using Orleans.Storage;
 using Orleans.Providers;
 using TestExtensions;
 using UnitTests.Persistence;
+using UnitTests.StorageTests.ModelBased;
 using Orleans.Persistence.Firestore;
 using UnitTests.StorageTests.Relational;
 
@@ -280,6 +281,31 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
 
         Assert.Equal(staleETag, exception.CurrentEtag);
         Assert.Equal("Unknown", exception.StoredEtag);
+    }
+
+    [SkippableFact, TestCategory("Functional"), TestCategory("ModelBased")]
+    public async Task FirestoreStorage_ModelBasedGeneratedConformance()
+    {
+        var storage = await CreateStorage(deleteStateOnClear: true);
+        var runner = new GrainStorageModelBasedTestRunner(storage, "Firestore", _output.WriteLine);
+
+        await runner.RunGeneratedConformanceTests();
+    }
+
+    [SkippableFact, TestCategory("Functional"), TestCategory("ModelBased")]
+    public async Task FirestoreStorage_ClearWritesTombstone_ModelBasedGeneratedConformance()
+    {
+        var storage = await CreateStorage(deleteStateOnClear: false);
+        var runner = new GrainStorageModelBasedTestRunner(
+            storage,
+            new GrainStorageModelBasedConformanceOptions
+            {
+                ProviderName = "FirestoreClearWritesTombstone",
+                DeleteStateOnClear = false
+            },
+            _output.WriteLine);
+        await runner.RunGeneratedConformanceTests();
+    }
     }
 
     [TestSuite("Functional")]
