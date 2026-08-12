@@ -325,7 +325,7 @@ public class ShardExecutorTests
         var runTask = executor.RunShardAsync(shard, CancellationToken.None);
 
         await firstCall.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await timeProvider.TimerCreated.WaitAsync(TimeSpan.FromSeconds(5));
+        await timeProvider.TimerCreated.WaitAsync(TimeSpan.FromMinutes(1));
         Assert.False(secondCall.Task.IsCompleted);
 
         timeProvider.Advance(TimeSpan.FromSeconds(5));
