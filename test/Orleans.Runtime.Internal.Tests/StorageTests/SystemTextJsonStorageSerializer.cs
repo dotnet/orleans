@@ -131,6 +131,17 @@ namespace UnitTests.StorageTests
         public void UniqueKeyConverter() => Roundtrip(UniqueKey.NewKey());
 
         [Fact]
+        public void UniqueKeyConverterIgnoresMetadata()
+        {
+            var expected = UniqueKey.NewKey();
+            var json = $$"""{"$id":"1","metadata":{"value":true},"UniqueKey":"{{expected.ToHexString()}}"}""";
+
+            var actual = _systemTextJson.Deserialize<UniqueKey>(BinaryData.FromString(json));
+
+            Assert.Equal(expected, actual);
+        }
+
+        [Fact]
         public void IpEndPointConverter()
         {
             Roundtrip(IPEndPoint.Parse("[1234:1224:1223:1234:1234:ffff:192.168.100.228]:443"));

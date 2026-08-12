@@ -366,12 +366,20 @@ namespace Orleans.Runtime
 
                 if (reader.TokenType == JsonTokenType.PropertyName)
                 {
-                    Span<char> buffer = stackalloc char[MaxBufferSize];
-                    var written = reader.CopyString(buffer);
-
-                    if (buffer[..written] is "UniqueKey" && reader.Read())
+                    var isUniqueKey = reader.ValueTextEquals("UniqueKey");
+                    if (!reader.Read())
                     {
+                        throw new JsonException($"Could not deserialize {nameof(UniqueKey)}.");
+                    }
+
+                    if (isUniqueKey)
+                    {
+                        Span<char> buffer = stackalloc char[MaxBufferSize];
                         result = GetUniqueKey(ref reader, buffer);
+                    }
+                    else
+                    {
+                        reader.Skip();
                     }
                 }
             }
