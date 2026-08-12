@@ -801,7 +801,8 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
     {
         // During a rolling upgrade, LocalGrainDirectory does not participate in DistributedGrainDirectory's
         // recovery-registration barrier and can report an activation superseded in a newer membership view.
-        // Preserve the newest registration: conflicting registrations within one membership version remain invalid.
+        // This is the only expected case where recovery returns different registrations for one grain. Preserve
+        // the newest view while retaining recovery's existing last-response tie-breaking within the same view.
         if (!directory.TryGetValue(recovered.GrainId, out var existing)
             || recovered.MembershipVersion >= existing.MembershipVersion)
         {
