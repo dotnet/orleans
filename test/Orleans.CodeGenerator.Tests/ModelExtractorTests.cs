@@ -399,6 +399,11 @@ public record DemoRecord([Id(42)] string Value);
         Assert.Contains("global::LibraryB.CopierType", registeredCodecTypes);
         Assert.Contains("global::LibraryB.ConverterType", registeredCodecTypes);
         Assert.Contains("global::LibraryB.SerializerType", registeredCodecTypes);
+        Assert.Equal(
+            [
+                new RegisteredProviderModel("Client", "Clustering", "Consumer", new TypeRef("global::ConsumerProject.ConsumerMarker")),
+            ],
+            model.RegisteredProviders);
         Assert.Contains(model.InterfaceImplementations, implementation => implementation.ImplementationType.SyntaxString == "global::LibraryB.GeneratedInterfaceImplementation");
     }
 
@@ -413,6 +418,87 @@ public record DemoRecord([Id(42)] string Value);
 
         Assert.Equal(modelA, modelB);
         Assert.Equal(modelA.GetHashCode(), modelB.GetHashCode());
+    }
+
+    [Fact]
+    public async Task ExtractReferenceAssemblyData_DoesNotEmitPartialMetadataForAliasOnlyProvider()
+    {
+        const string providerCode = """
+            using Orleans;
+
+            [assembly: RegisterProvider("Aliased", "Clustering", "Client", typeof(AliasedLibrary.Provider))]
+
+            namespace AliasedLibrary;
+
+            public sealed class Provider
+            {
+            }
+            """;
+
+        var providerCompilation = await CreateCompilation(providerCode, "AliasedLibrary");
+        var aliasedReference = providerCompilation.ToMetadataReference().WithAliases(["AliasOnly"]);
+        var consumerCompilation = await CreateCompilation(
+            """
+            extern alias AliasOnly;
+            using Orleans;
+
+            [assembly: RegisterProvider(
+                "Local",
+                "Clustering",
+                "Client",
+                typeof(ConsumerProject.LocalProvider))]
+            [assembly: RegisterProvider(
+                "Aliased",
+                "Clustering",
+                "Client",
+                typeof(ConsumerProject.ProviderContainer<AliasOnly::AliasedLibrary.Provider>.NestedProvider))]
+
+            namespace ConsumerProject;
+
+            public sealed class LocalProvider
+            {
+            }
+
+            public sealed class ProviderContainer<T>
+            {
+                public sealed class NestedProvider
+                {
+                }
+            }
+            """,
+            "ConsumerProject",
+            aliasedReference);
+
+        var model = ModelExtractor.ExtractReferenceAssemblyData(consumerCompilation, new CodeGeneratorOptions(), default);
+
+        Assert.Empty(model.RegisteredProviders);
+    }
+
+    [Fact]
+    public async Task ExtractReferenceAssemblyData_DoesNotEmitPartialMetadataForFileLocalProvider()
+    {
+        const string code = """
+            using Orleans;
+
+            [assembly: RegisterProvider("Local", "Clustering", "Client", typeof(TestProject.LocalProvider))]
+            [assembly: RegisterProvider("FileLocal", "Clustering", "Client", typeof(FileLocalProvider))]
+
+            file sealed class FileLocalProvider
+            {
+            }
+
+            namespace TestProject
+            {
+                public sealed class LocalProvider
+                {
+                }
+            }
+            """;
+
+        var compilation = await CreateCompilation(code);
+        var model = ModelExtractor.ExtractReferenceAssemblyData(compilation, new CodeGeneratorOptions(), default);
+
+        Assert.Empty(model.RegisteredProviders);
     }
 
     [Fact]
@@ -619,6 +705,11 @@ public record DemoRecord([Id(42)] string Value);
             using Orleans;
             using System.Threading.Tasks;
 
+            [assembly: RegisterProvider("LibraryB", "Clustering", "Client", typeof(LibraryB.BetaType))]
+            [assembly: RegisterProvider("Generic", "Clustering", "Client", typeof(LibraryB.GenericProvider<LibraryB.BetaType>))]
+            [assembly: RegisterProvider("Hidden", "Clustering", "Client", typeof(LibraryB.HiddenProvider))]
+            [assembly: RegisterProvider("Consumer", "Clustering", "Client", typeof(LibraryB.BetaType))]
+
             namespace LibraryB;
 
             [Id(200)]
@@ -658,6 +749,14 @@ public record DemoRecord([Id(42)] string Value);
             {
                 public Task Ping() => Task.CompletedTask;
             }
+
+            internal sealed class HiddenProvider
+            {
+            }
+
+            public sealed class GenericProvider<T>
+            {
+            }
             """;
 
         const string libraryACode = """
@@ -667,6 +766,7 @@ public record DemoRecord([Id(42)] string Value);
             [assembly: ApplicationPart("Zeta.Part")]
             [assembly: ApplicationPart("Alpha.Part")]
             [assembly: GenerateCodeForDeclaringAssembly(typeof(LibraryB.BetaType))]
+            [assembly: RegisterProvider("LibraryA", "Clustering", "Client", typeof(LibraryA.AlphaType))]
 
             namespace LibraryA;
 
@@ -681,6 +781,7 @@ public record DemoRecord([Id(42)] string Value);
             using Orleans;
 
             [assembly: GenerateCodeForDeclaringAssembly(typeof(LibraryA.AlphaType))]
+            [assembly: RegisterProvider("Consumer", "Clustering", "Client", typeof(ConsumerProject.ConsumerMarker))]
 
             namespace ConsumerProject;
 

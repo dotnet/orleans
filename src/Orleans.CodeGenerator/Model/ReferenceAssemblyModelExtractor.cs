@@ -44,8 +44,12 @@ internal static class ReferenceAssemblyModelExtractor
         var referencedSerializableTypes = new HashSet<SerializableTypeModel>();
         var referencedProxyInterfaces = new HashSet<ProxyInterfaceModel>();
         var registeredCodecs = new HashSet<RegisteredCodecModel>();
+        var registeredProviders = new Dictionary<(string Target, string Kind, string Name), RegisteredProviderModel>();
+        var hasUnrepresentableProviderRegistration = false;
         var interfaceImplementations = new HashSet<InterfaceImplementationModel>();
         var diagnosticBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
+
+        CollectAssemblyAttributes(compilation.Assembly, includeApplicationParts: false);
 
         foreach (var reference in compilation.References)
         {
@@ -56,20 +60,7 @@ internal static class ReferenceAssemblyModelExtractor
                 continue;
             }
 
-            if (!asm.GetAttributes(libraryTypes.ApplicationPartAttribute, out var attrs))
-            {
-                continue;
-            }
-
-            AddApplicationPart(asm.MetadataName);
-            foreach (var attr in attrs)
-            {
-                if (attr.ConstructorArguments.Length > 0
-                    && attr.ConstructorArguments[0].Value is string partName)
-                {
-                    AddApplicationPart(partName);
-                }
-            }
+            CollectAssemblyAttributes(asm, includeApplicationParts: true);
         }
 
         foreach (var asm in assembliesToExamine)
@@ -179,6 +170,14 @@ internal static class ReferenceAssemblyModelExtractor
             .ThenBy(static entry => entry.Kind)
             .ToImmutableArray();
 
+        var sortedRegisteredProviders = hasUnrepresentableProviderRegistration
+            ? []
+            : registeredProviders.Values
+                .OrderBy(static entry => entry.Target, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.Kind, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.Name, StringComparer.Ordinal)
+                .ToImmutableArray();
+
         var sortedInterfaceImplementations = interfaceImplementations
             .OrderBy(static entry => entry.ImplementationType.SyntaxString, StringComparer.Ordinal)
             .ToImmutableArray();
@@ -194,6 +193,7 @@ internal static class ReferenceAssemblyModelExtractor
             ReferencedSerializableTypes: sortedReferencedSerializableTypes,
             ReferencedProxyInterfaces: sortedReferencedProxyInterfaces,
             RegisteredCodecs: sortedRegisteredCodecs,
+            RegisteredProviders: sortedRegisteredProviders,
             InterfaceImplementations: sortedInterfaceImplementations);
 
         void AddApplicationPart(string applicationPart)
@@ -202,6 +202,87 @@ internal static class ReferenceAssemblyModelExtractor
             {
                 applicationParts.Add(applicationPart);
             }
+        }
+
+        void CollectAssemblyAttributes(IAssemblySymbol assembly, bool includeApplicationParts)
+        {
+            var hasApplicationPartAttribute = false;
+
+            foreach (var attribute in assembly.GetAttributes())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (includeApplicationParts
+                    && SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, libraryTypes.ApplicationPartAttribute))
+                {
+                    if (!hasApplicationPartAttribute)
+                    {
+                        AddApplicationPart(assembly.MetadataName);
+                        hasApplicationPartAttribute = true;
+                    }
+
+                    if (attribute.ConstructorArguments.Length > 0
+                        && attribute.ConstructorArguments[0].Value is string partName)
+                    {
+                        AddApplicationPart(partName);
+                    }
+
+                    continue;
+                }
+
+                if (!SymbolEqualityComparer.Default.Equals(assembly, compilation.Assembly)
+                    || !SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, libraryTypes.RegisterProviderAttribute))
+                {
+                    continue;
+                }
+
+                var arguments = attribute.ConstructorArguments;
+                if (arguments.Length < 4
+                    || arguments[0].Value is not string name
+                    || arguments[1].Value is not string kind
+                    || arguments[2].Value is not string target
+                    || arguments[3].Value is not INamedTypeSymbol type
+                    || !compilation.IsSymbolAccessibleWithin(type, compilation.Assembly)
+                    || !CanReferenceProviderType(type))
+                {
+                    hasUnrepresentableProviderRegistration = true;
+                    continue;
+                }
+
+                var provider = new RegisteredProviderModel(
+                    target,
+                    kind,
+                    name,
+                    new TypeRef(type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
+                var key = (target, kind, name);
+                registeredProviders[key] = provider;
+            }
+        }
+
+        bool CanReferenceProviderType(ITypeSymbol type)
+        {
+            return type switch
+            {
+                INamedTypeSymbol namedType => CanReferenceNamedType(namedType)
+                    && (namedType.ContainingType is null || CanReferenceProviderType(namedType.ContainingType))
+                    && namedType.TypeArguments.All(CanReferenceProviderType),
+                IArrayTypeSymbol arrayType => CanReferenceProviderType(arrayType.ElementType),
+                IPointerTypeSymbol pointerType => CanReferenceProviderType(pointerType.PointedAtType),
+                _ => true,
+            };
+        }
+
+        bool CanReferenceNamedType(INamedTypeSymbol type)
+        {
+            if (type.IsFileLocal)
+            {
+                return false;
+            }
+
+            var originalDefinition = type.OriginalDefinition;
+            var metadataName = TypeMetadataIdentity.Create(originalDefinition).MetadataName;
+            return compilation.GetTypeByMetadataName(metadataName) is { } resolvedType
+                && SymbolEqualityComparer.Default.Equals(resolvedType, originalDefinition);
         }
     }
 
@@ -321,4 +402,3 @@ internal static class ReferenceAssemblyModelExtractor
             kind);
     }
 }
-

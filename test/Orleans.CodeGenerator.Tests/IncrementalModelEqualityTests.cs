@@ -246,6 +246,7 @@ public class IncrementalModelEqualityTests
         ImmutableArray<SerializableTypeModel> referencedSerializableTypes = default,
         ImmutableArray<ProxyInterfaceModel> referencedProxyInterfaces = default,
         ImmutableArray<RegisteredCodecModel> registeredCodecs = default,
+        ImmutableArray<RegisteredProviderModel> registeredProviders = default,
         ImmutableArray<InterfaceImplementationModel> interfaceImplementations = default) => new(
             "TestAssembly",
             applicationParts,
@@ -255,5 +256,6 @@ public class IncrementalModelEqualityTests
             referencedSerializableTypes,
             referencedProxyInterfaces,
             registeredCodecs,
+            registeredProviders,
             interfaceImplementations);
 }

@@ -94,6 +94,18 @@ internal static class MetadataAggregateModelBuilder
             .ThenBy(static entry => entry.Kind)
             .ToImmutableArray();
 
+        var registeredProviders = new Dictionary<(string Target, string Kind, string Name), RegisteredProviderModel>();
+        foreach (var provider in referenceData.RegisteredProviders)
+        {
+            registeredProviders[(provider.Target, provider.Kind, provider.Name)] = provider;
+        }
+
+        var normalizedRegisteredProviders = registeredProviders.Values
+            .OrderBy(static entry => entry.Target, StringComparer.Ordinal)
+            .ThenBy(static entry => entry.Kind, StringComparer.Ordinal)
+            .ThenBy(static entry => entry.Name, StringComparer.Ordinal)
+            .ToImmutableArray();
+
         var interfaceImplementations = referenceData.InterfaceImplementations
             .Distinct()
             .OrderBy(static entry => entry.ImplementationType.SyntaxString, StringComparer.Ordinal)
@@ -108,6 +120,7 @@ internal static class MetadataAggregateModelBuilder
             ReferencedSerializableTypes: referencedSerializableTypes,
             ReferencedProxyInterfaces: referencedProxyInterfaces,
             RegisteredCodecs: registeredCodecs,
+            RegisteredProviders: normalizedRegisteredProviders,
             InterfaceImplementations: interfaceImplementations);
     }
 

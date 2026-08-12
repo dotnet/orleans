@@ -42,6 +42,6 @@ internal static class ReferenceAssemblyDataProvider
             EquatableArray<SerializableTypeModel>.Empty,
             EquatableArray<ProxyInterfaceModel>.Empty,
             EquatableArray<RegisteredCodecModel>.Empty,
+            EquatableArray<RegisteredProviderModel>.Empty,
             EquatableArray<InterfaceImplementationModel>.Empty);
 }
-

@@ -3335,6 +3335,11 @@ namespace Orleans.Serialization.Codecs
 
 namespace Orleans.Serialization.Configuration
 {
+    public partial interface IProviderMetadataProvider
+    {
+        void ConfigureProviders(System.Collections.Generic.IDictionary<(string Target, string Kind, string Name), System.Type> providers);
+    }
+
     public partial interface ITypeManifestProvider : Microsoft.Extensions.Options.IConfigureOptions<TypeManifestOptions>
     {
     }

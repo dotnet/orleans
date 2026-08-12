@@ -1,4 +1,3 @@
-using System.Reflection;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -233,21 +232,7 @@ namespace Orleans
             }
 
             static Dictionary<(string Kind, string Name), Type> GetRegisteredProviders()
-            {
-                var result = new Dictionary<(string, string), Type>();
-                foreach (var asm in ReferencedAssemblyProvider.GetRelevantAssemblies())
-                {
-                    foreach (var attr in asm.GetCustomAttributes<RegisterProviderAttribute>())
-                    {
-                        if (string.Equals(attr.Target, "Client"))
-                        {
-                            result[(attr.Kind, attr.Name)] = attr.Type;
-                        }
-                    }
-                }
-
-                return result;
-            }
+                => ProviderRegistrationResolver.GetRegisteredProviders(ReferencedAssemblyProvider.GetRelevantAssemblies(), "Client");
 
             static void ApplySubsection(IClientBuilder builder, IConfigurationSection cfg, Dictionary<(string Kind, string Name), Type> knownProviderTypes, string sectionName)
             {
