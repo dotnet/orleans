@@ -14,6 +14,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
         private readonly ConnectionOptions connectionOptions;
         private readonly Gateway gateway;
+        private readonly Action<Message> trackRequest;
         private readonly GatewayInstruments gatewayInstruments;
         private readonly OverloadDetector overloadDetector;
         private readonly SiloAddress myAddress;
@@ -34,6 +35,7 @@ namespace Orleans.Runtime.Messaging
         {
             this.connectionOptions = connectionOptions;
             this.gateway = gateway;
+            this.trackRequest = gateway.TrackRequest;
             this.gatewayInstruments = gatewayInstruments;
             this.overloadDetector = overloadDetector;
             this.messageCenter = messageCenter;
@@ -92,7 +94,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 MessagingInstrumentation.OnMessageReRoute(msg);
-                this.messageCenter.RerouteMessage(msg);
+                this.messageCenter.RerouteMessage(msg, this.trackRequest);
             }
             else
             {
