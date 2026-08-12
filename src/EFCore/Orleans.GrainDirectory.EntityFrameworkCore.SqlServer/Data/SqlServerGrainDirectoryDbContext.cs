@@ -23,7 +23,7 @@ public class SqlServerGrainDirectoryDbContext : GrainDirectoryDbContext<SqlServe
             c.Property(p => p.MembershipVersion).IsRequired();
             c.Property(p => p.ETag).IsRequired().IsRowVersion();
 
-            c.HasIndex(p => new {p.ClusterId, p.SiloAddress}).IsClustered(false).HasDatabaseName("IDX_Activations_CusterId_SiloAddress");
+            c.HasIndex(p => new {p.ClusterId, p.SiloAddress}).IsClustered(false).HasDatabaseName("IDX_Activations_ClusterId_SiloAddress");
             c.HasIndex(p => new {p.ClusterId, p.GrainId, p.ActivationId}).IsClustered(false).HasDatabaseName("IDX_Activations_ClusterId_GrainId_ActivationId");
         });
     }

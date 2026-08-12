@@ -11,6 +11,9 @@ namespace Orleans.EntityFrameworkCore.Tests.GrainDirectory;
 [TestCategory(EFCoreTestCategories.PostgreSql)]
 [TestCategory(EFCoreTestCategories.PostgreSqlProvider)]
 [TestCategory(EFCoreTestCategories.Functional)]
+[TestSuite("Functional")]
+[TestProvider(EFCoreTestCategories.PostgreSqlProvider)]
+[TestArea("GrainDirectory")]
 public sealed class EFCorePostgreSqlGrainDirectoryTests :
     EFCoreGrainDirectoryTestsBase<PostgreSqlGrainDirectoryDbContext, Guid>
 {

@@ -34,7 +34,7 @@ namespace Orleans.GrainDirectory.EntityFrameworkCore.SqlServer.Data.Migrations
                 .Annotation("SqlServer:Clustered", false);
 
             migrationBuilder.CreateIndex(
-                name: "IDX_Activations_CusterId_SiloAddress",
+                name: "IDX_Activations_ClusterId_SiloAddress",
                 table: "Activations",
                 columns: new[] { "ClusterId", "SiloAddress" })
                 .Annotation("SqlServer:Clustered", false);

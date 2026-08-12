@@ -10,6 +10,9 @@ namespace Orleans.EntityFrameworkCore.Tests.Reminders;
 [TestCategory("Reminders")]
 [TestCategory("EFCore")]
 [TestCategory(EFCoreTestCategories.SqlServer)]
+[TestSuite("Functional")]
+[TestProvider(EFCoreTestCategories.SqlServer)]
+[TestArea("Reminders")]
 public sealed class EFCoreSqlServerReminderTableTests :
     EFCoreReminderTableTestsBase<SqlServerReminderDbContext, byte[]>
 {
