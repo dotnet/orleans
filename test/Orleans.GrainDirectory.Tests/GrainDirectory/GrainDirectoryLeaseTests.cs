@@ -40,7 +40,7 @@ public class GrainDirectoryLeaseTests
     {
         var (cluster, timeProvider) = CreateCluster();
         using var events = new DiagnosticEventCollector(GrainDirectoryEvents.ListenerName);
-        await cluster.DeployAsync();
+        await DeployAndWaitForClusterManifestAsync(cluster);
 
         try
         {
@@ -88,7 +88,7 @@ public class GrainDirectoryLeaseTests
     {
         var (cluster, timeProvider) = CreateCluster();
         using var events = new DiagnosticEventCollector(GrainDirectoryEvents.ListenerName);
-        await cluster.DeployAsync();
+        await DeployAndWaitForClusterManifestAsync(cluster);
 
         try
         {
@@ -145,7 +145,7 @@ public class GrainDirectoryLeaseTests
     {
         var (cluster, _) = CreateCluster();
         using var events = new DiagnosticEventCollector(GrainDirectoryEvents.ListenerName);
-        await cluster.DeployAsync();
+        await DeployAndWaitForClusterManifestAsync(cluster);
 
         try
         {
@@ -261,7 +261,7 @@ public class GrainDirectoryLeaseTests
     {
         var (cluster, _) = CreateCluster(TimeSpan.Zero);
         using var events = new DiagnosticEventCollector(GrainDirectoryEvents.ListenerName);
-        await cluster.DeployAsync();
+        await DeployAndWaitForClusterManifestAsync(cluster);
 
         try
         {
@@ -296,7 +296,7 @@ public class GrainDirectoryLeaseTests
     {
         var (cluster, _) = CreateCluster();
         using var events = new DiagnosticEventCollector(GrainDirectoryEvents.ListenerName);
-        await cluster.DeployAsync();
+        await DeployAndWaitForClusterManifestAsync(cluster);
 
         try
         {
@@ -330,7 +330,7 @@ public class GrainDirectoryLeaseTests
     {
         var (cluster, timeProvider) = CreateCluster();
         using var events = new DiagnosticEventCollector(GrainDirectoryEvents.ListenerName);
-        await cluster.DeployAsync();
+        await DeployAndWaitForClusterManifestAsync(cluster);
 
         try
         {
@@ -407,6 +407,12 @@ public class GrainDirectoryLeaseTests
         });
 
         return (builder.Build(), timeProvider);
+    }
+
+    private static async Task DeployAndWaitForClusterManifestAsync(InProcessTestCluster cluster)
+    {
+        await cluster.DeployAsync();
+        await cluster.WaitForClusterManifestToStabilizeAsync();
     }
 
     private static async Task DisposeClusterAsync(InProcessTestCluster cluster)
