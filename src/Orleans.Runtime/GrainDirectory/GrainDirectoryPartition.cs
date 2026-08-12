@@ -801,7 +801,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
     {
         // Concurrent recovery responses can include an activation which was superseded in a newer membership view.
         if (!directory.TryGetValue(recovered.GrainId, out var existing)
-            || recovered.MembershipVersion > existing.MembershipVersion)
+            || recovered.MembershipVersion >= existing.MembershipVersion)
         {
             directory[recovered.GrainId] = recovered;
         }

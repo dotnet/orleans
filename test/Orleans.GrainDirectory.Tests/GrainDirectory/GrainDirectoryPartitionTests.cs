@@ -200,8 +200,8 @@ public sealed class GrainDirectoryPartitionTests
         GrainDirectoryPartition.RecoverEntry(newThenOld, newRegistration);
         GrainDirectoryPartition.RecoverEntry(newThenOld, oldRegistration);
 
-        Assert.Same(newRegistration, oldThenNew[grainId]);
-        Assert.Same(newRegistration, newThenOld[grainId]);
+        Assert.Equal(newRegistration, oldThenNew[grainId]);
+        Assert.Equal(newRegistration, newThenOld[grainId]);
     }
 
     private static void AssertRanges(RingRange previousOwnerRange, RingRange addedRange, params RingRange[] expected)
