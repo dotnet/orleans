@@ -57,4 +57,3 @@ Security controls should fail closed when identity or policy data is missing, in
 - [Network hardening](networking.md)
 - [Secure Orleans connections with TLS](../host/transport-layer-security.md)
 - [Secure the Orleans Dashboard](../dashboard/index.md#secure-the-dashboard-before-exposing-it)
-

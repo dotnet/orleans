@@ -51,6 +51,5 @@ For every credential:
 1. Decide whether credential-provider failure should reject new work, preserve existing connections, or make the host unready.
 
 Credential rotation doesn't replace authorization review. Periodically verify that provider identities still have least privilege and that removed clients, silos, and operators can no longer connect.
-
 For network boundaries around credentials and provider connections, see [network hardening](networking.md).
-
+For network boundaries around credentials and provider connections, see [network hardening](networking.md).

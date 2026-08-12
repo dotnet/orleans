@@ -54,6 +54,5 @@ From each network zone, test both allowed and denied paths:
 1. TLS peers reject untrusted certificates, invalid names, and expired certificates.
 1. Unauthenticated and unauthorized users can't reach dashboard or diagnostic data.
 1. A rollout, address change, and connection retry don't bypass policy or depend on a previously open connection.
-
 Record the deployed rules and their owners in the [production-readiness checklist](../deployment/production-readiness.md).
-
+Record the deployed rules and their owners in the [production-readiness checklist](../deployment/production-readiness.md).
