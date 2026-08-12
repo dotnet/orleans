@@ -226,7 +226,7 @@ public class MemoryStorageTests : GrainStorageTestRunner, IClassFixture<MemorySt
 
 - .NET 8.0 or later
 - xUnit 2.0 or later
-- Orleans 9.0 or later
+- Orleans 10.0 or later
 
 ## Contributing
 

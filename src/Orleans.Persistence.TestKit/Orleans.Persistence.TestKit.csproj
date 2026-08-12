@@ -9,6 +9,7 @@
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <PropertyGroup>
