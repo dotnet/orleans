@@ -108,6 +108,7 @@ namespace Orleans.Runtime.Messaging
                     msg.TargetGrain = systemTargetId.WithSiloAddress(targetAddress).GrainId;
                 }
 
+                this.gateway.TrackRequest(msg);
                 this.messageCenter.SendMessage(msg);
             }
         }
