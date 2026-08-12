@@ -19,20 +19,29 @@ namespace UnitTests.StorageTests.AdoNet
         private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameSqlServer;
         private readonly RelationalStorageForTesting _storage;
 
-        public class Fixture
+        public class Fixture : IAsyncLifetime
         {
+            private readonly Func<Task<RelationalStorageForTesting>> _storageFactory;
+
             public Fixture() : this(
-                () => RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName).GetAwaiter().GetResult())
+                () => RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName))
             {
             }
 
-            internal Fixture(Func<RelationalStorageForTesting> storageFactory)
+            internal Fixture(Func<Task<RelationalStorageForTesting>> storageFactory)
             {
                 ArgumentNullException.ThrowIfNull(storageFactory);
-                Storage = storageFactory();
+                _storageFactory = storageFactory;
             }
 
-            public RelationalStorageForTesting Storage { get; }
+            public RelationalStorageForTesting Storage { get; private set; } = null!;
+
+            public async Task InitializeAsync()
+            {
+                Storage = await _storageFactory();
+            }
+
+            public Task DisposeAsync() => Task.CompletedTask;
         }
 
         public SqlServerRelationalStoreTests(Fixture fixture) : base(AdoNetInvariantName)
@@ -77,12 +86,12 @@ namespace UnitTests.StorageTests.AdoNet
     public class SqlServerRelationalStoreFixtureTests
     {
         [Fact]
-        public void InitializationFailureIsPropagated()
+        public async Task InitializationFailureIsPropagated()
         {
             var expectedException = new InvalidOperationException("Simulated SQL Server database initialization failure.");
+            var fixture = new SqlServerRelationalStoreTests.Fixture(() => throw expectedException);
 
-            var exception = Assert.Throws<InvalidOperationException>(
-                () => new SqlServerRelationalStoreTests.Fixture(() => throw expectedException));
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(fixture.InitializeAsync);
 
             Assert.Same(expectedException, exception);
         }
