@@ -203,6 +203,7 @@ namespace Orleans.Hosting
             services.AddSingleton<ClusterMembershipService>();
             services.TryAddFromExisting<IClusterMembershipService, ClusterMembershipService>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterMembershipService>();
+            services.TryAddSingleton<UnknownSiloStatusCache>();
 
             services.TryAddSingleton<ClientDirectory>();
             services.AddFromExisting<ILocalClientDirectory, ClientDirectory>();
