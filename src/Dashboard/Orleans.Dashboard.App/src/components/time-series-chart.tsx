@@ -102,7 +102,7 @@ export default class TimeSeriesChart extends React.Component<TimeSeriesChartProp
             if (new Date(timepoint).getSeconds() % 30 == 0) {
               return new Date(timepoint).toLocaleTimeString();
             }
-          } catch (e) {
+          } catch {
             // not a valid date string
           }
         }

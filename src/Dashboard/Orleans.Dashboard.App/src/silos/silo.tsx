@@ -183,8 +183,6 @@ export default class Silo extends React.Component<SiloProps> {
 
     let cpuGauge: React.ReactNode;
     let memGauge: React.ReactNode;
-    let metadata: React.ReactNode;
-
     if (this.hasSeries(x => (x.cpuUsage || 0) > 0)) {
       cpuGauge = (
         <div>

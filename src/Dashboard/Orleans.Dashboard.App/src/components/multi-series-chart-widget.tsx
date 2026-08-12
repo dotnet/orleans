@@ -51,7 +51,7 @@ export default class MultiSeriesChartWidget extends React.Component<MultiSeriesC
     }
 
     const data = {
-      labels: this.props.series[0].map(function(x) {
+      labels: this.props.series[0].map(function() {
         return '';
       }),
       datasets: this.props.series.map((data, index) => {
