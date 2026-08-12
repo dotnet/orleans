@@ -11,6 +11,18 @@ An Orleans production deployment is a cluster of silo processes, optionally with
 
 Orleans manages grain activation and cluster membership, but the hosting platform remains responsible for process supervision, networking, health probes, secrets, resource allocation, and controlled rollout. A production design also needs durable grain state where the application requires it.
 
+<a id="configure-and-start-a-silo"></a>
+<a id="configure-and-connect-to-a-client"></a>
+<a id="configure-and-connect-a-client"></a>
+
+## Start the application
+
+Configure a silo on the [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensions/generic-host) with <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*>, then build and run the host with <xref:Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.RunAsync*>. For a separate client process, use <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*> and run that host the same way. Starting the host starts the silo or connects the client; stopping it coordinates a [graceful Orleans shutdown](../host/configuration-guide/shutting-down-orleans.md).
+
+See [Server configuration](../host/configuration-guide/server-configuration.md) and [Client configuration](../host/configuration-guide/client-configuration.md) for compiled examples.
+
+<a id="production-configurations"></a>
+
 ## Operations track
 
 Use these articles together:
