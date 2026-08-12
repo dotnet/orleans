@@ -343,17 +343,19 @@ namespace Orleans.Transactions.TestKit
                 $"Recovery phase=silo-shutdown completed, timestamp={DateTime.UtcNow:O}. Silo={siloToTerminate.SiloAddress}, "
                 + $"mode={shutdownMode}, elapsed={shutdownElapsed}.");
 
-            this.Log("Waiting for transactions to stop completing successfully");
+            this.Log("Observing transaction activity after silo shutdown");
             var failureDetectionStartedAt = Stopwatch.GetTimestamp();
+            var failureObservationWindow = gracefulShutdown ? TimeSpan.Zero : this.clientResponseTimeout;
+            var failureObservationTimeout = failureObservationWindow + FailureDetectionSchedulingMargin;
             this.Log(
-                $"Recovery phase=failure-watchdog started. ClientResponseTimeout="
-                + $"{this.clientResponseTimeout}, "
-                + $"schedulingMargin={FailureDetectionSchedulingMargin}, watchdog={this.failureDetectionTimeout}.");
+                $"Recovery phase=failure-watchdog started. ObservationWindow="
+                + $"{failureObservationWindow}, clientResponseTimeout={this.clientResponseTimeout}, "
+                + $"schedulingMargin={FailureDetectionSchedulingMargin}, watchdog={failureObservationTimeout}.");
             var failureDetection = await TransactionRecoveryFailureObservation.DetectAsync(
                 producer,
                 firstFailure.Task,
                 stopProducing,
-                this.clientResponseTimeout,
+                failureObservationWindow,
                 FailureDetectionSchedulingMargin);
             this.Log(
                 $"Recovery phase=failure-watchdog completed, timestamp={DateTime.UtcNow:O}. "
@@ -363,70 +365,84 @@ namespace Orleans.Transactions.TestKit
             if (failureDetection.Kind == TransactionRecoveryFailureObservation.OutcomeKind.AttemptTimedOut)
             {
                 throw new TimeoutException(
-                    $"The in-flight transaction attempt did not settle within the {this.failureDetectionTimeout} "
+                    $"The in-flight transaction attempt did not settle within the {failureObservationTimeout} "
                     + $"failure-detection deadline after silo death. Shutdown elapsed={shutdownElapsed}, "
                     + $"failure detection elapsed={failureDetection.Elapsed}, drain elapsed={failureDetection.DrainElapsed}. "
                     + $"Performed {Volatile.Read(ref index)} transactions on each group.");
             }
 
+            List<ExpectedGrainActivity>[] groupsToRecover;
             if (failureDetection.Kind == TransactionRecoveryFailureObservation.OutcomeKind.StoppedWithoutFailure)
             {
-                throw new InvalidOperationException(
-                    $"Transaction production stopped without observing a failure after silo death. "
-                    + $"Shutdown elapsed={shutdownElapsed}, failure detection elapsed={failureDetection.Elapsed}. "
-                    + $"Performed {Volatile.Read(ref index)} transactions on each group.");
-            }
+                if (!gracefulShutdown)
+                {
+                    throw new InvalidOperationException(
+                        $"Transaction production stopped without observing a failure after silo death. "
+                        + $"Shutdown elapsed={shutdownElapsed}, failure detection elapsed={failureDetection.Elapsed}. "
+                        + $"Performed {Volatile.Read(ref index)} transactions on each group.");
+                }
 
-            var interruption = failureDetection.Failure!;
-            if (!failureDetection.ProducerSettled)
+                groupsToRecover = transactionGroups;
+                recoveryEvents.SetRelevantGrains(txGrains.Select(grain => grain.RuntimeGrainId));
+                this.Log(
+                    $"Recovery phase=transaction-continuity observed, timestamp={DateTime.UtcNow:O}. "
+                    + "The graceful silo shutdown produced no client-visible transaction failure; "
+                    + $"all {groupsToRecover.Length} transaction groups will be probed after convergence.");
+            }
+            else
             {
-                throw new TimeoutException(
-                    $"A transaction failure was observed at index {interruption.Index}, but the in-flight batch did not "
-                    + $"settle within the {this.failureDetectionTimeout} absolute deadline. No recovery probe was started "
-                    + $"while that state-mutating attempt remained active. Drain elapsed={failureDetection.DrainElapsed}.");
+                var interruption = failureDetection.Failure!;
+                if (!failureDetection.ProducerSettled)
+                {
+                    throw new TimeoutException(
+                        $"A transaction failure was observed at index {interruption.Index}, but the in-flight batch did not "
+                        + $"settle within the {failureObservationTimeout} absolute deadline. No recovery probe was started "
+                        + $"while that state-mutating attempt remained active. Drain elapsed={failureDetection.DrainElapsed}.");
+                }
+
+                var failedGroups = failureDetection.ProducerResult;
+                if (TransactionRecoveryFailureObservation.IsPremature(interruption.ObservedAt, shutdownStartedAt))
+                {
+                    throw new InvalidOperationException(
+                        $"A transaction failed before silo shutdown began. Index: {interruption.Index}. "
+                        + $"Groups: {string.Join(":", interruption.GrainIds)}. Exception: {interruption.Exception.GetType().Name}.");
+                }
+
+                if (interruption.ObservedAt >= failureDetectionStartedAt
+                    && Stopwatch.GetElapsedTime(failureDetectionStartedAt, interruption.ObservedAt) > failureObservationTimeout)
+                {
+                    throw new TimeoutException(
+                        $"No transaction failure was observed within the {failureObservationTimeout} watchdog after silo death. "
+                        + $"The first later failure was at index {interruption.Index} after "
+                        + $"{Stopwatch.GetElapsedTime(failureDetectionStartedAt, interruption.ObservedAt)}.");
+                }
+
+                var firstFailureAfterShutdownRequest = Stopwatch.GetElapsedTime(shutdownStartedAt, interruption.ObservedAt);
+                var firstFailureRelativeToShutdownCompletion = Stopwatch.GetElapsedTime(failureDetectionStartedAt, interruption.ObservedAt);
+                this.Log(
+                    $"Recovery phase=transaction-terminal-failure observed, timestamp={DateTime.UtcNow:O}. "
+                    + $"Index={interruption.Index}, "
+                    + $"grains={string.Join(":", interruption.GrainIds)}, "
+                    + $"afterShutdownRequest={firstFailureAfterShutdownRequest}, "
+                    + $"relativeToShutdownCompletion={firstFailureRelativeToShutdownCompletion}, "
+                    + $"producerDrain={failureDetection.DrainElapsed}, "
+                    + $"exception={interruption.Exception.GetType().Name}: {interruption.Exception.Message}.");
+
+                failedGroups.Should().NotBeNullOrEmpty(
+                    "the drained producer must identify the transaction groups affected by the observed failure");
+                groupsToRecover = failedGroups!;
+                recoveryEvents.SetRelevantGrains(groupsToRecover.SelectMany(group => group).Select(grain => grain.RuntimeGrainId));
             }
-
-            var failedGroups = failureDetection.ProducerResult;
-            if (TransactionRecoveryFailureObservation.IsPremature(interruption.ObservedAt, shutdownStartedAt))
-            {
-                throw new InvalidOperationException(
-                    $"A transaction failed before silo shutdown began. Index: {interruption.Index}. "
-                    + $"Groups: {string.Join(":", interruption.GrainIds)}. Exception: {interruption.Exception.GetType().Name}.");
-            }
-
-            if (interruption.ObservedAt >= failureDetectionStartedAt
-                && Stopwatch.GetElapsedTime(failureDetectionStartedAt, interruption.ObservedAt) > this.failureDetectionTimeout)
-            {
-                throw new TimeoutException(
-                    $"No transaction failure was observed within the {this.failureDetectionTimeout} watchdog after silo death. "
-                    + $"The first later failure was at index {interruption.Index} after "
-                    + $"{Stopwatch.GetElapsedTime(failureDetectionStartedAt, interruption.ObservedAt)}.");
-            }
-
-            var firstFailureAfterShutdownRequest = Stopwatch.GetElapsedTime(shutdownStartedAt, interruption.ObservedAt);
-            var firstFailureRelativeToShutdownCompletion = Stopwatch.GetElapsedTime(failureDetectionStartedAt, interruption.ObservedAt);
-            this.Log(
-                $"Recovery phase=transaction-terminal-failure observed, timestamp={DateTime.UtcNow:O}. "
-                + $"Index={interruption.Index}, "
-                + $"grains={string.Join(":", interruption.GrainIds)}, "
-                + $"afterShutdownRequest={firstFailureAfterShutdownRequest}, "
-                + $"relativeToShutdownCompletion={firstFailureRelativeToShutdownCompletion}, "
-                + $"producerDrain={failureDetection.DrainElapsed}, "
-                + $"exception={interruption.Exception.GetType().Name}: {interruption.Exception.Message}.");
-
-            failedGroups.Should().NotBeNullOrEmpty(
-                "the drained producer must identify the transaction groups affected by the observed failure");
-            recoveryEvents.SetRelevantGrains(failedGroups!.SelectMany(group => group).Select(grain => grain.RuntimeGrainId));
 
             var convergenceStartedAt = Stopwatch.GetTimestamp();
             this.Log(
                 $"Recovery phase=membership-directory-convergence started, timestamp={DateTime.UtcNow:O}, "
-                + $"failedGroups={FormatGroups(failedGroups)}.");
+                + $"groups={FormatGroups(groupsToRecover)}.");
             await this.testCluster.WaitForLivenessToStabilizeAsync(didKill: !gracefulShutdown);
             var convergenceElapsed = Stopwatch.GetElapsedTime(convergenceStartedAt);
             this.Log(
                 $"Recovery phase=membership-directory-convergence completed, timestamp={DateTime.UtcNow:O}, "
-                + $"elapsed={convergenceElapsed}, failedGroups={FormatGroups(failedGroups)}.");
+                + $"elapsed={convergenceElapsed}, groups={FormatGroups(groupsToRecover)}.");
 
             this.Log($"Waiting for system to recover. Performed {Volatile.Read(ref index)} transactions on each group.");
             this.Log(
@@ -434,7 +450,7 @@ namespace Orleans.Transactions.TestKit
                 + $"watchdog={this.recoveryTimeout}, failureDetection={this.failureDetectionTimeout}, "
                 + $"remotePingFrequency={TransactionalStateOptions.DefaultRemoteTransactionPingFrequency}.");
             var recovery = await RecoverTransactions(
-                failedGroups,
+                groupsToRecover,
                 getIndex,
                 this.recoveryTimeout,
                 this.failureDetectionTimeout,
