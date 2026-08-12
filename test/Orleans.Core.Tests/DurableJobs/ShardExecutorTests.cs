@@ -420,7 +420,7 @@ public class ShardExecutorTests
             Arg.Any<CancellationToken>())
             .Returns(async _ =>
             {
-                retryPersistenceStarted.SetResult();
+                retryPersistenceStarted.TrySetResult();
                 await failRetryPersistence.Task;
             });
 
@@ -430,7 +430,7 @@ public class ShardExecutorTests
         var runTask = executor.RunShardAsync(shard, cts.Token);
 
         await Task.WhenAll(firstJobRegistered.Task, retryPersistenceStarted.Task).WaitAsync(cts.Token);
-        failRetryPersistence.SetException(expectedException);
+        Assert.True(failRetryPersistence.TrySetException(expectedException));
 
         var actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => runTask);
 
@@ -688,7 +688,7 @@ public class ShardExecutorTests
             // The iterator resumes only after RunShardAsync has registered the yielded job task.
             if (i == 0)
             {
-                firstJobRegistered?.SetResult();
+                firstJobRegistered?.TrySetResult();
             }
         }
         
