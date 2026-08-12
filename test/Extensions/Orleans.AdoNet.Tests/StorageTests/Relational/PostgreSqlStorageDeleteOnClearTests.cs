@@ -17,7 +17,6 @@ namespace UnitTests.StorageTests.Relational
 
         public PostgreSqlStorageDeleteOnClearTests(CommonFixture commonFixture) : base(AdoNetInvariant, commonFixture, deleteStateOnClear: true)
         {
-            Skip.If(PersistenceStorageTests == null, "Persistence storage not available for PostgreSql.");
         }
 
         [SkippableTheory, ClassData(typeof(StorageDataSetPlain<long>))]

@@ -26,6 +26,8 @@ namespace Tester.AdoNet.Persistence
 
         public class Fixture : BaseTestClusterFixture
         {
+            private string _connectionString = null!;
+
             protected override void CheckPreconditionsOrThrow()
             {
                 if (string.IsNullOrEmpty(TestDefaultConfiguration.MySqlConnectionString))
@@ -34,13 +36,20 @@ namespace Tester.AdoNet.Persistence
                 }
             }
 
+            public override async Task InitializeAsync()
+            {
+                EnsurePreconditionsMet();
+                var relationalStorage = await RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName);
+                _connectionString = relationalStorage.CurrentConnectionString;
+                await base.InitializeAsync();
+            }
+
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName).Result;
                 builder.ConfigureHostConfiguration(configBuilder => configBuilder.AddInMemoryCollection(
                     new Dictionary<string, string?>
                     {
-                        {ConnectionStringKey, relationalStorage.CurrentConnectionString}
+                        {ConnectionStringKey, _connectionString}
                     }));
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             }

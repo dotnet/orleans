@@ -18,26 +18,21 @@ namespace UnitTests.StorageTests.AdoNet
 
         private readonly RelationalStorageForTesting _storage;
 
-        public class Fixture
+        public class Fixture : IAsyncLifetime
         {
-            public Fixture()
+            public RelationalStorageForTesting Storage { get; private set; } = null!;
+
+            public async Task InitializeAsync()
             {
-                try
-                {
-                    Storage = RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName).GetAwaiter().GetResult();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Failed to initialize {AdoNetInvariantName} for testing: {ex}");
-                }
+                Storage = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
             }
 
-            public RelationalStorageForTesting? Storage { get; private set; }
+            public Task DisposeAsync() => Task.CompletedTask;
         }
 
         public PostgreSqlRelationalStoreTests(Fixture fixture) : base(AdoNetInvariantName)
         {
-            _storage = fixture.Storage!;
+            _storage = fixture.Storage;
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -59,7 +54,7 @@ namespace UnitTests.StorageTests.AdoNet
         [SkippableFact, TestCategory("Functional")]
         public async Task NativeDataSource_PostgreSql_Test()
         {
-            Skip.If(_storage is null || string.IsNullOrWhiteSpace(_storage.CurrentConnectionString), "Connection string not provided.");
+            Skip.If(string.IsNullOrWhiteSpace(_storage.CurrentConnectionString), "Connection string not provided.");
             await using var dataSource = Npgsql.NpgsqlDataSource.Create(_storage.CurrentConnectionString);
             var storage = RelationalStorage.CreateInstance(AdoNetInvariantName, dataSource);
 

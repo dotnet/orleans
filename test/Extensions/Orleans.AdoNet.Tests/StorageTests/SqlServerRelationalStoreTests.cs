@@ -19,26 +19,34 @@ namespace UnitTests.StorageTests.AdoNet
         private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameSqlServer;
         private readonly RelationalStorageForTesting _storage;
 
-        public class Fixture
+        public class Fixture : IAsyncLifetime
         {
-            public Fixture()
+            private readonly Func<Task<RelationalStorageForTesting>> _storageFactory;
+
+            public Fixture() : this(
+                () => RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName))
             {
-                try
-                {
-                    Storage = RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName).GetAwaiter().GetResult();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Failed to initialize {AdoNetInvariantName} for testing: {ex}");
-                }
             }
 
-            public RelationalStorageForTesting? Storage { get; private set; }
+            internal Fixture(Func<Task<RelationalStorageForTesting>> storageFactory)
+            {
+                ArgumentNullException.ThrowIfNull(storageFactory);
+                _storageFactory = storageFactory;
+            }
+
+            public RelationalStorageForTesting Storage { get; private set; } = null!;
+
+            public async Task InitializeAsync()
+            {
+                Storage = await _storageFactory();
+            }
+
+            public Task DisposeAsync() => Task.CompletedTask;
         }
 
         public SqlServerRelationalStoreTests(Fixture fixture) : base(AdoNetInvariantName)
         {
-            _storage = fixture.Storage!;
+            _storage = fixture.Storage;
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -60,7 +68,7 @@ namespace UnitTests.StorageTests.AdoNet
         [SkippableFact, TestCategory("Functional")]
         public async Task DataSource_SqlServer_Test()
         {
-            Skip.If(_storage is null || string.IsNullOrWhiteSpace(_storage.CurrentConnectionString), "Connection string not provided.");
+            Skip.If(string.IsNullOrWhiteSpace(_storage.CurrentConnectionString), "Connection string not provided.");
             using var dataSource = new ProviderDbDataSource(
                 _storage.CurrentConnectionString,
                 () => new SqlConnection(_storage.CurrentConnectionString));
@@ -72,6 +80,29 @@ namespace UnitTests.StorageTests.AdoNet
                 (record, _, _) => Task.FromResult(record.GetInt32(0)));
 
             Assert.Equal([47], values);
+        }
+    }
+
+    public class SqlServerRelationalStoreFixtureTests
+    {
+        [Fact]
+        public async Task InitializationFailureIsPropagated()
+        {
+            var expectedException = new InvalidOperationException("Simulated SQL Server database initialization failure.");
+            var fixture = new SqlServerRelationalStoreTests.Fixture(() => throw expectedException);
+
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(fixture.InitializeAsync);
+
+            Assert.Same(expectedException, exception);
+        }
+
+        [Fact]
+        public void NullStorageFactoryIsRejected()
+        {
+            var exception = Assert.Throws<ArgumentNullException>(
+                () => new SqlServerRelationalStoreTests.Fixture(null!));
+
+            Assert.Equal("storageFactory", exception.ParamName);
         }
     }
 }

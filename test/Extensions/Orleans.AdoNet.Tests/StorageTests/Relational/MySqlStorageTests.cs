@@ -25,8 +25,6 @@ namespace UnitTests.StorageTests.Relational
 
         public MySqlStorageTests(CommonFixture commonFixture) : base(AdoNetInvariant, commonFixture)
         {
-            //XUnit.NET will automatically call this constructor before every test method run.
-            Skip.If(PersistenceStorageTests == null, $"Persistence storage not available for MySql.");
         }
 
         [SkippableFact]

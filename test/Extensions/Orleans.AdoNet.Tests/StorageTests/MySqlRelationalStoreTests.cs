@@ -1,4 +1,3 @@
-using System.Runtime.ExceptionServices;
 using MySql.Data.MySqlClient;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;
@@ -22,35 +21,21 @@ namespace UnitTests.StorageTests.AdoNet
 
         private readonly RelationalStorageForTesting _storage;
 
-        public class Fixture
+        public class Fixture : IAsyncLifetime
         {
-            private readonly ExceptionDispatchInfo? preconditionsException;
+            public RelationalStorageForTesting Storage { get; private set; } = null!;
 
-            public void EnsurePreconditionsMet()
+            public async Task InitializeAsync()
             {
-                this.preconditionsException?.Throw();
+                Storage = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
             }
 
-            public Fixture()
-            {
-                try
-                {
-                    Storage = RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName).GetAwaiter().GetResult();
-                }
-                catch (Exception ex)
-                {
-                    this.preconditionsException = ExceptionDispatchInfo.Capture(ex);
-                    return;
-                }
-            }
-
-            public RelationalStorageForTesting? Storage { get; private set; }
+            public Task DisposeAsync() => Task.CompletedTask;
         }
 
         public MySqlRelationalStoreTests(Fixture fixture) : base(AdoNetInvariantName)
         {
-            fixture.EnsurePreconditionsMet();
-            _storage = fixture.Storage!;
+            _storage = fixture.Storage;
         }
 
         [SkippableFact, TestCategory("Functional")]
