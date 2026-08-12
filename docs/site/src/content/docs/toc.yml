@@ -56,8 +56,6 @@ items:
         href: host/configuration-guide/index.md
       - name: Deploy and operate
         href: deployment/index.md
-      - name: Use Orleans features
-        href: grains/index.md
       - name: Diagnose and recover
         href: host/monitoring/troubleshooting.md
   - name: Develop applications

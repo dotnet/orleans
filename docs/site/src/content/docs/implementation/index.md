@@ -70,4 +70,4 @@ Use the map below to choose the right depth. The [runtime architecture](runtime-
 
 Configuration values affect failure detection and resource use. This track explains their role in protocols, while the [hosting configuration guide](../host/configuration-guide/index.md) and [deployment guidance](../deployment/index.md) own operational recommendations.
 
-For the application mental model, start with [Orleans overview](../overview.md). For task-oriented recipes which apply these components, use the [how-to guide index](../how-to/index.md); for public type contracts, use the [C# API reference](https://dotnet.github.io/orleans/docs/api/csharp/).
+For the application mental model, start with [Orleans overview](../overview.md). For task-oriented recipes that apply these components, use the [how-to guide index](../how-to/index.md); for public type contracts, use the [C# API reference](https://dotnet.github.io/orleans/docs/api/csharp/).
