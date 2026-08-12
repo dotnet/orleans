@@ -49,7 +49,7 @@ internal partial class ActivationDataActivatorProvider(
         return true;
     }
 
-    private partial class ActivationDataActivator : IGrainContextActivator
+    private partial class ActivationDataActivator : IGrainContextActivatorWithConfiguration
     {
         private readonly IOptions<SchedulingOptions> _schedulingOptions;
         private readonly IGrainActivator _grainActivator;
@@ -76,13 +76,20 @@ internal partial class ActivationDataActivatorProvider(
             _startActivation = state => ((ActivationData)state!).Start(_grainActivator);
         }
 
-        public IGrainContext CreateContext(GrainAddress activationAddress)
+        public IGrainContext CreateContext(GrainAddress activationAddress) => CreateContext(activationAddress, []);
+
+        public IGrainContext CreateContext(GrainAddress activationAddress, IConfigureGrainContext[] configureActions)
         {
             var context = new ActivationData(
                 activationAddress,
                 _createWorkItemGroup,
                 _serviceProvider,
                 _sharedComponents);
+
+            foreach (var configure in configureActions)
+            {
+                configure.Configure(context);
+            }
 
             using var ecSuppressor = ExecutionContext.SuppressFlow();
             _ = Task.Factory.StartNew(

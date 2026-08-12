@@ -64,6 +64,11 @@ namespace Orleans.Runtime
                 activator = this.CreateActivator(grainId.Type);
             }
 
+            if (activator.Activator is IGrainContextActivatorWithConfiguration configurableActivator)
+            {
+                return configurableActivator.CreateContext(address, activator.ConfigureActions);
+            }
+
             var result = activator.Activator.CreateContext(address);
             foreach (var configure in activator.ConfigureActions)
             {
@@ -137,6 +142,11 @@ namespace Orleans.Runtime
         /// <param name="address">The grain address.</param>
         /// <returns>The newly created grain context.</returns>
         public IGrainContext CreateContext(GrainAddress address);
+    }
+
+    internal interface IGrainContextActivatorWithConfiguration : IGrainContextActivator
+    {
+        IGrainContext CreateContext(GrainAddress address, IConfigureGrainContext[] configureActions);
     }
 
     /// <summary>
