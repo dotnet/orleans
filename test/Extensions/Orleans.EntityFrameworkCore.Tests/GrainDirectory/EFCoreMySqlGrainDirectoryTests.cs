@@ -11,6 +11,9 @@ namespace Orleans.EntityFrameworkCore.Tests.GrainDirectory;
 [TestCategory(EFCoreTestCategories.MySql)]
 [TestCategory(EFCoreTestCategories.MySqlProvider)]
 [TestCategory(EFCoreTestCategories.Functional)]
+[TestSuite("Functional")]
+[TestProvider(EFCoreTestCategories.MySqlProvider)]
+[TestArea("GrainDirectory")]
 public sealed class EFCoreMySqlGrainDirectoryTests :
     EFCoreGrainDirectoryTestsBase<MySqlGrainDirectoryDbContext, Guid>
 {

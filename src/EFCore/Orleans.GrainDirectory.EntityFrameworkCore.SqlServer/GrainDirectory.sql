@@ -42,7 +42,7 @@ IF NOT EXISTS (
     WHERE [MigrationId] = N'20260811210058_InitialGrainDirectorySchema'
 )
 BEGIN
-    CREATE NONCLUSTERED INDEX [IDX_Activations_CusterId_SiloAddress] ON [Activations] ([ClusterId], [SiloAddress]);
+    CREATE NONCLUSTERED INDEX [IDX_Activations_ClusterId_SiloAddress] ON [Activations] ([ClusterId], [SiloAddress]);
 END;
 GO
 
@@ -58,4 +58,3 @@ GO
 
 COMMIT;
 GO
-

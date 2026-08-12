@@ -11,6 +11,9 @@ namespace Orleans.EntityFrameworkCore.Tests.GrainDirectory;
 [TestCategory("EFCore")]
 [TestCategory(EFCoreTestCategories.SqlServer)]
 [TestCategory(EFCoreTestCategories.Functional)]
+[TestSuite("Functional")]
+[TestProvider(EFCoreTestCategories.SqlServer)]
+[TestArea("GrainDirectory")]
 public sealed class EFCoreSqlServerGrainDirectoryMatrixTests :
     EFCoreGrainDirectoryTestsBase<SqlServerGrainDirectoryDbContext, byte[]>
 {

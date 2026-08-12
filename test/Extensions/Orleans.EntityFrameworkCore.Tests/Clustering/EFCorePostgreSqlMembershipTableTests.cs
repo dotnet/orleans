@@ -10,6 +10,9 @@ namespace Orleans.EntityFrameworkCore.Tests.Clustering;
 [TestCategory(EFCoreTestCategories.PostgreSql)]
 [TestCategory(EFCoreTestCategories.PostgreSqlProvider)]
 [TestCategory(EFCoreTestCategories.Functional)]
+[TestSuite("Functional")]
+[TestProvider(EFCoreTestCategories.PostgreSqlProvider)]
+[TestArea("Membership")]
 public sealed class EFCorePostgreSqlMembershipTableTests :
     EFCoreMembershipTableTestsBase<PostgreSqlClusterDbContext, Guid>
 {
