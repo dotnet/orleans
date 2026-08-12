@@ -57,6 +57,7 @@ internal partial class ActivationDataActivatorProvider(
         private readonly GrainTypeSharedContext _sharedComponents;
         private readonly Func<IGrainContext, WorkItemGroup> _createWorkItemGroup;
         private readonly Action<object?> _startActivation;
+        private readonly ContextCallback _startActivationSynchronously;
 
         public ActivationDataActivator(
             IGrainActivator grainActivator,
@@ -74,6 +75,24 @@ internal partial class ActivationDataActivatorProvider(
                 _schedulingOptions,
                 schedulerInstruments);
             _startActivation = state => ((ActivationData)state!).Start(_grainActivator);
+            _startActivationSynchronously = state =>
+            {
+                var context = (ActivationData)state!;
+                RuntimeContext.SetExecutionContext(context, out var originalContext);
+                try
+                {
+                    var task = new Task(
+                        _startActivation,
+                        context,
+                        CancellationToken.None,
+                        TaskCreationOptions.DenyChildAttach);
+                    task.RunSynchronously(context.ActivationTaskScheduler);
+                }
+                finally
+                {
+                    RuntimeContext.ResetExecutionContext(originalContext);
+                }
+            };
         }
 
         public IGrainContext CreateContext(GrainAddress activationAddress, IConfigureGrainContext[] configureActions)
@@ -89,13 +108,7 @@ internal partial class ActivationDataActivatorProvider(
                 configure.Configure(context);
             }
 
-            using var ecSuppressor = ExecutionContext.SuppressFlow();
-            _ = Task.Factory.StartNew(
-                _startActivation,
-                context,
-                CancellationToken.None,
-                TaskCreationOptions.DenyChildAttach,
-                context.ActivationTaskScheduler);
+            ExecutionContext.Run(DefaultExecutionContext.Instance, _startActivationSynchronously, context);
             return context;
         }
     }
