@@ -28,9 +28,9 @@ namespace Orleans.Transactions.TestKit
             
             ITransactionCoordinatorGrain coordinator1 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
             ITransactionCoordinatorGrain coordinator2 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
-            await Task.WhenAll(
-                coordinator1.MultiGrainAdd(transaction1Members, expected),
-                coordinator2.MultiGrainAdd(transaction2Members, expected));
+            await RunConcurrentTransactions(
+                () => coordinator1.MultiGrainAdd(transaction1Members, expected),
+                () => coordinator2.MultiGrainAdd(transaction2Members, expected));
 
             int[] actual = await grain1.Get();
             expected.Should().Be(actual.FirstOrDefault());
@@ -63,11 +63,11 @@ namespace Orleans.Transactions.TestKit
             ITransactionCoordinatorGrain coordinator2 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
             ITransactionCoordinatorGrain coordinator3 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
             ITransactionCoordinatorGrain coordinator4 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
-            await Task.WhenAll(
-                coordinator1.MultiGrainAdd(transaction1Members, expected),
-                coordinator2.MultiGrainAdd(transaction2Members, expected),
-                coordinator3.MultiGrainAdd(transaction3Members, expected),
-                coordinator4.MultiGrainAdd(transaction4Members, expected));
+            await RunConcurrentTransactions(
+                () => coordinator1.MultiGrainAdd(transaction1Members, expected),
+                () => coordinator2.MultiGrainAdd(transaction2Members, expected),
+                () => coordinator3.MultiGrainAdd(transaction3Members, expected),
+                () => coordinator4.MultiGrainAdd(transaction4Members, expected));
 
             int[] actual = await grain1.Get();
             actual.FirstOrDefault().Should().Be(expected);
@@ -101,10 +101,10 @@ namespace Orleans.Transactions.TestKit
             ITransactionCoordinatorGrain coordinator1 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
             ITransactionCoordinatorGrain coordinator2 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
             ITransactionCoordinatorGrain coordinator3 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
-            await Task.WhenAll(
-                coordinator1.MultiGrainAdd(transaction1Members, expected),
-                coordinator2.MultiGrainAdd(transaction2Members, expected),
-                coordinator3.MultiGrainAdd(transaction3Members, expected));
+            await RunConcurrentTransactions(
+                () => coordinator1.MultiGrainAdd(transaction1Members, expected),
+                () => coordinator2.MultiGrainAdd(transaction2Members, expected),
+                () => coordinator3.MultiGrainAdd(transaction3Members, expected));
 
             int[] actual = await grain1.Get();
             actual.FirstOrDefault().Should().Be(expected);
@@ -114,6 +114,33 @@ namespace Orleans.Transactions.TestKit
             actual.FirstOrDefault().Should().Be(expected*2);
             actual = await grain4.Get();
             actual.FirstOrDefault().Should().Be(expected);
+        }
+
+        private async Task RunConcurrentTransactions(params Func<Task>[] transactions)
+        {
+            var completed = await Task.WhenAll(transactions.Select(TryRunTransaction));
+            // Preserve contention in the first attempt, then serialize retries so aborted operations can make progress.
+            for (var i = 0; i < transactions.Length; i++)
+            {
+                while (!completed[i])
+                {
+                    completed[i] = await TryRunTransaction(transactions[i]);
+                }
+            }
+        }
+
+        private async Task<bool> TryRunTransaction(Func<Task> transaction)
+        {
+            try
+            {
+                await transaction();
+                return true;
+            }
+            catch (OrleansTransactionTransientFailureException exception)
+            {
+                this.testOutput($"Transaction aborted transiently: {exception.Message}. Retrying.");
+                return false;
+            }
         }
     }
 }

@@ -14,7 +14,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         /// </summary>
         /// <param name="grainStates"></param>
         /// <returns></returns>
-        [SkippableTheory(Skip = "https://github.com/dotnet/orleans/issues/9554")]
+        [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
@@ -28,7 +28,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         /// </summary>
         /// <param name="grainStates"></param>
         /// <returns></returns>
-        [SkippableTheory(Skip = "https://github.com/dotnet/orleans/issues/9554")]
+        [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
@@ -42,7 +42,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         /// </summary>
         /// <param name="grainStates"></param>
         /// <returns></returns>
-        [SkippableTheory(Skip = "https://github.com/dotnet/orleans/issues/9554")]
+        [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
