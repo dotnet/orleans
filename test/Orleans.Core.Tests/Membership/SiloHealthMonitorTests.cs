@@ -314,6 +314,7 @@ namespace NonSilo.Tests.Membership
             var args = probeCall.GetArguments();
             var intermediary = Assert.IsType<SiloAddress>(args[0]);
             Assert.Equal(otherSilo, intermediary);
+            Assert.Equal(TimeSpan.FromSeconds(2), Assert.IsType<TimeSpan>(args[2]));
 
             // Ensure that negative results from unhealthy intermediaries are not considered.
             _prober.ProbeIndirectly(default!, default!, default, default).ReturnsForAnyArgs(new IndirectProbeResponse

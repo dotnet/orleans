@@ -201,7 +201,8 @@ namespace Orleans.Runtime.MembershipService
                     }
 
                     var isDirectProbe = !options.EnableIndirectProbes || _failedProbes < options.NumMissedProbesLimit - 1 || otherNodes.Length == 0;
-                    var timeout = GetTimeout(isDirectProbe);
+                    var localDegradationScore = GetLocalDegradationScore();
+                    var timeout = CalculateProbeTimeout(failureDetector, options, localDegradationScore, isDirectProbe, Debugger.IsAttached);
                     using var cancellation = new CancellationTokenSource(timeout, _timeProvider);
 
                     if (isDirectProbe)
@@ -217,7 +218,8 @@ namespace Orleans.Runtime.MembershipService
                         // Select a timeout which will allow the intermediary node to attempt to probe the target node and still respond to this node
                         // if the remote node does not respond in time.
                         // Attempt to account for local health degradation by extending the timeout period.
-                        probeResult = await this.ProbeIndirectly(intermediary, timeout, cancellation.Token).ConfigureAwait(false);
+                        var directProbeTimeout = CalculateIndirectProbeTargetTimeout(timeout, localDegradationScore);
+                        probeResult = await this.ProbeIndirectly(intermediary, directProbeTimeout, cancellation.Token).ConfigureAwait(false);
 
                         // If the intermediary is not entirely healthy, remove it from consideration and continue to probe.
                         // Note that all recused silos will be included in the consideration set the next time cluster membership changes.
@@ -240,19 +242,18 @@ namespace Orleans.Runtime.MembershipService
                 }
             }
 
-            TimeSpan GetTimeout(bool isDirectProbe)
+            int GetLocalDegradationScore()
             {
-                var localDegradationScore = 0;
-                if (options.ExtendProbeTimeoutDuringDegradation)
+                if (!options.ExtendProbeTimeoutDuringDegradation)
                 {
-                    // This query must happen before the probe because its result determines the probe timeout.
-                    // Outcome-reporting health checks, such as an intermediary's health score, run after probing.
-                    localDegradationScore = _localSiloHealthMonitor.GetLocalHealthStatus(
-                        options.ProbeInterval,
-                        LocalSiloHealthCheckCategory.Local).Score;
+                    return 0;
                 }
 
-                return CalculateProbeTimeout(failureDetector, options, localDegradationScore, isDirectProbe, Debugger.IsAttached);
+                // This query must happen before the probe because its result determines the probe timeout.
+                // Outcome-reporting health checks, such as an intermediary's health score, run after probing.
+                return _localSiloHealthMonitor.GetLocalHealthStatus(
+                    options.ProbeInterval,
+                    LocalSiloHealthCheckCategory.Local).Score;
             }
         }
 
@@ -278,6 +279,16 @@ namespace Orleans.Runtime.MembershipService
             }
 
             return timeout;
+        }
+
+        internal static TimeSpan CalculateIndirectProbeTargetTimeout(TimeSpan timeout, int localDegradationScore)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(timeout, TimeSpan.Zero);
+            ArgumentOutOfRangeException.ThrowIfNegative(localDegradationScore);
+
+            var extensionFactor = 1 + localDegradationScore;
+            var responseAllowanceTicks = Math.Max(1, timeout.Ticks / (extensionFactor + 1));
+            return TimeSpan.FromTicks(timeout.Ticks - responseAllowanceTicks);
         }
 
         /// <summary>

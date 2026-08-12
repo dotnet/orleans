@@ -212,6 +212,21 @@ namespace NonSilo.Tests
                         });
                 }).RunConsoleAsync();
             });
+
+            await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
+            {
+                await new HostBuilder().UseOrleans((ctx, siloBuilder) =>
+                {
+                    siloBuilder
+                        .UseLocalhostClustering()
+                        .Configure<ClusterMembershipOptions>(options =>
+                        {
+                            options.InitialProbeTimeout = TimeSpan.FromTicks(4_611_686_018);
+                            options.MaxProbeTimeout = options.InitialProbeTimeout;
+                            options.NumMissedProbesLimit = 2_000_000_000;
+                        });
+                }).RunConsoleAsync();
+            });
         }
 
         /// <summary>

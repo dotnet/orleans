@@ -91,10 +91,22 @@ namespace Orleans.Runtime.Configuration
             var maxProbeCycleTime = clusterMembershipOptions.ProbeInterval > clusterMembershipOptions.MaxProbeTimeout
                 ? clusterMembershipOptions.ProbeInterval
                 : clusterMembershipOptions.MaxProbeTimeout;
+            var failureDetectionTimeoutTicks = 0L;
             if (clusterMembershipOptions.NumMissedProbesLimit > 0
                 && maxProbeCycleTime.Ticks > TimeSpan.MaxValue.Ticks / clusterMembershipOptions.NumMissedProbesLimit)
             {
                 throw new OrleansConfigurationException($"The maximum probe cycle time ({maxProbeCycleTime}) multiplied by {nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.NumMissedProbesLimit)} ({clusterMembershipOptions.NumMissedProbesLimit}) must not exceed {TimeSpan.MaxValue}.");
+            }
+            else if (clusterMembershipOptions.NumMissedProbesLimit > 0)
+            {
+                failureDetectionTimeoutTicks = maxProbeCycleTime.Ticks * clusterMembershipOptions.NumMissedProbesLimit;
+            }
+
+            var tableRefreshTimeoutTicks = clusterMembershipOptions.TableRefreshTimeout.Ticks;
+            if (tableRefreshTimeoutTicks > 0
+                && tableRefreshTimeoutTicks > (TimeSpan.MaxValue.Ticks - failureDetectionTimeoutTicks) / 2)
+            {
+                throw new OrleansConfigurationException($"The failure detection timeout plus twice {nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.TableRefreshTimeout)} ({clusterMembershipOptions.TableRefreshTimeout}) must not exceed {TimeSpan.MaxValue}.");
             }
 
             if (clusterMembershipOptions.LivenessEnabled)
