@@ -32,8 +32,9 @@ Run all commands from the repository root unless stated otherwise.
 ### 1. Start Azurite
 
 The distributed tests use Azure Tables for cluster membership and Azure Queues
-to coordinate the reliability scenarios. Start the same Azurite version and
-service endpoints used by CI:
+for the control channel required by every scenario. The reliability and rolling
+scenarios also use queues to coordinate their workloads. Start the same Azurite
+version and service endpoints used by CI:
 
 ```powershell
 docker run --detach --rm --name orleans-distributed-tests-azurite `
@@ -108,10 +109,11 @@ crank --config .\distributed-tests.yml --scenario ping --profile local `
   --variable "azureTableUri=https://$account.table.core.windows.net"
 ```
 
-The workload processes authenticate non-loopback endpoints using
-`DefaultAzureCredential`. Authenticate on the agent host using a supported
-credential, such as `az login`, and grant that identity permission to create
-and use queues and tables in the target account.
+When `TENANT_ID` and `CLIENT_ID` are set, the workload processes authenticate
+non-loopback endpoints using `ClientAssertionCredential`; otherwise they use
+`DefaultAzureCredential`. Configure the selected credential on the agent host
+and grant that identity permission to create and use queues and tables in the
+target account.
 
 ## Troubleshooting
 
