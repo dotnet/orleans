@@ -76,6 +76,12 @@ internal interface IMembershipManager : ILifecycleParticipant<ISiloLifecycle>, I
     /// reaches at least this version.
     /// </param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <remarks>
+    /// When <paramref name="targetVersion"/> is <see langword="null"/>, an implementation may join a refresh
+    /// already in progress. If no refresh is in progress, it must start one against the source of truth.
+    /// Therefore, if two calls are made sequentially, the refresh satisfying the second call must have started
+    /// after the first call was issued.
+    /// </remarks>
     Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken);
 
     /// <summary>

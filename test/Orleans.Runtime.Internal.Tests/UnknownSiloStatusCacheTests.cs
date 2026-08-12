@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Net;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 using Xunit;
@@ -13,55 +14,100 @@ namespace UnitTests;
 public class UnknownSiloStatusCacheTests
 {
     [Fact]
-    public void UnknownSiloRequiresFullRefreshStartedAfterObservation()
+    public async Task UnknownSiloRequiresTwoSequentialSourceRefreshes()
     {
-        var cache = new UnknownSiloStatusCache();
-        var silo = CreateSiloAddress();
-        var inFlightRefresh = cache.OnFullRefreshStarted();
+        var membershipManager = new TestMembershipManager(CreateMembershipTableSnapshot(1));
+        var cache = new UnknownSiloStatusCache(membershipManager, NullLogger<UnknownSiloStatusCache>.Instance);
+        var firstSilo = CreateSiloAddress();
+        var secondSilo = CreateSiloAddress(port: 11112);
         var snapshot = CreateSnapshot(1);
 
-        Assert.Equal(SiloStatus.None, cache.GetSiloStatus(snapshot, silo));
-        cache.OnFullRefreshCompleted(inFlightRefresh, snapshot);
-        Assert.Equal(SiloStatus.None, cache.GetSiloStatus(snapshot, silo));
+        var statuses = await cache.GetSiloStatuses(snapshot, [firstSilo, secondSilo]);
 
-        var causalRefresh = cache.OnFullRefreshStarted();
-        cache.OnFullRefreshCompleted(causalRefresh, snapshot);
-
-        Assert.Equal(SiloStatus.Dead, cache.GetSiloStatus(snapshot, silo));
+        Assert.Equal(SiloStatus.Dead, statuses[firstSilo]);
+        Assert.Equal(SiloStatus.Dead, statuses[secondSilo]);
+        Assert.Equal(2, membershipManager.RefreshCount);
     }
 
     [Fact]
-    public void KnownSiloClearsUnknownClassification()
+    public async Task KnownSiloClearsUnknownClassification()
     {
-        var cache = new UnknownSiloStatusCache();
+        var membershipManager = new TestMembershipManager(CreateMembershipTableSnapshot(1));
+        var cache = new UnknownSiloStatusCache(membershipManager, NullLogger<UnknownSiloStatusCache>.Instance);
         var silo = CreateSiloAddress();
         var unknownSnapshot = CreateSnapshot(1);
 
-        Assert.Equal(SiloStatus.None, cache.GetSiloStatus(unknownSnapshot, silo));
-        var refresh = cache.OnFullRefreshStarted();
+        Assert.Equal(SiloStatus.Dead, (await cache.GetSiloStatuses(unknownSnapshot, [silo]))[silo]);
         var activeSnapshot = CreateSnapshot(1, new ClusterMember(silo, SiloStatus.Active, "silo"));
-        cache.OnFullRefreshCompleted(refresh, activeSnapshot);
-        Assert.Equal(SiloStatus.Active, cache.GetSiloStatus(activeSnapshot, silo));
-
-        Assert.Equal(SiloStatus.None, cache.GetSiloStatus(unknownSnapshot, silo));
-        refresh = cache.OnFullRefreshStarted();
-        cache.OnFullRefreshCompleted(refresh, unknownSnapshot);
-        Assert.Equal(SiloStatus.Dead, cache.GetSiloStatus(unknownSnapshot, silo));
+        Assert.Equal(SiloStatus.Active, (await cache.GetSiloStatuses(activeSnapshot, [silo]))[silo]);
+        Assert.Equal(SiloStatus.Dead, (await cache.GetSiloStatuses(unknownSnapshot, [silo]))[silo]);
+        Assert.Equal(4, membershipManager.RefreshCount);
     }
 
     [Fact]
-    public void KnownDeadSiloIsReturnedImmediately()
+    public async Task KnownDeadSiloIsReturnedImmediately()
     {
-        var cache = new UnknownSiloStatusCache();
+        var membershipManager = new TestMembershipManager(CreateMembershipTableSnapshot(1));
+        var cache = new UnknownSiloStatusCache(membershipManager, NullLogger<UnknownSiloStatusCache>.Instance);
         var silo = CreateSiloAddress();
         var snapshot = CreateSnapshot(1, new ClusterMember(silo, SiloStatus.Dead, "silo"));
 
-        Assert.Equal(SiloStatus.Dead, cache.GetSiloStatus(snapshot, silo));
+        Assert.Equal(SiloStatus.Dead, (await cache.GetSiloStatuses(snapshot, [silo]))[silo]);
+        Assert.Equal(0, membershipManager.RefreshCount);
     }
 
     private static ClusterMembershipSnapshot CreateSnapshot(long version, params ClusterMember[] members) =>
         new(members.ToImmutableDictionary(member => member.SiloAddress), new MembershipVersion(version));
 
-    private static SiloAddress CreateSiloAddress() =>
-        SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 1);
+    private static MembershipTableSnapshot CreateMembershipTableSnapshot(long version) =>
+        new(new MembershipVersion(version), ImmutableDictionary<SiloAddress, MembershipEntry>.Empty);
+
+    private static SiloAddress CreateSiloAddress(int port = 11111) =>
+        SiloAddress.New(new IPEndPoint(IPAddress.Loopback, port), 1);
+
+    private sealed class TestMembershipManager(MembershipTableSnapshot snapshot) : IMembershipManager
+    {
+        public int RefreshCount { get; private set; }
+
+        public MembershipTableSnapshot CurrentSnapshot { get; } = snapshot;
+
+        public IAsyncEnumerable<MembershipTableSnapshot> MembershipUpdates => GetMembershipUpdates();
+
+        public SiloStatus LocalSiloStatus => SiloStatus.Active;
+
+        public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken)
+        {
+            RefreshCount++;
+            return Task.CompletedTask;
+        }
+
+        public Task UpdateLocalStatus(SiloStatus status, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<bool> TryKillSilo(SiloAddress silo, CancellationToken cancellationToken) => Task.FromResult(false);
+
+        public Task<bool> TrySuspectSilo(
+            SiloAddress silo,
+            SiloAddress? indirectProbingSilo,
+            CancellationToken cancellationToken) => Task.FromResult(false);
+
+        public Task ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task UpdateIAmAlive(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public void Participate(ISiloLifecycle lifecycle)
+        {
+        }
+
+        public bool CheckHealth(DateTime lastCheckTime, out string reason)
+        {
+            reason = string.Empty;
+            return true;
+        }
+
+        private static async IAsyncEnumerable<MembershipTableSnapshot> GetMembershipUpdates()
+        {
+            await Task.CompletedTask;
+            yield break;
+        }
+    }
 }
