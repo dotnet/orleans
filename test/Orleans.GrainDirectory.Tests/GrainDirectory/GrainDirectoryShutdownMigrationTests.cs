@@ -33,6 +33,7 @@ public sealed class GrainDirectoryShutdownMigrationTests
         await using var cluster = builder.Build();
         await cluster.DeployAsync();
         await cluster.WaitForLivenessToStabilizeAsync();
+        await cluster.WaitForClusterManifestToStabilizeAsync();
         await WaitForDirectoryMembershipAsync(cluster);
 
         var survivingSilo = cluster.Silos[0];
