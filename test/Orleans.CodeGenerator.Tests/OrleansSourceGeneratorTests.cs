@@ -1581,6 +1581,38 @@ public class DemoClass
     }
 
     [Fact]
+    public async Task ProviderMetadata_EmitsCompilableModuleInitializer()
+    {
+        var code = """
+            using Orleans;
+
+            [assembly: RegisterProvider("Test", "Clustering", "Client", typeof(TestProject.Provider))]
+
+            namespace TestProject;
+
+            public sealed class Provider
+            {
+            }
+            """;
+
+        var compilation = await CreateCompilation(code, "TestProject");
+        var result = RunSourceGenerator(compilation);
+        var metadataSource = result.GeneratedSources
+            .Single(source => source.HintName.EndsWith(".orleans.metadata.g.cs", StringComparison.Ordinal))
+            .SourceText
+            .ToString();
+
+        Assert.Contains("global::System.Runtime.CompilerServices.ModuleInitializerAttribute", metadataSource, StringComparison.Ordinal);
+        Assert.Contains("global::Orleans.Serialization.Configuration.ProviderMetadataRegistry.Register", metadataSource, StringComparison.Ordinal);
+
+        var outputCompilation = compilation
+            .AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(
+            result.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText, path: source.HintName)));
+        Assert.Empty(outputCompilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Fact]
     public async Task AttachDebuggerFalseOption_DoesNotChangeOutput()
     {
         var code = """

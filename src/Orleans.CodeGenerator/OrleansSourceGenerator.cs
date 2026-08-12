@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using Orleans.CodeGenerator.Model;
@@ -204,9 +205,15 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
             productionContext.AddSource($"{assemblyName}.orleans.g.cs", SourceText.From(string.Empty, Encoding.UTF8));
         });
 
+        var supportsModuleInitializers = compilationProvider
+            .Select(static (compilation, _) =>
+                compilation is CSharpCompilation { LanguageVersion: >= LanguageVersion.CSharp9 }
+                && compilation.GetTypeByMetadataName("System.Runtime.CompilerServices.ModuleInitializerAttribute") is not null);
+
         var metadataOutputs = metadataAggregate
+            .Combine(supportsModuleInitializers)
             .Combine(generatorOptions)
-            .Select(static (input, _) => MetadataSourceOutputGenerator.CreateMetadataSourceOutput(input.Left, input.Right))
+            .Select(static (input, _) => MetadataSourceOutputGenerator.CreateMetadataSourceOutput(input.Left.Left, input.Right, input.Left.Right))
             .WithTrackingName(MetadataOutputsTrackingName);
 
         context.RegisterSourceOutput(metadataOutputs, static (productionContext, input) =>

@@ -4,7 +4,10 @@ using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
+using System.Runtime.Loader;
 using System.Threading;
+using System.Threading.Tasks;
 using Orleans;
 using Orleans.Serialization.Configuration;
 using Xunit;
@@ -123,6 +126,119 @@ namespace NonSilo.Tests
             Assert.Single(clientProviders);
         }
 
+        [Fact]
+        public void GeneratedRegistryProvider_DoesNotInitializeLegacyFallback()
+        {
+            ProviderMetadataRegistry.Register(new RegistryMetadataProvider());
+            var fallbackCount = 0;
+            var resolver = new ProviderRegistrationResolver(
+                typeof(ProviderRegistrationResolver).Assembly,
+                () =>
+                {
+                    Interlocked.Increment(ref fallbackCount);
+                    return [];
+                });
+
+            var providers = resolver.GetRegisteredProviders("Client");
+
+            Assert.True(resolver.TryGetRegisteredProvider(
+                providers,
+                "Client",
+                "Clustering",
+                "RegistryClustering",
+                out var providerType));
+            Assert.Equal(typeof(RegistryClientProviderBuilder), providerType);
+            Assert.Equal(0, fallbackCount);
+        }
+
+        [Fact]
+        public void MissingGeneratedProvider_InitializesLegacyFallbackOnceForAllTargets()
+        {
+            var fallbackCount = 0;
+            var assembly = CreateAssemblyWithAttributes(
+                RegisterProviderAttribute("LazyClient", "Clustering", "Client", typeof(LegacyClientProviderBuilder)),
+                RegisterProviderAttribute("LazySilo", "GrainStorage", "Silo", typeof(LegacySiloProviderBuilder)));
+            var resolver = new ProviderRegistrationResolver(
+                typeof(ProviderRegistrationResolver).Assembly,
+                () =>
+                {
+                    Interlocked.Increment(ref fallbackCount);
+                    return [assembly];
+                });
+
+            var clientProviders = resolver.GetRegisteredProviders("Client");
+            Assert.True(resolver.TryGetRegisteredProvider(
+                clientProviders,
+                "Client",
+                "Clustering",
+                "LazyClient",
+                out var clientProviderType));
+            Assert.Equal(typeof(LegacyClientProviderBuilder), clientProviderType);
+
+            var siloProviders = resolver.GetRegisteredProviders("Silo");
+            Assert.True(resolver.TryGetRegisteredProvider(
+                siloProviders,
+                "Silo",
+                "GrainStorage",
+                "LazySilo",
+                out var siloProviderType));
+            Assert.Equal(typeof(LegacySiloProviderBuilder), siloProviderType);
+
+            Assert.False(resolver.TryGetRegisteredProvider(
+                clientProviders,
+                "Client",
+                "Clustering",
+                "Missing",
+                out _));
+            Assert.Equal(1, fallbackCount);
+            Assert.Equal(typeof(LegacyClientProviderBuilder), clientProviders[("Clustering", "LazyClient")]);
+        }
+
+        [Fact]
+        public void GeneratedRegistry_DuplicateRegistrationIsDeterministicUnderConcurrency()
+        {
+            Parallel.Invoke(
+                static () => ProviderMetadataRegistry.Register(new ZDuplicateMetadataProvider()),
+                static () => ProviderMetadataRegistry.Register(new ADuplicateMetadataProvider()),
+                static () => ProviderMetadataRegistry.Register(new ZDuplicateMetadataProvider()));
+
+            var resolver = new ProviderRegistrationResolver(
+                typeof(ProviderRegistrationResolver).Assembly,
+                static () => []);
+            var providers = resolver.GetRegisteredProviders("Client");
+
+            Assert.Equal(typeof(ZDuplicateProviderBuilder), providers[("Clustering", "DeterministicDuplicate")]);
+        }
+
+        [Fact]
+        public void GeneratedRegistry_DoesNotRootCollectibleAssemblyLoadContext()
+        {
+            var loadContextReference = RegisterProviderInCollectibleContext();
+
+            for (var attempt = 0; attempt < 10 && loadContextReference.IsAlive; attempt++)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+            }
+
+            Assert.False(loadContextReference.IsAlive);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static WeakReference RegisterProviderInCollectibleContext()
+        {
+            var loadContext = new CollectibleProviderLoadContext();
+            var assembly = loadContext.LoadFromAssemblyPath(typeof(ProviderRegistrationResolverTests).Assembly.Location);
+            var providerType = assembly.GetType(typeof(CollectibleMetadataProvider).FullName!, throwOnError: true)!;
+            var provider = (IProviderMetadataProvider)Activator.CreateInstance(providerType)!;
+            ProviderMetadataRegistry.Register(provider);
+
+            var result = new WeakReference(loadContext);
+            loadContext.Unload();
+            return result;
+        }
+
         private static CustomAttributeBuilder TypeManifestProviderAttribute(Type providerType)
         {
             var ctor = typeof(TypeManifestProviderAttribute).GetConstructor(new[] { typeof(Type) })!;
@@ -215,5 +331,61 @@ namespace NonSilo.Tests
         public sealed class LegacySiloProviderBuilder
         {
         }
+
+        public sealed class RegistryMetadataProvider : IProviderMetadataProvider
+        {
+            public void ConfigureProviders(IDictionary<(string Target, string Kind, string Name), Type> providers)
+                => providers[("Client", "Clustering", "RegistryClustering")] = typeof(RegistryClientProviderBuilder);
+        }
+
+        public sealed class ADuplicateMetadataProvider : IProviderMetadataProvider
+        {
+            public void ConfigureProviders(IDictionary<(string Target, string Kind, string Name), Type> providers)
+                => providers[("Client", "Clustering", "DeterministicDuplicate")] = typeof(ADuplicateProviderBuilder);
+        }
+
+        public sealed class ZDuplicateMetadataProvider : IProviderMetadataProvider
+        {
+            public void ConfigureProviders(IDictionary<(string Target, string Kind, string Name), Type> providers)
+                => providers[("Client", "Clustering", "DeterministicDuplicate")] = typeof(ZDuplicateProviderBuilder);
+        }
+
+        public sealed class RegistryClientProviderBuilder
+        {
+        }
+
+        public sealed class ADuplicateProviderBuilder
+        {
+        }
+
+        public sealed class ZDuplicateProviderBuilder
+        {
+        }
+
+        private sealed class CollectibleProviderLoadContext : AssemblyLoadContext
+        {
+            public CollectibleProviderLoadContext()
+                : base(isCollectible: true)
+            {
+            }
+
+            protected override Assembly? Load(AssemblyName assemblyName)
+                => string.Equals(
+                    assemblyName.Name,
+                    typeof(IProviderMetadataProvider).Assembly.GetName().Name,
+                    StringComparison.Ordinal)
+                    ? typeof(IProviderMetadataProvider).Assembly
+                    : null;
+        }
+    }
+
+    public sealed class CollectibleMetadataProvider : IProviderMetadataProvider
+    {
+        public void ConfigureProviders(IDictionary<(string Target, string Kind, string Name), Type> providers)
+            => providers[("Client", "Clustering", "Collectible")] = typeof(CollectibleProviderBuilder);
+    }
+
+    public sealed class CollectibleProviderBuilder
+    {
     }
 }
