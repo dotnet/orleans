@@ -62,7 +62,7 @@ public sealed class IndexServiceClient :
                 "Grain service clients can only be called from a grain.");
         IIndexService service =
             GetGrainService(grainReference.GrainId);
-  
+
         return service.Add(key);
     }
 }
