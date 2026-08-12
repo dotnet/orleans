@@ -64,11 +64,6 @@ interface MenuItem {
   isSeparated?: boolean;
 }
 
-interface GrainStatItem {
-  grain?: string;
-  grainType?: string;
-}
-
 const target = document.getElementById('content');
 
 // Restore theme preference.
@@ -93,7 +88,9 @@ let routeIndex = 0;
 function scroll() {
   try {
     document.getElementsByClassName('wrapper')[0].scrollTo(0, 0);
-  } catch (e) { }
+  } catch {
+    // Older browsers may not support scrolling the wrapper element.
+  }
 }
 
 let errorTimer: NodeJS.Timeout | null;
@@ -149,7 +146,7 @@ function getVersion() {
     );
   };
 
-  const loadData = function (cb?: any) {
+  const loadData = function () {
     http.get('version', function (err, data) {
       version = data.version;
       renderVersion();
@@ -192,7 +189,7 @@ function renderPage(jsx: JSX.Element, path: string) {
   let clusterStats: any = {};
   let grainMethodStats: any = [];
   let loadDataIsPending = false;
-  const loadData = function (cb?: any) {
+  const loadData = function () {
     if (!loadDataIsPending) {
       loadDataIsPending = true;
       http.get('ClusterStats', function (err, data) {
@@ -279,7 +276,7 @@ function renderPage(jsx: JSX.Element, path: string) {
 
   let siloData: any[] = [];
   let siloStats: any[] = [];
-  const loadData = function (cb?: any) {
+  const loadData = function () {
     http.get(`HistoricalStats/${host}`, (err, data) => {
       siloData = data;
       render();
@@ -371,7 +368,7 @@ function renderPage(jsx: JSX.Element, path: string) {
 
   let grainStats: any = {};
   let loadDataIsPending = false;
-  const loadData = function (cb?: any) {
+  const loadData = function () {
     if (!loadDataIsPending) {
       http.get('GrainStats/' + grainType, function (err, data) {
         grainStats = data;
@@ -406,7 +403,7 @@ function renderPage(jsx: JSX.Element, path: string) {
 
   let grainTypes: any = {};
   let loadDataIsPending = false;
-  const loadData = function (cb?: any) {
+  const loadData = function () {
     if (!loadDataIsPending) {
       http.get(`GrainTypes${getFilter(settings)}`, function (err, data) {
         grainTypes = data;
@@ -450,12 +447,8 @@ function renderPage(jsx: JSX.Element, path: string) {
     );
   };
 
-  const rerouteToLastPage = function (lastPage: number) {
-    return (document.location.hash = `/reminders/${lastPage}`);
-  };
-
   let loadDataIsPending = false;
-  const loadData = function (cb?: any) {
+  const loadData = function () {
     if (!loadDataIsPending) {
       loadDataIsPending = true;
       http.get(`Reminders/${pageNum}`, function (err, data) {
@@ -471,7 +464,7 @@ function renderPage(jsx: JSX.Element, path: string) {
 });
 
 (routie as any)('/trace', function () {
-  const thisRouteIndex = ++routeIndex;
+  ++routeIndex;
   events.clearAll();
   scroll();
   const xhr = http.stream('Trace');
@@ -516,7 +509,7 @@ function renderPage(jsx: JSX.Element, path: string) {
       ...settings
     };
 
-    if (newSettings.hasOwnProperty('dashboardGrainsHidden')) {
+    if (Object.prototype.hasOwnProperty.call(newSettings, 'dashboardGrainsHidden')) {
       storage.put(
         'dashboardGrains',
         newSettings.dashboardGrainsHidden ? 'hidden' : 'visible'
@@ -524,7 +517,7 @@ function renderPage(jsx: JSX.Element, path: string) {
       settings.dashboardGrainsHidden = newSettings.dashboardGrainsHidden!;
     }
 
-    if (newSettings.hasOwnProperty('systemGrainsHidden')) {
+    if (Object.prototype.hasOwnProperty.call(newSettings, 'systemGrainsHidden')) {
       storage.put(
         'systemGrains',
         newSettings.systemGrainsHidden ? 'hidden' : 'visible'

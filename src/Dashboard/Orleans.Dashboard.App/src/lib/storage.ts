@@ -10,7 +10,7 @@ try {
   if (typeof localStorage !== 'undefined') {
     store = localStorage;
   }
-} catch (e) {
+} catch {
   // noop
 }
 

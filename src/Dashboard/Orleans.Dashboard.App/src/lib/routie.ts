@@ -119,7 +119,7 @@ const pathToRegexp = function(
         (optional || '')
       );
     })
-    .replace(/([\/.])/g, '\\$1')
+    .replace(/([/.])/g, '\\$1')
     .replace(/__plus__/g, '(.+)')
     .replace(/\*/g, '(.*)');
   return new RegExp('^' + path + '$', sensitive ? '' : 'i');

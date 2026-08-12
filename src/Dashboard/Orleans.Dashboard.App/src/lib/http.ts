@@ -1,5 +1,3 @@
-import events from 'eventthing';
-
 type HttpCallback = (error: string | null, result?: any) => void;
 
 function makeRequest(method: string, uri: string, body: string | null, cb: HttpCallback): Promise<any> {
