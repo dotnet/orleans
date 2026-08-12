@@ -11,6 +11,8 @@ An Orleans production deployment is a cluster of silo processes, optionally with
 
 Orleans manages grain activation and cluster membership, but the hosting platform remains responsible for process supervision, networking, health probes, secrets, resource allocation, and controlled rollout. A production design also needs durable grain state where the application requires it.
 
+Review the [Orleans security model](../security/index.md) before choosing the client, network, provider, and administrative boundaries for a production deployment.
+
 <a id="configure-and-start-a-silo"></a>
 <a id="configure-and-connect-to-a-client"></a>
 <a id="configure-and-connect-a-client"></a>

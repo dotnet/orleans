@@ -30,6 +30,8 @@ Set context as close as possible to the operation that needs it, and restore or 
 
 Request context is caller-provided data. Don't trust a role, user ID, or tenant ID merely because it arrived in `RequestContext`. Establish authentication at a trusted boundary and use call filters or application authorization logic to validate access.
 
+See [client and grain-call security](../security/authentication-authorization.md) for identity propagation and authorization guidance.
+
 ## Placement and migration
 
 Placement occurs before a new activation exists, so the static `RequestContext` isn't populated inside placement directors and filters. Read <xref:Orleans.Runtime.Placement.PlacementTarget.RequestContextData> instead.

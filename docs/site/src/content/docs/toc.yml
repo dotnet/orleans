@@ -265,6 +265,22 @@ items:
             href: host/monitoring/client-error-code-monitoring.md
           - name: Orleans Dashboard
             href: dashboard/index.md
+  - name: Security
+    items:
+      - name: Security overview
+        href: security/index.md
+      - name: Client and grain-call security
+        href: security/authentication-authorization.md
+      - name: Serialization security
+        href: security/serialization.md
+      - name: Secrets and credentials
+        href: security/secrets.md
+      - name: Network hardening
+        href: security/networking.md
+      - name: Transport Layer Security (TLS)
+        href: host/transport-layer-security.md
+      - name: Secure the Orleans Dashboard
+        href: dashboard/index.md
   - name: Deploy and operate
     items:
       - name: Overview

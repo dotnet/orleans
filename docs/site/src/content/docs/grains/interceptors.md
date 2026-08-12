@@ -46,6 +46,8 @@ The attribute is on the grain implementation method, so the filter reads it from
 
 The identity accessor must be implemented and populated by trusted host or filter infrastructure after it validates the caller's credentials. <xref:Orleans.Runtime.RequestContext> is application metadata that callers can set, and it flows transitively into grain calls made while handling the request. Treat its values as untrusted unless trusted infrastructure sets or validates them at each trust boundary. An Orleans client can set an `"isAdmin"` flag or claimed user ID, so those values alone aren't an authentication or authorization boundary. If a tamper-resistant credential is carried in request context, trusted infrastructure must still validate it before producing the authenticated principal. `SourceId` identifies an Orleans caller, not an authenticated end user.
 
+See [client and grain-call security](../security/authentication-authorization.md) for the complete boundary and enforcement model.
+
 ## Outgoing filters
 
 Outgoing filters use the same pipeline pattern:
