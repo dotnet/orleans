@@ -1,7 +1,7 @@
 ---
 title: Orleans observability
 description: Configure OpenTelemetry logging, metrics, and tracing for Orleans.
-ms.date: 08/02/2026
+ms.date: 08/12/2026
 ms.topic: overview
 ---
 
@@ -46,7 +46,11 @@ Use an [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/) betwe
 | `Microsoft.Orleans.DurableJobs` | Durable job scheduling and execution |
 | `Microsoft.Orleans.*` | Wildcard for all Orleans activity sources |
 
-The example selects the first four sources explicitly so the collected scope is visible in code. Add durable jobs when used. A wildcard is convenient during investigation but can begin collecting new sources after an Orleans upgrade, so review its volume and data policy.
+The example selects the first four sources and the separate
+`Microsoft.Orleans.Reminders` source explicitly so the collected scope is
+visible in code. Add durable jobs when used. A wildcard is convenient during
+investigation but can begin collecting new sources after an Orleans upgrade, so
+review its volume and data policy.
 
 ## Propagate trace context through grain calls
 

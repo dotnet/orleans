@@ -40,6 +40,8 @@ items:
         items:
           - name: Overview
             href: grains/reminders.md
+          - name: Concurrency control
+            href: grains/reminder-concurrency-control.md
           - name: Amazon DynamoDB reminders
             href: grains/reminders/dynamodb.md
       - name: Observers
