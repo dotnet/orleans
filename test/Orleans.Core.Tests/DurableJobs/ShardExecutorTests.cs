@@ -296,7 +296,7 @@ public class ShardExecutorTests
     [Fact]
     public async Task RunShardAsync_WhenJobReturnsPollAfter_UsesTimeProvider()
     {
-        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var timeProvider = new TimerTrackingFakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         var options = CreateOptions(maxConcurrentJobs: 10);
         var overloadDetector = CreateOverloadDetector(isOverloaded: false);
         var jobs = CreateJobs(1, timeProvider.GetUtcNow().AddSeconds(-1));
@@ -325,6 +325,7 @@ public class ShardExecutorTests
         var runTask = executor.RunShardAsync(shard, CancellationToken.None);
 
         await firstCall.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await timeProvider.TimerCreated.WaitAsync(TimeSpan.FromMinutes(1));
         Assert.False(secondCall.Task.IsCompleted);
 
         timeProvider.Advance(TimeSpan.FromSeconds(5));
