@@ -3340,6 +3340,13 @@ namespace Orleans.Serialization.Configuration
         void ConfigureProviders(System.Collections.Generic.IDictionary<(string Target, string Kind, string Name), System.Type> providers);
     }
 
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    public static partial class ProviderMetadataRegistry
+    {
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static void Register(IProviderMetadataProvider provider) { }
+    }
+
     public partial interface ITypeManifestProvider : Microsoft.Extensions.Options.IConfigureOptions<TypeManifestOptions>
     {
     }

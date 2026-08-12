@@ -33,7 +33,6 @@ using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Runtime.Versions.Selector;
 using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
-using Orleans.Serialization.Internal;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Statistics;
@@ -488,7 +487,7 @@ namespace Orleans.Hosting
 
             static IProviderBuilder<ISiloBuilder> GetRequiredProvider(Dictionary<(string Kind, string Name), Type> knownProviderTypes, string kind, string name)
             {
-                if (knownProviderTypes.TryGetValue((kind, name), out var type))
+                if (ProviderRegistrationResolver.Default.TryGetRegisteredProvider(knownProviderTypes, "Silo", kind, name, out var type))
                 {
                     var instance = Activator.CreateInstance(type);
                     return instance as IProviderBuilder<ISiloBuilder>
@@ -509,7 +508,7 @@ namespace Orleans.Hosting
             }
 
             static Dictionary<(string Kind, string Name), Type> GetRegisteredProviders()
-                => ProviderRegistrationResolver.GetRegisteredProviders(ReferencedAssemblyProvider.GetRelevantAssemblies(), "Silo");
+                => ProviderRegistrationResolver.Default.GetRegisteredProviders("Silo");
 
             static void ApplySubsection(ISiloBuilder builder, IConfigurationSection cfg, Dictionary<(string Kind, string Name), Type> knownProviderTypes, string sectionName)
             {

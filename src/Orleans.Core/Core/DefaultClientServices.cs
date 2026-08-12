@@ -18,7 +18,6 @@ using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Versions;
 using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
-using Orleans.Serialization.Internal;
 using Orleans.Serialization.Serializers;
 using Orleans.Statistics;
 
@@ -211,7 +210,7 @@ namespace Orleans
 
             static IProviderBuilder<IClientBuilder> GetRequiredProvider(Dictionary<(string Kind, string Name), Type> knownProviderTypes, string kind, string name)
             {
-                if (knownProviderTypes.TryGetValue((kind, name), out var type))
+                if (ProviderRegistrationResolver.Default.TryGetRegisteredProvider(knownProviderTypes, "Client", kind, name, out var type))
                 {
                     var instance = Activator.CreateInstance(type);
                     return instance as IProviderBuilder<IClientBuilder>
@@ -232,7 +231,7 @@ namespace Orleans
             }
 
             static Dictionary<(string Kind, string Name), Type> GetRegisteredProviders()
-                => ProviderRegistrationResolver.GetRegisteredProviders(ReferencedAssemblyProvider.GetRelevantAssemblies(), "Client");
+                => ProviderRegistrationResolver.Default.GetRegisteredProviders("Client");
 
             static void ApplySubsection(IClientBuilder builder, IConfigurationSection cfg, Dictionary<(string Kind, string Name), Type> knownProviderTypes, string sectionName)
             {

@@ -186,6 +186,9 @@ public class IncrementalCachingTests
         Assert.Contains(generatedProviderType, modifiedGeneratedSource, StringComparison.Ordinal);
         Assert.Contains("global::Orleans.Serialization.Configuration.IProviderMetadataProvider", modifiedGeneratedSource, StringComparison.Ordinal);
         Assert.Contains("public void ConfigureProviders(", modifiedGeneratedSource, StringComparison.Ordinal);
+        Assert.Contains("global::System.Runtime.CompilerServices.ModuleInitializerAttribute", modifiedGeneratedSource, StringComparison.Ordinal);
+        Assert.Contains("global::Orleans.Serialization.Configuration.ProviderMetadataRegistry.Register", modifiedGeneratedSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("global::System.Runtime.CompilerServices.ModuleInitializerAttribute", originalGeneratedSource, StringComparison.Ordinal);
         Assert.DoesNotContain("config.RegisteredProviders", modifiedGeneratedSource, StringComparison.Ordinal);
     }
 

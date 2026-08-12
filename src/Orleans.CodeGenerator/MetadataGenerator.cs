@@ -8,7 +8,7 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator;
 
-internal class MetadataGenerator(MetadataAggregateModel metadataModel, string assemblyName)
+internal class MetadataGenerator(MetadataAggregateModel metadataModel, string assemblyName, bool supportsModuleInitializers)
 {
     private static readonly TypeSyntax TypeManifestOptionsType = ParseTypeName("global::Orleans.Serialization.Configuration.TypeManifestOptions");
     private static readonly TypeSyntax TypeManifestProviderBaseType = ParseTypeName("global::Orleans.Serialization.Configuration.TypeManifestProviderBase");
@@ -18,6 +18,7 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
 
     private readonly MetadataAggregateModel _metadataModel = metadataModel;
     private readonly string _assemblyName = assemblyName ?? "Assembly";
+    private readonly bool _supportsModuleInitializers = supportsModuleInitializers;
 
     public ClassDeclarationSyntax GenerateMetadata()
         => GenerateIncrementalMetadata();
@@ -174,6 +175,27 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
             result = result
                 .AddBaseListTypes(SimpleBaseType(ProviderMetadataProviderType))
                 .AddMembers(configureProvidersMethod);
+
+            if (_supportsModuleInitializers)
+            {
+                var registerProvidersMethod = MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "RegisterProviders")
+                    .AddAttributeLists(
+                        AttributeList(
+                            SingletonSeparatedList(
+                                Attribute(ParseName("global::System.Runtime.CompilerServices.ModuleInitializerAttribute")))))
+                    .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.StaticKeyword))
+                    .AddBodyStatements(
+                        ExpressionStatement(
+                            InvocationExpression(
+                                ParseExpression("global::Orleans.Serialization.Configuration.ProviderMetadataRegistry.Register"),
+                                ArgumentList(
+                                    SingletonSeparatedList(
+                                        Argument(
+                                            ObjectCreationExpression(IdentifierName(result.Identifier))
+                                                .WithArgumentList(ArgumentList())))))));
+
+                result = result.AddMembers(registerProvidersMethod);
+            }
         }
 
         return result;
