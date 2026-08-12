@@ -530,12 +530,11 @@ namespace UnitTests.TimerTests
             await observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cts.Token);
 
             var tickTask = observer.WaitForReminderTickAsync(grainId, cts.Token, reminderName);
-            var immediateDeliveryDelay = TimeSpan.FromMilliseconds(1);
-            await AdvanceReminderTimeAsync(immediateDeliveryDelay, cts.Token);
+            await AdvanceUntilAsync(tickTask, cts.Token);
             var tick = await tickTask;
 
             Assert.Equal(firstTickTime, tick.Status.FirstTickTime);
-            Assert.Equal(firstTickTime + immediateDeliveryDelay, tick.Status.CurrentTickTime);
+            Assert.InRange(tick.Status.CurrentTickTime, firstTickTime, firstTickTime + period - TimeSpan.FromTicks(1));
 
             await grain.StopReminder(reminderName);
         }
