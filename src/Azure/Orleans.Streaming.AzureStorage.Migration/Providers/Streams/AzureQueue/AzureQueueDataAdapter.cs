@@ -203,7 +203,7 @@ public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatch
                 ["$value"] = Convert.ToBase64String(fullKey)
             },
             ["ki"] = namespaceBytes.Length,
-            ["fh"] = unchecked((int)ComputeXxHash32(fullKey))
+            ["fh"] = unchecked((int)ComputeStableHash(fullKey))
         };
     }
 
@@ -244,8 +244,8 @@ public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatch
         }
     }
 
-    // This must match the XxHash32 used by current Orleans StreamId instances.
-    private static uint ComputeXxHash32(byte[] data)
+    // StableHash reads the big-endian XxHash32 digest into a native uint.
+    private static uint ComputeStableHash(byte[] data)
     {
         const uint prime1 = 0x9E3779B1;
         const uint prime2 = 0x85EBCA77;
@@ -306,7 +306,7 @@ public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatch
             hash ^= hash >> 13;
             hash *= prime3;
             hash ^= hash >> 16;
-            return hash;
+            return BitConverter.IsLittleEndian ? BinaryPrimitives.ReverseEndianness(hash) : hash;
 
             static uint Round(uint accumulator, uint input) => RotateLeft(accumulator + input * prime2, 13) * prime1;
             static uint RotateLeft(uint value, int count) => (value << count) | (value >> (32 - count));

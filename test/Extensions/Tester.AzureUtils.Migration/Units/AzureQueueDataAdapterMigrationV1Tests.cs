@@ -33,7 +33,7 @@ namespace Tester.AzureUtils.Migration.Units
             "\"key\":\"value\"},\"StreamId\":{\"$id\":\"3\",\"$type\":\"Orleans.Runtime.StreamId, Orleans.Streaming\"," +
             "\"fk\":{\"$type\":\"System.Byte[], System.Private.CoreLib\"," +
             "\"$value\":\"dGVzdC1uYW1lc3BhY2UwMDExMjIzMzQ0NTU2Njc3ODg5OWFhYmJjY2RkZWVmZg==\"}," +
-            "\"ki\":14,\"fh\":1821817189}}";
+            "\"ki\":14,\"fh\":1706661484}}";
 
         private readonly AzureQueueDataAdapterMigrationV1 adapter;
         private readonly SerializationManager serializationManager;
@@ -103,7 +103,7 @@ namespace Tester.AzureUtils.Migration.Units
             var fullKey = Convert.FromBase64String(streamId.FullKey.Value);
             Assert.Equal("test-namespace00112233445566778899aabbccddeeff", Encoding.UTF8.GetString(fullKey));
             Assert.Equal(14, streamId.KeyIndex);
-            Assert.Equal(1821817189, streamId.Hash);
+            Assert.Equal(1706661484, streamId.Hash);
         }
 
         [Fact]
