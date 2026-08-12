@@ -395,7 +395,7 @@ public class ShardExecutorTests
     }
 
     [Fact]
-    public async Task RunShardAsync_WhenRetryPersistenceFails_ReleasesConcurrencyAndContinuesProcessing()
+    public async Task RunShardAsync_WhenRetryPersistenceFails_PropagatesAfterReleasingConcurrencyAndContinuingProcessing()
     {
         var options = CreateOptions(
             maxConcurrentJobs: 1,
@@ -403,24 +403,38 @@ public class ShardExecutorTests
         );
         var overloadDetector = CreateOverloadDetector(isOverloaded: false);
         var jobs = CreateJobs(2);
-        var shard = CreateJobShard(jobs);
+        var firstJobRegistered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var shard = CreateJobShard(jobs, firstJobRegistered: firstJobRegistered);
         var grainFactory = CreateGrainFactory();
         var completedJobs = new List<string>();
         var failedJobs = new List<string>();
         var jobExecutionCount = 0;
         ConfigureGrainFactoryWithSelectiveFailures(grainFactory, completedJobs, failedJobs, ref jobExecutionCount);
+        var retryPersistenceStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var failRetryPersistence = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var expectedException = new InvalidOperationException("Simulated retry persistence failure");
 
         shard.RetryJobLaterAsync(
             Arg.Any<IJobRunContext>(),
             Arg.Any<DateTimeOffset>(),
             Arg.Any<CancellationToken>())
-            .Returns(Task.FromException(new InvalidOperationException("Simulated retry persistence failure")));
+            .Returns(async _ =>
+            {
+                retryPersistenceStarted.SetResult();
+                await failRetryPersistence.Task;
+            });
 
         var executor = new ShardExecutor(grainFactory, options, overloadDetector, NullLogger<ShardExecutor>.Instance);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        await executor.RunShardAsync(shard, cts.Token);
+        var runTask = executor.RunShardAsync(shard, cts.Token);
 
+        await Task.WhenAll(firstJobRegistered.Task, retryPersistenceStarted.Task).WaitAsync(cts.Token);
+        failRetryPersistence.SetException(expectedException);
+
+        var actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => runTask);
+
+        Assert.Same(expectedException, actualException);
         Assert.Single(failedJobs);
         Assert.Single(completedJobs);
         await shard.Received(1).RetryJobLaterAsync(Arg.Any<IJobRunContext>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
@@ -626,14 +640,15 @@ public class ShardExecutorTests
     private static IJobShard CreateJobShard(
         List<DurableJob> jobs, 
         DateTimeOffset? startTime = null,
-        DateTimeOffset? endTime = null)
+        DateTimeOffset? endTime = null,
+        TaskCompletionSource? firstJobRegistered = null)
     {
         var shard = Substitute.For<IJobShard>();
         shard.Id.Returns("shard-1");
         shard.StartTime.Returns(startTime ?? DateTimeOffset.UtcNow.AddMinutes(-10));
         shard.EndTime.Returns(endTime ?? DateTimeOffset.UtcNow.AddMinutes(10));
 
-        shard.ConsumeDurableJobsAsync().Returns(callInfo => CreateJobContexts(jobs));
+        shard.ConsumeDurableJobsAsync().Returns(callInfo => CreateJobContexts(jobs, firstJobRegistered));
 
         shard.RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(true));
@@ -657,15 +672,24 @@ public class ShardExecutorTests
         return shard;
     }
 
-    private static async IAsyncEnumerable<IJobRunContext> CreateJobContexts(List<DurableJob> jobs)
+    private static async IAsyncEnumerable<IJobRunContext> CreateJobContexts(
+        List<DurableJob> jobs,
+        TaskCompletionSource? firstJobRegistered = null)
     {
-        foreach (var job in jobs)
+        for (var i = 0; i < jobs.Count; i++)
         {
+            var job = jobs[i];
             var context = Substitute.For<IJobRunContext>();
             context.Job.Returns(job);
             context.RunId.Returns(Guid.NewGuid().ToString());
             context.DequeueCount.Returns(1);
             yield return context;
+
+            // The iterator resumes only after RunShardAsync has registered the yielded job task.
+            if (i == 0)
+            {
+                firstJobRegistered?.SetResult();
+            }
         }
         
         await Task.CompletedTask;
