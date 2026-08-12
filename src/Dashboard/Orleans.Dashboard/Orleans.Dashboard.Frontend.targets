@@ -12,7 +12,9 @@
   <ItemGroup Condition="'$(BuildExternalAssets)' != 'false'">
     <NpmAppSources Include="$(NpmAppRootDirectory)\src\**\*" />
     <NpmAppSources Include="$(NpmAppRootDirectory)\public\**\*" />
+    <NpmAppSources Include="$(NpmAppRootDirectory)\scripts\npm-ci.js" />
     <NpmAppSources Include="$(NpmAppRootDirectory)\package.json" />
+    <NpmAppSources Include="$(NpmAppRootDirectory)\package-lock.json" />
     <NpmAppSources Include="$(NpmAppRootDirectory)\vite.config.ts" />
     <NpmAppSources Include="$(NpmAppRootDirectory)\tsconfig.json" />
     <NpmAppSources Include="$(NpmAppRootDirectory)\index.html" />
@@ -46,7 +48,7 @@
 
     <!-- Install dependencies -->
     <Exec
-      Command="npm ci --prefer-offline --no-audit $(NpmConfigArg)"
+      Command="node &quot;$(NpmAppRootDirectory)\scripts\npm-ci.js&quot; --prefer-offline --no-audit $(NpmConfigArg)"
       WorkingDirectory="$(NpmAppRootDirectory)"
       ConsoleToMsBuild="true" />
 

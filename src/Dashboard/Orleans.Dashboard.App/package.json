@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:npm-ci": "node --test scripts/npm-ci.test.js"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.1.0",
