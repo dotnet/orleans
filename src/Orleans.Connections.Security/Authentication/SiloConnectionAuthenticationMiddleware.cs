@@ -408,7 +408,9 @@ internal class InboundSiloConnectionAuthenticationMiddleware : SiloConnectionAut
         var state = new SiloConnectionAuthenticationStateMachine();
         state.Move(SiloConnectionAuthenticationState.Created, SiloConnectionAuthenticationState.ProtocolSelected);
 
-        using var linked = CreateExchangeCancellation(context, out var timeout);
+        SiloConnectionAuthenticationFeature? feature = null;
+        var resultCategory = AuthenticationResultCategory.Authenticated;
+        using (var linked = CreateExchangeCancellation(context, out var timeout))
         using (timeout)
         {
             IDisposable? admission = null;
@@ -469,23 +471,16 @@ internal class InboundSiloConnectionAuthenticationMiddleware : SiloConnectionAut
                     }
 
                     state.Move(SiloConnectionAuthenticationState.ResultTransferred, SiloConnectionAuthenticationState.Accepted);
-                    var feature = new SiloConnectionAuthenticationFeature(
+                    feature = new SiloConnectionAuthenticationFeature(
                         true,
                         isAuthenticated,
                         principal,
                         expiresAt,
                         failure,
                         SiloConnectionAuthenticationProtocol.Version2);
-                    admission.Dispose();
-                    linked.Dispose();
-                    timeout.Dispose();
-                    await RunAcceptedAsync(
-                        context,
-                        next,
-                        direction,
-                        feature,
-                        started,
-                        isAuthenticated ? AuthenticationResultCategory.Authenticated : AuthenticationResultCategory.AcceptedUnauthenticated);
+                    resultCategory = isAuthenticated
+                        ? AuthenticationResultCategory.Authenticated
+                        : AuthenticationResultCategory.AcceptedUnauthenticated;
                 }
             }
             catch (OperationCanceledException) when (state.State != SiloConnectionAuthenticationState.Accepted)
@@ -500,6 +495,11 @@ internal class InboundSiloConnectionAuthenticationMiddleware : SiloConnectionAut
             {
                 Abort(context, direction, AuthenticationResultCategory.ProtocolError, started);
             }
+        }
+
+        if (feature is not null)
+        {
+            await RunAcceptedAsync(context, next, direction, feature, started, resultCategory);
         }
     }
 
@@ -690,7 +690,9 @@ internal class OutboundSiloConnectionAuthenticationMiddleware : SiloConnectionAu
         var state = new SiloConnectionAuthenticationStateMachine();
         state.Move(SiloConnectionAuthenticationState.Created, SiloConnectionAuthenticationState.ProtocolSelected);
 
-        using var linked = CreateExchangeCancellation(context, out var timeout);
+        SiloConnectionAuthenticationFeature? feature = null;
+        var resultCategory = AuthenticationResultCategory.Authenticated;
+        using (var linked = CreateExchangeCancellation(context, out var timeout))
         using (timeout)
         {
             try
@@ -727,44 +729,28 @@ internal class OutboundSiloConnectionAuthenticationMiddleware : SiloConnectionAu
                     {
                         case AuthenticatedResult:
                             state.Move(SiloConnectionAuthenticationState.ResultTransferred, SiloConnectionAuthenticationState.Accepted);
-                            admission.Dispose();
-                            linked.Dispose();
-                            timeout.Dispose();
-                            await RunAcceptedAsync(
-                                context,
-                                next,
-                                direction,
-                                new SiloConnectionAuthenticationFeature(
-                                    true,
-                                    true,
-                                    null,
-                                    expiresAt,
-                                    SiloConnectionAuthenticationFailure.None,
-                                    SiloConnectionAuthenticationProtocol.Version2),
-                                started,
-                                AuthenticationResultCategory.Authenticated);
-                            return;
+                            feature = new SiloConnectionAuthenticationFeature(
+                                true,
+                                true,
+                                null,
+                                expiresAt,
+                                SiloConnectionAuthenticationFailure.None,
+                                SiloConnectionAuthenticationProtocol.Version2);
+                            resultCategory = AuthenticationResultCategory.Authenticated;
+                            break;
                         case AcceptedUnauthenticatedResult when Options.Mode == SiloConnectionAuthenticationMode.Audit:
                             state.Move(SiloConnectionAuthenticationState.ResultTransferred, SiloConnectionAuthenticationState.Accepted);
-                            admission.Dispose();
-                            linked.Dispose();
-                            timeout.Dispose();
-                            await RunAcceptedAsync(
-                                context,
-                                next,
-                                direction,
-                                new SiloConnectionAuthenticationFeature(
-                                    true,
-                                    false,
-                                    null,
-                                    null,
-                                    localFailure == SiloConnectionAuthenticationFailure.None
-                                        ? SiloConnectionAuthenticationFailure.InvalidToken
-                                        : localFailure,
-                                    SiloConnectionAuthenticationProtocol.Version2),
-                                started,
-                                AuthenticationResultCategory.AcceptedUnauthenticated);
-                            return;
+                            feature = new SiloConnectionAuthenticationFeature(
+                                true,
+                                false,
+                                null,
+                                null,
+                                localFailure == SiloConnectionAuthenticationFailure.None
+                                    ? SiloConnectionAuthenticationFailure.InvalidToken
+                                    : localFailure,
+                                SiloConnectionAuthenticationProtocol.Version2);
+                            resultCategory = AuthenticationResultCategory.AcceptedUnauthenticated;
+                            break;
                         case RejectedResult:
                         case AcceptedUnauthenticatedResult:
                             state.Move(SiloConnectionAuthenticationState.ResultTransferred, SiloConnectionAuthenticationState.Rejected);
@@ -788,6 +774,11 @@ internal class OutboundSiloConnectionAuthenticationMiddleware : SiloConnectionAu
             {
                 Abort(context, direction, AuthenticationResultCategory.ProtocolError, started);
             }
+        }
+
+        if (feature is not null)
+        {
+            await RunAcceptedAsync(context, next, direction, feature, started, resultCategory);
         }
     }
 
