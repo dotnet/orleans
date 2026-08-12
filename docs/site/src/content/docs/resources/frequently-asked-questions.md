@@ -1,7 +1,7 @@
 ---
 title: Frequently asked questions
 description: Answers to common questions about Orleans.
-ms.date: 08/08/2026
+ms.date: 08/12/2026
 ms.topic: faq
 ---
 
@@ -34,6 +34,12 @@ Orleans is a set of .NET libraries used to build an application. An application 
 ### Where can Orleans run?
 
 Orleans runs wherever its supported .NET targets run, including Linux and Windows hosts, containers, Kubernetes, Azure services, AWS, other clouds, on-premises environments, and developer machines.
+
+### How many grains or silos can a cluster contain?
+
+Orleans doesn't impose a configured numeric maximum on grain identities, activations, or silos. The practical limit depends on the workload, active grain footprint, hot keys, lifecycle cost, network topology, providers, failure-recovery objectives, and host resources. Adding silos doesn't guarantee linear scaling because cluster coordination and shared dependencies also have costs.
+
+Use production-like capacity tests to find a safe operating envelope rather than relying on a universal grain, silo, or activation-rate number. See [Capacity planning and scaling](../deployment/capacity-planning.md).
 
 ### Is Orleans tied to Azure?
 
