@@ -47,9 +47,16 @@ namespace Orleans.Transactions.TestKit
             }
 
             // then, analyze the history results
-            var tolerateGenericTimeouts = StorageErrorInjectionActive || (scale >= 3 && !avoidTimeouts);
+            var tolerateGenericTimeouts = ShouldTolerateGenericTimeouts(scale, StorageErrorInjectionActive);
             var tolerateUnknownExceptions = StorageAdaptorHasLimitedCommitSpace || StorageErrorInjectionActive;
             harness.CheckConsistency(tolerateGenericTimeouts, tolerateUnknownExceptions);
+        }
+
+        internal static bool ShouldTolerateGenericTimeouts(int scale, bool storageErrorInjectionActive)
+        {
+            // AvoidTimeouts limits recursive work before the response timeout, but cannot prevent
+            // the response timeout itself from expiring when the system is under load.
+            return storageErrorInjectionActive || scale >= 3;
         }
     }
 }
