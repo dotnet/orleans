@@ -11,6 +11,27 @@ namespace Orleans.Transactions.Tests;
 [TestCategory("BVT"), TestCategory("Transactions")]
 public class TransactionRecoveryFailureObservationTests
 {
+    [Theory]
+    [InlineData(true, 0, 45)]
+    [InlineData(false, 30, 15)]
+    public void GetTimeouts_PreservesAbsoluteWatchdogWhenAllocatingProducerDrain(
+        bool gracefulShutdown,
+        int expectedObservationWindowSeconds,
+        int expectedProducerDrainSeconds)
+    {
+        var clientResponseTimeout = TimeSpan.FromSeconds(30);
+        var schedulingMargin = TimeSpan.FromSeconds(15);
+
+        var timeouts = TransactionRecoveryFailureObservation.GetTimeouts(
+            gracefulShutdown,
+            clientResponseTimeout,
+            schedulingMargin);
+
+        Assert.Equal(TimeSpan.FromSeconds(expectedObservationWindowSeconds), timeouts.ObservationWindow);
+        Assert.Equal(TimeSpan.FromSeconds(expectedProducerDrainSeconds), timeouts.ProducerDrainTimeout);
+        Assert.Equal(TimeSpan.FromSeconds(45), timeouts.MaximumDuration);
+    }
+
     [Fact]
     public async Task DetectAsync_NonCancellableProducerTimesOutAndStopsProducing()
     {
@@ -59,8 +80,8 @@ public class TransactionRecoveryFailureObservationTests
             producer.Task,
             failure.Task,
             stopProducing,
-            responseWindow: TimeSpan.Zero,
-            schedulingMargin: TimeSpan.FromSeconds(1));
+            observationWindow: TimeSpan.Zero,
+            producerDrainTimeout: TimeSpan.FromSeconds(1));
 
         Assert.Equal(TransactionRecoveryFailureObservation.OutcomeKind.FailureObserved, outcome.Kind);
         Assert.Same(expectedFailure, outcome.Failure);
@@ -111,8 +132,8 @@ public class TransactionRecoveryFailureObservationTests
             producer,
             failure.Task,
             stopProducing,
-            responseWindow: TimeSpan.Zero,
-            schedulingMargin: TimeSpan.FromSeconds(1));
+            observationWindow: TimeSpan.Zero,
+            producerDrainTimeout: TimeSpan.FromSeconds(1));
 
         Assert.Equal(TransactionRecoveryFailureObservation.OutcomeKind.StoppedWithoutFailure, outcome.Kind);
         Assert.Null(outcome.Failure);
