@@ -24,13 +24,14 @@ namespace Tester.AdoNet.Reminders
     [TestProvider("SqlServer")]
     [TestArea("Reminders")]
     [TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("SqlServer")]
-    public class ReminderTests_AdoNet_SqlServer : ReminderTestsBase, IClassFixture<ReminderTests_AdoNet_SqlServer.Fixture>
+    public class ReminderTests_AdoNet_SqlServer : ReminderTestsBase, IClassFixture<ReminderTests_AdoNet_SqlServer.Fixture>, IAsyncLifetime
     {
         private const string TestDatabaseName = "OrleansTest_SqlServer_Reminders";
         private static readonly string AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
 
         public class Fixture : BaseInProcessTestClusterFixture
         {
+            private string _connectionString = null!;
             private ReminderTestClock? _reminderClock;
             internal ReminderTestClock ReminderClock => _reminderClock ?? throw new InvalidOperationException($"{nameof(ReminderTestClock)} has not been configured.");
 
@@ -39,16 +40,22 @@ namespace Tester.AdoNet.Reminders
                 RelationalStorageForTesting.CheckPreconditionsOrThrow(AdoInvariant);
             }
 
+            public override async Task InitializeAsync()
+            {
+                EnsurePreconditionsMet();
+                var relationalStorage = await RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName);
+                _connectionString = relationalStorage.CurrentConnectionString;
+                await base.InitializeAsync();
+            }
+
             protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
-                string connectionString = RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName)
-                    .Result.CurrentConnectionString;
                 _reminderClock = builder.AddReminderTestClock();
                 builder.ConfigureSilo((_, siloBuilder) =>
                 {
                     siloBuilder.UseAdoNetReminderService(options =>
                     {
-                        options.ConnectionString = connectionString;
+                        options.ConnectionString = _connectionString;
                         options.Invariant = AdoInvariant;
                     });
                 });
@@ -69,11 +76,17 @@ namespace Tester.AdoNet.Reminders
 
         public ReminderTests_AdoNet_SqlServer(Fixture fixture) : base(fixture.ReminderClock, fixture.HostedCluster)
         {
+        }
+
+        public async Task InitializeAsync()
+        {
             // ReminderTable.Clear() cannot be called from a non-Orleans thread,
             // so we must proxy the call through a grain.
             var controlProxy = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            controlProxy.EraseReminderTable().WaitAsync(TestConstants.InitTimeout).Wait();
+            await controlProxy.EraseReminderTable().WaitAsync(TestConstants.InitTimeout);
         }
+
+        Task IAsyncLifetime.DisposeAsync() => Task.CompletedTask;
         
         // Basic tests
 

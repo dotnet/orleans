@@ -3,6 +3,7 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
 using UnitTests.StorageTests.Relational.TestDataSets;
+using Xunit;
 
 
 namespace UnitTests.StorageTests.Relational
@@ -12,14 +13,17 @@ namespace UnitTests.StorageTests.Relational
     /// is collected here, but concrete implementations can provide and implement storage specific
     /// actions.
     /// </summary>
-    public abstract class RelationalStorageTests
+    public abstract class RelationalStorageTests : IAsyncLifetime
     {
+        private readonly string _adoNetInvariant;
+        private readonly bool _deleteStateOnClear;
+
         private IStorageHasherPicker ConstantHasher { get; } = new StorageHasherPicker(new[] { new ConstantHasher() });
 
         /// <summary>
         /// The tests and assertions common across all back-ends are here.
         /// </summary>
-        internal CommonStorageTests PersistenceStorageTests { get; } = null!;
+        internal CommonStorageTests PersistenceStorageTests { get; private set; } = null!;
 
         /// <summary>
         /// The tests and assertions common across all back-ends are here.
@@ -35,12 +39,18 @@ namespace UnitTests.StorageTests.Relational
         public RelationalStorageTests(string adoNetInvariant, CommonFixture fixture, bool deleteStateOnClear = false)
         {
             Fixture = fixture;
-            var persistenceStorage = fixture.GetStorageProvider(adoNetInvariant, deleteStateOnClear).GetAwaiter().GetResult();
-            if(persistenceStorage != null)
-            {
-                PersistenceStorageTests = new CommonStorageTests(persistenceStorage);
-            }
+            _adoNetInvariant = adoNetInvariant;
+            _deleteStateOnClear = deleteStateOnClear;
         }
+
+        public async Task InitializeAsync()
+        {
+            var persistenceStorage = await Fixture.GetStorageProvider(_adoNetInvariant, _deleteStateOnClear);
+            Skip.If(persistenceStorage is null, $"Persistence storage not available for {_adoNetInvariant}.");
+            PersistenceStorageTests = new CommonStorageTests(persistenceStorage);
+        }
+
+        public Task DisposeAsync() => Task.CompletedTask;
 
         internal Task Relational_WriteReadWriteRead100StatesInParallel()
         {

@@ -98,7 +98,7 @@ namespace UnitTests.StorageTests.Relational
                         {
                             // Each storage mode has its own class fixture, so it must not recreate a database used by the other mode.
                             var storageName = deleteStateOnClear ? "OrleansStorageTestsDeleteOnClear" : "OrleansStorageTests";
-                            Storage = Invariants.EnsureStorageForTesting(connectionString, storageName);
+                            Storage = await Invariants.EnsureStorageForTestingAsync(connectionString, storageName);
 
                             var options = new AdoNetGrainStorageOptions()
                             {

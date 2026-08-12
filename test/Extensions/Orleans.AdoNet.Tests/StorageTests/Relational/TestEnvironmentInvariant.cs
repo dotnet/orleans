@@ -93,13 +93,15 @@ namespace UnitTests.StorageTests.Relational
         /// <param name="connection">The connection with which to ensure the storage is functional.</param>
         /// <param name="storageName">Storage name. This is optional.</param>
         /// <returns></returns>
-        public RelationalStorageForTesting? EnsureStorageForTesting(StorageConnection connection, string? storageName = null)
+        public async Task<RelationalStorageForTesting?> EnsureStorageForTestingAsync(StorageConnection connection, string? storageName = null)
         {
-
             if (AdoNetInvariants.Invariants.Contains(connection.StorageInvariant))
             {
                 const string RelationalStorageTestDb = "OrleansStorageTests";
-                return RelationalStorageForTesting.SetupInstance(connection.StorageInvariant, storageName ?? RelationalStorageTestDb, connection.ConnectionString).GetAwaiter().GetResult();
+                return await RelationalStorageForTesting.SetupInstance(
+                    connection.StorageInvariant,
+                    storageName ?? RelationalStorageTestDb,
+                    connection.ConnectionString);
             }
 
             return null;

@@ -17,6 +17,8 @@ namespace UnitTests.MembershipTests
     {
         public const string TestDatabaseName = "OrleansTest_SqlServer_Liveness";
         private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameSqlServer;
+        private string _connectionString = null!;
+
         public LivenessTests_SqlServer(ITestOutputHelper output) : base(output)
         {
             EnsurePreconditionsMet();
@@ -24,10 +26,16 @@ namespace UnitTests.MembershipTests
 
         protected override void CheckPreconditionsOrThrow() => RelationalStorageForTesting.CheckPreconditionsOrThrow(AdoNetInvariantName);
 
+        public override async Task InitializeAsync()
+        {
+            var relationalStorage = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
+            _connectionString = relationalStorage.CurrentConnectionString;
+            await base.InitializeAsync();
+        }
+
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName).GetAwaiter().GetResult();
-            builder.Properties["RelationalStorageConnectionString"] = relationalStorage.CurrentConnectionString;
+            builder.Properties["RelationalStorageConnectionString"] = _connectionString;
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
 
@@ -90,6 +98,8 @@ namespace UnitTests.MembershipTests
     {
         public const string TestDatabaseName = "OrleansTest_Postgres_Liveness";
         private const string AdoNetInvariantName = AdoNetInvariants.InvariantNamePostgreSql;
+        private string _connectionString = null!;
+
         public LivenessTests_PostgreSql(ITestOutputHelper output) : base(output)
         {
             EnsurePreconditionsMet();
@@ -97,10 +107,16 @@ namespace UnitTests.MembershipTests
 
         protected override void CheckPreconditionsOrThrow() => RelationalStorageForTesting.CheckPreconditionsOrThrow(AdoNetInvariantName);
 
+        public override async Task InitializeAsync()
+        {
+            var relationalStorage = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
+            _connectionString = relationalStorage.CurrentConnectionString;
+            await base.InitializeAsync();
+        }
+
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName).Result;
-            builder.Properties["RelationalStorageConnectionString"] = relationalStorage.CurrentConnectionString;
+            builder.Properties["RelationalStorageConnectionString"] = _connectionString;
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
 
@@ -163,6 +179,8 @@ namespace UnitTests.MembershipTests
     {
         public const string TestDatabaseName = "OrleansTest_MySql_Liveness";
         private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameMySql;
+        private string _connectionString = null!;
+
         public LivenessTests_MySql(ITestOutputHelper output) : base(output)
         {
             EnsurePreconditionsMet();
@@ -170,10 +188,16 @@ namespace UnitTests.MembershipTests
 
         protected override void CheckPreconditionsOrThrow() => RelationalStorageForTesting.CheckPreconditionsOrThrow(AdoNetInvariantName);
 
+        public override async Task InitializeAsync()
+        {
+            var relationalStorage = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
+            _connectionString = relationalStorage.CurrentConnectionString;
+            await base.InitializeAsync();
+        }
+
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName).Result;
-            builder.Properties["RelationalStorageConnectionString"] = relationalStorage.CurrentConnectionString;
+            builder.Properties["RelationalStorageConnectionString"] = _connectionString;
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
 

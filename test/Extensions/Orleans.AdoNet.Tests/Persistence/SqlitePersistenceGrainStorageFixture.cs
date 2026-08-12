@@ -11,10 +11,11 @@ using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;
+using Xunit;
 
 namespace Tester.AdoNet.Persistence
 {
-    public sealed class SqlitePersistenceGrainStorageFixture : TestEnvironmentFixture
+    public sealed class SqlitePersistenceGrainStorageFixture : TestEnvironmentFixture, IAsyncLifetime
     {
         public const string AdoInvariant = AdoNetInvariants.InvariantNameSqlLite;
 
@@ -28,8 +29,6 @@ namespace Tester.AdoNet.Persistence
             }.ToString();
 
             this.DatabaseStorage = RelationalStorage.CreateInstance(AdoInvariant, this.ConnectionString);
-            this.InitializeSchemaAsync().GetAwaiter().GetResult();
-            this.Storage = this.CreateGrainStorageAsync().GetAwaiter().GetResult();
         }
 
         public string DatabaseFilePath { get; }
@@ -38,7 +37,15 @@ namespace Tester.AdoNet.Persistence
 
         public IRelationalStorage DatabaseStorage { get; }
 
-        public AdoNetGrainStorage Storage { get; }
+        public AdoNetGrainStorage Storage { get; private set; } = null!;
+
+        public async Task InitializeAsync()
+        {
+            await this.InitializeSchemaAsync();
+            this.Storage = await this.CreateGrainStorageAsync();
+        }
+
+        public Task DisposeAsync() => Task.CompletedTask;
 
         public async Task InitializeSchemaAsync()
         {
