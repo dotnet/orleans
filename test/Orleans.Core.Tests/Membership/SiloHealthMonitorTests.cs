@@ -369,7 +369,7 @@ namespace NonSilo.Tests.Membership
             optionsMonitor.CurrentValue.Returns(options);
             var localHealthMonitor = Substitute.For<ILocalSiloHealthMonitor>();
             localHealthMonitor
-                .GetLocalHealthStatus(default, default, default)
+                .GetLocalHealthStatus(default, default)
                 .ReturnsForAnyArgs(new LocalSiloHealthStatus(localHealthScore, []));
             var prober = Substitute.For<IRemoteSiloProber>();
             var probeEntered = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -408,13 +408,12 @@ namespace NonSilo.Tests.Membership
                 if (extendProbeTimeout)
                 {
                     localHealthMonitor.Received(1).GetLocalHealthStatus(
-                        timeProvider.GetUtcNow() - options.ProbeTimeout,
-                        timeProvider.GetUtcNow(),
+                        options.ProbeTimeout,
                         LocalSiloHealthCheckCategory.Local);
                 }
                 else
                 {
-                    localHealthMonitor.DidNotReceiveWithAnyArgs().GetLocalHealthStatus(default, default, default);
+                    localHealthMonitor.DidNotReceiveWithAnyArgs().GetLocalHealthStatus(default, default);
                 }
 
                 await prober.Received(1).Probe(_targetSilo, 1, cancellationToken);

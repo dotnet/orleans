@@ -81,8 +81,7 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task<IndirectProbeResponse> ProbeIndirectly(SiloAddress target, TimeSpan probeTimeout, int probeNumber)
         {
-            var probeStartTime = _timeProvider.GetUtcNow();
-            var probeResponseTimestamp = _timeProvider.GetTimestamp();
+            var probeTimer = TimeProviderValueStopwatch.StartNew(_timeProvider);
             var succeeded = false;
             string? failureMessage = null;
             try
@@ -105,10 +104,9 @@ namespace Orleans.Runtime.MembershipService
                 failureMessage = $"Encountered exception {LogFormatter.PrintException(exception)}";
             }
 
-            var probeResponseTime = _timeProvider.GetElapsedTime(probeResponseTimestamp);
-            var probeEndTime = probeStartTime + probeResponseTime;
+            var probeResponseTime = probeTimer.GetElapsedTime(out var probeEndTimestamp);
             var healthScore = this.ActivationServices.GetRequiredService<ILocalSiloHealthMonitor>()
-                .GetLocalHealthStatus(probeStartTime, probeEndTime, LocalSiloHealthCheckCategory.Local)
+                .GetLocalHealthStatus(probeTimer.StartTimestamp, probeEndTimestamp, LocalSiloHealthCheckCategory.Local)
                 .Score;
             return new IndirectProbeResponse
             {

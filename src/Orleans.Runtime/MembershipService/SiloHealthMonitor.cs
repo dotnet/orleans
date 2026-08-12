@@ -241,10 +241,8 @@ namespace Orleans.Runtime.MembershipService
                 {
                     // This query must happen before the probe because its result determines the probe timeout.
                     // Outcome-reporting health checks, such as an intermediary's health score, run after probing.
-                    var end = _timeProvider.GetUtcNow();
                     var localHealth = _localSiloHealthMonitor.GetLocalHealthStatus(
-                        end - options.ProbeTimeout,
-                        end,
+                        options.ProbeTimeout,
                         LocalSiloHealthCheckCategory.Local);
                     additionalTimeout += localHealth.Score;
                 }
@@ -276,7 +274,7 @@ namespace Orleans.Runtime.MembershipService
             var id = ++_nextProbeId;
             LogTraceGoingToSendPing(_log, id, TargetSiloAddress);
 
-            var roundTripTimestamp = _timeProvider.GetTimestamp();
+            var roundTripTimer = TimeProviderValueStopwatch.StartNew(_timeProvider);
             ProbeResult probeResult;
             Exception? failureException;
             try
@@ -287,14 +285,14 @@ namespace Orleans.Runtime.MembershipService
             catch (OperationCanceledException exception)
             {
                 failureException = new OperationCanceledException(
-                    $"The ping attempt was cancelled after {_timeProvider.GetElapsedTime(roundTripTimestamp)}. Ping #{id}",
+                    $"The ping attempt was cancelled after {roundTripTimer.GetElapsedTime(out _)}. Ping #{id}",
                     exception);
             }
             catch (Exception exception)
             {
                 failureException = exception;
             }
-            var roundTripTime = _timeProvider.GetElapsedTime(roundTripTimestamp);
+            var roundTripTime = roundTripTimer.GetElapsedTime(out _);
 
             if (failureException is null)
             {
@@ -332,13 +330,13 @@ namespace Orleans.Runtime.MembershipService
             var id = ++_nextProbeId;
             LogTraceGoingToSendIndirectPing(_log, id, TargetSiloAddress, intermediary);
 
-            var roundTripTimestamp = _timeProvider.GetTimestamp();
+            var roundTripTimer = TimeProviderValueStopwatch.StartNew(_timeProvider);
             ProbeResult probeResult;
             try
             {
                 using var cancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellation, _stoppingCancellation.Token);
                 var indirectResult = await _prober.ProbeIndirectly(intermediary, TargetSiloAddress, directProbeTimeout, id, cancellationSource.Token).WaitAsync(cancellationSource.Token);
-                var elapsed = _timeProvider.GetElapsedTime(roundTripTimestamp);
+                var elapsed = roundTripTimer.GetElapsedTime(out _);
                 var roundTripTime = elapsed - indirectResult.ProbeResponseTime;
 
                 // Record timing regardless of the result.

@@ -17,12 +17,14 @@ namespace NonSilo.Tests.Membership
     {
         private static readonly DateTimeOffset Start = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
         private readonly FakeTimeProvider _timeProvider = new(Start);
+        private readonly long _startTimestamp;
         private readonly IMembershipManager _membershipManager;
         private readonly IProbeHealthMonitor _probeHealthMonitor = Substitute.For<IProbeHealthMonitor>();
         private readonly ILocalSiloDetails _localSiloDetails = Substitute.For<ILocalSiloDetails>();
 
         public LocalSiloHealthMonitorTests()
         {
+            _startTimestamp = _timeProvider.GetTimestamp();
             var localSilo = SiloAddress.FromParsableString("127.0.0.1:100@100");
             _localSiloDetails.SiloAddress.Returns(localSilo);
             _membershipManager = Substitute.For<IMembershipManager>();
@@ -60,11 +62,11 @@ namespace NonSilo.Tests.Membership
 
             var exception = Assert.Throws<ArgumentOutOfRangeException>(
                 () => monitor.GetLocalHealthStatus(
-                    Start,
-                    Start - TimeSpan.FromTicks(1),
+                    _startTimestamp,
+                    _startTimestamp - 1,
                     LocalSiloHealthCheckCategory.All));
 
-            Assert.Equal("end", exception.ParamName);
+            Assert.Equal("endTimestamp", exception.ParamName);
             Assert.Equal(0, participant.CallCount);
         }
 
@@ -81,7 +83,7 @@ namespace NonSilo.Tests.Membership
                 source: "retention-boundary");
 
             var atRecordedTime = monitor.GetLocalHealthStatus(TimeSpan.Zero, LocalSiloHealthCheckCategory.Local);
-            Assert.Contains(atRecordedTime.Events, IsRetentionEvent);
+            Assert.Equal(_startTimestamp, Assert.Single(atRecordedTime.Events, IsRetentionEvent).Timestamp);
 
             _timeProvider.Advance(TimeSpan.FromMinutes(1));
             var atRetentionBoundary = monitor.GetLocalHealthStatus(TimeSpan.FromMinutes(1), LocalSiloHealthCheckCategory.Local);
@@ -93,8 +95,7 @@ namespace NonSilo.Tests.Membership
 
             static bool IsRetentionEvent(LocalSiloHealthEvent item)
                 => item.Kind == LocalSiloHealthCheckKind.RuntimeStall
-                    && item.Source == "retention-boundary"
-                    && item.Timestamp == Start;
+                    && item.Source == "retention-boundary";
         }
 
         [Fact]
@@ -172,7 +173,7 @@ namespace NonSilo.Tests.Membership
             var selected = Assert.Single(status.Events, item => item.Source == "equal-score");
 
             Assert.Equal(3, status.Score);
-            Assert.Equal(Start.AddSeconds(1), selected.Timestamp);
+            Assert.Equal(TimestampAt(TimeSpan.FromSeconds(1)), selected.Timestamp);
             Assert.Equal("later", selected.Complaint);
             Assert.Equal(TimeSpan.FromSeconds(2), selected.Duration);
         }
@@ -265,8 +266,8 @@ namespace NonSilo.Tests.Membership
 
             _timeProvider.Advance(TimeSpan.FromMilliseconds(500));
             var carried = monitor.GetLocalHealthStatus(
-                Start.AddSeconds(1),
-                Start.AddSeconds(1.5),
+                TimestampAt(TimeSpan.FromSeconds(1)),
+                TimestampAt(TimeSpan.FromSeconds(1.5)),
                 LocalSiloHealthCheckCategory.Network);
             Assert.Equal(0, carried.Score);
             var membershipStatus = Assert.Single(
@@ -342,15 +343,15 @@ namespace NonSilo.Tests.Membership
                 duration: TimeSpan.FromSeconds(2));
 
             var status = monitor.GetLocalHealthStatus(
-                Start,
-                Start.AddSeconds(2),
+                _startTimestamp,
+                TimestampAt(TimeSpan.FromSeconds(2)),
                 LocalSiloHealthCheckCategory.Local);
 
             var healthEvent = Assert.Single(
                 status.Events,
                 item => item.Kind == LocalSiloHealthCheckKind.RuntimeStall);
             Assert.Equal(2, status.Score);
-            Assert.Equal(Start.AddSeconds(3), healthEvent.Timestamp);
+            Assert.Equal(TimestampAt(TimeSpan.FromSeconds(3)), healthEvent.Timestamp);
             Assert.Equal(TimeSpan.FromSeconds(2), healthEvent.Duration);
         }
 
@@ -363,15 +364,15 @@ namespace NonSilo.Tests.Membership
             _timeProvider.Advance(TimeSpan.FromMilliseconds(500));
 
             var status = monitor.GetLocalHealthStatus(
-                Start.AddMilliseconds(250),
-                Start.AddMilliseconds(500),
+                TimestampAt(TimeSpan.FromMilliseconds(250)),
+                TimestampAt(TimeSpan.FromMilliseconds(500)),
                 LocalSiloHealthCheckCategory.Local);
 
             var participantEvent = Assert.Single(
                 status.Events,
                 item => item.Kind == LocalSiloHealthCheckKind.HealthCheckParticipant);
             Assert.Equal(1, status.Score);
-            Assert.Equal(Start, participantEvent.Timestamp);
+            Assert.Equal(_startTimestamp, participantEvent.Timestamp);
             Assert.Contains("persistently unhealthy", participantEvent.Complaint, StringComparison.Ordinal);
         }
 
@@ -388,8 +389,8 @@ namespace NonSilo.Tests.Membership
             _timeProvider.Advance(TimeSpan.FromSeconds(2));
 
             var status = monitor.GetLocalHealthStatus(
-                Start.AddSeconds(1),
-                Start.AddSeconds(2),
+                TimestampAt(TimeSpan.FromSeconds(1)),
+                TimestampAt(TimeSpan.FromSeconds(2)),
                 LocalSiloHealthCheckCategory.Local);
 
             Assert.DoesNotContain(
@@ -414,9 +415,9 @@ namespace NonSilo.Tests.Membership
             var refreshed = monitor.GetLocalHealthStatus(TimeSpan.FromMinutes(1), LocalSiloHealthCheckCategory.Local);
             Assert.Equal(2, participant.CallCount);
 
-            Assert.Equal(Start, Assert.Single(first.Events, IsParticipantEvent).Timestamp);
-            Assert.Equal(Start, Assert.Single(cached.Events, IsParticipantEvent).Timestamp);
-            Assert.Equal(Start.AddSeconds(1), Assert.Single(refreshed.Events, IsParticipantEvent).Timestamp);
+            Assert.Equal(_startTimestamp, Assert.Single(first.Events, IsParticipantEvent).Timestamp);
+            Assert.Equal(_startTimestamp, Assert.Single(cached.Events, IsParticipantEvent).Timestamp);
+            Assert.Equal(TimestampAt(TimeSpan.FromSeconds(1)), Assert.Single(refreshed.Events, IsParticipantEvent).Timestamp);
 
             static bool IsParticipantEvent(LocalSiloHealthEvent item)
                 => item.Kind == LocalSiloHealthCheckKind.HealthCheckParticipant;
@@ -506,7 +507,7 @@ namespace NonSilo.Tests.Membership
                     expectedEvents,
                     result.Events.Select(item => (item.Timestamp, item.Kind, item.Category, item.Source, item.Score, item.Complaint, item.Duration)));
                 var participantEvent = Assert.Single(result.Events, item => item.Kind == LocalSiloHealthCheckKind.HealthCheckParticipant);
-                Assert.Equal(Start, participantEvent.Timestamp);
+                Assert.Equal(_startTimestamp, participantEvent.Timestamp);
                 Assert.Equal(0, participantEvent.Score);
                 Assert.Null(participantEvent.Complaint);
             });
@@ -563,7 +564,7 @@ namespace NonSilo.Tests.Membership
                 status.Events,
                 item => item.Kind == LocalSiloHealthCheckKind.ThreadPoolQueueDelay);
 
-            Assert.Equal(Start, threadPoolEvent.Timestamp);
+            Assert.Equal(_startTimestamp, threadPoolEvent.Timestamp);
             Assert.Equal(LocalSiloHealthCheckCategory.Local, threadPoolEvent.Category);
             Assert.Null(threadPoolEvent.Source);
             Assert.True(threadPoolEvent.Score >= 0);
@@ -613,6 +614,9 @@ namespace NonSilo.Tests.Membership
                 NullLoggerFactory.Instance,
                 _timeProvider);
         }
+
+        private long TimestampAt(TimeSpan elapsed)
+            => _startTimestamp + (long)(elapsed.TotalSeconds * _timeProvider.TimestampFrequency);
 
         private static void UpdateMaximum(ref int maximum, int candidate)
         {

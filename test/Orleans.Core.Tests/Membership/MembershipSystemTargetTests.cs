@@ -26,6 +26,7 @@ namespace NonSilo.Tests.Membership
             var targetSilo = SiloAddress.FromParsableString("127.0.0.1:200@100");
             var healthStatus = CreateDistinctStallStatus();
             using var rig = CreateTestRig(healthStatus);
+            var startTimestamp = rig.TimeProvider.GetTimestamp();
 
             var responseTask = rig.Target.ProbeIndirectly(targetSilo, probeTimeout, ProbeNumber);
             await rig.PingEntered.Task;
@@ -42,8 +43,8 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(elapsed, response.ProbeResponseTime);
             Assert.Null(response.FailureMessage);
             rig.LocalHealthMonitor.Received(1).GetLocalHealthStatus(
-                Start,
-                Start + elapsed,
+                startTimestamp,
+                rig.TimeProvider.GetTimestamp(),
                 LocalSiloHealthCheckCategory.Local);
             rig.GrainFactory.Received(1).GetSystemTarget<IMembershipService>(
                 Constants.MembershipServiceType,
@@ -60,6 +61,7 @@ namespace NonSilo.Tests.Membership
             var targetSilo = SiloAddress.FromParsableString("127.0.0.1:300@100");
             var healthStatus = CreateDistinctStallStatus();
             using var rig = CreateTestRig(healthStatus);
+            var startTimestamp = rig.TimeProvider.GetTimestamp();
 
             try
             {
@@ -78,8 +80,8 @@ namespace NonSilo.Tests.Membership
                 Assert.Equal(probeTimeout, response.ProbeResponseTime);
                 Assert.Contains(nameof(TimeoutException), response.FailureMessage, StringComparison.Ordinal);
                 rig.LocalHealthMonitor.Received(1).GetLocalHealthStatus(
-                    Start,
-                    Start + probeTimeout,
+                    startTimestamp,
+                    rig.TimeProvider.GetTimestamp(),
                     LocalSiloHealthCheckCategory.Local);
                 rig.GrainFactory.Received(1).GetSystemTarget<IMembershipService>(
                     Constants.MembershipServiceType,
@@ -97,7 +99,7 @@ namespace NonSilo.Tests.Membership
             Events:
             [
                 new(
-                    Start,
+                    0,
                     LocalSiloHealthCheckKind.GarbageCollectionPause,
                     LocalSiloHealthCheckCategory.Local,
                     Source: null,
@@ -105,7 +107,7 @@ namespace NonSilo.Tests.Membership
                     Complaint: "gc pause",
                     Duration: TimeSpan.FromSeconds(1)),
                 new(
-                    Start,
+                    0,
                     LocalSiloHealthCheckKind.RuntimeStall,
                     LocalSiloHealthCheckCategory.Local,
                     Source: null,
@@ -113,7 +115,7 @@ namespace NonSilo.Tests.Membership
                     Complaint: "runtime stall",
                     Duration: TimeSpan.FromSeconds(2)),
                 new(
-                    Start,
+                    0,
                     LocalSiloHealthCheckKind.ComponentHealthCheckStall,
                     LocalSiloHealthCheckCategory.Local,
                     Source: null,
@@ -203,5 +205,6 @@ namespace NonSilo.Tests.Membership
         {
             public void Dispose() => ServiceProvider.Dispose();
         }
+
     }
 }
