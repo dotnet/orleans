@@ -18,6 +18,7 @@ namespace Orleans.Providers.Streams.Common
         private readonly IRecoverableStreamDataAdapter<TQueueMessage> _dataAdapter;
         private readonly IEvictionStrategy _evictionStrategy;
         private readonly IQueueFlowController? _flowController;
+        private readonly int? _maxCacheSize;
         private readonly PooledQueueCache _cache;
         private FixedSizeBuffer? _currentBuffer;
 
@@ -33,7 +34,8 @@ namespace Orleans.Providers.Streams.Common
             IQueueFlowController? flowController = null,
             ICacheMonitor? cacheMonitor = null,
             TimeSpan? cacheMonitorWriteInterval = null,
-            TimeSpan? metadataMinTimeInCache = null)
+            TimeSpan? metadataMinTimeInCache = null,
+            int? maxCacheSize = null)
         {
             if (defaultMaxAddCount <= 0)
             {
@@ -45,6 +47,12 @@ namespace Orleans.Providers.Streams.Common
             _dataAdapter = dataAdapter ?? throw new ArgumentNullException(nameof(dataAdapter));
             _evictionStrategy = evictionStrategy ?? throw new ArgumentNullException(nameof(evictionStrategy));
             _flowController = flowController;
+            if (maxCacheSize <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(maxCacheSize));
+            }
+
+            _maxCacheSize = maxCacheSize;
             _cache = new PooledQueueCache(
                 dataAdapter,
                 logger ?? throw new ArgumentNullException(nameof(logger)),
@@ -59,6 +67,30 @@ namespace Orleans.Providers.Streams.Common
         /// Gets the most recently purged provider offset.
         /// </summary>
         public string? LastPurgedOffset { get; private set; }
+
+        /// <summary>
+        /// Gets the number of records currently held in the cache.
+        /// </summary>
+        public int ItemCount => _cache.ItemCount;
+
+        /// <summary>
+        /// Tries to get the newest cached provider position.
+        /// </summary>
+        public bool TryGetNewestPosition(
+            [NotNullWhen(true)] out StreamSequenceToken? token,
+            [NotNullWhen(true)] out string? offset)
+        {
+            if (_cache.Newest is not { } newest)
+            {
+                token = null;
+                offset = null;
+                return false;
+            }
+
+            token = _dataAdapter.GetSequenceToken(ref newest);
+            offset = _dataAdapter.GetOffset(ref newest);
+            return true;
+        }
 
         /// <summary>
         /// Packs and adds ordered source records to the cache.
@@ -83,9 +115,20 @@ namespace Orleans.Providers.Streams.Common
 
         /// <inheritdoc />
         public int GetMaxAddCount()
-            => _flowController is null
-                ? _defaultMaxAddCount
-                : Math.Min(_defaultMaxAddCount, _flowController.GetMaxAddCount());
+        {
+            var result = _defaultMaxAddCount;
+            if (_maxCacheSize is { } maxCacheSize)
+            {
+                result = Math.Min(result, Math.Max(0, maxCacheSize - _cache.ItemCount));
+            }
+
+            if (_flowController is not null)
+            {
+                result = Math.Min(result, _flowController.GetMaxAddCount());
+            }
+
+            return result;
+        }
 
         /// <inheritdoc />
         public void AddToCache(IList<IBatchContainer> messages)
@@ -115,6 +158,27 @@ namespace Orleans.Providers.Streams.Common
         /// <inheritdoc />
         public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
         {
+            if (earliestSubscriptionToken is null)
+            {
+                return;
+            }
+
+            CachedMessage? lastPurged = null;
+            var itemsPurged = 0;
+            while (_cache.Oldest is { } oldest
+                && _dataAdapter.Compare(ref oldest, earliestSubscriptionToken) <= 0)
+            {
+                LastPurgedOffset = _dataAdapter.GetOffset(ref oldest);
+                lastPurged = oldest;
+                itemsPurged++;
+                _cache.RemoveOldestMessage();
+            }
+
+            _evictionStrategy.OnPurgeCompleted(lastPurged, itemsPurged);
+            if (_cache.IsEmpty)
+            {
+                _currentBuffer = null;
+            }
         }
 
         /// <inheritdoc />
@@ -142,7 +206,8 @@ namespace Orleans.Providers.Streams.Common
             if (!buffer.TryGetSegment(size, out segment))
             {
                 buffer.Dispose();
-                throw new ArgumentOutOfRangeException(nameof(size), $"Message size is too big. MessageSize: {size}");
+                buffer = new FixedSizeBuffer(size);
+                _ = buffer.TryGetSegment(size, out segment);
             }
 
             _currentBuffer = buffer;
