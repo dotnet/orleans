@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -109,6 +112,7 @@ namespace Orleans.Providers.Streams.AzureQueue
     [Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
     public class AzureQueueJsonDataAdapter : IQueueDataAdapter<string, IBatchContainer>
     {
+        private const int CompactEnvelopeVersion = 1;
         private readonly AzureQueueJsonDataAdapterOptions _options;
         private readonly ILogger<AzureQueueJsonDataAdapter> _logger;
         private readonly OrleansJsonSerializer _jsonSerializer;
@@ -143,7 +147,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             try
             {
                 return _options.PreferJson
-                    ? SerializeJson()
+                    ? SerializeJson(streamId, eventList, requestContext)
                     : _fallbackAdapter.ToQueueMessage(streamId, eventList, token, requestContext);
             }
             catch (Exception ex) when (_options.EnableFallback)
@@ -155,13 +159,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 }
 
                 _logger.LogDebug(ex, "Binary serialization failed for stream {StreamId}, falling back to JSON serialization", streamId);
-                return SerializeJson();
-            }
-
-            string SerializeJson()
-            {
-                var batchMessage = new AzureQueueBatchContainerV2(streamId, eventList.Cast<object>().ToList(), requestContext);
-                return _jsonSerializer.Serialize(batchMessage, typeof(AzureQueueBatchContainerV2));
+                return SerializeJson(streamId, eventList, requestContext);
             }
         }
 
@@ -206,6 +204,12 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         private AzureQueueBatchContainerV2 DeserializeJson(string cloudMsg, long sequenceId)
         {
+            if (TryDeserializeCompactJson(cloudMsg, out var compactBatch))
+            {
+                compactBatch.RealSequenceToken = new EventSequenceTokenV2(sequenceId);
+                return compactBatch;
+            }
+
             if (_jsonSerializer.Deserialize(typeof(AzureQueueBatchContainerV2), cloudMsg) is not AzureQueueBatchContainerV2 azureQueueBatch)
             {
                 throw new InvalidDataException("The queue message did not contain an Azure Queue batch.");
@@ -213,6 +217,125 @@ namespace Orleans.Providers.Streams.AzureQueue
 
             azureQueueBatch.RealSequenceToken = new EventSequenceTokenV2(sequenceId);
             return azureQueueBatch;
+        }
+
+        private string SerializeJson<T>(StreamId streamId, List<T> events, Dictionary<string, object>? requestContext)
+        {
+            var streamNamespace = streamId.GetNamespace();
+            if (!Guid.TryParseExact(streamId.GetKeyAsString(), "N", out var streamKey))
+            {
+                throw new InvalidDataException("The compact JSON envelope only supports GUID-keyed streams.");
+            }
+
+            var serializedEvents = _jsonSerializer.Serialize(events.Cast<object>().ToList(), typeof(List<object>));
+            var serializedRequestContext = _jsonSerializer.Serialize(
+                requestContext ?? new Dictionary<string, object>(),
+                typeof(Dictionary<string, object>));
+            using var eventsDocument = JsonDocument.Parse(serializedEvents);
+            using var requestContextDocument = JsonDocument.Parse(serializedRequestContext);
+            using var textWriter = new StringWriter(CultureInfo.InvariantCulture);
+            using var jsonWriter = new JsonTextWriter(textWriter) { Formatting = Formatting.None };
+            jsonWriter.WriteStartObject();
+            jsonWriter.WritePropertyName("version");
+            jsonWriter.WriteValue(CompactEnvelopeVersion);
+            jsonWriter.WritePropertyName("stream");
+            jsonWriter.WriteStartObject();
+            jsonWriter.WritePropertyName("namespace");
+            jsonWriter.WriteValue(streamNamespace);
+            jsonWriter.WritePropertyName("key");
+            jsonWriter.WriteValue(streamKey.ToString("D", CultureInfo.InvariantCulture));
+            jsonWriter.WriteEndObject();
+            jsonWriter.WritePropertyName("events");
+            WriteCollectionValues(jsonWriter, eventsDocument.RootElement);
+            jsonWriter.WritePropertyName("requestContext");
+            jsonWriter.WriteStartObject();
+            foreach (var property in requestContextDocument.RootElement.EnumerateObject())
+            {
+                if (property.Name is not "$id" and not "$type")
+                {
+                    jsonWriter.WritePropertyName(property.Name);
+                    jsonWriter.WriteRawValue(property.Value.GetRawText());
+                }
+            }
+
+            jsonWriter.WriteEndObject();
+            jsonWriter.WriteEndObject();
+            jsonWriter.Flush();
+            return textWriter.ToString();
+        }
+
+        private bool TryDeserializeCompactJson(string cloudMsg, out AzureQueueBatchContainerV2 batch)
+        {
+            using var document = JsonDocument.Parse(cloudMsg);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("version", out var versionElement))
+            {
+                batch = null!;
+                return false;
+            }
+
+            if (versionElement.ValueKind != JsonValueKind.Number
+                || !versionElement.TryGetInt32(out var version)
+                || version != CompactEnvelopeVersion)
+            {
+                throw new InvalidDataException($"Unsupported Azure Queue JSON envelope version: {versionElement.GetRawText()}.");
+            }
+
+            var streamElement = GetRequiredProperty(root, "stream", JsonValueKind.Object);
+            if (!streamElement.TryGetProperty("namespace", out var namespaceElement)
+                || namespaceElement.ValueKind is not JsonValueKind.String and not JsonValueKind.Null)
+            {
+                throw new InvalidDataException("The Azure Queue JSON envelope property 'namespace' must be a String or Null.");
+            }
+
+            var keyElement = GetRequiredProperty(streamElement, "key", JsonValueKind.String);
+            var eventsElement = GetRequiredProperty(root, "events", JsonValueKind.Array);
+            var requestContextElement = GetRequiredProperty(root, "requestContext", JsonValueKind.Object);
+            var streamNamespace = namespaceElement.ValueKind == JsonValueKind.Null ? null : namespaceElement.GetString();
+            var streamKeyText = keyElement.GetString();
+            if (!Guid.TryParseExact(streamKeyText, "D", out var streamKey))
+            {
+                throw new InvalidDataException("The Azure Queue JSON envelope stream key is not a GUID in D format.");
+            }
+
+            var events = _jsonSerializer.Deserialize(typeof(List<object>), eventsElement.GetRawText()) as List<object>
+                ?? throw new InvalidDataException("The Azure Queue JSON envelope events could not be deserialized.");
+            var requestContext = _jsonSerializer.Deserialize(
+                typeof(Dictionary<string, object>),
+                requestContextElement.GetRawText()) as Dictionary<string, object>
+                ?? throw new InvalidDataException("The Azure Queue JSON envelope request context could not be deserialized.");
+
+            batch = new AzureQueueBatchContainerV2(StreamId.Create(streamNamespace, streamKey), events, requestContext);
+            return true;
+        }
+
+        private static void WriteCollectionValues(JsonTextWriter writer, JsonElement serializedCollection)
+        {
+            var values = serializedCollection.ValueKind switch
+            {
+                JsonValueKind.Array => serializedCollection,
+                JsonValueKind.Object when serializedCollection.TryGetProperty("$values", out var result)
+                    && result.ValueKind == JsonValueKind.Array => result,
+                _ => throw new InvalidDataException("The serialized event collection is not a JSON array.")
+            };
+
+            writer.WriteStartArray();
+            foreach (var item in values.EnumerateArray())
+            {
+                writer.WriteRawValue(item.GetRawText());
+            }
+
+            writer.WriteEndArray();
+        }
+
+        private static JsonElement GetRequiredProperty(JsonElement parent, string name, JsonValueKind valueKind)
+        {
+            if (!parent.TryGetProperty(name, out var result) || result.ValueKind != valueKind)
+            {
+                throw new InvalidDataException($"The Azure Queue JSON envelope property '{name}' must be a {valueKind}.");
+            }
+
+            return result;
         }
     }
 }

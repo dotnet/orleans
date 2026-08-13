@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
@@ -22,7 +23,11 @@ namespace Tester.AzureUtils.Streaming
     [TestCategory("AzureStorage"), TestCategory("Streaming")]
     public class AzureQueueJsonDataAdapterTests
     {
-        private const string Orleans3JsonMessage =
+        private const string CompactOrleans3JsonMessage =
+            "{\"version\":1,\"stream\":{\"namespace\":\"test-namespace\",\"key\":\"00112233-4455-6677-8899-aabbccddeeff\"}," +
+            "\"events\":[\"test-event\"],\"requestContext\":{\"key\":\"value\"}}";
+
+        private const string LegacyDirectContainerJsonMessage =
             "{\"$id\":\"1\",\"$type\":\"Orleans.Providers.Streams.AzureQueue.AzureQueueBatchContainerV2, Orleans.Streaming.AzureStorage\"," +
             "\"events\":{\"$type\":\"System.Collections.Generic.List`1[[System.Object, System.Private.CoreLib]], System.Private.CoreLib\"," +
             "\"$values\":[\"test-event\"]},\"requestContext\":{\"$id\":\"2\"," +
@@ -78,15 +83,34 @@ namespace Tester.AzureUtils.Streaming
                 StreamId.Create("ns", Guid.NewGuid()),
                 [data],
                 token,
-                new Dictionary<string, object>());
+                new Dictionary<string, object> { ["context"] = data });
 
             this.output.WriteLine("Serialized message: {0}", msg);
             Assert.True(IsValidJson(msg), "Message should be valid JSON");
+            var envelope = JObject.Parse(msg);
+            Assert.Equal(
+                ["version", "stream", "events", "requestContext"],
+                envelope.Properties().Select(property => property.Name));
+            Assert.NotNull(envelope["events"]![0]!["$type"]);
+            Assert.NotNull(envelope["requestContext"]!["context"]!["$type"]);
+            Assert.DoesNotContain("AzureQueueBatchContainerV2", msg);
+            Assert.DoesNotContain("System.Collections.Generic.List", msg);
+            Assert.DoesNotContain("System.Collections.Generic.Dictionary", msg);
+            Assert.DoesNotContain(nameof(StreamId), msg);
 
             var batchContainer = queueDataAdapter.FromQueueMessage(msg, token.SequenceNumber);
             var deserializedMsg = batchContainer.GetEvents<EventData>().FirstOrDefault();
             Assert.NotNull(deserializedMsg);
             Assert.Equal(data, deserializedMsg.Item1);
+            try
+            {
+                Assert.True(batchContainer.ImportRequestContext());
+                Assert.Equal(data, Assert.IsType<EventData>(RequestContext.Get("context")));
+            }
+            finally
+            {
+                RequestContext.Clear();
+            }
         }
 
         [Fact, TestCategory("BVT")]
@@ -158,15 +182,107 @@ namespace Tester.AzureUtils.Streaming
         }
 
         [Fact, TestCategory("BVT")]
-        public void JsonAdapter_DeserializesOrleans3JsonMessage()
+        public void JsonAdapter_DeserializesCompactOrleans3JsonMessage()
         {
             var jsonAdapter = InitializeQueueJsonDataAdapter();
 
-            var batchContainer = jsonAdapter.FromQueueMessage(Orleans3JsonMessage, sequenceId: 43);
+            var batchContainer = jsonAdapter.FromQueueMessage(CompactOrleans3JsonMessage, sequenceId: 43);
             var deserializedEvent = Assert.Single(batchContainer.GetEvents<string>());
 
             Assert.Equal("test-event", deserializedEvent.Item1);
             Assert.Equal(new EventSequenceTokenV2(43), deserializedEvent.Item2);
+            Assert.Equal(
+                StreamId.Create("test-namespace", Guid.Parse("00112233-4455-6677-8899-aabbccddeeff")),
+                batchContainer.StreamId);
+        }
+
+        [Fact, TestCategory("BVT")]
+        public void JsonAdapter_ProducesCompactVersion1Message()
+        {
+            var jsonAdapter = InitializeQueueJsonDataAdapter();
+
+            var message = jsonAdapter.ToQueueMessage(
+                StreamId.Create("test-namespace", Guid.Parse("00112233-4455-6677-8899-aabbccddeeff")),
+                ["test-event"],
+                token: null,
+                new Dictionary<string, object> { ["key"] = "value" });
+
+            Assert.Equal(CompactOrleans3JsonMessage, message);
+            Assert.DoesNotContain("$type", message);
+            Assert.DoesNotContain("$id", message);
+            Assert.DoesNotContain("StreamId", message);
+        }
+
+        [Fact, TestCategory("BVT")]
+        public void JsonAdapter_RoundTripsNamespaceLessGuidStream()
+        {
+            var jsonAdapter = InitializeQueueJsonDataAdapter();
+            var streamId = StreamId.Create(null, Guid.Parse("00112233-4455-6677-8899-aabbccddeeff"));
+
+            var message = jsonAdapter.ToQueueMessage(streamId, ["test-event"], token: null, requestContext: null);
+            var batchContainer = jsonAdapter.FromQueueMessage(message, sequenceId: 45);
+
+            Assert.Contains("\"namespace\":null", message);
+            Assert.Equal(streamId, batchContainer.StreamId);
+        }
+
+        [Fact, TestCategory("BVT")]
+        public void JsonAdapter_RoundTripsSharedReferencesWithinCollections()
+        {
+            var jsonAdapter = InitializeQueueJsonDataAdapter();
+            var sharedEvent = new EventData { Id = 123, Name = "shared" };
+            var sharedContext = new EventData { Id = 456, Name = "context" };
+
+            var message = jsonAdapter.ToQueueMessage(
+                StreamId.Create("shared", Guid.NewGuid()),
+                [sharedEvent, sharedEvent],
+                token: null,
+                new Dictionary<string, object>
+                {
+                    ["first"] = sharedContext,
+                    ["second"] = sharedContext
+                });
+            var batchContainer = jsonAdapter.FromQueueMessage(message, sequenceId: 46);
+            var deserializedEvents = batchContainer.GetEvents<EventData>().Select(item => item.Item1).ToList();
+
+            Assert.Same(deserializedEvents[0], deserializedEvents[1]);
+            try
+            {
+                Assert.True(batchContainer.ImportRequestContext());
+                Assert.Same(RequestContext.Get("first"), RequestContext.Get("second"));
+            }
+            finally
+            {
+                RequestContext.Clear();
+            }
+        }
+
+        [Fact, TestCategory("BVT")]
+        public void JsonAdapter_SerializesNullRequestContextAsEmptyObject()
+        {
+            var jsonAdapter = InitializeQueueJsonDataAdapter();
+
+            var message = jsonAdapter.ToQueueMessage(
+                StreamId.Create("context", Guid.NewGuid()),
+                ["test-event"],
+                token: null,
+                requestContext: null);
+            var batchContainer = jsonAdapter.FromQueueMessage(message, sequenceId: 47);
+
+            Assert.EndsWith("\"requestContext\":{}}", message);
+            Assert.True(batchContainer.ImportRequestContext());
+        }
+
+        [Fact, TestCategory("BVT")]
+        public void JsonAdapter_DeserializesLegacyDirectContainerJsonMessage()
+        {
+            var jsonAdapter = InitializeQueueJsonDataAdapter();
+
+            var batchContainer = jsonAdapter.FromQueueMessage(LegacyDirectContainerJsonMessage, sequenceId: 44);
+            var deserializedEvent = Assert.Single(batchContainer.GetEvents<string>());
+
+            Assert.Equal("test-event", deserializedEvent.Item1);
+            Assert.Equal(new EventSequenceTokenV2(44), deserializedEvent.Item2);
             Assert.Equal(
                 StreamId.Create("test-namespace", Guid.Parse("00112233-4455-6677-8899-aabbccddeeff")),
                 batchContainer.StreamId);
