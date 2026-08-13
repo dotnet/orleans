@@ -33,7 +33,8 @@ public readonly struct EnvironmentStatistics
     /// The system CPU usage.
     /// <br/>
     /// Applies Kalman filtering to smooth out short-term fluctuations.
-    /// See <see href="https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/"/>.
+    /// See <see href="https://en.wikipedia.org/wiki/Kalman_filter"/>;
+    /// <see href="https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/"/>
     /// </summary>
     /// <remarks>Ranges from 0.0-100.0.</remarks>
     [Id(0)]
@@ -43,7 +44,8 @@ public readonly struct EnvironmentStatistics
     /// The amount of managed memory currently consumed by the process.
     /// <br/>
     /// Applies Kalman filtering to smooth out short-term fluctuations.
-    /// See <see href="https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/"/>.
+    /// See <see href="https://en.wikipedia.org/wiki/Kalman_filter"/>;
+    /// <see href="https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/"/>
     /// </summary>
     /// <remarks>
     /// Includes fragmented memory, which is the unused memory between objects on the managed heaps.
@@ -55,7 +57,8 @@ public readonly struct EnvironmentStatistics
     /// The amount of memory currently available for allocations to the process.
     /// <br/>
     /// Applies Kalman filtering to smooth out short-term fluctuations.
-    /// See <see href="https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/"/>.
+    /// See <see href="https://en.wikipedia.org/wiki/Kalman_filter"/>;
+    /// <see href="https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/"/>
     /// </summary>
     /// <remarks>
     /// Includes the currently available memory of the process and the system.

@@ -15,7 +15,7 @@ namespace Orleans.Runtime
     /// but this value is configurable via <c>Orleans.Runtime.ActivationCountBasedPlacementOptions</c>.
     /// <br/>
     /// This algorithm is based on the thesis The Power of Two Choices in Randomized Load Balancing by Michael David Mitzenmacher <see href="https://www.eecs.harvard.edu/~michaelm/postscripts/mythesis.pdf"/>,
-    /// and is also used by NGINX's Random with Two Choices load-balancing method <see href="https://docs.nginx.com/nginx/admin-guide/load-balancer/http-load-balancer/"/>.
+    /// and is also used in NGINX for distributed load balancing, as described in the article NGINX and the "Power of Two Choices" Load-Balancing Algorithm <see href="https://www.f5.com/company/blog/nginx/nginx-power-of-two-choices-load-balancing-algorithm"/>.
     /// <br/>
     /// This placement strategy is configured by adding the <see cref="Orleans.Placement.ActivationCountBasedPlacementAttribute"/> attribute to a grain.
     /// </remarks>
