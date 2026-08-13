@@ -374,19 +374,22 @@ namespace Orleans.Runtime.Placement
         }
 
         /// <summary>
-        /// Places a grain without considering the grain's existing location, if any.
+        /// Places a migrating grain on a silo other than its current host.
         /// </summary>
         /// <param name="grainId">The grain id of the grain being placed.</param>
         /// <param name="requestContextData">The request context, which will be available to the placement strategy.</param>
         /// <param name="placementStrategy">The placement strategy to use.</param>
         /// <returns>A location for the new activation.</returns>
-        public async Task<SiloAddress> PlaceGrainAsync(GrainId grainId, Dictionary<string, object>? requestContextData, PlacementStrategy placementStrategy)
+        public async Task<SiloAddress> PlaceMigratingGrainAsync(
+            GrainId grainId,
+            Dictionary<string, object>? requestContextData,
+            PlacementStrategy placementStrategy)
         {
             using var _ = TryRestoreActivityContext(requestContextData, ActivityNames.PlaceGrain);
             var target = new PlacementTarget(grainId, requestContextData!, default, 0);
             ThrowIfStopping();
             var director = _directorResolver.GetPlacementDirector(placementStrategy);
-            return await director.OnAddActivation(placementStrategy, target, this);
+            return await director.OnAddActivation(placementStrategy, target, new MigrationPlacementContext(this));
         }
 
         private void ThrowIfStopping()
@@ -398,6 +401,21 @@ namespace Orleans.Runtime.Placement
         }
 
         private SiloUnavailableException CreateStoppingException() => new($"Silo '{LocalSilo}' is shutting down.");
+
+        private sealed class MigrationPlacementContext(PlacementService placementService) : IPlacementContext
+        {
+            public SiloAddress LocalSilo => placementService.LocalSilo;
+
+            public SiloStatus LocalSiloStatus => placementService.LocalSiloStatus;
+
+            public SiloAddress[] GetCompatibleSilos(PlacementTarget target) =>
+                placementService.GetCompatibleSilos(target).Where(silo => !silo.Equals(LocalSilo)).ToArray();
+
+            public IReadOnlyDictionary<ushort, SiloAddress[]> GetCompatibleSilosWithVersions(PlacementTarget target) =>
+                placementService.GetCompatibleSilosWithVersions(target).ToDictionary(
+                    pair => pair.Key,
+                    pair => pair.Value.Where(silo => !silo.Equals(LocalSilo)).ToArray());
+        }
 
         private class PlacementWorker
         {

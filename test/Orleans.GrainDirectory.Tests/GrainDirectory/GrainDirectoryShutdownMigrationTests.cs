@@ -18,6 +18,43 @@ namespace UnitTests.GrainDirectory;
 public sealed class GrainDirectoryShutdownMigrationTests
 {
     [Fact]
+    public async Task PreferLocalGrain_MigrationExcludesCurrentSilo()
+    {
+        var builder = new InProcessTestClusterBuilder(2);
+#pragma warning disable ORLEANSEXP003
+        builder.ConfigureSilo((_, siloBuilder) => siloBuilder.AddDistributedGrainDirectory());
+#pragma warning restore ORLEANSEXP003
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync();
+        await cluster.WaitForLivenessToStabilizeAsync();
+        await cluster.WaitForClusterManifestToStabilizeAsync();
+        await WaitForDirectoryMembershipAsync(cluster);
+
+        var sourceSilo = cluster.Silos[0];
+        var targetSilo = cluster.Silos[1];
+        var grain = cluster.Client.GetGrain<IShutdownMigrationGrain>(Guid.NewGuid());
+
+        RequestContext.Set(IPlacementDirector.PlacementHintKey, sourceSilo.SiloAddress);
+        try
+        {
+            await grain.SetState(42, waitForDirectoryHandoff: false);
+            Assert.Equal(sourceSilo.SiloAddress, await grain.GetLocation());
+        }
+        finally
+        {
+            RequestContext.Remove(IPlacementDirector.PlacementHintKey);
+        }
+
+        var deactivated = cluster.WaitForDeactivationAsync(grain);
+        await grain.Migrate();
+        await deactivated.WaitAsync(TimeSpan.FromSeconds(30));
+
+        Assert.Equal(targetSilo.SiloAddress, await grain.GetLocation());
+        Assert.Equal(42, await grain.GetState());
+    }
+
+    [Fact]
     public async Task PreferLocalGrain_MigratesWhenHostingSiloShutsDown()
     {
         var builder = new InProcessTestClusterBuilder(2);
@@ -135,6 +172,8 @@ public interface IShutdownMigrationGrain : IGrainWithGuidKey
 
     ValueTask<SiloStatus> GetPreviousSiloStatus();
 
+    ValueTask Migrate();
+
     ValueTask SetState(int value, bool waitForDirectoryHandoff);
 }
 
@@ -159,6 +198,12 @@ public sealed class ShutdownMigrationGrain : Grain, IShutdownMigrationGrain, IGr
     public ValueTask<DeactivationReasonCode> GetPreviousDeactivationReason() => new(_previousDeactivationReason);
 
     public ValueTask<SiloStatus> GetPreviousSiloStatus() => new(_previousSiloStatus);
+
+    public ValueTask Migrate()
+    {
+        this.MigrateOnIdle();
+        return default;
+    }
 
     public ValueTask SetState(int value, bool waitForDirectoryHandoff)
     {
