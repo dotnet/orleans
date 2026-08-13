@@ -1481,7 +1481,7 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
-        public async Task MembershipTableManager_RefreshFromSourceStartsNewReadWhileRefreshInFlight()
+        public async Task MembershipTableManager_RequireFreshStartsNewReadWhileRefreshInFlight()
         {
             var membershipTable = new InMemoryMembershipTable();
             var manager = CreateMembershipTableManager(membershipTable);
@@ -1502,7 +1502,10 @@ namespace NonSilo.Tests.Membership
 
             var inFlightRefresh = Task.Run(() => manager.Refresh());
             await firstReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(30));
-            var causalRefresh = ((IMembershipManager)manager).RefreshFromSource(CancellationToken.None);
+            var causalRefresh = ((IMembershipManager)manager).Refresh(
+                targetVersion: null,
+                cancellationToken: CancellationToken.None,
+                requireFresh: true);
 
             try
             {
@@ -1514,7 +1517,6 @@ namespace NonSilo.Tests.Membership
                 releaseFirstRead.Set();
                 await inFlightRefresh;
             }
-            Assert.Equal(2, readCount);
             Assert.Equal(2, readCount);
         }
 

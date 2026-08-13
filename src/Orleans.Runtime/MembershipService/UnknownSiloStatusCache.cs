@@ -56,7 +56,10 @@ internal sealed partial class UnknownSiloStatusCache
 
         try
         {
-            await _membershipManager.RefreshFromSource(CancellationToken.None);
+            await _membershipManager.Refresh(
+                targetVersion: null,
+                cancellationToken: CancellationToken.None,
+                requireFresh: true);
 
             var refreshedSnapshot = _membershipManager.CurrentSnapshot;
             foreach (var siloAddress in unknownSilos)
