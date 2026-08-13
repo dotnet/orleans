@@ -6,7 +6,9 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -232,10 +234,25 @@ namespace Orleans.Providers.Streams.AzureQueue
             var serializedRequestContext = _jsonSerializer.Serialize(
                 requestContext ?? new Dictionary<string, object>(),
                 typeof(Dictionary<string, object>));
-            using var eventsDocument = JsonDocument.Parse(serializedEvents);
-            using var requestContextDocument = JsonDocument.Parse(serializedRequestContext);
+            var serializedEventNode = JsonNode.Parse(serializedEvents)
+                ?? throw new InvalidDataException("The serialized event collection is not valid JSON.");
+            var eventValues = serializedEventNode switch
+            {
+                JsonArray array => array,
+                JsonObject obj when obj["$values"] is JsonArray array => array,
+                _ => throw new InvalidDataException("The serialized event collection is not a JSON array.")
+            };
+            RemoveUnreferencedIds(eventValues);
+
+            var requestContextObject = JsonNode.Parse(serializedRequestContext) as JsonObject
+                ?? throw new InvalidDataException("The serialized request context is not a JSON object.");
+            requestContextObject.Remove("$type");
+            RemoveUnreferencedIds(requestContextObject);
+
             var bufferWriter = new ArrayBufferWriter<byte>();
-            using var jsonWriter = new Utf8JsonWriter(bufferWriter);
+            using var jsonWriter = new Utf8JsonWriter(
+                bufferWriter,
+                new JsonWriterOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
             jsonWriter.WriteStartObject();
             jsonWriter.WriteNumber("version", CompactEnvelopeVersion);
             jsonWriter.WriteStartObject("stream");
@@ -251,18 +268,9 @@ namespace Orleans.Providers.Streams.AzureQueue
             jsonWriter.WriteString("key", streamKey.ToString("D", CultureInfo.InvariantCulture));
             jsonWriter.WriteEndObject();
             jsonWriter.WritePropertyName("events");
-            WriteCollectionValues(jsonWriter, eventsDocument.RootElement);
-            jsonWriter.WriteStartObject("requestContext");
-            foreach (var property in requestContextDocument.RootElement.EnumerateObject())
-            {
-                if (property.Name is not "$id" and not "$type")
-                {
-                    jsonWriter.WritePropertyName(property.Name);
-                    property.Value.WriteTo(jsonWriter);
-                }
-            }
-
-            jsonWriter.WriteEndObject();
+            eventValues.WriteTo(jsonWriter);
+            jsonWriter.WritePropertyName("requestContext");
+            requestContextObject.WriteTo(jsonWriter);
             jsonWriter.WriteEndObject();
             jsonWriter.Flush();
             return Encoding.UTF8.GetString(bufferWriter.WrittenSpan);
@@ -313,23 +321,69 @@ namespace Orleans.Providers.Streams.AzureQueue
             return true;
         }
 
-        private static void WriteCollectionValues(Utf8JsonWriter writer, JsonElement serializedCollection)
+        private static void RemoveUnreferencedIds(JsonNode value)
         {
-            var values = serializedCollection.ValueKind switch
-            {
-                JsonValueKind.Array => serializedCollection,
-                JsonValueKind.Object when serializedCollection.TryGetProperty("$values", out var result)
-                    && result.ValueKind == JsonValueKind.Array => result,
-                _ => throw new InvalidDataException("The serialized event collection is not a JSON array.")
-            };
+            var referencedIds = new HashSet<string>(StringComparer.Ordinal);
+            CollectReferences(value);
+            RemoveIds(value);
 
-            writer.WriteStartArray();
-            foreach (var item in values.EnumerateArray())
+            void CollectReferences(JsonNode node)
             {
-                item.WriteTo(writer);
+                if (node is JsonObject obj)
+                {
+                    if (obj["$ref"]?.GetValue<string>() is { } reference)
+                    {
+                        referencedIds.Add(reference);
+                    }
+
+                    foreach (var property in obj)
+                    {
+                        if (property.Value is not null)
+                        {
+                            CollectReferences(property.Value);
+                        }
+                    }
+                }
+                else if (node is JsonArray array)
+                {
+                    foreach (var item in array)
+                    {
+                        if (item is not null)
+                        {
+                            CollectReferences(item);
+                        }
+                    }
+                }
             }
 
-            writer.WriteEndArray();
+            void RemoveIds(JsonNode node)
+            {
+                if (node is JsonObject obj)
+                {
+                    if (obj["$id"]?.GetValue<string>() is { } id && !referencedIds.Contains(id))
+                    {
+                        obj.Remove("$id");
+                    }
+
+                    foreach (var property in obj)
+                    {
+                        if (property.Value is not null)
+                        {
+                            RemoveIds(property.Value);
+                        }
+                    }
+                }
+                else if (node is JsonArray array)
+                {
+                    foreach (var item in array)
+                    {
+                        if (item is not null)
+                        {
+                            RemoveIds(item);
+                        }
+                    }
+                }
+            }
         }
 
         private static JsonElement GetRequiredProperty(JsonElement parent, string name, JsonValueKind valueKind)

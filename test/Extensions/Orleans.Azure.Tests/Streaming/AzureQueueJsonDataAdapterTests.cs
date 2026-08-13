@@ -97,6 +97,7 @@ namespace Tester.AzureUtils.Streaming
             Assert.DoesNotContain("System.Collections.Generic.List", msg);
             Assert.DoesNotContain("System.Collections.Generic.Dictionary", msg);
             Assert.DoesNotContain(nameof(StreamId), msg);
+            Assert.DoesNotContain("\"$id\"", msg);
 
             var batchContainer = queueDataAdapter.FromQueueMessage(msg, token.SequenceNumber);
             var deserializedMsg = batchContainer.GetEvents<EventData>().FirstOrDefault();
@@ -242,6 +243,8 @@ namespace Tester.AzureUtils.Streaming
                     ["first"] = sharedContext,
                     ["second"] = sharedContext
                 });
+            Assert.Contains("\"$id\"", message);
+            Assert.Contains("\"$ref\"", message);
             var batchContainer = jsonAdapter.FromQueueMessage(message, sequenceId: 46);
             var deserializedEvents = batchContainer.GetEvents<EventData>().Select(item => item.Item1).ToList();
 
