@@ -84,7 +84,7 @@ public abstract class AdoNetQueueAdapterFactoryTests(string invariant, TestEnvir
         var streamOptions = new AdoNetStreamOptions
         {
             Invariant = invariant,
-            ConnectionString = _storage.ConnectionString
+            ConnectionString = _storage.ConnectionString,
         };
         var clusterOptions = new ClusterOptions
         {
@@ -104,8 +104,12 @@ public abstract class AdoNetQueueAdapterFactoryTests(string invariant, TestEnvir
         Assert.NotNull(adapter);
         Assert.IsType<AdoNetQueueAdapter>(adapter);
         Assert.Equal(name, adapter.Name);
-        Assert.False(adapter.IsRewindable);
+        Assert.True(adapter.IsRewindable);
         Assert.Equal(StreamProviderDirection.ReadWrite, adapter.Direction);
+        var queueId = factory.GetStreamQueueMapper().GetAllQueues().First();
+        Assert.Same(
+            adapter.CreateReceiver(queueId),
+            factory.GetQueueAdapterCache().CreateQueueCache(queueId));
     }
 
     /// <summary>
@@ -119,7 +123,8 @@ public abstract class AdoNetQueueAdapterFactoryTests(string invariant, TestEnvir
         var streamOptions = new AdoNetStreamOptions
         {
             Invariant = invariant,
-            ConnectionString = _storage.ConnectionString
+            ConnectionString = _storage.ConnectionString,
+            FaultOnDeliveryFailure = true,
         };
         var clusterOptions = new ClusterOptions
         {
@@ -139,11 +144,11 @@ public abstract class AdoNetQueueAdapterFactoryTests(string invariant, TestEnvir
         // assert
         Assert.NotNull(handler);
         Assert.IsType<AdoNetStreamFailureHandler>(handler);
-        Assert.False(handler.ShouldFaultSubsriptionOnError);
+        Assert.True(handler.ShouldFaultSubsriptionOnError);
     }
 
     /// <summary>
-    /// Tests that the <see cref="AdoNetQueueAdapterFactory"/> gets a <see cref="SimpleQueueCache"/> instance.
+    /// Tests that the <see cref="AdoNetQueueAdapterFactory"/> exposes its shared receiver/cache registry.
     /// </summary>
     [Fact]
     public void AdoNetQueueAdapterFactory_GetsQueueAdapterCache()
@@ -171,7 +176,7 @@ public abstract class AdoNetQueueAdapterFactoryTests(string invariant, TestEnvir
 
         // assert
         Assert.NotNull(cache);
-        Assert.IsType<SimpleQueueAdapterCache>(cache);
+        Assert.Same(factory, cache);
     }
 
     /// <summary>

@@ -3,9 +3,20 @@ namespace Orleans.Streaming.AdoNet;
 /// <summary>
 /// Stream queue storage adapter for ADO.NET providers.
 /// </summary>
-internal partial class AdoNetQueueAdapter(string name, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, SimpleQueueCacheOptions cacheOptions, AdoNetStreamQueueMapper mapper, RelationalOrleansQueries queries, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapter> logger, IServiceProvider serviceProvider) : IQueueAdapter
+internal partial class AdoNetQueueAdapter(string name, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, SimpleQueueCacheOptions cacheOptions, AdoNetStreamQueueMapper mapper, RelationalOrleansQueries queries, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapter> logger, IServiceProvider serviceProvider) : IQueueAdapter, IQueueAdapterCache
 {
     private readonly ILogger<AdoNetQueueAdapter> _logger = logger;
+    private readonly QueueAdapterReceiverRegistry<AdoNetQueueAdapterReceiver> _receivers = new(
+        queueId => ReceiverFactory(
+            serviceProvider,
+            [
+                name,
+                mapper.GetAdoNetQueueId(queueId),
+                streamOptions,
+                clusterOptions,
+                cacheOptions,
+                queries,
+            ]));
 
     /// <summary>
     /// Maps to the ProviderId in the database.
@@ -13,9 +24,9 @@ internal partial class AdoNetQueueAdapter(string name, AdoNetStreamOptions strea
     public string Name { get; } = name;
 
     /// <summary>
-    /// The ADO.NET provider is not yet rewindable.
+    /// The retained-log ADO.NET provider supports replay from cached and durable checkpoints.
     /// </summary>
-    public bool IsRewindable => false;
+    public bool IsRewindable => true;
 
     /// <summary>
     /// The ADO.NET provider works both ways.
@@ -23,17 +34,14 @@ internal partial class AdoNetQueueAdapter(string name, AdoNetStreamOptions strea
     public StreamProviderDirection Direction => StreamProviderDirection.ReadWrite;
 
     public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
-    {
-        // map the queue id
-        var adoNetQueueId = mapper.GetAdoNetQueueId(queueId);
+        => _receivers.GetOrCreate(queueId);
 
-        // create the receiver
-        return ReceiverFactory(serviceProvider, [Name, adoNetQueueId, streamOptions, clusterOptions, cacheOptions, queries]);
-    }
+    public IQueueCache CreateQueueCache(QueueId queueId)
+        => _receivers.GetOrCreate(queueId);
 
     public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
     {
-        // the ADO.NET provider is not rewindable so we do not support user supplied tokens
+        // Producer-supplied tokens are not supported. Replay positions are consumer-side tokens.
         if (token is not null)
         {
             throw new ArgumentException($"{nameof(AdoNetQueueAdapter)} does not support a user supplied {nameof(StreamSequenceToken)}.");

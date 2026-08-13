@@ -1,10 +1,12 @@
 namespace Orleans.Streaming.AdoNet;
 
 /// <summary>
-/// A placeholder <see cref="IStreamFailureHandler"/> for the retained-log receiver integration.
+/// Logs subscriber failures without mutating the shared retained log.
 /// </summary>
-internal class AdoNetStreamFailureHandler : IStreamFailureHandler
+internal partial class AdoNetStreamFailureHandler : IStreamFailureHandler
 {
+    private readonly ILogger<AdoNetStreamFailureHandler> _logger;
+
     public AdoNetStreamFailureHandler(
         bool faultOnFailure,
         AdoNetStreamOptions streamOptions,
@@ -14,30 +16,55 @@ internal class AdoNetStreamFailureHandler : IStreamFailureHandler
         ILogger<AdoNetStreamFailureHandler> logger)
     {
         ShouldFaultSubsriptionOnError = faultOnFailure;
+        _logger = logger;
         _ = streamOptions;
         _ = clusterOptions;
         _ = mapper;
         _ = queries;
-        _ = logger;
     }
 
-    /// <summary>
-    /// Gets a value indicating whether the subscription should fault when there is an error.
-    /// </summary>
+    /// <inheritdoc />
     public bool ShouldFaultSubsriptionOnError { get; }
 
-    /// <summary>
-    /// Failure handling is supplied by the shared recoverable stream pipeline.
-    /// </summary>
-    public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, StreamId streamIdentity, StreamSequenceToken? sequenceToken) =>
-        Task.FromException(CreatePipelineUnavailableException());
+    /// <inheritdoc />
+    public Task OnDeliveryFailure(
+        GuidId subscriptionId,
+        string streamProviderName,
+        StreamId streamIdentity,
+        StreamSequenceToken? sequenceToken)
+    {
+        LogDeliveryFailure(_logger, subscriptionId, streamProviderName, streamIdentity, sequenceToken);
+        return Task.CompletedTask;
+    }
 
-    /// <summary>
-    /// Failure handling is supplied by the shared recoverable stream pipeline.
-    /// </summary>
-    public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, StreamId streamIdentity, StreamSequenceToken? sequenceToken) =>
-        Task.FromException(CreatePipelineUnavailableException());
+    /// <inheritdoc />
+    public Task OnSubscriptionFailure(
+        GuidId subscriptionId,
+        string streamProviderName,
+        StreamId streamIdentity,
+        StreamSequenceToken? sequenceToken)
+    {
+        LogSubscriptionFailure(_logger, subscriptionId, streamProviderName, streamIdentity, sequenceToken);
+        return Task.CompletedTask;
+    }
 
-    private static InvalidOperationException CreatePipelineUnavailableException() =>
-        new("The ADO.NET retained-log failure policy requires the shared recoverable stream cache and receiver pipeline.");
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "ADO.NET stream delivery failed for subscription {SubscriptionId} on provider {ProviderName}, stream {StreamId}, at {SequenceToken}. The retained source record was not modified.")]
+    private static partial void LogDeliveryFailure(
+        ILogger logger,
+        GuidId subscriptionId,
+        string providerName,
+        StreamId streamId,
+        StreamSequenceToken? sequenceToken);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "ADO.NET stream subscription {SubscriptionId} failed on provider {ProviderName}, stream {StreamId}, at {SequenceToken}. The retained source record was not modified.")]
+    private static partial void LogSubscriptionFailure(
+        ILogger logger,
+        GuidId subscriptionId,
+        string providerName,
+        StreamId streamId,
+        StreamSequenceToken? sequenceToken);
 }
