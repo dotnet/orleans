@@ -1735,6 +1735,12 @@ namespace Orleans.Streams
         System.Threading.Tasks.Task UnregisterProducer(Runtime.QualifiedStreamId streamId, Runtime.GrainId streamProducer);
     }
 
+    public partial interface IStreamCheckpointStore
+    {
+        System.Threading.Tasks.ValueTask<StreamCheckpointStoreState> Load(System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask<StreamCheckpointStoreState> Update(string checkpoint, string expectedVersion, System.Threading.CancellationToken cancellationToken);
+    }
+
     public partial interface IStreamQueueBalanceListener
     {
         System.Threading.Tasks.Task QueueDistributionChangeNotification();
@@ -2013,6 +2019,15 @@ namespace Orleans.Streams
         public static System.Collections.Generic.IComparer<string> Numeric { get { throw null; } }
     }
 
+    public readonly partial struct StreamCheckpointStoreState
+    {
+        public StreamCheckpointStoreState(string checkpoint, string version) { }
+
+        public string Checkpoint { get { throw null; } }
+
+        public string Version { get { throw null; } }
+    }
+
     [GenerateSerializer]
     public partial class StreamCheckpointerGrainState
     {
@@ -2029,6 +2044,28 @@ namespace Orleans.Streams
         public System.Threading.Tasks.ValueTask<string> Load(System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.ValueTask<string> Update(string offset, string expectedCheckpoint, System.Threading.CancellationToken cancellationToken) { throw null; }
+    }
+
+    public sealed partial class StreamQueueCheckpointer : IStreamQueueCheckpointer<string>
+    {
+        public StreamQueueCheckpointer(IStreamCheckpointStore store, StreamQueueCheckpointerOptions options) { }
+
+        public bool CheckpointExists { get { throw null; } }
+
+        public System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
+        public System.Threading.Tasks.Task<string> Load() { throw null; }
+        public System.Threading.Tasks.Task<string> Load(System.Threading.CancellationToken cancellationToken) { throw null; }
+        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
+        public void Update(string offset, System.DateTime utcNow) { }
+        public void Update(string offset, System.DateTime utcNow, System.Threading.CancellationToken cancellationToken) { }
+    }
+
+    public sealed partial class StreamQueueCheckpointerOptions
+    {
+        public System.Collections.Generic.IComparer<string>? CheckpointComparer { get { throw null; } set { } }
+
+        public System.TimeSpan PersistInterval { get { throw null; } set { } }
     }
 
     [GenerateSerializer]
