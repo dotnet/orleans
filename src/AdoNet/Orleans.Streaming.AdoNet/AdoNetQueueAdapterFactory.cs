@@ -3,7 +3,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace Orleans.Streaming.AdoNet;
 
-internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
+internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory, IQueueAdapterCache
 {
     public AdoNetQueueAdapterFactory(string name, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, SimpleQueueCacheOptions cacheOptions, HashRingStreamQueueMapperOptions hashOptions, ILoggerFactory loggerFactory, IHostApplicationLifetime lifetime, IServiceProvider serviceProvider)
     {
@@ -15,7 +15,6 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
         _serviceProvider = serviceProvider;
 
         _streamQueueMapper = new HashRingBasedStreamQueueMapper(hashOptions, name);
-        _cache = new SimpleQueueAdapterCache(cacheOptions, name, loggerFactory);
         _adoNetQueueMapper = new AdoNetStreamQueueMapper(_streamQueueMapper);
     }
 
@@ -27,10 +26,10 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
     private readonly IServiceProvider _serviceProvider;
 
     private readonly HashRingBasedStreamQueueMapper _streamQueueMapper;
-    private readonly SimpleQueueAdapterCache _cache;
     private readonly AdoNetStreamQueueMapper _adoNetQueueMapper;
 
     private RelationalOrleansQueries? _queries;
+    private AdoNetQueueAdapter? _adapter;
 
     /// <summary>
     /// Unfortunate implementation detail to account for lack of async lifetime.
@@ -74,17 +73,23 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
     {
         var queries = await GetQueriesAsync();
 
-        return AdapterFactory(_serviceProvider, [_name, _streamOptions, _clusterOptions, _cacheOptions, _adoNetQueueMapper, queries]);
+        return _adapter ??= (AdoNetQueueAdapter)AdapterFactory(
+            _serviceProvider,
+            [_name, _streamOptions, _clusterOptions, _cacheOptions, _adoNetQueueMapper, queries]);
     }
 
     public async Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
     {
         var queries = await GetQueriesAsync();
 
-        return HandlerFactory(_serviceProvider, [false, _streamOptions, _clusterOptions, _adoNetQueueMapper, queries]);
+        return HandlerFactory(_serviceProvider, [_streamOptions.FaultOnDeliveryFailure, _streamOptions, _clusterOptions, _adoNetQueueMapper, queries]);
     }
 
-    public IQueueAdapterCache GetQueueAdapterCache() => _cache;
+    public IQueueAdapterCache GetQueueAdapterCache() => this;
+
+    public IQueueCache CreateQueueCache(QueueId queueId)
+        => (_adapter ?? throw new InvalidOperationException("The ADO.NET stream adapter must be created before its queue cache."))
+            .CreateQueueCache(queueId);
 
     public IStreamQueueMapper GetStreamQueueMapper() => _streamQueueMapper;
 

@@ -37,6 +37,11 @@ public class AdoNetStreamOptions
     public bool StartFromNow { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether a subscription is faulted after delivery failure handling.
+    /// </summary>
+    public bool FaultOnDeliveryFailure { get; set; }
+
+    /// <summary>
     /// Gets or sets the maximum number of messages returned by a partition read.
     /// </summary>
     public int MaxMessagesPerRead { get; set; } = 1_000;
