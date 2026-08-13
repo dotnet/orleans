@@ -81,7 +81,7 @@ namespace Orleans.Streaming.Kinesis
         }
 
         public int CompareTo(KinesisBatchContainer? other)
-            => other is null ? 1 : Token.SequenceNumber.CompareTo(other.SequenceToken.SequenceNumber);
+            => other is null ? 1 : Token.CompareTo(other.Token);
 
         [Serializable]
         [GenerateSerializer]
