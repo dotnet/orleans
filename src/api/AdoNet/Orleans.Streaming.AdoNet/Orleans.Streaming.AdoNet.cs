@@ -22,6 +22,8 @@ namespace Orleans.Configuration
         [Redact]
         public System.Data.Common.DbDataSource? DataSource { get { throw null; } set { } }
 
+        public bool FaultOnDeliveryFailure { get { throw null; } set { } }
+
         public System.TimeSpan InitializationTimeout { get { throw null; } set { } }
 
         public string Invariant { get { throw null; } set { } }

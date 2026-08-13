@@ -242,6 +242,15 @@ public sealed class AdoNetOptionsValidatorTests
     }
 
     [Fact]
+    public void Streaming_RejectsSubSecondRetentionPeriod()
+    {
+        var options = ValidStreamOptions();
+        options.RetentionPeriod = TimeSpan.FromMilliseconds(500);
+
+        AssertStreamingValidation(false, options, nameof(AdoNetStreamOptions.RetentionPeriod));
+    }
+
+    [Fact]
     public void Streaming_AllowsNullMaximumRetentionPeriod()
     {
         var options = ValidStreamOptions();
@@ -283,6 +292,15 @@ public sealed class AdoNetOptionsValidatorTests
         options.CleanupInterval = TimeSpan.FromSeconds(seconds);
 
         AssertStreamingValidation(valid, options, nameof(AdoNetStreamOptions.CleanupInterval));
+    }
+
+    [Fact]
+    public void Streaming_RejectsSubSecondCleanupInterval()
+    {
+        var options = ValidStreamOptions();
+        options.CleanupInterval = TimeSpan.FromMilliseconds(500);
+
+        AssertStreamingValidation(false, options, nameof(AdoNetStreamOptions.CleanupInterval));
     }
 
     [Theory]

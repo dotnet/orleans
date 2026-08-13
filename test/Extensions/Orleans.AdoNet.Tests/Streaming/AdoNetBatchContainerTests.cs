@@ -88,6 +88,42 @@ public class AdoNetBatchContainerTests(TestEnvironmentFixture fixture)
     }
 
     [Fact]
+    public void RecoverableDataAdapter_UsesIdentityColumnsAndDecodesPayloadLazily()
+    {
+        var serializer = fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
+        var streamId = StreamId.Create("MyNamespace", "MyKey");
+        var payload = AdoNetBatchContainer.ToMessagePayload(
+            serializer,
+            streamId,
+            [new TestModel(1)],
+            requestContext: null);
+        var message = new AdoNetStreamMessage(
+            "service",
+            "provider",
+            "queue",
+            42,
+            streamId.FullKey.ToArray(),
+            streamId.Namespace.Length,
+            DateTime.UtcNow,
+            payload);
+        var adapter = new AdoNetRecoverableStreamDataAdapter(serializer);
+
+        var position = adapter.GetStreamPosition(message);
+        var cached = adapter.FromQueueMessage(
+            position,
+            message,
+            DateTime.UtcNow,
+            size => new byte[size]);
+
+        Assert.Equal(streamId, cached.StreamId);
+        Assert.Equal("42", adapter.GetOffset(ref cached));
+        var batch = Assert.IsType<AdoNetBatchContainer>(adapter.GetBatchContainer(ref cached));
+        Assert.Equal(streamId, batch.StreamId);
+        Assert.Equal([new TestModel(1)], batch.GetEvents<TestModel>().Select(item => item.Item1));
+        Assert.Equal(new EventSequenceTokenV2(42), batch.SequenceToken);
+    }
+
+    [Fact]
     public void AdoNetBatchContainer_GetEvents_ThrowsOnHalfBaked()
     {
         // arrange
