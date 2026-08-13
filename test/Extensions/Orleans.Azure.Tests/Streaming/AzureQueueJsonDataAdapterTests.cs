@@ -24,7 +24,7 @@ namespace Tester.AzureUtils.Streaming
     public class AzureQueueJsonDataAdapterTests
     {
         private const string CompactOrleans3JsonMessage =
-            "{\"version\":1,\"stream\":{\"namespace\":\"test-namespace\",\"key\":\"00112233-4455-6677-8899-aabbccddeeff\"}," +
+            "{\"version\":1,\"stream\":{\"namespace\":\"test-namespace\",\"key\":\"00112233445566778899aabbccddeeff\"}," +
             "\"events\":[\"test-event\"],\"requestContext\":{\"key\":\"value\"}}";
 
         private const string LegacyDirectContainerJsonMessage =
@@ -224,6 +224,20 @@ namespace Tester.AzureUtils.Streaming
             var batchContainer = jsonAdapter.FromQueueMessage(message, sequenceId: 45);
 
             Assert.Contains("\"namespace\":null", message);
+            Assert.Equal(streamId, batchContainer.StreamId);
+        }
+
+        [Theory, TestCategory("BVT")]
+        [InlineData("customer/\u03B2")]
+        [InlineData("00112233-4455-6677-8899-aabbccddeeff")]
+        public void JsonAdapter_RoundTripsUtf8StringStreamKey(string key)
+        {
+            var jsonAdapter = InitializeQueueJsonDataAdapter();
+            var streamId = StreamId.Create("string-key", key);
+
+            var message = jsonAdapter.ToQueueMessage(streamId, ["test-event"], token: null, requestContext: null);
+            var batchContainer = jsonAdapter.FromQueueMessage(message, sequenceId: 48);
+
             Assert.Equal(streamId, batchContainer.StreamId);
         }
 

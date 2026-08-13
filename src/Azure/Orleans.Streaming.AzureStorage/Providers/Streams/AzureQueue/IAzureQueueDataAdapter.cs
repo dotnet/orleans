@@ -2,7 +2,6 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -225,10 +224,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         private string SerializeJson<T>(StreamId streamId, List<T> events, Dictionary<string, object>? requestContext)
         {
             var streamNamespace = streamId.GetNamespace();
-            if (!Guid.TryParseExact(streamId.GetKeyAsString(), "N", out var streamKey))
-            {
-                throw new InvalidDataException("The compact JSON envelope only supports GUID-keyed streams.");
-            }
+            var streamKey = streamId.GetKeyAsString();
 
             var serializedEvents = _jsonSerializer.Serialize(events.Cast<object>().ToList(), typeof(List<object>));
             var serializedRequestContext = _jsonSerializer.Serialize(
@@ -265,7 +261,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 jsonWriter.WriteString("namespace", streamNamespace);
             }
 
-            jsonWriter.WriteString("key", streamKey.ToString("D", CultureInfo.InvariantCulture));
+            jsonWriter.WriteString("key", streamKey);
             jsonWriter.WriteEndObject();
             jsonWriter.WritePropertyName("events");
             eventValues.WriteTo(jsonWriter);
@@ -304,11 +300,8 @@ namespace Orleans.Providers.Streams.AzureQueue
             var eventsElement = GetRequiredProperty(root, "events", JsonValueKind.Array);
             var requestContextElement = GetRequiredProperty(root, "requestContext", JsonValueKind.Object);
             var streamNamespace = namespaceElement.ValueKind == JsonValueKind.Null ? null : namespaceElement.GetString();
-            var streamKeyText = keyElement.GetString();
-            if (!Guid.TryParseExact(streamKeyText, "D", out var streamKey))
-            {
-                throw new InvalidDataException("The Azure Queue JSON envelope stream key is not a GUID in D format.");
-            }
+            var streamKey = keyElement.GetString()
+                ?? throw new InvalidDataException("The Azure Queue JSON envelope stream key is missing.");
 
             var events = _jsonSerializer.Deserialize(typeof(List<object>), eventsElement.GetRawText()) as List<object>
                 ?? throw new InvalidDataException("The Azure Queue JSON envelope events could not be deserialized.");
