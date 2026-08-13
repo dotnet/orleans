@@ -11,13 +11,11 @@ Orleans is an <xref:Microsoft.Extensions.Hosting.IHostedService> inside the [.NE
 
 ## Graceful silo shutdown
 
-For a standalone console process, use <xref:Microsoft.Extensions.Hosting.HostingHostBuilderExtensions.RunConsoleAsync*>. It installs the console lifetime, which requests host shutdown when the process receives a supported console interrupt or termination event:
+Build the host with <xref:Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder*> and run it with <xref:Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.RunAsync*> or <xref:Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.Run*>. Both `Host.CreateApplicationBuilder` and the older `Host.CreateDefaultBuilder` register <xref:Microsoft.Extensions.Hosting.IHostLifetime> with the console lifetime by default, so no additional call is needed to observe termination requests:
 
 :::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="run_silo":::
 
-On Unix-like systems, container orchestrators normally send `SIGTERM`, and interactive terminals send `SIGINT` for <kbd>Ctrl</kbd>+<kbd>C</kbd>. Windows does not use POSIX signals; a Windows service or another process manager must use its host-lifetime integration to request shutdown. Web applications and service-managed applications should let their configured host lifetime initiate the same Generic Host stop sequence rather than adding a separate process-exit handler.
-
-<xref:Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.RunAsync*> starts a host and waits for it to stop, but it does not itself configure signal handling. Use it only when the application has already configured the appropriate host lifetime. For details, see [.NET Generic Host shutdown](https://learn.microsoft.com/dotnet/core/extensions/generic-host#host-shutdown).
+The console lifetime requests host shutdown when the process receives a supported console interrupt or termination event. On Unix-like systems, container orchestrators normally send `SIGTERM`, and interactive terminals send `SIGINT` for <kbd>Ctrl</kbd>+<kbd>C</kbd>. Windows does not use POSIX signals; a Windows service or another process manager must use its host-lifetime integration to request shutdown. Web applications and service-managed applications should let their configured host lifetime initiate the same Generic Host stop sequence rather than adding a separate process-exit handler. For details, see [.NET Generic Host shutdown](https://learn.microsoft.com/dotnet/core/extensions/generic-host#host-shutdown).
 
 In tests or embedded hosts, call <xref:Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.StopAsync*> and dispose the host:
 

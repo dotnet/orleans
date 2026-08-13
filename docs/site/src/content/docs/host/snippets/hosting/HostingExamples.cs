@@ -401,12 +401,14 @@ public static class HostingExamples
     // <run_silo>
     public static async Task RunSilo(string[] args)
     {
-        await Host.CreateDefaultBuilder(args)
-            .UseOrleans(siloBuilder =>
-            {
-                // Configure Orleans.
-            })
-            .RunConsoleAsync();
+        var builder = Host.CreateApplicationBuilder(args);
+
+        builder.UseOrleans(siloBuilder =>
+        {
+            // Configure Orleans.
+        });
+
+        await builder.Build().RunAsync();
     }
     // </run_silo>
 
