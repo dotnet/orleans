@@ -620,6 +620,43 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     }
 
     /// <summary>
+    /// Tests that a message can be released for immediate redelivery using its dequeue receipt.
+    /// </summary>
+    [SkippableFact]
+    public async Task RelationalOrleansQueries_ReleasesMessageUsingDequeueReceipt()
+    {
+        var serviceId = $"Service-{Guid.NewGuid()}";
+        var providerId = $"Provider-{Guid.NewGuid()}";
+        var queueId = $"Queue-{Guid.NewGuid()}";
+        var payload = RandomPayload();
+        var expiryTimeout = 100;
+        var maxCount = 1;
+        var maxAttempts = 5;
+        var visibilityTimeout = 100;
+        var removalTimeout = 100;
+        var evictionInterval = 100;
+        var evictionBatchSize = 0;
+
+        var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout);
+        var first = Assert.Single(await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize));
+        var firstReceipt = new AdoNetStreamConfirmation(first.MessageId, first.Dequeued);
+
+        var released = Assert.Single(await _queries.ReleaseStreamMessagesAsync(serviceId, providerId, queueId, [firstReceipt]));
+        Assert.Equal(ack.MessageId, released.MessageId);
+
+        var second = Assert.Single(await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize));
+        Assert.Equal(first.Dequeued + 1, second.Dequeued);
+
+        Assert.Empty(await _queries.ReleaseStreamMessagesAsync(serviceId, providerId, queueId, [firstReceipt]));
+        Assert.Empty(await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize));
+
+        var secondReceipt = new AdoNetStreamConfirmation(second.MessageId, second.Dequeued);
+        Assert.Single(await _queries.ReleaseStreamMessagesAsync(serviceId, providerId, queueId, [secondReceipt]));
+        var third = Assert.Single(await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize));
+        await _queries.ConfirmStreamMessagesAsync(serviceId, providerId, queueId, [new AdoNetStreamConfirmation(third.MessageId, third.Dequeued)]);
+    }
+
+    /// <summary>
     /// Tests that a single message is not dequeued again after expiry
     /// </summary>
     [SkippableFact]

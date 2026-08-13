@@ -6,6 +6,7 @@ namespace Orleans.Streaming.AdoNet;
 internal partial class AdoNetQueueAdapterReceiver(string providerId, string queueId, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, SimpleQueueCacheOptions cacheOptions, RelationalOrleansQueries queries, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapterReceiver> logger) : IQueueAdapterReceiver
 {
     private readonly ILogger<AdoNetQueueAdapterReceiver> _logger = logger;
+    private readonly Dictionary<long, PendingMessage> _pendingMessages = [];
 
     /// <summary>
     /// Flags that no further work should be attempted.
@@ -43,6 +44,35 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
                 LogShutdownFault(ex, clusterOptions.ServiceId, providerId, queueId);
             }
         }
+
+        RemoveExpiredPendingMessages();
+        if (_outstandingTask is not null || _pendingMessages.Count == 0)
+        {
+            return;
+        }
+
+        var pending = _pendingMessages
+            .Select(static item => new AdoNetStreamConfirmation(item.Key, item.Value.Dequeued))
+            .ToList();
+
+        try
+        {
+            var task = queries.ReleaseStreamMessagesAsync(clusterOptions.ServiceId, providerId, queueId, pending);
+            _outstandingTask = task;
+            var released = await task.WaitAsync(timeout);
+            foreach (var message in released)
+            {
+                _pendingMessages.Remove(message.MessageId);
+            }
+        }
+        catch (Exception ex)
+        {
+            LogReleaseFailed(ex, clusterOptions.ServiceId, providerId, queueId, pending);
+        }
+        finally
+        {
+            _outstandingTask = null;
+        }
     }
 
     /// <inheritdoc />
@@ -74,6 +104,11 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
             _outstandingTask = task;
 
             var messages = await task;
+            RemoveExpiredPendingMessages();
+            foreach (var message in messages)
+            {
+                _pendingMessages[message.MessageId] = new(message.Dequeued, message.ExpiresOn);
+            }
 
             // convert the messages into standard batch containers
             return messages.Select(x => AdoNetBatchContainer.FromMessage(serializer, x)).Cast<IBatchContainer>().ToList();
@@ -109,7 +144,17 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
 
             try
             {
-                await task;
+                var confirmed = await task;
+                var receipts = items.ToDictionary(static item => item.MessageId, static item => item.Dequeued);
+                foreach (var message in confirmed)
+                {
+                    if (receipts.TryGetValue(message.MessageId, out var receipt)
+                        && _pendingMessages.TryGetValue(message.MessageId, out var pending)
+                        && receipt == pending.Dequeued)
+                    {
+                        _pendingMessages.Remove(message.MessageId);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -123,6 +168,21 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
         }
     }
 
+    private void RemoveExpiredPendingMessages()
+    {
+        var now = DateTime.UtcNow;
+        var expired = _pendingMessages
+            .Where(message => message.Value.ExpiresOn <= now)
+            .Select(static message => message.Key)
+            .ToList();
+        foreach (var messageId in expired)
+        {
+            _pendingMessages.Remove(messageId);
+        }
+    }
+
+    private readonly record struct PendingMessage(int Dequeued, DateTime ExpiresOn);
+
     #region Logging
 
     [LoggerMessage(1, LogLevel.Error, "Failed to get messages from ({ServiceId}, {ProviderId}, {QueueId})")]
@@ -133,6 +193,9 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
 
     [LoggerMessage(3, LogLevel.Warning, "Handled fault while shutting down receiver for ({ServiceId}, {ProviderId}, {QueueId})")]
     private partial void LogShutdownFault(Exception exception, string serviceId, string providerId, string queueId);
+
+    [LoggerMessage(4, LogLevel.Warning, "Failed to release messages while shutting down receiver for ({ServiceId}, {ProviderId}, {QueueId}, {@Items})")]
+    private partial void LogReleaseFailed(Exception exception, string serviceId, string providerId, string queueId, List<AdoNetStreamConfirmation> items);
 
     #endregion Logging
 }

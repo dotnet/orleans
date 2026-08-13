@@ -148,6 +148,44 @@ public abstract class AdoNetQueueAdapterReceiverTests(string invariant, TestEnvi
     }
 
     /// <summary>
+    /// Tests that shutting down a receiver immediately releases its unconfirmed messages.
+    /// </summary>
+    [SkippableFact]
+    public async Task AdoNetQueueAdapterReceiver_Shutdown_ReleasesUnconfirmedMessages()
+    {
+        var serviceId = $"Service-{Guid.NewGuid()}";
+        var providerId = $"Provider-{Guid.NewGuid()}";
+        var queueId = $"Queue-{Guid.NewGuid()}";
+        var clusterOptions = new ClusterOptions { ServiceId = serviceId };
+        var streamOptions = new AdoNetStreamOptions
+        {
+            Invariant = invariant,
+            ConnectionString = _storage.ConnectionString,
+            VisibilityTimeout = TimeSpan.FromMinutes(5),
+            EvictionBatchSize = 0
+        };
+        var cacheOptions = new SimpleQueueCacheOptions();
+        var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
+        var logger = NullLogger<AdoNetQueueAdapterReceiver>.Instance;
+        var streamId = StreamId.Create("MyNamespace", "MyKey");
+        var payload = serializer.SerializeToArray(new AdoNetBatchContainer(streamId, [new TestModel(1)], null!));
+        var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, 100);
+
+        var receiver = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, cacheOptions, _queries, serializer, logger);
+        var first = Assert.IsType<AdoNetBatchContainer>(Assert.Single(await receiver.GetQueueMessagesAsync(1)));
+        Assert.Equal(1, first.Dequeued);
+
+        await receiver.Shutdown(TimeSpan.FromSeconds(10));
+
+        var replacement = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, cacheOptions, _queries, serializer, logger);
+        var redelivered = Assert.IsType<AdoNetBatchContainer>(Assert.Single(await replacement.GetQueueMessagesAsync(1)));
+        Assert.Equal(ack.MessageId, redelivered.SequenceToken.SequenceNumber);
+        Assert.Equal(2, redelivered.Dequeued);
+        await replacement.MessagesDeliveredAsync([redelivered]);
+        await replacement.Shutdown(TimeSpan.FromSeconds(10));
+    }
+
+    /// <summary>
     /// Tests that <see cref="AdoNetQueueAdapterReceiver.Shutdown(TimeSpan)"/> waits for the outstanding task.
     /// </summary>
     /// <returns></returns>
