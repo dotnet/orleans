@@ -120,6 +120,33 @@ public sealed class RecoverableStreamReceiverTests
     }
 
     [Fact]
+    public void CachePressure_BlocksUnsafeTimePurgeUntilDeliveryProgressAdvances()
+    {
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var adapter = new TestDataAdapter();
+        var evictionStrategy = new NoOpEvictionStrategy();
+        var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
+            100,
+            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(4 * 1024)),
+            adapter,
+            evictionStrategy,
+            NullLogger.Instance,
+            flowController: new FixedFlowController(0));
+        var positions = cache.Add(
+            [new TestQueueMessage(streamId, 11, "payload")],
+            DateTime.UnixEpoch);
+
+        Assert.True(cache.IsUnderPressure());
+        Assert.False(cache.TryPurgeFromCache(out _));
+        Assert.Equal(0, evictionStrategy.PerformPurgeCount);
+        Assert.Equal(1, cache.ItemCount);
+
+        cache.UpdateDeliveryProgress(positions[0].SequenceToken, DateTime.UtcNow);
+
+        Assert.Equal(0, cache.ItemCount);
+    }
+
+    [Fact]
     public void Cache_AddsRawRecordsInOrderAndDecodesLazily()
     {
         var streamA = StreamId.Create("namespace", Guid.NewGuid());
@@ -430,17 +457,25 @@ public sealed class RecoverableStreamReceiverTests
 
     private sealed class NoOpEvictionStrategy : IEvictionStrategy
     {
+        public int PerformPurgeCount { get; private set; }
+
         public IPurgeObservable PurgeObservable { private get; set; } = null!;
 
         public Action<CachedMessage?, CachedMessage?>? OnPurged { get; set; }
 
         public void PerformPurge(DateTime utcNow)
         {
+            PerformPurgeCount++;
         }
 
         public void OnBlockAllocated(FixedSizeBuffer newBlock)
         {
         }
+    }
+
+    private sealed class FixedFlowController(int maxAddCount) : IQueueFlowController
+    {
+        public int GetMaxAddCount() => maxAddCount;
     }
 
     private sealed class TrackingBufferPool : IObjectPool<FixedSizeBuffer>
