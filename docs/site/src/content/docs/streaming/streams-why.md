@@ -25,7 +25,7 @@ Use **response streaming** when one call produces many results: the grain method
 
 ## Prefer observers for client callbacks
 
-Use a grain observer when a connected Orleans client wants transient callbacks and can re-register after reconnecting. See [Orleans observers](../grains/observers.md) for the supported lifecycle and registration model. Observers are not categorically redundant: they are a low-overhead direct-callback API for a small set of live client objects, while streams are the appropriate abstraction for multicast event flow and provider-managed delivery guarantees.
+Use a grain observer when a connected Orleans client wants transient callbacks and can re-register after reconnecting. See [Orleans observers](../grains/observers.md) for the supported lifecycle and registration model. Observers are not categorically redundant: they are a low-overhead direct-callback API for a small set of live client objects, while streams are the appropriate abstraction for multicast event flow and provider-specific delivery semantics.
 
 Choose streams instead when a producer needs to fan out to many independent subscribers, when delivery must survive client disconnects or grain reactivation, or when a provider offers replay, retention, or durable subscription state. Observer references are not durable subscriptions and are not a replacement for retained events or server-side pub/sub.
 

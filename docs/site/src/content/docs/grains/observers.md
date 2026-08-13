@@ -13,9 +13,9 @@ Use observers for a small set of known, live callbacks. They are intentionally t
 
 ## When to choose observers versus streams
 
-Use a grain observer when the callback target is a specific connected client object or grain and the application only needs a live notification while that connection remains active. Observers carry very little infrastructure: a local object reference is registered, and the grain notifies that reference directly.
+Use a grain observer when the callback target is a specific connected client object or grain and the application only needs a live notification while that connection remains active. Observers carry very little infrastructure: a callback target is registered, and the grain notifies that target directly.
 
-Use an Orleans stream when the application needs multicast delivery, dynamic subscriptions, playback, provider-defined durability, or recovery after a client or grain restarts. A stream can outlive a single activation or connection, while an observer registration is tied to the callback object and must be re-established after reconnect.
+Use an Orleans stream when the application needs multicast delivery, dynamic subscriptions, playback, provider-defined durability, or recovery after a client or grain restarts. A stream can outlive a single activation or connection, while an observer registration is tied to the callback target and must be re-established after reconnect.
 
 The tradeoff is mostly about lifetime and delivery guarantees:
 
