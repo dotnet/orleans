@@ -322,7 +322,7 @@ public sealed class LocalThrottleRateTests
             .Build();
         await using var throttle = new TestThrottle(config, clock);
 
-        // Burst of 10 (auto-derived) should be admitted immediately.
+        // The configured burst of 10 should be admitted immediately.
         var admitted = 0;
         for (var i = 0; i < 10; i++)
         {
