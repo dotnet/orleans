@@ -18,6 +18,10 @@ using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Placement.Filtering;
 using Orleans.Runtime.Versions;
+using Orleans.Runtime.Versions.Compatibility;
+using Orleans.Runtime.Versions.Selector;
+using Orleans.Versions.Compatibility;
+using Orleans.Versions.Selector;
 using Orleans.TestingHost.Diagnostics;
 using TestExtensions;
 using Xunit;
@@ -152,6 +156,44 @@ namespace UnitTests.Runtime
         }
 
         [Fact]
+        public async Task GetCompatibleSilos_LocalSiloShuttingDown_ExcludesLocalSiloFromCachedManifest()
+        {
+            var silos = CreateSilos(2);
+            var fixture = new PlacementServiceFixture(
+                activeSilos: silos,
+                manifestSilos: silos,
+                localSiloStatus: SiloStatus.ShuttingDown);
+
+            var result = fixture.Target.GetCompatibleSilos(CreatePlacementTarget());
+
+            Assert.Equal(new[] { silos[1] }, result);
+
+            await StopAsync(fixture.Target);
+        }
+
+        [Fact]
+        public async Task GetCompatibleSilosWithVersions_LocalSiloShuttingDown_ExcludesLocalSiloFromCachedManifest()
+        {
+            var silos = CreateSilos(2);
+            var fixture = new PlacementServiceFixture(
+                activeSilos: silos,
+                manifestSilos: silos,
+                localSiloStatus: SiloStatus.ShuttingDown,
+                interfaceVersion: 1);
+            var target = new PlacementTarget(
+                GrainId.Create(TestGrainType, "grain-1"),
+                new Dictionary<string, object>(),
+                TestInterfaceType,
+                1);
+
+            var result = fixture.Target.GetCompatibleSilosWithVersions(target);
+
+            Assert.Equal(new[] { silos[1] }, result[1]);
+
+            await StopAsync(fixture.Target);
+        }
+
+        [Fact]
         public async Task GetCompatibleSilos_MembershipChange_InvalidatesCachedResult()
         {
             var silos = CreateSilos(2);
@@ -280,14 +322,18 @@ namespace UnitTests.Runtime
             return result;
         }
 
-        private static ClusterManifest CreateClusterManifest(SiloAddress[] silos, bool useFilter = false, MajorMinorVersion? version = null)
+        private static ClusterManifest CreateClusterManifest(
+            SiloAddress[] silos,
+            bool useFilter = false,
+            MajorMinorVersion? version = null,
+            ushort interfaceVersion = 0)
         {
-            var manifest = CreateGrainManifest(useFilter);
+            var manifest = CreateGrainManifest(useFilter, interfaceVersion);
             var manifests = silos.ToImmutableDictionary(silo => silo, _ => manifest);
             return new ClusterManifest(version ?? MajorMinorVersion.Zero, manifests);
         }
 
-        private static GrainManifest CreateGrainManifest(bool useFilter)
+        private static GrainManifest CreateGrainManifest(bool useFilter, ushort interfaceVersion = 0)
         {
             var grainProperties = ImmutableDictionary.Create<string, string>(StringComparer.Ordinal);
             if (useFilter)
@@ -306,8 +352,25 @@ namespace UnitTests.Runtime
                         TestInterfaceType,
                         new GrainInterfaceProperties(
                             ImmutableDictionary.Create<string, string>(StringComparer.Ordinal)
-                                .Add(WellKnownGrainInterfaceProperties.Version, "0")))
+                           .Add(WellKnownGrainInterfaceProperties.Version, interfaceVersion.ToString())))
                 }));
+        }
+
+        private static CachedVersionSelectorManager CreateCachedVersionSelectorManager(GrainVersionManifest manifest)
+        {
+            var services = new ServiceCollection();
+            services.AddOptions<GrainVersioningOptions>();
+            services.AddKeyedSingleton<VersionSelectorStrategy, AllCompatibleVersions>(nameof(AllCompatibleVersions));
+            services.AddKeyedSingleton<CompatibilityStrategy, BackwardCompatible>(nameof(BackwardCompatible));
+            services.AddKeyedSingleton<IVersionSelector, AllCompatibleVersionsSelector>(typeof(AllCompatibleVersions));
+            services.AddKeyedSingleton<ICompatibilityDirector, BackwardCompatilityDirector>(typeof(BackwardCompatible));
+            var serviceProvider = services.BuildServiceProvider();
+            var options = serviceProvider.GetRequiredService<IOptions<GrainVersioningOptions>>();
+
+            return new CachedVersionSelectorManager(
+                manifest,
+                new VersionSelectorManager(serviceProvider, options),
+                new CompatibilityDirectorManager(serviceProvider, options));
         }
 
         private static ServiceProvider CreateServiceProvider(TestPlacementFilterDirector? filterDirector = null)
@@ -381,14 +444,16 @@ namespace UnitTests.Runtime
                 SiloAddress[]? activeSilos = null,
                 SiloAddress[]? manifestSilos = null,
                 TestClusterManifestProvider? manifestProvider = null,
-                bool useFilter = false)
+                bool useFilter = false,
+                SiloStatus localSiloStatus = SiloStatus.Active,
+                ushort interfaceVersion = 0)
             {
                 activeSilos ??= CreateSilos(1);
                 manifestSilos ??= activeSilos;
                 SetActiveSilos(activeSilos);
 
-                ClusterManifestProvider = manifestProvider ?? new TestClusterManifestProvider(CreateClusterManifest(manifestSilos, useFilter));
-                VersionSelectorManager = new CachedVersionSelectorManager(new GrainVersionManifest(ClusterManifestProvider), null!, null!);
+                ClusterManifestProvider = manifestProvider ?? new TestClusterManifestProvider(CreateClusterManifest(manifestSilos, useFilter, interfaceVersion: interfaceVersion));
+                VersionSelectorManager = CreateCachedVersionSelectorManager(new GrainVersionManifest(ClusterManifestProvider));
                 FilterDirector = useFilter ? new TestPlacementFilterDirector() : null;
                 ServiceProvider = CreateServiceProvider(FilterDirector);
 
@@ -399,7 +464,7 @@ namespace UnitTests.Runtime
                 localSiloDetails.SiloAddress.Returns(activeSilos[0]);
 
                 SiloStatusOracle = Substitute.For<ISiloStatusOracle>();
-                SiloStatusOracle.CurrentStatus.Returns(SiloStatus.Active);
+                SiloStatusOracle.CurrentStatus.Returns(localSiloStatus);
                 SiloStatusOracle.GetActiveSilos().Returns(_ => _siloStatuses.Keys.ToArray());
                 SiloStatusOracle.SubscribeToSiloStatusEvents(Arg.Do<ISiloStatusListener>(listener => StatusListener = listener)).Returns(true);
                 SiloStatusOracle.UnSubscribeFromSiloStatusEvents(Arg.Any<ISiloStatusListener>()).Returns(true);
