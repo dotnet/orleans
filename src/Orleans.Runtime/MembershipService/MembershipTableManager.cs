@@ -48,6 +48,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly Channel<SuspectOrKillRequest> _trySuspectOrKillChannel = Channel.CreateBounded<SuspectOrKillRequest>(new BoundedChannelOptions(100) { FullMode = BoundedChannelFullMode.DropOldest });
 
         private MembershipTableSnapshot snapshot;
+        private int _currentStatus = (int)SiloStatus.Created;
 
         public MembershipTableManager(
             ILocalSiloDetails localSiloDetails,
@@ -74,7 +75,7 @@ namespace Orleans.Runtime.MembershipService
                     initialEntries);
             this.updates = new AsyncEnumerable<MembershipTableSnapshot>(
                 initialValue: this.snapshot,
-                updateValidator: (previous, proposed) => proposed.IsSuccessorTo(previous),
+                updateValidator: IsValidMembershipUpdate,
                 onPublished: update => Interlocked.Exchange(ref this.snapshot, update));
 
             this.membershipUpdateTimer = timerFactory.Create(
@@ -91,7 +92,7 @@ namespace Orleans.Runtime.MembershipService
 
         public IAsyncEnumerable<MembershipTableSnapshot> MembershipTableUpdates => this.updates;
 
-        public SiloStatus CurrentStatus { get; private set; } = SiloStatus.Created;
+        public SiloStatus CurrentStatus => (SiloStatus)Volatile.Read(ref _currentStatus);
 
         // IMembershipManager explicit interface implementations
         MembershipTableSnapshot IMembershipManager.CurrentSnapshot => this.snapshot;
@@ -330,6 +331,8 @@ namespace Orleans.Runtime.MembershipService
 
                 if (status.IsTerminating() && this.membershipTableProvider is SystemTargetBasedMembershipTable)
                 {
+                    this.AdvanceCurrentStatus(status, publishSnapshot: true);
+
                     // SystemTarget-based membership may not be accessible at this stage, so allow for one quick attempt to update
                     // the status before continuing regardless of the outcome.
                     var updateTask = UpdateMyStatusTask(0);
@@ -340,7 +343,6 @@ namespace Orleans.Runtime.MembershipService
                     gossipTask.Ignore();
                     await Task.WhenAny(Task.Delay(TimeSpan.FromMilliseconds(500)), gossipTask);
 
-                    this.CurrentStatus = status;
                     return;
                 }
 
@@ -426,7 +428,7 @@ namespace Orleans.Runtime.MembershipService
 
             if (ok)
             {
-                this.CurrentStatus = newStatus;
+                this.AdvanceCurrentStatus(newStatus, publishSnapshot: false);
                 var entries = table.Members.ToDictionary(e => e.Item1.SiloAddress, e => e);
                 entries[myEntry.SiloAddress] = Tuple.Create(myEntry, myEtag!);
                 var updatedTable = new MembershipTableData(entries.Values.ToList(), next);
@@ -626,11 +628,73 @@ namespace Orleans.Runtime.MembershipService
         private void KillMyselfLocally(string reason)
         {
             LogErrorKillMyselfLocally(this.log, reason);
-            this.CurrentStatus = SiloStatus.Dead;
+            this.AdvanceCurrentStatus(SiloStatus.Dead, publishSnapshot: true);
             if (!this.IsStopping)
             {
                 this.fatalErrorHandler.OnFatalException(this, $"I have been told I am dead, so this silo will stop! Reason: {reason}", null);
             }
+        }
+
+        private void AdvanceCurrentStatus(SiloStatus status, bool publishSnapshot)
+        {
+            while (true)
+            {
+                var current = Volatile.Read(ref _currentStatus);
+                if (current >= (int)status)
+                {
+                    return;
+                }
+
+                if (Interlocked.CompareExchange(ref _currentStatus, (int)status, current) == current)
+                {
+                    break;
+                }
+            }
+
+            if (!publishSnapshot)
+            {
+                return;
+            }
+
+            this.updates.TryPublish(
+                static (previous, state) =>
+                {
+                    var entry = previous.Entries.TryGetValue(state.Manager.myAddress, out var existing)
+                        ? existing.WithStatus(state.Status)
+                        : state.Manager.CreateLocalSiloEntry(state.Status);
+                    return new MembershipTableSnapshot(
+                        previous.Version,
+                        previous.Entries.SetItem(state.Manager.myAddress, entry));
+                },
+                (Manager: this, Status: status));
+        }
+
+        private bool IsValidMembershipUpdate(MembershipTableSnapshot previous, MembershipTableSnapshot proposed)
+        {
+            if (proposed.IsSuccessorTo(previous))
+            {
+                return true;
+            }
+
+            if (proposed.Version != previous.Version
+                || proposed.Entries.Count != previous.Entries.Count + 1
+                || previous.Entries.ContainsKey(this.myAddress)
+                || !proposed.Entries.TryGetValue(this.myAddress, out var localEntry)
+                || !localEntry.Status.IsTerminating())
+            {
+                return false;
+            }
+
+            foreach (var entry in previous.Entries)
+            {
+                if (!proposed.Entries.TryGetValue(entry.Key, out var proposedEntry)
+                    || !ReferenceEquals(entry.Value, proposedEntry))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private async Task GossipToOthers(SiloAddress updatedSilo, SiloStatus updatedStatus)

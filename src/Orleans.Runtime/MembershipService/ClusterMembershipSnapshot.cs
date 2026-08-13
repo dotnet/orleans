@@ -90,11 +90,6 @@ namespace Orleans.Runtime
                 throw new ArgumentException($"Argument must have a previous version to the current instance. Expected <= {this.Version}, encountered {previous.Version}", nameof(previous));
             }
 
-            if (this.Version == previous.Version)
-            {
-                return new ClusterMembershipUpdate(this, ImmutableArray<ClusterMember>.Empty);
-            }
-
             var changes = ImmutableHashSet.CreateBuilder<ClusterMember>();
             foreach (var entry in this.Members)
             {
@@ -115,6 +110,42 @@ namespace Orleans.Runtime
             }
 
             return new ClusterMembershipUpdate(this, changes.ToImmutableArray());
+        }
+
+        internal bool IsSuccessorTo(ClusterMembershipSnapshot previous)
+        {
+            if (this.Version > previous.Version)
+            {
+                return true;
+            }
+
+            if (this.Version < previous.Version)
+            {
+                return false;
+            }
+
+            var changed = this.Members.Count != previous.Members.Count;
+            foreach (var entry in this.Members)
+            {
+                if (!previous.Members.TryGetValue(entry.Key, out var previousEntry))
+                {
+                    if (!entry.Value.Status.IsTerminating())
+                    {
+                        return false;
+                    }
+
+                    continue;
+                }
+
+                if (entry.Value.Status < previousEntry.Status)
+                {
+                    return false;
+                }
+
+                changed |= entry.Value.Status > previousEntry.Status;
+            }
+
+            return changed;
         }
 
         /// <inheritdoc/>

@@ -88,6 +88,17 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
+        public void MembershipTableSnapshot_SameVersionStatusTransition_IsSuccessor()
+        {
+            var silo = Silo("127.0.0.1:100@1");
+            var active = MembershipTableSnapshot.Create(Table(Entry(silo, SiloStatus.Active)));
+            var shuttingDown = AddOrUpdateEntry(active, Entry(silo, SiloStatus.ShuttingDown));
+
+            Assert.True(shuttingDown.IsSuccessorTo(active));
+            Assert.False(active.IsSuccessorTo(shuttingDown));
+        }
+
+        [Fact]
         public void MembershipTableSnapshot_GetSiloStatus_UnknownSilo_KnownSuccessor()
         {
             var unknownSilo = Silo("127.0.0.1:100@1");

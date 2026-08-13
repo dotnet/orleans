@@ -451,6 +451,7 @@ namespace UnitTests.Runtime
                 activeSilos ??= CreateSilos(1);
                 manifestSilos ??= activeSilos;
                 SetActiveSilos(activeSilos);
+                _siloStatuses[activeSilos[0]] = localSiloStatus;
 
                 ClusterManifestProvider = manifestProvider ?? new TestClusterManifestProvider(CreateClusterManifest(manifestSilos, useFilter, interfaceVersion: interfaceVersion));
                 VersionSelectorManager = CreateCachedVersionSelectorManager(new GrainVersionManifest(ClusterManifestProvider));
@@ -465,7 +466,13 @@ namespace UnitTests.Runtime
 
                 SiloStatusOracle = Substitute.For<ISiloStatusOracle>();
                 SiloStatusOracle.CurrentStatus.Returns(localSiloStatus);
-                SiloStatusOracle.GetActiveSilos().Returns(_ => _siloStatuses.Keys.ToArray());
+                SiloStatusOracle.GetActiveSilos().Returns(_ => _siloStatuses
+                    .Where(static entry => entry.Value == SiloStatus.Active)
+                    .Select(static entry => entry.Key)
+                    .ToArray());
+                SiloStatusOracle.GetApproximateSiloStatuses(onlyActive: true).Returns(_ => _siloStatuses
+                    .Where(static entry => entry.Value == SiloStatus.Active)
+                    .ToDictionary());
                 SiloStatusOracle.SubscribeToSiloStatusEvents(Arg.Do<ISiloStatusListener>(listener => StatusListener = listener)).Returns(true);
                 SiloStatusOracle.UnSubscribeFromSiloStatusEvents(Arg.Any<ISiloStatusListener>()).Returns(true);
 

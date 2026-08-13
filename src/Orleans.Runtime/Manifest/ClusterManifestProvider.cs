@@ -65,7 +65,8 @@ namespace Orleans.Runtime.Metadata
         {
             var current = _current;
             var membershipVersion = clusterMembership.Version.Value;
-            if (current.Version.Major >= membershipVersion)
+            if (current.Version.Major > membershipVersion
+                || current.Version.Major == membershipVersion && IsSynchronized(current, clusterMembership))
             {
                 return current;
             }
@@ -73,7 +74,8 @@ namespace Orleans.Runtime.Metadata
             lock (_currentLock)
             {
                 current = _current;
-                if (current.Version.Major >= membershipVersion)
+                if (current.Version.Major > membershipVersion
+                    || current.Version.Major == membershipVersion && IsSynchronized(current, clusterMembership))
                 {
                     return current;
                 }
@@ -85,11 +87,27 @@ namespace Orleans.Runtime.Metadata
                     synchronizedSilos = synchronizedSilos.Add(_localSiloAddress, LocalGrainManifest);
                 }
 
-                var version = new MajorMinorVersion(membershipVersion, 0);
+                var version = current.Version.Major < membershipVersion
+                    ? new MajorMinorVersion(membershipVersion, 0)
+                    : new MajorMinorVersion(membershipVersion, current.Version.Minor + 1);
                 var updated = CreateClusterManifest(version, synchronizedSilos);
                 TryPublishManifest(updated);
                 return _current;
             }
+        }
+
+        private bool IsSynchronized(ClusterManifest manifest, ClusterMembershipSnapshot membership)
+        {
+            foreach (var silo in manifest.Silos.Keys)
+            {
+                if (membership.GetSiloStatus(silo) != SiloStatus.Active)
+                {
+                    return false;
+                }
+            }
+
+            return membership.GetSiloStatus(_localSiloAddress) != SiloStatus.Active
+                || manifest.Silos.ContainsKey(_localSiloAddress);
         }
 
         private async Task ProcessMembershipUpdates()

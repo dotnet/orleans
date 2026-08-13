@@ -72,21 +72,28 @@ namespace Orleans.Runtime
             foreach (var item in updatedEntries)
             {
                 var entry = item;
-                entry = PreserveIAmAliveTime(previousSnapshot, entry);
+                entry = PreserveEntryState(previousSnapshot, entry);
                 entries.Add(entry.SiloAddress, entry);
             }
 
             return new MembershipTableSnapshot(version, entries.ToImmutable());
         }
 
-        private static MembershipEntry PreserveIAmAliveTime(MembershipTableSnapshot previousSnapshot, MembershipEntry entry)
+        private static MembershipEntry PreserveEntryState(MembershipTableSnapshot previousSnapshot, MembershipEntry entry)
         {
-            // Retain the maximum IAmAliveTime, since IAmAliveTime updates do not increase membership version
-            // and therefore can be clobbered by torn reads.
-            if (previousSnapshot.Entries.TryGetValue(entry.SiloAddress, out var previousEntry)
-                && previousEntry.IAmAliveTime > entry.IAmAliveTime)
+            if (previousSnapshot.Entries.TryGetValue(entry.SiloAddress, out var previousEntry))
             {
-                entry = entry.WithIAmAliveTime(previousEntry.IAmAliveTime);
+                // IAmAliveTime updates do not increase membership version and can be clobbered by torn reads.
+                if (previousEntry.IAmAliveTime > entry.IAmAliveTime)
+                {
+                    entry = entry.WithIAmAliveTime(previousEntry.IAmAliveTime);
+                }
+
+                // Status transitions are monotonic, including local same-version shutdown transitions.
+                if (previousEntry.Status > entry.Status)
+                {
+                    entry = entry.WithStatus(previousEntry.Status);
+                }
             }
 
             return entry;
@@ -177,6 +184,23 @@ namespace Orleans.Runtime
                     // Something is amiss.
                     return false;
                 }
+            }
+
+            var statusChanged = false;
+            foreach (var entry in Entries)
+            {
+                var previousStatus = other.Entries[entry.Key].Status;
+                if (entry.Value.Status < previousStatus)
+                {
+                    return false;
+                }
+
+                statusChanged |= entry.Value.Status > previousStatus;
+            }
+
+            if (statusChanged)
+            {
+                return true;
             }
 
             // This is a successor if any silo has a later EffectiveIAmAliveTime.

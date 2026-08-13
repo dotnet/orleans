@@ -203,7 +203,10 @@ namespace Orleans.Runtime.Placement
             var compatibleSilos = _assumeHomogeneousSilosForTesting
                 ? _siloStatusOracle.GetActiveSilos()
                 : GetUnfilteredCompatibleSilos(grainType, target.InterfaceType, target.InterfaceVersion);
-            compatibleSilos = ExcludeLocalSiloIfNotActive(compatibleSilos);
+            if (!_assumeHomogeneousSilosForTesting)
+            {
+                compatibleSilos = FilterActiveSilos(compatibleSilos);
+            }
 
             if (!_assumeHomogeneousSilosForTesting)
             {
@@ -303,18 +306,46 @@ namespace Orleans.Runtime.Placement
                 .GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion)
                 .SuitableSilosByVersion;
 
-            if (LocalSiloStatus == SiloStatus.Active)
+            Dictionary<ushort, SiloAddress[]>? filteredSilos = null;
+            foreach (var entry in silos)
             {
-                return silos;
+                var activeSilos = FilterActiveSilos(entry.Value);
+                if (!ReferenceEquals(activeSilos, entry.Value))
+                {
+                    filteredSilos ??= new(silos);
+                    filteredSilos[entry.Key] = activeSilos;
+                }
             }
 
-            return silos.ToDictionary(pair => pair.Key, pair => ExcludeLocalSiloIfNotActive(pair.Value));
+            return filteredSilos ?? silos;
         }
 
-        private SiloAddress[] ExcludeLocalSiloIfNotActive(SiloAddress[] silos) =>
-            LocalSiloStatus == SiloStatus.Active
-                ? silos
-                : silos.Where(silo => !silo.Equals(LocalSilo)).ToArray();
+        private SiloAddress[] FilterActiveSilos(SiloAddress[] silos)
+        {
+            var activeSilos = _siloStatusOracle.GetApproximateSiloStatuses(onlyActive: true);
+            SiloAddress[]? filteredSilos = null;
+            var count = 0;
+
+            foreach (var silo in silos)
+            {
+                if (activeSilos.ContainsKey(silo))
+                {
+                    if (filteredSilos is not null)
+                    {
+                        filteredSilos[count] = silo;
+                    }
+
+                    ++count;
+                }
+                else if (filteredSilos is null)
+                {
+                    filteredSilos = new SiloAddress[silos.Length];
+                    Array.Copy(silos, filteredSilos, count);
+                }
+            }
+
+            return filteredSilos is null ? silos : count == 0 ? [] : filteredSilos.AsSpan(0, count).ToArray();
+        }
 
         void ISiloStatusListener.SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status) => InvalidatePlacementCaches();
 

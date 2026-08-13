@@ -79,6 +79,28 @@ public class ClusterManifestProviderTests
     }
 
     [Fact]
+    public void Current_WhenLocalSiloShutsDownAtSameMembershipVersion_ExcludesLocalManifestSynchronously()
+    {
+        var localSilo = CreateSiloAddress(11111, 1);
+        using var membership = new TestClusterMembershipService(CreateMembershipSnapshot(
+            1,
+            (localSilo, SiloStatus.Active)));
+        var grainFactory = CreateGrainFactory(CreateSiloAddress(11112, 1), CreateGrainManifest());
+        var provider = CreateClusterManifestProvider(localSilo, membership, grainFactory);
+
+        Assert.Contains(localSilo, provider.Current.Silos.Keys);
+
+        membership.Update(CreateMembershipSnapshot(
+            1,
+            (localSilo, SiloStatus.ShuttingDown)));
+
+        var current = provider.Current;
+
+        Assert.Equal(new MajorMinorVersion(1, 1), current.Version);
+        Assert.DoesNotContain(localSilo, current.Silos.Keys);
+    }
+
+    [Fact]
     public async Task Current_WhenMembershipVersionAdvances_PrunesNonActiveSilosAtFirstMinorVersion()
     {
         var localSilo = CreateSiloAddress(11111, 1);
@@ -407,7 +429,7 @@ public class ClusterManifestProviderTests
         {
             _updates = new AsyncEnumerable<ClusterMembershipSnapshot>(
                 initialValue: initialSnapshot,
-                updateValidator: (previous, proposed) => proposed.Version > previous.Version,
+                updateValidator: (previous, proposed) => proposed.IsSuccessorTo(previous),
                 onPublished: update => CurrentSnapshot = update);
         }
 
