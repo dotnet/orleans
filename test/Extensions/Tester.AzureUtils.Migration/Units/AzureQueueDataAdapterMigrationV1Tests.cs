@@ -1,12 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Persistence.Migration;
@@ -25,7 +23,12 @@ namespace Tester.AzureUtils.Migration.Units
     {
         private static readonly Guid Version10FixtureStreamGuid = Guid.Parse("00112233-4455-6677-8899-aabbccddeeff");
 
-        private const string Version10GoldenJson =
+        private const string MigrationEnvelopeGoldenJson =
+            "{\"version\":1,\"stream\":{\"namespace\":\"test-namespace\"," +
+            "\"key\":\"00112233-4455-6677-8899-aabbccddeeff\"},\"events\":[\"test-event\"]," +
+            "\"requestContext\":{\"key\":\"value\"}}";
+
+        private const string Version10ContainerJson =
             "{\"$id\":\"1\",\"$type\":\"Orleans.Providers.Streams.AzureQueue.AzureQueueBatchContainerV2, Orleans.Streaming.AzureStorage\"," +
             "\"events\":{\"$type\":\"System.Collections.Generic.List`1[[System.Object, System.Private.CoreLib]], System.Private.CoreLib\"," +
             "\"$values\":[\"test-event\"]},\"requestContext\":{\"$id\":\"2\"," +
@@ -71,7 +74,7 @@ namespace Tester.AzureUtils.Migration.Units
         }
 
         [Fact]
-        public void ToQueueMessage_WithJsonMode_ProducesVersion10GoldenJson()
+        public void ToQueueMessage_WithJsonMode_ProducesCompactMigrationEnvelope()
         {
             var streamNamespace = "test-namespace";
             var events = new[] { "test-event" };
@@ -79,31 +82,59 @@ namespace Tester.AzureUtils.Migration.Units
 
             var result = adapter.ToQueueMessage(Version10FixtureStreamGuid, streamNamespace, events, null, requestContext);
 
-            Assert.Equal(Version10GoldenJson, result);
-            Assert.DoesNotContain("\"StreamGuid\"", result);
-            Assert.DoesNotContain("\"StreamNamespace\"", result);
+            Assert.Equal(MigrationEnvelopeGoldenJson, result);
+            Assert.DoesNotContain("\"$type\"", result);
+            Assert.DoesNotContain("\"$id\"", result);
         }
 
         [Fact]
-        public void ToQueueMessage_WithJsonMode_ProducesVersion10ConsumableStreamIdFixture()
+        public void FromQueueMessage_WithVersion10ContainerJson_DeserializesCorrectly()
         {
-            var result = adapter.ToQueueMessage(
-                Version10FixtureStreamGuid,
+            var result = adapter.FromQueueMessage(Version10ContainerJson, 42);
+
+            Assert.Equal(Version10FixtureStreamGuid, result.StreamGuid);
+            Assert.Equal("test-namespace", result.StreamNamespace);
+            var deserializedEvent = Assert.Single(result.GetEvents<string>());
+            Assert.Equal("test-event", deserializedEvent.Item1);
+            Assert.Equal(42, deserializedEvent.Item2.SequenceNumber);
+        }
+
+        [Fact]
+        public void RoundTrip_JsonSerialization_PreservesSharedEventReferences()
+        {
+            var sharedEvent = new TestEvent { Id = 7, Message = "shared" };
+
+            var queueMessage = adapter.ToQueueMessage(
+                Guid.NewGuid(),
                 "test-namespace",
+                new[] { sharedEvent, sharedEvent },
+                null,
+                new Dictionary<string, object>());
+            var batchContainer = adapter.FromQueueMessage(queueMessage, 43);
+            var deserializedEvents = batchContainer.GetEvents<TestEvent>().Select(tuple => tuple.Item1).ToList();
+
+            Assert.Equal(2, deserializedEvents.Count);
+            Assert.Same(deserializedEvents[0], deserializedEvents[1]);
+        }
+
+        [Fact]
+        public void RoundTrip_JsonSerialization_SupportsNullNamespaceAndRequestContext()
+        {
+            var streamGuid = Guid.NewGuid();
+
+            var queueMessage = adapter.ToQueueMessage(
+                streamGuid,
+                null,
                 new[] { "test-event" },
                 null,
-                new Dictionary<string, object> { { "key", "value" } });
+                null);
+            var batchContainer = adapter.FromQueueMessage(queueMessage, 44);
 
-            var fixture = Assert.IsType<Version10BatchContainerWireFixture>(
-                JsonConvert.DeserializeObject<Version10BatchContainerWireFixture>(
-                    result,
-                    new JsonSerializerSettings { MetadataPropertyHandling = MetadataPropertyHandling.Ignore }));
-
-            var streamId = Assert.IsType<Version10StreamIdWireFixture>(fixture.StreamId);
-            var fullKey = Convert.FromBase64String(streamId.FullKey.Value);
-            Assert.Equal("test-namespace00112233445566778899aabbccddeeff", Encoding.UTF8.GetString(fullKey));
-            Assert.Equal(14, streamId.KeyIndex);
-            Assert.Equal(1706661484, streamId.Hash);
+            Assert.Contains("\"namespace\":null", queueMessage);
+            Assert.Contains("\"requestContext\":{}", queueMessage);
+            Assert.Equal(streamGuid, batchContainer.StreamGuid);
+            Assert.Null(batchContainer.StreamNamespace);
+            Assert.Equal("test-event", Assert.Single(batchContainer.GetEvents<string>()).Item1);
         }
 
         [Fact]
@@ -426,28 +457,6 @@ namespace Tester.AzureUtils.Migration.Units
             }
         }
 
-        private sealed class Version10BatchContainerWireFixture
-        {
-            public Version10StreamIdWireFixture StreamId { get; set; } = null!;
-        }
-
-        private sealed class Version10StreamIdWireFixture
-        {
-            [JsonProperty("fk")]
-            public Version10ByteArrayWireFixture FullKey { get; set; } = null!;
-
-            [JsonProperty("ki")]
-            public ushort KeyIndex { get; set; }
-
-            [JsonProperty("fh")]
-            public int Hash { get; set; }
-        }
-
-        private sealed class Version10ByteArrayWireFixture
-        {
-            [JsonProperty("$value")]
-            public string Value { get; set; } = null!;
-        }
     }
 
     [Serializable]

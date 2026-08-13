@@ -1,7 +1,5 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -70,7 +68,8 @@ public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatch
     /// <returns>The serialized queue message.</returns>
     public string ToQueueMessage<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
     {
-        var azureQueueBatchMessage = new AzureQueueBatchContainerV2(streamGuid, streamNamespace, events.Cast<object>().ToList(), requestContext);
+        var eventList = events.Cast<object>().ToList();
+        var azureQueueBatchMessage = new AzureQueueBatchContainerV2(streamGuid, streamNamespace, eventList, requestContext);
 
         switch (SerializationMode)
         {
@@ -78,7 +77,7 @@ public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatch
             {
                 try
                 {
-                    return SerializeJson(azureQueueBatchMessage, streamGuid, streamNamespace);
+                    return SerializeJson(streamGuid, streamNamespace, eventList, requestContext);
                 }
                 catch (Exception ex)
                 {
@@ -89,7 +88,7 @@ public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatch
 
             case SerializationMode.Json:
             {
-                return SerializeJson(azureQueueBatchMessage, streamGuid, streamNamespace);
+                return SerializeJson(streamGuid, streamNamespace, eventList, requestContext);
             }
 
             case SerializationMode.Binary:
@@ -143,20 +142,51 @@ public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatch
         return azureQueueBatch;
     }
 
-    private string SerializeJson(AzureQueueBatchContainerV2 batch, Guid streamGuid, string streamNamespace)
+    private string SerializeJson(
+        Guid streamGuid,
+        string streamNamespace,
+        List<object> events,
+        Dictionary<string, object> requestContext)
     {
-        var result = JsonNode.Parse(orleansMigrationJsonSerializer.Serialize(batch, typeof(AzureQueueBatchContainerV2)))?.AsObject()
-            ?? throw new JsonSerializationException("The serialized Azure Queue batch is not a JSON object.");
-        result.Remove(nameof(AzureQueueBatchContainerV2.StreamGuid));
-        result.Remove(nameof(AzureQueueBatchContainerV2.StreamNamespace));
-        result.Add("StreamId", CreateStreamId(streamGuid, streamNamespace, GetNextReferenceId(result)));
-        return result.ToJsonString(JsonNodeSerializerOptions);
+        var serializedEvents = JsonNode.Parse(
+            orleansMigrationJsonSerializer.Serialize(events, typeof(List<object>)))?.AsObject()
+            ?? throw new JsonSerializationException("The serialized event collection is not a JSON object.");
+        var eventValues = serializedEvents["$values"]?.AsArray()
+            ?? throw new JsonSerializationException("The serialized event collection does not contain values.");
+        serializedEvents.Remove("$values");
+        RemoveUnreferencedIds(eventValues);
+
+        var serializedRequestContext = JsonNode.Parse(
+            orleansMigrationJsonSerializer.Serialize(requestContext, typeof(Dictionary<string, object>)))
+            ?? new JsonObject();
+        if (serializedRequestContext is JsonObject requestContextObject)
+        {
+            requestContextObject.Remove("$type");
+            RemoveUnreferencedIds(requestContextObject);
+        }
+
+        return new JsonObject
+        {
+            ["version"] = 1,
+            ["stream"] = new JsonObject
+            {
+                ["namespace"] = streamNamespace,
+                ["key"] = streamGuid.ToString("D")
+            },
+            ["events"] = eventValues,
+            ["requestContext"] = serializedRequestContext
+        }.ToJsonString(JsonNodeSerializerOptions);
     }
 
     private AzureQueueBatchContainerV2 DeserializeJson(string message)
     {
         var result = JsonNode.Parse(message)?.AsObject()
             ?? throw new JsonSerializationException("The Azure Queue message is not a JSON object.");
+        if (result["version"] is JsonValue)
+        {
+            return DeserializeMigrationEnvelope(result);
+        }
+
         if (result["StreamId"] is not JsonObject streamId)
         {
             return (AzureQueueBatchContainerV2)orleansMigrationJsonSerializer.Deserialize(
@@ -190,54 +220,58 @@ public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatch
             result.ToJsonString(JsonNodeSerializerOptions));
     }
 
-    private static JsonObject CreateStreamId(Guid streamGuid, string streamNamespace, int referenceId)
+    private AzureQueueBatchContainerV2 DeserializeMigrationEnvelope(JsonObject envelope)
     {
-        var namespaceBytes = streamNamespace is null ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(streamNamespace);
-        if (namespaceBytes.Length > ushort.MaxValue)
+        var version = envelope["version"]?.GetValue<int>()
+            ?? throw new JsonSerializationException("The migration envelope version is missing.");
+        if (version != 1)
         {
-            throw new ArgumentException("The stream namespace is too long.", nameof(streamNamespace));
+            throw new JsonSerializationException($"Unsupported Azure Queue migration envelope version '{version}'.");
         }
 
-        var keyBytes = Encoding.UTF8.GetBytes(streamGuid.ToString("N", CultureInfo.InvariantCulture));
-        var fullKey = new byte[namespaceBytes.Length + keyBytes.Length];
-        Buffer.BlockCopy(namespaceBytes, 0, fullKey, 0, namespaceBytes.Length);
-        Buffer.BlockCopy(keyBytes, 0, fullKey, namespaceBytes.Length, keyBytes.Length);
-
-        return new JsonObject
+        var stream = envelope["stream"]?.AsObject()
+            ?? throw new JsonSerializationException("The migration envelope stream is missing.");
+        var streamNamespace = stream["namespace"]?.GetValue<string>();
+        var streamKey = stream["key"]?.GetValue<string>()
+            ?? throw new JsonSerializationException("The migration envelope stream key is missing.");
+        if (!Guid.TryParseExact(streamKey, "D", out var streamGuid))
         {
-            ["$id"] = referenceId.ToString(CultureInfo.InvariantCulture),
-            ["$type"] = "Orleans.Runtime.StreamId, Orleans.Streaming",
-            ["fk"] = new JsonObject
-            {
-                ["$type"] = "System.Byte[], System.Private.CoreLib",
-                ["$value"] = Convert.ToBase64String(fullKey)
-            },
-            ["ki"] = namespaceBytes.Length,
-            ["fh"] = unchecked((int)ComputeStableHash(fullKey))
-        };
+            throw new JsonSerializationException("The migration envelope stream key is not a GUID.");
+        }
+
+        var serializedEvents = envelope["events"]?.ToJsonString(JsonNodeSerializerOptions)
+            ?? throw new JsonSerializationException("The migration envelope events are missing.");
+        var events = (List<object>)orleansMigrationJsonSerializer.Deserialize(typeof(List<object>), serializedEvents);
+
+        var requestContext = envelope["requestContext"] is { } requestContextNode
+            ? (Dictionary<string, object>)orleansMigrationJsonSerializer.Deserialize(
+                typeof(Dictionary<string, object>),
+                requestContextNode.ToJsonString(JsonNodeSerializerOptions))
+            : null;
+
+        return new AzureQueueBatchContainerV2(streamGuid, streamNamespace, events, requestContext);
     }
 
-    private static int GetNextReferenceId(JsonNode value)
+    private static void RemoveUnreferencedIds(JsonNode value)
     {
-        var maximumId = 0;
-        Visit(value);
-        return checked(maximumId + 1);
+        var referencedIds = new HashSet<string>(StringComparer.Ordinal);
+        CollectReferences(value);
+        RemoveIds(value);
 
-        void Visit(JsonNode token)
+        void CollectReferences(JsonNode token)
         {
             if (token is JsonObject obj)
             {
-                var id = obj["$id"]?.GetValue<string>();
-                if (int.TryParse(id, NumberStyles.None, CultureInfo.InvariantCulture, out var parsedId))
+                if (obj["$ref"]?.GetValue<string>() is { } reference)
                 {
-                    maximumId = Math.Max(maximumId, parsedId);
+                    referencedIds.Add(reference);
                 }
 
                 foreach (var property in obj)
                 {
                     if (property.Value is not null)
                     {
-                        Visit(property.Value);
+                        CollectReferences(property.Value);
                     }
                 }
             }
@@ -247,79 +281,39 @@ public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatch
                 {
                     if (item is not null)
                     {
-                        Visit(item);
+                        CollectReferences(item);
                     }
                 }
             }
         }
-    }
 
-    // StableHash reads the big-endian XxHash32 digest into a native uint.
-    private static uint ComputeStableHash(byte[] data)
-    {
-        const uint prime1 = 0x9E3779B1;
-        const uint prime2 = 0x85EBCA77;
-        const uint prime3 = 0xC2B2AE3D;
-        const uint prime4 = 0x27D4EB2F;
-        const uint prime5 = 0x165667B1;
-
-        unchecked
+        void RemoveIds(JsonNode token)
         {
-            var offset = 0;
-            uint hash;
-            if (data.Length >= 16)
+            if (token is JsonObject obj)
             {
-                var accumulator1 = prime1 + prime2;
-                var accumulator2 = prime2;
-                uint accumulator3 = 0;
-                var accumulator4 = 0u - prime1;
-                var limit = data.Length - 16;
-                do
+                if (obj["$id"]?.GetValue<string>() is { } id && !referencedIds.Contains(id))
                 {
-                    accumulator1 = Round(accumulator1, BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(offset)));
-                    offset += 4;
-                    accumulator2 = Round(accumulator2, BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(offset)));
-                    offset += 4;
-                    accumulator3 = Round(accumulator3, BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(offset)));
-                    offset += 4;
-                    accumulator4 = Round(accumulator4, BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(offset)));
-                    offset += 4;
+                    obj.Remove("$id");
                 }
-                while (offset <= limit);
 
-                hash = RotateLeft(accumulator1, 1)
-                    + RotateLeft(accumulator2, 7)
-                    + RotateLeft(accumulator3, 12)
-                    + RotateLeft(accumulator4, 18);
+                foreach (var property in obj)
+                {
+                    if (property.Value is not null)
+                    {
+                        RemoveIds(property.Value);
+                    }
+                }
             }
-            else
+            else if (token is JsonArray array)
             {
-                hash = prime5;
+                foreach (var item in array)
+                {
+                    if (item is not null)
+                    {
+                        RemoveIds(item);
+                    }
+                }
             }
-
-            hash += (uint)data.Length;
-            while (offset <= data.Length - 4)
-            {
-                hash += BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(offset)) * prime3;
-                hash = RotateLeft(hash, 17) * prime4;
-                offset += 4;
-            }
-
-            while (offset < data.Length)
-            {
-                hash += data[offset++] * prime5;
-                hash = RotateLeft(hash, 11) * prime1;
-            }
-
-            hash ^= hash >> 15;
-            hash *= prime2;
-            hash ^= hash >> 13;
-            hash *= prime3;
-            hash ^= hash >> 16;
-            return BitConverter.IsLittleEndian ? BinaryPrimitives.ReverseEndianness(hash) : hash;
-
-            static uint Round(uint accumulator, uint input) => RotateLeft(accumulator + input * prime2, 13) * prime1;
-            static uint RotateLeft(uint value, int count) => (value << count) | (value >> (32 - count));
         }
     }
 
