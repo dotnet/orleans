@@ -16,7 +16,7 @@ namespace Orleans.Timers
         /// </summary>
         /// <param name="callingGrainId">The ID of the the currently executing grain</param>
         /// <param name="reminderName">The reminder name.</param>
-        /// <param name="dueTime">The amount of time to delay before initially invoking the reminder. A value of <see cref="TimeSpan.Zero"/> means the first tick is scheduled immediately; negative values and <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> are rejected.</param>
+        /// <param name="dueTime">The amount of time to delay before initially invoking the reminder. A value of <see cref="TimeSpan.Zero"/> means the first tick is scheduled immediately; negative, infinite, or values which exceed the remaining <see cref="DateTime"/> range are rejected.</param>
         /// <param name="period">The time interval between invocations of the reminder. The value must be greater than <see cref="TimeSpan.Zero"/>; values of zero, negative, and <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> are rejected. The effective minimum is also constrained by <see cref="Orleans.Hosting.ReminderOptions.MinimumReminderPeriod"/>.</param>
         /// <returns>The reminder.</returns>
         /// <remarks>

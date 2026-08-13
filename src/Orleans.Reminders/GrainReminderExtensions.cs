@@ -21,7 +21,7 @@ public static class GrainReminderExtensions
     /// </summary>
     /// <param name="grain">The grain instance.</param>
     /// <param name="reminderName">Name of this reminder</param>
-    /// <param name="dueTime">Due time for this reminder. A value of <see cref="TimeSpan.Zero"/> schedules the first tick immediately; negative values and <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> are rejected.</param>
+    /// <param name="dueTime">Due time for this reminder. A value of <see cref="TimeSpan.Zero"/> schedules the first tick immediately; negative, infinite, or values which exceed the remaining <see cref="DateTime"/> range are rejected.</param>
     /// <param name="period">Frequency period for this reminder. The value must be greater than <see cref="TimeSpan.Zero"/>; zero, negative, and <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> values are rejected. The minimum is also constrained by <see cref="Orleans.Hosting.ReminderOptions.MinimumReminderPeriod"/>.</param>
     /// <returns>Promise for Reminder handle.</returns>
     /// <remarks>
@@ -39,7 +39,7 @@ public static class GrainReminderExtensions
     /// </summary>
     /// <param name="grain">The grain instance.</param>
     /// <param name="reminderName">Name of this reminder</param>
-    /// <param name="dueTime">Due time for this reminder. A value of <see cref="TimeSpan.Zero"/> schedules the first tick immediately; negative values and <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> are rejected.</param>
+    /// <param name="dueTime">Due time for this reminder. A value of <see cref="TimeSpan.Zero"/> schedules the first tick immediately; negative, infinite, or values which exceed the remaining <see cref="DateTime"/> range are rejected.</param>
     /// <param name="period">Frequency period for this reminder. The value must be greater than <see cref="TimeSpan.Zero"/>; zero, negative, and <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> values are rejected. The minimum is also constrained by <see cref="Orleans.Hosting.ReminderOptions.MinimumReminderPeriod"/>.</param>
     /// <returns>Promise for Reminder handle.</returns>
     /// <remarks>
