@@ -75,12 +75,16 @@ public class UnknownSiloStatusCacheTests
 
         public SiloStatus LocalSiloStatus => SiloStatus.Active;
 
-        public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken)
-            => Task.CompletedTask;
-
-        public Task RefreshFromSource(CancellationToken cancellationToken)
+        public Task Refresh(
+            MembershipVersion? targetVersion,
+            CancellationToken cancellationToken,
+            bool requireFresh = false)
         {
-            SourceRefreshCount++;
+            if (requireFresh)
+            {
+                SourceRefreshCount++;
+            }
+
             return Task.CompletedTask;
         }
 
