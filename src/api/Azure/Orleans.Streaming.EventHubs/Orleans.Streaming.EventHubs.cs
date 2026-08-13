@@ -766,7 +766,11 @@ namespace Orleans.Streams
 
         public System.Threading.Tasks.Task<string> Load() { throw null; }
 
+        public System.Threading.Tasks.Task<string> Load(System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public void Update(string offset, System.DateTime utcNow) { }
+
+        public void Update(string offset, System.DateTime utcNow, System.Threading.CancellationToken cancellationToken) { }
     }
 
     public partial class AzureTableStreamQueueCheckpointerFactory : IStreamQueueCheckpointerFactory

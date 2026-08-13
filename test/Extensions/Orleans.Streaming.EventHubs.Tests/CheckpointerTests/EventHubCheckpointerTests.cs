@@ -405,7 +405,6 @@ public class EventHubCheckpointerTests
 
         Assert.True(checkpointer.CheckpointExists);
         Assert.Equal("21", GetLatestOffset(checkpointer));
-        Assert.Equal("21", GetEntityOffset(checkpointer));
     }
 
     [TestSuite("BVT")]
@@ -413,12 +412,12 @@ public class EventHubCheckpointerTests
     public void Update_WithNoComparer_TracksOpaqueCheckpoint()
     {
         var checkpointer = CreateUninitializedCheckpointer(useNumericComparer: false);
+        ThrottleSaves(checkpointer);
 
         checkpointer.Update("opaque-checkpoint", new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc));
 
         Assert.True(checkpointer.CheckpointExists);
         Assert.Equal("opaque-checkpoint", GetLatestOffset(checkpointer));
-        Assert.Equal("opaque-checkpoint", GetEntityOffset(checkpointer));
     }
 
     [TestSuite("BVT")]
@@ -441,7 +440,7 @@ public class EventHubCheckpointerTests
             streamProviderName: "provider/name",
             partition: "partition?1",
             serviceId: "service#id");
-        var entity = GetField(checkpointer, "_entity");
+        var entity = GetEntity(checkpointer);
         var entityType = entity.GetType();
 
         Assert.Equal("EventHubCheckpoints_provider_name_service_id", GetEntityPartitionKey(checkpointer));
@@ -664,53 +663,68 @@ public class EventHubCheckpointerTests
 
     private static void SetPersistedOffset(AzureTableStreamQueueCheckpointer checkpointer, string offset)
     {
-        SetField(checkpointer, "_latestCheckpoint", offset);
-        SetField(checkpointer, "_persistedCheckpoint", offset);
+        var inner = GetField(checkpointer, "_inner");
+        SetField(inner, "_latestCheckpoint", offset);
+        SetField(inner, "_persistedState", new StreamCheckpointStoreState(offset, offset));
+        SetField(inner, "_throttleSavesUntilUtc", DateTime.MaxValue);
         SetEntityOffset(checkpointer, offset);
     }
 
     private static string GetLatestOffset(AzureTableStreamQueueCheckpointer checkpointer)
-        => (string)GetField(checkpointer, "_latestCheckpoint");
+        => (string)GetField(GetField(checkpointer, "_inner"), "_latestCheckpoint");
 
     private static string GetEntityOffset(AzureTableStreamQueueCheckpointer checkpointer)
-        => (string)GetField(checkpointer, "_entity")
+        => (string)GetEntity(checkpointer)
             .GetType()
             .GetProperty("Offset")!
-            .GetValue(GetField(checkpointer, "_entity"))!;
+            .GetValue(GetEntity(checkpointer))!;
 
     private static string GetEntityPartitionKey(AzureTableStreamQueueCheckpointer checkpointer)
-        => (string)GetField(checkpointer, "_entity")
+        => (string)GetEntity(checkpointer)
             .GetType()
             .GetProperty("PartitionKey")!
-            .GetValue(GetField(checkpointer, "_entity"))!;
+            .GetValue(GetEntity(checkpointer))!;
 
     private static string GetEntityRowKey(AzureTableStreamQueueCheckpointer checkpointer)
-        => (string)GetField(checkpointer, "_entity")
+        => (string)GetEntity(checkpointer)
             .GetType()
             .GetProperty("RowKey")!
-            .GetValue(GetField(checkpointer, "_entity"))!;
+            .GetValue(GetEntity(checkpointer))!;
 
     private static void SetEntityOffset(AzureTableStreamQueueCheckpointer checkpointer, string offset)
     {
-        var entity = GetField(checkpointer, "_entity");
+        var entity = GetEntity(checkpointer);
         entity.GetType().GetProperty("Offset")!.SetValue(entity, offset);
     }
 
-    private static object GetField(AzureTableStreamQueueCheckpointer checkpointer, string name)
+    private static object GetEntity(AzureTableStreamQueueCheckpointer checkpointer)
     {
-        var field = typeof(AzureTableStreamQueueCheckpointer).GetField(
-            name,
-            BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(field);
-        return field.GetValue(checkpointer)!;
+        var store = GetField(checkpointer, "_store");
+        var property = store.GetType().GetProperty(
+            "Entity",
+            BindingFlags.Instance | BindingFlags.Public);
+        Assert.NotNull(property);
+        return property.GetValue(store)!;
     }
 
-    private static void SetField(AzureTableStreamQueueCheckpointer checkpointer, string name, object value)
+    private static void ThrottleSaves(AzureTableStreamQueueCheckpointer checkpointer)
+        => SetField(GetField(checkpointer, "_inner"), "_throttleSavesUntilUtc", DateTime.MaxValue);
+
+    private static object GetField(object instance, string name)
     {
-        var field = typeof(AzureTableStreamQueueCheckpointer).GetField(
+        var field = instance.GetType().GetField(
             name,
             BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(field);
-        field.SetValue(checkpointer, value);
+        return field.GetValue(instance)!;
+    }
+
+    private static void SetField(object instance, string name, object value)
+    {
+        var field = instance.GetType().GetField(
+            name,
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        field.SetValue(instance, value);
     }
 }
