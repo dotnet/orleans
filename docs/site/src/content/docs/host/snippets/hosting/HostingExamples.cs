@@ -517,6 +517,11 @@ public interface IShoppingCartGrain : IGrainWithStringKey
 {
 }
 
+public interface IUserSessionGrain : IGrainWithStringKey
+{
+    Task ExpireAsync();
+}
+
 // <grain_directory_attribute>
 [GrainDirectory("durable-directory")]
 public sealed class ShoppingCartGrain : Grain, IShoppingCartGrain
@@ -566,6 +571,18 @@ public sealed class ReferenceDataGrain : Grain
 {
 }
 // </keep_alive_grain>
+
+// <explicit_deactivate_grain>
+public sealed class UserSessionGrain : Grain, IUserSessionGrain
+{
+    public Task ExpireAsync()
+    {
+        // Ends this activation after the current turn completes.
+        this.DeactivateOnIdle();
+        return Task.CompletedTask;
+    }
+}
+// </explicit_deactivate_grain>
 
 // <validate_dependencies_task>
 public sealed class ValidateDependenciesTask : IStartupTask

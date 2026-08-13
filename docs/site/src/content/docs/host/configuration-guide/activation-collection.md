@@ -33,6 +33,8 @@ Call <xref:Orleans.Grain.DeactivateOnIdle*> when the current activation should d
 
 :::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="deactivate_on_idle":::
 
+This API applies to the current activation only. You can't call it from outside the grain to deactivate an arbitrary grain ID.
+
 Queued calls are forwarded to a new or existing activation.
 
 ### Delay activation collection
@@ -61,6 +63,26 @@ For example, assume a 10-minute collection age and ignore scan latency:
 | Call `DelayDeactivation` with 5 minutes at minute 0, then receive an ordinary grain call at minute 7. | No earlier than minute 17, after the new 10-minute idle period. |
 
 <xref:Orleans.Grain.DeactivateOnIdle*> takes priority over a delay. Delaying deactivation is an optimization, not a durability or placement guarantee. It doesn't pin an activation to a silo, and failures, shutdown, migration, explicit deactivation, and memory pressure can still remove the activation.
+
+## How to deactivate a specific grain identity
+
+Orleans intentionally doesn't expose a "deactivate by grain ID" management API. To explicitly deactivate one logical grain, expose an application method on that grain and call <xref:Orleans.Grain.DeactivateOnIdle*> from inside the grain.
+
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="explicit_deactivate_grain":::
+
+Use this pattern only when the grain has a domain reason to end its current activation (for example, after completing a one-off workflow or releasing costly in-memory resources). Don't use it for ordinary lifecycle management; idle collection is the default and preferred behavior.
+
+### What "idle" means for collection
+
+An activation is idle when it hasn't processed inbound work during the configured idle window. Inbound grain calls, reminders, and stream events reset idleness. Outbound calls and arbitrary local work don't. Timer callbacks reset idleness only when the timer is created with <xref:Orleans.Runtime.GrainTimerCreationOptions.KeepAlive>.
+
+`DeactivateOnIdle` requests deactivation after the current turn and currently queued work complete. A later call to the same grain identity can reactivate it on any compatible silo.
+
+### Cautions
+
+- Treat deactivation as best effort cleanup. It can be skipped by abrupt process termination and some failure paths.
+- Persist important state as part of normal operations, not only in <xref:Orleans.Grain.OnDeactivateAsync*>.
+- Don't use explicit deactivation as a substitute for memory-pressure tuning. Use collection settings and scaling based on measurements.
 
 ### Keep alive
 
