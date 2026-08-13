@@ -1,6 +1,10 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Orleans.Configuration;
+using Orleans.Hosting;
+using Orleans.TestingHost;
 using Tester.DurableJobs;
 using TestExtensions;
 using Xunit;
@@ -108,5 +112,44 @@ public class InMemoryDurableJobsTests : HostedTestClusterEnsureDefaultStarted
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         await _runner.JobRetry(cts.Token);
+    }
+}
+
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
+public class InMemoryDurableJobsResponseTimeoutTests : TestClusterPerTest
+{
+    protected override void ConfigureTestCluster(TestClusterBuilder builder)
+    {
+        builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        builder.AddClientBuilderConfigurator<ClientConfigurator>();
+    }
+
+    [Fact, TestCategory("BVT"), TestCategory("DurableJobs")]
+    public async Task JobRetryWaitOverridesClientResponseTimeout()
+    {
+        var runner = new DurableJobTestsRunner(GrainFactory);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await runner.JobRetry(cts.Token);
+    }
+
+    private sealed class SiloConfigurator : ISiloConfigurator
+    {
+        public void Configure(ISiloBuilder hostBuilder)
+        {
+            hostBuilder
+                .UseInMemoryReminderService()
+                .UseInMemoryDurableJobs()
+                .AddMemoryGrainStorageAsDefault();
+        }
+    }
+
+    private sealed class ClientConfigurator : IClientBuilderConfigurator
+    {
+        public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+        {
+            clientBuilder.Configure<ClientMessagingOptions>(options => options.ResponseTimeout = TimeSpan.FromSeconds(1));
+        }
     }
 }
