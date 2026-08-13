@@ -163,7 +163,8 @@ namespace Orleans.Streaming.Kinesis
 
             foreach (var record in getRecordsResponse.Records)
             {
-                // Kinesis only has a long string sequence ID, so we fake one based on the order we read from the partition.
+                // Retain the receiver-local ordinal for compatibility with existing serialized tokens.
+                // KinesisSequenceToken orders records using the durable shard sequence.
                 batch.Add(KinesisBatchContainer.FromKinesisRecord(_serializer, record, _lastReadMessage++));
             }
 
