@@ -79,20 +79,20 @@ public class DurableJobReceiverExtensionTests
         handler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(executionTask.Task);
 
-        var extension = CreateExtension(handler);
+        var extension = CreateExtension(handler, TimeSpan.FromMinutes(1));
         var firstNotification = CreateJobContext("run-1", jobId: "job-1", dequeueCount: 1);
         var secondNotification = CreateJobContext("run-2", jobId: "job-1", dequeueCount: 1);
 
-        var first = await extension.HandleDurableJobAsync(firstNotification, CancellationToken.None);
+        var first = extension.HandleDurableJobAsync(firstNotification, CancellationToken.None);
         var second = await extension.HandleDurableJobAsync(secondNotification, CancellationToken.None);
 
-        Assert.True(first.IsPending);
+        Assert.False(first.IsCompleted);
         Assert.True(second.IsPending);
         await handler.Received(1).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
 
         executionTask.SetResult(true);
 
-        var completed = await WaitForTerminalResult(extension, firstNotification);
+        var completed = await first.AsTask().WaitAsync(TimeSpan.FromMinutes(1));
         Assert.Equal(DurableJobRunStatus.Completed, completed.Status);
         await handler.Received(1).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
 
@@ -140,21 +140,5 @@ public class DurableJobReceiverExtensionTests
         });
 
         return context;
-    }
-
-    private static async Task<DurableJobRunResult> WaitForTerminalResult(DurableJobReceiverExtension extension, IJobRunContext context)
-    {
-        for (var i = 0; i < 10; i++)
-        {
-            var result = await extension.HandleDurableJobAsync(context, CancellationToken.None);
-            if (!result.IsPending)
-            {
-                return result;
-            }
-
-            await Task.Yield();
-        }
-
-        throw new TimeoutException("Durable job receiver did not observe terminal job status.");
     }
 }
