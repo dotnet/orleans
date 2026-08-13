@@ -21,9 +21,12 @@ public static class GrainReminderExtensions
     /// </summary>
     /// <param name="grain">The grain instance.</param>
     /// <param name="reminderName">Name of this reminder</param>
-    /// <param name="dueTime">Due time for this reminder</param>
-    /// <param name="period">Frequency period for this reminder</param>
+    /// <param name="dueTime">Due time for this reminder. A value of <see cref="TimeSpan.Zero"/> schedules the first tick immediately; negative values and <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> are rejected.</param>
+    /// <param name="period">Frequency period for this reminder. The value must be greater than <see cref="TimeSpan.Zero"/>; zero, negative, and <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> values are rejected. The minimum is also constrained by <see cref="Orleans.Hosting.ReminderOptions.MinimumReminderPeriod"/>.</param>
     /// <returns>Promise for Reminder handle.</returns>
+    /// <remarks>
+    /// There is no special one-shot reminder value for <paramref name="period"/>. Register a valid positive period and then unregister the reminder when the first callback fires.
+    /// </remarks>
     public static Task<IGrainReminder> RegisterOrUpdateReminder(this Grain grain, string reminderName, TimeSpan dueTime, TimeSpan period)
         => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, dueTime, period);
 
@@ -36,9 +39,12 @@ public static class GrainReminderExtensions
     /// </summary>
     /// <param name="grain">The grain instance.</param>
     /// <param name="reminderName">Name of this reminder</param>
-    /// <param name="dueTime">Due time for this reminder</param>
-    /// <param name="period">Frequency period for this reminder</param>
+    /// <param name="dueTime">Due time for this reminder. A value of <see cref="TimeSpan.Zero"/> schedules the first tick immediately; negative values and <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> are rejected.</param>
+    /// <param name="period">Frequency period for this reminder. The value must be greater than <see cref="TimeSpan.Zero"/>; zero, negative, and <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> values are rejected. The minimum is also constrained by <see cref="Orleans.Hosting.ReminderOptions.MinimumReminderPeriod"/>.</param>
     /// <returns>Promise for Reminder handle.</returns>
+    /// <remarks>
+    /// There is no special one-shot reminder value for <paramref name="period"/>. Register a valid positive period and then unregister the reminder when the first callback fires.
+    /// </remarks>
     public static Task<IGrainReminder> RegisterOrUpdateReminder(this IGrainBase grain, string reminderName, TimeSpan dueTime, TimeSpan period)
         => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, dueTime, period);
 
