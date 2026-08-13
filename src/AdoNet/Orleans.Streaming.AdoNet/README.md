@@ -51,11 +51,14 @@ await builder.RunAsync();
 The provider stores each queue as an immutable partition log. Configure retained-log behavior with:
 
 - `StartFromNow`: initialize a new checkpoint at the retained tail instead of before the earliest retained message.
+- `FaultOnDeliveryFailure`: optionally fault a failing subscription without altering the shared retained log.
 - `MaxMessagesPerRead`: bound each ordered storage read.
 - `CheckpointPersistInterval`: throttle durable checkpoint updates.
 - `RetentionPeriod`: retain checkpointed messages for at least this period (one day by default).
 - `MaximumRetentionPeriod`: optionally delete older messages even when they are not checkpointed. This is a hard capacity ceiling and can create a diagnosed delivery gap.
 - `CleanupInterval` and `CleanupBatchSize`: bound cleanup frequency and work.
+
+The provider is rewindable while requested records remain retained. It resumes strictly after its durable, ownership-fenced checkpoint and can redeliver records after a crash without skipping uncheckpointed data.
 
 ## Alpha schema upgrade
 

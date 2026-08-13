@@ -99,7 +99,7 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
 
         // assert
         Assert.Equal(name, adapter.Name);
-        Assert.False(adapter.IsRewindable);
+        Assert.True(adapter.IsRewindable);
         Assert.Equal(StreamProviderDirection.ReadWrite, adapter.Direction);
     }
 
