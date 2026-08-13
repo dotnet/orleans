@@ -1363,7 +1363,9 @@ namespace Orleans.Runtime.ReminderService
                                 if (lease.Outcome == ReminderAdmissionOutcome.Skipped)
                                 {
                                     _shared._throttleInstruments.OnTickSkipped(lease.TierName, lease.SkipReason!.Value);
-                                    ReminderEvents.EmitTickSkipped(entry.GrainId, entry.ReminderName, provisionalStatus, lease.SkipReason!.Value, lease.TierName, lease.WaitedFor, _shared.Silo);
+                                    var skippedAt = _shared._timeProvider.GetUtcNow().UtcDateTime;
+                                    var skippedStatus = new TickStatus(entry.StartAt, entry.Period, skippedAt);
+                                    ReminderEvents.EmitTickSkipped(entry.GrainId, entry.ReminderName, skippedStatus, lease.SkipReason!.Value, lease.TierName, lease.WaitedFor, _shared.Silo);
                                     continue;
                                 }
 
