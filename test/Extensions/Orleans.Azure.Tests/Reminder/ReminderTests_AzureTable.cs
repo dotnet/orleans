@@ -23,10 +23,20 @@ namespace Tester.AzureUtils.TimerTests
     [TestCategory("Reminders"), TestCategory("AzureStorage")]
     public class ReminderTests_AzureTable : ReminderTestsBase, IClassFixture<ReminderTests_AzureTable.Fixture>
     {
+        private readonly Fixture _fixture;
+
         public class Fixture : BaseInProcessAzureTestClusterFixture
         {
+            private static readonly TimeSpan ReminderServiceStartupTimeout = TimeSpan.FromMinutes(5);
             private ReminderTestClock? _reminderClock;
+            private readonly ReminderDiagnosticObserver _startupObserver = ReminderDiagnosticObserver.Create();
+            private IReadOnlyList<SiloAddress>? _initialSilos;
+            private IReadOnlyList<SiloAddress>? _startedReminderServices;
             internal ReminderTestClock ReminderClock => _reminderClock ?? throw new InvalidOperationException($"{nameof(ReminderTestClock)} has not been configured.");
+            internal IReadOnlyList<SiloAddress> InitialSilos => _initialSilos
+                ?? throw new InvalidOperationException("The initial silos have not been captured.");
+            internal IReadOnlyList<SiloAddress> StartedReminderServices => _startedReminderServices
+                ?? throw new InvalidOperationException("Reminder services have not completed startup.");
 
             protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
@@ -40,6 +50,33 @@ namespace Tester.AzureUtils.TimerTests
                 });
             }
 
+            public override async Task InitializeAsync()
+            {
+                await base.InitializeAsync();
+
+                var silos = HostedCluster.Silos.ToArray();
+                _initialSilos = silos.Select(silo => silo.SiloAddress).ToArray();
+                using var cancellation = new CancellationTokenSource(ReminderServiceStartupTimeout);
+                var startedTasks = silos
+                    .Select(silo => _startupObserver.WaitForReminderServiceStartedAsync(cancellation.Token, silo.SiloAddress))
+                    .ToArray();
+
+                try
+                {
+                    _startedReminderServices = (await Task.WhenAll(startedTasks))
+                        .Select(started => started.SiloAddress!)
+                        .ToArray();
+                }
+                catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+                {
+                    var missing = silos
+                        .Where((_, index) => !startedTasks[index].IsCompletedSuccessfully)
+                        .Select(silo => silo.SiloAddress);
+                    throw new TimeoutException(
+                        $"Azure reminder services did not start within {ReminderServiceStartupTimeout}. Missing silos: {string.Join(", ", missing)}.");
+                }
+            }
+
             public override async Task DisposeAsync()
             {
                 try
@@ -49,16 +86,24 @@ namespace Tester.AzureUtils.TimerTests
                 finally
                 {
                     _reminderClock?.Dispose();
+                    _startupObserver.Dispose();
                 }
             }
         }
 
         public ReminderTests_AzureTable(Fixture fixture) : base(fixture.ReminderClock, fixture.HostedCluster)
         {
+            _fixture = fixture;
             fixture.EnsurePreconditionsMet();
         }
 
         // Basic tests
+
+        [SkippableFact, TestCategory("Functional")]
+        public void Fixture_WaitsForReminderServicesToStart()
+        {
+            Assert.Equal(_fixture.InitialSilos, _fixture.StartedReminderServices);
+        }
 
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_Basic_StopByRef()
