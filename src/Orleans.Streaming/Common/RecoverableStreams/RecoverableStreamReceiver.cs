@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Streams;
@@ -15,10 +16,14 @@ namespace Orleans.Providers.Streams.Common
     {
         private readonly IRecoverableStreamSource<TQueueMessage> _source;
         private readonly IRecoverableStreamDataAdapter<TQueueMessage> _dataAdapter;
-        private readonly RecoverableStreamQueueCache<TQueueMessage> _cache;
+        private readonly IRecoverableStreamQueueCache<TQueueMessage> _cache;
         private readonly IStreamQueueCheckpointer<string> _checkpointer;
         private readonly bool _startFromNow;
+        private readonly object _lifecycleLock = new();
+        private readonly CancellationTokenSource _lifecycleCancellation = new();
+        private Task? _initializeTask;
         private int _running;
+        private int _shutdown;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RecoverableStreamReceiver{TQueueMessage}"/> class.
@@ -27,6 +32,19 @@ namespace Orleans.Providers.Streams.Common
             IRecoverableStreamSource<TQueueMessage> source,
             IRecoverableStreamDataAdapter<TQueueMessage> dataAdapter,
             RecoverableStreamQueueCache<TQueueMessage> cache,
+            IStreamQueueCheckpointer<string> checkpointer,
+            bool startFromNow)
+            : this(source, dataAdapter, (IRecoverableStreamQueueCache<TQueueMessage>)cache, checkpointer, startFromNow)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="RecoverableStreamReceiver{TQueueMessage}"/> class.
+        /// </summary>
+        public RecoverableStreamReceiver(
+            IRecoverableStreamSource<TQueueMessage> source,
+            IRecoverableStreamDataAdapter<TQueueMessage> dataAdapter,
+            IRecoverableStreamQueueCache<TQueueMessage> cache,
             IStreamQueueCheckpointer<string> checkpointer,
             bool startFromNow)
         {
@@ -44,12 +62,49 @@ namespace Orleans.Providers.Streams.Common
                 ? null
                 : new CancellationTokenSource(timeout);
             var cancellationToken = cancellation?.Token ?? CancellationToken.None;
-            var checkpoint = await _checkpointer.Load(cancellationToken);
+            await EnsureInitialized(cancellationToken);
+        }
+
+        /// <summary>
+        /// Initializes the receiver.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        public Task Initialize(CancellationToken cancellationToken)
+            => EnsureInitialized(cancellationToken);
+
+        private Task EnsureInitialized(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (_lifecycleLock)
+            {
+                if (Volatile.Read(ref _running) != 0 || Volatile.Read(ref _shutdown) != 0)
+                {
+                    return Task.CompletedTask;
+                }
+
+                if (_initializeTask is null || _initializeTask.IsCompleted)
+                {
+                    _initializeTask = InitializeCore();
+                }
+
+                return _initializeTask.WaitAsync(cancellationToken);
+            }
+        }
+
+        private async Task InitializeCore()
+        {
+            var lifecycleToken = _lifecycleCancellation.Token;
+            var checkpoint = await _checkpointer.Load(lifecycleToken);
             await _source.Initialize(
                 new RecoverableStreamStartPosition(
                     _checkpointer.CheckpointExists ? checkpoint : null,
                     _startFromNow),
-                cancellationToken);
+                lifecycleToken);
+            if (Volatile.Read(ref _shutdown) != 0)
+            {
+                return;
+            }
+
             Volatile.Write(ref _running, 1);
         }
 
@@ -63,7 +118,14 @@ namespace Orleans.Providers.Streams.Common
             int maxCount,
             CancellationToken cancellationToken)
         {
-            if (Volatile.Read(ref _running) == 0 || maxCount <= 0)
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Volatile.Read(ref _shutdown) != 0 || maxCount <= 0)
+            {
+                return [];
+            }
+
+            await EnsureInitialized(cancellationToken);
+            if (Volatile.Read(ref _shutdown) != 0)
             {
                 return [];
             }
@@ -109,18 +171,77 @@ namespace Orleans.Providers.Streams.Common
         /// <inheritdoc />
         public async Task Shutdown(TimeSpan timeout)
         {
-            if (Interlocked.Exchange(ref _running, 0) == 0)
+            if (Interlocked.Exchange(ref _shutdown, 1) != 0)
             {
                 return;
             }
 
+            Volatile.Write(ref _running, 0);
+            _lifecycleCancellation.Cancel();
             using var cancellation = timeout == Timeout.InfiniteTimeSpan
                 ? null
                 : new CancellationTokenSource(timeout);
             var cancellationToken = cancellation?.Token ?? CancellationToken.None;
-            await _checkpointer.FlushAsync(cancellationToken);
-            await _source.Shutdown(cancellationToken);
-            _cache.Dispose();
+            List<Exception>? exceptions = null;
+            Task? initializeTask;
+            lock (_lifecycleLock)
+            {
+                initializeTask = _initializeTask;
+            }
+
+            if (initializeTask is not null)
+            {
+                try
+                {
+                    await initializeTask.WaitAsync(cancellationToken);
+                }
+                catch (OperationCanceledException)
+                    when (_lifecycleCancellation.IsCancellationRequested
+                        && !cancellationToken.IsCancellationRequested)
+                {
+                }
+                catch (Exception exception)
+                {
+                    (exceptions ??= []).Add(exception);
+                }
+            }
+
+            try
+            {
+                await _checkpointer.FlushAsync(cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                (exceptions ??= []).Add(exception);
+            }
+
+            try
+            {
+                await _source.Shutdown(cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                (exceptions ??= []).Add(exception);
+            }
+
+            try
+            {
+                _cache.Dispose();
+            }
+            catch (Exception exception)
+            {
+                (exceptions ??= []).Add(exception);
+            }
+
+            if (exceptions is [var singleException])
+            {
+                ExceptionDispatchInfo.Capture(singleException).Throw();
+            }
+
+            if (exceptions is { Count: > 1 })
+            {
+                throw new AggregateException(exceptions);
+            }
         }
 
         /// <inheritdoc />
@@ -145,6 +266,11 @@ namespace Orleans.Providers.Streams.Common
         /// <inheritdoc />
         public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
         {
+            if (Volatile.Read(ref _shutdown) != 0)
+            {
+                return;
+            }
+
             var progressToken = earliestSubscriptionToken;
             string? offset = null;
             if (progressToken is null)
