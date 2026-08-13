@@ -30,8 +30,11 @@ namespace Tester.AzureUtils.TimerTests
             private static readonly TimeSpan ReminderServiceStartupTimeout = TimeSpan.FromMinutes(5);
             private ReminderTestClock? _reminderClock;
             private readonly ReminderDiagnosticObserver _startupObserver = ReminderDiagnosticObserver.Create();
+            private IReadOnlyList<SiloAddress>? _initialSilos;
             private IReadOnlyList<SiloAddress>? _startedReminderServices;
             internal ReminderTestClock ReminderClock => _reminderClock ?? throw new InvalidOperationException($"{nameof(ReminderTestClock)} has not been configured.");
+            internal IReadOnlyList<SiloAddress> InitialSilos => _initialSilos
+                ?? throw new InvalidOperationException("The initial silos have not been captured.");
             internal IReadOnlyList<SiloAddress> StartedReminderServices => _startedReminderServices
                 ?? throw new InvalidOperationException("Reminder services have not completed startup.");
 
@@ -52,6 +55,7 @@ namespace Tester.AzureUtils.TimerTests
                 await base.InitializeAsync();
 
                 var silos = HostedCluster.Silos.ToArray();
+                _initialSilos = silos.Select(silo => silo.SiloAddress).ToArray();
                 using var cancellation = new CancellationTokenSource(ReminderServiceStartupTimeout);
                 var startedTasks = silos
                     .Select(silo => _startupObserver.WaitForReminderServiceStartedAsync(cancellation.Token, silo.SiloAddress))
@@ -98,9 +102,7 @@ namespace Tester.AzureUtils.TimerTests
         [SkippableFact, TestCategory("Functional")]
         public void Fixture_WaitsForReminderServicesToStart()
         {
-            Assert.All(
-                HostedCluster.Silos,
-                silo => Assert.Contains(silo.SiloAddress, _fixture.StartedReminderServices));
+            Assert.Equal(_fixture.InitialSilos, _fixture.StartedReminderServices);
         }
 
         [SkippableFact, TestCategory("Functional")]
