@@ -14,8 +14,11 @@ namespace Orleans.Streams
     /// </summary>
     public partial class AzureTableStreamQueueCheckpointer : IStreamQueueCheckpointer<string>
     {
-        private readonly AzureTableCheckpointStore _store;
+        private readonly IStreamCheckpointStore _store;
+        private readonly Func<CancellationToken, Task> _initialize;
         private readonly StreamQueueCheckpointer _inner;
+
+        internal IStreamCheckpointStore Store => _store;
 
         private AzureTableStreamQueueCheckpointer(
             AzureTableStreamCheckpointerOptions options,
@@ -41,13 +44,15 @@ namespace Orleans.Streams
             var dataManager = new AzureTableDataManager<StreamQueueCheckpointEntity>(
                 options,
                 loggerFactory.CreateLogger<StreamQueueCheckpointEntity>());
-            _store = new AzureTableCheckpointStore(
+            var store = new AzureTableCheckpointStore(
                 dataManager,
                 StreamQueueCheckpointEntity.Create(
                     partitionKeyPrefix ?? options.PartitionKeyPrefix,
                     streamProviderName,
                     serviceId,
                     partition));
+            _store = store;
+            _initialize = store.Initialize;
             _inner = new StreamQueueCheckpointer(
                 _store,
                 new StreamQueueCheckpointerOptions
@@ -60,6 +65,23 @@ namespace Orleans.Streams
                 partition,
                 streamProviderName,
                 serviceId);
+        }
+
+        internal AzureTableStreamQueueCheckpointer(
+            IStreamCheckpointStore store,
+            TimeSpan persistInterval,
+            IComparer<string>? checkpointComparer)
+        {
+            ArgumentNullException.ThrowIfNull(store);
+            _store = store;
+            _initialize = static _ => Task.CompletedTask;
+            _inner = new StreamQueueCheckpointer(
+                store,
+                new StreamQueueCheckpointerOptions
+                {
+                    CheckpointComparer = checkpointComparer,
+                    PersistInterval = persistInterval,
+                });
         }
 
         /// <inheritdoc />
@@ -75,7 +97,35 @@ namespace Orleans.Streams
             string serviceId,
             ILoggerFactory loggerFactory)
         {
-            return Create(options, streamProviderName, partition, serviceId, loggerFactory, defaultComparer: null);
+            return Create(
+                options,
+                streamProviderName,
+                partition,
+                serviceId,
+                loggerFactory,
+                defaultComparer: null,
+                cancellationToken: CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Creates and initializes an Azure Table stream queue checkpointer.
+        /// </summary>
+        public static Task<IStreamQueueCheckpointer<string>> Create(
+            AzureTableStreamCheckpointerOptions options,
+            string streamProviderName,
+            string partition,
+            string serviceId,
+            ILoggerFactory loggerFactory,
+            CancellationToken cancellationToken)
+        {
+            return Create(
+                options,
+                streamProviderName,
+                partition,
+                serviceId,
+                loggerFactory,
+                defaultComparer: null,
+                cancellationToken: cancellationToken);
         }
 
         internal static async Task<IStreamQueueCheckpointer<string>> Create(
@@ -85,7 +135,8 @@ namespace Orleans.Streams
             string serviceId,
             ILoggerFactory loggerFactory,
             IComparer<string>? defaultComparer,
-            string? partitionKeyPrefix = null)
+            string? partitionKeyPrefix = null,
+            CancellationToken cancellationToken = default)
         {
             var checkpointer = new AzureTableStreamQueueCheckpointer(
                 options,
@@ -95,7 +146,7 @@ namespace Orleans.Streams
                 loggerFactory,
                 defaultComparer,
                 partitionKeyPrefix);
-            await checkpointer._store.Initialize();
+            await checkpointer._initialize(cancellationToken);
             return checkpointer;
         }
 
@@ -123,7 +174,8 @@ namespace Orleans.Streams
         {
             public StreamQueueCheckpointEntity Entity { get; private set; } = entity;
 
-            public Task Initialize() => dataManager.InitTableAsync();
+            public Task Initialize(CancellationToken cancellationToken)
+                => dataManager.InitTableAsync(cancellationToken);
 
             public async ValueTask<StreamCheckpointStoreState> Load(CancellationToken cancellationToken)
             {
@@ -152,45 +204,34 @@ namespace Orleans.Streams
                     Offset = checkpoint,
                 };
 
-                try
+                string version;
+                if (string.IsNullOrEmpty(expectedVersion))
                 {
-                    string version;
-                    if (string.IsNullOrEmpty(expectedVersion))
-                    {
-                        var result = await dataManager.InsertTableEntryAsync(updatedEntity);
-                        if (!result.isSuccess)
-                        {
-                            return await Load(cancellationToken);
-                        }
-
-                        version = result.eTag!;
-                    }
-                    else
-                    {
-                        version = await dataManager.UpdateTableEntryAsync(updatedEntity, expectedVersion);
-                    }
-
-                    updatedEntity.ETag = new ETag(version);
-                    Entity = updatedEntity;
-                    return new(checkpoint, version);
-                }
-                catch (RequestFailedException exception) when (exception.Status is 409 or 412)
-                {
-                    return await Load(cancellationToken);
-                }
-                catch (RequestFailedException exception) when (exception.Status == 404)
-                {
-                    var result = await dataManager.InsertTableEntryAsync(updatedEntity);
+                    var result = await dataManager.InsertTableEntryAsync(updatedEntity, cancellationToken);
                     if (!result.isSuccess)
                     {
                         return await Load(cancellationToken);
                     }
 
-                    var version = result.eTag!;
-                    updatedEntity.ETag = new ETag(version);
-                    Entity = updatedEntity;
-                    return new(checkpoint, version);
+                    version = result.eTag!;
                 }
+                else
+                {
+                    var result = await dataManager.TryUpdateTableEntryAsync(
+                        updatedEntity,
+                        expectedVersion,
+                        cancellationToken);
+                    if (!result.isSuccess)
+                    {
+                        return await Load(cancellationToken);
+                    }
+
+                    version = result.eTag!;
+                }
+
+                updatedEntity.ETag = new ETag(version);
+                Entity = updatedEntity;
+                return new(checkpoint, version);
             }
         }
 

@@ -18,7 +18,7 @@ namespace Orleans.Streaming.Kinesis
             DynamoDBStreamQueueCheckpointerOptions options)
         {
             _inner = new StreamQueueCheckpointer(
-                new StreamCheckpointStoreAdapter(store),
+                store,
                 new StreamQueueCheckpointerOptions
                 {
                     CheckpointComparer = StreamCheckpointComparers.Numeric,
@@ -63,22 +63,5 @@ namespace Orleans.Streaming.Kinesis
         /// <inheritdoc />
         public Task FlushAsync(CancellationToken cancellationToken) => _inner.FlushAsync(cancellationToken);
 
-        private sealed class StreamCheckpointStoreAdapter(IDynamoDBStreamCheckpointStore store) : IStreamCheckpointStore
-        {
-            public async ValueTask<StreamCheckpointStoreState> Load(CancellationToken cancellationToken)
-            {
-                var checkpoint = await store.Load(cancellationToken).ConfigureAwait(false);
-                return new(checkpoint, checkpoint);
-            }
-
-            public async ValueTask<StreamCheckpointStoreState> Update(
-                string checkpoint,
-                string expectedVersion,
-                CancellationToken cancellationToken)
-            {
-                var persistedCheckpoint = await store.Update(checkpoint, expectedVersion, cancellationToken).ConfigureAwait(false);
-                return new(persistedCheckpoint, persistedCheckpoint);
-            }
-        }
     }
 }

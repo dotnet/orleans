@@ -11,7 +11,7 @@ namespace Orleans.Providers.Streams.Common
     /// Provider-neutral pooled cache for immutable recoverable stream records.
     /// </summary>
     /// <typeparam name="TQueueMessage">The source record type.</typeparam>
-    public sealed class RecoverableStreamQueueCache<TQueueMessage> : IQueueCache, IDisposable
+    public sealed class RecoverableStreamQueueCache<TQueueMessage> : IRecoverableStreamQueueCache<TQueueMessage>
     {
         private readonly int _defaultMaxAddCount;
         private readonly IObjectPool<FixedSizeBuffer> _bufferPool;
@@ -237,7 +237,16 @@ namespace Orleans.Providers.Streams.Common
                 return _current;
             }
 
-            public bool MoveNext() => _cache.TryGetNextMessage(_cursor, out _current);
+            public bool MoveNext()
+            {
+                if (!_cache.TryGetNextMessage(_cursor, out var next))
+                {
+                    return false;
+                }
+
+                _current = next;
+                return true;
+            }
 
             public void Refresh(StreamSequenceToken token) => _cache.Refresh(_cursor, token);
 

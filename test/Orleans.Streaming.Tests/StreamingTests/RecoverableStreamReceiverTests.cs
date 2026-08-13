@@ -53,6 +53,9 @@ public sealed class RecoverableStreamReceiverTests
         Assert.Null(exception);
         Assert.Equal("payload", batch.Payload);
         Assert.True(adapter.CompareCallCount > 0);
+        Assert.False(cursor.MoveNext());
+        Assert.Same(batch, cursor.GetCurrent(out exception));
+        Assert.Null(exception);
 
         receiver.UpdateDeliveryProgress(new EventSequenceTokenV2(11), DateTime.UtcNow);
         Assert.Equal("11", checkpointer.LastUpdatedCheckpoint);
@@ -116,14 +119,156 @@ public sealed class RecoverableStreamReceiverTests
         await receiver.Shutdown(TimeSpan.FromSeconds(5));
     }
 
+    [Fact]
+    public void Cache_AddsRawRecordsInOrderAndDecodesLazily()
+    {
+        var streamA = StreamId.Create("namespace", Guid.NewGuid());
+        var streamB = StreamId.Create("namespace", Guid.NewGuid());
+        var messages = new[]
+        {
+            new TestQueueMessage(streamA, 10, "first"),
+            new TestQueueMessage(streamB, 11, "second"),
+            new TestQueueMessage(streamA, 12, "third"),
+        };
+        var adapter = new TestDataAdapter();
+        var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
+            100,
+            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(4 * 1024)),
+            adapter,
+            new NoOpEvictionStrategy(),
+            NullLogger.Instance);
+
+        var positions = cache.Add(messages, DateTime.UnixEpoch);
+
+        Assert.Equal([10, 11, 12], positions.Select(position => position.SequenceToken.SequenceNumber));
+        Assert.Equal(3, adapter.PositionCallCount);
+        Assert.Equal(3, adapter.FromQueueMessageCallCount);
+        Assert.Equal(0, adapter.GetBatchContainerCallCount);
+
+        using var cursor = cache.GetCacheCursor(streamA, positions[0].SequenceToken);
+        Assert.True(cursor.MoveNext());
+        Assert.Equal("first", Assert.IsType<TestBatchContainer>(cursor.GetCurrent(out _)).Payload);
+        Assert.Equal(1, adapter.GetBatchContainerCallCount);
+        Assert.True(cursor.MoveNext());
+        Assert.Equal("third", Assert.IsType<TestBatchContainer>(cursor.GetCurrent(out _)).Payload);
+        Assert.Equal(2, adapter.GetBatchContainerCallCount);
+        Assert.False(cursor.MoveNext());
+        Assert.Equal(2, adapter.GetBatchContainerCallCount);
+    }
+
+    [Fact]
+    public async Task Receiver_RetriesInitializationOnNextRead()
+    {
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var source = new TestSource(
+            [new TestQueueMessage(streamId, 1, "payload")],
+            initializationFailures: 1);
+        var receiver = CreateReceiver(source, new TestCheckpointer(string.Empty));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => receiver.GetQueueMessagesAsync(10, CancellationToken.None));
+        var messages = await receiver.GetQueueMessagesAsync(10, CancellationToken.None);
+
+        Assert.Single(messages);
+        Assert.Equal(2, source.InitializeCount);
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task Receiver_PreCanceledReadDoesNotInitialize()
+    {
+        var source = new TestSource([]);
+        var receiver = CreateReceiver(source, new TestCheckpointer(string.Empty));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => receiver.GetQueueMessagesAsync(10, cancellation.Token));
+
+        Assert.Equal(0, source.InitializeCount);
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task Shutdown_WhenFlushFails_StillShutsDownSource()
+    {
+        var source = new TestSource([]);
+        var expected = new InvalidOperationException("flush failed");
+        var receiver = CreateReceiver(
+            source,
+            new TestCheckpointer(string.Empty) { FlushException = expected });
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => receiver.Shutdown(TimeSpan.FromSeconds(5)));
+
+        Assert.Same(expected, actual);
+        Assert.True(source.IsShutdown);
+    }
+
+    [Fact]
+    public async Task Registry_ConcurrentRequestsReturnSameWinningInstance()
+    {
+        const int participantCount = 3;
+        var queue = QueueId.GetQueueId("queue", 0, 0);
+        using var barrier = new Barrier(participantCount);
+        var registry = new QueueAdapterReceiverRegistry<TestCombinedReceiver>(_ =>
+        {
+            barrier.SignalAndWait();
+            return new TestCombinedReceiver();
+        });
+
+        var results = await Task.WhenAll(
+            Enumerable.Range(0, participantCount)
+                .Select(_ => Task.Run(() => registry.GetOrCreate(queue))));
+
+        Assert.All(results, result => Assert.Same(results[0], result));
+        Assert.Same(results[0], Assert.Single(registry.Receivers).Value);
+    }
+
+    [Fact]
+    public void Registry_RemoveAllowsFreshReceiverForReassignedQueue()
+    {
+        var queue = QueueId.GetQueueId("queue", 0, 0);
+        var registry = new QueueAdapterReceiverRegistry<TestCombinedReceiver>(
+            _ => new TestCombinedReceiver());
+        var first = registry.GetOrCreate(queue);
+
+        Assert.True(registry.Remove(queue, first));
+        var second = registry.GetOrCreate(queue);
+
+        Assert.NotSame(first, second);
+        Assert.Same(second, Assert.Single(registry.Receivers).Value);
+    }
+
+    private static RecoverableStreamReceiver<TestQueueMessage> CreateReceiver(
+        TestSource source,
+        TestCheckpointer checkpointer)
+    {
+        var adapter = new TestDataAdapter();
+        var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
+            100,
+            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(4 * 1024)),
+            adapter,
+            new NoOpEvictionStrategy(),
+            NullLogger.Instance);
+        return new(source, adapter, cache, checkpointer, startFromNow: false);
+    }
+
     private sealed record TestQueueMessage(StreamId StreamId, long SequenceNumber, string Payload);
 
     private sealed class TestDataAdapter : IRecoverableStreamDataAdapter<TestQueueMessage>
     {
         public int CompareCallCount { get; private set; }
+        public int PositionCallCount { get; private set; }
+        public int FromQueueMessageCallCount { get; private set; }
+        public int GetBatchContainerCallCount { get; private set; }
 
         public StreamPosition GetStreamPosition(TestQueueMessage queueMessage)
-            => new(queueMessage.StreamId, new EventSequenceTokenV2(queueMessage.SequenceNumber));
+        {
+            PositionCallCount++;
+            return new(queueMessage.StreamId, new EventSequenceTokenV2(queueMessage.SequenceNumber));
+        }
 
         public CachedMessage FromQueueMessage(
             StreamPosition streamPosition,
@@ -131,6 +276,7 @@ public sealed class RecoverableStreamReceiverTests
             DateTime dequeueTimeUtc,
             Func<int, ArraySegment<byte>> getSegment)
         {
+            FromQueueMessageCallCount++;
             var size = SegmentBuilder.CalculateAppendSize(queueMessage.SequenceNumber.ToString(CultureInfo.InvariantCulture))
                 + SegmentBuilder.CalculateAppendSize(queueMessage.Payload);
             var segment = getSegment(size);
@@ -150,6 +296,7 @@ public sealed class RecoverableStreamReceiverTests
 
         public IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage)
         {
+            GetBatchContainerCallCount++;
             var offset = 0;
             _ = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref offset);
             var payload = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref offset);
@@ -199,17 +346,27 @@ public sealed class RecoverableStreamReceiverTests
         public bool ImportRequestContext() => false;
     }
 
-    private sealed class TestSource(IReadOnlyList<TestQueueMessage> messages) : IRecoverableStreamSource<TestQueueMessage>
+    private sealed class TestSource(
+        IReadOnlyList<TestQueueMessage> messages,
+        int initializationFailures = 0) : IRecoverableStreamSource<TestQueueMessage>
     {
         private bool read;
+        private int remainingInitializationFailures = initializationFailures;
 
         public RecoverableStreamStartPosition StartPosition { get; private set; }
 
         public bool IsShutdown { get; private set; }
+        public int InitializeCount { get; private set; }
 
         public Task Initialize(RecoverableStreamStartPosition position, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            InitializeCount++;
+            if (remainingInitializationFailures-- > 0)
+            {
+                throw new InvalidOperationException("initialization failed");
+            }
+
             StartPosition = position;
             return Task.CompletedTask;
         }
@@ -241,6 +398,7 @@ public sealed class RecoverableStreamReceiverTests
         public string? LastUpdatedCheckpoint { get; private set; }
 
         public int FlushCount { get; private set; }
+        public Exception? FlushException { get; init; }
 
         public Task<string> Load() => Task.FromResult(checkpoint);
 
@@ -261,6 +419,11 @@ public sealed class RecoverableStreamReceiverTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             FlushCount++;
+            if (FlushException is not null)
+            {
+                return Task.FromException(FlushException);
+            }
+
             return Task.CompletedTask;
         }
     }
