@@ -13,6 +13,42 @@ namespace UnitTests.General
         {
         }
 
+        protected override void PrepareForDatabaseReset() => SqlConnection.ClearAllPools();
+
+        protected override async Task WaitForDatabaseReadyAsync()
+        {
+            const int maxAttempts = 3;
+            var connectionStringBuilder = new SqlConnectionStringBuilder(CurrentConnectionString)
+            {
+                Pooling = false,
+                ConnectTimeout = 5
+            };
+
+            for (var attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    await using var connection = new SqlConnection(connectionStringBuilder.ConnectionString);
+                    await connection.OpenAsync();
+                    await using var command = connection.CreateCommand();
+                    command.CommandText = "SELECT 1";
+                    command.CommandTimeout = 5;
+                    _ = await command.ExecuteScalarAsync();
+                    return;
+                }
+                catch (SqlException exception) when (exception.Number == 18456 && exception.State == 1 && attempt < maxAttempts)
+                {
+                    Console.WriteLine(
+                        "SQL Server database '{0}' was not ready after recreation (attempt {1}/{2}): {3}",
+                        connectionStringBuilder.InitialCatalog,
+                        attempt,
+                        maxAttempts,
+                        exception.Message);
+                    await Task.Delay(TimeSpan.FromMilliseconds(250));
+                }
+            }
+        }
+
         public override string CancellationTestQuery { get { return "WAITFOR DELAY '00:00:010'; SELECT 1; "; } }
 
         public override string CreateStreamTestTable { get { return "CREATE TABLE StreamingTest(Id INT NOT NULL, StreamData VARBINARY(MAX) NOT NULL);"; } }
