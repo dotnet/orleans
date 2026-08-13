@@ -40,9 +40,16 @@ public abstract class RebalancingTestBase<TFixture>
     protected void AddTestActivations(List<Task> tasks, SiloAddress silo, int count)
     {
         RequestContext.Set(IPlacementDirector.PlacementHintKey, silo);
-        for (var i = 0; i < count; i++)
+        try
         {
-            tasks.Add(GrainFactory.GetGrain<IRebalancingTestGrain>(Guid.NewGuid()).Ping());
+            for (var i = 0; i < count; i++)
+            {
+                tasks.Add(GrainFactory.GetGrain<IRebalancingTestGrain>(Guid.NewGuid()).Ping());
+            }
+        }
+        finally
+        {
+            RequestContext.Remove(IPlacementDirector.PlacementHintKey);
         }
     }
 
