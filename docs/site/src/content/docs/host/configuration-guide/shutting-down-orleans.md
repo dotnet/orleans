@@ -7,15 +7,17 @@ ms.topic: how-to
 
 # Shut down Orleans silos
 
-Orleans is an <xref:Microsoft.Extensions.Hosting.IHostedService> inside the [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensions/generic-host). When the host stops, Orleans leaves the cluster, closes gateways and networking, deactivates grains, and stops providers in reverse lifecycle order.
+Orleans is an <xref:Microsoft.Extensions.Hosting.IHostedService> inside the [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensions/generic-host). When the host stops, it calls Orleans' <xref:Microsoft.Extensions.Hosting.IHostedService.StopAsync*> method. Orleans then leaves the cluster, closes gateways and networking, deactivates grains, and stops providers in reverse lifecycle order.
 
 ## Graceful silo shutdown
 
-Use <xref:Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.RunAsync*> or <xref:Microsoft.Extensions.Hosting.HostingHostBuilderExtensions.RunConsoleAsync*> and don't terminate the process directly:
+For a standalone console process, use <xref:Microsoft.Extensions.Hosting.HostingHostBuilderExtensions.RunConsoleAsync*>. It installs the console lifetime, which requests host shutdown when the process receives a supported console interrupt or termination event:
 
 :::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="run_silo":::
 
-The console lifetime handles <kbd>Ctrl</kbd>+<kbd>C</kbd>, `SIGINT`, and `SIGTERM`. ASP.NET Core hosts use the same host lifetime model. For details, see [.NET Generic Host shutdown](https://learn.microsoft.com/dotnet/core/extensions/generic-host#host-shutdown).
+On Unix-like systems, container orchestrators normally send `SIGTERM`, and interactive terminals send `SIGINT` for <kbd>Ctrl</kbd>+<kbd>C</kbd>. Windows does not use POSIX signals; a Windows service or another process manager must use its host-lifetime integration to request shutdown. Web applications and service-managed applications should let their configured host lifetime initiate the same Generic Host stop sequence rather than adding a separate process-exit handler.
+
+<xref:Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.RunAsync*> starts a host and waits for it to stop, but it does not itself configure signal handling. Use it only when the application has already configured the appropriate host lifetime. For details, see [.NET Generic Host shutdown](https://learn.microsoft.com/dotnet/core/extensions/generic-host#host-shutdown).
 
 In tests or embedded hosts, call <xref:Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.StopAsync*> and dispose the host:
 
@@ -25,7 +27,7 @@ Don't call <xref:System.Environment.Exit*>, kill the process from application co
 
 ## Configure a shutdown budget
 
-The host cancellation token bounds every hosted service, including Orleans lifecycle participants and grain deactivation. Configure <xref:Microsoft.Extensions.Hosting.HostOptions.ShutdownTimeout> for the expected workload:
+The host passes a cancellation token to every hosted service during shutdown, including Orleans. <xref:Microsoft.Extensions.Hosting.HostOptions.ShutdownTimeout> cancels that token after the configured budget. Configure it for the expected workload:
 
 :::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="shutdown_timeout":::
 
@@ -50,7 +52,7 @@ Grains can move or reactivate elsewhere after a silo leaves. Don't use graceful 
 
 ## Containers and orchestrators
 
-Configure readiness to fail before sending the termination signal when the platform supports a pre-stop phase. Send a normal termination signal, allow the host timeout to elapse, and reserve forceful termination for hung processes.
+Remove the instance from application traffic before requesting host shutdown. Then send the platform's normal termination request, allow the host shutdown budget to elapse, and reserve forceful termination for hung processes. A forced termination, power loss, or process crash can bypass the host entirely, so correctness must not depend on graceful shutdown.
 
 ## See also
 
