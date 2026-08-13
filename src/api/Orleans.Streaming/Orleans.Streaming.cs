@@ -576,6 +576,8 @@ namespace Orleans.Providers.Streams.Common
 
         public void OnBlockAllocated(FixedSizeBuffer newBlock) { }
 
+        public void OnPurgeCompleted(CachedMessage? lastMessagePurged, int itemsPurged) { }
+
         public void PerformPurge(System.DateTime nowUtc) { }
 
         protected virtual bool ShouldPurge(ref CachedMessage cachedMessage, ref CachedMessage newestCachedMessage, System.DateTime nowUtc) { throw null; }
@@ -736,6 +738,7 @@ namespace Orleans.Providers.Streams.Common
         IPurgeObservable PurgeObservable { set; }
 
         void OnBlockAllocated(FixedSizeBuffer newBlock);
+        void OnPurgeCompleted(CachedMessage? lastMessagePurged, int itemsPurged);
         void PerformPurge(System.DateTime utcNow);
     }
 
@@ -785,6 +788,8 @@ namespace Orleans.Providers.Streams.Common
     public partial interface IRecoverableStreamSource<TQueueMessage>
     {
         System.Threading.Tasks.Task Initialize(RecoverableStreamStartPosition position, System.Threading.CancellationToken cancellationToken);
+        void MessagesAdded(System.Collections.Generic.IReadOnlyList<TQueueMessage> messages);
+        void MessagesAddFailed(System.Collections.Generic.IReadOnlyList<TQueueMessage> messages);
         System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TQueueMessage>> Read(int maxCount, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task Shutdown(System.Threading.CancellationToken cancellationToken);
     }
@@ -901,7 +906,9 @@ namespace Orleans.Providers.Streams.Common
 
     public sealed partial class RecoverableStreamQueueCache<TQueueMessage> : Orleans.Streams.IQueueCache, Orleans.Streams.IQueueFlowController, System.IDisposable
     {
-        public RecoverableStreamQueueCache(int defaultMaxAddCount, IObjectPool<FixedSizeBuffer> bufferPool, IRecoverableStreamDataAdapter<TQueueMessage> dataAdapter, IEvictionStrategy evictionStrategy, Microsoft.Extensions.Logging.ILogger logger, Orleans.Streams.IQueueFlowController? flowController = null, ICacheMonitor? cacheMonitor = null, System.TimeSpan? cacheMonitorWriteInterval = null, System.TimeSpan? metadataMinTimeInCache = null) { }
+        public RecoverableStreamQueueCache(int defaultMaxAddCount, IObjectPool<FixedSizeBuffer> bufferPool, IRecoverableStreamDataAdapter<TQueueMessage> dataAdapter, IEvictionStrategy evictionStrategy, Microsoft.Extensions.Logging.ILogger logger, Orleans.Streams.IQueueFlowController? flowController = null, ICacheMonitor? cacheMonitor = null, System.TimeSpan? cacheMonitorWriteInterval = null, System.TimeSpan? metadataMinTimeInCache = null, int? maxCacheSize = null) { }
+
+        public int ItemCount { get { throw null; } }
 
         public string? LastPurgedOffset { get { throw null; } }
 
@@ -916,6 +923,8 @@ namespace Orleans.Providers.Streams.Common
         public int GetMaxAddCount() { throw null; }
 
         public bool IsUnderPressure() { throw null; }
+
+        public bool TryGetNewestPosition(out Orleans.Streams.StreamSequenceToken? token, out string? offset) { throw null; }
 
         public bool TryPurgeFromCache(out System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> purgedItems) { throw null; }
 
