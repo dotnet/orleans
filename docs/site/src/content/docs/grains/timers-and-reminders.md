@@ -57,14 +57,13 @@ Reminders are intended for periods measured in minutes, hours, or days, not high
 
 ### Reminder timing constraints
 
-The current Orleans runtime validates reminder timing when the reminder is registered:
+Reminder timing is subject to the following constraints:
 
-- <xref:System.TimeSpan> values are validated before they are stored.
 - `dueTime` must be greater than or equal to `TimeSpan.Zero`; a zero `dueTime` means the first tick is scheduled immediately.
 - `dueTime` cannot be negative or <xref:System.Threading.Timeout.InfiniteTimeSpan>.
 - `period` must be greater than `TimeSpan.Zero`.
 - `period` cannot be negative, zero, or <xref:System.Threading.Timeout.InfiniteTimeSpan>.
-- The runtime also enforces a configured lower bound through <xref:Orleans.Hosting.ReminderOptions.MinimumReminderPeriod?displayProperty=nameWithType> (default: one minute).
+- The runtime rejects `period` values below the lower bound configured by <xref:Orleans.Hosting.ReminderOptions.MinimumReminderPeriod?displayProperty=nameWithType> (default: one minute).
 - `dueTime` is also bounded by the remaining <xref:System.DateTime> range from the time of registration. A value which would place the first tick after <xref:System.DateTime.MaxValue> is rejected rather than clamped. Later occurrences are scheduled from the persisted start time and period.
 
 There is no special `period` value that means "fire once and never again." To model a one-shot reminder, create a valid reminder with a positive `period`, then unregister it in the first callback or after the first tick. `TimeSpan.Zero` and negative values are rejected by the runtime rather than treated as a one-shot schedule.

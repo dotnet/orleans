@@ -22,7 +22,7 @@ public static class GrainReminderExtensions
     /// <param name="grain">The grain instance.</param>
     /// <param name="reminderName">Name of this reminder</param>
     /// <param name="dueTime">Due time for this reminder. A value of <see cref="TimeSpan.Zero"/> schedules the first tick immediately; negative, infinite, or values which exceed the remaining <see cref="DateTime"/> range are rejected.</param>
-    /// <param name="period">Frequency period for this reminder. The value must be greater than <see cref="TimeSpan.Zero"/>; zero, negative, and <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> values are rejected. The minimum is also constrained by <see cref="Orleans.Hosting.ReminderOptions.MinimumReminderPeriod"/>.</param>
+    /// <param name="period">Frequency period for this reminder. The value must be at least <see cref="Orleans.Hosting.ReminderOptions.MinimumReminderPeriod"/>; smaller values and <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> are rejected.</param>
     /// <returns>Promise for Reminder handle.</returns>
     /// <remarks>
     /// There is no special one-shot reminder value for <paramref name="period"/>. Register a valid positive period and then unregister the reminder when the first callback fires.
@@ -40,7 +40,7 @@ public static class GrainReminderExtensions
     /// <param name="grain">The grain instance.</param>
     /// <param name="reminderName">Name of this reminder</param>
     /// <param name="dueTime">Due time for this reminder. A value of <see cref="TimeSpan.Zero"/> schedules the first tick immediately; negative, infinite, or values which exceed the remaining <see cref="DateTime"/> range are rejected.</param>
-    /// <param name="period">Frequency period for this reminder. The value must be greater than <see cref="TimeSpan.Zero"/>; zero, negative, and <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> values are rejected. The minimum is also constrained by <see cref="Orleans.Hosting.ReminderOptions.MinimumReminderPeriod"/>.</param>
+    /// <param name="period">Frequency period for this reminder. The value must be at least <see cref="Orleans.Hosting.ReminderOptions.MinimumReminderPeriod"/>; smaller values and <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> are rejected.</param>
     /// <returns>Promise for Reminder handle.</returns>
     /// <remarks>
     /// There is no special one-shot reminder value for <paramref name="period"/>. Register a valid positive period and then unregister the reminder when the first callback fires.
