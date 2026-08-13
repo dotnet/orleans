@@ -68,7 +68,7 @@ namespace Orleans.Streaming.Kinesis
 
         public string Name { get; }
 
-        public bool IsRewindable => false;
+        public bool IsRewindable => true;
 
         public StreamProviderDirection Direction => StreamProviderDirection.ReadWrite;
 
