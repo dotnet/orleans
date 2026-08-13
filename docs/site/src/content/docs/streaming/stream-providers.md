@@ -18,7 +18,7 @@ A stream provider connects the Orleans streaming API to a transport and defines 
 | Azure Event Hubs | [`Microsoft.Orleans.Streaming.EventHubs`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.EventHubs) | Stable | Yes, within Event Hubs retention | Yes | Event Hubs namespace, hub, consumer group, and checkpoint storage |
 | Amazon Kinesis | [`Microsoft.Orleans.Streaming.Kinesis`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.Kinesis) | Stable | Yes, within Kinesis retention | Yes | Kinesis data stream, AWS credentials, region, and durable checkpoint storage |
 | Amazon SQS | [`Microsoft.Orleans.Streaming.SQS`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.SQS) | Stable | Yes, within SQS retention | No | AWS account, queue permissions, region/endpoint configuration |
-| ADO.NET | [`Microsoft.Orleans.Streaming.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.AdoNet) | **Alpha** | Yes, in relational tables until expiry/dead-letter eviction | No | Supported database, ADO.NET driver, and Orleans streaming SQL schema |
+| ADO.NET | [`Microsoft.Orleans.Streaming.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.AdoNet) | **Alpha** | Yes, in a retained relational partition log | No | Supported database, ADO.NET driver, and matching Orleans streaming SQL schema |
 | NATS JetStream | [`Microsoft.Orleans.Streaming.NATS`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.NATS) | **Alpha** | Configurable; file storage is the default | No | NATS server with JetStream and sufficient storage; subject/stream administration |
 | Redis Streams | [`Microsoft.Orleans.Streaming.Redis`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.Redis) | **Alpha** | Configurable through Redis persistence and stream retention | Yes, while entries remain | Redis deployment, persistence/HA policy, and retention sizing |
 
@@ -68,7 +68,9 @@ Register [Amazon SQS](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/S
 
 ## ADO.NET streaming (alpha)
 
-Register [ADO.NET](https://learn.microsoft.com/dotnet/framework/data/adonet/ado-net-overview) streaming with `AddAdoNetStreams`. Install the matching database driver and apply the SQL Server, PostgreSQL, or MySQL streaming schema shipped in the package source. Messages are durable in relational tables but expire and can move to dead letters according to `AdoNetStreamOptions`. The provider isn't rewindable.
+Register [ADO.NET](https://learn.microsoft.com/dotnet/framework/data/adonet/ado-net-overview) streaming with <xref:Orleans.Hosting.SiloBuilderAdoNetStreamExtensions.AddAdoNetStreams*>. Install the matching database driver and apply the SQL Server, PostgreSQL, or MySQL streaming schema shipped in the package source. Each queue is an immutable, ordered partition log with a durable, ownership-fenced checkpoint. <xref:Orleans.Configuration.AdoNetStreamOptions.RetentionPeriod*> retains checkpointed messages for one day by default. <xref:Orleans.Configuration.AdoNetStreamOptions.MaximumRetentionPeriod*> can impose a hard storage ceiling, but it can delete unprocessed messages and therefore produces gap diagnostics. Cleanup is bounded by <xref:Orleans.Configuration.AdoNetStreamOptions.CleanupBatchSize*>.
+
+The current alpha schema is versioned and isn't compatible with the former queue, visibility-timeout, confirmation, or dead-letter schema. There is no in-place migration for alpha data. Before upgrading, stop producers and consumers, drop the former `OrleansStreamMessage`, `OrleansStreamDeadLetter`, `OrleansStreamControl`, and `OrleansStreamMessageSequence` objects, remove their streaming routines and `OrleansQuery` rows, and then apply the current streaming script. Drop `OrleansStreamPartition` too if a partial installation exists. Existing alpha rows aren't read or silently converted; preserve them externally first if the payloads are required.
 
 ## NATS JetStream streaming (alpha)
 
