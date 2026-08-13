@@ -72,28 +72,21 @@ namespace Orleans.Runtime
             foreach (var item in updatedEntries)
             {
                 var entry = item;
-                entry = PreserveEntryState(previousSnapshot, entry);
+                entry = PreserveIAmAliveTime(previousSnapshot, entry);
                 entries.Add(entry.SiloAddress, entry);
             }
 
             return new MembershipTableSnapshot(version, entries.ToImmutable());
         }
 
-        private static MembershipEntry PreserveEntryState(MembershipTableSnapshot previousSnapshot, MembershipEntry entry)
+        private static MembershipEntry PreserveIAmAliveTime(MembershipTableSnapshot previousSnapshot, MembershipEntry entry)
         {
-            if (previousSnapshot.Entries.TryGetValue(entry.SiloAddress, out var previousEntry))
+            // Retain the maximum IAmAliveTime, since IAmAliveTime updates do not increase membership version
+            // and therefore can be clobbered by torn reads.
+            if (previousSnapshot.Entries.TryGetValue(entry.SiloAddress, out var previousEntry)
+                && previousEntry.IAmAliveTime > entry.IAmAliveTime)
             {
-                // IAmAliveTime updates do not increase membership version and can be clobbered by torn reads.
-                if (previousEntry.IAmAliveTime > entry.IAmAliveTime)
-                {
-                    entry = entry.WithIAmAliveTime(previousEntry.IAmAliveTime);
-                }
-
-                // Status transitions are monotonic, including local same-version shutdown transitions.
-                if (previousEntry.Status > entry.Status)
-                {
-                    entry = entry.WithStatus(previousEntry.Status);
-                }
+                entry = entry.WithIAmAliveTime(previousEntry.IAmAliveTime);
             }
 
             return entry;

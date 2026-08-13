@@ -628,7 +628,7 @@ namespace Orleans.Runtime.MembershipService
         private void KillMyselfLocally(string reason)
         {
             LogErrorKillMyselfLocally(this.log, reason);
-            this.AdvanceCurrentStatus(SiloStatus.Dead, publishSnapshot: true);
+            this.AdvanceCurrentStatus(SiloStatus.Dead, publishSnapshot: false);
             if (!this.IsStopping)
             {
                 this.fatalErrorHandler.OnFatalException(this, $"I have been told I am dead, so this silo will stop! Reason: {reason}", null);
