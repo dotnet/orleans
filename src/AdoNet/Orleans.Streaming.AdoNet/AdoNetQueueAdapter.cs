@@ -45,14 +45,20 @@ internal partial class AdoNetQueueAdapter(string name, AdoNetStreamOptions strea
         // create the payload from the events
         var payload = AdoNetBatchContainer.ToMessagePayload(serializer, streamId, events.Cast<object>().ToList(), requestContext);
 
-        // we can enqueue the message now
+        // Append the immutable payload together with the canonical stream identifier.
         try
         {
-            await queries.QueueStreamMessageAsync(clusterOptions.ServiceId, Name, queueId, payload, streamOptions.ExpiryTimeout.TotalSecondsCeiling());
+            await queries.AppendStreamMessageAsync(
+                clusterOptions.ServiceId,
+                Name,
+                queueId,
+                streamId.FullKey.ToArray(),
+                streamId.Namespace.Length,
+                payload);
         }
         catch (Exception ex)
         {
-            LogFailedToQueueStreamMessage(ex, clusterOptions.ServiceId, Name, queueId);
+            LogFailedToAppendStreamMessage(ex, clusterOptions.ServiceId, Name, queueId);
             throw;
         }
     }
@@ -64,8 +70,8 @@ internal partial class AdoNetQueueAdapter(string name, AdoNetStreamOptions strea
 
     #region Logging
 
-    [LoggerMessage(1, LogLevel.Error, "Failed to queue stream message with ({ServiceId}, {ProviderId}, {QueueId})")]
-    private partial void LogFailedToQueueStreamMessage(Exception ex, string serviceId, string providerId, string queueId);
+    [LoggerMessage(1, LogLevel.Error, "Failed to append stream message with ({ServiceId}, {ProviderId}, {QueueId})")]
+    private partial void LogFailedToAppendStreamMessage(Exception ex, string serviceId, string providerId, string queueId);
 
     #endregion Logging
 }

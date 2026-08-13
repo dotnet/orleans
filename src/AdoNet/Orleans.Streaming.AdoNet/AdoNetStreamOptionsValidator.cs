@@ -20,34 +20,39 @@ public class AdoNetStreamOptionsValidator(AdoNetStreamOptions options, string na
             throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': configure exactly one of {nameof(options.ConnectionString)} or {nameof(options.DataSource)}.");
         }
 
-        if (options.MaxAttempts < 0)
+        if (options.MaxMessagesPerRead <= 0)
         {
-            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.MaxAttempts)} must be greater than zero.");
+            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.MaxMessagesPerRead)} must be greater than zero.");
         }
 
-        if (options.VisibilityTimeout < TimeSpan.Zero)
+        if (options.CheckpointPersistInterval <= TimeSpan.Zero)
         {
-            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.VisibilityTimeout)} must be greater than zero.");
+            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.CheckpointPersistInterval)} must be greater than zero.");
         }
 
-        if (options.EvictionInterval < TimeSpan.Zero)
+        if (options.RetentionPeriod <= TimeSpan.Zero)
         {
-            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.EvictionInterval)} must be greater than zero.");
+            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.RetentionPeriod)} must be greater than zero.");
         }
 
-        if (options.ExpiryTimeout < TimeSpan.Zero)
+        if (options.MaximumRetentionPeriod is { } maximumRetentionPeriod && maximumRetentionPeriod < options.RetentionPeriod)
         {
-            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.ExpiryTimeout)} must be greater than zero.");
+            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.MaximumRetentionPeriod)} must be greater than or equal to {nameof(options.RetentionPeriod)}.");
         }
 
-        if (options.DeadLetterEvictionTimeout < TimeSpan.Zero)
+        if (options.CleanupInterval <= TimeSpan.Zero)
         {
-            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.DeadLetterEvictionTimeout)} must be greater than zero.");
+            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.CleanupInterval)} must be greater than zero.");
         }
 
-        if (options.EvictionBatchSize < 0)
+        if (options.CleanupBatchSize <= 0)
         {
-            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.EvictionBatchSize)} must be greater than zero.");
+            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.CleanupBatchSize)} must be greater than zero.");
+        }
+
+        if (options.InitializationTimeout <= TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.InitializationTimeout)} must be greater than zero.");
         }
     }
 }
