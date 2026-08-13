@@ -38,12 +38,6 @@ namespace UnitTests.General
                 }
                 catch (SqlException exception) when (exception.Number == 18456 && exception.State == 1 && attempt < maxAttempts)
                 {
-                    Console.WriteLine(
-                        "SQL Server database '{0}' was not ready after recreation (attempt {1}/{2}): {3}",
-                        connectionStringBuilder.InitialCatalog,
-                        attempt,
-                        maxAttempts,
-                        exception.Message);
                     await Task.Delay(TimeSpan.FromMilliseconds(250));
                 }
             }
