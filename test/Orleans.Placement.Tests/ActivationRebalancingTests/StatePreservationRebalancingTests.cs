@@ -49,6 +49,7 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
 
         await Task.WhenAll(tasks);
 
+        rebalancerEvents.Clear();
         await rebalancerEvents.WaitForCycleCountAsync(targetHost, 3, WaitTimeout);
 
         var stats = await MgmtGrain.GetDetailedGrainStatistics();
