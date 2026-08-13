@@ -79,6 +79,32 @@ public sealed class KinesisSequenceTokenTests
     }
 
     [Fact]
+    public void RepeatedOrderingOperationsDoNotReparseShardSequence()
+    {
+        var older = new KinesisSequenceToken(HugeShardSequence, sequenceNumber: 0, eventIndex: 0);
+        var newer = new KinesisSequenceToken(SlightlyLargerShardSequence, sequenceNumber: 0, eventIndex: 0);
+
+        _ = older.CompareTo(newer);
+        _ = older.GetHashCode();
+        _ = newer.GetHashCode();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var comparisonTotal = 0;
+        var hash = 0;
+
+        for (var i = 0; i < 1_000; i++)
+        {
+            comparisonTotal += older.CompareTo(newer);
+            hash ^= older.GetHashCode();
+            hash ^= newer.GetHashCode();
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        Assert.Equal(-1_000, comparisonTotal);
+        Assert.Equal(0, allocated);
+        GC.KeepAlive(hash);
+    }
+
+    [Fact]
     public void BinarySerializationRoundTripPreservesFieldsAndOrderingAfterRestart()
     {
         var original = new KinesisSequenceToken(HugeShardSequence, sequenceNumber: 42, eventIndex: 3);
