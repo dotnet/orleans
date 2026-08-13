@@ -1,12 +1,11 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
-using Orleans.Configuration;
-using Orleans.Hosting;
-using Orleans.TestingHost;
+using Orleans.Serialization.Invocation;
 using Tester.DurableJobs;
 using TestExtensions;
+using UnitTests.GrainInterfaces;
 using Xunit;
 
 namespace DefaultCluster.Tests;
@@ -118,42 +117,20 @@ public class InMemoryDurableJobsTests : HostedTestClusterEnsureDefaultStarted
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestArea("Runtime")]
-public class InMemoryDurableJobsResponseTimeoutTests : TestClusterPerTest
+public class DurableJobsResponseTimeoutTests
 {
-    private static readonly TimeSpan ClientResponseTimeout = TimeSpan.FromSeconds(10);
-    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(6);
-
-    protected override void ConfigureTestCluster(TestClusterBuilder builder)
-    {
-        builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-        builder.AddClientBuilderConfigurator<ClientConfigurator>();
-    }
-
     [Fact, TestCategory("BVT"), TestCategory("DurableJobs")]
-    public async Task JobRetryWaitOverridesClientResponseTimeout()
+    public void JobRetryWaitOverridesClientResponseTimeout()
     {
-        var runner = new DurableJobTestsRunner(GrainFactory);
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await runner.JobRetry(cts.Token);
-    }
+        var request = typeof(IRetryTestGrain).Assembly
+            .GetTypes()
+            .Where(type => !type.IsAbstract
+                && !type.ContainsGenericParameters
+                && typeof(IInvokable).IsAssignableFrom(type))
+            .Select(type => (IInvokable)Activator.CreateInstance(type)!)
+            .Single(request => request.GetInterfaceType() == typeof(IRetryTestGrain)
+                && request.GetMethodName() == nameof(IRetryTestGrain.WaitForJobToSucceed));
 
-    private sealed class SiloConfigurator : ISiloConfigurator
-    {
-        public void Configure(ISiloBuilder hostBuilder)
-        {
-            hostBuilder
-                .UseInMemoryReminderService()
-                .UseInMemoryDurableJobs()
-                .Configure<DurableJobsOptions>(options => options.ShouldRetry = (_, _) => DateTimeOffset.UtcNow + RetryDelay)
-                .AddMemoryGrainStorageAsDefault();
-        }
-    }
-
-    private sealed class ClientConfigurator : IClientBuilderConfigurator
-    {
-        public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-        {
-            clientBuilder.Configure<ClientMessagingOptions>(options => options.ResponseTimeout = ClientResponseTimeout);
-        }
+        Assert.Equal(TimeSpan.FromMinutes(2), request.GetDefaultResponseTimeout());
     }
 }
