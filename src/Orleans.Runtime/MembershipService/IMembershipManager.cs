@@ -76,18 +76,14 @@ internal interface IMembershipManager : ILifecycleParticipant<ISiloLifecycle>, I
     /// reaches at least this version.
     /// </param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken);
-
-    /// <summary>
-    /// Establishes a freshness barrier against the membership source of truth.
-    /// </summary>
+    /// <param name="requireFresh">
+    /// Whether to require a source-of-truth observation which began after this method was invoked.
+    /// </param>
     /// <remarks>
-    /// When this method completes, <see cref="CurrentSnapshot"/> must reflect a source-of-truth observation
-    /// which began after this method was invoked. Implementations can satisfy the barrier using a full read or
-    /// a write which produces and publishes a complete membership view.
+    /// When <paramref name="requireFresh"/> is <see langword="true"/>, implementations can satisfy the
+    /// freshness barrier using a full read or a write which produces and publishes a complete membership view.
     /// </remarks>
-    /// <param name="cancellationToken">A token to cancel the operation.</param>
-    Task RefreshFromSource(CancellationToken cancellationToken);
+    Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken, bool requireFresh = false);
 
     /// <summary>
     /// Processes a membership snapshot received via gossip.
