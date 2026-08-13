@@ -1,3 +1,4 @@
+using System.Data.Common;
 using Microsoft.Data.SqlClient;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;
@@ -13,7 +14,20 @@ namespace UnitTests.General
         {
         }
 
-        protected override void PrepareForDatabaseReset() => SqlConnection.ClearAllPools();
+        protected override void PrepareForDatabaseReset(string databaseName)
+        {
+            using var administrativeConnection = new SqlConnection(CurrentConnectionString);
+            SqlConnection.ClearPool(administrativeConnection);
+
+            var builder = new DbConnectionStringBuilder
+            {
+                ConnectionString = CurrentConnectionString
+            };
+            builder["Database"] = databaseName;
+
+            using var databaseConnection = new SqlConnection(builder.ConnectionString);
+            SqlConnection.ClearPool(databaseConnection);
+        }
 
         protected override async Task WaitForDatabaseReadyAsync()
         {

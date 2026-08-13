@@ -126,7 +126,7 @@ namespace UnitTests.General
             }
 
             Console.WriteLine("Dropping and recreating database '{0}' with ConnectionString '{1}'", testDatabaseName, testStorage.CurrentConnectionString);
-            testStorage.PrepareForDatabaseReset();
+            testStorage.PrepareForDatabaseReset(testDatabaseName);
 
             if (await testStorage.ExistsDatabaseAsync(testDatabaseName))
             {
@@ -181,7 +181,7 @@ namespace UnitTests.General
             }
         }
 
-        protected virtual void PrepareForDatabaseReset()
+        protected virtual void PrepareForDatabaseReset(string databaseName)
         {
         }
 
