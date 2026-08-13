@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -388,22 +387,35 @@ namespace Orleans.Tests.SqlUtils
 #if STREAMING_ADONET || TESTER_SQLUTILS
 
         /// <summary>
-        /// Queues a stream message to the stream message table.
+        /// Appends an immutable message to a stream partition.
         /// </summary>
         /// <param name="serviceId">The service identifier.</param>
         /// <param name="providerId">The provider identifier.</param>
         /// <param name="queueId">The queue identifier.</param>
+        /// <param name="streamIdBytes">The canonical <see cref="StreamId.FullKey"/> bytes.</param>
+        /// <param name="streamNamespaceLength">The namespace boundary within <paramref name="streamIdBytes"/>.</param>
         /// <param name="payload">The serialized event payload.</param>
-        /// <param name="expiryTimeout">The expiry timeout for this event batch.</param>
-        /// <returns>An acknowledgement that the message was queued.</returns>
-        internal Task<AdoNetStreamMessageAck> QueueStreamMessageAsync(string serviceId, string providerId, string queueId, byte[] payload, int expiryTimeout)
+        /// <returns>An acknowledgement containing the allocated partition-local message identifier.</returns>
+        internal Task<AdoNetStreamMessageAck> AppendStreamMessageAsync(
+            string serviceId,
+            string providerId,
+            string queueId,
+            byte[] streamIdBytes,
+            int streamNamespaceLength,
+            byte[] payload)
         {
             ArgumentNullException.ThrowIfNull(serviceId);
             ArgumentNullException.ThrowIfNull(providerId);
             ArgumentNullException.ThrowIfNull(queueId);
+            ArgumentNullException.ThrowIfNull(streamIdBytes);
+            ArgumentNullException.ThrowIfNull(payload);
+            if (streamIdBytes.Length == 0 || streamNamespaceLength < 0 || streamNamespaceLength >= streamIdBytes.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(streamNamespaceLength), "The stream namespace boundary must leave a non-empty stream key.");
+            }
 
             return ReadAsync(
-                dbStoredQueries.QueueStreamMessageKey,
+                dbStoredQueries.AppendStreamMessageKey,
                 record => new AdoNetStreamMessageAck(
                     (string)record[nameof(AdoNetStreamMessageAck.ServiceId)],
                     (string)record[nameof(AdoNetStreamMessageAck.ProviderId)],
@@ -414,232 +426,203 @@ namespace Orleans.Tests.SqlUtils
                     ServiceId = serviceId,
                     ProviderId = providerId,
                     QueueId = queueId,
-                    Payload = payload,
-                    ExpiryTimeout = expiryTimeout,
+                    StreamIdBytes = streamIdBytes,
+                    StreamNamespaceLength = streamNamespaceLength,
+                    Payload = payload
                 },
                 result => result.Single());
         }
 
         /// <summary>
-        /// Gets stream messages from the stream message table.
+        /// Acquires partition ownership and initializes its checkpoint when necessary.
         /// </summary>
-        /// <param name="serviceId">The service identifier.</param>
-        /// <param name="providerId">The provider identifier.</param>
-        /// <param name="queueId">The queue identifier.</param>
-        /// <param name="maxCount">The maximum count of event batches to get.</param>
-        /// <param name="maxAttempts">The maximum attempts to lock an unprocessed event batch.</param>
-        /// <param name="visibilityTimeout">The visibility timeout for the retrieved event batches.</param>
-        /// <param name="removalTimeout">The timeout before the message is to be deleted from dead letters.</param>
-        /// <param name="evictionInterval">The interval between opportunistic data eviction.</param>
-        /// <param name="evictionBatchSize">The number of messages to evict in each batch.</param>
-        /// <returns>A list of dequeued payloads.</returns>
-        internal Task<IList<AdoNetStreamMessage>> GetStreamMessagesAsync(string serviceId, string providerId, string queueId, int maxCount, int maxAttempts, int visibilityTimeout, int removalTimeout, int evictionInterval, int evictionBatchSize)
+        internal Task<AdoNetStreamPartitionState> AcquireStreamPartitionAsync(
+            string serviceId,
+            string providerId,
+            string queueId,
+            bool startFromNow)
         {
             ArgumentNullException.ThrowIfNull(serviceId);
             ArgumentNullException.ThrowIfNull(providerId);
             ArgumentNullException.ThrowIfNull(queueId);
 
+            return ReadAsync(
+                dbStoredQueries.AcquireStreamPartitionKey,
+                record => new AdoNetStreamPartitionState(
+                    (string)record[nameof(AdoNetStreamPartitionState.ServiceId)],
+                    (string)record[nameof(AdoNetStreamPartitionState.ProviderId)],
+                    (string)record[nameof(AdoNetStreamPartitionState.QueueId)],
+                    (long)record[nameof(AdoNetStreamPartitionState.OwnerEpoch)],
+                    GetNullableInt64(record, nameof(AdoNetStreamPartitionState.Checkpoint)),
+                    GetNullableInt64(record, nameof(AdoNetStreamPartitionState.EarliestMessageId)),
+                    GetNullableInt64(record, nameof(AdoNetStreamPartitionState.TailMessageId))),
+                command => new DbStoredQueries.Columns(command)
+                {
+                    ServiceId = serviceId,
+                    ProviderId = providerId,
+                    QueueId = queueId,
+                    StartFromNow = startFromNow
+                },
+                result => result.Single());
+        }
+
+        /// <summary>
+        /// Reads retained messages with identifiers strictly greater than <paramref name="afterMessageId"/>.
+        /// </summary>
+        internal Task<IList<AdoNetStreamMessage>> ReadStreamMessagesAsync(
+            string serviceId,
+            string providerId,
+            string queueId,
+            long afterMessageId,
+            int maxCount)
+        {
+            ArgumentNullException.ThrowIfNull(serviceId);
+            ArgumentNullException.ThrowIfNull(providerId);
+            ArgumentNullException.ThrowIfNull(queueId);
+            ArgumentOutOfRangeException.ThrowIfNegative(afterMessageId);
+            ArgumentOutOfRangeException.ThrowIfLessThan(maxCount, 1);
+
             return ReadAsync<AdoNetStreamMessage, IList<AdoNetStreamMessage>>(
-                dbStoredQueries.GetStreamMessagesKey,
+                dbStoredQueries.ReadStreamMessagesKey,
                 record => new AdoNetStreamMessage(
                     (string)record[nameof(AdoNetStreamMessage.ServiceId)],
                     (string)record[nameof(AdoNetStreamMessage.ProviderId)],
                     (string)record[nameof(AdoNetStreamMessage.QueueId)],
                     (long)record[nameof(AdoNetStreamMessage.MessageId)],
-                    (int)record[nameof(AdoNetStreamMessage.Dequeued)],
-                    (DateTime)record[nameof(AdoNetStreamMessage.VisibleOn)],
-                    (DateTime)record[nameof(AdoNetStreamMessage.ExpiresOn)],
-                    (DateTime)record[nameof(AdoNetStreamMessage.CreatedOn)],
-                    (DateTime)record[nameof(AdoNetStreamMessage.ModifiedOn)],
+                    (byte[])record[nameof(AdoNetStreamMessage.StreamIdBytes)],
+                    (int)record[nameof(AdoNetStreamMessage.StreamNamespaceLength)],
+                    record.GetDateTimeValue(nameof(AdoNetStreamMessage.CreatedOn)),
                     (byte[])record[nameof(AdoNetStreamMessage.Payload)]),
                 command => new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,
                     ProviderId = providerId,
                     QueueId = queueId,
-                    MaxCount = maxCount,
-                    MaxAttempts = maxAttempts,
-                    VisibilityTimeout = visibilityTimeout,
-                    RemovalTimeout = removalTimeout,
-                    EvictionInterval = evictionInterval,
-                    EvictionBatchSize = evictionBatchSize
-                },
-                result =>
-                {
-                    var messages = result.ToList();
-                    messages.Sort(static (left, right) => left.MessageId.CompareTo(right.MessageId));
-                    return messages;
-                });
-        }
-
-        /// <summary>
-        /// Confirms delivery of messages from the stream message table.
-        /// </summary>
-        /// <param name="serviceId">The service identifier.</param>
-        /// <param name="providerId">The provider identifier.</param>
-        /// <param name="queueId">The queue identifier.</param>
-        /// <param name="messages">The messages to confirm.</param>
-        /// <returns>A list of confirmations.</returns>
-        /// <remarks>
-        /// If <paramref name="messages"/> is empty then an empty confirmation list is returned.
-        /// </remarks>
-        internal Task<IList<AdoNetStreamConfirmationAck>> ConfirmStreamMessagesAsync(string serviceId, string providerId, string queueId, IList<AdoNetStreamConfirmation> messages)
-        {
-            ArgumentNullException.ThrowIfNull(serviceId);
-            ArgumentNullException.ThrowIfNull(providerId);
-            ArgumentNullException.ThrowIfNull(queueId);
-            ArgumentNullException.ThrowIfNull(messages);
-
-            if (messages.Count == 0)
-            {
-                return Task.FromResult<IList<AdoNetStreamConfirmationAck>>([]);
-            }
-
-            return ReadAsync<AdoNetStreamConfirmationAck, IList<AdoNetStreamConfirmationAck>>(
-                dbStoredQueries.ConfirmStreamMessagesKey,
-                record => new AdoNetStreamConfirmationAck(
-                    (string)record[nameof(AdoNetStreamConfirmationAck.ServiceId)],
-                    (string)record[nameof(AdoNetStreamConfirmationAck.ProviderId)],
-                    (string)record[nameof(AdoNetStreamConfirmationAck.QueueId)],
-                    (long)record[nameof(AdoNetStreamConfirmationAck.MessageId)]),
-                command => new DbStoredQueries.Columns(command)
-                {
-                    ServiceId = serviceId,
-                    ProviderId = providerId,
-                    QueueId = queueId,
-                    Items = FormatStreamConfirmations(messages, release: false)
-                },
-                result => result.ToList());
-        }
-
-        /// <summary>
-        /// Makes unconfirmed stream messages immediately available for redelivery.
-        /// </summary>
-        /// <param name="serviceId">The service identifier.</param>
-        /// <param name="providerId">The provider identifier.</param>
-        /// <param name="queueId">The queue identifier.</param>
-        /// <param name="messages">The messages to release.</param>
-        /// <returns>A list of released messages.</returns>
-        /// <remarks>
-        /// The dequeue counter acts as a receipt so that a stale receiver cannot release a message
-        /// which has already been dequeued by a new receiver.
-        /// </remarks>
-        internal Task<IList<AdoNetStreamConfirmationAck>> ReleaseStreamMessagesAsync(string serviceId, string providerId, string queueId, IList<AdoNetStreamConfirmation> messages)
-        {
-            ArgumentNullException.ThrowIfNull(serviceId);
-            ArgumentNullException.ThrowIfNull(providerId);
-            ArgumentNullException.ThrowIfNull(queueId);
-            ArgumentNullException.ThrowIfNull(messages);
-
-            if (messages.Count == 0)
-            {
-                return Task.FromResult<IList<AdoNetStreamConfirmationAck>>([]);
-            }
-
-            return ReadAsync<AdoNetStreamConfirmationAck, IList<AdoNetStreamConfirmationAck>>(
-                dbStoredQueries.ConfirmStreamMessagesKey,
-                record => new AdoNetStreamConfirmationAck(
-                    (string)record[nameof(AdoNetStreamConfirmationAck.ServiceId)],
-                    (string)record[nameof(AdoNetStreamConfirmationAck.ProviderId)],
-                    (string)record[nameof(AdoNetStreamConfirmationAck.QueueId)],
-                    (long)record[nameof(AdoNetStreamConfirmationAck.MessageId)]),
-                command => new DbStoredQueries.Columns(command)
-                {
-                    ServiceId = serviceId,
-                    ProviderId = providerId,
-                    QueueId = queueId,
-                    Items = FormatStreamConfirmations(messages, release: true)
-                },
-                result => result.ToList());
-        }
-
-        // Builds a provider-neutral receipt list in the form "1:2|3:4|5:6".
-        private static string FormatStreamConfirmations(IList<AdoNetStreamConfirmation> messages, bool release) =>
-            messages.Aggregate(
-                new StringBuilder(),
-                (builder, message) => builder
-                    .Append(builder.Length > 0 ? "|" : "")
-                    .Append(message.MessageId)
-                    .Append(':')
-                    .Append(release ? -message.Dequeued : message.Dequeued),
-                static builder => builder.ToString());
-
-        /// <summary>
-        /// Applies delivery failure logic to a stream message, such as making the message visible again or moving it to dead letters.
-        /// </summary>
-        /// <param name="serviceId">The service identifier.</param>
-        /// <param name="providerId">The provider identifier.</param>
-        /// <param name="queueId">The queue identifier.</param>
-        /// <param name="messageId">The message identifier.</param>
-        internal Task FailStreamMessageAsync(string serviceId, string providerId, string queueId, long messageId, int maxAttempts, int removalTimeout)
-        {
-            ArgumentNullException.ThrowIfNull(serviceId);
-            ArgumentNullException.ThrowIfNull(providerId);
-            ArgumentNullException.ThrowIfNull(queueId);
-
-            return ExecuteAsync(
-                dbStoredQueries.FailStreamMessageKey,
-                command => new DbStoredQueries.Columns(command)
-                {
-                    ServiceId = serviceId,
-                    ProviderId = providerId,
-                    QueueId = queueId,
-                    MessageId = messageId,
-                    MaxAttempts = maxAttempts,
-                    RemovalTimeout = removalTimeout
-                });
-        }
-
-        /// <summary>
-        /// Moves eligible messages from the stream message table to the dead letter table.
-        /// </summary>
-        /// <param name="serviceId">The service identifier.</param>
-        /// <param name="providerId">The provider identifier.</param>
-        /// <param name="queueId">The queue identifier.</param>
-        /// <param name="maxCount">The max number of messages to move in this batch.</param>
-        /// <param name="maxAttempts">The max number of times a message can be dequeued.</param>
-        /// <param name="removalTimeout">The timeout before the message is to be deleted from dead letters.</param>
-        internal Task EvictStreamMessagesAsync(string serviceId, string providerId, string queueId, int maxCount, int maxAttempts, int removalTimeout)
-        {
-            ArgumentNullException.ThrowIfNull(serviceId);
-            ArgumentNullException.ThrowIfNull(providerId);
-            ArgumentNullException.ThrowIfNull(queueId);
-
-            return ExecuteAsync(
-                dbStoredQueries.EvictStreamMessagesKey,
-                command => new DbStoredQueries.Columns(command)
-                {
-                    ServiceId = serviceId,
-                    ProviderId = providerId,
-                    QueueId = queueId,
-                    MaxCount = maxCount,
-                    MaxAttempts = maxAttempts,
-                    RemovalTimeout = removalTimeout
-                });
-        }
-
-        /// <summary>
-        /// Removes messages from the dead letter after their removal timeout expires.
-        /// </summary>
-        /// <param name="serviceId">The service identifier.</param>
-        /// <param name="providerId">The provider identifier.</param>
-        /// <param name="queueId">The queue identifier.</param>
-        /// <param name="maxCount">The max number of messages to move in this batch.</param>
-        internal Task EvictStreamDeadLettersAsync(string serviceId, string providerId, string queueId, int maxCount)
-        {
-            ArgumentNullException.ThrowIfNull(serviceId);
-            ArgumentNullException.ThrowIfNull(providerId);
-            ArgumentNullException.ThrowIfNull(queueId);
-
-            return ExecuteAsync(
-                dbStoredQueries.EvictStreamDeadLettersKey,
-                command => new DbStoredQueries.Columns(command)
-                {
-                    ServiceId = serviceId,
-                    ProviderId = providerId,
-                    QueueId = queueId,
+                    AfterMessageId = afterMessageId,
                     MaxCount = maxCount
-                });
+                },
+                result => result.ToList());
+        }
+
+        /// <summary>
+        /// Advances a checkpoint only when the caller owns the current epoch and the value moves forward.
+        /// </summary>
+        internal Task<AdoNetStreamCheckpointUpdate?> AdvanceStreamCheckpointAsync(
+            string serviceId,
+            string providerId,
+            string queueId,
+            long ownerEpoch,
+            long checkpoint)
+        {
+            ArgumentNullException.ThrowIfNull(serviceId);
+            ArgumentNullException.ThrowIfNull(providerId);
+            ArgumentNullException.ThrowIfNull(queueId);
+            ArgumentOutOfRangeException.ThrowIfLessThan(ownerEpoch, 1);
+            ArgumentOutOfRangeException.ThrowIfNegative(checkpoint);
+
+            return ReadAsync<AdoNetStreamCheckpointUpdate, AdoNetStreamCheckpointUpdate?>(
+                dbStoredQueries.AdvanceStreamCheckpointKey,
+                record => new AdoNetStreamCheckpointUpdate(
+                    (string)record[nameof(AdoNetStreamCheckpointUpdate.ServiceId)],
+                    (string)record[nameof(AdoNetStreamCheckpointUpdate.ProviderId)],
+                    (string)record[nameof(AdoNetStreamCheckpointUpdate.QueueId)],
+                    (long)record[nameof(AdoNetStreamCheckpointUpdate.OwnerEpoch)],
+                    GetNullableInt64(record, nameof(AdoNetStreamCheckpointUpdate.Checkpoint)),
+                    Convert.ToBoolean(record[nameof(AdoNetStreamCheckpointUpdate.Updated)])),
+                command => new DbStoredQueries.Columns(command)
+                {
+                    ServiceId = serviceId,
+                    ProviderId = providerId,
+                    QueueId = queueId,
+                    OwnerEpoch = ownerEpoch,
+                    Checkpoint = checkpoint
+                },
+                result => result.SingleOrDefault());
+        }
+
+        /// <summary>
+        /// Reads the current checkpoint, ownership epoch, and retained message bounds.
+        /// </summary>
+        internal Task<AdoNetStreamPartitionState?> GetStreamPartitionBoundsAsync(
+            string serviceId,
+            string providerId,
+            string queueId)
+        {
+            ArgumentNullException.ThrowIfNull(serviceId);
+            ArgumentNullException.ThrowIfNull(providerId);
+            ArgumentNullException.ThrowIfNull(queueId);
+
+            return ReadAsync<AdoNetStreamPartitionState, AdoNetStreamPartitionState?>(
+                dbStoredQueries.GetStreamPartitionBoundsKey,
+                record => new AdoNetStreamPartitionState(
+                    (string)record[nameof(AdoNetStreamPartitionState.ServiceId)],
+                    (string)record[nameof(AdoNetStreamPartitionState.ProviderId)],
+                    (string)record[nameof(AdoNetStreamPartitionState.QueueId)],
+                    (long)record[nameof(AdoNetStreamPartitionState.OwnerEpoch)],
+                    GetNullableInt64(record, nameof(AdoNetStreamPartitionState.Checkpoint)),
+                    GetNullableInt64(record, nameof(AdoNetStreamPartitionState.EarliestMessageId)),
+                    GetNullableInt64(record, nameof(AdoNetStreamPartitionState.TailMessageId))),
+                command => new DbStoredQueries.Columns(command)
+                {
+                    ServiceId = serviceId,
+                    ProviderId = providerId,
+                    QueueId = queueId
+                },
+                result => result.SingleOrDefault());
+        }
+
+        /// <summary>
+        /// Deletes an ordered, bounded batch of retained messages.
+        /// </summary>
+        internal Task<AdoNetStreamCleanupResult> CleanupStreamMessagesAsync(
+            string serviceId,
+            string providerId,
+            string queueId,
+            int retentionPeriodSeconds,
+            int? maximumRetentionPeriodSeconds,
+            int cleanupIntervalSeconds,
+            int cleanupBatchSize)
+        {
+            ArgumentNullException.ThrowIfNull(serviceId);
+            ArgumentNullException.ThrowIfNull(providerId);
+            ArgumentNullException.ThrowIfNull(queueId);
+            ArgumentOutOfRangeException.ThrowIfLessThan(retentionPeriodSeconds, 1);
+            ArgumentOutOfRangeException.ThrowIfLessThan(cleanupIntervalSeconds, 1);
+            ArgumentOutOfRangeException.ThrowIfLessThan(cleanupBatchSize, 1);
+            if (maximumRetentionPeriodSeconds is { } maximum && maximum < retentionPeriodSeconds)
+            {
+                throw new ArgumentOutOfRangeException(nameof(maximumRetentionPeriodSeconds), "The maximum retention period must be greater than or equal to the normal retention period.");
+            }
+
+            return ReadAsync(
+                dbStoredQueries.CleanupStreamMessagesKey,
+                record => new AdoNetStreamCleanupResult(
+                    Convert.ToBoolean(record[nameof(AdoNetStreamCleanupResult.Ran)]),
+                    Convert.ToInt32(record[nameof(AdoNetStreamCleanupResult.DeletedCount)]),
+                    GetNullableInt64(record, nameof(AdoNetStreamCleanupResult.DeletedThroughMessageId)),
+                    Convert.ToInt32(record[nameof(AdoNetStreamCleanupResult.HardDeletedCount)]),
+                    GetNullableInt64(record, nameof(AdoNetStreamCleanupResult.HardDeletedFromMessageId)),
+                    GetNullableInt64(record, nameof(AdoNetStreamCleanupResult.HardDeletedThroughMessageId)),
+                    GetNullableInt64(record, nameof(AdoNetStreamCleanupResult.Checkpoint)),
+                    GetNullableInt64(record, nameof(AdoNetStreamCleanupResult.EarliestMessageId)),
+                    GetNullableInt64(record, nameof(AdoNetStreamCleanupResult.TailMessageId))),
+                command => new DbStoredQueries.Columns(command)
+                {
+                    ServiceId = serviceId,
+                    ProviderId = providerId,
+                    QueueId = queueId,
+                    RetentionPeriodSeconds = retentionPeriodSeconds,
+                    MaximumRetentionPeriodSeconds = maximumRetentionPeriodSeconds,
+                    CleanupIntervalSeconds = cleanupIntervalSeconds,
+                    CleanupBatchSize = cleanupBatchSize
+                },
+                result => result.Single());
+        }
+
+        private static long? GetNullableInt64(IDataRecord record, string fieldName)
+        {
+            var ordinal = record.GetOrdinal(fieldName);
+            return record.IsDBNull(ordinal) ? null : Convert.ToInt64(record.GetValue(ordinal));
         }
 
 #endif
