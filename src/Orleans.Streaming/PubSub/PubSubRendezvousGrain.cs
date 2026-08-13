@@ -122,25 +122,38 @@ namespace Orleans.Streams
         public async Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
         {
             TagList? tags = null;
-
-            if (_streamInstruments.PubSubProducersAdded.Enabled)
-            {
-                tags = StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
-                _streamInstruments.PubSubProducersAdded.Add(1, tags.Value);
-            }
+            var registrationRejected = false;
 
             try
             {
-                await RemoveDefunctSystemTargetProducers();
                 var publisherState = new PubSubPublisherState(streamId, streamProducer);
-                State.Producers.Add(publisherState);
-                LogPubSubCounts("RegisterProducer {0}", streamProducer);
-                await WriteStateAsync();
-                StreamingEvents.EmitProducerRegistered(streamId.ProviderName, streamId.StreamId, streamProducer, GrainContext.Address.SiloAddress);
-                if (_streamInstruments.PubSubProducersTotal.Enabled)
+                var (shouldRegister, stateChanged) = await RemoveDefunctSystemTargetProducers(streamProducer);
+                if (!shouldRegister)
                 {
-                    tags ??= StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
-                    _streamInstruments.PubSubProducersTotal.Add(1, tags.Value);
+                    LogWarningProducerRegistrationIgnored(publisherState, streamId);
+                    if (stateChanged)
+                    {
+                        await WriteStateAsync();
+                    }
+                    registrationRejected = true;
+                }
+                else
+                {
+                    if (_streamInstruments.PubSubProducersAdded.Enabled)
+                    {
+                        tags = StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
+                        _streamInstruments.PubSubProducersAdded.Add(1, tags.Value);
+                    }
+
+                    State.Producers.Add(publisherState);
+                    LogPubSubCounts("RegisterProducer {0}", streamProducer);
+                    await WriteStateAsync();
+                    StreamingEvents.EmitProducerRegistered(streamId.ProviderName, streamId.StreamId, streamProducer, GrainContext.Address.SiloAddress);
+                    if (_streamInstruments.PubSubProducersTotal.Enabled)
+                    {
+                        tags ??= StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
+                        _streamInstruments.PubSubProducersTotal.Add(1, tags.Value);
+                    }
                 }
             }
             catch (Exception exc)
@@ -151,11 +164,17 @@ namespace Orleans.Streams
                 DeactivateOnIdle();
                 throw;
             }
+
+            if (registrationRejected)
+            {
+                throw new OrleansException($"Cannot register stream producer {streamProducer} because its silo is no longer active.");
+            }
+
             // The LINQ query is non-null, so ToSet cannot return null.
             return State.Consumers.Where(c => !c.IsFaulted).ToSet()!;
         }
 
-        private async Task RemoveDefunctSystemTargetProducers()
+        private async Task<(bool ShouldRegister, bool StateChanged)> RemoveDefunctSystemTargetProducers(GrainId streamProducer)
         {
             var membershipSnapshot = _clusterMembershipService.CurrentSnapshot;
             List<(PubSubPublisherState Producer, SiloAddress SiloAddress)>? systemTargetProducers = null;
@@ -168,35 +187,51 @@ namespace Orleans.Streams
                 }
             }
 
-            if (systemTargetProducers is null)
+            SiloAddress? registeringSiloAddress = null;
+            if (SystemTargetGrainId.TryParse(streamProducer, out var registeringSystemTarget))
             {
-                return;
+                registeringSiloAddress = registeringSystemTarget.GetSiloAddress();
+            }
+
+            if (systemTargetProducers is null && registeringSiloAddress is null)
+            {
+                return (true, false);
+            }
+
+            var siloAddresses = systemTargetProducers?.Select(producer => producer.SiloAddress).ToList() ?? [];
+            if (registeringSiloAddress is not null)
+            {
+                siloAddresses.Add(registeringSiloAddress);
             }
 
             var statuses = await _unknownSiloStatusCache.GetSiloStatuses(
                 membershipSnapshot,
-                systemTargetProducers.Select(producer => producer.SiloAddress));
+                siloAddresses);
             List<PubSubPublisherState>? removedProducers = null;
-            foreach (var (producer, siloAddress) in systemTargetProducers)
+            if (systemTargetProducers is not null)
             {
-                if (statuses[siloAddress].IsTerminating())
+                foreach (var (producer, siloAddress) in systemTargetProducers)
                 {
-                    removedProducers ??= [];
-                    removedProducers.Add(producer);
+                    if (statuses[siloAddress].IsTerminating())
+                    {
+                        removedProducers ??= [];
+                        removedProducers.Add(producer);
+                    }
                 }
             }
 
-            if (removedProducers is null)
+            if (removedProducers is not null)
             {
-                return;
+                foreach (var producer in removedProducers)
+                {
+                    RemoveProducer(producer);
+                }
+
+                RecordRemovedProducers(removedProducers);
             }
 
-            foreach (var producer in removedProducers)
-            {
-                RemoveProducer(producer);
-            }
-
-            RecordRemovedProducers(removedProducers);
+            var shouldRegister = registeringSiloAddress is null || !statuses[registeringSiloAddress].IsTerminating();
+            return (shouldRegister, removedProducers is not null);
         }
 
         public async Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
@@ -651,6 +686,12 @@ namespace Orleans.Streams
             Message = "Producer {Producer} on stream {StreamId} is no longer active - permanently removing producer."
         )]
         private partial void LogWarningProducerIsDead(PubSubPublisherState producer, QualifiedStreamId streamId);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Producer {Producer} on stream {StreamId} is no longer active - ignoring registration."
+        )]
+        private partial void LogWarningProducerRegistrationIgnored(PubSubPublisherState producer, QualifiedStreamId streamId);
 
         [LoggerMessage(
             Level = LogLevel.Error,

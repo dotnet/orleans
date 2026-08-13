@@ -105,11 +105,49 @@ namespace UnitTests.StreamingTests
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
-        public async Task RegisterProducer_ReplacesStalePullingAgentFromDefunctSilo()
+        public async Task RegisterProducer_RemovesPersistedPullingAgentFromDefunctSilo()
         {
             var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
-            var activeSilo = this.fixture.HostedCluster.GetActiveSilos().First().SiloAddress;
+            Assert.Equal(0, await pubSubGrain.ProducerCount(streamId));
+            var managementGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
+            var rendezvousSilo = await managementGrain.GetActivationAddress(pubSubGrain);
+            Assert.NotNull(rendezvousSilo);
+            var restartedSilo = this.fixture.HostedCluster.GetActiveSilos().First(silo => silo.SiloAddress != rendezvousSilo);
+            var staleProducer = SystemTargetGrainId.Create(
+                Constants.StreamPullingAgentType,
+                restartedSilo.SiloAddress,
+                "ProviderName_1_test-queue").GrainId;
+
+            await pubSubGrain.RegisterProducer(streamId, staleProducer);
+            Assert.Equal(1, await pubSubGrain.ProducerCount(streamId));
+
+            var replacementSilo = await this.fixture.HostedCluster.RestartSiloAsync(restartedSilo);
+            Assert.NotNull(replacementSilo);
+            await this.fixture.HostedCluster.WaitForLivenessToStabilizeAsync();
+            var replacementProducer = SystemTargetGrainId.Create(
+                Constants.StreamPullingAgentType,
+                rendezvousSilo,
+                "ProviderName_1_test-queue").GrainId;
+
+            await pubSubGrain.RegisterProducer(streamId, replacementProducer);
+
+            Assert.Equal(1, await pubSubGrain.ProducerCount(streamId));
+            await managementGrain.ForceActivationCollection(TimeSpan.Zero);
+            Assert.Equal(1, await pubSubGrain.ProducerCount(streamId));
+            await pubSubGrain.UnregisterProducer(streamId, replacementProducer);
+            Assert.Equal(0, await pubSubGrain.ProducerCount(streamId));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
+        public async Task RegisterProducer_DoesNotRestorePullingAgentFromDefunctSilo()
+        {
+            var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
+            var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
+            Assert.Equal(0, await pubSubGrain.ProducerCount(streamId));
+            var managementGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
+            var activeSilo = await managementGrain.GetActivationAddress(pubSubGrain);
+            Assert.NotNull(activeSilo);
             var defunctSilo = SiloAddress.New(activeSilo.Endpoint, activeSilo.Generation - 1);
             var defunctProducer = SystemTargetGrainId.Create(
                 Constants.StreamPullingAgentType,
@@ -120,12 +158,12 @@ namespace UnitTests.StreamingTests
                 activeSilo,
                 "ProviderName_1_test-queue").GrainId;
 
-            await pubSubGrain.RegisterProducer(streamId, defunctProducer);
-            Assert.Equal(1, await pubSubGrain.ProducerCount(streamId));
-
             await pubSubGrain.RegisterProducer(streamId, replacementProducer);
+            await Assert.ThrowsAsync<OrleansException>(() => pubSubGrain.RegisterProducer(streamId, defunctProducer));
 
             Assert.Equal(1, await pubSubGrain.ProducerCount(streamId));
+            await pubSubGrain.UnregisterProducer(streamId, replacementProducer);
+            Assert.Equal(0, await pubSubGrain.ProducerCount(streamId));
         }
 
         /// <summary>
