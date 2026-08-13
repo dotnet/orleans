@@ -15,7 +15,7 @@ Build the host with <xref:Microsoft.Extensions.Hosting.Host.CreateApplicationBui
 
 :::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="run_silo":::
 
-The console lifetime requests host shutdown when the process receives a supported console interrupt or termination event. On Unix-like systems, container orchestrators normally send `SIGTERM`, and interactive terminals send `SIGINT` for <kbd>Ctrl</kbd>+<kbd>C</kbd>. Windows does not use POSIX signals; a Windows service or another process manager must use its host-lifetime integration to request shutdown. Web applications and service-managed applications should let their configured host lifetime initiate the same Generic Host stop sequence rather than adding a separate process-exit handler. For details, see [.NET Generic Host shutdown](https://learn.microsoft.com/dotnet/core/extensions/generic-host#host-shutdown).
+The configured .NET host lifetime handles the relevant termination events and initiates the Generic Host shutdown sequence, so applications shouldn't add a separate process-exit handler. For details, see [.NET Generic Host shutdown](https://learn.microsoft.com/dotnet/core/extensions/generic-host#host-shutdown).
 
 In tests or embedded hosts, call <xref:Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.StopAsync*> and dispose the host:
 
