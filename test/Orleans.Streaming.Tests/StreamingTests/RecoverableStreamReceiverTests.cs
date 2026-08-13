@@ -81,6 +81,41 @@ public sealed class RecoverableStreamReceiverTests
         Assert.Single(registry.Receivers);
     }
 
+    [Fact]
+    public async Task DeliveryProgress_WithNoSubscribers_AdvancesToNewestCachedRecord()
+    {
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var source = new TestSource([new TestQueueMessage(streamId, 11, "payload")]);
+        var adapter = new TestDataAdapter();
+        var bufferPool = new TrackingBufferPool();
+        var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
+            100,
+            bufferPool,
+            adapter,
+            new ChronologicalEvictionStrategy(
+                NullLogger.Instance,
+                new TimePurgePredicate(TimeSpan.MaxValue, TimeSpan.MaxValue),
+                cacheMonitor: null,
+                monitorWriteInterval: null),
+            NullLogger.Instance);
+        var checkpointer = new TestCheckpointer("10");
+        var receiver = new RecoverableStreamReceiver<TestQueueMessage>(
+            source,
+            adapter,
+            cache,
+            checkpointer,
+            startFromNow: false);
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+        _ = await receiver.GetQueueMessagesAsync(100, CancellationToken.None);
+
+        receiver.UpdateDeliveryProgress(earliestSubscriptionToken: null, DateTime.UtcNow);
+
+        Assert.Equal("11", checkpointer.LastUpdatedCheckpoint);
+        Assert.Equal(0, cache.ItemCount);
+        Assert.Equal(1, bufferPool.FreeCount);
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+    }
+
     private sealed record TestQueueMessage(StreamId StreamId, long SequenceNumber, string Payload);
 
     private sealed class TestDataAdapter : IRecoverableStreamDataAdapter<TestQueueMessage>
@@ -242,6 +277,18 @@ public sealed class RecoverableStreamReceiverTests
 
         public void OnBlockAllocated(FixedSizeBuffer newBlock)
         {
+        }
+    }
+
+    private sealed class TrackingBufferPool : IObjectPool<FixedSizeBuffer>
+    {
+        public int FreeCount { get; private set; }
+
+        public FixedSizeBuffer Allocate() => new(4 * 1024) { Pool = this };
+
+        public void Free(FixedSizeBuffer resource)
+        {
+            FreeCount++;
         }
     }
 
