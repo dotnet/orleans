@@ -114,7 +114,7 @@ public sealed class ReminderThrottleInstruments
         _coordinatorOutages.Add(
             1,
             new KeyValuePair<string, object?>(ReminderActivityAttributes.ThrottleTier, tier),
-            new KeyValuePair<string, object?>(ReminderActivityAttributes.ThrottleFailureMode, failureMode == Concurrency.ThrottleFailureMode.Open ? "open" : "closed"));
+            new KeyValuePair<string, object?>(ReminderActivityAttributes.ThrottleFailureMode, failureMode == ThrottleFailureMode.Open ? "open" : "closed"));
     }
 
     internal static string FormatOutcome(ReminderAdmissionOutcome outcome) => outcome switch
