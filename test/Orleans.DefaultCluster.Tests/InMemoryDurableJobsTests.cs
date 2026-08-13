@@ -120,6 +120,9 @@ public class InMemoryDurableJobsTests : HostedTestClusterEnsureDefaultStarted
 [TestArea("Runtime")]
 public class InMemoryDurableJobsResponseTimeoutTests : TestClusterPerTest
 {
+    private static readonly TimeSpan ClientResponseTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(6);
+
     protected override void ConfigureTestCluster(TestClusterBuilder builder)
     {
         builder.AddSiloBuilderConfigurator<SiloConfigurator>();
@@ -141,6 +144,7 @@ public class InMemoryDurableJobsResponseTimeoutTests : TestClusterPerTest
             hostBuilder
                 .UseInMemoryReminderService()
                 .UseInMemoryDurableJobs()
+                .Configure<DurableJobsOptions>(options => options.ShouldRetry = (_, _) => DateTimeOffset.UtcNow + RetryDelay)
                 .AddMemoryGrainStorageAsDefault();
         }
     }
@@ -149,7 +153,7 @@ public class InMemoryDurableJobsResponseTimeoutTests : TestClusterPerTest
     {
         public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
         {
-            clientBuilder.Configure<ClientMessagingOptions>(options => options.ResponseTimeout = TimeSpan.FromSeconds(1));
+            clientBuilder.Configure<ClientMessagingOptions>(options => options.ResponseTimeout = ClientResponseTimeout);
         }
     }
 }
