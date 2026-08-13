@@ -1,8 +1,11 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Serialization.Invocation;
 using Tester.DurableJobs;
 using TestExtensions;
+using UnitTests.GrainInterfaces;
 using Xunit;
 
 namespace DefaultCluster.Tests;
@@ -108,5 +111,26 @@ public class InMemoryDurableJobsTests : HostedTestClusterEnsureDefaultStarted
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         await _runner.JobRetry(cts.Token);
+    }
+}
+
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
+public class DurableJobsResponseTimeoutTests
+{
+    [Fact, TestCategory("BVT"), TestCategory("DurableJobs")]
+    public void JobRetryWaitOverridesClientResponseTimeout()
+    {
+        var request = typeof(IRetryTestGrain).Assembly
+            .GetTypes()
+            .Where(type => !type.IsAbstract
+                && !type.ContainsGenericParameters
+                && typeof(IInvokable).IsAssignableFrom(type))
+            .Select(type => (IInvokable)Activator.CreateInstance(type)!)
+            .Single(request => request.GetInterfaceType() == typeof(IRetryTestGrain)
+                && request.GetMethodName() == nameof(IRetryTestGrain.WaitForJobToSucceed));
+
+        Assert.Equal(TimeSpan.FromMinutes(2), request.GetDefaultResponseTimeout());
     }
 }

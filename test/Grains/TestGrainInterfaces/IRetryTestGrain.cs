@@ -13,6 +13,7 @@ public interface IRetryTestGrain : IGrainWithStringKey
     Task<bool> HasJobSucceeded(string jobId);
 
     [AlwaysInterleave]
+    [ResponseTimeout("00:02:00")]
     Task WaitForJobToSucceed(string jobId);
 
     Task<int> GetJobExecutionAttemptCount(string jobId);
