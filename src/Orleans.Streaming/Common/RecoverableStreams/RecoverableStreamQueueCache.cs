@@ -140,6 +140,9 @@ namespace Orleans.Providers.Streams.Common
         public bool TryPurgeFromCache([MaybeNullWhen(false)] out IList<IBatchContainer> purgedItems)
         {
             purgedItems = null;
+            // Pressure indicates that a lagging cursor can still need the oldest records. Time-based
+            // eviction in that state would turn backpressure into data loss. UpdateDeliveryProgress
+            // removes records through the safe delivery watermark and releases pressure as consumers advance.
             if (!IsUnderPressure())
             {
                 _evictionStrategy.PerformPurge(DateTime.UtcNow);
