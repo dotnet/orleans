@@ -785,6 +785,12 @@ namespace Orleans.Providers.Streams.Common
         bool TryGetOffset(Orleans.Streams.StreamSequenceToken token, out string offset);
     }
 
+    public partial interface IRecoverableStreamQueueCache<TQueueMessage> : Orleans.Streams.IQueueCache, Orleans.Streams.IQueueFlowController, System.IDisposable
+    {
+        System.Collections.Generic.IReadOnlyList<Orleans.Streams.StreamPosition> Add(System.Collections.Generic.IReadOnlyList<TQueueMessage> messages, System.DateTime dequeueTimeUtc);
+        bool TryGetNewestPosition(out Orleans.Streams.StreamSequenceToken? token, out string? offset);
+    }
+
     public partial interface IRecoverableStreamSource<TQueueMessage>
     {
         System.Threading.Tasks.Task Initialize(RecoverableStreamStartPosition position, System.Threading.CancellationToken cancellationToken);
@@ -893,6 +899,8 @@ namespace Orleans.Providers.Streams.Common
         public System.Collections.Generic.IReadOnlyDictionary<Orleans.Streams.QueueId, TReceiver> Receivers { get { throw null; } }
 
         public TReceiver GetOrCreate(Orleans.Streams.QueueId queueId) { throw null; }
+
+        public bool Remove(Orleans.Streams.QueueId queueId, TReceiver receiver) { throw null; }
     }
 
     public partial class ReceiverMonitorDimensions
@@ -904,7 +912,7 @@ namespace Orleans.Providers.Streams.Common
         public string QueueId { get { throw null; } set { } }
     }
 
-    public sealed partial class RecoverableStreamQueueCache<TQueueMessage> : Orleans.Streams.IQueueCache, Orleans.Streams.IQueueFlowController, System.IDisposable
+    public sealed partial class RecoverableStreamQueueCache<TQueueMessage> : IRecoverableStreamQueueCache<TQueueMessage>, Orleans.Streams.IQueueCache, Orleans.Streams.IQueueFlowController, System.IDisposable
     {
         public RecoverableStreamQueueCache(int defaultMaxAddCount, IObjectPool<FixedSizeBuffer> bufferPool, IRecoverableStreamDataAdapter<TQueueMessage> dataAdapter, IEvictionStrategy evictionStrategy, Microsoft.Extensions.Logging.ILogger logger, Orleans.Streams.IQueueFlowController? flowController = null, ICacheMonitor? cacheMonitor = null, System.TimeSpan? cacheMonitorWriteInterval = null, System.TimeSpan? metadataMinTimeInCache = null, int? maxCacheSize = null) { }
 
@@ -933,6 +941,8 @@ namespace Orleans.Providers.Streams.Common
 
     public sealed partial class RecoverableStreamReceiver<TQueueMessage> : Orleans.Streams.IQueueAdapterReceiver, Orleans.Streams.IQueueCache, Orleans.Streams.IQueueFlowController
     {
+        public RecoverableStreamReceiver(IRecoverableStreamSource<TQueueMessage> source, IRecoverableStreamDataAdapter<TQueueMessage> dataAdapter, IRecoverableStreamQueueCache<TQueueMessage> cache, Orleans.Streams.IStreamQueueCheckpointer<string> checkpointer, bool startFromNow) { }
+
         public RecoverableStreamReceiver(IRecoverableStreamSource<TQueueMessage> source, IRecoverableStreamDataAdapter<TQueueMessage> dataAdapter, RecoverableStreamQueueCache<TQueueMessage> cache, Orleans.Streams.IStreamQueueCheckpointer<string> checkpointer, bool startFromNow) { }
 
         public void AddToCache(System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> messages) { }
@@ -946,6 +956,8 @@ namespace Orleans.Providers.Streams.Common
 
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         public System.Threading.Tasks.Task<System.Collections.Generic.IList<Orleans.Streams.IBatchContainer>> GetQueueMessagesAsync(int maxCount) { throw null; }
+
+        public System.Threading.Tasks.Task Initialize(System.Threading.CancellationToken cancellationToken) { throw null; }
 
         [System.Diagnostics.DebuggerStepThrough]
         public System.Threading.Tasks.Task Initialize(System.TimeSpan timeout) { throw null; }
