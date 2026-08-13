@@ -61,6 +61,13 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
            OnStart,
            _ => Task.CompletedTask);
 
+        // The rebalancer must migrate before the catalog deactivates ordinary grains during shutdown.
+        observer.Subscribe(
+           $"{nameof(ActivationRebalancerMonitor)}.Migration",
+           ServiceLifecycleStage.GrainDeactivation + 1,
+           _ => Task.CompletedTask,
+           MigrateRebalancerOnStop);
+
         observer.Subscribe(
            nameof(ActivationRepartitioner),
            ServiceLifecycleStage.ApplicationServices,
@@ -101,23 +108,25 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
         });
     }
 
-    private async Task OnStop(CancellationToken cancellationToken)
+    private async Task MigrateRebalancerOnStop(CancellationToken cancellationToken)
     {
-        await this.RunOrQueueTask(() =>
+        await this.RunOrQueueTask(async () =>
         {
-            if (_latestReport is { } report && Silo.IsSameLogicalSilo(report.Host))
+            if (!cancellationToken.IsCancellationRequested &&
+                _activationDirectory.FindTarget(_rebalancerGrain.GetGrainId()) is { } activation)
             {
-                if (_activationDirectory.FindTarget(_rebalancerGrain.GetGrainId()) is { } activation)
-                {
-                    LogMigratingRebalancer(Silo);
-                    activation.Migrate(null, cancellationToken); // migrate it anywhere else
-                }
+                LogMigratingRebalancer(Silo);
+                activation.Migrate(null, cancellationToken); // migrate it anywhere else
+                await activation.Deactivated.WaitAsync(cancellationToken);
             }
-
-            _monitorTimer?.Dispose();
-            return Task.CompletedTask;
         });
     }
+
+    private Task OnStop(CancellationToken cancellationToken) => this.RunOrQueueTask(() =>
+    {
+        _monitorTimer?.Dispose();
+        return Task.CompletedTask;
+    });
 
     public Task ResumeRebalancing() => _rebalancerGrain.ResumeRebalancing();
     public Task SuspendRebalancing(TimeSpan? duration) => _rebalancerGrain.SuspendRebalancing(duration);

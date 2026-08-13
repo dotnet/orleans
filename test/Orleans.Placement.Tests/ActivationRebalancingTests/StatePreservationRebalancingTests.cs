@@ -23,6 +23,8 @@ namespace UnitTests.ActivationRebalancingTests;
 public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHelper output)
     : RebalancingTestBase<SPFixture>(fixture, output), IClassFixture<SPFixture>
 {
+    private static readonly TimeSpan WaitTimeout = TimeSpan.FromSeconds(30);
+
     private const string ErrorMessage =
         "The rebalancer was not found in any of the 4 silos. " +
         "Either you have added more silos and not updated this code, " +
@@ -32,12 +34,13 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
     public async Task Should_Migrate_And_Preserve_State_When_Hosting_Silo_Dies()
     {
         var tasks = new List<Task>();
+        using var rebalancerEvents = RebalancerDiagnosticObserver.Create();
+        var rebalancer = Cluster.Client!.GetGrain<IActivationRebalancerWorker>(0);
+        var targetHost = Cluster.Silos[1].SiloAddress;
 
         // Move the rebalancer to the first secondary silo, since we will stop it later and we cannot stop
         // the primary in this test setup.
-        RequestContext.Set(IPlacementDirector.PlacementHintKey, Cluster.Silos[1].SiloAddress);
-        await Cluster.Client!.GetGrain<IActivationRebalancerWorker>(0).Cast<IGrainManagementExtension>().MigrateOnIdle();
-        RequestContext.Remove(IPlacementDirector.PlacementHintKey);
+        await MoveRebalancerToSilo(rebalancer, targetHost);
 
         AddTestActivations(tasks, Silo1, 300);
         AddTestActivations(tasks, Silo2, 30);
@@ -45,6 +48,8 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
         AddTestActivations(tasks, Silo4, 100);
 
         await Task.WhenAll(tasks);
+
+        await rebalancerEvents.WaitForCycleCountAsync(targetHost, 3, WaitTimeout);
 
         var stats = await MgmtGrain.GetDetailedGrainStatistics();
 
@@ -60,95 +65,90 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
            $"Silo3: {initialSilo3Activations}\n" +
            $"Silo4: {initialSilo4Activations}\n");
 
-        var silo1Activations = initialSilo1Activations;
-        var silo2Activations = initialSilo2Activations;
-        var silo3Activations = initialSilo3Activations;
-        var silo4Activations = initialSilo4Activations;
+        (var rebalancerHost, var rebalancerHostNum) = await FindRebalancerHost(Silo1);
+        var reportBeforeStop = await rebalancer.GetReport();
 
-        var rebalancerHostNum = 0;
-        var index = 0;
+        OutputHelper.WriteLine($"Now stopping Silo{rebalancerHostNum}, which is the host of the rebalancer\n");
 
-        while (index < 6)
-        {
-            if (index == 3)
-            {
-                (var rebalancerHost, rebalancerHostNum) = await FindRebalancerHost(Silo1);
+        Assert.Equal(targetHost, rebalancerHost);
+        Assert.NotEqual(rebalancerHost, Cluster.Silos[0].SiloAddress);
 
-                OutputHelper.WriteLine($"Cycle {index}: Now stopping Silo{rebalancerHostNum}, which is the host of the rebalancer\n");
+        await Cluster.StopSiloAsync(Cluster.Silos.First(x => x.SiloAddress.Equals(rebalancerHost)));
 
-                Assert.NotEqual(rebalancerHost, Cluster.Silos[0].SiloAddress);
-                await Cluster.StopSiloAsync(Cluster.Silos.First(x => x.SiloAddress.Equals(rebalancerHost)));
-            }
+        var reportAfterStop = await rebalancer.GetReport();
+        var newHost = reportAfterStop.Host;
+        Assert.NotEqual(rebalancerHost, newHost);
+        Assert.Equal(reportBeforeStop.ClusterImbalance, reportAfterStop.ClusterImbalance);
+        Assert.Equal(reportBeforeStop.Status, reportAfterStop.Status);
+        Assert.Equal(
+            reportBeforeStop.Statistics
+                .Single(statistic => statistic.SiloAddress.Equals(newHost))
+                .AcquiredActivations,
+            reportAfterStop.Statistics
+                .Single(statistic => statistic.SiloAddress.Equals(newHost))
+                .AcquiredActivations);
+        Assert.Equal(
+            reportBeforeStop.Statistics
+                .Where(statistic => !statistic.SiloAddress.Equals(rebalancerHost))
+                .OrderBy(statistic => statistic.SiloAddress.ToString(), StringComparer.Ordinal)
+                .Select(statistic => (
+                    statistic.TimeStamp,
+                    statistic.SiloAddress,
+                    statistic.DispersedActivations,
+                    statistic.AcquiredActivations)),
+            reportAfterStop.Statistics
+                .Where(statistic => !statistic.SiloAddress.Equals(rebalancerHost))
+                .OrderBy(statistic => statistic.SiloAddress.ToString(), StringComparer.Ordinal)
+                .Select(statistic => (
+                    statistic.TimeStamp,
+                    statistic.SiloAddress,
+                    statistic.DispersedActivations,
+                    statistic.AcquiredActivations)));
 
-            await Task.Delay(SPFixture.SessionCyclePeriod);
-            stats = await MgmtGrain.GetDetailedGrainStatistics();
+        rebalancerEvents.Clear();
+        await rebalancerEvents.WaitForCycleCountAsync(newHost, 3, WaitTimeout);
 
-            silo1Activations = GetActivationCount(stats, Silo1);
-            silo2Activations = GetActivationCount(stats, Silo2);
-            silo3Activations = GetActivationCount(stats, Silo3);
-            silo4Activations = GetActivationCount(stats, Silo4);
+        stats = await MgmtGrain.GetDetailedGrainStatistics();
+        Assert.DoesNotContain(stats, statistic => statistic.SiloAddress.Equals(rebalancerHost));
 
-            index++;
-        }
-
-        if (rebalancerHostNum == 1)
-        {
-            Assert.True(silo2Activations > initialSilo2Activations,
-                $"Did not expect Silo2 to have less activations than what it started with: " +
-                $"[{initialSilo2Activations} -> {silo2Activations}]");
-
-            Assert.True(silo3Activations < initialSilo3Activations,
-                $"Did not expect Silo3 to have more activations than what it started with: " +
-                $"[{initialSilo3Activations} -> {silo3Activations}]");
-        }
-        else if (rebalancerHostNum == 2)
-        {
-            Assert.True(silo3Activations < initialSilo3Activations,
-                $"Did not expect Silo3 to have more activations than what it started with: " +
-                $"[{initialSilo3Activations} -> {silo3Activations}]");
-
-            Assert.True(silo4Activations > initialSilo4Activations,
-                $"Did not expect Silo4 to have less activations than what it started with: " +
-                $"[{initialSilo4Activations} -> {silo4Activations}]");
-        }
-        else if (rebalancerHostNum == 3)
-        {
-            Assert.True(silo1Activations < initialSilo1Activations,
-                $"Did not expect Silo1 to have more activations than what it started with: " +
-                $"[{initialSilo1Activations} -> {silo1Activations}]");
-
-            Assert.True(silo2Activations > initialSilo2Activations,
-                $"Did not expect Silo2 to have less activations than what it started with: " +
-                $"[{initialSilo2Activations} -> {silo2Activations}]");
-        }
-        else if (rebalancerHostNum == 4)
-        {
-            Assert.True(silo1Activations < initialSilo1Activations,
-                $"Did not expect Silo1 to have more activations than what it started with: " +
-                $"[{initialSilo1Activations} -> {silo1Activations}]");
-
-            Assert.True(silo2Activations > initialSilo2Activations,
-                $"Did not expect Silo2 to have less activations than what it started with: " +
-                $"[{initialSilo2Activations} -> {silo2Activations}]");
-        }
+        var silo1Activations = GetActivationCount(stats, Silo1);
+        var silo2Activations = GetActivationCount(stats, Silo2);
+        var silo3Activations = GetActivationCount(stats, Silo3);
+        var silo4Activations = GetActivationCount(stats, Silo4);
 
         OutputHelper.WriteLine(
-            $"Post-rebalancing activations ({index} cycles):\n" +
+            $"Post-rebalancing activations:\n" +
             $"Silo1: {(rebalancerHostNum == 1 ? "DEAD" : silo1Activations)}\n" +
             $"Silo2: {(rebalancerHostNum == 2 ? "DEAD" : silo2Activations)}\n" +
             $"Silo3: {(rebalancerHostNum == 3 ? "DEAD" : silo3Activations)}\n" +
             $"Silo4: {(rebalancerHostNum == 4 ? "DEAD" : silo4Activations)}\n");
 
-        (_, rebalancerHostNum) = await FindRebalancerHost(rebalancerHostNum switch
-        {
-            1 => Silo2,
-            2 => Silo3,
-            3 => Silo4,
-            4 => Silo1,
-            _ => throw new InvalidOperationException(ErrorMessage)
-        });
+        (var finalHost, rebalancerHostNum) = await FindRebalancerHost(newHost);
 
+        Assert.Equal(newHost, finalHost);
         OutputHelper.WriteLine($"The rebalancer is hosted by Silo{rebalancerHostNum} now");
+    }
+
+    private async Task MoveRebalancerToSilo(
+        IActivationRebalancerWorker rebalancer,
+        SiloAddress targetHost)
+    {
+        if ((await rebalancer.GetReport()).Host.Equals(targetHost))
+        {
+            return;
+        }
+
+        RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
+        try
+        {
+            await rebalancer.Cast<IGrainManagementExtension>().MigrateOnIdle();
+        }
+        finally
+        {
+            RequestContext.Remove(IPlacementDirector.PlacementHintKey);
+        }
+
+        Assert.Equal(targetHost, (await rebalancer.GetReport()).Host);
     }
 
     private async Task<(SiloAddress, int)> FindRebalancerHost(SiloAddress target)
