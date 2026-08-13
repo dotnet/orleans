@@ -74,7 +74,18 @@ namespace Orleans.Providers.Streams.Common
                 return [];
             }
 
-            var positions = _cache.Add(messages, DateTime.UtcNow);
+            IReadOnlyList<StreamPosition> positions;
+            try
+            {
+                positions = _cache.Add(messages, DateTime.UtcNow);
+                _source.MessagesAdded(messages);
+            }
+            catch
+            {
+                _source.MessagesAddFailed(messages);
+                throw;
+            }
+
             var result = new List<IBatchContainer>(positions.Count);
             foreach (var position in positions)
             {
@@ -134,8 +145,16 @@ namespace Orleans.Providers.Streams.Common
         /// <inheritdoc />
         public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
         {
-            if (earliestSubscriptionToken is not null
-                && _dataAdapter.TryGetOffset(earliestSubscriptionToken, out var offset))
+            var progressToken = earliestSubscriptionToken;
+            string? offset = null;
+            if (progressToken is null)
+            {
+                _ = _cache.TryGetNewestPosition(out progressToken, out offset);
+            }
+
+            _cache.UpdateDeliveryProgress(progressToken, utcNow);
+            if (progressToken is not null
+                && (offset is not null || _dataAdapter.TryGetOffset(progressToken, out offset)))
             {
                 _checkpointer.Update(offset, utcNow, CancellationToken.None);
             }
