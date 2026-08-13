@@ -1050,6 +1050,9 @@ function xrefUrl(uid, uidMap) {
       return uidMap.get(candidate);
     }
   }
+  if (withoutMethodArity.startsWith('Orleans.')) {
+    return 'https://dotnet.github.io/orleans/docs/api/csharp/';
+  }
   const slug = withoutMethodArity.replace(/`(\d+)/g, '-$1').toLowerCase();
   return `https://learn.microsoft.com/dotnet/api/${encodeURI(slug)}`;
 }

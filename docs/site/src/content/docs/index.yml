@@ -223,35 +223,35 @@ additionalContent:
 
           - title: ".NET Orleans core API reference"
             summary: API reference documentation for .NET Orleans.Core
-            url: https://learn.microsoft.com/dotnet/api/orleans.core
+            url: https://dotnet.github.io/orleans/docs/api/csharp/microsoft.orleans.core/
 
           - title: ".NET Orleans runtime API reference"
             summary: API reference documentation for .NET Orleans.Runtime
-            url: https://learn.microsoft.com/dotnet/api/orleans.runtime
+            url: https://dotnet.github.io/orleans/docs/api/csharp/microsoft.orleans.runtime/
 
           - title: ".NET Orleans streams API reference"
             summary: API reference documentation for .NET Orleans.Streams
-            url: https://learn.microsoft.com/dotnet/api/orleans.streams
+            url: https://dotnet.github.io/orleans/docs/api/csharp/microsoft.orleans.streaming/
 
           - title: ".NET Orleans providers API reference"
             summary: API reference documentation for .NET Orleans.Providers
-            url: https://learn.microsoft.com/dotnet/api/orleans.providers
+            url: https://dotnet.github.io/orleans/docs/api/csharp/
 
           - title: ".NET Orleans storage API reference"
             summary: API reference documentation for .NET Orleans.Storage
-            url: https://learn.microsoft.com/dotnet/api/orleans.storage
+            url: https://dotnet.github.io/orleans/docs/api/csharp/
 
           - title: ".NET Orleans Azure Storage API reference"
             summary: API reference documentation for .NET Orleans.Clustering.AzureStorage
-            url: https://learn.microsoft.com/dotnet/api/orleans.clustering.azurestorage
+            url: https://dotnet.github.io/orleans/docs/api/csharp/microsoft.orleans.clustering.azurestorage/
 
           - title: ".NET Orleans services API reference"
             summary: API reference documentation for .NET Orleans.Services
-            url: https://learn.microsoft.com/dotnet/api/orleans.services
+            url: https://dotnet.github.io/orleans/docs/api/csharp/
 
           - title: ".NET Orleans transactions API reference"
             summary: API reference documentation for .NET Orleans.Transactions
-            url: https://learn.microsoft.com/dotnet/api/orleans.transactions
+            url: https://dotnet.github.io/orleans/docs/api/csharp/microsoft.orleans.transactions/
 
 
     # footer (optional)
