@@ -240,11 +240,11 @@ internal sealed class DelayedMembershipManager(MembershipTableManager inner) : I
     public Task ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) =>
         ((IMembershipManager)inner).ProcessGossipSnapshot(snapshot, cancellationToken);
 
-    public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) =>
-        ((IMembershipManager)inner).Refresh(targetVersion, cancellationToken);
-
-    public Task RefreshFromSource(CancellationToken cancellationToken) =>
-        ((IMembershipManager)inner).RefreshFromSource(cancellationToken);
+    public Task Refresh(
+        MembershipVersion? targetVersion,
+        CancellationToken cancellationToken,
+        bool requireFresh = false) =>
+        ((IMembershipManager)inner).Refresh(targetVersion, cancellationToken, requireFresh);
 
     public Task<bool> TryKillSilo(SiloAddress silo, CancellationToken cancellationToken) =>
         ((IMembershipManager)inner).TryKillSilo(silo, cancellationToken);
