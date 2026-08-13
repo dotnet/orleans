@@ -11,15 +11,15 @@ namespace Orleans.Streaming.Kinesis
     /// </summary>
     internal sealed class DynamoDBStreamQueueCheckpointer : IStreamQueueCheckpointer<string>
     {
-        private readonly GrainStreamQueueCheckpointer _inner;
+        private readonly StreamQueueCheckpointer _inner;
 
         internal DynamoDBStreamQueueCheckpointer(
             IDynamoDBStreamCheckpointStore store,
             DynamoDBStreamQueueCheckpointerOptions options)
         {
-            _inner = new GrainStreamQueueCheckpointer(
+            _inner = new StreamQueueCheckpointer(
                 new StreamCheckpointStoreAdapter(store),
-                new GrainStreamQueueCheckpointerOptions
+                new StreamQueueCheckpointerOptions
                 {
                     CheckpointComparer = StreamCheckpointComparers.Numeric,
                     PersistInterval = options.PersistInterval,
@@ -63,15 +63,22 @@ namespace Orleans.Streaming.Kinesis
         /// <inheritdoc />
         public Task FlushAsync(CancellationToken cancellationToken) => _inner.FlushAsync(cancellationToken);
 
-        private sealed class StreamCheckpointStoreAdapter(IDynamoDBStreamCheckpointStore store) : IStreamCheckpointerGrain
+        private sealed class StreamCheckpointStoreAdapter(IDynamoDBStreamCheckpointStore store) : IStreamCheckpointStore
         {
-            public ValueTask<string> Load(CancellationToken cancellationToken) => store.Load(cancellationToken);
+            public async ValueTask<StreamCheckpointStoreState> Load(CancellationToken cancellationToken)
+            {
+                var checkpoint = await store.Load(cancellationToken).ConfigureAwait(false);
+                return new(checkpoint, checkpoint);
+            }
 
-            public ValueTask<string> Update(
+            public async ValueTask<StreamCheckpointStoreState> Update(
                 string checkpoint,
-                string expectedCheckpoint,
+                string expectedVersion,
                 CancellationToken cancellationToken)
-                => store.Update(checkpoint, expectedCheckpoint, cancellationToken);
+            {
+                var persistedCheckpoint = await store.Update(checkpoint, expectedVersion, cancellationToken).ConfigureAwait(false);
+                return new(persistedCheckpoint, persistedCheckpoint);
+            }
         }
     }
 }
