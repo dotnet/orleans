@@ -60,32 +60,6 @@ public class ClusterMembershipSnapshotTests
     }
 
     [Fact]
-    public void CreateUpdate_IncludesSameVersionStatusChange()
-    {
-        var silo = CreateSiloAddress(1);
-        var previous = CreateSnapshot(new ClusterMember(silo, SiloStatus.Active, "silo"), version: 1);
-        var current = CreateSnapshot(new ClusterMember(silo, SiloStatus.ShuttingDown, "silo"), version: 1);
-
-        var change = Assert.Single(current.CreateUpdate(previous).Changes);
-
-        Assert.Equal(SiloStatus.ShuttingDown, change.Status);
-        Assert.True(current.IsSuccessorTo(previous));
-        Assert.False(previous.IsSuccessorTo(current));
-    }
-
-    [Fact]
-    public void SameVersionTerminatingMemberAddition_IsSuccessor()
-    {
-        var silo = CreateSiloAddress(1);
-        var previous = new ClusterMembershipSnapshot(
-            ImmutableDictionary<SiloAddress, ClusterMember>.Empty,
-            new MembershipVersion(1));
-        var current = CreateSnapshot(new ClusterMember(silo, SiloStatus.ShuttingDown, "silo"), version: 1);
-
-        Assert.True(current.IsSuccessorTo(previous));
-    }
-
-    [Fact]
     public void GracefullyDeadMember_IsNotDeclaredDead()
     {
         var member = new ClusterMember(CreateSiloAddress(1), SiloStatus.Dead, "silo");

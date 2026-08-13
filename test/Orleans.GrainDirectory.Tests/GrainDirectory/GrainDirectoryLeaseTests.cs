@@ -516,6 +516,12 @@ public class GrainDirectoryLeaseTests
 
 internal sealed class LeaseTestMembershipManager(MembershipTableManager inner) : IMembershipManager
 {
+    public event Action<SiloStatus> LocalSiloStatusChanged
+    {
+        add => ((IMembershipManager)inner).LocalSiloStatusChanged += value;
+        remove => ((IMembershipManager)inner).LocalSiloStatusChanged -= value;
+    }
+
     private bool _gracefulShutdown;
 
     public MembershipTableSnapshot CurrentSnapshot => ((IMembershipManager)inner).CurrentSnapshot;

@@ -20,6 +20,7 @@ namespace Orleans.Runtime.MembershipService
         private Dictionary<SiloAddress, SiloStatus> siloStatusCache = new Dictionary<SiloAddress, SiloStatus>();
         private Dictionary<SiloAddress, SiloStatus> siloStatusCacheOnlyActive = new Dictionary<SiloAddress, SiloStatus>();
         private SiloAddress[] _activeSilos = [];
+        private int _localSiloStatus;
 
         public SiloStatusOracle(
             ILocalSiloDetails localSiloDetails,
@@ -31,6 +32,8 @@ namespace Orleans.Runtime.MembershipService
             this.membershipManager = membershipManager;
             this.listenerManager = listenerManager;
             this.log = logger;
+            membershipManager.LocalSiloStatusChanged += OnLocalSiloStatusChanged;
+            OnLocalSiloStatusChanged(membershipManager.LocalSiloStatus);
         }
 
         public SiloStatus CurrentStatus => this.membershipManager.LocalSiloStatus;
@@ -39,6 +42,11 @@ namespace Orleans.Runtime.MembershipService
 
         public SiloStatus GetApproximateSiloStatus(SiloAddress silo)
         {
+            if (silo.Equals(this.SiloAddress))
+            {
+                return (SiloStatus)Volatile.Read(ref _localSiloStatus);
+            }
+
             var status = this.membershipManager.CurrentSnapshot.GetSiloStatus(silo);
 
             if (status == SiloStatus.None)
@@ -83,10 +91,11 @@ namespace Orleans.Runtime.MembershipService
                 var newSiloStatusCache = new Dictionary<SiloAddress, SiloStatus>();
                 var newSiloStatusCacheOnlyActive = new Dictionary<SiloAddress, SiloStatus>();
                 var newActiveSilos = new List<SiloAddress>();
+                var localSiloStatus = (SiloStatus)Volatile.Read(ref _localSiloStatus);
                 foreach (var entry in currentMembership.Entries)
                 {
                     var silo = entry.Key;
-                    var status = entry.Value.Status;
+                    var status = silo.Equals(this.SiloAddress) ? localSiloStatus : entry.Value.Status;
                     newSiloStatusCache[silo] = status;
                     if (status == SiloStatus.Active)
                     {
@@ -99,6 +108,28 @@ namespace Orleans.Runtime.MembershipService
                 this.siloStatusCache = newSiloStatusCache;
                 this.siloStatusCacheOnlyActive = newSiloStatusCacheOnlyActive;
                 _activeSilos = newActiveSilos.ToArray();
+            }
+        }
+
+        private void OnLocalSiloStatusChanged(SiloStatus status)
+        {
+            while (true)
+            {
+                var current = Volatile.Read(ref _localSiloStatus);
+                if (current >= (int)status)
+                {
+                    return;
+                }
+
+                if (Interlocked.CompareExchange(ref _localSiloStatus, (int)status, current) == current)
+                {
+                    break;
+                }
+            }
+
+            lock (this.cacheUpdateLock)
+            {
+                Volatile.Write(ref this.cachedSnapshot, null);
             }
         }
 

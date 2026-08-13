@@ -222,6 +222,12 @@ internal static class ShutdownMigrationTestCoordinator
 
 internal sealed class DelayedMembershipManager(MembershipTableManager inner) : IMembershipManager
 {
+    public event Action<SiloStatus> LocalSiloStatusChanged
+    {
+        add => ((IMembershipManager)inner).LocalSiloStatusChanged += value;
+        remove => ((IMembershipManager)inner).LocalSiloStatusChanged -= value;
+    }
+
     public MembershipTableSnapshot CurrentSnapshot => ((IMembershipManager)inner).CurrentSnapshot;
 
     public IAsyncEnumerable<MembershipTableSnapshot> MembershipUpdates => ((IMembershipManager)inner).MembershipUpdates;

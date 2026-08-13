@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -34,6 +35,11 @@ internal interface IMembershipManager : ILifecycleParticipant<ISiloLifecycle>, I
     /// Gets the local silo's current status.
     /// </summary>
     SiloStatus LocalSiloStatus { get; }
+
+    /// <summary>
+    /// Raised when the local silo's status changes.
+    /// </summary>
+    event Action<SiloStatus> LocalSiloStatusChanged;
 
     /// <summary>
     /// Updates the local silo's status in the cluster.
