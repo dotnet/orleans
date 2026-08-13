@@ -174,41 +174,99 @@ BEGIN
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 
-DECLARE @MessageId BIGINT = NEXT VALUE FOR OrleansStreamMessageSequence;
-DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
-DECLARE @ExpiresOn DATETIME2(7) = DATEADD(SECOND, @ExpiryTimeout, @Now);
-
-INSERT INTO OrleansStreamMessage
+/*
+MessageIds must become visible in allocation order within each queue. Otherwise,
+concurrent transactions can expose a later MessageId while an earlier insert is
+still uncommitted, violating the stream cache's monotonic sequence invariant.
+*/
+DECLARE @LockResource NVARCHAR(255) = CONCAT
 (
-	ServiceId,
-    ProviderId,
-	QueueId,
-	MessageId,
-	Dequeued,
-	VisibleOn,
-	ExpiresOn,
-	CreatedOn,
-	ModifiedOn,
-	Payload
-)
-OUTPUT
-    Inserted.ServiceId,
-    Inserted.ProviderId,
-    Inserted.QueueId,
-    Inserted.MessageId
-VALUES
-(
-	@ServiceId,
-    @ProviderId,
-	@QueueId,
-	@MessageId,
-	0,
-	@Now,
-	@ExpiresOn,
-	@Now,
-	@Now,
-	@Payload
+    N'OrleansStreamMessage:',
+    CONVERT
+    (
+        VARCHAR(64),
+        HASHBYTES
+        (
+            'SHA2_256',
+            CONCAT
+            (
+                DATALENGTH(@ServiceId), N':', @ServiceId,
+                DATALENGTH(@ProviderId), N':', @ProviderId,
+                DATALENGTH(@QueueId), N':', @QueueId
+            )
+        ),
+        2
+    )
 );
+DECLARE @LockResult INT;
+DECLARE @StartedTransaction BIT = 0;
+
+BEGIN TRY
+    IF @@TRANCOUNT = 0
+    BEGIN
+        BEGIN TRANSACTION;
+        SET @StartedTransaction = 1;
+    END;
+
+    EXECUTE @LockResult = sys.sp_getapplock
+        @Resource = @LockResource,
+        @LockMode = 'Exclusive',
+        @LockOwner = 'Transaction';
+
+    IF @LockResult < 0
+    BEGIN
+        THROW 51000, 'Failed to acquire the stream message queue lock.', 1;
+    END;
+
+    DECLARE @MessageId BIGINT = NEXT VALUE FOR OrleansStreamMessageSequence;
+    DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
+    DECLARE @ExpiresOn DATETIME2(7) = DATEADD(SECOND, @ExpiryTimeout, @Now);
+
+    INSERT INTO OrleansStreamMessage
+    (
+        ServiceId,
+        ProviderId,
+        QueueId,
+        MessageId,
+        Dequeued,
+        VisibleOn,
+        ExpiresOn,
+        CreatedOn,
+        ModifiedOn,
+        Payload
+    )
+    OUTPUT
+        Inserted.ServiceId,
+        Inserted.ProviderId,
+        Inserted.QueueId,
+        Inserted.MessageId
+    VALUES
+    (
+        @ServiceId,
+        @ProviderId,
+        @QueueId,
+        @MessageId,
+        0,
+        @Now,
+        @ExpiresOn,
+        @Now,
+        @Now,
+        @Payload
+    );
+
+    IF @StartedTransaction = 1
+    BEGIN
+        COMMIT TRANSACTION;
+    END;
+END TRY
+BEGIN CATCH
+    IF @StartedTransaction = 1 AND XACT_STATE() <> 0
+    BEGIN
+        ROLLBACK TRANSACTION;
+    END;
+
+    THROW;
+END CATCH;
 
 END
 GO

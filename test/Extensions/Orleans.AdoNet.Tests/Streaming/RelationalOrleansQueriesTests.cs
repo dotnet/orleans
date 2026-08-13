@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Data;
+using Microsoft.Data.SqlClient;
 using MySql.Data.MySqlClient;
 using Npgsql;
 using Orleans.Configuration;
@@ -17,6 +19,8 @@ namespace Tester.AdoNet.Streaming;
 [TestSuite("Functional")]
 public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueriesTests(AdoNetInvariants.InvariantNameSqlServer, 90)
 {
+    [SkippableFact]
+    public Task RelationalOrleansQueries_SerializesQueueMessageCommits() => VerifySqlServerQueueMessageCommitsAreSerialized();
 }
 
 /// <summary>
@@ -144,6 +148,67 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         var messages = await queries.GetStreamMessagesAsync(serviceId, providerId, queueId, 100, 3, 10, 100, 10, 1000);
 
         Assert.Equal(messages.OrderBy(message => message.MessageId), messages);
+    }
+
+    protected async Task VerifySqlServerQueueMessageCommitsAreSerialized()
+    {
+        var serviceId = RandomServiceId();
+        var providerId = RandomProviderId();
+        var queueId = RandomQueueId();
+        var payload = new byte[] { 0xFF };
+        const int expiryTimeout = 100;
+
+        await using var firstConnection = new SqlConnection(_storage.ConnectionString);
+        await firstConnection.OpenAsync();
+        await using var firstTransaction = (SqlTransaction)await firstConnection.BeginTransactionAsync();
+        await using var firstCommand = CreateQueueCommand(firstConnection, firstTransaction, serviceId, providerId, queueId, payload, expiryTimeout);
+        var firstMessageId = await ReadMessageId(firstCommand);
+
+        await using (var secondConnection = new SqlConnection(_storage.ConnectionString))
+        {
+            await secondConnection.OpenAsync();
+            await using var secondCommand = CreateQueueCommand(secondConnection, transaction: null, serviceId, providerId, queueId, payload, expiryTimeout);
+            secondCommand.CommandType = CommandType.Text;
+            secondCommand.CommandText = "SET LOCK_TIMEOUT 0; EXECUTE QueueStreamMessage @ServiceId, @ProviderId, @QueueId, @Payload, @ExpiryTimeout;";
+
+            var exception = await Assert.ThrowsAsync<SqlException>(() => secondCommand.ExecuteReaderAsync());
+            Assert.Equal(51000, exception.Number);
+        }
+
+        await firstTransaction.CommitAsync();
+
+        var secondAck = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout);
+        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, 2, 3, 10, 100, 10, 1000);
+
+        Assert.Equal([firstMessageId, secondAck.MessageId], messages.Select(message => message.MessageId));
+    }
+
+    private static SqlCommand CreateQueueCommand(
+        SqlConnection connection,
+        SqlTransaction? transaction,
+        string serviceId,
+        string providerId,
+        string queueId,
+        byte[] payload,
+        int expiryTimeout)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandType = CommandType.StoredProcedure;
+        command.CommandText = "QueueStreamMessage";
+        command.Parameters.AddWithValue("ServiceId", serviceId);
+        command.Parameters.AddWithValue("ProviderId", providerId);
+        command.Parameters.AddWithValue("QueueId", queueId);
+        command.Parameters.AddWithValue("Payload", payload);
+        command.Parameters.AddWithValue("ExpiryTimeout", expiryTimeout);
+        return command;
+    }
+
+    private static async Task<long> ReadMessageId(SqlCommand command)
+    {
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        return reader.GetInt64(reader.GetOrdinal(nameof(AdoNetStreamMessage.MessageId)));
     }
 
     /// <summary>
