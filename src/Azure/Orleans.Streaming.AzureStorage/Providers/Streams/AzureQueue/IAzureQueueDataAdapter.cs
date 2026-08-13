@@ -1,14 +1,15 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -233,35 +234,38 @@ namespace Orleans.Providers.Streams.AzureQueue
                 typeof(Dictionary<string, object>));
             using var eventsDocument = JsonDocument.Parse(serializedEvents);
             using var requestContextDocument = JsonDocument.Parse(serializedRequestContext);
-            using var textWriter = new StringWriter(CultureInfo.InvariantCulture);
-            using var jsonWriter = new JsonTextWriter(textWriter) { Formatting = Formatting.None };
+            var bufferWriter = new ArrayBufferWriter<byte>();
+            using var jsonWriter = new Utf8JsonWriter(bufferWriter);
             jsonWriter.WriteStartObject();
-            jsonWriter.WritePropertyName("version");
-            jsonWriter.WriteValue(CompactEnvelopeVersion);
-            jsonWriter.WritePropertyName("stream");
-            jsonWriter.WriteStartObject();
-            jsonWriter.WritePropertyName("namespace");
-            jsonWriter.WriteValue(streamNamespace);
-            jsonWriter.WritePropertyName("key");
-            jsonWriter.WriteValue(streamKey.ToString("D", CultureInfo.InvariantCulture));
+            jsonWriter.WriteNumber("version", CompactEnvelopeVersion);
+            jsonWriter.WriteStartObject("stream");
+            if (streamNamespace is null)
+            {
+                jsonWriter.WriteNull("namespace");
+            }
+            else
+            {
+                jsonWriter.WriteString("namespace", streamNamespace);
+            }
+
+            jsonWriter.WriteString("key", streamKey.ToString("D", CultureInfo.InvariantCulture));
             jsonWriter.WriteEndObject();
             jsonWriter.WritePropertyName("events");
             WriteCollectionValues(jsonWriter, eventsDocument.RootElement);
-            jsonWriter.WritePropertyName("requestContext");
-            jsonWriter.WriteStartObject();
+            jsonWriter.WriteStartObject("requestContext");
             foreach (var property in requestContextDocument.RootElement.EnumerateObject())
             {
                 if (property.Name is not "$id" and not "$type")
                 {
                     jsonWriter.WritePropertyName(property.Name);
-                    jsonWriter.WriteRawValue(property.Value.GetRawText());
+                    property.Value.WriteTo(jsonWriter);
                 }
             }
 
             jsonWriter.WriteEndObject();
             jsonWriter.WriteEndObject();
             jsonWriter.Flush();
-            return textWriter.ToString();
+            return Encoding.UTF8.GetString(bufferWriter.WrittenSpan);
         }
 
         private bool TryDeserializeCompactJson(string cloudMsg, out AzureQueueBatchContainerV2 batch)
@@ -309,7 +313,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             return true;
         }
 
-        private static void WriteCollectionValues(JsonTextWriter writer, JsonElement serializedCollection)
+        private static void WriteCollectionValues(Utf8JsonWriter writer, JsonElement serializedCollection)
         {
             var values = serializedCollection.ValueKind switch
             {
@@ -322,7 +326,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             writer.WriteStartArray();
             foreach (var item in values.EnumerateArray())
             {
-                writer.WriteRawValue(item.GetRawText());
+                item.WriteTo(writer);
             }
 
             writer.WriteEndArray();
