@@ -421,6 +421,7 @@ namespace Orleans.Providers
         [System.Diagnostics.CodeAnalysis.MemberNotNull(new[] { "CacheMonitorFactory", "BlockPoolMonitorFactory", "ReceiverMonitorFactory" })]
         public void Init() { }
 
+        [System.Diagnostics.DebuggerStepThrough]
         public System.Threading.Tasks.Task QueueMessageBatchAsync<T>(Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Orleans.Streams.StreamSequenceToken? token, System.Collections.Generic.Dictionary<string, object>? requestContext) { throw null; }
     }
 
@@ -530,6 +531,8 @@ namespace Orleans.Providers.Streams.Common
         public int OldestMessageIndex { get { throw null; } }
 
         public void Add(CachedMessage message) { }
+
+        public int GetIndexOfFirstMessageLessThanOrEqualTo(Orleans.Streams.StreamSequenceToken token, ICacheDataAdapter dataAdapter) { throw null; }
 
         public int GetIndexOfFirstMessageLessThanOrEqualTo(Orleans.Streams.StreamSequenceToken token) { throw null; }
 
@@ -710,6 +713,7 @@ namespace Orleans.Providers.Streams.Common
 
     public partial interface ICacheDataAdapter
     {
+        int Compare(ref CachedMessage cachedMessage, Orleans.Streams.StreamSequenceToken token);
         Orleans.Streams.IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage);
         Orleans.Streams.StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage);
     }
@@ -768,6 +772,21 @@ namespace Orleans.Providers.Streams.Common
         void TrackMessagesReceived(long count, System.DateTime? oldestMessageEnqueueTimeUtc, System.DateTime? newestMessageEnqueueTimeUtc);
         void TrackRead(bool success, System.TimeSpan callTime, System.Exception? exception);
         void TrackShutdown(bool success, System.TimeSpan callTime, System.Exception? exception);
+    }
+
+    public partial interface IRecoverableStreamDataAdapter<TQueueMessage> : ICacheDataAdapter
+    {
+        CachedMessage FromQueueMessage(Orleans.Streams.StreamPosition streamPosition, TQueueMessage queueMessage, System.DateTime dequeueTimeUtc, System.Func<int, System.ArraySegment<byte>> getSegment);
+        string GetOffset(ref CachedMessage cachedMessage);
+        Orleans.Streams.StreamPosition GetStreamPosition(TQueueMessage queueMessage);
+        bool TryGetOffset(Orleans.Streams.StreamSequenceToken token, out string offset);
+    }
+
+    public partial interface IRecoverableStreamSource<TQueueMessage>
+    {
+        System.Threading.Tasks.Task Initialize(RecoverableStreamStartPosition position, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TQueueMessage>> Read(int maxCount, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task Shutdown(System.Threading.CancellationToken cancellationToken);
     }
 
     public partial class ObjectPoolMonitorBridge : IObjectPoolMonitor
@@ -861,6 +880,16 @@ namespace Orleans.Providers.Streams.Common
         public virtual void SignalPurge() { }
     }
 
+    public sealed partial class QueueAdapterReceiverRegistry<TReceiver>
+        where TReceiver : class, Orleans.Streams.IQueueAdapterReceiver, Orleans.Streams.IQueueCache
+    {
+        public QueueAdapterReceiverRegistry(System.Func<Orleans.Streams.QueueId, TReceiver> factory) { }
+
+        public System.Collections.Generic.IReadOnlyDictionary<Orleans.Streams.QueueId, TReceiver> Receivers { get { throw null; } }
+
+        public TReceiver GetOrCreate(Orleans.Streams.QueueId queueId) { throw null; }
+    }
+
     public partial class ReceiverMonitorDimensions
     {
         public ReceiverMonitorDimensions() { }
@@ -868,6 +897,74 @@ namespace Orleans.Providers.Streams.Common
         public ReceiverMonitorDimensions(string queueId) { }
 
         public string QueueId { get { throw null; } set { } }
+    }
+
+    public sealed partial class RecoverableStreamQueueCache<TQueueMessage> : Orleans.Streams.IQueueCache, Orleans.Streams.IQueueFlowController, System.IDisposable
+    {
+        public RecoverableStreamQueueCache(int defaultMaxAddCount, IObjectPool<FixedSizeBuffer> bufferPool, IRecoverableStreamDataAdapter<TQueueMessage> dataAdapter, IEvictionStrategy evictionStrategy, Microsoft.Extensions.Logging.ILogger logger, Orleans.Streams.IQueueFlowController? flowController = null, ICacheMonitor? cacheMonitor = null, System.TimeSpan? cacheMonitorWriteInterval = null, System.TimeSpan? metadataMinTimeInCache = null) { }
+
+        public string? LastPurgedOffset { get { throw null; } }
+
+        public System.Collections.Generic.IReadOnlyList<Orleans.Streams.StreamPosition> Add(System.Collections.Generic.IReadOnlyList<TQueueMessage> messages, System.DateTime dequeueTimeUtc) { throw null; }
+
+        public void AddToCache(System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> messages) { }
+
+        public void Dispose() { }
+
+        public Orleans.Streams.IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? token) { throw null; }
+
+        public int GetMaxAddCount() { throw null; }
+
+        public bool IsUnderPressure() { throw null; }
+
+        public bool TryPurgeFromCache(out System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> purgedItems) { throw null; }
+
+        public void UpdateDeliveryProgress(Orleans.Streams.StreamSequenceToken? earliestSubscriptionToken, System.DateTime utcNow) { }
+    }
+
+    public sealed partial class RecoverableStreamReceiver<TQueueMessage> : Orleans.Streams.IQueueAdapterReceiver, Orleans.Streams.IQueueCache, Orleans.Streams.IQueueFlowController
+    {
+        public RecoverableStreamReceiver(IRecoverableStreamSource<TQueueMessage> source, IRecoverableStreamDataAdapter<TQueueMessage> dataAdapter, RecoverableStreamQueueCache<TQueueMessage> cache, Orleans.Streams.IStreamQueueCheckpointer<string> checkpointer, bool startFromNow) { }
+
+        public void AddToCache(System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> messages) { }
+
+        public Orleans.Streams.IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken? token) { throw null; }
+
+        public int GetMaxAddCount() { throw null; }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public System.Threading.Tasks.Task<System.Collections.Generic.IList<Orleans.Streams.IBatchContainer>> GetQueueMessagesAsync(int maxCount, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
+        public System.Threading.Tasks.Task<System.Collections.Generic.IList<Orleans.Streams.IBatchContainer>> GetQueueMessagesAsync(int maxCount) { throw null; }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public System.Threading.Tasks.Task Initialize(System.TimeSpan timeout) { throw null; }
+
+        public bool IsUnderPressure() { throw null; }
+
+        public System.Threading.Tasks.Task MessagesDeliveredAsync(System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> messages, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
+        public System.Threading.Tasks.Task MessagesDeliveredAsync(System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> messages) { throw null; }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public System.Threading.Tasks.Task Shutdown(System.TimeSpan timeout) { throw null; }
+
+        public bool TryPurgeFromCache(out System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> purgedItems) { throw null; }
+
+        public void UpdateDeliveryProgress(Orleans.Streams.StreamSequenceToken? earliestSubscriptionToken, System.DateTime utcNow) { }
+    }
+
+    public readonly partial struct RecoverableStreamStartPosition
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public RecoverableStreamStartPosition(string? checkpoint, bool startFromNow) { }
+
+        public string? Checkpoint { get { throw null; } }
+
+        public bool StartFromNow { get { throw null; } }
     }
 
     public static partial class SegmentBuilder
@@ -1498,13 +1595,17 @@ namespace Orleans.Streams
 
         public bool CheckpointExists { get { throw null; } }
 
+        [System.Diagnostics.DebuggerStepThrough]
         public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string providerName, string partition, string serviceId, IClusterClient clusterClient, Configuration.GrainStreamQueueCheckpointerOptions options, System.Threading.CancellationToken cancellationToken) { throw null; }
 
+        [System.Diagnostics.DebuggerStepThrough]
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string providerName, string partition, string serviceId, IClusterClient clusterClient, Configuration.GrainStreamQueueCheckpointerOptions options) { throw null; }
 
+        [System.Diagnostics.DebuggerStepThrough]
         public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string providerName, string partition, string serviceId, IClusterClient clusterClient, System.Threading.CancellationToken cancellationToken) { throw null; }
 
+        [System.Diagnostics.DebuggerStepThrough]
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string providerName, string partition, string serviceId, IClusterClient clusterClient) { throw null; }
 
@@ -1711,6 +1812,12 @@ namespace Orleans.Streams
         System.Threading.Tasks.ValueTask<string> Update(string offset, string expectedCheckpoint, System.Threading.CancellationToken cancellationToken);
     }
 
+    public partial interface IStreamCheckpointStore
+    {
+        System.Threading.Tasks.ValueTask<StreamCheckpointStoreState> Load(System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask<StreamCheckpointStoreState> Update(string checkpoint, string expectedVersion, System.Threading.CancellationToken cancellationToken);
+    }
+
     public partial interface IStreamFailureHandler
     {
         bool ShouldFaultSubsriptionOnError { get; }
@@ -1773,12 +1880,6 @@ namespace Orleans.Streams
         System.Threading.Tasks.Task UnregisterProducer(Runtime.QualifiedStreamId streamId, Runtime.GrainId streamProducer);
     }
 
-    public partial interface IStreamCheckpointStore
-    {
-        System.Threading.Tasks.ValueTask<StreamCheckpointStoreState> Load(System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.ValueTask<StreamCheckpointStoreState> Update(string checkpoint, string expectedVersion, System.Threading.CancellationToken cancellationToken);
-    }
-
     public partial interface IStreamQueueBalanceListener
     {
         System.Threading.Tasks.Task QueueDistributionChangeNotification();
@@ -1827,10 +1928,12 @@ namespace Orleans.Streams
 
         public override System.Collections.Generic.IEnumerable<QueueId> GetMyQueues() { throw null; }
 
+        [System.Diagnostics.DebuggerStepThrough]
         public override System.Threading.Tasks.Task Initialize(IStreamQueueMapper queueMapper) { throw null; }
 
         protected override void OnClusterMembershipChange(System.Collections.Generic.HashSet<Runtime.SiloAddress> activeSilos) { }
 
+        [System.Diagnostics.DebuggerStepThrough]
         public override System.Threading.Tasks.Task Shutdown() { throw null; }
     }
 
@@ -1961,6 +2064,7 @@ namespace Orleans.Streams
         protected System.Threading.Tasks.Task NotifyListeners() { throw null; }
 
         protected abstract void OnClusterMembershipChange(System.Collections.Generic.HashSet<Runtime.SiloAddress> activeSilos);
+        [System.Diagnostics.DebuggerStepThrough]
         public virtual System.Threading.Tasks.Task Shutdown() { throw null; }
 
         public bool SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer) { throw null; }
@@ -2057,15 +2161,6 @@ namespace Orleans.Streams
         public static System.Collections.Generic.IComparer<string> Numeric { get { throw null; } }
     }
 
-    public readonly partial struct StreamCheckpointStoreState
-    {
-        public StreamCheckpointStoreState(string checkpoint, string version) { }
-
-        public string Checkpoint { get { throw null; } }
-
-        public string Version { get { throw null; } }
-    }
-
     [GenerateSerializer]
     public partial class StreamCheckpointerGrainState
     {
@@ -2081,29 +2176,19 @@ namespace Orleans.Streams
 
         public System.Threading.Tasks.ValueTask<string> Load(System.Threading.CancellationToken cancellationToken) { throw null; }
 
+        [System.Diagnostics.DebuggerStepThrough]
         public System.Threading.Tasks.ValueTask<string> Update(string offset, string expectedCheckpoint, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
-    public sealed partial class StreamQueueCheckpointer : IStreamQueueCheckpointer<string>
+    public readonly partial struct StreamCheckpointStoreState
     {
-        public StreamQueueCheckpointer(IStreamCheckpointStore store, StreamQueueCheckpointerOptions options) { }
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public StreamCheckpointStoreState(string checkpoint, string version) { }
 
-        public bool CheckpointExists { get { throw null; } }
+        public string Checkpoint { get { throw null; } }
 
-        public System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
-        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
-        public System.Threading.Tasks.Task<string> Load() { throw null; }
-        public System.Threading.Tasks.Task<string> Load(System.Threading.CancellationToken cancellationToken) { throw null; }
-        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
-        public void Update(string offset, System.DateTime utcNow) { }
-        public void Update(string offset, System.DateTime utcNow, System.Threading.CancellationToken cancellationToken) { }
-    }
-
-    public sealed partial class StreamQueueCheckpointerOptions
-    {
-        public System.Collections.Generic.IComparer<string>? CheckpointComparer { get { throw null; } set { } }
-
-        public System.TimeSpan PersistInterval { get { throw null; } set { } }
+        public string Version { get { throw null; } }
     }
 
     [GenerateSerializer]
@@ -2178,6 +2263,34 @@ namespace Orleans.Streams
         ExplicitGrainBasedAndImplicit = 0,
         ExplicitGrainBasedOnly = 1,
         ImplicitOnly = 2
+    }
+
+    public sealed partial class StreamQueueCheckpointer : IStreamQueueCheckpointer<string>
+    {
+        public StreamQueueCheckpointer(IStreamCheckpointStore store, StreamQueueCheckpointerOptions options) { }
+
+        public bool CheckpointExists { get { throw null; } }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
+        public System.Threading.Tasks.Task<string> Load() { throw null; }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public System.Threading.Tasks.Task<string> Load(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public void Update(string offset, System.DateTime utcNow, System.Threading.CancellationToken cancellationToken) { }
+
+        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
+        public void Update(string offset, System.DateTime utcNow) { }
+    }
+
+    public sealed partial class StreamQueueCheckpointerOptions
+    {
+        public System.Collections.Generic.IComparer<string>? CheckpointComparer { get { throw null; } set { } }
+
+        public System.TimeSpan PersistInterval { get { throw null; } set { } }
     }
 
     [GenerateSerializer]
