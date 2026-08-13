@@ -17,10 +17,10 @@ Use a grain observer when the callback target is a specific connected client obj
 
 Use an Orleans stream when the application needs multicast delivery, dynamic subscriptions, playback, provider-defined durability, or recovery after a client or grain restarts. A stream can outlive a single activation or connection, while an observer registration is tied to the callback target and must be re-established after reconnect.
 
-The tradeoff is mostly about lifetime and delivery guarantees:
+The tradeoff is mostly about lifetime and delivery semantics:
 
 - Observers are low-overhead, direct callbacks. They are best for ephemeral status or UI updates, but they are not durable, replayable, or automatically recovered after disconnects.
-- Streams are more operationally expensive because they depend on a configured provider, subscription records, and provider-specific delivery semantics. In return, they support independent subscribers, retained events, and more flexible failure recovery.
+- Streams add operational cost through their configured provider and provider-specific delivery semantics. Explicit subscriptions can also require durable subscription records. In return, streams support independent subscribers, retained events, and more flexible failure recovery.
 
 See [Choose an Orleans messaging abstraction](../streaming/streams-why.md) and [Orleans streaming APIs](../streaming/streams-programming-apis.md) for the broader decision guidance.
 
