@@ -54,7 +54,15 @@ You can replace the default with <xref:Orleans.Hosting.ClientBuilderExtensions.U
 - Honor the supplied cancellation token.
 - Let startup fail when the cluster or configuration is persistently unavailable.
 
-After startup, Orleans refreshes gateways and reconnects as cluster membership changes. A transient failure can still surface from an individual grain call. The grain reference remains valid, but retry the operation only if the application can safely tolerate duplicate execution.
+### Client lifetime and registration
+
+For generic-host and ASP.NET Core applications, treat <xref:Orleans.IClusterClient> as a singleton for the lifetime of the application process. Register it once with <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*> and resolve it from dependency injection instead of creating a second client per request, per controller, or in a static field.
+
+A web app or worker can safely share the same client across all requests and background services, because Orleans is designed for concurrent use from multiple threads. The client is thread-safe for reuse; protect only mutable application state that you share outside Orleans.
+
+Let the host own client startup and shutdown. The host starts the client during application startup and closes it during normal termination, so you should not dispose the dependency-injected singleton manually. If the cluster is unavailable during startup, the host fails fast rather than leaving the app in a partially started state.
+
+After startup, Orleans refreshes gateways and reconnects as cluster membership changes. If a gateway or silo becomes unavailable, the client tries to reconnect automatically and a transient failure can still surface from an individual grain call. The grain reference remains valid, but retry the operation only if the application can safely tolerate duplicate execution.
 
 ## Make calls to grains
 
