@@ -24,7 +24,7 @@ siloBuilder
             .PermitsPerSecond(200, 200, ThrottleBlockMode.Wait)));
 ```
 
-That configuration says: on this silo, never deliver more than 50 reminder ticks at once, never exceed a sustained rate of 200 ticks/second (with an automatically-derived burst of 200), and if a tick can't be admitted right away, **wait** for capacity rather than skipping the tick.
+That configuration says: on this silo, never deliver more than 50 reminder ticks at once, never exceed a sustained rate of 200 ticks/second (with an explicit burst capacity of 200), and if a tick can't be admitted right away, **wait** for capacity rather than skipping the tick.
 
 A configuration that also wants to honor silo overload and ramp up gradually after silo restart:
 
