@@ -66,11 +66,19 @@ For example, assume a 10-minute collection age and ignore scan latency:
 
 ## How to deactivate a specific grain identity
 
-Orleans intentionally doesn't expose a "deactivate by grain ID" management API. To explicitly deactivate one logical grain, expose an application method on that grain and call <xref:Orleans.Grain.DeactivateOnIdle*> from inside the grain.
+To explicitly request deactivation of a grain from outside it, cast its reference to <xref:Orleans.Core.Internal.IGrainManagementExtension> and call <xref:Orleans.Core.Internal.IGrainManagementExtension.DeactivateOnIdle*>:
+
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="deactivate_grain_externally":::
+
+The management extension targets the current activation for that grain identity and requests deactivation once the current turn and queued work complete. The same grain reference is still valid: a later call can activate the grain again on any compatible silo.
+
+For tests which use <xref:Orleans.TestingHost.TestCluster> or <xref:Orleans.TestingHost.InProcessTestCluster>, use <xref:Orleans.TestingHost.TestCluster.DeactivateAsync*> or <xref:Orleans.TestingHost.InProcessTestCluster.DeactivateAsync*> instead. These helpers request deactivation through the same mechanism and wait for it to complete.
+
+The <xref:Orleans.Grain.DeactivateOnIdle*> method is also available inside grain code when the grain itself decides that its current activation should end:
 
 :::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="explicit_deactivate_grain":::
 
-Use this pattern only when the grain has a domain reason to end its current activation (for example, after completing a one-off workflow or releasing costly in-memory resources). Don't use it for ordinary lifecycle management; idle collection is the default and preferred behavior.
+Use explicit deactivation only when there is a domain or operational reason to end an activation (for example, after completing a one-off workflow or releasing costly in-memory resources). Don't use it for ordinary lifecycle management; idle collection is the default and preferred behavior.
 
 ### What "idle" means for collection
 

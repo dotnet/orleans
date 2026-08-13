@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
+using Orleans.Core.Internal;
 using Orleans.GrainDirectory;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -521,6 +522,17 @@ public interface IUserSessionGrain : IGrainWithStringKey
 {
     Task ExpireAsync();
 }
+
+// <deactivate_grain_externally>
+public static class GrainDeactivation
+{
+    public static ValueTask DeactivateAsync(
+        IUserSessionGrain grain)
+    {
+        return grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+    }
+}
+// </deactivate_grain_externally>
 
 // <grain_directory_attribute>
 [GrainDirectory("durable-directory")]
