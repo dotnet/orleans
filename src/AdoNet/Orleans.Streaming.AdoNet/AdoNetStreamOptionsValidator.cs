@@ -30,19 +30,20 @@ public class AdoNetStreamOptionsValidator(AdoNetStreamOptions options, string na
             throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.CheckpointPersistInterval)} must be greater than zero.");
         }
 
-        if (options.RetentionPeriod <= TimeSpan.Zero)
+        if (IsInvalidSqlInterval(options.RetentionPeriod))
         {
-            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.RetentionPeriod)} must be greater than zero.");
+            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.RetentionPeriod)} must be between one second and {int.MaxValue} seconds.");
         }
 
-        if (options.MaximumRetentionPeriod is { } maximumRetentionPeriod && maximumRetentionPeriod < options.RetentionPeriod)
+        if (options.MaximumRetentionPeriod is { } maximumRetentionPeriod
+            && (IsInvalidSqlInterval(maximumRetentionPeriod) || maximumRetentionPeriod < options.RetentionPeriod))
         {
-            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.MaximumRetentionPeriod)} must be greater than or equal to {nameof(options.RetentionPeriod)}.");
+            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.MaximumRetentionPeriod)} must fit in SQL integer seconds and be greater than or equal to {nameof(options.RetentionPeriod)}.");
         }
 
-        if (options.CleanupInterval <= TimeSpan.Zero)
+        if (IsInvalidSqlInterval(options.CleanupInterval))
         {
-            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.CleanupInterval)} must be greater than zero.");
+            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.CleanupInterval)} must be between one second and {int.MaxValue} seconds.");
         }
 
         if (options.CleanupBatchSize <= 0)
@@ -55,4 +56,7 @@ public class AdoNetStreamOptionsValidator(AdoNetStreamOptions options, string na
             throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming Provider '{name}': {nameof(options.InitializationTimeout)} must be greater than zero.");
         }
     }
+
+    private static bool IsInvalidSqlInterval(TimeSpan value)
+        => value < TimeSpan.FromSeconds(1) || value.TotalSeconds > int.MaxValue;
 }
