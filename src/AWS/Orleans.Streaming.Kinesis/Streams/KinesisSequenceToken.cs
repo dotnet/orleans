@@ -11,6 +11,9 @@ namespace Orleans.Streaming.Kinesis
     [GenerateSerializer]
     internal class KinesisSequenceToken : EventSequenceTokenV2
     {
+        [NonSerialized]
+        private BigInteger? _numericShardSequence;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="KinesisSequenceToken" /> class.
         /// </summary>
@@ -81,6 +84,9 @@ namespace Orleans.Streaming.Kinesis
         }
 
         private BigInteger NumericShardSequence
-            => BigInteger.Parse(ShardSequence, NumberStyles.None, CultureInfo.InvariantCulture);
+            => _numericShardSequence ??= BigInteger.Parse(
+                ShardSequence,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture);
     }
 }
