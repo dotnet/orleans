@@ -251,7 +251,7 @@ namespace Orleans.Providers.Streams.Common
 
             // If sequenceToken is too new to be in cache, unset token, and wait for more data.
             CachedMessage newestMessage = newestBlock.Value.NewestMessage;
-            if (newestMessage.Compare(sequenceToken) < 0)
+            if (cacheDataAdapter.Compare(ref newestMessage, sequenceToken) < 0)
             {
                 cursor.State = CursorStates.Unset;
                 cursor.SequenceToken = sequenceToken;
@@ -261,7 +261,7 @@ namespace Orleans.Providers.Streams.Common
             // Check to see if sequenceToken is too old to be in cache
             var oldestBlock = messageBlocks.Last!; // messageBlocks.Count != 0 (checked above).
             var oldestMessage = oldestBlock.Value.OldestMessage;
-            if (oldestMessage.Compare(sequenceToken) > 0)
+            if (cacheDataAdapter.Compare(ref oldestMessage, sequenceToken) > 0)
             {
                 // Check if we missed an event since we last purged the cache
                 if (this.lastPurgedToken.TryGetValue(cursor.StreamId, out var entry) && sequenceToken.CompareTo(entry.Token) >= 0)
@@ -286,7 +286,7 @@ namespace Orleans.Providers.Streams.Common
             while (true)
             {
                 CachedMessage oldestMessageInBlock = node!.Value.OldestMessage; // Loop invariant: node is non-null while the search has not exhausted the cache (guaranteed by the bounds checks above).
-                if (oldestMessageInBlock.Compare(sequenceToken) <= 0)
+                if (cacheDataAdapter.Compare(ref oldestMessageInBlock, sequenceToken) <= 0)
                 {
                     break;
                 }
@@ -295,7 +295,7 @@ namespace Orleans.Providers.Streams.Common
 
             // return cursor from start.
             cursor.CurrentBlock = node;
-            cursor.Index = node!.Value.GetIndexOfFirstMessageLessThanOrEqualTo(sequenceToken); // See loop invariant above.
+            cursor.Index = node!.Value.GetIndexOfFirstMessageLessThanOrEqualTo(sequenceToken, cacheDataAdapter); // See loop invariant above.
             // if cursor has been idle, move to next message after message specified by sequenceToken  
             if (cursor.State == CursorStates.Idle)
             {
@@ -453,7 +453,7 @@ namespace Orleans.Providers.Streams.Common
             // has this message been purged
             CachedMessage oldestMessage = messageBlocks.Last!.Value.OldestMessage; // Cursor is Set, so the cache is non-empty.
             if (cursor.State == CursorStates.Set
-                && oldestMessage.Compare(cursor.SequenceToken!) > 0) // Cursor is Set, so SequenceToken is guaranteed non-null.
+                && cacheDataAdapter.Compare(ref oldestMessage, cursor.SequenceToken!) > 0) // Cursor is Set, so SequenceToken is guaranteed non-null.
             {
                 throw new QueueCacheMissException(cursor.SequenceToken!, // Cursor is Set, so SequenceToken is guaranteed non-null.
                     messageBlocks.Last!.Value.GetOldestSequenceToken(cacheDataAdapter), // Cursor is Set, so the cache is non-empty.
