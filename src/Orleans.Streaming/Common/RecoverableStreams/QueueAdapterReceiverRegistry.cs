@@ -32,5 +32,12 @@ namespace Orleans.Providers.Streams.Common
         /// Gets or creates the coordinator for a queue.
         /// </summary>
         public TReceiver GetOrCreate(QueueId queueId) => _receivers.GetOrAdd(queueId, _factory);
+
+        /// <summary>
+        /// Removes a receiver if it is still the registered instance for the queue.
+        /// </summary>
+        public bool Remove(QueueId queueId, TReceiver receiver)
+            => ((ICollection<KeyValuePair<QueueId, TReceiver>>)_receivers)
+                .Remove(new(queueId, receiver));
     }
 }

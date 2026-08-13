@@ -161,7 +161,8 @@ namespace Orleans.Streaming.Kinesis
                 _loggerFactory,
                 _topologyMonitor,
                 _options.GetRecordsInterval,
-                _timeProvider
+                _timeProvider,
+                receiver => _receivers.Remove(queueId, receiver)
                 );
         }
 
