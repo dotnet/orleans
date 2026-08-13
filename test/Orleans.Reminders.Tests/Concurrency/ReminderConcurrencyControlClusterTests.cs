@@ -409,8 +409,8 @@ public sealed class ReminderConcurrencyControlClusterTests
         {
             Assert.True(skipped.Count >= 1, $"Expected at least one TickSkipped; got {skipped.Count}.");
 
-            // For every skipped tick (identified by (GrainId, ReminderName, DueTime)), no TickFiring
-            // event must have been emitted for the same identifying tuple. (We deliberately do not
+            // For every skipped tick (identified by (GrainId, ReminderName)), no TickFiring
+            // event must have been emitted for the same identifying pair. (We deliberately do not
             // assert skipped.Count == firings.Count of the OPPOSITE polarity since admit events
             // may also be present from successful dispatches.)
             foreach (var s in skipped)
