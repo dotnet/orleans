@@ -44,7 +44,15 @@ public class AdoNetBatchContainerTests(TestEnvironmentFixture fixture)
         var temp = new AdoNetBatchContainer(streamId, events, requestContext);
         var serializer = fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
         var payload = serializer.SerializeToArray(temp);
-        var message = new AdoNetStreamMessage("MyServiceId", "MyProviderId", "MyQueueId", 123, 234, DateTime.UtcNow, DateTime.UtcNow, DateTime.UtcNow, DateTime.UtcNow, payload);
+        var message = new AdoNetStreamMessage(
+            "MyServiceId",
+            "MyProviderId",
+            "MyQueueId",
+            123,
+            streamId.FullKey.ToArray(),
+            streamId.Namespace.Length,
+            DateTime.UtcNow,
+            payload);
 
         // act
         var container = AdoNetBatchContainer.FromMessage(serializer, message);
@@ -54,7 +62,7 @@ public class AdoNetBatchContainerTests(TestEnvironmentFixture fixture)
         Assert.Equal(events, container.Events);
         Assert.Equal(requestContext, container.RequestContext);
         Assert.Equal(new EventSequenceTokenV2(123), container.SequenceToken);
-        Assert.Equal(234, container.Dequeued);
+        Assert.Equal(0, container.Dequeued);
     }
 
     [Fact]
@@ -104,7 +112,15 @@ public class AdoNetBatchContainerTests(TestEnvironmentFixture fixture)
         var temp = new AdoNetBatchContainer(streamId, events, requestContext);
         var serializer = fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
         var payload = serializer.SerializeToArray(temp);
-        var message = new AdoNetStreamMessage("MyServiceId", "MyProviderId", "MyQueueId", 123, 234, DateTime.UtcNow, DateTime.UtcNow, DateTime.UtcNow, DateTime.UtcNow, payload);
+        var message = new AdoNetStreamMessage(
+            "MyServiceId",
+            "MyProviderId",
+            "MyQueueId",
+            123,
+            streamId.FullKey.ToArray(),
+            streamId.Namespace.Length,
+            DateTime.UtcNow,
+            payload);
 
         // act
         var container = AdoNetBatchContainer.FromMessage(serializer, message);

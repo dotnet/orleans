@@ -81,7 +81,7 @@ internal class AdoNetBatchContainer : IBatchContainer
         // A stored stream message always contains a serialized batch container.
         var container = serializer.Deserialize(message.Payload)!;
         container.SequenceToken = new(message.MessageId);
-        container.Dequeued = message.Dequeued;
+        container.Dequeued = 0;
 
         return container;
     }
