@@ -171,7 +171,7 @@ public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatch
             ["stream"] = new JsonObject
             {
                 ["namespace"] = streamNamespace,
-                ["key"] = streamGuid.ToString("D")
+                ["key"] = streamGuid.ToString("N")
             },
             ["events"] = eventValues,
             ["requestContext"] = serializedRequestContext
@@ -234,7 +234,7 @@ public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatch
         var streamNamespace = stream["namespace"]?.GetValue<string>();
         var streamKey = stream["key"]?.GetValue<string>()
             ?? throw new JsonSerializationException("The migration envelope stream key is missing.");
-        if (!Guid.TryParseExact(streamKey, "D", out var streamGuid))
+        if (!Guid.TryParseExact(streamKey, "N", out var streamGuid))
         {
             throw new JsonSerializationException("The migration envelope stream key is not a GUID.");
         }

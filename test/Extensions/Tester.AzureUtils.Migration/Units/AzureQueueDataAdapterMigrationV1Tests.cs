@@ -25,7 +25,7 @@ namespace Tester.AzureUtils.Migration.Units
 
         private const string MigrationEnvelopeGoldenJson =
             "{\"version\":1,\"stream\":{\"namespace\":\"test-namespace\"," +
-            "\"key\":\"00112233-4455-6677-8899-aabbccddeeff\"},\"events\":[\"test-event\"]," +
+            "\"key\":\"00112233445566778899aabbccddeeff\"},\"events\":[\"test-event\"]," +
             "\"requestContext\":{\"key\":\"value\"}}";
 
         private const string Version10ContainerJson =
@@ -97,6 +97,16 @@ namespace Tester.AzureUtils.Migration.Units
             var deserializedEvent = Assert.Single(result.GetEvents<string>());
             Assert.Equal("test-event", deserializedEvent.Item1);
             Assert.Equal(42, deserializedEvent.Item2.SequenceNumber);
+        }
+
+        [Fact]
+        public void FromQueueMessage_WithHyphenatedMigrationStreamKey_FallsBackAndThrows()
+        {
+            const string message =
+                "{\"version\":1,\"stream\":{\"namespace\":\"test-namespace\"," +
+                "\"key\":\"00112233-4455-6677-8899-aabbccddeeff\"},\"events\":[],\"requestContext\":{}}";
+
+            Assert.Throws<FormatException>(() => adapter.FromQueueMessage(message, 42));
         }
 
         [Fact]
