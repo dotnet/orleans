@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streaming.Kinesis;
@@ -123,5 +124,41 @@ public sealed class KinesisBatchContainerTests
 
         Assert.True(readFirstButNewer.CompareTo(readSecondButOlder) > 0);
         Assert.True(readSecondButOlder.CompareTo(readFirstButNewer) < 0);
+    }
+
+    [Fact]
+    public void RecoverableDataAdapter_PreservesRawPayloadAndExternalOffsetOrdering()
+    {
+        var streamId = StreamId.Create("test", Guid.NewGuid());
+        var payload = KinesisBatchContainer.ToKinesisPayload(
+            serializer,
+            streamId,
+            new[] { "event" },
+            requestContext: null);
+        var record = new KinesisRecord
+        {
+            Data = new MemoryStream(payload),
+            SequenceNumber = "123456789012345678901234567890",
+        };
+        var queueMessage = new KinesisCacheRecord(record, sequenceNumber: 7);
+        var adapter = new KinesisRecoverableStreamDataAdapter(serializer);
+
+        var position = adapter.GetStreamPosition(queueMessage);
+        var cached = adapter.FromQueueMessage(
+            position,
+            queueMessage,
+            DateTime.UtcNow,
+            size => new byte[size]);
+
+        Assert.Equal(streamId, cached.StreamId);
+        Assert.Equal(record.SequenceNumber, adapter.GetOffset(ref cached));
+        Assert.True(adapter.Compare(
+            ref cached,
+            new KinesisSequenceToken("123456789012345678901234567889", 1000, 0)) > 0);
+
+        var batch = Assert.IsType<KinesisBatchContainer>(adapter.GetBatchContainer(ref cached));
+        Assert.Equal(streamId, batch.StreamId);
+        Assert.Equal(["event"], batch.GetEvents<string>().Select(item => item.Item1));
+        Assert.Equal(record.SequenceNumber, ((KinesisSequenceToken)batch.SequenceToken).ShardSequence);
     }
 }

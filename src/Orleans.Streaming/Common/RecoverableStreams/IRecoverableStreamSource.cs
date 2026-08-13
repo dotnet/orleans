@@ -24,6 +24,19 @@ namespace Orleans.Providers.Streams.Common
         Task<IReadOnlyList<TQueueMessage>> Read(int maxCount, CancellationToken cancellationToken);
 
         /// <summary>
+        /// Notifies the source that records were successfully admitted to the cache.
+        /// </summary>
+        /// <param name="messages">The admitted records.</param>
+        /// <remarks>Sources should advance volatile read offsets only in this callback.</remarks>
+        void MessagesAdded(IReadOnlyList<TQueueMessage> messages) { }
+
+        /// <summary>
+        /// Notifies the source that records could not be admitted to the cache.
+        /// </summary>
+        /// <param name="messages">The records which were not admitted.</param>
+        void MessagesAddFailed(IReadOnlyList<TQueueMessage> messages) { }
+
+        /// <summary>
         /// Shuts the partition source down.
         /// </summary>
         Task Shutdown(CancellationToken cancellationToken);
