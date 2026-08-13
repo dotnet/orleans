@@ -34,20 +34,21 @@ public sealed class DynamoDBStreamQueueCheckpointerTests : StreamQueueCheckpoint
 
     private sealed class TestCheckpointStore(ControllableCheckpointStore store) : IDynamoDBStreamCheckpointStore
     {
-        public ValueTask<string> Load(CancellationToken cancellationToken)
+        public async ValueTask<StreamCheckpointStoreState> Load(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return new(store.Load());
+            var checkpoint = await store.Load().ConfigureAwait(false);
+            return new(checkpoint, checkpoint);
         }
 
-        public async ValueTask<string> Update(
+        public async ValueTask<StreamCheckpointStoreState> Update(
             string checkpoint,
-            string expectedCheckpoint,
+            string expectedVersion,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             await store.Write(checkpoint).ConfigureAwait(false);
-            return checkpoint;
+            return new(checkpoint, checkpoint);
         }
     }
 }
@@ -74,9 +75,11 @@ public sealed class DynamoDBStreamCheckpointStoreTests
             });
         var store = CreateStore(client);
 
-        await store.Update(checkpoint, string.Empty, TestContext.Current.CancellationToken);
+        var state = await store.Update(checkpoint, string.Empty, TestContext.Current.CancellationToken);
 
         Assert.NotNull(write);
+        Assert.Equal(checkpoint, state.Checkpoint);
+        Assert.Equal("1", state.Version);
         Assert.Equal(checkpoint, write.Item[DynamoDBStreamCheckpointStore.CheckpointAttribute].S);
         Assert.Equal("1", write.Item[DynamoDBStreamCheckpointStore.VersionAttribute].N);
         Assert.Equal(
@@ -99,12 +102,14 @@ public sealed class DynamoDBStreamCheckpointStoreTests
                 new ConditionalCheckFailedException("stale checkpoint")));
         var store = CreateStore(client);
 
-        Assert.Equal("20", await store.Update("10", string.Empty, TestContext.Current.CancellationToken));
+        var result = await store.Update("10", string.Empty, TestContext.Current.CancellationToken);
+        Assert.Equal("20", result.Checkpoint);
+        Assert.Equal("7", result.Version);
 
         await client.Received(1).PutItemAsync(
             Arg.Any<PutItemRequest>(),
             Arg.Any<CancellationToken>());
-        Assert.Equal("20", await store.Load(TestContext.Current.CancellationToken));
+        Assert.Equal("20", (await store.Load(TestContext.Current.CancellationToken)).Checkpoint);
     }
 
     [Fact]
@@ -131,8 +136,12 @@ public sealed class DynamoDBStreamCheckpointStoreTests
             });
         var store = CreateStore(client);
 
-        Assert.Equal("20", await store.Update("30", string.Empty, TestContext.Current.CancellationToken));
-        Assert.Equal("30", await store.Update("30", "20", TestContext.Current.CancellationToken));
+        var conflicted = await store.Update("30", string.Empty, TestContext.Current.CancellationToken);
+        Assert.Equal("20", conflicted.Checkpoint);
+        Assert.Equal("7", conflicted.Version);
+        var updated = await store.Update("30", "7", TestContext.Current.CancellationToken);
+        Assert.Equal("30", updated.Checkpoint);
+        Assert.Equal("8", updated.Version);
 
         Assert.Equal(2, writes.Count);
         Assert.Equal("#version = :expectedVersion", writes[1].ConditionExpression);
@@ -142,20 +151,21 @@ public sealed class DynamoDBStreamCheckpointStoreTests
             writes[1].ExpressionAttributeNames["#version"]);
         Assert.Equal("7", writes[1].ExpressionAttributeValues[":expectedVersion"].N);
         Assert.Equal("8", writes[1].Item[DynamoDBStreamCheckpointStore.VersionAttribute].N);
-        Assert.Equal("30", await store.Load(TestContext.Current.CancellationToken));
+        Assert.Equal("30", (await store.Load(TestContext.Current.CancellationToken)).Checkpoint);
     }
 
     [Fact]
-    public async Task ExpectedCheckpointMismatchReturnsPersistedCheckpointWithoutWriting()
+    public async Task ExpectedVersionMismatchReturnsPersistedStateWithoutWriting()
     {
         var client = Substitute.For<IAmazonDynamoDB>();
         client.GetItemAsync(Arg.Any<GetItemRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(CreateReadResponse("20", 7)));
         var store = CreateStore(client);
 
-        var result = await store.Update("30", "10", TestContext.Current.CancellationToken);
+        var result = await store.Update("30", "6", TestContext.Current.CancellationToken);
 
-        Assert.Equal("20", result);
+        Assert.Equal("20", result.Checkpoint);
+        Assert.Equal("7", result.Version);
         await client.DidNotReceive().PutItemAsync(
             Arg.Any<PutItemRequest>(),
             Arg.Any<CancellationToken>());
