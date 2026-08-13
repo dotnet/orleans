@@ -70,15 +70,15 @@ namespace Orleans.Providers.Streams.Common
         /// <inheritdoc/>
         public override bool Equals(object? obj)
         {
-            return Equals(obj as EventSequenceTokenV2);
+            return obj is StreamSequenceToken token && Equals(token);
         }
 
         /// <inheritdoc/>
         public override bool Equals(StreamSequenceToken? other)
         {
-            var token = other as EventSequenceTokenV2;
-            return token != null && (token.SequenceNumber == SequenceNumber &&
-                                     token.EventIndex == EventIndex);
+            return other is EventSequenceTokenV2 or EventSequenceToken
+                && other.SequenceNumber == SequenceNumber
+                && other.EventIndex == EventIndex;
         }
 
         /// <inheritdoc/>
@@ -87,12 +87,11 @@ namespace Orleans.Providers.Streams.Common
             if (other == null)
                 return 1;
 
-            var token = other as EventSequenceTokenV2;
-            if (token == null)
+            if (other is not EventSequenceTokenV2 and not EventSequenceToken)
                 throw new ArgumentOutOfRangeException(nameof(other));
 
-            int difference = SequenceNumber.CompareTo(token.SequenceNumber);
-            return difference != 0 ? difference : EventIndex.CompareTo(token.EventIndex);
+            int difference = SequenceNumber.CompareTo(other.SequenceNumber);
+            return difference != 0 ? difference : EventIndex.CompareTo(other.EventIndex);
         }
 
         /// <inheritdoc/>
