@@ -11,7 +11,9 @@ An external client runs outside a silo process and reaches the cluster through s
 
 :::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="external_client":::
 
-Client settings participate in the [.NET options pattern](https://learn.microsoft.com/dotnet/core/extensions/options). The host starts Orleans before later registered hosted services and stops it with the rest of the application. Resolve <xref:Orleans.IClusterClient> or <xref:Orleans.IGrainFactory> from [.NET dependency injection](https://learn.microsoft.com/dotnet/core/extensions/dependency-injection); don't build a second client singleton manually.
+Client settings participate in the [.NET options pattern](https://learn.microsoft.com/dotnet/core/extensions/options). The host starts the Orleans client before later registered hosted services and stops it with the rest of the application. Resolve <xref:Orleans.IClusterClient> or <xref:Orleans.IGrainFactory> from [.NET dependency injection](https://learn.microsoft.com/dotnet/core/extensions/dependency-injection); don't build a second client singleton manually or create a new client per request.
+
+For ASP.NET Core and other generic-host apps, keep a single client instance for the lifetime of the process. This is the same client you inject into controllers, background workers, hosted services, and other long-lived components. The host owns startup and shutdown; do not dispose the dependency-injected singleton or replace it with a static cache.
 
 ## Orleans clustering information
 
