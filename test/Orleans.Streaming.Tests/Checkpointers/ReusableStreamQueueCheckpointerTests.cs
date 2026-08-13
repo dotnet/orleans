@@ -45,6 +45,25 @@ public sealed class ReusableStreamQueueCheckpointerTests : StreamQueueCheckpoint
         Assert.Equal("30", (await store.Load(CancellationToken.None)).Checkpoint);
     }
 
+    [Fact]
+    public async Task ConditionalConflict_WithEmptyPersistedCheckpoint_RetriesFirstCheckpoint()
+    {
+        var store = new EmptyCheckpointConflictStore();
+        var checkpointer = new StreamQueueCheckpointer(
+            store,
+            new StreamQueueCheckpointerOptions
+            {
+                CheckpointComparer = StreamCheckpointComparers.Numeric,
+            });
+        Assert.Equal(string.Empty, await checkpointer.Load(CancellationToken.None));
+
+        checkpointer.Update("10", DateTime.UtcNow, CancellationToken.None);
+        await checkpointer.FlushAsync(CancellationToken.None);
+
+        Assert.Equal(["version-1", "version-2"], store.ExpectedVersions);
+        Assert.Equal("10", (await store.Load(CancellationToken.None)).Checkpoint);
+    }
+
     private sealed class TestCheckpointStore(ControllableCheckpointStore store) : IStreamCheckpointStore
     {
         public async ValueTask<StreamCheckpointStoreState> Load(CancellationToken cancellationToken)
@@ -89,6 +108,41 @@ public sealed class ReusableStreamQueueCheckpointerTests : StreamQueueCheckpoint
             {
                 conflict = false;
                 state = new("20", "version-2");
+            }
+            else
+            {
+                Assert.Equal(state.Version, expectedVersion);
+                state = new(checkpoint, "version-3");
+            }
+
+            return ValueTask.FromResult(state);
+        }
+    }
+
+    private sealed class EmptyCheckpointConflictStore : IStreamCheckpointStore
+    {
+        private StreamCheckpointStoreState state = new(string.Empty, "version-1");
+        private bool conflict = true;
+
+        public List<string> ExpectedVersions { get; } = [];
+
+        public ValueTask<StreamCheckpointStoreState> Load(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(state);
+        }
+
+        public ValueTask<StreamCheckpointStoreState> Update(
+            string checkpoint,
+            string expectedVersion,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ExpectedVersions.Add(expectedVersion);
+            if (conflict)
+            {
+                conflict = false;
+                state = new(string.Empty, "version-2");
             }
             else
             {

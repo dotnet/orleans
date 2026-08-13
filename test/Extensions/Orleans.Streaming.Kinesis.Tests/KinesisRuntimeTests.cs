@@ -111,6 +111,55 @@ public sealed class KinesisRuntimeTests
     }
 
     [Fact]
+    public async Task PooledReceiver_ReadsAfterSuccessfulInitialization()
+    {
+        var client = Substitute.For<IAmazonKinesis>();
+        client.GetShardIteratorAsync(
+                Arg.Any<GetShardIteratorRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new GetShardIteratorResponse { ShardIterator = "iterator" });
+        client.GetRecordsAsync(Arg.Any<GetRecordsRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new GetRecordsResponse
+            {
+                NextShardIterator = "iterator",
+                Records = [],
+            });
+        var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
+        checkpointer.Load(Arg.Any<CancellationToken>()).Returns(string.Empty);
+        var checkpointerFactory = Substitute.For<IStreamQueueCheckpointerFactory>();
+        checkpointerFactory.Create("shard-1", Arg.Any<CancellationToken>()).Returns(checkpointer);
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer<KinesisBatchContainer.Body>>();
+        var timeProvider = new FakeTimeProvider();
+        var topologyMonitor = new KinesisShardTopologyMonitor(
+            client,
+            "stream",
+            ["shard-1"],
+            TimeSpan.FromMinutes(1),
+            timeProvider,
+            NullLogger<KinesisShardTopologyMonitor>.Instance);
+        var receiver = new KinesisPooledAdapterReceiver(
+            client,
+            "stream",
+            "shard-1",
+            checkpointerFactory,
+            new SimpleQueueCacheOptions(),
+            serializer,
+            NullLoggerFactory.Instance,
+            topologyMonitor,
+            TimeSpan.Zero,
+            timeProvider);
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+
+        Assert.Empty(await receiver.GetQueueMessagesAsync(10, CancellationToken.None));
+
+        await client.Received(1).GetRecordsAsync(
+            Arg.Any<GetRecordsRequest>(),
+            Arg.Any<CancellationToken>());
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public async Task InitialShardIteratorUsesTrimHorizonWhenNoCheckpointExists()
     {
         var client = Substitute.For<IAmazonKinesis>();

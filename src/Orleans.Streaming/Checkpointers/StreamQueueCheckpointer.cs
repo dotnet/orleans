@@ -180,12 +180,12 @@ namespace Orleans.Streams
                         return;
                     }
 
-                    if (comparer.Compare(_latestCheckpoint, persistedState.Checkpoint) <= 0)
+                    if (Compare(comparer, _latestCheckpoint, persistedState.Checkpoint) <= 0)
                     {
                         _latestCheckpoint = persistedState.Checkpoint;
                     }
 
-                    if (comparer.Compare(checkpoint, persistedState.Checkpoint) <= 0)
+                    if (Compare(comparer, checkpoint, persistedState.Checkpoint) <= 0)
                     {
                         return;
                     }
@@ -193,6 +193,16 @@ namespace Orleans.Streams
                     expectedVersion = persistedState.Version;
                 }
             }
+        }
+
+        private static int Compare(IComparer<string> comparer, string left, string right)
+        {
+            if (string.IsNullOrEmpty(left))
+            {
+                return string.IsNullOrEmpty(right) ? 0 : -1;
+            }
+
+            return string.IsNullOrEmpty(right) ? 1 : comparer.Compare(left, right);
         }
     }
 }
