@@ -126,6 +126,7 @@ namespace UnitTests.General
             }
 
             Console.WriteLine("Dropping and recreating database '{0}' with ConnectionString '{1}'", testDatabaseName, testStorage.CurrentConnectionString);
+            testStorage.PrepareForDatabaseReset(testDatabaseName);
 
             if (await testStorage.ExistsDatabaseAsync(testDatabaseName))
             {
@@ -136,6 +137,7 @@ namespace UnitTests.General
 
             //The old storage instance has the previous connection string, time have a new handle with a new connection string...
             testStorage = testStorage.CopyInstance(testDatabaseName);
+            await testStorage.WaitForDatabaseReadyAsync();
 
             Console.WriteLine("Creating database tables...");
 
@@ -178,6 +180,12 @@ namespace UnitTests.General
                 throw new SkipException("ConnectionString not provided.");
             }
         }
+
+        protected virtual void PrepareForDatabaseReset(string databaseName)
+        {
+        }
+
+        protected virtual Task WaitForDatabaseReadyAsync() => Task.CompletedTask;
 
         /// <summary>
         /// Executes the given script in a test context.

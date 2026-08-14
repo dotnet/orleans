@@ -1,3 +1,4 @@
+using System.Data.Common;
 using Microsoft.Data.SqlClient;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;
@@ -11,6 +12,49 @@ namespace UnitTests.General
         public SqlServerStorageForTesting(string connectionString)
             : base(AdoNetInvariants.InvariantNameSqlServer, connectionString ?? TestDefaultConfiguration.MsSqlConnectionString)
         {
+        }
+
+        protected override void PrepareForDatabaseReset(string databaseName)
+        {
+            using var administrativeConnection = new SqlConnection(CurrentConnectionString);
+            SqlConnection.ClearPool(administrativeConnection);
+
+            var builder = new DbConnectionStringBuilder
+            {
+                ConnectionString = CurrentConnectionString
+            };
+            builder["Database"] = databaseName;
+
+            using var databaseConnection = new SqlConnection(builder.ConnectionString);
+            SqlConnection.ClearPool(databaseConnection);
+        }
+
+        protected override async Task WaitForDatabaseReadyAsync()
+        {
+            const int maxAttempts = 3;
+            var connectionStringBuilder = new SqlConnectionStringBuilder(CurrentConnectionString)
+            {
+                Pooling = false,
+                ConnectTimeout = 5
+            };
+
+            for (var attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    await using var connection = new SqlConnection(connectionStringBuilder.ConnectionString);
+                    await connection.OpenAsync();
+                    await using var command = connection.CreateCommand();
+                    command.CommandText = "SELECT 1";
+                    command.CommandTimeout = 5;
+                    _ = await command.ExecuteScalarAsync();
+                    return;
+                }
+                catch (SqlException exception) when (exception.Number == 18456 && exception.State == 1 && attempt < maxAttempts)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(250));
+                }
+            }
         }
 
         public override string CancellationTestQuery { get { return "WAITFOR DELAY '00:00:010'; SELECT 1; "; } }
