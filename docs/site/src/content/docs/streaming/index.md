@@ -13,7 +13,7 @@ Orleans streams are typed, logical, multicast channels. Producers and consumers 
 
 The stream is a virtual address. Its transport, retention, retry behavior, ordering, and ability to replay are supplied by the configured [stream provider](stream-providers.md). A stream handle alone doesn't make data durable.
 
-Use streams when events should fan out to independently managed consumers, when subscriptions should outlive a grain activation, or when an external queue or event log should feed grains. For request/response calls, transient client callbacks, or low-overhead best-effort fan-out, another Orleans messaging abstraction can be a better fit. Start with [Choose an Orleans messaging abstraction](streams-why.md).
+Use streams when events should fan out to independently managed consumers, when subscriptions should outlive a grain activation, or when an external queue or event log should feed grains. For request/response calls, specific connected-client callbacks, or low-overhead best-effort fan-out, another Orleans messaging abstraction can be a better fit. See [grain observers](../grains/observers.md) for direct client callbacks and [Choose an Orleans messaging abstraction](streams-why.md) for the full decision model.
 
 ## Programming model
 

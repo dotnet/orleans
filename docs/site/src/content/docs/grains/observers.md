@@ -9,7 +9,20 @@ ms.topic: concept-article
 
 Observers let grains call an object hosted by an Orleans client or another grain. They are useful for live, best-effort notifications while the receiver is connected.
 
-Observers aren't durable subscriptions. A client can disconnect without notice, and a recreated observer has a different identity. Use [Orleans streams](../streaming/index.md) or another durable messaging mechanism when subscriptions or delivery must survive failures.
+Use observers for a small set of known, live callbacks. They are intentionally transient and are not a general replacement for a durable event bus. A client can disconnect without notice, and a recreated observer has a different identity. Use [Orleans streams](../streaming/index.md) or another durable messaging mechanism when subscriptions or delivery must survive failures or fan out to many independent consumers.
+
+## When to choose observers versus streams
+
+Use a grain observer when the callback target is a specific connected client object or grain and the application only needs a live notification while that connection remains active. Observers carry very little infrastructure: a callback target is registered, and the grain notifies that target directly.
+
+Use an Orleans stream when the application needs multicast delivery, dynamic subscriptions, playback, provider-defined durability, or recovery after a client or grain restarts. A stream can outlive a single activation or connection, while an observer registration is tied to the callback target and must be re-established after reconnect.
+
+The tradeoff is mostly about lifetime and delivery semantics:
+
+- Observers are low-overhead, direct callbacks. They are best for ephemeral status or UI updates, but they are not durable, replayable, or automatically recovered after disconnects.
+- Streams add operational cost through their configured provider and provider-specific delivery semantics. Explicit subscriptions can also require durable subscription records. In return, streams support independent subscribers, retained events, and more flexible failure recovery.
+
+See [Choose an Orleans messaging abstraction](../streaming/streams-why.md) and [Orleans streaming APIs](../streaming/streams-programming-apis.md) for the broader decision guidance.
 
 ## Define an observer
 
