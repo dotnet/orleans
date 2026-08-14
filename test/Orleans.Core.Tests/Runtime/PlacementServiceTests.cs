@@ -150,7 +150,6 @@ namespace UnitTests.Runtime
             var second = fixture.Target.GetCompatibleSilos(secondTarget);
 
             Assert.Same(first, second);
-            Assert.Equal(1, GetTestAccessor(fixture.Target).CompatibleSilosCacheCount);
 
             await StopAsync(fixture.Target);
         }
@@ -161,7 +160,7 @@ namespace UnitTests.Runtime
             var silos = CreateSilos(2);
             var fixture = new PlacementServiceFixture(
                 activeSilos: silos,
-                manifestSilos: silos,
+                manifestSilos: [silos[1]],
                 localSiloStatus: SiloStatus.ShuttingDown);
 
             var result = fixture.Target.GetCompatibleSilos(CreatePlacementTarget());
@@ -177,7 +176,7 @@ namespace UnitTests.Runtime
             var silos = CreateSilos(2);
             var fixture = new PlacementServiceFixture(
                 activeSilos: silos,
-                manifestSilos: silos,
+                manifestSilos: [silos[1]],
                 localSiloStatus: SiloStatus.ShuttingDown,
                 interfaceVersion: 1);
             var target = new PlacementTarget(
@@ -203,30 +202,11 @@ namespace UnitTests.Runtime
             var first = fixture.Target.GetCompatibleSilos(placementTarget);
 
             fixture.ClusterManifestProvider.SetCurrent(CreateClusterManifest(new[] { silos[1] }, version: new MajorMinorVersion(1, 0)));
-            fixture.NotifyMembershipChanged(silos[1]);
+            fixture.SetActiveSilos(silos[1]);
             var second = fixture.Target.GetCompatibleSilos(placementTarget);
 
             Assert.NotSame(first, second);
             Assert.Equal(new[] { silos[1] }, second);
-
-            await StopAsync(fixture.Target);
-        }
-
-        [Fact]
-        public async Task GetCompatibleSilos_VersionSelectorCacheReset_InvalidatesCachedResult()
-        {
-            var silos = CreateSilos(2);
-            var fixture = new PlacementServiceFixture(activeSilos: silos, manifestSilos: silos);
-            var placementTarget = CreatePlacementTarget();
-
-            fixture.Target.GetCompatibleSilos(placementTarget);
-            Assert.Equal(1, GetTestAccessor(fixture.Target).CompatibleSilosCacheCount);
-
-            fixture.VersionSelectorManager.ResetCache();
-
-            Assert.Equal(0, GetTestAccessor(fixture.Target).CompatibleSilosCacheCount);
-            fixture.Target.GetCompatibleSilos(placementTarget);
-            Assert.Equal(1, GetTestAccessor(fixture.Target).CompatibleSilosCacheCount);
 
             await StopAsync(fixture.Target);
         }
@@ -238,20 +218,18 @@ namespace UnitTests.Runtime
             var manifestProvider = new TestClusterManifestProvider(CreateClusterManifest(new[] { silos[0] }));
             var fixture = new PlacementServiceFixture(activeSilos: silos, manifestSilos: new[] { silos[0] }, manifestProvider: manifestProvider);
             var placementTarget = CreatePlacementTarget();
-            var lifecycle = await StartAsync(fixture.Target);
-
             var first = fixture.Target.GetCompatibleSilos(placementTarget);
             Assert.Equal(new[] { silos[0] }, first);
 
             manifestProvider.Publish(CreateClusterManifest(new[] { silos[1] }, version: new MajorMinorVersion(1, 0)));
+            fixture.SetActiveSilos(silos[1]);
 
-            await Until(() => fixture.Target.GetCompatibleSilos(placementTarget).SequenceEqual(new[] { silos[1] }));
             var second = fixture.Target.GetCompatibleSilos(placementTarget);
 
             Assert.NotSame(first, second);
             Assert.Equal(new[] { silos[1] }, second);
 
-            await lifecycle.OnStop();
+            await StopAsync(fixture.Target);
         }
 
         [Fact]
@@ -304,7 +282,6 @@ namespace UnitTests.Runtime
                 grainLocator: null!,
                 grainInterfaceVersions: grainVersionManifest,
                 versionSelectorManager,
-                clusterManifestProvider,
                 directorResolver: null!,
                 strategyResolver: null!,
                 filterStrategyResolver,
@@ -320,6 +297,16 @@ namespace UnitTests.Runtime
             }
 
             return result;
+        }
+
+        private static ClusterMembershipSnapshot CreateMembershipSnapshot(
+            long version,
+            IReadOnlyDictionary<SiloAddress, SiloStatus> statuses)
+        {
+            var members = statuses.ToImmutableDictionary(
+                static entry => entry.Key,
+                static entry => new ClusterMember(entry.Key, entry.Value, entry.Key.ToString()));
+            return new ClusterMembershipSnapshot(members, new MembershipVersion(version));
         }
 
         private static ClusterManifest CreateClusterManifest(
@@ -356,7 +343,9 @@ namespace UnitTests.Runtime
                 }));
         }
 
-        private static CachedVersionSelectorManager CreateCachedVersionSelectorManager(GrainVersionManifest manifest)
+        private static CachedVersionSelectorManager CreateCachedVersionSelectorManager(
+            GrainVersionManifest manifest,
+            IClusterMembershipService membership)
         {
             var services = new ServiceCollection();
             services.AddOptions<GrainVersioningOptions>();
@@ -370,7 +359,8 @@ namespace UnitTests.Runtime
             return new CachedVersionSelectorManager(
                 manifest,
                 new VersionSelectorManager(serviceProvider, options),
-                new CompatibilityDirectorManager(serviceProvider, options));
+                new CompatibilityDirectorManager(serviceProvider, options),
+                membership);
         }
 
         private static ServiceProvider CreateServiceProvider(TestPlacementFilterDirector? filterDirector = null)
@@ -425,20 +415,10 @@ namespace UnitTests.Runtime
             Assert.Equal(workerCount, stoppedEvents.Count);
         }
 
-        private static async Task Until(Func<bool> condition)
-        {
-            var maxTimeout = 10_000;
-            while (!condition() && (maxTimeout -= 10) > 0)
-            {
-                await Task.Delay(10);
-            }
-
-            Assert.True(maxTimeout > 0);
-        }
-
         private sealed class PlacementServiceFixture
         {
             private Dictionary<SiloAddress, SiloStatus> _siloStatuses = new();
+            private long _membershipVersion;
 
             public PlacementServiceFixture(
                 SiloAddress[]? activeSilos = null,
@@ -454,7 +434,9 @@ namespace UnitTests.Runtime
                 _siloStatuses[activeSilos[0]] = localSiloStatus;
 
                 ClusterManifestProvider = manifestProvider ?? new TestClusterManifestProvider(CreateClusterManifest(manifestSilos, useFilter, interfaceVersion: interfaceVersion));
-                VersionSelectorManager = CreateCachedVersionSelectorManager(new GrainVersionManifest(ClusterManifestProvider));
+                _membershipVersion = ClusterManifestProvider.Current.Version.Major;
+                ClusterMembershipService = new TestClusterMembershipService(CreateMembershipSnapshot(_membershipVersion, _siloStatuses));
+                VersionSelectorManager = CreateCachedVersionSelectorManager(new GrainVersionManifest(ClusterManifestProvider), ClusterMembershipService);
                 FilterDirector = useFilter ? new TestPlacementFilterDirector() : null;
                 ServiceProvider = CreateServiceProvider(FilterDirector);
 
@@ -473,9 +455,6 @@ namespace UnitTests.Runtime
                 SiloStatusOracle.GetApproximateSiloStatuses(onlyActive: true).Returns(_ => _siloStatuses
                     .Where(static entry => entry.Value == SiloStatus.Active)
                     .ToDictionary());
-                SiloStatusOracle.SubscribeToSiloStatusEvents(Arg.Do<ISiloStatusListener>(listener => StatusListener = listener)).Returns(true);
-                SiloStatusOracle.UnSubscribeFromSiloStatusEvents(Arg.Any<ISiloStatusListener>()).Returns(true);
-
                 Target = CreateTarget(optionsMonitor, localSiloDetails, SiloStatusOracle, ClusterManifestProvider, ServiceProvider, VersionSelectorManager);
             }
 
@@ -485,22 +464,21 @@ namespace UnitTests.Runtime
 
             public TestClusterManifestProvider ClusterManifestProvider { get; }
 
+            public TestClusterMembershipService ClusterMembershipService { get; }
+
             public ServiceProvider ServiceProvider { get; }
 
             public CachedVersionSelectorManager VersionSelectorManager { get; }
 
             public TestPlacementFilterDirector? FilterDirector { get; }
 
-            private ISiloStatusListener StatusListener { get; set; } = null!;
-
             public void SetActiveSilos(params SiloAddress[] silos)
             {
                 _siloStatuses = silos.ToDictionary(silo => silo, _ => SiloStatus.Active);
-            }
-
-            public void NotifyMembershipChanged(SiloAddress silo)
-            {
-                StatusListener.SiloStatusChangeNotification(silo, SiloStatus.Active);
+                if (ClusterMembershipService is not null)
+                {
+                    ClusterMembershipService.Update(CreateMembershipSnapshot(++_membershipVersion, _siloStatuses));
+                }
             }
         }
 
@@ -537,6 +515,25 @@ namespace UnitTests.Runtime
                 {
                     yield return manifest;
                 }
+            }
+        }
+
+        public sealed class TestClusterMembershipService(ClusterMembershipSnapshot current) : IClusterMembershipService
+        {
+            public ClusterMembershipSnapshot CurrentSnapshot { get; private set; } = current;
+
+            public IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates => GetUpdates();
+
+            public void Update(ClusterMembershipSnapshot snapshot) => CurrentSnapshot = snapshot;
+
+            public ValueTask Refresh(MembershipVersion minimumVersion = default, CancellationToken cancellationToken = default) => default;
+
+            public Task<bool> TryKill(SiloAddress siloAddress) => Task.FromResult(false);
+
+            private async IAsyncEnumerable<ClusterMembershipSnapshot> GetUpdates()
+            {
+                yield return CurrentSnapshot;
+                await Task.CompletedTask;
             }
         }
 
