@@ -180,18 +180,51 @@ public class ClusterManifestProviderTests
         var localSilo = CreateSiloAddress(11111, 1);
         var remoteSilo = CreateSiloAddress(11112, 1);
         var clusterManifestProvider = new TestClusterManifestProvider(CreateClusterManifest(1, 0, localSilo, remoteSilo));
+        using var membership = new TestClusterMembershipService(CreateMembershipSnapshot(
+            1,
+            (localSilo, SiloStatus.Active),
+            (remoteSilo, SiloStatus.Active)));
         var manifest = new GrainVersionManifest(clusterManifestProvider);
-        var selectorManager = CreateCachedVersionSelectorManager(manifest);
+        var selectorManager = CreateCachedVersionSelectorManager(manifest, membership);
 
         var initial = selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1);
         SiloAddress[] initialSilos = initial.SuitableSilos;
         Assert.Equal(new[] { localSilo, remoteSilo }, initialSilos.OrderBy(static silo => silo));
+        Assert.Equal(new[] { localSilo, remoteSilo }, selectorManager.GetSupportedSilos(TestGrainType).OrderBy(static silo => silo));
 
-        clusterManifestProvider.Current = CreateClusterManifest(2, 0, localSilo);
+        membership.Update(CreateMembershipSnapshot(
+            2,
+            (localSilo, SiloStatus.ShuttingDown),
+            (remoteSilo, SiloStatus.Active)));
+        clusterManifestProvider.Current = CreateClusterManifest(2, 0, remoteSilo);
 
         var updated = selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1);
         SiloAddress[] updatedSilos = updated.SuitableSilos;
-        Assert.Equal(new[] { localSilo }, updatedSilos);
+        Assert.Equal(new[] { remoteSilo }, updatedSilos);
+        Assert.Equal(new[] { remoteSilo }, selectorManager.GetSupportedSilos(TestGrainType));
+    }
+
+    [Fact]
+    public void CachedVersionSelectorManager_RefreshesSuitableSilosWhenManifestMinorVersionChanges()
+    {
+        var localSilo = CreateSiloAddress(11111, 1);
+        var remoteSilo = CreateSiloAddress(11112, 1);
+        var clusterManifestProvider = new TestClusterManifestProvider(CreateClusterManifest(1, 0, localSilo));
+        using var membership = new TestClusterMembershipService(CreateMembershipSnapshot(
+            1,
+            (localSilo, SiloStatus.Active),
+            (remoteSilo, SiloStatus.Active)));
+        var selectorManager = CreateCachedVersionSelectorManager(
+            new GrainVersionManifest(clusterManifestProvider),
+            membership);
+
+        Assert.Equal(new[] { localSilo }, selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1).SuitableSilos);
+
+        clusterManifestProvider.Current = CreateClusterManifest(1, 1, localSilo, remoteSilo);
+
+        Assert.Equal(
+            new[] { localSilo, remoteSilo },
+            selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1).SuitableSilos.OrderBy(static silo => silo));
     }
 
     private static ClusterManifestProvider CreateClusterManifestProvider(
@@ -229,7 +262,9 @@ public class ClusterManifestProviderTests
         return grainFactory;
     }
 
-    private static CachedVersionSelectorManager CreateCachedVersionSelectorManager(GrainVersionManifest manifest)
+    private static CachedVersionSelectorManager CreateCachedVersionSelectorManager(
+        GrainVersionManifest manifest,
+        IClusterMembershipService membership)
     {
         var services = new ServiceCollection();
         services.AddOptions<GrainVersioningOptions>();
@@ -243,7 +278,8 @@ public class ClusterManifestProviderTests
         return new CachedVersionSelectorManager(
             manifest,
             new VersionSelectorManager(serviceProvider, options),
-            new CompatibilityDirectorManager(serviceProvider, options));
+            new CompatibilityDirectorManager(serviceProvider, options),
+            membership);
     }
 
     private static ClusterManifest CreateClusterManifest(long major, long minor, params SiloAddress[] silos)
