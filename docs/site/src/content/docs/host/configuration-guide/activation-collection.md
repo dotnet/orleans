@@ -62,7 +62,7 @@ For example, assume a 10-minute collection age and ignore scan latency:
 
 <xref:Orleans.Grain.DeactivateOnIdle*> takes priority over a delay. Delaying deactivation is an optimization, not a durability or placement guarantee. It doesn't pin an activation to a silo, and failures, shutdown, migration, explicit deactivation, and memory pressure can still remove the activation.
 
-## How to deactivate a specific grain identity
+### How to deactivate a specific grain identity
 
 Code that needs to target a specific grain identity from outside the grain can cast the reference to the public <xref:Orleans.Core.Internal.IGrainManagementExtension> extension and call <xref:Orleans.Core.Internal.IGrainManagementExtension.DeactivateOnIdle*>:
 
@@ -87,7 +87,7 @@ Use explicit deactivation only when there is a domain or operational reason to e
 
 An activation is idle when it hasn't processed inbound work during the configured idle window. Inbound grain calls, reminders, and stream events reset idleness. Outbound calls and arbitrary local work don't. Timer callbacks reset idleness only when the timer is created with <xref:Orleans.Runtime.GrainTimerCreationOptions.KeepAlive>.
 
-`DeactivateOnIdle` requests deactivation after the current turn; queued calls are forwarded to a new or existing activation. A later call to the same grain identity can reactivate it on any compatible silo.
+`DeactivateOnIdle` requests deactivation when the current turn ends; queued calls are forwarded to a new or existing activation. A later call to the same grain identity can reactivate it on any compatible silo.
 
 ### Cautions
 
