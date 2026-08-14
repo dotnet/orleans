@@ -404,7 +404,7 @@ namespace Orleans.Runtime.MembershipService
             if (myEntry.Status == SiloStatus.Dead && myEntry.Status != newStatus)
             {
                 LogWarningFoundMyselfDead1(this.log, myEntry.ToFullString());
-                this.ProcessObservedLocalDeath(table, nameof(TryUpdateMyStatusGlobalOnce));
+                this.ProcessTableUpdate(table, nameof(TryUpdateMyStatusGlobalOnce));
                 return true;
             }
 
@@ -580,7 +580,7 @@ namespace Orleans.Runtime.MembershipService
                     if (entry.Status == SiloStatus.Dead)
                     {
                         LogWarningFoundMyselfDead2(this.log, entry.ToFullString());
-                        this.ProcessObservedLocalDeath(table, nameof(CleanupMyTableEntries));
+                        this.ProcessTableUpdate(table, nameof(CleanupMyTableEntries));
                     }
                     continue;
                 }
@@ -641,11 +641,6 @@ namespace Orleans.Runtime.MembershipService
             {
                 this.fatalErrorHandler.OnFatalException(this, $"I have been told I am dead, so this silo will stop! Reason: {reason}", null);
             }
-        }
-
-        private void ProcessObservedLocalDeath(MembershipTableData table, string caller)
-        {
-            this.ProcessTableUpdate(table, caller);
         }
 
         private void PublishSnapshot(MembershipTableSnapshot snapshot)
@@ -824,7 +819,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 var msg = string.Format("I should be Dead according to membership table (in TryKill): entry = {0}.", localSiloEntry.ToFullString());
                 LogWarningFoundMyselfDead3(this.log, msg);
-                this.ProcessObservedLocalDeath(table, nameof(InnerTryKill));
+                this.ProcessTableUpdate(table, nameof(InnerTryKill));
                 return true;
             }
 
@@ -873,7 +868,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 var localSiloEntryDetails = localSiloEntry.ToFullString();
                 LogWarningFoundMyselfDead3(this.log, $"I should be Dead according to membership table (in TryToSuspectOrKill): entry = {localSiloEntryDetails}.");
-                this.ProcessObservedLocalDeath(table, nameof(InnerTryToSuspectOrKill));
+                this.ProcessTableUpdate(table, nameof(InnerTryToSuspectOrKill));
                 return true;
             }
 
