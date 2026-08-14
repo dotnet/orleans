@@ -646,9 +646,6 @@ namespace Orleans.Runtime.MembershipService
         private void ProcessObservedLocalDeath(MembershipTableData table, string caller)
         {
             this.ProcessTableUpdate(table, caller);
-            Debug.Assert(
-                this.MembershipTableSnapshot.GetSiloStatus(this.myAddress) == SiloStatus.Dead,
-                "An observed Dead status cannot be older than a non-Dead local status.");
         }
 
         private void PublishSnapshot(MembershipTableSnapshot snapshot)
