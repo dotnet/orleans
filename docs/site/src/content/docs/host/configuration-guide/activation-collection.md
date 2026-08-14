@@ -64,18 +64,18 @@ For example, assume a 10-minute collection age and ignore scan latency:
 
 ## How to deactivate a specific grain identity
 
-For internal or test code that needs to target a specific grain identity from outside the grain, cast the reference to <xref:Orleans.Core.Internal.IGrainManagementExtension> and call <xref:Orleans.Core.Internal.IGrainManagementExtension.DeactivateOnIdle*>:
+Code that needs to target a specific grain identity from outside the grain can cast the reference to the public <xref:Orleans.Core.Internal.IGrainManagementExtension> extension and call <xref:Orleans.Core.Internal.IGrainManagementExtension.DeactivateOnIdle*>:
 
 :::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="deactivate_grain_externally":::
 
 This is a request, not a wait-for-deactivation call. The method returns immediately after requesting deactivation for that grain identity; queued calls are forwarded to a new or existing activation. If there is no current activation, a later call can reactivate the grain.
 
-The test-host helpers are convenience APIs for test assertions:
+The test-host helpers are convenience APIs for tests:
 
-- <xref:Orleans.TestingHost.TestCluster.DeactivateAsync*> sends the external management-extension request and then waits for the server to finish deactivating the current activation.
+- <xref:Orleans.TestingHost.TestCluster.DeactivateAsync*> uses the public management extension and then waits for the server to finish deactivating the current activation.
 - <xref:Orleans.TestingHost.InProcessTestCluster.DeactivateAsync*> directly deactivates the current grain context and waits for that deactivation to complete.
 
-These helpers are useful because they make deactivation deterministic in tests, but they are not a separate public runtime feature.
+These helpers are valuable because they make deactivation deterministic in tests, but they are not a different runtime capability.
 
 The <xref:Orleans.Grain.DeactivateOnIdle*> method is also available inside grain code when the grain itself decides that its current activation should end:
 
