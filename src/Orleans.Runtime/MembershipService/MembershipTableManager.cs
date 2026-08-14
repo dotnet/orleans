@@ -48,7 +48,6 @@ namespace Orleans.Runtime.MembershipService
         private readonly Channel<SuspectOrKillRequest> _trySuspectOrKillChannel = Channel.CreateBounded<SuspectOrKillRequest>(new BoundedChannelOptions(100) { FullMode = BoundedChannelFullMode.DropOldest });
 
         private MembershipState _state;
-        private int _selfTerminationTriggered;
         private int _fatalTerminationTriggered;
 
         public MembershipTableManager(
@@ -428,11 +427,6 @@ namespace Orleans.Runtime.MembershipService
 
             if (ok)
             {
-                if (myEntry.Status == SiloStatus.Dead)
-                {
-                    Interlocked.Exchange(ref _selfTerminationTriggered, 1);
-                }
-
                 var entries = table.Members.ToDictionary(e => e.Item1.SiloAddress, e => e);
                 entries[myEntry.SiloAddress] = Tuple.Create(myEntry, myEtag!);
                 var updatedTable = new MembershipTableData(entries.Values.ToList(), next);
@@ -538,7 +532,7 @@ namespace Orleans.Runtime.MembershipService
         private void CheckIfLocalSiloIsDead(string caller)
         {
             var current = this.MembershipTableSnapshot;
-            if (Volatile.Read(ref _selfTerminationTriggered) == 0
+            if (!this.IsStopping
                 && current.Entries.TryGetValue(this.myAddress, out var localSiloEntry)
                 && localSiloEntry.Status == SiloStatus.Dead)
             {
@@ -606,7 +600,7 @@ namespace Orleans.Runtime.MembershipService
                     }
                     finally
                     {
-                        this.TriggerFatalTermination(reason);
+                        this.KillMyselfLocally(reason);
                     }
 
                     return true; // No point continuing!
@@ -634,26 +628,13 @@ namespace Orleans.Runtime.MembershipService
 
         private void KillMyselfLocally(string reason)
         {
-            if (Interlocked.Exchange(ref _selfTerminationTriggered, 1) != 0)
-            {
-                return;
-            }
-
-            this.TriggerFatalTermination(reason);
-        }
-
-        private void TriggerFatalTermination(string reason)
-        {
-            if (Interlocked.Exchange(ref _fatalTerminationTriggered, 1) != 0)
+            if (this.IsStopping || Interlocked.Exchange(ref _fatalTerminationTriggered, 1) != 0)
             {
                 return;
             }
 
             LogErrorKillMyselfLocally(this.log, reason);
-            if (!this.IsStopping)
-            {
-                this.fatalErrorHandler.OnFatalException(this, $"I have been told I am dead, so this silo will stop! Reason: {reason}", null);
-            }
+            this.fatalErrorHandler.OnFatalException(this, $"I have been told I am dead, so this silo will stop! Reason: {reason}", null);
         }
 
         private void PublishSnapshot(MembershipTableSnapshot snapshot)

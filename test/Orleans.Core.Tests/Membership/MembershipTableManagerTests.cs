@@ -483,7 +483,7 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
-        public async Task MembershipTableManager_IntentionalDeadTransition_DoesNotSelfTerminate()
+        public async Task MembershipTableManager_DeadTransitionOutsideShutdown_Terminates()
         {
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
             var manager = this.CreateMembershipTableManager(membershipTable);
@@ -494,7 +494,7 @@ namespace NonSilo.Tests.Membership
             await manager.UpdateStatus(SiloStatus.Dead);
 
             Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
-            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
             await this.lifecycle.OnStop();
         }
 
