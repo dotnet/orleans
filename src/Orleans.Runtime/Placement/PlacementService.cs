@@ -323,28 +323,25 @@ namespace Orleans.Runtime.Placement
         private SiloAddress[] FilterActiveSilos(SiloAddress[] silos)
         {
             var activeSilos = _siloStatusOracle.GetApproximateSiloStatuses(onlyActive: true);
-            SiloAddress[]? filteredSilos = null;
-            var count = 0;
-
-            foreach (var silo in silos)
+            List<SiloAddress>? filteredSilos = null;
+            for (var index = 0; index < silos.Length; index++)
             {
+                var silo = silos[index];
                 if (activeSilos.ContainsKey(silo))
                 {
-                    if (filteredSilos is not null)
-                    {
-                        filteredSilos[count] = silo;
-                    }
-
-                    ++count;
+                    filteredSilos?.Add(silo);
                 }
                 else if (filteredSilos is null)
                 {
-                    filteredSilos = new SiloAddress[silos.Length];
-                    Array.Copy(silos, filteredSilos, count);
+                    filteredSilos = new List<SiloAddress>(silos.Length - 1);
+                    for (var priorIndex = 0; priorIndex < index; priorIndex++)
+                    {
+                        filteredSilos.Add(silos[priorIndex]);
+                    }
                 }
             }
 
-            return filteredSilos is null ? silos : count == 0 ? [] : filteredSilos.AsSpan(0, count).ToArray();
+            return filteredSilos?.ToArray() ?? silos;
         }
 
         void ISiloStatusListener.SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status) => InvalidatePlacementCaches();
