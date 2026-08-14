@@ -17,20 +17,15 @@ namespace Orleans.Runtime.Versions
 #endif
         private readonly Dictionary<(GrainType Type, GrainInterfaceType Interface, ushort Version), CachedEntry> suitableSilosCache;
         private readonly GrainVersionManifest grainInterfaceVersions;
-        private readonly IClusterMembershipService? clusterMembershipService;
+        private readonly IClusterMembershipService clusterMembershipService;
         private MajorMinorVersion observedManifestVersion;
         private long cacheGeneration;
-
-        public CachedVersionSelectorManager(GrainVersionManifest grainInterfaceVersions, VersionSelectorManager versionSelectorManager, CompatibilityDirectorManager compatibilityDirectorManager)
-            : this(grainInterfaceVersions, versionSelectorManager, compatibilityDirectorManager, clusterMembershipService: null)
-        {
-        }
 
         public CachedVersionSelectorManager(
             GrainVersionManifest grainInterfaceVersions,
             VersionSelectorManager versionSelectorManager,
             CompatibilityDirectorManager compatibilityDirectorManager,
-            IClusterMembershipService? clusterMembershipService)
+            IClusterMembershipService clusterMembershipService)
         {
             this.grainInterfaceVersions = grainInterfaceVersions;
             this.VersionSelectorManager = versionSelectorManager;
@@ -43,8 +38,6 @@ namespace Orleans.Runtime.Versions
         public VersionSelectorManager VersionSelectorManager { get; }
 
         public CompatibilityDirectorManager CompatibilityDirectorManager { get; }
-
-        public event Action? CacheInvalidated;
 
         public CachedEntry GetSuitableSilos(GrainType grainType, GrainInterfaceType interfaceId, ushort requestedVersion)
         {
@@ -114,8 +107,6 @@ namespace Orleans.Runtime.Versions
                 ++this.cacheGeneration;
                 this.suitableSilosCache.Clear();
             }
-
-            CacheInvalidated?.Invoke();
         }
 
         private (MajorMinorVersion Version, CachedEntry Entry) GetSuitableSilosImpl(
@@ -148,9 +139,8 @@ namespace Orleans.Runtime.Versions
 
         private CacheState ObserveCacheState()
         {
+            var membershipVersion = this.clusterMembershipService.CurrentSnapshot.Version;
             var manifestVersion = this.grainInterfaceVersions.LatestVersion;
-            var membershipVersion = this.clusterMembershipService?.CurrentSnapshot.Version
-                ?? new MembershipVersion(manifestVersion.Major);
             if (manifestVersion != this.observedManifestVersion)
             {
                 this.observedManifestVersion = manifestVersion;
