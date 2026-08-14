@@ -11,6 +11,11 @@ namespace Orleans.Runtime.Versions
 {
     internal class CachedVersionSelectorManager
     {
+#if NET9_0_OR_GREATER
+        private readonly Lock cacheLock = new();
+#else
+        private readonly object cacheLock = new();
+#endif
         private readonly ConcurrentDictionary<(GrainType Type, GrainInterfaceType Interface, ushort Version), CachedEntry> suitableSilosCache;
         private readonly GrainVersionManifest grainInterfaceVersions;
         private readonly IClusterMembershipService clusterMembershipService;
@@ -41,21 +46,29 @@ namespace Orleans.Runtime.Versions
                 var generation = Volatile.Read(ref this.cacheGeneration);
                 var membershipVersion = this.clusterMembershipService.CurrentSnapshot.Version;
                 var manifestVersion = this.grainInterfaceVersions.LatestVersion;
-                if (suitableSilosCache.TryGetValue(key, out var entry)
-                    && entry.Generation == generation
-                    && entry.Version == manifestVersion
-                    && entry.Version.Major == membershipVersion.Value
-                    && VersionsAreCurrent(generation, membershipVersion, manifestVersion))
+                lock (this.cacheLock)
                 {
-                    return entry;
+                    if (generation == this.cacheGeneration
+                        && suitableSilosCache.TryGetValue(key, out var cachedEntry)
+                        && cachedEntry.Generation == generation
+                        && cachedEntry.Version == manifestVersion
+                        && cachedEntry.Version.Major == membershipVersion.Value
+                        && VersionsAreCurrent(generation, membershipVersion, manifestVersion))
+                    {
+                        return cachedEntry;
+                    }
                 }
 
-                entry = GetSuitableSilosImpl(key, generation);
-                if (entry.Version == manifestVersion
-                    && entry.Version.Major == membershipVersion.Value
-                    && VersionsAreCurrent(generation, membershipVersion, manifestVersion))
+                var entry = GetSuitableSilosImpl(key, generation);
+                lock (this.cacheLock)
                 {
-                    return suitableSilosCache[key] = entry;
+                    if (generation == this.cacheGeneration
+                        && entry.Version == manifestVersion
+                        && entry.Version.Major == membershipVersion.Value
+                        && VersionsAreCurrent(generation, membershipVersion, manifestVersion))
+                    {
+                        return suitableSilosCache[key] = entry;
+                    }
                 }
             }
         }
@@ -78,8 +91,11 @@ namespace Orleans.Runtime.Versions
 
         public void ResetCache()
         {
-            Interlocked.Increment(ref this.cacheGeneration);
-            this.suitableSilosCache.Clear();
+            lock (this.cacheLock)
+            {
+                ++this.cacheGeneration;
+                this.suitableSilosCache.Clear();
+            }
         }
 
         private CachedEntry GetSuitableSilosImpl(
