@@ -2,6 +2,45 @@
 
 Some notes and guidelines for developers who want to contribute to Orleans.
 
+## Getting started
+
+### Prerequisites
+
+Install [Git](https://git-scm.com/downloads) and the [.NET SDK](https://dotnet.microsoft.com/download/dotnet). The repository's `global.json` selects the SDK used by the build.
+
+### Clone and build
+
+Clone the repository and build the solution from its root directory:
+
+```console
+git clone https://github.com/dotnet/orleans.git
+cd orleans
+dotnet build Orleans.slnx -bl
+```
+
+The `Orleans.slnx` solution includes the source projects under `src` and the test projects under `test`. On Windows, `Build.cmd` additionally restores, builds, and packs the solution, placing packages in `Artifacts\<Configuration>`.
+
+### Run tests
+
+Run the full test suite for the current .NET target with:
+
+```console
+dotnet test Orleans.slnx --framework net10.0 -- -parallel none -noshadow
+```
+
+For a faster feedback loop, run a category or a single test. For example:
+
+```console
+dotnet test Orleans.slnx --framework net10.0 --filter "Category=BVT" -- -parallel none -noshadow
+dotnet test test\Orleans.Core.Tests\Orleans.Core.Tests.csproj --framework net10.0 --filter "FullyQualifiedName~MyTestClass.MyTestMethod" -- -parallel none -noshadow
+```
+
+### Work on an application with local source
+
+For an application which needs to exercise an unreleased change, reference the relevant project under `src` instead of the published NuGet package. For example, reference `src\Orleans.Core\Orleans.Core.csproj` from the application project and build the application together with the Orleans solution. This lets the debugger step into the local Orleans source.
+
+Most changes should start in a project under `src` and have focused tests in the corresponding project under `test`. The repository also contains documentation under `docs` and examples under `samples`.
+
 ## Contributing to this project
 
 Here are some pointers for anyone looking for mini-features and work items that would make a positive contribution to Orleans.
