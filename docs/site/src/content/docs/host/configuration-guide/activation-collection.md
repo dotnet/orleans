@@ -29,13 +29,11 @@ Prefer type-specific changes over a cluster-wide increase. Longer ages trade mem
 
 ### Expedite activation collection
 
-Call <xref:Orleans.Grain.DeactivateOnIdle*> when the current activation should deactivate after its current turn:
+Call <xref:Orleans.Grain.DeactivateOnIdle*> when the current activation should request deactivation after its current turn:
 
 :::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="deactivate_on_idle":::
 
-This API applies to the current activation only. You can't call it from outside the grain to deactivate an arbitrary grain ID.
-
-Queued calls are forwarded to a new or existing activation.
+This instance method is only called from inside the grain implementation. It requests deactivation; it does not wait for the activation to stop. Queued calls are forwarded to a new or existing activation.
 
 ### Delay activation collection
 
@@ -70,9 +68,9 @@ To explicitly request deactivation of a grain from outside it, cast its referenc
 
 :::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="deactivate_grain_externally":::
 
-The management extension targets the current activation for that grain identity and requests deactivation once the current turn and queued work complete. The same grain reference is still valid: a later call can activate the grain again on any compatible silo.
+This is a request, not a wait-for-deactivation call. The method returns immediately after scheduling deactivation for the current activation of that grain identity; queued calls are forwarded to a new or existing activation. If there is no current activation, the next call can reactivate the grain.
 
-For tests which use <xref:Orleans.TestingHost.TestCluster> or <xref:Orleans.TestingHost.InProcessTestCluster>, use <xref:Orleans.TestingHost.TestCluster.DeactivateAsync*> or <xref:Orleans.TestingHost.InProcessTestCluster.DeactivateAsync*> instead. These helpers request deactivation through the same mechanism and wait for it to complete.
+For tests which use <xref:Orleans.TestingHost.TestCluster> or <xref:Orleans.TestingHost.InProcessTestCluster>, use <xref:Orleans.TestingHost.TestCluster.DeactivateAsync*> or <xref:Orleans.TestingHost.InProcessTestCluster.DeactivateAsync*> instead. These helpers request deactivation through the same mechanism and wait for actual deactivation to finish.
 
 The <xref:Orleans.Grain.DeactivateOnIdle*> method is also available inside grain code when the grain itself decides that its current activation should end:
 
@@ -84,7 +82,7 @@ Use explicit deactivation only when there is a domain or operational reason to e
 
 An activation is idle when it hasn't processed inbound work during the configured idle window. Inbound grain calls, reminders, and stream events reset idleness. Outbound calls and arbitrary local work don't. Timer callbacks reset idleness only when the timer is created with <xref:Orleans.Runtime.GrainTimerCreationOptions.KeepAlive>.
 
-`DeactivateOnIdle` requests deactivation after the current turn and currently queued work complete. A later call to the same grain identity can reactivate it on any compatible silo.
+`DeactivateOnIdle` requests deactivation after the current turn; queued calls are forwarded to a new or existing activation. A later call to the same grain identity can reactivate it on any compatible silo.
 
 ### Cautions
 

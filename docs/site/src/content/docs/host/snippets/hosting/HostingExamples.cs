@@ -526,7 +526,7 @@ public interface IUserSessionGrain : IGrainWithStringKey
 // <deactivate_grain_externally>
 public static class GrainDeactivation
 {
-    public static ValueTask DeactivateAsync(
+    public static ValueTask RequestDeactivationAsync(
         IUserSessionGrain grain)
     {
         return grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
