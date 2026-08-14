@@ -200,16 +200,15 @@ namespace Orleans.Runtime.Placement
             var grainType = target.GrainIdentity.Type;
             // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
             // with the current silo
-            var compatibleSilos = _assumeHomogeneousSilosForTesting
-                ? _siloStatusOracle.GetActiveSilos()
-                : GetUnfilteredCompatibleSilos(grainType, target.InterfaceType, target.InterfaceVersion);
-            if (!_assumeHomogeneousSilosForTesting)
+            SiloAddress[] compatibleSilos;
+            if (_assumeHomogeneousSilosForTesting)
             {
-                compatibleSilos = FilterActiveSilos(compatibleSilos);
+                compatibleSilos = _siloStatusOracle.GetActiveSilos();
             }
-
-            if (!_assumeHomogeneousSilosForTesting)
+            else
             {
+                compatibleSilos = FilterActiveSilos(
+                    GetUnfilteredCompatibleSilos(grainType, target.InterfaceType, target.InterfaceVersion));
                 ThrowIfStopping();
                 var filters = _filterStrategyResolver.GetPlacementFilterStrategies(grainType);
                 if (filters.Length > 0)
