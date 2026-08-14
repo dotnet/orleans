@@ -177,11 +177,6 @@ namespace Orleans.Runtime
                     // Something is amiss.
                     return false;
                 }
-
-                if (!HasSameVersionedState(entry.Value, otherEntry))
-                {
-                    return false;
-                }
             }
 
             // This is a successor if any silo has a later EffectiveIAmAliveTime.
@@ -195,18 +190,6 @@ namespace Orleans.Runtime
 
             return false;
         }
-
-        private static bool HasSameVersionedState(MembershipEntry left, MembershipEntry right) =>
-            left.Status == right.Status
-            && Equals(left.SiloAddress, right.SiloAddress)
-            && Enumerable.SequenceEqual(left.SuspectTimes ?? [], right.SuspectTimes ?? [])
-            && left.ProxyPort == right.ProxyPort
-            && string.Equals(left.HostName, right.HostName, StringComparison.Ordinal)
-            && string.Equals(left.SiloName, right.SiloName, StringComparison.Ordinal)
-            && string.Equals(left.RoleName, right.RoleName, StringComparison.Ordinal)
-            && left.UpdateZone == right.UpdateZone
-            && left.FaultZone == right.FaultZone
-            && left.StartTime == right.StartTime;
 
         public override string ToString()
         {
