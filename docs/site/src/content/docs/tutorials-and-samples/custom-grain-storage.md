@@ -1,7 +1,7 @@
 ---
 title: Custom grain storage sample project
 description: Explore a custom grain storage sample project written with .NET Orleans.
-ms.date: 08/02/2026
+ms.date: 08/14/2026
 ms.topic: tutorial
 ai-usage: ai-assisted
 ---
@@ -21,6 +21,17 @@ Each method implements the corresponding method in the <xref:Orleans.Storage.IGr
 - <xref:Orleans.Storage.IGrainStorage.ReadStateAsync*?displayProperty=nameWithType>: Reads the state of a grain.
 - <xref:Orleans.Storage.IGrainStorage.WriteStateAsync*?displayProperty=nameWithType>: Writes the state of a grain.
 - <xref:Orleans.Storage.IGrainStorage.ClearStateAsync*?displayProperty=nameWithType>: Clears the state of a grain.
+
+All three methods receive the same arguments:
+
+| Argument | Meaning |
+| --- | --- |
+| `stateName` | The logical name of this state record. For <xref:Orleans.Runtime.IPersistentState`1>, this is the state name configured by <xref:Orleans.Runtime.PersistentStateAttribute>; legacy <xref:Orleans.Grain`1> state uses `state`. A grain can have multiple named state records, so include this value in the storage key. Older versions of the interface called this argument `grainType`, but it doesn't describe the state object's .NET type. |
+| `grainId` | The complete Orleans grain identity, including its grain type and primary key. Combine it with `stateName` to identify a record. Don't key records using only the primary key, because different grain types can use the same key. |
+| `grainState` | The state container Orleans passes to the provider. Its <xref:Orleans.IGrainState`1.State> property contains the application state, <xref:Orleans.IGrainState`1.ETag> carries the provider's optimistic-concurrency token, and <xref:Orleans.IGrainState`1.RecordExists> indicates whether the record exists. A read populates these properties; a write or clear updates them to reflect the completed operation. |
+| `T` | The declared .NET type of the state payload. Use `T` (or `typeof(T)`) for serialization and type metadata. It isn't a record identifier and can be shared by many grains and named state records. |
+
+Therefore, `stateName` and `grainState.State?.GetType().Name` aren't interchangeable. The first identifies one of a grain's logical state records and is stable independently of the payload implementation. The second is only the runtime type name of the current payload; it can be `null`, can differ from `typeof(T)` when polymorphism is involved, and can change during a refactoring. The sample uses `stateName` and `grainId` for identity and delegates payload type handling to the configured serializer.
 
 The <xref:Orleans.ILifecycleParticipant`1.Participate*?displayProperty=nameWithType> method subscribes to the silo's lifecycle.
 
@@ -42,7 +53,7 @@ To initialize the storage, subscribe to the <xref:Orleans.ServiceLifecycleStage.
 
 The `onStart` function conditionally creates the root directory to store grain states if it doesn't already exist.
 
-Also, provide a common function to construct the filename, ensuring uniqueness per service, grain ID, and grain type:
+Also, provide a common function to construct the filename, ensuring uniqueness per service, grain ID, and state name:
 
 :::code source="snippets/custom-grain-storage/FileGrainStorage.cs" id="getkeystring":::
 
@@ -52,7 +63,7 @@ To read a grain state, get the filename using the `GetKeyString` function and co
 
 :::code source="snippets/custom-grain-storage/FileGrainStorage.cs" id="readstateasync":::
 
-Use `fileInfo.LastWriteTimeUtc` as an `ETag`, which other functions use for inconsistency checks to prevent data loss.
+Use `fileInfo.LastWriteTimeUtc` as an `ETag`, which other functions use for inconsistency checks to prevent data loss. Set <xref:Orleans.IGrainState`1.RecordExists> to indicate whether the read found a record.
 
 For deserialization, use the <xref:Orleans.Storage.IStorageProviderSerializerOptions.GrainStorageSerializer?displayProperty=nameWithType>. This is important for correctly serializing and deserializing the state.
 

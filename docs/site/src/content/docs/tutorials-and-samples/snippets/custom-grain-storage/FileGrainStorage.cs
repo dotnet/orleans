@@ -42,11 +42,12 @@ public sealed class FileGrainStorage : IGrainStorage, ILifecycleParticipant<ISil
                     """);
             }
 
-            grainState.ETag = null;
-            grainState.State = (T)Activator.CreateInstance(typeof(T))!;
-
             fileInfo.Delete();
         }
+
+        grainState.ETag = null;
+        grainState.RecordExists = false;
+        grainState.State = (T)Activator.CreateInstance(typeof(T))!;
 
         return Task.CompletedTask;
     }
@@ -63,6 +64,8 @@ public sealed class FileGrainStorage : IGrainStorage, ILifecycleParticipant<ISil
         if (fileInfo is { Exists: false })
         {
             grainState.State = (T)Activator.CreateInstance(typeof(T))!;
+            grainState.ETag = null;
+            grainState.RecordExists = false;
             return;
         }
 
@@ -71,6 +74,7 @@ public sealed class FileGrainStorage : IGrainStorage, ILifecycleParticipant<ISil
         
         grainState.State = _options.GrainStorageSerializer.Deserialize<T>(new BinaryData(storedData));
         grainState.ETag = fileInfo.LastWriteTimeUtc.ToString();
+        grainState.RecordExists = true;
     }
     // </readstateasync>
     // <writestateasync>
@@ -96,6 +100,7 @@ public sealed class FileGrainStorage : IGrainStorage, ILifecycleParticipant<ISil
 
         fileInfo.Refresh();
         grainState.ETag = fileInfo.LastWriteTimeUtc.ToString();
+        grainState.RecordExists = true;
     }
     // </writestateasync>
     // <participate>
@@ -110,8 +115,8 @@ public sealed class FileGrainStorage : IGrainStorage, ILifecycleParticipant<ISil
             });
     // </participate>
     // <getkeystring>
-    private string GetKeyString(string grainType, GrainId grainId) =>
-        $"{_clusterOptions.ServiceId}.{grainId.Key}.{grainType}";
+    private string GetKeyString(string stateName, GrainId grainId) =>
+        $"{_clusterOptions.ServiceId}.{grainId.Type}.{grainId.Key}.{stateName}";
     // </getkeystring>
 }
 // </file_grain_storage>
