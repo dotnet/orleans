@@ -399,15 +399,14 @@ namespace Orleans.Runtime.MembershipService
 
             LogDebugTryUpdateMyStatusGlobalOnce(this.log, newStatus.Equals(SiloStatus.Active) ? "All" : " my entry from", table.ToString());
             LogMissedIAmAlives(table);
-            var (myEntry, myEtag) = this.GetOrCreateLocalSiloEntry(table, newStatus);
+            this.ProcessTableUpdate(table, nameof(TryUpdateMyStatusGlobalOnce));
 
-            if (myEntry.Status == SiloStatus.Dead && myEntry.Status != newStatus)
+            if (this.CurrentStatus == SiloStatus.Dead)
             {
-                LogWarningFoundMyselfDead1(this.log, myEntry.ToFullString());
-                this.ProcessTableUpdate(table, nameof(TryUpdateMyStatusGlobalOnce));
                 return true;
             }
 
+            var (myEntry, myEtag) = this.GetOrCreateLocalSiloEntry(table, newStatus);
             var now = GetDateTimeUtcNow();
             if (newStatus == SiloStatus.Dead)
                 myEntry.AddSuspector(myAddress, now); // add the killer (myself) to the suspect list, for easier diagnostics later on.
@@ -577,11 +576,6 @@ namespace Orleans.Runtime.MembershipService
 
                 if (siloAddress.Generation.Equals(myAddress.Generation))
                 {
-                    if (entry.Status == SiloStatus.Dead)
-                    {
-                        LogWarningFoundMyselfDead2(this.log, entry.ToFullString());
-                        this.ProcessTableUpdate(table, nameof(CleanupMyTableEntries));
-                    }
                     continue;
                 }
 
@@ -817,8 +811,6 @@ namespace Orleans.Runtime.MembershipService
             var (localSiloEntry, _) = this.GetOrCreateLocalSiloEntry(table, this.CurrentStatus);
             if (localSiloEntry.Status == SiloStatus.Dead)
             {
-                var msg = string.Format("I should be Dead according to membership table (in TryKill): entry = {0}.", localSiloEntry.ToFullString());
-                LogWarningFoundMyselfDead3(this.log, msg);
                 this.ProcessTableUpdate(table, nameof(InnerTryKill));
                 return true;
             }
@@ -836,7 +828,7 @@ namespace Orleans.Runtime.MembershipService
             // Check if the table already knows that this silo is dead
             if (entry.Status == SiloStatus.Dead)
             {
-                this.ProcessTableUpdate(table, "TryKill");
+                this.ProcessTableUpdate(table, nameof(InnerTryKill));
                 return true;
             }
 
@@ -863,12 +855,9 @@ namespace Orleans.Runtime.MembershipService
                 return true;
             }
 
-            var (localSiloEntry, _) = this.GetOrCreateLocalSiloEntry(table, this.CurrentStatus);
-            if (localSiloEntry.Status == SiloStatus.Dead)
+            this.ProcessTableUpdate(table, nameof(InnerTryToSuspectOrKill));
+            if (this.CurrentStatus == SiloStatus.Dead)
             {
-                var localSiloEntryDetails = localSiloEntry.ToFullString();
-                LogWarningFoundMyselfDead3(this.log, $"I should be Dead according to membership table (in TryToSuspectOrKill): entry = {localSiloEntryDetails}.");
-                this.ProcessTableUpdate(table, nameof(InnerTryToSuspectOrKill));
                 return true;
             }
 
@@ -934,7 +923,7 @@ namespace Orleans.Runtime.MembershipService
                 this.ProcessTableUpdate(table, "TrySuspectOrKill");
 
                 // Gossip using the local silo status, since this is just informational to propagate the suspicion vote.
-                GossipToOthers(localSiloEntry.SiloAddress, localSiloEntry.Status).Ignore();
+                GossipToOthers(this.myAddress, this.CurrentStatus).Ignore();
             }
 
             return ok;
@@ -1096,13 +1085,6 @@ namespace Orleans.Runtime.MembershipService
         private static partial void LogWarningMissedIAmAliveTableUpdate(ILogger logger, SiloAddress siloAddress, DateTime lastUpdateTime, DateTime currentTime, TimeSpan sinceUpdate, TimeSpan allowedIAmAliveMissPeriod);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.MembershipFoundMyselfDead2,
-            Level = LogLevel.Warning,
-            Message = "I should be Dead according to membership table (in CleanupTableEntries): entry = {Entry}."
-        )]
-        private static partial void LogWarningFoundMyselfDead2(ILogger logger, string entry);
-
-        [LoggerMessage(
             Level = LogLevel.Trace,
             Message = "Skipping my previous old Dead entry in membership table: {Entry}"
         )]
@@ -1192,13 +1174,6 @@ namespace Orleans.Runtime.MembershipService
         private static partial void LogDebugTryUpdateMyStatusGlobalOnce(ILogger logger, string selection, string table);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.MembershipFoundMyselfDead1,
-            Level = LogLevel.Warning,
-            Message = "I should be Dead according to membership table (in TryUpdateMyStatusGlobalOnce): Entry = {Entry}."
-        )]
-        private static partial void LogWarningFoundMyselfDead1(ILogger logger, string entry);
-
-        [LoggerMessage(
             Level = LogLevel.Debug,
             Message = "TryKill: Read Membership table {Table}"
         )]
@@ -1210,13 +1185,6 @@ namespace Orleans.Runtime.MembershipService
             Message = "Ignoring call to TryKill for silo {Silo} since the local silo is stopping"
         )]
         private static partial void LogInformationIgnoringCallToTryKill(ILogger logger, SiloAddress silo);
-
-        [LoggerMessage(
-            EventId = (int)ErrorCode.MembershipFoundMyselfDead3,
-            Level = LogLevel.Warning,
-            Message = "{Message}"
-        )]
-        private static partial void LogWarningFoundMyselfDead3(ILogger logger, string message);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.MembershipFailedToReadSilo,
