@@ -20,23 +20,18 @@ internal sealed partial class SiloStatusListenerManager : ILifecycleParticipant<
 #endif
     private readonly CancellationTokenSource _cancellation = new();
     private readonly IMembershipManager _membershipService;
-    private readonly SiloAddress _localSiloAddress;
     private readonly ILogger<SiloStatusListenerManager> _logger;
     private readonly IFatalErrorHandler _fatalErrorHandler;
     private ImmutableList<WeakReference<ISiloStatusListener>> _listeners = [];
-    private int _lastNotifiedLocalStatus;
 
     public SiloStatusListenerManager(
         IMembershipManager membershipManager,
-        ILocalSiloDetails localSiloDetails,
         ILogger<SiloStatusListenerManager> log,
         IFatalErrorHandler fatalErrorHandler)
     {
         _membershipService = membershipManager;
-        _localSiloAddress = localSiloDetails.SiloAddress;
         _logger = log;
         _fatalErrorHandler = fatalErrorHandler;
-        membershipManager.LocalSiloStatusChanged += OnLocalSiloStatusChanged;
     }
 
     public bool Subscribe(ISiloStatusListener listener)
@@ -118,67 +113,26 @@ internal sealed partial class SiloStatusListenerManager : ILifecycleParticipant<
         var subscribers = _listeners;
         foreach (var change in update.Changes)
         {
-            if (change.SiloAddress.Equals(_localSiloAddress))
+            for (var i = 0; i < subscribers.Count; ++i)
             {
-                OnLocalSiloStatusChanged(change.Status);
-                continue;
-            }
+                if (!subscribers[i].TryGetTarget(out var listener))
+                {
+                    if (toRemove is null) toRemove = new List<WeakReference<ISiloStatusListener>>();
+                    toRemove.Add(subscribers[i]);
+                    continue;
+                }
 
-            NotifyObservers(change.SiloAddress, change.Status, subscribers, ref toRemove);
-        }
-
-        RemoveDefunctListeners(toRemove);
-    }
-
-    private void OnLocalSiloStatusChanged(SiloStatus status)
-    {
-        while (true)
-        {
-            var current = Volatile.Read(ref _lastNotifiedLocalStatus);
-            if (current >= (int)status)
-            {
-                return;
-            }
-
-            if (Interlocked.CompareExchange(ref _lastNotifiedLocalStatus, (int)status, current) == current)
-            {
-                break;
+                try
+                {
+                    listener.SiloStatusChangeNotification(change.SiloAddress, change.Status);
+                }
+                catch (Exception exception)
+                {
+                    LogErrorCallingSiloStatusChangeNotification(exception, listener);
+                }
             }
         }
 
-        List<WeakReference<ISiloStatusListener>>? toRemove = null;
-        NotifyObservers(_localSiloAddress, status, _listeners, ref toRemove);
-        RemoveDefunctListeners(toRemove);
-    }
-
-    private void NotifyObservers(
-        SiloAddress siloAddress,
-        SiloStatus status,
-        ImmutableList<WeakReference<ISiloStatusListener>> subscribers,
-        ref List<WeakReference<ISiloStatusListener>>? toRemove)
-    {
-        for (var i = 0; i < subscribers.Count; ++i)
-        {
-            if (!subscribers[i].TryGetTarget(out var listener))
-            {
-                if (toRemove is null) toRemove = new List<WeakReference<ISiloStatusListener>>();
-                toRemove.Add(subscribers[i]);
-                continue;
-            }
-
-            try
-            {
-                listener.SiloStatusChangeNotification(siloAddress, status);
-            }
-            catch (Exception exception)
-            {
-                LogErrorCallingSiloStatusChangeNotification(exception, listener);
-            }
-        }
-    }
-
-    private void RemoveDefunctListeners(List<WeakReference<ISiloStatusListener>>? toRemove)
-    {
         if (toRemove != null)
         {
             lock (_listenersLock)

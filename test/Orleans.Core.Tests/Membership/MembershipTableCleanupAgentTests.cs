@@ -279,12 +279,6 @@ namespace NonSilo.Tests.Membership
             public MembershipTableSnapshot CurrentSnapshot { get; private set; } = Snapshot();
             public IAsyncEnumerable<MembershipTableSnapshot> MembershipUpdates => this.updates.Reader.ReadAllAsync();
             public SiloStatus LocalSiloStatus => SiloStatus.Active;
-            public event Action<SiloStatus> LocalSiloStatusChanged
-            {
-                add { }
-                remove { }
-            }
-
             public void Publish(MembershipTableSnapshot snapshot)
             {
                 this.CurrentSnapshot = snapshot;
