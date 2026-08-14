@@ -11,6 +11,103 @@ using RelationalOrleansQueries = Orleans.Streaming.AdoNet.Storage.RelationalOrle
 namespace Tester.AdoNet.Streaming;
 
 /// <summary>
+/// Provider-independent lifecycle tests for <see cref="AdoNetQueueAdapterReceiver"/>.
+/// </summary>
+[Collection(TestEnvironmentFixture.DefaultCollection)]
+[TestCategory("BVT"), TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestProvider("None")]
+[TestSuite("BVT")]
+[TestArea("Streaming")]
+public class AdoNetQueueAdapterReceiverLifecycleTests(TestEnvironmentFixture fixture)
+{
+    [Fact]
+    public async Task AdoNetQueueAdapterReceiver_Shutdown_WaitsForDequeueBookkeepingBeforeRelease()
+    {
+        var serviceId = $"Service-{Guid.NewGuid()}";
+        var providerId = $"Provider-{Guid.NewGuid()}";
+        var queueId = $"Queue-{Guid.NewGuid()}";
+        var clusterOptions = new ClusterOptions { ServiceId = serviceId };
+        var streamOptions = new AdoNetStreamOptions
+        {
+            VisibilityTimeout = TimeSpan.FromMinutes(5),
+            EvictionBatchSize = 0
+        };
+        var cacheOptions = new SimpleQueueCacheOptions();
+        var serializer = fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
+        var logger = NullLogger<AdoNetQueueAdapterReceiver>.Instance;
+        var payload = serializer.SerializeToArray(new AdoNetBatchContainer(StreamId.Create("MyNamespace", "MyKey"), [new TestModel(1)], null!));
+        var now = DateTime.UtcNow;
+        var message = new AdoNetStreamMessage(serviceId, providerId, queueId, 42, 1, now.AddMinutes(5), now.AddHours(1), now, now, payload);
+        var dequeueStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var continueDequeue = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var queries = new BlockingStreamMessageQueries(message, dequeueStarted, continueDequeue);
+
+        var receiver = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, cacheOptions, queries, serializer, logger);
+        var getTask = receiver.GetQueueMessagesAsync(1);
+        await dequeueStarted.Task;
+
+        var shutdownTask = receiver.Shutdown(TimeSpan.FromSeconds(10));
+        Assert.False(shutdownTask.IsCompleted);
+
+        continueDequeue.SetResult();
+        var dequeued = Assert.IsType<AdoNetBatchContainer>(Assert.Single(await getTask));
+        await shutdownTask;
+
+        Assert.Equal(message.MessageId, dequeued.SequenceToken.SequenceNumber);
+        var released = Assert.Single(queries.Released);
+        Assert.Equal(message.MessageId, released.MessageId);
+        Assert.Equal(message.Dequeued, released.Dequeued);
+    }
+
+    [GenerateSerializer]
+    [Alias("Tester.AdoNet.Streaming.AdoNetQueueAdapterReceiverLifecycleTests.TestModel")]
+    public record TestModel(
+        [property: Id(0)] int Value);
+
+    private sealed class BlockingStreamMessageQueries(
+        AdoNetStreamMessage message,
+        TaskCompletionSource dequeueStarted,
+        TaskCompletionSource continueDequeue) : IStreamMessageQueries
+    {
+        public IList<AdoNetStreamConfirmation> Released { get; private set; } = [];
+
+        public async Task<IList<AdoNetStreamMessage>> GetStreamMessagesAsync(
+            string serviceId,
+            string providerId,
+            string queueId,
+            int maxCount,
+            int maxAttempts,
+            int visibilityTimeout,
+            int removalTimeout,
+            int evictionInterval,
+            int evictionBatchSize)
+        {
+            dequeueStarted.SetResult();
+            await continueDequeue.Task;
+            return [message];
+        }
+
+        public Task<IList<AdoNetStreamConfirmationAck>> ConfirmStreamMessagesAsync(
+            string serviceId,
+            string providerId,
+            string queueId,
+            IList<AdoNetStreamConfirmation> messages) =>
+            throw new NotSupportedException();
+
+        public Task<IList<AdoNetStreamConfirmationAck>> ReleaseStreamMessagesAsync(
+            string serviceId,
+            string providerId,
+            string queueId,
+            IList<AdoNetStreamConfirmation> messages)
+        {
+            Released = messages.ToList();
+            return Task.FromResult<IList<AdoNetStreamConfirmationAck>>(
+                [new(serviceId, providerId, queueId, message.MessageId)]);
+        }
+    }
+}
+
+/// <summary>
 /// Tests for <see cref="AdoNetQueueAdapterReceiverTests"/> against SQL Server.
 /// </summary>
 [TestCategory("SqlServer"), TestCategory("BVT"), TestCategory("AdoNet"), TestCategory("Streaming")]
@@ -188,41 +285,40 @@ public abstract class AdoNetQueueAdapterReceiverTests(string invariant, TestEnvi
     /// <summary>
     /// Tests that <see cref="AdoNetQueueAdapterReceiver.Shutdown(TimeSpan)"/> waits for the outstanding task.
     /// </summary>
-    /// <returns></returns>
     [SkippableFact]
     public async Task AdoNetQueueAdapterReceiver_Shutdown_WaitsForOutstandingTask()
     {
-        // arrange - receiver
-        var serviceId = "MyServiceId";
-        var clusterOptions = new ClusterOptions
-        {
-            ServiceId = serviceId
-        };
-        var providerId = "MyProviderId";
-        var queueId = "MyQueueId";
+        var serviceId = $"Service-{Guid.NewGuid()}";
+        var providerId = $"Provider-{Guid.NewGuid()}";
+        var queueId = $"Queue-{Guid.NewGuid()}";
+        var clusterOptions = new ClusterOptions { ServiceId = serviceId };
         var streamOptions = new AdoNetStreamOptions
         {
             Invariant = invariant,
-            ConnectionString = _storage.ConnectionString
+            ConnectionString = _storage.ConnectionString,
+            VisibilityTimeout = TimeSpan.FromMinutes(5),
+            EvictionBatchSize = 0
         };
         var cacheOptions = new SimpleQueueCacheOptions();
         var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
         var logger = NullLogger<AdoNetQueueAdapterReceiver>.Instance;
         var receiver = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, cacheOptions, _queries, serializer, logger);
-        await receiver.Initialize(TimeSpan.FromSeconds(10));
-
-        // arrange - enqueue a message
         var payload = serializer.SerializeToArray(new AdoNetBatchContainer(StreamId.Create("MyNamespace", "MyKey"), [new TestModel(1)], null!));
-        await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, 100);
+        var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, 100);
 
-        // act - start getting messages from the receiver
-        var getTask = receiver.GetQueueMessagesAsync(10);
-
-        // act - shutdown the receiver
+        var getTask = receiver.GetQueueMessagesAsync(1);
         await receiver.Shutdown(TimeSpan.FromSeconds(10));
 
-        // assert - the outstanding task completes before the shutdown task
         Assert.True(getTask.IsCompleted);
+        var first = Assert.IsType<AdoNetBatchContainer>(Assert.Single(await getTask));
+        Assert.Equal(1, first.Dequeued);
+
+        var replacement = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, cacheOptions, _queries, serializer, logger);
+        var redelivered = Assert.IsType<AdoNetBatchContainer>(Assert.Single(await replacement.GetQueueMessagesAsync(1)));
+        Assert.Equal(ack.MessageId, redelivered.SequenceToken.SequenceNumber);
+        Assert.Equal(2, redelivered.Dequeued);
+        await replacement.MessagesDeliveredAsync([redelivered]);
+        await replacement.Shutdown(TimeSpan.FromSeconds(10));
     }
 
     public Task DisposeAsync() => Task.CompletedTask;

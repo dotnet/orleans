@@ -1,11 +1,38 @@
 namespace Orleans.Streaming.AdoNet;
 
+internal interface IStreamMessageQueries
+{
+    Task<IList<AdoNetStreamMessage>> GetStreamMessagesAsync(
+        string serviceId,
+        string providerId,
+        string queueId,
+        int maxCount,
+        int maxAttempts,
+        int visibilityTimeout,
+        int removalTimeout,
+        int evictionInterval,
+        int evictionBatchSize);
+
+    Task<IList<AdoNetStreamConfirmationAck>> ConfirmStreamMessagesAsync(
+        string serviceId,
+        string providerId,
+        string queueId,
+        IList<AdoNetStreamConfirmation> messages);
+
+    Task<IList<AdoNetStreamConfirmationAck>> ReleaseStreamMessagesAsync(
+        string serviceId,
+        string providerId,
+        string queueId,
+        IList<AdoNetStreamConfirmation> messages);
+}
+
 /// <summary>
 /// Receives message batches from an individual queue of an ADO.NET provider.
 /// </summary>
-internal partial class AdoNetQueueAdapterReceiver(string providerId, string queueId, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, SimpleQueueCacheOptions cacheOptions, RelationalOrleansQueries queries, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapterReceiver> logger) : IQueueAdapterReceiver
+internal partial class AdoNetQueueAdapterReceiver(string providerId, string queueId, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, SimpleQueueCacheOptions cacheOptions, IStreamMessageQueries queries, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapterReceiver> logger) : IQueueAdapterReceiver
 {
     private readonly ILogger<AdoNetQueueAdapterReceiver> _logger = logger;
+    private readonly object _lock = new();
     private readonly Dictionary<long, PendingMessage> _pendingMessages = [];
 
     /// <summary>
@@ -13,10 +40,21 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
     /// </summary>
     private bool _shutdown;
 
-    /// <summary>
-    /// Helps shutdown wait for any outstanding storage operation.
-    /// </summary>
-    private Task? _outstandingTask;
+    private int _activeOperations;
+    private TaskCompletionSource? _operationsCompleted;
+
+    internal AdoNetQueueAdapterReceiver(
+        string providerId,
+        string queueId,
+        AdoNetStreamOptions streamOptions,
+        ClusterOptions clusterOptions,
+        SimpleQueueCacheOptions cacheOptions,
+        RelationalOrleansQueries queries,
+        Serializer<AdoNetBatchContainer> serializer,
+        ILogger<AdoNetQueueAdapterReceiver> logger)
+        : this(providerId, queueId, streamOptions, clusterOptions, cacheOptions, new RelationalStreamMessageQueries(queries), serializer, logger)
+    {
+    }
 
     /// <summary>
     /// This receiver does not require initialization.
@@ -28,58 +66,61 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
     /// </summary>
     public async Task Shutdown(TimeSpan timeout)
     {
-        // disable any further attempts to access storage
-        _shutdown = true;
+        Task? operationsCompleted;
+        lock (_lock)
+        {
+            _shutdown = true;
+            operationsCompleted = _operationsCompleted?.Task;
+        }
 
-        // wait for any outstanding storage operation to complete.
-        var outstandingTask = _outstandingTask;
-        if (outstandingTask is not null)
+        if (operationsCompleted is not null)
         {
             try
             {
-                await outstandingTask.WaitAsync(timeout);
+                await operationsCompleted.WaitAsync(timeout);
             }
             catch (Exception ex)
             {
                 LogShutdownFault(ex, clusterOptions.ServiceId, providerId, queueId);
+                return;
             }
         }
 
-        RemoveExpiredPendingMessages();
-        if (_outstandingTask is not null || _pendingMessages.Count == 0)
+        List<AdoNetStreamConfirmation> pending;
+        lock (_lock)
         {
-            return;
-        }
+            RemoveExpiredPendingMessages();
+            if (_pendingMessages.Count == 0)
+            {
+                return;
+            }
 
-        var pending = _pendingMessages
-            .Select(static item => new AdoNetStreamConfirmation(item.Key, item.Value.Dequeued))
-            .ToList();
+            pending = _pendingMessages
+                .Select(static item => new AdoNetStreamConfirmation(item.Key, item.Value.Dequeued))
+                .ToList();
+        }
 
         try
         {
-            var task = queries.ReleaseStreamMessagesAsync(clusterOptions.ServiceId, providerId, queueId, pending);
-            _outstandingTask = task;
-            var released = await task.WaitAsync(timeout);
-            foreach (var message in released)
+            var released = await queries.ReleaseStreamMessagesAsync(clusterOptions.ServiceId, providerId, queueId, pending).WaitAsync(timeout);
+            lock (_lock)
             {
-                _pendingMessages.Remove(message.MessageId);
+                foreach (var message in released)
+                {
+                    _pendingMessages.Remove(message.MessageId);
+                }
             }
         }
         catch (Exception ex)
         {
             LogReleaseFailed(ex, clusterOptions.ServiceId, providerId, queueId, pending);
         }
-        finally
-        {
-            _outstandingTask = null;
-        }
     }
 
     /// <inheritdoc />
     public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
     {
-        // if shutdown has been called then we refuse further requests gracefully
-        if (_shutdown)
+        if (!TryBeginOperation())
         {
             return [];
         }
@@ -89,8 +130,7 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
 
         try
         {
-            // grab a message batch from storage while pinning the task so shutdown can wait for it
-            var task = queries.GetStreamMessagesAsync(
+            var messages = await queries.GetStreamMessagesAsync(
                 clusterOptions.ServiceId,
                 providerId,
                 queueId,
@@ -101,13 +141,13 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
                 streamOptions.EvictionInterval.TotalSecondsCeiling(),
                 streamOptions.EvictionBatchSize);
 
-            _outstandingTask = task;
-
-            var messages = await task;
-            RemoveExpiredPendingMessages();
-            foreach (var message in messages)
+            lock (_lock)
             {
-                _pendingMessages[message.MessageId] = new(message.Dequeued, message.ExpiresOn);
+                RemoveExpiredPendingMessages();
+                foreach (var message in messages)
+                {
+                    _pendingMessages[message.MessageId] = new(message.Dequeued, message.ExpiresOn);
+                }
             }
 
             // convert the messages into standard batch containers
@@ -120,7 +160,7 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
         }
         finally
         {
-            _outstandingTask = null;
+            EndOperation();
         }
     }
 
@@ -133,39 +173,76 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
             return;
         }
 
+        if (!TryBeginOperation())
+        {
+            return;
+        }
+
         // get the identifiers for the messages to confirm
         var items = messages.Cast<AdoNetBatchContainer>().Select(x => new AdoNetStreamConfirmation(x.SequenceToken.SequenceNumber, x.Dequeued)).ToList();
 
         try
         {
-            // execute the confirmation while pinning the task so shutdown can wait for it
-            var task = queries.ConfirmStreamMessagesAsync(clusterOptions.ServiceId, providerId, queueId, items);
-            _outstandingTask = task;
-
             try
             {
-                var confirmed = await task;
+                var confirmed = await queries.ConfirmStreamMessagesAsync(clusterOptions.ServiceId, providerId, queueId, items);
                 var receipts = items.ToDictionary(static item => item.MessageId, static item => item.Dequeued);
-                foreach (var message in confirmed)
+                lock (_lock)
                 {
-                    if (receipts.TryGetValue(message.MessageId, out var receipt)
-                        && _pendingMessages.TryGetValue(message.MessageId, out var pending)
-                        && receipt == pending.Dequeued)
+                    foreach (var message in confirmed)
                     {
-                        _pendingMessages.Remove(message.MessageId);
+                        if (receipts.TryGetValue(message.MessageId, out var receipt)
+                            && _pendingMessages.TryGetValue(message.MessageId, out var pending)
+                            && receipt == pending.Dequeued)
+                        {
+                            _pendingMessages.Remove(message.MessageId);
+                        }
                     }
                 }
             }
             catch (Exception ex)
             {
-                LogConfirmationFailed(ex, clusterOptions.ClusterId, providerId, queueId, items);
+                LogConfirmationFailed(ex, clusterOptions.ServiceId, providerId, queueId, items);
                 throw;
             }
         }
         finally
         {
-            _outstandingTask = null;
+            EndOperation();
         }
+    }
+
+    private bool TryBeginOperation()
+    {
+        lock (_lock)
+        {
+            if (_shutdown)
+            {
+                return false;
+            }
+
+            if (_activeOperations++ == 0)
+            {
+                _operationsCompleted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+
+            return true;
+        }
+    }
+
+    private void EndOperation()
+    {
+        TaskCompletionSource? operationsCompleted = null;
+        lock (_lock)
+        {
+            if (--_activeOperations == 0)
+            {
+                operationsCompleted = _operationsCompleted;
+                _operationsCompleted = null;
+            }
+        }
+
+        operationsCompleted?.TrySetResult();
     }
 
     private void RemoveExpiredPendingMessages()
@@ -182,6 +259,35 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
     }
 
     private readonly record struct PendingMessage(int Dequeued, DateTime ExpiresOn);
+
+    private sealed class RelationalStreamMessageQueries(RelationalOrleansQueries queries) : IStreamMessageQueries
+    {
+        public Task<IList<AdoNetStreamMessage>> GetStreamMessagesAsync(
+            string serviceId,
+            string providerId,
+            string queueId,
+            int maxCount,
+            int maxAttempts,
+            int visibilityTimeout,
+            int removalTimeout,
+            int evictionInterval,
+            int evictionBatchSize) =>
+            queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
+
+        public Task<IList<AdoNetStreamConfirmationAck>> ConfirmStreamMessagesAsync(
+            string serviceId,
+            string providerId,
+            string queueId,
+            IList<AdoNetStreamConfirmation> messages) =>
+            queries.ConfirmStreamMessagesAsync(serviceId, providerId, queueId, messages);
+
+        public Task<IList<AdoNetStreamConfirmationAck>> ReleaseStreamMessagesAsync(
+            string serviceId,
+            string providerId,
+            string queueId,
+            IList<AdoNetStreamConfirmation> messages) =>
+            queries.ReleaseStreamMessagesAsync(serviceId, providerId, queueId, messages);
+    }
 
     #region Logging
 
