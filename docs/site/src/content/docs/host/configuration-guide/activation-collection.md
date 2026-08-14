@@ -70,7 +70,7 @@ To explicitly request deactivation of a grain from outside it, cast its referenc
 
 This is a request, not a wait-for-deactivation call. The method returns immediately after scheduling deactivation for the current activation of that grain identity; queued calls are forwarded to a new or existing activation. If there is no current activation, the next call can reactivate the grain.
 
-For tests which use <xref:Orleans.TestingHost.TestCluster> or <xref:Orleans.TestingHost.InProcessTestCluster>, use <xref:Orleans.TestingHost.TestCluster.DeactivateAsync*> or <xref:Orleans.TestingHost.InProcessTestCluster.DeactivateAsync*> instead. These helpers request deactivation through the same mechanism and wait for actual deactivation to finish.
+For tests that need a deterministic shutdown check, use <xref:Orleans.TestingHost.TestCluster.DeactivateAsync*> or <xref:Orleans.TestingHost.InProcessTestCluster.DeactivateAsync*>. These helpers are convenience wrappers around the external management request: they trigger the same deactivation request and then wait until the current activation has actually finished deactivating. That wait makes them useful in tests that need to assert the activation is fully gone before continuing.
 
 The <xref:Orleans.Grain.DeactivateOnIdle*> method is also available inside grain code when the grain itself decides that its current activation should end:
 
