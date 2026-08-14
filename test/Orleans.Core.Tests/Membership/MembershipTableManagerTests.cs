@@ -483,6 +483,57 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
+        public async Task MembershipTableManager_DeadTransitionOutsideShutdown_Terminates()
+        {
+            var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
+            var manager = this.CreateMembershipTableManager(membershipTable);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            await this.lifecycle.OnStart();
+            await manager.UpdateStatus(SiloStatus.Joining);
+
+            await manager.UpdateStatus(SiloStatus.Dead);
+
+            Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
+            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+            await this.lifecycle.OnStop();
+        }
+
+        [Fact]
+        public async Task MembershipTableManager_DeadTransitionDuringLaterStopStage_DoesNotTerminate()
+        {
+            var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
+            var manager = this.CreateMembershipTableManager(membershipTable);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            this.lifecycle.Subscribe(
+                "CustomLaterStage",
+                ServiceLifecycleStage.Active + 1,
+                _ => Task.CompletedTask,
+                _ => manager.UpdateStatus(SiloStatus.Dead));
+            await this.lifecycle.OnStart();
+            await manager.UpdateStatus(SiloStatus.Joining);
+
+            await this.lifecycle.OnStop();
+
+            Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+        }
+
+        [Fact]
+        public async Task MembershipTableManager_StopBeforeStart_DoesNotMarkLifecycleStopping()
+        {
+            var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
+            var manager = this.CreateMembershipTableManager(membershipTable);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+
+            await this.lifecycle.OnStop();
+            await this.lifecycle.OnStart();
+            await manager.UpdateStatus(SiloStatus.Dead);
+
+            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+            await this.lifecycle.OnStop();
+        }
+
+        [Fact]
         public async Task MembershipTableManager_MissingLocalEntry_OnlyNewerSnapshotAfterJoiningTerminates()
         {
             var now = DateTimeOffset.UtcNow;
@@ -531,7 +582,7 @@ namespace NonSilo.Tests.Membership
 
             await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(125)));
             await manager.UpdateStatus(SiloStatus.Joining);
-            Assert.Equal(SiloStatus.Joining, manager.CurrentStatus);
+            Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
             Assert.DoesNotContain(this.localSilo, manager.MembershipTableSnapshot.Entries.Keys);
 
             await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(126)));

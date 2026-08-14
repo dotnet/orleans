@@ -19,12 +19,16 @@ namespace Orleans.Runtime
         private readonly SiloAddress? _siloAddress;
         private int highestCompletedStage;
         private int lowestStoppedStage;
+        private int _isStarted;
+        private int _isStopping;
 
         /// <inheritdoc />
         public int HighestCompletedStage => this.highestCompletedStage;
 
         /// <inheritdoc />
         public int LowestStoppedStage => this.lowestStoppedStage;
+
+        internal bool IsStopping => Volatile.Read(ref _isStopping) != 0;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SiloLifecycleSubject"/> class.
@@ -51,12 +55,24 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public override Task OnStart(CancellationToken cancellationToken = default)
         {
+            Volatile.Write(ref _isStarted, 1);
             foreach (var stage in this.observers.GroupBy(o => o.Stage).OrderBy(s => s.Key))
             {
                 LogDebugLifecycleStagesReport(stage.Key, string.Join(", ", stage.Select(o => o.Name)));
             }
 
             return base.OnStart(cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public override Task OnStop(CancellationToken cancellationToken = default)
+        {
+            if (Volatile.Read(ref _isStarted) != 0)
+            {
+                Volatile.Write(ref _isStopping, 1);
+            }
+
+            return base.OnStop(cancellationToken);
         }
 
         /// <inheritdoc />
