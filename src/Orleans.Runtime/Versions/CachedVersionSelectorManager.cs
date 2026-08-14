@@ -49,6 +49,7 @@ namespace Orleans.Runtime.Versions
         public CachedEntry GetSuitableSilos(GrainType grainType, GrainInterfaceType interfaceId, ushort requestedVersion)
         {
             var key = ValueTuple.Create(grainType, interfaceId, requestedVersion);
+            var spinner = new SpinWait();
             while (true)
             {
                 CacheState state;
@@ -74,11 +75,14 @@ namespace Orleans.Runtime.Versions
                         return suitableSilosCache[key] = entry;
                     }
                 }
+
+                spinner.SpinOnce();
             }
         }
 
         public SiloAddress[] GetSupportedSilos(GrainType grainType)
         {
+            var spinner = new SpinWait();
             while (true)
             {
                 CacheState state;
@@ -98,6 +102,8 @@ namespace Orleans.Runtime.Versions
                         return result;
                     }
                 }
+
+                spinner.SpinOnce();
             }
         }
 
@@ -106,6 +112,7 @@ namespace Orleans.Runtime.Versions
             lock (this.cacheLock)
             {
                 ++this.cacheGeneration;
+                this.suitableSilosCache.Clear();
             }
 
             CacheInvalidated?.Invoke();

@@ -227,6 +227,46 @@ public class ClusterManifestProviderTests
             selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1).SuitableSilos.OrderBy(static silo => silo));
     }
 
+    [Fact]
+    public async Task CachedVersionSelectorManager_RetriesUntilMembershipAndManifestVersionsConverge()
+    {
+        var localSilo = CreateSiloAddress(11111, 1);
+        var remoteSilo = CreateSiloAddress(11112, 1);
+        var clusterManifestProvider = new TestClusterManifestProvider(CreateClusterManifest(1, 0, localSilo));
+        using var membership = new TestClusterMembershipService(CreateMembershipSnapshot(
+            2,
+            (localSilo, SiloStatus.Active),
+            (remoteSilo, SiloStatus.Active)));
+        var selectorManager = CreateCachedVersionSelectorManager(
+            new GrainVersionManifest(clusterManifestProvider),
+            membership);
+
+        var suitableSilosRead = membership.ObserveNextSnapshotRead();
+        var suitableSilosTask = Task.Run(
+            () => selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1));
+        await suitableSilosRead.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(suitableSilosTask.IsCompleted);
+
+        clusterManifestProvider.Current = CreateClusterManifest(2, 0, remoteSilo);
+
+        var suitableSilos = await suitableSilosTask.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(new[] { remoteSilo }, suitableSilos.SuitableSilos);
+
+        membership.Update(CreateMembershipSnapshot(
+            3,
+            (localSilo, SiloStatus.Active),
+            (remoteSilo, SiloStatus.Active)));
+        var supportedSilosRead = membership.ObserveNextSnapshotRead();
+        var supportedSilosTask = Task.Run(() => selectorManager.GetSupportedSilos(TestGrainType));
+        await supportedSilosRead.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(supportedSilosTask.IsCompleted);
+
+        clusterManifestProvider.Current = CreateClusterManifest(3, 0, localSilo, remoteSilo);
+
+        var supportedSilos = await supportedSilosTask.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(new[] { localSilo, remoteSilo }, supportedSilos.OrderBy(static silo => silo));
+    }
+
     private static ClusterManifestProvider CreateClusterManifestProvider(
         SiloAddress localSilo,
         TestClusterMembershipService membership,
@@ -438,20 +478,36 @@ public class ClusterManifestProviderTests
     private sealed class TestClusterMembershipService : IClusterMembershipService, IDisposable
     {
         private readonly AsyncEnumerable<ClusterMembershipSnapshot> _updates;
+        private ClusterMembershipSnapshot _currentSnapshot = ClusterMembershipSnapshot.Default;
+        private TaskCompletionSource? _nextSnapshotRead;
 
         public TestClusterMembershipService(ClusterMembershipSnapshot initialSnapshot)
         {
             _updates = new AsyncEnumerable<ClusterMembershipSnapshot>(
                 initialValue: initialSnapshot,
                 updateValidator: (previous, proposed) => proposed.Version > previous.Version,
-                onPublished: update => CurrentSnapshot = update);
+                onPublished: update => Volatile.Write(ref _currentSnapshot, update));
         }
 
-        public ClusterMembershipSnapshot CurrentSnapshot { get; private set; } = ClusterMembershipSnapshot.Default;
+        public ClusterMembershipSnapshot CurrentSnapshot
+        {
+            get
+            {
+                Volatile.Read(ref _nextSnapshotRead)?.TrySetResult();
+                return Volatile.Read(ref _currentSnapshot);
+            }
+        }
 
         public IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates => _updates;
 
         public void Update(ClusterMembershipSnapshot snapshot) => _updates.Publish(snapshot);
+
+        public Task ObserveNextSnapshotRead()
+        {
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            Interlocked.Exchange(ref _nextSnapshotRead, completion);
+            return completion.Task;
+        }
 
         public ValueTask Refresh(MembershipVersion minimumVersion = default, CancellationToken cancellationToken = default) => default;
 
