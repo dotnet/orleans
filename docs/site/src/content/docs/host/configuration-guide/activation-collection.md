@@ -64,13 +64,18 @@ For example, assume a 10-minute collection age and ignore scan latency:
 
 ## How to deactivate a specific grain identity
 
-To explicitly request deactivation of a grain from outside it, cast its reference to <xref:Orleans.Core.Internal.IGrainManagementExtension> and call <xref:Orleans.Core.Internal.IGrainManagementExtension.DeactivateOnIdle*>:
+For internal or test code that needs to target a specific grain identity from outside the grain, cast the reference to <xref:Orleans.Core.Internal.IGrainManagementExtension> and call <xref:Orleans.Core.Internal.IGrainManagementExtension.DeactivateOnIdle*>:
 
 :::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="deactivate_grain_externally":::
 
-This is a request, not a wait-for-deactivation call. The method returns immediately after scheduling deactivation for the current activation of that grain identity; queued calls are forwarded to a new or existing activation. If there is no current activation, the next call can reactivate the grain.
+This is a request, not a wait-for-deactivation call. The method returns immediately after requesting deactivation for that grain identity; queued calls are forwarded to a new or existing activation. If there is no current activation, a later call can reactivate the grain.
 
-For tests that need a deterministic shutdown check, use <xref:Orleans.TestingHost.TestCluster.DeactivateAsync*> or <xref:Orleans.TestingHost.InProcessTestCluster.DeactivateAsync*>. These helpers are convenience wrappers around the external management request: they trigger the same deactivation request and then wait until the current activation has actually finished deactivating. That wait makes them useful in tests that need to assert the activation is fully gone before continuing.
+The test-host helpers are convenience APIs for test assertions:
+
+- <xref:Orleans.TestingHost.TestCluster.DeactivateAsync*> sends the external management-extension request and then waits for the server to finish deactivating the current activation.
+- <xref:Orleans.TestingHost.InProcessTestCluster.DeactivateAsync*> directly deactivates the current grain context and waits for that deactivation to complete.
+
+These helpers are useful because they make deactivation deterministic in tests, but they are not a separate public runtime feature.
 
 The <xref:Orleans.Grain.DeactivateOnIdle*> method is also available inside grain code when the grain itself decides that its current activation should end:
 
