@@ -428,6 +428,11 @@ namespace Orleans.Runtime.MembershipService
 
             if (ok)
             {
+                if (myEntry.Status == SiloStatus.Dead)
+                {
+                    Interlocked.Exchange(ref _selfTerminationTriggered, 1);
+                }
+
                 var entries = table.Members.ToDictionary(e => e.Item1.SiloAddress, e => e);
                 entries[myEntry.SiloAddress] = Tuple.Create(myEntry, myEtag!);
                 var updatedTable = new MembershipTableData(entries.Values.ToList(), next);
@@ -599,8 +604,8 @@ namespace Orleans.Runtime.MembershipService
                 {
                     // I am the older clone - Newer version of me should survive - I need to kill myself
                     LogWarningDetectedNewer(this.log, myAddress, siloAddress, entry.ToString());
-                    await this.UpdateStatus(SiloStatus.Dead);
                     KillMyselfLocally($"Detected newer version of myself - I am the older clone so I will stop -- Current Me={myAddress} Newer Me={siloAddress}, Current entry={entry}");
+                    await this.UpdateStatus(SiloStatus.Dead);
                     return true; // No point continuing!
                 }
             }

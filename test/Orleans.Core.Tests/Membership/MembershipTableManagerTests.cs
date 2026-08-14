@@ -483,6 +483,22 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
+        public async Task MembershipTableManager_IntentionalDeadTransition_DoesNotSelfTerminate()
+        {
+            var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
+            var manager = this.CreateMembershipTableManager(membershipTable);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            await this.lifecycle.OnStart();
+            await manager.UpdateStatus(SiloStatus.Joining);
+
+            await manager.UpdateStatus(SiloStatus.Dead);
+
+            Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            await this.lifecycle.OnStop();
+        }
+
+        [Fact]
         public async Task MembershipTableManager_MissingLocalEntry_OnlyNewerSnapshotAfterJoiningTerminates()
         {
             var now = DateTimeOffset.UtcNow;
