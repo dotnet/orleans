@@ -29,11 +29,11 @@ Prefer type-specific changes over a cluster-wide increase. Longer ages trade mem
 
 ### Expedite activation collection
 
-Call <xref:Orleans.Grain.DeactivateOnIdle*> when the current activation should deactivate after its current turn:
+Call <xref:Orleans.Grain.DeactivateOnIdle*> when the current activation should request deactivation after its current turn:
 
 :::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="deactivate_on_idle":::
 
-Queued calls are forwarded to a new or existing activation.
+This instance method is only called from inside the grain implementation. It requests deactivation; it does not wait for the activation to stop. Queued calls are forwarded to a new or existing activation.
 
 ### Delay activation collection
 
@@ -61,6 +61,39 @@ For example, assume a 10-minute collection age and ignore scan latency:
 | Call `DelayDeactivation` with 5 minutes at minute 0, then receive an ordinary grain call at minute 7. | No earlier than minute 17, after the new 10-minute idle period. |
 
 <xref:Orleans.Grain.DeactivateOnIdle*> takes priority over a delay. Delaying deactivation is an optimization, not a durability or placement guarantee. It doesn't pin an activation to a silo, and failures, shutdown, migration, explicit deactivation, and memory pressure can still remove the activation.
+
+### How to deactivate a specific grain identity
+
+Code that needs to target a specific grain identity from outside the grain can cast the reference to the public <xref:Orleans.Core.Internal.IGrainManagementExtension> extension and call <xref:Orleans.Core.Internal.IGrainManagementExtension.DeactivateOnIdle*>:
+
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="deactivate_grain_externally":::
+
+This is a request, not a wait-for-deactivation call. The method returns immediately after requesting deactivation for that grain identity; queued calls are forwarded to a new or existing activation. If there is no current activation, a later call can reactivate the grain.
+
+The test-host helpers are convenience APIs for tests:
+
+- <xref:Orleans.TestingHost.TestCluster.DeactivateAsync*> uses the public management extension and then waits for the server to finish deactivating the current activation.
+- <xref:Orleans.TestingHost.InProcessTestCluster.DeactivateAsync*> directly deactivates the current grain context and waits for that deactivation to complete.
+
+These helpers are valuable because they make deactivation deterministic in tests, but they are not a different runtime capability.
+
+The <xref:Orleans.Grain.DeactivateOnIdle*> method is also available inside grain code when the grain itself decides that its current activation should end:
+
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="explicit_deactivate_grain":::
+
+Use explicit deactivation only when there is a domain or operational reason to end an activation (for example, after completing a one-off workflow or releasing costly in-memory resources). Don't use it for ordinary lifecycle management; idle collection is the default and preferred behavior.
+
+### What "idle" means for collection
+
+An activation is idle when it hasn't processed inbound work during the configured idle window. Inbound grain calls, reminders, and stream events reset idleness. Outbound calls and arbitrary local work don't. Timer callbacks reset idleness only when the timer is created with <xref:Orleans.Runtime.GrainTimerCreationOptions.KeepAlive>.
+
+`DeactivateOnIdle` requests deactivation when the current turn ends; queued calls are forwarded to a new or existing activation. A later call to the same grain identity can reactivate it on any compatible silo.
+
+### Cautions
+
+- Treat deactivation as best effort cleanup. It can be skipped by abrupt process termination and some failure paths.
+- Persist important state as part of normal operations, not only in <xref:Orleans.Grain.OnDeactivateAsync*>.
+- Don't use explicit deactivation as a substitute for memory-pressure tuning. Use collection settings and scaling based on measurements.
 
 ### Keep alive
 
