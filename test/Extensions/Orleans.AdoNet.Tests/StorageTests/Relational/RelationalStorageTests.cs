@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
+using Orleans.Persistence.TestKit;
 using UnitTests.StorageTests.Relational.TestDataSets;
 using Xunit;
 
@@ -85,6 +86,13 @@ namespace UnitTests.StorageTests.Relational
         {
             ((AdoNetGrainStorage)PersistenceStorageTests.Storage).Serializer = GetOrleansGrainStorageSerializer();
             return PersistenceStorageTests.Store_WriteRead(grainType, grainId, grainState);
+        }
+
+        internal Task Relational_ModelBasedGeneratedConformance(string providerName)
+        {
+            var runner = new GrainStorageModelBasedTestRunner(PersistenceStorageTests.Storage, providerName);
+
+            return runner.RunGeneratedConformanceTests();
         }
 
         private JsonGrainStorageSerializer GetJsonGrainStorageSerializer()

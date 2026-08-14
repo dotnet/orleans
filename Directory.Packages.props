@@ -38,6 +38,7 @@
     <PackageVersion Include="Hyperion" Version="0.12.2" />
     <PackageVersion Include="KubernetesClient" Version="18.0.13" />
     <PackageVersion Include="MessagePack" Version="3.1.7" />
+    <PackageVersion Include="Microsoft.Accordant" Version="0.1.6" />
     <PackageVersion Include="Microsoft.AspNetCore.Connections.Abstractions" Version="8.0.24" />
     <PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.57.0" />
     <PackageVersion Include="Microsoft.Build" Version="17.10.4" />
@@ -170,6 +171,19 @@
     <PackageVersion Update="System.Drawing.Common" Version="10.0.3" />
     <PackageVersion Update="System.IO.Pipelines" Version="10.0.5" />
     <PackageVersion Update="System.Memory.Data" Version="10.0.3" />
+    <PackageVersion Update="System.Text.Json" Version="10.0.5" />
+  </ItemGroup>
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net8.0' and (
+      '$(MSBuildProjectName)' == 'Orleans.Persistence.TestKit' or
+      '$(MSBuildProjectName)' == 'Orleans.Persistence.TestKit.Tests' or
+      '$(MSBuildProjectName)' == 'Orleans.AWS.Tests' or
+      '$(MSBuildProjectName)' == 'Orleans.AdoNet.Tests' or
+      '$(MSBuildProjectName)' == 'Orleans.Azure.Tests' or
+      '$(MSBuildProjectName)' == 'Orleans.Cosmos.Tests' or
+      '$(MSBuildProjectName)' == 'Orleans.Persistence.Firestore.Tests' or
+      '$(MSBuildProjectName)' == 'Orleans.Redis.Tests') ">
+    <PackageVersion Update="System.Collections.Immutable" Version="10.0.0" />
+    <PackageVersion Update="System.IO.Pipelines" Version="10.0.5" />
     <PackageVersion Update="System.Text.Json" Version="10.0.5" />
   </ItemGroup>
 </Project>

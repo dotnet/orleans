@@ -56,6 +56,13 @@ namespace UnitTests.StorageTests.Relational
         }
 
         [SkippableFact]
+        [TestCategory("Functional"), TestCategory("ModelBased")]
+        public async Task GrainStorage_ModelBasedGeneratedConformance()
+        {
+            await Relational_ModelBasedGeneratedConformance("MySql");
+        }
+
+        [SkippableFact]
         [TestCategory("Functional")]
         public async Task WriteReadCyrillic()
         {

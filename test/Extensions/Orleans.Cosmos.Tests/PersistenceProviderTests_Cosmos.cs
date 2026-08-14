@@ -10,6 +10,7 @@ using Orleans.Providers;
 using Orleans.Configuration;
 using Orleans.Persistence.Cosmos;
 using UnitTests.Persistence;
+using Orleans.Persistence.TestKit;
 using Microsoft.Extensions.Options;
 
 namespace Tester.Cosmos.Persistence;
@@ -47,11 +48,12 @@ public class PersistenceProviderTests_Cosmos
         _serviceId = Guid.NewGuid().ToString("N");
     }
 
-    private async Task<CosmosGrainStorage> InitializeStorage()
+    private async Task<CosmosGrainStorage> InitializeStorage(bool deleteStateOnClear = false)
     {
         var options = new CosmosGrainStorageOptions();
 
         options.ConfigureTestDefaults();
+        options.DeleteStateOnClear = deleteStateOnClear;
 
         var clusterOptions = Options.Create(new ClusterOptions { ClusterId = _clusterId, ServiceId = _serviceId });
         var idProvider = new DefaultDocumentIdProvider(clusterOptions);
@@ -61,6 +63,24 @@ public class PersistenceProviderTests_Cosmos
         store.Participate(lifecycle);
         await lifecycle.OnStart();
         return store;
+    }
+
+    [SkippableFact, TestCategory("Functional"), TestCategory("ModelBased")]
+    public async Task CosmosStorage_ModelBasedGeneratedConformance()
+    {
+        var storage = await InitializeStorage(deleteStateOnClear: false);
+        var runner = new GrainStorageModelBasedTestRunner(storage, "Cosmos", output.WriteLine);
+
+        await runner.RunGeneratedConformanceTests();
+    }
+
+    [SkippableFact, TestCategory("Functional"), TestCategory("ModelBased")]
+    public async Task CosmosStorage_DeleteStateOnClear_ModelBasedGeneratedConformance()
+    {
+        var storage = await InitializeStorage(deleteStateOnClear: true);
+        var runner = new GrainStorageModelBasedTestRunner(storage, "CosmosDeleteStateOnClear", output.WriteLine);
+
+        await runner.RunGeneratedConformanceTests();
     }
 
     [SkippableFact, TestCategory("Functional")]

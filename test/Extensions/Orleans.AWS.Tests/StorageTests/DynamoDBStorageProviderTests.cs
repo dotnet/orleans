@@ -9,6 +9,7 @@ using Orleans.Serialization;
 using Orleans.Storage;
 using TestExtensions;
 using UnitTests.Persistence;
+using Orleans.Persistence.TestKit;
 using Xunit;
 using Xunit.Abstractions;
 using static Orleans.Storage.DynamoDBGrainStorage;
@@ -169,6 +170,34 @@ namespace AWSUtils.Tests.StorageTests
             Assert.Equal(initialState.C, convertedState.C);
         }
 
+        [SkippableFact, TestCategory("Functional"), TestCategory("ModelBased")]
+        public async Task DynamoDBStorage_ModelBasedGeneratedConformance()
+        {
+            if (!AWSTestConstants.IsDynamoDbAvailable)
+            {
+                throw new SkipException("Unable to connect to AWS DynamoDB simulator");
+            }
+
+            var storage = await InitDynamoDBGrainStorage();
+            var runner = new GrainStorageModelBasedTestRunner(storage, "DynamoDB", output.WriteLine);
+
+            await runner.RunGeneratedConformanceTests();
+        }
+
+        [SkippableFact, TestCategory("Functional"), TestCategory("ModelBased")]
+        public async Task DynamoDBStorage_DeleteStateOnClear_ModelBasedGeneratedConformance()
+        {
+            if (!AWSTestConstants.IsDynamoDbAvailable)
+            {
+                throw new SkipException("Unable to connect to AWS DynamoDB simulator");
+            }
+
+            var storage = await InitDynamoDBGrainStorage(deleteStateOnClear: true);
+            var runner = new GrainStorageModelBasedTestRunner(storage, "DynamoDBDeleteStateOnClear", output.WriteLine);
+
+            await runner.RunGeneratedConformanceTests();
+        }
+
         private async Task<DynamoDBGrainStorage> InitDynamoDBGrainStorage(DynamoDBStorageOptions options)
         {
             DynamoDBGrainStorage store = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(this.providerRuntime.ServiceProvider, "StorageProviderTests", options);
@@ -178,11 +207,12 @@ namespace AWSUtils.Tests.StorageTests
             return store;
         }
 
-        private Task<DynamoDBGrainStorage> InitDynamoDBGrainStorage(bool useJson = false, bool useFallback = true)
+        private Task<DynamoDBGrainStorage> InitDynamoDBGrainStorage(bool useJson = false, bool useFallback = true, bool deleteStateOnClear = false)
         {
             var options = new DynamoDBStorageOptions
             {
                 Service = AWSTestConstants.DynamoDbService,
+                DeleteStateOnClear = deleteStateOnClear,
             };
 
             var jsonOptions = this.providerRuntime.ServiceProvider.GetService<IOptions<OrleansJsonSerializerOptions>>()!;

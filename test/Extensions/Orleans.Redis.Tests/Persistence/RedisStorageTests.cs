@@ -1,4 +1,6 @@
+using Orleans.Storage;
 using TestExtensions;
+using Orleans.Persistence.TestKit;
 using UnitTests.StorageTests.Relational;
 using UnitTests.StorageTests.Relational.TestDataSets;
 using Xunit;
@@ -18,12 +20,16 @@ namespace Tester.Redis.Persistence
     {
         private readonly CommonFixture fixture;
         private readonly CommonStorageTests commonStorageTests;
+        private readonly ITestOutputHelper output;
+        private readonly IGrainStorage storageProvider;
     
         public RedisStorageTests(ITestOutputHelper output, CommonFixture commonFixture) 
         {
             TestUtils.CheckForRedis();
             this.fixture = commonFixture;
-            this.commonStorageTests = new CommonStorageTests(commonFixture.CreateRedisGrainStorage(false).GetAwaiter().GetResult());      
+            this.output = output;
+            this.storageProvider = commonFixture.CreateRedisGrainStorage(false).GetAwaiter().GetResult();
+            this.commonStorageTests = new CommonStorageTests(storageProvider);
         }
 
         [SkippableFact]
@@ -132,6 +138,13 @@ namespace Tester.Redis.Persistence
         {
             var exception = await commonStorageTests.PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException();
             CommonStorageUtilities.AssertRelationalInconsistentExceptionMessage(exception.Message);
+        }
+
+        [SkippableFact, TestCategory("Functional"), TestCategory("ModelBased")]
+        public async Task GrainStorage_ModelBasedGeneratedConformance()
+        {
+            var runner = new GrainStorageModelBasedTestRunner(storageProvider, "Redis", output.WriteLine);
+            await runner.RunGeneratedConformanceTests();
         }
     }
 }

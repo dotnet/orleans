@@ -62,6 +62,13 @@ namespace UnitTests.StorageTests.Relational
             await Relational_WriteInconsistentFailsWithIncosistentStateException();
         }
 
+        [SkippableFact]
+        [TestCategory("Functional"), TestCategory("ModelBased")]
+        public async Task GrainStorage_ModelBasedGeneratedConformance()
+        {
+            await Relational_ModelBasedGeneratedConformance("SqlServer");
+        }
+
         [SkippableTheory, ClassData(typeof(StorageDataSetPlain<long>))]
         [TestCategory("Functional")]
         internal async Task StorageDataSetPlain_IntegerKey_WriteClearRead(int testNum)

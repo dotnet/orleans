@@ -15,6 +15,7 @@ using Orleans.Storage;
 using Samples.StorageProviders;
 using TestExtensions;
 using UnitTests.Persistence;
+using Orleans.Persistence.TestKit;
 using UnitTests.StorageTests;
 using Xunit;
 using Xunit.Abstractions;
@@ -80,6 +81,32 @@ namespace Tester.AzureUtils.Persistence
 
             AzureTableGrainStorage store = await InitAzureTableGrainStorage();
             await Test_PersistenceProvider_Read(testName, store);
+        }
+
+        [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("ModelBased")]
+        [TestSuite("Functional")]
+        [TestProvider("AzureStorage")]
+        [TestArea("Persistence")]
+        public async Task AzureTableStorage_ModelBasedGeneratedConformance()
+        {
+            TestUtils.CheckForAzureStorage();
+            var storage = await InitAzureTableGrainStorage(deleteStateOnClear: false);
+            var runner = new GrainStorageModelBasedTestRunner(storage, "AzureTable", output.WriteLine);
+
+            await runner.RunGeneratedConformanceTests();
+        }
+
+        [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("ModelBased")]
+        [TestSuite("Functional")]
+        [TestProvider("AzureStorage")]
+        [TestArea("Persistence")]
+        public async Task AzureTableStorage_DeleteStateOnClear_ModelBasedGeneratedConformance()
+        {
+            TestUtils.CheckForAzureStorage();
+            var storage = await InitAzureTableGrainStorage(deleteStateOnClear: true);
+            var runner = new GrainStorageModelBasedTestRunner(storage, "AzureTableDeleteStateOnClear", output.WriteLine);
+
+            await runner.RunGeneratedConformanceTests();
         }
 
         [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
@@ -335,7 +362,7 @@ namespace Tester.AzureUtils.Persistence
             Assert.True(typeof(IGrainStorage).IsAssignableFrom(classType), $"Is an IStorageProvider : {classType.FullName}");
         }
 
-        private async Task<AzureTableGrainStorage> InitAzureTableGrainStorage(bool useJson = false, bool useFallback = true, bool useStringFormat = false, TypeNameHandling? typeNameHandling = null)
+        private async Task<AzureTableGrainStorage> InitAzureTableGrainStorage(bool useJson = false, bool useFallback = true, bool useStringFormat = false, TypeNameHandling? typeNameHandling = null, bool deleteStateOnClear = false)
         {
             if (useStringFormat && !useJson)
             {
@@ -351,6 +378,7 @@ namespace Tester.AzureUtils.Persistence
 
             options.ConfigureTestDefaults();
             options.UseStringFormat = useStringFormat;
+            options.DeleteStateOnClear = deleteStateOnClear;
 
             // TODO change test to include more serializer?
             var binarySerializer = new OrleansGrainStorageSerializer(this.providerRuntime.ServiceProvider.GetRequiredService<Serializer>());

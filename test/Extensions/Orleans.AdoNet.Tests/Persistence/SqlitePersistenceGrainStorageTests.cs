@@ -3,8 +3,10 @@ using Microsoft.Data.Sqlite;
 using Orleans.Runtime;
 using Orleans.Storage;
 using TestExtensions;
+using Orleans.Persistence.TestKit;
 using UnitTests.StorageTests.Relational;
 using UnitTests.StorageTests.Relational.TestDataSets;
+using TestState1 = UnitTests.StorageTests.Relational.TestDataSets.TestState1;
 using Xunit;
 
 namespace Tester.AdoNet.Persistence
@@ -50,6 +52,14 @@ namespace Tester.AdoNet.Persistence
         {
             var exception = await this.commonStorageTests.PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException();
             CommonStorageUtilities.AssertRelationalInconsistentExceptionMessage(exception.Message);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("ModelBased")]
+        public async Task GrainStorage_ModelBasedGeneratedConformance()
+        {
+            var runner = new GrainStorageModelBasedTestRunner(this.fixture.Storage, "Sqlite");
+
+            await runner.RunGeneratedConformanceTests();
         }
 
         [Fact]
