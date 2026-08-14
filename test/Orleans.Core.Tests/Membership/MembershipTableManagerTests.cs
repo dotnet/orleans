@@ -531,7 +531,7 @@ namespace NonSilo.Tests.Membership
 
             await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(125)));
             await manager.UpdateStatus(SiloStatus.Joining);
-            Assert.Equal(SiloStatus.Joining, manager.CurrentStatus);
+            Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
             Assert.DoesNotContain(this.localSilo, manager.MembershipTableSnapshot.Entries.Keys);
 
             await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(126)));
