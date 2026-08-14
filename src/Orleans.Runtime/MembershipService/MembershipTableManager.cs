@@ -49,6 +49,7 @@ namespace Orleans.Runtime.MembershipService
 
         private MembershipState _state;
         private int _selfTerminationTriggered;
+        private int _fatalTerminationTriggered;
 
         public MembershipTableManager(
             ILocalSiloDetails localSiloDetails,
@@ -598,8 +599,16 @@ namespace Orleans.Runtime.MembershipService
                 {
                     // I am the older clone - Newer version of me should survive - I need to kill myself
                     LogWarningDetectedNewer(this.log, myAddress, siloAddress, entry.ToString());
-                    KillMyselfLocally($"Detected newer version of myself - I am the older clone so I will stop -- Current Me={myAddress} Newer Me={siloAddress}, Current entry={entry}");
-                    await this.UpdateStatus(SiloStatus.Dead);
+                    var reason = $"Detected newer version of myself - I am the older clone so I will stop -- Current Me={myAddress} Newer Me={siloAddress}, Current entry={entry}";
+                    try
+                    {
+                        await this.UpdateStatus(SiloStatus.Dead);
+                    }
+                    finally
+                    {
+                        this.TriggerFatalTermination(reason);
+                    }
+
                     return true; // No point continuing!
                 }
             }
@@ -626,6 +635,16 @@ namespace Orleans.Runtime.MembershipService
         private void KillMyselfLocally(string reason)
         {
             if (Interlocked.Exchange(ref _selfTerminationTriggered, 1) != 0)
+            {
+                return;
+            }
+
+            this.TriggerFatalTermination(reason);
+        }
+
+        private void TriggerFatalTermination(string reason)
+        {
+            if (Interlocked.Exchange(ref _fatalTerminationTriggered, 1) != 0)
             {
                 return;
             }
