@@ -36,7 +36,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly IMembershipTable membershipTableProvider;
         private readonly ILogger log;
-        private readonly ISiloLifecycle siloLifecycle;
+        private readonly SiloLifecycleSubject siloLifecycle;
         private readonly ClusterMembershipOptions clusterMembershipOptions;
         private readonly DateTime siloStartTime = DateTime.UtcNow;
         private readonly SiloAddress myAddress;
@@ -58,7 +58,7 @@ namespace Orleans.Runtime.MembershipService
             IMembershipGossiper gossiper,
             ILogger<MembershipTableManager> log,
             IAsyncTimerFactory timerFactory,
-            ISiloLifecycle siloLifecycle,
+            SiloLifecycleSubject siloLifecycle,
             [FromKeyedServices(TimeProviderNames.Membership)] TimeProvider timeProvider)
         {
             this.localSiloDetails = localSiloDetails;
@@ -107,7 +107,7 @@ namespace Orleans.Runtime.MembershipService
         Task IMembershipManager.ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) => this.RefreshFromSnapshot(snapshot);
         Task IMembershipManager.UpdateIAmAlive(CancellationToken cancellationToken) => this.UpdateIAmAlive();
 
-        private bool IsStopping => this.siloLifecycle.LowestStoppedStage <= ServiceLifecycleStage.Active;
+        private bool IsStopping => this.siloLifecycle.IsStopping;
 
         private Task? pendingRefresh;
 
