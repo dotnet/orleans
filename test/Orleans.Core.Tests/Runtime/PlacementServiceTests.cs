@@ -17,6 +17,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Placement.Filtering;
+using Orleans.Runtime.Utilities;
 using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Runtime.Versions.Selector;
@@ -518,23 +519,29 @@ namespace UnitTests.Runtime
             }
         }
 
-        public sealed class TestClusterMembershipService(ClusterMembershipSnapshot current) : IClusterMembershipService
+        public sealed class TestClusterMembershipService : IClusterMembershipService
         {
-            public ClusterMembershipSnapshot CurrentSnapshot { get; private set; } = current;
+            private readonly AsyncEnumerable<ClusterMembershipSnapshot> _updates;
+            private ClusterMembershipSnapshot _current;
 
-            public IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates => GetUpdates();
+            public TestClusterMembershipService(ClusterMembershipSnapshot current)
+            {
+                _current = current;
+                _updates = new AsyncEnumerable<ClusterMembershipSnapshot>(
+                    initialValue: current,
+                    updateValidator: (previous, proposed) => proposed.Version > previous.Version,
+                    onPublished: update => Volatile.Write(ref _current, update));
+            }
 
-            public void Update(ClusterMembershipSnapshot snapshot) => CurrentSnapshot = snapshot;
+            public ClusterMembershipSnapshot CurrentSnapshot => Volatile.Read(ref _current);
+
+            public IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates => _updates;
+
+            public void Update(ClusterMembershipSnapshot snapshot) => _updates.Publish(snapshot);
 
             public ValueTask Refresh(MembershipVersion minimumVersion = default, CancellationToken cancellationToken = default) => default;
 
             public Task<bool> TryKill(SiloAddress siloAddress) => Task.FromResult(false);
-
-            private async IAsyncEnumerable<ClusterMembershipSnapshot> GetUpdates()
-            {
-                yield return CurrentSnapshot;
-                await Task.CompletedTask;
-            }
         }
 
         private sealed class TestPlacementFilterStrategy : PlacementFilterStrategy
