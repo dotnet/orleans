@@ -67,4 +67,16 @@ Not every capability supports every database. The presence of a script in the pr
 4. Review and apply scripts under the provider's `Migrations` directory when upgrading from an older schema.
 5. Validate with a staging cluster using the same driver and database engine version.
 
+## Production database layout
+
+The supplied scripts are a starting schema, not a universal production
+database layout. They create unqualified table names in the database user's
+default schema, and the ADO.NET providers do not expose schema or filegroup
+configuration. A production deployment may choose a dedicated schema,
+filegroups, partitioning, or other database-specific storage features, but
+those choices must be implemented in the database deployment and kept
+consistent with the queries stored in `OrleansQuery`. Preserve the table names,
+columns, parameters, and result shapes expected by the provider, and validate
+the customized scripts and queries with a staging cluster before rollout.
+
 See [Configure ADO.NET providers](configuring-ado-dot-net-providers.md) for host configuration.

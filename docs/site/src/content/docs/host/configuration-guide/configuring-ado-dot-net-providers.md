@@ -31,6 +31,15 @@ See [ADO.NET database configuration](adonet-configuration.md) for schema script 
 
 Apply schema changes as a controlled deployment step. Don't grant silos schema-owner permissions solely so they can create tables at runtime.
 
+The scripts create tables and the `OrleansQuery` table using the database user's
+default schema, and the provider queries refer to those objects by unqualified
+name. Orleans does not provide an option to select a schema or filegroup. If
+your production database requires a dedicated schema, filegroups, partitioning,
+or another storage layout, adapt the scripts as part of your database
+deployment and keep the resulting table names, columns, parameters, and query
+result shapes compatible with Orleans. Apply and test those changes outside the
+application startup path.
+
 ## Configure SQL Server
 
 Use `Microsoft.Data.SqlClient` for SQL Server:
