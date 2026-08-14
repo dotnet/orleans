@@ -1,7 +1,7 @@
 ---
 title: Grain timers and reminders
 description: Schedule activation-scoped and durable periodic work in Orleans.
-ms.date: 08/07/2026
+ms.date: 08/13/2026
 ms.topic: concept-article
 ---
 
@@ -54,6 +54,19 @@ Store the reminder name, not the <xref:Orleans.Runtime.IGrainReminder> handle, a
 Reminder definitions are durable, but individual tick messages aren't. If the cluster is unavailable at a scheduled time, that occurrence can be missed. The next scheduled tick still occurs. Reminder delivery follows normal grain request scheduling and can activate an inactive grain.
 
 Reminders are intended for periods measured in minutes, hours, or days, not high-frequency scheduling. A common pattern is for a reminder to wake a grain and create a finer-grained local timer.
+
+### Reminder timing constraints
+
+Reminder timing is subject to the following constraints:
+
+- `dueTime` must be greater than or equal to `TimeSpan.Zero`; a zero `dueTime` means the first tick is scheduled immediately.
+- `dueTime` cannot be negative or <xref:System.Threading.Timeout.InfiniteTimeSpan>.
+- `period` must be greater than `TimeSpan.Zero`.
+- `period` cannot be negative, zero, or <xref:System.Threading.Timeout.InfiniteTimeSpan>.
+- The runtime rejects `period` values below the lower bound configured by <xref:Orleans.Hosting.ReminderOptions.MinimumReminderPeriod?displayProperty=nameWithType> (default: one minute).
+- `dueTime` is also bounded by the remaining <xref:System.DateTime> range from the time of registration. A value which would place the first tick after <xref:System.DateTime.MaxValue> is rejected rather than clamped. Later occurrences are scheduled from the persisted start time and period.
+
+There is no special `period` value that means "fire once and never again." To model a one-shot reminder, create a valid reminder with a positive `period`, then unregister it in the first callback or after the first tick. `TimeSpan.Zero` and negative values are rejected by the runtime rather than treated as a one-shot schedule.
 
 ## Configure reminder storage
 
