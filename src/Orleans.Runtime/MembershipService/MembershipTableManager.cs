@@ -69,10 +69,11 @@ namespace Orleans.Runtime.MembershipService
             this.myAddress = this.localSiloDetails.SiloAddress;
             this.log = log;
             this.siloLifecycle = siloLifecycle;
-            var initialEntries = ImmutableDictionary<SiloAddress, MembershipEntry>.Empty.SetItem(this.myAddress, this.CreateLocalSiloEntry(this.CurrentStatus));
             this.snapshot = new MembershipTableSnapshot(
-                    MembershipVersion.MinValue,
-                    initialEntries);
+                MembershipVersion.MinValue,
+                ImmutableDictionary<SiloAddress, MembershipEntry>.Empty.SetItem(
+                    this.myAddress,
+                    this.CreateLocalSiloEntry(SiloStatus.Created)));
             this.updates = new AsyncEnumerable<MembershipTableSnapshot>(
                 initialValue: this.snapshot,
                 updateValidator: (previous, proposed) => proposed.IsSuccessorTo(previous),
@@ -333,8 +334,6 @@ namespace Orleans.Runtime.MembershipService
 
                 if (status.IsTerminating() && this.membershipTableProvider is SystemTargetBasedMembershipTable)
                 {
-                    this.AdvanceCurrentStatus(status);
-
                     // SystemTarget-based membership may not be accessible at this stage, so allow for one quick attempt to update
                     // the status before continuing regardless of the outcome.
                     var updateTask = UpdateMyStatusTask(0);
@@ -430,7 +429,7 @@ namespace Orleans.Runtime.MembershipService
 
             if (ok)
             {
-                this.AdvanceCurrentStatus(newStatus);
+                this.AdvanceCurrentStatus(myEntry.Status);
                 var entries = table.Members.ToDictionary(e => e.Item1.SiloAddress, e => e);
                 entries[myEntry.SiloAddress] = Tuple.Create(myEntry, myEtag!);
                 var updatedTable = new MembershipTableData(entries.Values.ToList(), next);
