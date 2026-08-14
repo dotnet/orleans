@@ -122,7 +122,7 @@ public sealed class CustomQueueMessage(
     public StreamSequenceToken SequenceToken => _sequenceToken;
 
     public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() =>
-        events.Cast<T>().Select(
+        events.OfType<T>().Select(
             (item, index) => Tuple.Create<T, StreamSequenceToken>(
                 item,
                 _sequenceToken.CreateSequenceTokenForEvent(index)));

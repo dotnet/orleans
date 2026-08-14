@@ -25,7 +25,7 @@ Keep the queue SDK and wire-format logic behind a transport abstraction. The tra
 
 :::code language="csharp" source="snippets/streaming/CustomQueueAdapter.cs" id="custom_queue_transport":::
 
-The sequence number must remain stable when the queue redelivers a message. The example is non-rewindable, so it doesn't accept historical subscription tokens.
+The sequence number must remain stable when the queue redelivers a message. The example assigns sequence numbers in the transport, so it rejects caller-supplied sequence tokens when producing events.
 
 ## Implement the adapter and receiver
 
