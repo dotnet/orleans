@@ -167,7 +167,7 @@ Please see the [Orleans Hello World quickstart](https://dotnet.github.io/orleans
 
 For contributor prerequisites, building, testing, and using local source projects, see the [contributing guide](CONTRIBUTING.md).
 
-To build the solution directly, run `dotnet build Orleans.slnx -bl`. On Windows, `Build.cmd` also packs the solution and places packages in `Artifacts\<Configuration>`.
+To build the solution directly, run `dotnet build Orleans.slnx -bl`. On Windows, `Build.cmd` also packs the solution and places packages in `Artifacts/<Configuration>`.
 
 ## Official builds
 
