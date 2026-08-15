@@ -397,6 +397,31 @@ public class ShardExecutorTests
     }
 
     [Fact]
+    public async Task RunShardAsync_WhenJobFailsWithoutRetry_RemovesTerminalJob()
+    {
+        var options = CreateOptions(maxConcurrentJobs: 10, shouldRetry: static (_, _) => null);
+        var shard = CreateJobShard(CreateJobs(1));
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        var extension = Substitute.For<IDurableJobReceiverExtension>();
+        extension.HandleDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+            .Returns(DurableJobRunResult.Failed(new InvalidOperationException("terminal failure")));
+        grainFactory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
+        var executor = new ShardExecutor(
+            grainFactory,
+            options,
+            CreateOverloadDetector(isOverloaded: false),
+            NullLogger<ShardExecutor>.Instance);
+
+        await executor.RunShardAsync(shard, CancellationToken.None);
+
+        await shard.Received(1).RemoveJobAsync("job-0", Arg.Any<CancellationToken>());
+        await shard.DidNotReceive().RetryJobLaterAsync(
+            Arg.Any<IJobRunContext>(),
+            Arg.Any<DateTimeOffset>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task RunShardAsync_WhenRetryPersistenceFails_PropagatesAfterReleasingConcurrencyAndContinuingProcessing()
     {
         var options = CreateOptions(

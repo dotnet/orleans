@@ -66,6 +66,12 @@ public sealed class DurableJob
     [JsonInclude]
     internal long ExecutionGeneration { get; init; }
 
+    /// <summary>
+    /// Gets the priority used to order this job relative to other jobs with the same due time.
+    /// </summary>
+    [Id(9)]
+    public DurableJobPriority Priority { get; init; }
+
     internal DurableJob WithExecutionGeneration(long executionGeneration) =>
         new()
         {
@@ -77,6 +83,7 @@ public sealed class DurableJob
             Metadata = Metadata,
             TraceParent = TraceParent,
             TraceState = TraceState,
-            ExecutionGeneration = executionGeneration
+            ExecutionGeneration = executionGeneration,
+            Priority = Priority
         };
 }

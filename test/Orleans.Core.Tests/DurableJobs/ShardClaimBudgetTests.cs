@@ -17,6 +17,15 @@ public class ShardClaimBudgetTests
     private const int MaxBudget = 20;
 
     [Fact]
+    public void DurableJobsOptions_DefaultConcurrency_PreservesExistingCapacity()
+    {
+        var options = new DurableJobsOptions();
+
+        Assert.Equal(10_000 * Environment.ProcessorCount, options.MaxConcurrentJobsPerSilo);
+        Assert.Equal(4_096, options.MaxPendingOperationsPerShard);
+    }
+
+    [Fact]
     public void ComputeClaimBudget_AtStartup_ReturnsInitialBudget()
     {
         var budget = LocalDurableJobManager.ComputeClaimBudget(
@@ -219,6 +228,66 @@ public class ShardClaimBudgetTests
         var validator = new DurableJobsOptionsValidator(
             NullLogger<DurableJobsOptionsValidator>.Instance,
             options);
+
+        Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void ValidateConfiguration_NonPositiveMaxJobsPerShard_Throws(int value)
+    {
+        var validator = new DurableJobsOptionsValidator(
+            NullLogger<DurableJobsOptionsValidator>.Instance,
+            Options.Create(new DurableJobsOptions { MaxJobsPerShard = value }));
+
+        Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void ValidateConfiguration_NonPositiveMaxConcurrentJobsPerSilo_Throws(int value)
+    {
+        var validator = new DurableJobsOptionsValidator(
+            NullLogger<DurableJobsOptionsValidator>.Instance,
+            Options.Create(new DurableJobsOptions { MaxConcurrentJobsPerSilo = value }));
+
+        Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void ValidateConfiguration_NonPositiveMaxPendingOperationsPerShard_Throws(int value)
+    {
+        var validator = new DurableJobsOptionsValidator(
+            NullLogger<DurableJobsOptionsValidator>.Instance,
+            Options.Create(new DurableJobsOptions { MaxPendingOperationsPerShard = value }));
+
+        Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void ValidateConfiguration_NonPositiveMaxShardBatchOperationCount_Throws(int value)
+    {
+        var validator = new DurableJobsOptionsValidator(
+            NullLogger<DurableJobsOptionsValidator>.Instance,
+            Options.Create(new DurableJobsOptions { MaxShardBatchOperationCount = value }));
+
+        Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void ValidateConfiguration_NonPositiveMaxShardBatchSizeBytes_Throws(int value)
+    {
+        var validator = new DurableJobsOptionsValidator(
+            NullLogger<DurableJobsOptionsValidator>.Instance,
+            Options.Create(new DurableJobsOptions { MaxShardBatchSizeBytes = value }));
 
         Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
     }

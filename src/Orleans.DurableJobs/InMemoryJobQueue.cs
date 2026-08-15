@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,7 +15,10 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     private readonly PriorityQueue<JobBucket, DateTimeOffset> _queue = new();
     private readonly Dictionary<string, JobBucket> _jobsIdToBucket = new();
     private readonly Dictionary<DateTimeOffset, JobBucket> _buckets = new();
-    private TaskCompletionSource _queueChanged = CreateQueueChangedSource();
+    internal const int MaxDequeueBatchSize = 1_024;
+    private TaskCompletionSource? _queueChangedWaiter;
+    private long _mutationVersion;
+    private int _jobCount;
     private bool _isComplete;
 #if NET9_0_OR_GREATER
     private readonly Lock _syncLock = new();
@@ -32,7 +34,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     /// <summary>
     /// Gets the total number of jobs currently in the queue.
     /// </summary>
-    public int Count => _jobsIdToBucket.Count;
+    public int Count => Volatile.Read(ref _jobCount);
 
     /// <summary>
     /// Adds a durable job to the queue with the specified dequeue count.
@@ -54,10 +56,32 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
             if (_isComplete)
                 throw new InvalidOperationException("Cannot enqueue job to a completed queue.");
 
+            var wakeCheckRequired = _queueChangedWaiter is not null;
+            var previousNextDueTime = wakeCheckRequired ? GetNextReadyDueTime() : null;
             var bucket = GetJobBucket(job.DueTime);
+            var isReplacement = _jobsIdToBucket.TryGetValue(job.Id, out var existingBucket);
+            if (isReplacement
+                && existingBucket is not null
+                && !ReferenceEquals(existingBucket, bucket))
+            {
+                // A replayed or updated job can move to another due-time bucket. Keep a
+                // single live bucket membership for each ID so the stale copy cannot be
+                // dequeued before the replacement.
+                existingBucket.RemoveJob(job.Id);
+            }
+
             bucket.AddJob(job, dequeueCount);
             _jobsIdToBucket[job.Id] = bucket;
-            SignalQueueChanged();
+            if (!isReplacement)
+            {
+                Volatile.Write(ref _jobCount, _jobCount + 1);
+            }
+
+            PublishMutation();
+            if (wakeCheckRequired)
+            {
+                SignalQueueChangedIfNextDueTimeChanged(previousNextDueTime);
+            }
         }
     }
 
@@ -86,13 +110,20 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     {
         lock (_syncLock)
         {
+            var wakeCheckRequired = _queueChangedWaiter is not null;
+            var previousNextDueTime = wakeCheckRequired ? GetNextReadyDueTime() : null;
             if (_jobsIdToBucket.TryGetValue(jobId, out var bucket))
             {
                 // Try to remove from bucket (may already be dequeued)
                 bucket.RemoveJob(jobId);
                 _jobsIdToBucket.Remove(jobId);
+                Volatile.Write(ref _jobCount, _jobCount - 1);
+                PublishMutation();
                 // Note: The bucket remains in the priority queue until processed
-                SignalQueueChanged();
+                if (wakeCheckRequired)
+                {
+                    SignalQueueChangedIfNextDueTimeChanged(previousNextDueTime);
+                }
                 return true;
             }
 
@@ -135,6 +166,8 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
 
         lock (_syncLock)
         {
+            var wakeCheckRequired = _queueChangedWaiter is not null;
+            var previousNextDueTime = wakeCheckRequired ? GetNextReadyDueTime() : null;
             if (!_jobsIdToBucket.TryGetValue(jobId, out var oldBucket) || !oldBucket.TryGetJob(jobId, out var existing))
             {
                 return false;
@@ -151,6 +184,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                 TraceParent = existing.Job.TraceParent,
                 TraceState = existing.Job.TraceState,
                 ExecutionGeneration = executionGeneration ?? existing.Job.ExecutionGeneration,
+                Priority = existing.Job.Priority,
             };
 
             oldBucket.RemoveJob(jobId);
@@ -158,7 +192,11 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
             var newBucket = GetJobBucket(newDueTime);
             newBucket.AddJob(newJob, dequeueCount);
             _jobsIdToBucket[jobId] = newBucket;
-            SignalQueueChanged();
+            PublishMutation();
+            if (wakeCheckRequired)
+            {
+                SignalQueueChangedIfNextDueTimeChanged(previousNextDueTime);
+            }
             return true;
         }
     }
@@ -168,15 +206,19 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     /// </summary>
     /// <returns>The current live jobs and dequeue counts.</returns>
     public IReadOnlyList<(DurableJob Job, int DequeueCount)> GetSnapshot()
+        => GetSnapshot(static (job, dequeueCount) => (job, dequeueCount));
+
+    internal List<T> GetSnapshot<T>(Func<DurableJob, int, T> projector)
     {
+        ArgumentNullException.ThrowIfNull(projector);
         lock (_syncLock)
         {
-            var result = new List<(DurableJob Job, int DequeueCount)>(_jobsIdToBucket.Count);
+            var result = new List<T>(_jobsIdToBucket.Count);
             foreach (var (jobId, bucket) in _jobsIdToBucket)
             {
                 if (bucket.TryGetJob(jobId, out var item))
                 {
-                    result.Add(item);
+                    result.Add(projector(item.Job, item.DequeueCount));
                 }
             }
 
@@ -194,7 +236,9 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
             _queue.Clear();
             _jobsIdToBucket.Clear();
             _buckets.Clear();
+            Volatile.Write(ref _jobCount, 0);
             _isComplete = false;
+            PublishMutation();
             SignalQueueChanged();
         }
     }
@@ -212,6 +256,8 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
         while (true)
         {
             List<(DurableJob Job, int DequeueCount)>? jobsToYield = null;
+            JobBucket? bucketBeingProcessed = null;
+            long batchValidationVersion = 0;
             Task? queueChanged = null;
             TimeSpan? delay = null;
 
@@ -226,7 +272,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                         yield break; // Exit if the queue is frozen and empty
                     }
 
-                    queueChanged = _queueChanged.Task;
+                    queueChanged = GetQueueChangedTask();
                 }
                 else if (_queue.Count > 0)
                 {
@@ -234,46 +280,71 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                     var now = _timeProvider.GetUtcNow();
                     if (nextBucket.DueTime <= now)
                     {
-                        // Dequeue the bucket and remove it from _buckets atomically so a concurrent
-                        // Enqueue for the same DueTime cannot reuse this bucket. Without this,
-                        // GetJobBucket would find the bucket still in _buckets and add to it,
-                        // but the bucket is no longer in _queue, so the new job would be stranded.
-                        var bucketToProcess = _queue.Dequeue();
-                        _buckets.Remove(bucketToProcess.DueTime);
-
-                        // Snapshot the jobs under the lock so concurrent Cancel/Retry mutations
-                        // do not race the enumeration.
-                        jobsToYield = new List<(DurableJob Job, int DequeueCount)>(bucketToProcess.Jobs);
+                        bucketBeingProcessed = nextBucket;
+                        jobsToYield = nextBucket.TakeReadyJobs(MaxDequeueBatchSize);
+                        batchValidationVersion = _mutationVersion;
+                        if (nextBucket.ReadyCount == 0)
+                        {
+                            // Stop accepting new jobs into this bucket after its final ready batch is
+                            // detached. Dispatched jobs remain addressable through _jobsIdToBucket until
+                            // the executor explicitly removes or retries them.
+                            _queue.Dequeue();
+                            _buckets.Remove(nextBucket.DueTime);
+                        }
                     }
                     else
                     {
-                        queueChanged = _queueChanged.Task;
+                        queueChanged = GetQueueChangedTask();
                         delay = nextBucket.DueTime - now;
                     }
                 }
                 else
                 {
-                    queueChanged = _queueChanged.Task;
+                    queueChanged = GetQueueChangedTask();
                 }
             }
 
             if (jobsToYield is not null)
             {
-                // Process all jobs in the bucket outside the lock for better concurrency
-                foreach (var (job, dequeueCount) in jobsToYield)
+                for (var index = 0; index < jobsToYield.Count; index++)
                 {
-                    // Verify job hasn't been cancelled while we were processing
-                    bool shouldYield;
-                    lock (_syncLock)
+                    if (Volatile.Read(ref _mutationVersion) != batchValidationVersion)
                     {
-                        shouldYield = _jobsIdToBucket.ContainsKey(job.Id);
-                        // Keep job in _jobsIdToBucket for explicit removal via CancelJob/RetryJobLater
+                        // Queue mutations are rare while a detached batch is being yielded. When
+                        // one occurs, validate all remaining items in one lock and then stay on the
+                        // lock-free path until the version changes again. This preserves the former
+                        // per-item cancellation/replacement semantics without taking 1,024 locks for
+                        // an uncontended batch.
+                        lock (_syncLock)
+                        {
+                            var writeIndex = index;
+                            for (var readIndex = index; readIndex < jobsToYield.Count; readIndex++)
+                            {
+                                var item = jobsToYield[readIndex];
+                                if (_jobsIdToBucket.TryGetValue(item.Job.Id, out var currentBucket)
+                                    && ReferenceEquals(currentBucket, bucketBeingProcessed)
+                                    && bucketBeingProcessed.ContainsJob(item.Job))
+                                {
+                                    jobsToYield[writeIndex++] = item;
+                                }
+                            }
+
+                            if (writeIndex < jobsToYield.Count)
+                            {
+                                jobsToYield.RemoveRange(writeIndex, jobsToYield.Count - writeIndex);
+                            }
+
+                            batchValidationVersion = _mutationVersion;
+                        }
+
+                        if (index >= jobsToYield.Count)
+                        {
+                            break;
+                        }
                     }
 
-                    if (shouldYield)
-                    {
-                        yield return new JobRunContext(job, Guid.NewGuid().ToString(), dequeueCount + 1);
-                    }
+                    var (job, dequeueCount) = jobsToYield[index];
+                    yield return new JobRunContext(job, Guid.NewGuid().ToString("N"), dequeueCount + 1);
                 }
             }
             else
@@ -297,19 +368,39 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
 
     private void RemoveEmptyBuckets()
     {
-        while (_queue.Count > 0 && _queue.Peek().Count == 0)
+        while (_queue.Count > 0 && _queue.Peek().ReadyCount == 0)
         {
             var bucket = _queue.Dequeue();
             _buckets.Remove(bucket.DueTime);
         }
     }
 
+    private DateTimeOffset? GetNextReadyDueTime()
+    {
+        RemoveEmptyBuckets();
+        return _queue.Count == 0 ? null : _queue.Peek().DueTime;
+    }
+
+    private void SignalQueueChangedIfNextDueTimeChanged(DateTimeOffset? previousNextDueTime)
+    {
+        if ((_isComplete && _jobCount == 0)
+            || previousNextDueTime != GetNextReadyDueTime())
+        {
+            SignalQueueChanged();
+        }
+    }
+
     private void SignalQueueChanged()
     {
-        var previous = _queueChanged;
-        _queueChanged = CreateQueueChangedSource();
-        previous.TrySetResult();
+        var waiter = _queueChangedWaiter;
+        _queueChangedWaiter = null;
+        waiter?.TrySetResult();
     }
+
+    private void PublishMutation() => Volatile.Write(ref _mutationVersion, _mutationVersion + 1);
+
+    private Task GetQueueChangedTask()
+        => (_queueChangedWaiter ??= CreateQueueChangedSource()).Task;
 
     private async Task WaitForQueueChangeOrDelayAsync(Task queueChanged, TimeSpan? delay, CancellationToken cancellationToken)
     {
@@ -337,13 +428,19 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
 
 internal sealed class JobBucket
 {
-    private readonly Dictionary<string, (DurableJob Job, int DequeueCount)> _jobs = new();
+    private readonly Dictionary<string, JobBucketEntry> _jobs = new();
+    private JobBucketEntry? _highPriorityHead;
+    private JobBucketEntry? _highPriorityTail;
+    private JobBucketEntry? _normalPriorityHead;
+    private JobBucketEntry? _normalPriorityTail;
+    private JobBucketEntry? _lowPriorityHead;
+    private JobBucketEntry? _lowPriorityTail;
 
     public int Count => _jobs.Count;
 
-    public DateTimeOffset DueTime { get; private set; }
+    public int ReadyCount { get; private set; }
 
-    public IEnumerable<(DurableJob Job, int DequeueCount)> Jobs => _jobs.Values;
+    public DateTimeOffset DueTime { get; private set; }
 
     public JobBucket(DateTimeOffset dueTime)
     {
@@ -352,16 +449,174 @@ internal sealed class JobBucket
 
     public void AddJob(DurableJob job, int dequeueCount)
     {
-        _jobs[job.Id] = (job, dequeueCount);
+        if (_jobs.TryGetValue(job.Id, out var existing))
+        {
+            RemoveReadyNode(existing);
+        }
+
+        var entry = new JobBucketEntry(job, dequeueCount);
+        _jobs[job.Id] = entry;
+        AppendReady(entry);
+        ReadyCount++;
     }
 
     public bool RemoveJob(string jobId)
     {
-        return _jobs.Remove(jobId);
+        if (!_jobs.Remove(jobId, out var entry))
+        {
+            return false;
+        }
+
+        RemoveReadyNode(entry);
+        return true;
     }
 
     public bool TryGetJob(string jobId, out (DurableJob Job, int DequeueCount) job)
     {
-        return _jobs.TryGetValue(jobId, out job);
+        if (_jobs.TryGetValue(jobId, out var entry))
+        {
+            job = (entry.Job, entry.DequeueCount);
+            return true;
+        }
+
+        job = default;
+        return false;
+    }
+
+    public bool ContainsJob(DurableJob job)
+        => _jobs.TryGetValue(job.Id, out var entry) && ReferenceEquals(entry.Job, job);
+
+    public List<(DurableJob Job, int DequeueCount)> TakeReadyJobs(int maxCount)
+    {
+        var result = new List<(DurableJob Job, int DequeueCount)>(Math.Min(maxCount, ReadyCount));
+        TakeReadyJobs(ref _highPriorityHead, ref _highPriorityTail, result, maxCount);
+        TakeReadyJobs(ref _normalPriorityHead, ref _normalPriorityTail, result, maxCount);
+        TakeReadyJobs(ref _lowPriorityHead, ref _lowPriorityTail, result, maxCount);
+        return result;
+    }
+
+    private void TakeReadyJobs(
+        ref JobBucketEntry? head,
+        ref JobBucketEntry? tail,
+        List<(DurableJob Job, int DequeueCount)> destination,
+        int maxCount)
+    {
+        while (destination.Count < maxCount && head is { } entry)
+        {
+            head = entry.NextReady;
+            if (head is null)
+            {
+                tail = null;
+            }
+            else
+            {
+                head.PreviousReady = null;
+            }
+
+            entry.PreviousReady = null;
+            entry.NextReady = null;
+            entry.IsReady = false;
+            ReadyCount--;
+            destination.Add((entry.Job, entry.DequeueCount));
+        }
+    }
+
+    private void AppendReady(JobBucketEntry entry)
+    {
+        switch (entry.Job.Priority)
+        {
+            case DurableJobPriority.High:
+                AppendReady(ref _highPriorityHead, ref _highPriorityTail, entry);
+                break;
+            case DurableJobPriority.Low:
+                AppendReady(ref _lowPriorityHead, ref _lowPriorityTail, entry);
+                break;
+            default:
+                AppendReady(ref _normalPriorityHead, ref _normalPriorityTail, entry);
+                break;
+        }
+    }
+
+    private static void AppendReady(ref JobBucketEntry? head, ref JobBucketEntry? tail, JobBucketEntry entry)
+    {
+        entry.IsReady = true;
+        entry.PreviousReady = tail;
+        if (tail is null)
+        {
+            head = entry;
+        }
+        else
+        {
+            tail.NextReady = entry;
+        }
+
+        tail = entry;
+    }
+
+    private void RemoveReadyNode(JobBucketEntry entry)
+    {
+        if (!entry.IsReady)
+        {
+            return;
+        }
+
+        switch (entry.Job.Priority)
+        {
+            case DurableJobPriority.High:
+                RemoveReadyNode(ref _highPriorityHead, ref _highPriorityTail, entry);
+                break;
+            case DurableJobPriority.Low:
+                RemoveReadyNode(ref _lowPriorityHead, ref _lowPriorityTail, entry);
+                break;
+            default:
+                RemoveReadyNode(ref _normalPriorityHead, ref _normalPriorityTail, entry);
+                break;
+        }
+
+        ReadyCount--;
+    }
+
+    private static void RemoveReadyNode(ref JobBucketEntry? head, ref JobBucketEntry? tail, JobBucketEntry entry)
+    {
+        if (entry.PreviousReady is { } previous)
+        {
+            previous.NextReady = entry.NextReady;
+        }
+        else
+        {
+            head = entry.NextReady;
+        }
+
+        if (entry.NextReady is { } next)
+        {
+            next.PreviousReady = entry.PreviousReady;
+        }
+        else
+        {
+            tail = entry.PreviousReady;
+        }
+
+        entry.PreviousReady = null;
+        entry.NextReady = null;
+        entry.IsReady = false;
+    }
+
+    private sealed class JobBucketEntry
+    {
+        public JobBucketEntry(DurableJob job, int dequeueCount)
+        {
+            Job = job;
+            DequeueCount = dequeueCount;
+        }
+
+        public DurableJob Job { get; }
+
+        public int DequeueCount { get; }
+
+        public bool IsReady { get; set; }
+
+        public JobBucketEntry? PreviousReady { get; set; }
+
+        public JobBucketEntry? NextReady { get; set; }
     }
 }

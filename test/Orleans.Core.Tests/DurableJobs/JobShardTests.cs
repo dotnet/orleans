@@ -29,6 +29,7 @@ public class JobShardTests
                 Target = target,
                 JobName = "job",
                 DueTime = dueTime,
+                Priority = DurableJobPriority.High,
                 Metadata = metadata,
                 TraceParent = traceParent,
                 TraceState = traceState,
@@ -40,6 +41,7 @@ public class JobShardTests
         Assert.Equal(target, persistedJob.TargetGrainId);
         Assert.Equal("job", persistedJob.Name);
         Assert.Equal(dueTime, persistedJob.DueTime);
+        Assert.Equal(DurableJobPriority.High, persistedJob.Priority);
         Assert.Same(metadata, persistedJob.Metadata);
         Assert.Equal(traceParent, persistedJob.TraceParent);
         Assert.Equal(traceState, persistedJob.TraceState);

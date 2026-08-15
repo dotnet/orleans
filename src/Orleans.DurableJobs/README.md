@@ -389,11 +389,19 @@ public class WorkflowGrain : Grain, IDurableJobHandler
 ## How It Works
 
 ### Architecture Overview
-1. **Job Sharding**: Jobs are partitioned into time-based shards (default: 1-minute windows)
+1. **Job Sharding**: Jobs are partitioned into time-based shards (default: 1-hour windows)
 2. **Shard Ownership**: Each shard is owned by a single silo for execution
 3. **Automatic Rebalancing**: When a silo fails, its shards are automatically reassigned to healthy silos
 4. **Ordered Execution**: Within a shard, jobs are processed in order of their due time
 5. **Concurrency Control**: The `MaxConcurrentJobsPerSilo` setting limits concurrent job execution
+
+### Concurrency and mutation ordering
+
+Scheduling uses a writable-shard key composed of the time bucket and stripe. Creation is single-flight per key: callers targeting the same missing key share one creation task, while different buckets and stripes initialize concurrently. A canceled caller stops waiting without canceling shared creation for other callers. Silo shutdown cancels the creation itself.
+
+`JournaledJobShard` accepts concurrent writers through a bounded, single-reader channel. When `MaxPendingOperationsPerShard` operations are buffered, subsequent callers asynchronously wait for capacity instead of growing the shard's buffered ingress without limit. Schedule requests atomically reserve one of `MaxJobsPerShard` live-job slots before entering that channel, so a burst aimed at a full shard is rejected before it can build a second backlog behind that shard. The manager coalesces those rejections into one close-and-rollover operation. The reader preserves queue order, batches consecutive mutations within `MaxShardBatchOperationCount` and `MaxShardBatchSizeBytes`, and treats mark-complete and delete as ordering barriers. Disposal cancels active, queued, and capacity-waiting operations. The in-memory due queue uses a short lock to atomically maintain the priority queue, due buckets, and job-ID index, then yields detached batches outside that lock.
+
+`ShardStripeCount` reduces contention for concentrated time windows by spreading jobs across independent shard journals. More stripes also increase shard metadata and provider operations, and there is no deterministic global ordering between separate stripes. Within one shard, jobs dequeue by due time and priority breaks exact due-time ties. Tune striping from measured journal latency and storage throttling rather than increasing it unconditionally. `MaxConcurrentJobsPerSilo` controls callback execution; it doesn't serialize scheduling or replace journal operation ordering.
 
 ### Job Lifecycle
 ```
@@ -424,9 +432,16 @@ public class WorkflowGrain : Grain, IDurableJobHandler
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `ShardDuration` | `TimeSpan` | 1 minute | Duration of each job shard. Smaller values reduce latency but increase overhead. |
-| `MaxConcurrentJobsPerSilo` | `int` | 100 | Maximum number of jobs that can execute simultaneously on a silo. |
-| `ShouldRetry` | `Func<IDurableJobContext, Exception, DateTimeOffset?>` | 3 retries with exp. backoff | Determines if a failed job should be retried. Return the new due time or `null` to not retry. |
+| `ShardDuration` | `TimeSpan` | 1 hour | Duration of each job time bucket. Smaller values reduce each bucket's working set but create more shard journals. |
+| `ShardStripeCount` | `int` | 1 | Writable shard stripes per time bucket. Increase this when many jobs share the same time window. |
+| `MaxJobsPerShard` | `int` | 10,000 | Maximum live jobs in one shard before it closes to additions, drains, and scheduling rolls over to another shard journal for the same time bucket. |
+| `MaxConcurrentJobsPerSilo` | `int` | 10,000 × processor count | Maximum number of jobs which can execute simultaneously on a silo. Size this from handler I/O, CPU, and downstream limits. |
+| `MaxPendingOperationsPerShard` | `int` | 4,096 | Maximum operations buffered for one shard writer. Additional callers asynchronously wait for queue capacity. |
+| `MaxShardBatchOperationCount` | `int` | 1,024 | Maximum journal mutations in one storage write. |
+| `MaxShardBatchSizeBytes` | `int` | 1 MiB | Conservative encoded-size budget for one mutation batch; one oversized operation is written alone. |
+| `ShouldRetry` | `Func<IJobRunContext, Exception, DateTimeOffset?>` | Up to 5 retries with exponential backoff | Determines if a failed job should be retried. Return the new due time or `null` to not retry. |
+
+The per-shard job, ingress, and batch limits are safety bounds, not throughput targets. A large deployment can hold millions of jobs across many bounded shards; it should not put one million jobs into a single in-memory due-time bucket or one journal snapshot. Snapshot creation walks the live jobs in that shard while holding the queue's consistency lock. Use a shorter `ShardDuration` and/or more `ShardStripeCount` when traffic is concentrated, keep job metadata small, and validate the resulting shard count and provider request rate under production-like load. Backpressure is asynchronous: producers must await scheduling and use bounded producer concurrency instead of first materializing one million `ScheduleJobAsync` calls and only then awaiting them.
 
 ## Best Practices
 

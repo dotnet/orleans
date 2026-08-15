@@ -37,6 +37,12 @@ public sealed class DurableJobsOptions
     public int ShardStripeCount { get; set; } = 1;
 
     /// <summary>
+    /// Gets or sets the maximum number of live jobs retained by one shard before scheduling rolls over
+    /// to another shard for the same time bucket. Default: 10,000.
+    /// </summary>
+    public int MaxJobsPerShard { get; set; } = 10_000;
+
+    /// <summary>
     /// Gets or sets the delay before polling an asynchronous durable job handler again.
     /// The job continues holding its concurrency slot while it is polled.
     /// Default: 1 second.
@@ -99,6 +105,29 @@ public sealed class DurableJobsOptions
     /// <see cref="TimeSpan.Zero"/> (no linger, behavior unchanged).
     /// </remarks>
     public TimeSpan ShardBatchLingerDelay { get; set; } = TimeSpan.Zero;
+
+    /// <summary>
+    /// Gets or sets the maximum number of shard operations buffered for the single shard writer.
+    /// When the queue is full, callers asynchronously wait for capacity.
+    /// Default: 4,096.
+    /// </summary>
+    /// <remarks>
+    /// This bounds scheduling ingress independently from the number of live jobs in a shard and
+    /// the number of mutations written in one storage batch.
+    /// </remarks>
+    public int MaxPendingOperationsPerShard { get; set; } = 4_096;
+
+    /// <summary>
+    /// Gets or sets the maximum number of shard mutations written in one storage batch.
+    /// Default: 1,024.
+    /// </summary>
+    public int MaxShardBatchOperationCount { get; set; } = 1_024;
+
+    /// <summary>
+    /// Gets or sets the conservative encoded-size budget for one shard mutation batch.
+    /// A single operation which exceeds this value is still written by itself. Default: 1 MiB.
+    /// </summary>
+    public int MaxShardBatchSizeBytes { get; set; } = 1024 * 1024;
 
     /// <summary>
     /// Gets or sets the maximum number of times a shard can be adopted from a dead owner before
@@ -201,9 +230,17 @@ public sealed partial class DurableJobsOptionsValidator : IConfigurationValidato
         {
             throw new OrleansConfigurationException("DurableJobsOptions.ShardStripeCount must be less than or equal to 32768.");
         }
+        if (options.MaxJobsPerShard <= 0)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.MaxJobsPerShard must be greater than zero.");
+        }
         if (options.JobStatusPollInterval <= TimeSpan.Zero)
         {
             throw new OrleansConfigurationException("DurableJobsOptions.JobStatusPollInterval must be greater than zero.");
+        }
+        if (options.MaxConcurrentJobsPerSilo <= 0)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.MaxConcurrentJobsPerSilo must be greater than zero.");
         }
         if (options.ShouldRetry is null)
         {
@@ -228,6 +265,18 @@ public sealed partial class DurableJobsOptionsValidator : IConfigurationValidato
         if (options.ShardBatchLingerDelay < TimeSpan.Zero)
         {
             throw new OrleansConfigurationException("DurableJobsOptions.ShardBatchLingerDelay must be non-negative.");
+        }
+        if (options.MaxPendingOperationsPerShard <= 0)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.MaxPendingOperationsPerShard must be greater than zero.");
+        }
+        if (options.MaxShardBatchOperationCount <= 0)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.MaxShardBatchOperationCount must be greater than zero.");
+        }
+        if (options.MaxShardBatchSizeBytes <= 0)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.MaxShardBatchSizeBytes must be greater than zero.");
         }
         if (options.ShardClaimInitialBudget < 0)
         {

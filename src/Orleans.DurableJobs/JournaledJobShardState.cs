@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using Orleans.Journaling;
 
 namespace Orleans.DurableJobs;
@@ -11,6 +10,7 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
     private readonly JobShardId _shardId;
     private readonly IDurableValueCommandCodec<DurableJobShardJournalRecord>? _codec;
     private readonly TimeProvider _timeProvider;
+    private readonly int _maxJobCount;
     private InMemoryJobQueue _jobQueue;
     private JournalStreamWriter _writer;
 
@@ -19,14 +19,20 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
         DateTimeOffset startTime,
         DateTimeOffset endTime,
         IDurableValueCommandCodec<DurableJobShardJournalRecord> codec,
-        TimeProvider? timeProvider = null)
-        : this(shardId, startTime, endTime, codec, timeProvider, isAddingCompleted: false)
+        TimeProvider? timeProvider = null,
+        int maxJobCount = int.MaxValue)
+        : this(shardId, startTime, endTime, codec, timeProvider, isAddingCompleted: false, maxJobCount)
     {
         ArgumentNullException.ThrowIfNull(codec);
     }
 
-    internal JournaledJobShardState(JobShardId shardId, DateTimeOffset startTime, DateTimeOffset endTime, TimeProvider? timeProvider = null)
-        : this(shardId, startTime, endTime, codec: null, timeProvider: timeProvider, isAddingCompleted: false)
+    internal JournaledJobShardState(
+        JobShardId shardId,
+        DateTimeOffset startTime,
+        DateTimeOffset endTime,
+        TimeProvider? timeProvider = null,
+        int maxJobCount = int.MaxValue)
+        : this(shardId, startTime, endTime, codec: null, timeProvider: timeProvider, isAddingCompleted: false, maxJobCount)
     {
     }
 
@@ -36,16 +42,23 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
         DateTimeOffset endTime,
         IDurableValueCommandCodec<DurableJobShardJournalRecord>? codec,
         TimeProvider? timeProvider,
-        bool isAddingCompleted)
+        bool isAddingCompleted,
+        int maxJobCount)
     {
         if (endTime < startTime)
         {
             throw new ArgumentOutOfRangeException(nameof(endTime), "Shard end time must be greater than or equal to the start time.");
         }
 
+        if (maxJobCount <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxJobCount));
+        }
+
         _shardId = shardId;
         _codec = codec;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _maxJobCount = maxJobCount;
         _jobQueue = new(_timeProvider);
         StartTime = startTime;
         EndTime = endTime;
@@ -62,11 +75,13 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
 
     public int Count => _jobQueue.Count;
 
+    internal int MaxJobCount => _maxJobCount;
+
     public IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync() => _jobQueue;
 
     public DurableJob? TryScheduleJob(ScheduleJobRequest request)
     {
-        if (IsAddingCompleted)
+        if (IsAddingCompleted || Count >= _maxJobCount)
         {
             return null;
         }
@@ -78,7 +93,7 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
 
         var job = new DurableJob
         {
-            Id = Guid.NewGuid().ToString(),
+            Id = Guid.NewGuid().ToString("N"),
             TargetGrainId = request.Target,
             Name = request.JobName,
             DueTime = request.DueTime,
@@ -86,6 +101,7 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
             Metadata = request.Metadata,
             TraceParent = request.TraceParent,
             TraceState = request.TraceState,
+            Priority = request.Priority,
         };
 
         Write(DurableJobShardJournalRecord.ForSchedule(job));
@@ -127,15 +143,11 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
 
     internal DurableJobShardSnapshot CaptureSnapshot()
     {
-        var jobs = _jobQueue.GetSnapshot()
-            .OrderBy(static item => item.Job.DueTime)
-            .ThenBy(static item => item.Job.Id, StringComparer.Ordinal)
-            .Select(static item => new DurableJobShardSnapshotEntry
+        var jobs = _jobQueue.GetSnapshot(static (job, dequeueCount) => new DurableJobShardSnapshotEntry
             {
-                Job = item.Job,
-                DequeueCount = item.DequeueCount
-            })
-            .ToList();
+                Job = job,
+                DequeueCount = dequeueCount
+            });
 
         return new() { Jobs = jobs };
     }

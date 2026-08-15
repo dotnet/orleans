@@ -177,6 +177,7 @@ public abstract class JobShard : IJobShard
             Metadata = request.Metadata,
             TraceParent = request.TraceParent,
             TraceState = request.TraceState,
+            Priority = request.Priority,
         };
 
         await PersistAddJobAsync(job, cancellationToken);
