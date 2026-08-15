@@ -1,7 +1,7 @@
 ---
 title: Interpret Orleans observability signals
 description: Use Orleans logs, metrics, traces, correlation, and alerts without relying on stale catalogs.
-ms.date: 08/02/2026
+ms.date: 08/15/2026
 ms.topic: concept-article
 ---
 
@@ -23,27 +23,13 @@ Record application correlation fields in structured properties or an approved ac
 
 ## Metrics
 
-Subscribe to the `Microsoft.Orleans` meter. Discover the exact instrument set emitted by your deployed version instead of copying a static list. For installation and command details, see the [`dotnet-counters` diagnostic tool](https://learn.microsoft.com/dotnet/core/diagnostics/dotnet-counters):
+Subscribe to the `Microsoft.Orleans` meter. Discover the exact instrument set emitted by your deployed version. For installation and command details, see the [`dotnet-counters` diagnostic tool](https://learn.microsoft.com/dotnet/core/diagnostics/dotnet-counters):
 
 ```dotnetcli
 dotnet-counters monitor -n <ProcessName> --counters Microsoft.Orleans
 ```
 
-To inspect instruments under active development, see [InstrumentNames.cs on the `main` branch](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Diagnostics/Metrics/InstrumentNames.cs). Discover the emitted instruments from the deployed process because provider packages and released versions can differ from that branch.
-
-Useful starting signals include:
-
-| Concern | Signals to correlate |
-|---|---|
-| Requests | `orleans-app-requests-latency` histogram components (`-bucket`/`-count`/`-sum`), timed-out/canceled requests, application error rate |
-| Connectivity | open/closed sockets, failed/dropped sends, connected gateways, ping replies missed |
-| Overload | rejected messages, gateway load shedding, activation working set, host CPU and thread-pool metrics |
-| Stuck turns | `orleans-scheduler-long-running-turns`, request latency, process CPU, traces |
-| Storage | storage latency and error instruments, provider logs, backend health |
-| Memory | Orleans available/physical memory, .NET GC heap, allocation rate, working set, container limit |
-| Membership | membership warnings, ping failures, active-silo view, membership-store health |
-
-Counter values usually need a rate or increase over a time window. Histograms need percentiles and request volume. Compare each silo with the cluster aggregate: one outlier suggests a host or partition problem, while a cluster-wide shift suggests a shared dependency or traffic change.
+See [Monitor Orleans metrics](metrics.md) for the current client and silo signals, instrument types, units, dimensions, and health interpretation. Counter values usually need a rate or increase over a time window, gauges need a deliberately chosen point-in-time aggregation, and histograms need percentiles plus request volume. Compare each silo with the cluster aggregate: one outlier suggests a host or partition problem, while a cluster-wide shift suggests a shared dependency or traffic change.
 
 ### Cardinality
 
