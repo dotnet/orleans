@@ -117,6 +117,7 @@ These packages don't replace the cluster membership provider.
 | [Microsoft.Orleans.Journaling.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.Redis) | Pre-release alpha Redis provider for Orleans Journaling. |
 | [Microsoft.Orleans.Journaling.S3](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.S3) | Pre-release alpha Amazon S3 Express One Zone provider for Orleans Journaling. |
 | [Microsoft.Orleans.Transactions](https://www.nuget.org/packages/Microsoft.Orleans.Transactions) | Distributed transaction runtime. |
+| [Microsoft.Orleans.Transactions.AdoNet](https://www.nuget.org/packages/Microsoft.Orleans.Transactions.AdoNet) | ADO.NET transaction state storage. |
 | [Microsoft.Orleans.Transactions.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Transactions.AzureStorage) | Azure Storage transaction state. |
 | [Microsoft.Orleans.Transactions.DynamoDB](https://www.nuget.org/packages/Microsoft.Orleans.Transactions.DynamoDB) | Amazon DynamoDB transaction state. |
 
