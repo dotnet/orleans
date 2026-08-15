@@ -1345,14 +1345,21 @@ namespace Orleans.Runtime.ReminderService
                             var provisionalStatus = new TickStatus(entry.StartAt, entry.Period, preThrottleNow);
                             var context = new ReminderDeliveryContext(entry.GrainId, entry.ReminderName, provisionalStatus);
                             ReminderDeliveryLease lease;
-                            using var acquireCancellation = CancellationTokenSource.CreateLinkedTokenSource(_stopCancellation.Token, scheduleChangedToken);
-                            try
+                            if (ReferenceEquals(_shared._deliveryThrottle, NoOpReminderDeliveryThrottle.Instance))
                             {
-                                lease = await _shared._deliveryThrottle.AcquireAsync(context, acquireCancellation.Token).ConfigureAwait(true);
+                                lease = ReminderDeliveryLease.NoOpAdmitted;
                             }
-                            catch (OperationCanceledException) when (acquireCancellation.IsCancellationRequested)
+                            else
                             {
-                                continue;
+                                using var acquireCancellation = CancellationTokenSource.CreateLinkedTokenSource(_stopCancellation.Token, scheduleChangedToken);
+                                try
+                                {
+                                    lease = await _shared._deliveryThrottle.AcquireAsync(context, acquireCancellation.Token).ConfigureAwait(true);
+                                }
+                                catch (OperationCanceledException) when (acquireCancellation.IsCancellationRequested)
+                                {
+                                    continue;
+                                }
                             }
 
                             var activeLeaseRecorded = false;
