@@ -10,45 +10,45 @@ namespace Orleans.AdvancedReminders
 {
     public static partial class GrainReminderCronExtensions
     {
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, ReminderCronBuilder cronBuilder, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, ReminderCronBuilder cronBuilder, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, ReminderCronBuilder cronBuilder) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, ReminderCronExpression cronExpression, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action, System.TimeZoneInfo? timeZone) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, ReminderCronExpression cronExpression, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action, System.TimeZoneInfo? timeZone) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, ReminderCronExpression cronExpression, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, ReminderCronExpression cronExpression, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, ReminderCronExpression cronExpression, System.TimeZoneInfo? timeZone) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, ReminderCronExpression cronExpression) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, string cronExpression, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action, System.TimeZoneInfo? timeZone) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, string cronExpression, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action, System.TimeZoneInfo? timeZone) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, string cronExpression, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, string cronExpression, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, string cronExpression, System.TimeZoneInfo? timeZone, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, string cronExpression, System.TimeZoneInfo? timeZone, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, string cronExpression, System.TimeZoneInfo? timeZone) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, string cronExpression) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, ReminderCronBuilder cronBuilder, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, ReminderCronBuilder cronBuilder, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, ReminderCronBuilder cronBuilder) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, ReminderCronExpression cronExpression, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action, System.TimeZoneInfo? timeZone) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, ReminderCronExpression cronExpression, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action, System.TimeZoneInfo? timeZone) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, ReminderCronExpression cronExpression, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, ReminderCronExpression cronExpression, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, ReminderCronExpression cronExpression, System.TimeZoneInfo? timeZone) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, ReminderCronExpression cronExpression) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, string cronExpression, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action, System.TimeZoneInfo? timeZone) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, string cronExpression, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action, System.TimeZoneInfo? timeZone) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, string cronExpression, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, string cronExpression, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, string cronExpression, System.TimeZoneInfo? timeZone, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, string cronExpression, System.TimeZoneInfo? timeZone, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, string cronExpression, System.TimeZoneInfo? timeZone) { throw null; }
 
@@ -65,27 +65,27 @@ namespace Orleans.AdvancedReminders
 
         public static System.Threading.Tasks.Task<System.Collections.Generic.List<IGrainReminder>> GetAdvancedReminders(this IGrainBase grain) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, ReminderSchedule schedule, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, ReminderSchedule schedule, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, ReminderSchedule schedule) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, System.DateTime dueAtUtc, System.TimeSpan period, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, System.DateTime dueAtUtc, System.TimeSpan period, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, System.DateTime dueAtUtc, System.TimeSpan period) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, System.TimeSpan dueTime, System.TimeSpan period, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, System.TimeSpan dueTime, System.TimeSpan period, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this Grain grain, string reminderName, System.TimeSpan dueTime, System.TimeSpan period) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, ReminderSchedule schedule, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, ReminderSchedule schedule, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, ReminderSchedule schedule) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, System.DateTime dueAtUtc, System.TimeSpan period, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, System.DateTime dueAtUtc, System.TimeSpan period, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, System.DateTime dueAtUtc, System.TimeSpan period) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, System.TimeSpan dueTime, System.TimeSpan period, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, System.TimeSpan dueTime, System.TimeSpan period, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateAdvancedReminder(this IGrainBase grain, string reminderName, System.TimeSpan dueTime, System.TimeSpan period) { throw null; }
 
@@ -102,7 +102,7 @@ namespace Orleans.AdvancedReminders
 
         string? CronTimeZone { get; }
 
-        Runtime.ReminderPriority Priority { get; }
+        DurableJobs.DurableJobPriority Priority { get; }
 
         string ReminderName { get; }
     }
@@ -138,7 +138,7 @@ namespace Orleans.AdvancedReminders
         System.Threading.Tasks.Task<IGrainReminder?> GetReminder(Orleans.Runtime.GrainId grainId, string reminderName);
         System.Threading.Tasks.Task<System.Collections.Generic.List<IGrainReminder>> GetReminders(Orleans.Runtime.GrainId grainId);
         System.Threading.Tasks.Task ProcessDueReminderAsync(Orleans.Runtime.GrainId grainId, string reminderName, string? expectedScheduleId, System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(Orleans.Runtime.GrainId grainId, string reminderName, ReminderSchedule schedule, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action);
+        System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(Orleans.Runtime.GrainId grainId, string reminderName, ReminderSchedule schedule, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action);
         System.Threading.Tasks.Task UnregisterReminder(IGrainReminder reminder);
     }
 
@@ -159,9 +159,9 @@ namespace Orleans.AdvancedReminders
     [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
     public sealed partial class RegisterReminderAttribute : System.Attribute
     {
-        public RegisterReminderAttribute(string name, double dueSeconds, double periodSeconds, Runtime.ReminderPriority priority = Runtime.ReminderPriority.Normal, Runtime.MissedReminderAction action = Runtime.MissedReminderAction.Skip) { }
+        public RegisterReminderAttribute(string name, double dueSeconds, double periodSeconds, DurableJobs.DurableJobPriority priority = DurableJobs.DurableJobPriority.Normal, Runtime.MissedReminderAction action = Runtime.MissedReminderAction.Skip) { }
 
-        public RegisterReminderAttribute(string name, string cron, Runtime.ReminderPriority priority = Runtime.ReminderPriority.Normal, Runtime.MissedReminderAction action = Runtime.MissedReminderAction.Skip) { }
+        public RegisterReminderAttribute(string name, string cron, DurableJobs.DurableJobPriority priority = DurableJobs.DurableJobPriority.Normal, Runtime.MissedReminderAction action = Runtime.MissedReminderAction.Skip) { }
 
         public Runtime.MissedReminderAction Action { get { throw null; } }
 
@@ -173,7 +173,7 @@ namespace Orleans.AdvancedReminders
 
         public System.TimeSpan? Period { get { throw null; } }
 
-        public Runtime.ReminderPriority Priority { get { throw null; } }
+        public DurableJobs.DurableJobPriority Priority { get { throw null; } }
     }
 
     public sealed partial class ReminderCronBuilder
@@ -505,45 +505,45 @@ namespace Orleans.AdvancedReminders
 
     public static partial class ReminderCronRegistrationExtensions
     {
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, ReminderCronBuilder cronBuilder, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, ReminderCronBuilder cronBuilder, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, ReminderCronBuilder cronBuilder) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, ReminderCronExpression cronExpression, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action, System.TimeZoneInfo? timeZone) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, ReminderCronExpression cronExpression, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action, System.TimeZoneInfo? timeZone) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, ReminderCronExpression cronExpression, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, ReminderCronExpression cronExpression, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, ReminderCronExpression cronExpression, System.TimeZoneInfo? timeZone) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, ReminderCronExpression cronExpression) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, string cronExpression, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action, string? cronTimeZoneId) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, string cronExpression, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action, string? cronTimeZoneId) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, string cronExpression, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, string cronExpression, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, string cronExpression, System.TimeZoneInfo? timeZone, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, string cronExpression, System.TimeZoneInfo? timeZone, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, string cronExpression, System.TimeZoneInfo? timeZone) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, string cronExpression) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, ReminderCronBuilder cronBuilder, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, ReminderCronBuilder cronBuilder, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, ReminderCronBuilder cronBuilder) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, ReminderCronExpression cronExpression, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action, System.TimeZoneInfo? timeZone) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, ReminderCronExpression cronExpression, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action, System.TimeZoneInfo? timeZone) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, ReminderCronExpression cronExpression, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, ReminderCronExpression cronExpression, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, ReminderCronExpression cronExpression, System.TimeZoneInfo? timeZone) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, ReminderCronExpression cronExpression) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, string cronExpression, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action, string? cronTimeZoneId) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, string cronExpression, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action, string? cronTimeZoneId) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, string cronExpression, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, string cronExpression, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, string cronExpression, System.TimeZoneInfo? timeZone, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, string cronExpression, System.TimeZoneInfo? timeZone, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, string cronExpression, System.TimeZoneInfo? timeZone) { throw null; }
 
@@ -603,7 +603,7 @@ namespace Orleans.AdvancedReminders
         public System.TimeSpan Period { get { throw null; } set { } }
 
         [Id(8)]
-        public Runtime.ReminderPriority Priority { get { throw null; } set { } }
+        public DurableJobs.DurableJobPriority Priority { get { throw null; } set { } }
 
         [Id(1)]
         public string ReminderName { get { throw null; } set { } }
@@ -653,7 +653,7 @@ namespace Orleans.AdvancedReminders
 
         public System.Threading.Tasks.Task SetActionAsync(Orleans.Runtime.GrainId grainId, string name, Runtime.MissedReminderAction action) { throw null; }
 
-        public System.Threading.Tasks.Task SetPriorityAsync(Orleans.Runtime.GrainId grainId, string name, Runtime.ReminderPriority priority) { throw null; }
+        public System.Threading.Tasks.Task SetPriorityAsync(Orleans.Runtime.GrainId grainId, string name, DurableJobs.DurableJobPriority priority) { throw null; }
 
     }
 
@@ -720,7 +720,7 @@ namespace Orleans.AdvancedReminders
         public System.TimeSpan OverdueBy { get { throw null; } init { } }
 
         [Id(2)]
-        public Runtime.ReminderPriority? Priority { get { throw null; } init { } }
+        public DurableJobs.DurableJobPriority? Priority { get { throw null; } init { } }
 
         [Id(4)]
         public Runtime.ReminderScheduleKind? ScheduleKind { get { throw null; } init { } }
@@ -741,19 +741,19 @@ namespace Orleans.AdvancedReminders
 
     public static partial class ReminderRegistrationExtensions
     {
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, System.DateTime dueAtUtc, System.TimeSpan period, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, System.DateTime dueAtUtc, System.TimeSpan period, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, System.DateTime dueAtUtc, System.TimeSpan period) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, System.TimeSpan dueTime, System.TimeSpan period, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, System.TimeSpan dueTime, System.TimeSpan period, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IReminderService service, Orleans.Runtime.GrainId grainId, string reminderName, System.TimeSpan dueTime, System.TimeSpan period) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, System.DateTime dueAtUtc, System.TimeSpan period, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, System.DateTime dueAtUtc, System.TimeSpan period, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, System.DateTime dueAtUtc, System.TimeSpan period) { throw null; }
 
-        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, System.TimeSpan dueTime, System.TimeSpan period, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, System.TimeSpan dueTime, System.TimeSpan period, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Timers.IReminderRegistry registry, Orleans.Runtime.GrainId callingGrainId, string reminderName, System.TimeSpan dueTime, System.TimeSpan period) { throw null; }
     }
@@ -862,13 +862,6 @@ namespace Orleans.AdvancedReminders.Runtime
         public ReminderException(string message) { }
     }
 
-    public enum ReminderPriority : sbyte
-    {
-        Low = -1,
-        Normal = 0,
-        High = 1
-    }
-
     public enum ReminderScheduleKind : byte
     {
         Interval = 0,
@@ -901,7 +894,7 @@ namespace Orleans.AdvancedReminders.Timers
     {
         System.Threading.Tasks.Task<IGrainReminder?> GetReminder(Orleans.Runtime.GrainId callingGrainId, string reminderName);
         System.Threading.Tasks.Task<System.Collections.Generic.List<IGrainReminder>> GetReminders(Orleans.Runtime.GrainId callingGrainId);
-        System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(Orleans.Runtime.GrainId callingGrainId, string reminderName, ReminderSchedule schedule, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action);
+        System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(Orleans.Runtime.GrainId callingGrainId, string reminderName, ReminderSchedule schedule, DurableJobs.DurableJobPriority priority, Runtime.MissedReminderAction action);
         System.Threading.Tasks.Task UnregisterReminder(Orleans.Runtime.GrainId callingGrainId, IGrainReminder reminder);
     }
 }
@@ -1014,24 +1007,6 @@ namespace OrleansCodeGen.Orleans.AdvancedReminders
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_Invokable_IReminderManagementGrain_GrainReference_63932B7E : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IReminderManagementGrain_GrainReference_63932B7E>, global::Orleans.Serialization.Codecs.IFieldCodec
-    {
-        public Codec_Invokable_IReminderManagementGrain_GrainReference_63932B7E(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IReminderManagementGrain_GrainReference_63932B7E instance) { }
-
-        public Invokable_IReminderManagementGrain_GrainReference_63932B7E ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IReminderManagementGrain_GrainReference_63932B7E instance)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IReminderManagementGrain_GrainReference_63932B7E value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IReminderManagementGrain_GrainReference_74FE06B8 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IReminderManagementGrain_GrainReference_74FE06B8>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IReminderManagementGrain_GrainReference_74FE06B8 instance) { }
@@ -1130,6 +1105,24 @@ namespace OrleansCodeGen.Orleans.AdvancedReminders
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IReminderManagementGrain_GrainReference_91B34C93 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IReminderManagementGrain_GrainReference_A9848C14 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IReminderManagementGrain_GrainReference_A9848C14>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IReminderManagementGrain_GrainReference_A9848C14(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IReminderManagementGrain_GrainReference_A9848C14 instance) { }
+
+        public Invokable_IReminderManagementGrain_GrainReference_A9848C14 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IReminderManagementGrain_GrainReference_A9848C14 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IReminderManagementGrain_GrainReference_A9848C14 value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -1248,14 +1241,6 @@ namespace OrleansCodeGen.Orleans.AdvancedReminders
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Copier_Invokable_IReminderManagementGrain_GrainReference_63932B7E : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IReminderManagementGrain_GrainReference_63932B7E>, global::Orleans.Serialization.Cloning.IDeepCopier
-    {
-        public Invokable_IReminderManagementGrain_GrainReference_63932B7E DeepCopy(Invokable_IReminderManagementGrain_GrainReference_63932B7E original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IReminderManagementGrain_GrainReference_74FE06B8 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IReminderManagementGrain_GrainReference_74FE06B8>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Invokable_IReminderManagementGrain_GrainReference_74FE06B8 DeepCopy(Invokable_IReminderManagementGrain_GrainReference_74FE06B8 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
@@ -1301,6 +1286,14 @@ namespace OrleansCodeGen.Orleans.AdvancedReminders
     public sealed partial class Copier_Invokable_IReminderManagementGrain_GrainReference_91B34C93 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IReminderManagementGrain_GrainReference_91B34C93>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Invokable_IReminderManagementGrain_GrainReference_91B34C93 DeepCopy(Invokable_IReminderManagementGrain_GrainReference_91B34C93 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IReminderManagementGrain_GrainReference_A9848C14 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IReminderManagementGrain_GrainReference_A9848C14>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Invokable_IReminderManagementGrain_GrainReference_A9848C14 DeepCopy(Invokable_IReminderManagementGrain_GrainReference_A9848C14 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
@@ -1501,40 +1494,6 @@ namespace OrleansCodeGen.Orleans.AdvancedReminders
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.AdvancedReminders.IReminderManagementGrain), "63932B7E" })]
-    public sealed partial class Invokable_IReminderManagementGrain_GrainReference_63932B7E : global::Orleans.Runtime.TaskRequest
-    {
-        public global::Orleans.Runtime.GrainId arg0;
-        public string arg1;
-        public global::Orleans.AdvancedReminders.Runtime.ReminderPriority arg2;
-        public override void Dispose() { }
-
-        public override string GetActivityName() { throw null; }
-
-        public override object GetArgument(int index) { throw null; }
-
-        public override int GetArgumentCount() { throw null; }
-
-        public override string GetInterfaceName() { throw null; }
-
-        public override System.Type GetInterfaceType() { throw null; }
-
-        public override System.Reflection.MethodInfo GetMethod() { throw null; }
-
-        public override string GetMethodName() { throw null; }
-
-        public override object GetTarget() { throw null; }
-
-        protected override System.Threading.Tasks.Task InvokeInner() { throw null; }
-
-        public override void SetArgument(int index, object value) { }
-
-        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.AdvancedReminders.IReminderManagementGrain), "74FE06B8" })]
     public sealed partial class Invokable_IReminderManagementGrain_GrainReference_74FE06B8 : global::Orleans.Runtime.TaskRequest<global::Orleans.AdvancedReminders.ReminderManagementPage>
     {
@@ -1725,6 +1684,40 @@ namespace OrleansCodeGen.Orleans.AdvancedReminders
         public override object GetTarget() { throw null; }
 
         protected override System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<global::Orleans.AdvancedReminders.ReminderEntry>> InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.AdvancedReminders.IReminderManagementGrain), "A9848C14" })]
+    public sealed partial class Invokable_IReminderManagementGrain_GrainReference_A9848C14 : global::Orleans.Runtime.TaskRequest
+    {
+        public global::Orleans.Runtime.GrainId arg0;
+        public string arg1;
+        public global::Orleans.DurableJobs.DurableJobPriority arg2;
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task InvokeInner() { throw null; }
 
         public override void SetArgument(int index, object value) { }
 

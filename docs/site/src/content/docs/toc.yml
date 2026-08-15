@@ -40,6 +40,8 @@ items:
         items:
           - name: Overview
             href: grains/reminders.md
+          - name: Advanced reminders
+            href: grains/advanced-reminders.md
           - name: Amazon DynamoDB reminders
             href: grains/reminders/dynamodb.md
       - name: Observers

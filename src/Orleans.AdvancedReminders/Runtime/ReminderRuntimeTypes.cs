@@ -14,16 +14,6 @@ public enum ReminderScheduleKind : byte
 }
 
 /// <summary>
-/// Priority of reminder processing.
-/// </summary>
-public enum ReminderPriority : sbyte
-{
-    Low = -1,
-    Normal = 0,
-    High = 1,
-}
-
-/// <summary>
 /// Action to apply when a reminder tick was missed.
 /// </summary>
 public enum MissedReminderAction : byte

@@ -17,6 +17,8 @@ Orleans schedules periodic grain work through two mechanisms with distinct owner
 
 Choose a grain timer when the work belongs to the current activation. Choose a reminder when the schedule belongs to the grain identity and must survive activation and cluster lifecycle changes.
 
+[Advanced reminders](advanced-reminders.md) provide one-shot and cron schedules, absolute UTC due times, priority, missed-occurrence policies, and administrative paging through an opt-in reminder service.
+
 ## Grain timers
 
 Grain timers execute callbacks as grain turns on one activation. The runtime schedules the next tick after the current callback completes, so a timer callback never overlaps itself.

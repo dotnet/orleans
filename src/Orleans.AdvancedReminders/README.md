@@ -29,13 +29,14 @@ Advanced reminder methods have explicit `AdvancedReminder` names so that classic
 using Orleans;
 using Orleans.AdvancedReminders;
 using Orleans.AdvancedReminders.Runtime;
+using Orleans.DurableJobs;
 
 public sealed class CleanupGrain : Grain, ICleanupGrain, Orleans.AdvancedReminders.IRemindable
 {
     public Task StartAsync() => this.RegisterOrUpdateAdvancedReminder(
         "cleanup",
         ReminderCronBuilder.DailyAt(2, 0),
-        ReminderPriority.High,
+        DurableJobPriority.High,
         MissedReminderAction.FireImmediately);
 
     public Task ReceiveReminder(string reminderName, TickStatus status)
@@ -47,6 +48,8 @@ public sealed class CleanupGrain : Grain, ICleanupGrain, Orleans.AdvancedReminde
 ```
 
 Use `GetAdvancedReminder`, `GetAdvancedReminders`, and `UnregisterAdvancedReminder` to inspect or remove registrations. `ReminderOptions.MinimumReminderPeriod` applies to both interval and cron registrations.
+
+`DurableJobPriority` is a signed-byte enum with three values: `Low = -1`, `Normal = 0`, and `High = 1`. `Normal` is the default. Priority is persisted with the reminder and orders delivery jobs only when they have exactly the same due time: `High` is dequeued before `Normal`, and `Normal` before `Low`. It does not change a due time, preempt running work, reserve capacity, or provide a real-time execution guarantee.
 
 Optional cleanup policies operate on each due reminder and do not scan the reminder table:
 
@@ -65,7 +68,7 @@ Both policies are independent and disabled by default: `DeleteReminderWhenGrainT
 
 For an explicit administrative cleanup, page only matching entries with `EnumerateFilteredAsync(new ReminderQueryFilter { GrainType = Orleans.Runtime.GrainType.Create("credentialvaultkeyrotation") })`, inspect them, and call `DeleteAsync` for the selected rows. This is a bounded server-side filter but still scans storage because reminder tables are not indexed by grain type.
 
-Use `ReminderSchedule.OneShot(dueTime)` or `ReminderSchedule.OneShot(dueAtUtc)` for durable work which must fire once. A one-shot registration removes itself after its callback completes.
+Use `ReminderSchedule.OneShot(dueTime)` for a relative delay or `ReminderSchedule.OneShot(dueAt)` for durable work which must fire once at a specific timestamp. Prefer a `DateTimeOffset`; its offset is normalized to UTC. A `DateTime` overload is also available but requires `DateTimeKind.Utc`. A one-shot registration removes itself after its callback completes.
 
 ## Documentation
 
