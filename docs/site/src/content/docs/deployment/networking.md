@@ -1,7 +1,7 @@
 ---
 title: Topology, networking, and clustering
 description: Configure Orleans endpoints, network paths, and cluster discovery for production.
-ms.date: 08/02/2026
+ms.date: 08/15/2026
 ms.topic: concept-article
 ---
 
@@ -39,6 +39,8 @@ For a platform that maps private addresses or ports:
 - Confirm every peer can connect to the advertised values. A successful local bind isn't sufficient.
 
 Never advertise loopback, a host name that peers resolve differently, a load balancer virtual IP for the silo endpoint, or an ephemeral address that the clustering provider can retain after the instance is gone.
+
+For host-port mapping, overlay networks, container bridge limitations, and endpoint diagnostics, see [Run Orleans in containers across multiple hosts](containers.md).
 
 ## Cluster identity
 

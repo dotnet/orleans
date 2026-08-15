@@ -27,19 +27,19 @@ siloBuilder.ConfigureEndpoints(
     }
 }
 
-namespace Documentation.Deployment.ContainerApps.Endpoints
+namespace Documentation.Deployment.ContainerEndpoints
 {
-    // <container_apps_endpoint_usings>
+    // <container_endpoint_usings>
 using System.Net;
 using Orleans.Configuration;
 
-    // </container_apps_endpoint_usings>
+    // </container_endpoint_usings>
 
-    internal static class ContainerAppsEndpointSnippets
+    internal static class ContainerEndpointSnippets
     {
         internal static void Configure(WebApplicationBuilder builder)
         {
-            // <configure_container_apps_endpoints>
+            // <configure_container_endpoints>
 var advertisedAddress = IPAddress.Parse(
     builder.Configuration["ORLEANS_ADVERTISED_IP"]
         ?? throw new InvalidOperationException("ORLEANS_ADVERTISED_IP isn't configured."));
@@ -61,7 +61,7 @@ builder.Host.UseOrleans(siloBuilder =>
         options.GatewayListeningEndpoint = new IPEndPoint(IPAddress.Any, 30_000);
     });
 });
-            // </configure_container_apps_endpoints>
+            // </configure_container_endpoints>
         }
     }
 }

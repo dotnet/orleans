@@ -1,7 +1,7 @@
 ---
 title: Server configuration
 description: Configure Orleans silos, providers, and network endpoints.
-ms.date: 08/02/2026
+ms.date: 08/15/2026
 ms.topic: how-to
 ---
 
@@ -55,6 +55,8 @@ For containers, NAT, or port forwarding, configure advertised and listening endp
 :::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="advertised_and_listening_endpoints":::
 
 This silo listens on ports `40000` and `50000` but publishes `172.16.0.42:11111` and `172.16.0.42:30000`. Ensure membership data never contains an address that peers can't route to.
+
+For private networking, host-port mappings, and cross-host container diagnostics, see [Run Orleans in containers across multiple hosts](../../deployment/containers.md).
 
 ## Configure providers and options
 

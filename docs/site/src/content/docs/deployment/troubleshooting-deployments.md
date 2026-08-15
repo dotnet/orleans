@@ -1,7 +1,7 @@
 ---
 title: Troubleshoot deployments
 description: Triage Orleans deployment and production incidents.
-ms.date: 08/02/2026
+ms.date: 08/15/2026
 ms.topic: troubleshooting
 ms.custom: devops
 ---
@@ -44,6 +44,8 @@ Compare every silo's:
 - Orleans package and application versions.
 
 From each silo network, test TCP connectivity to every advertised silo endpoint. A process can listen successfully while advertising an address no peer can reach.
+
+Periodic request timeouts, repeated forwarding, or connection attempts to loopback, a host-local container address, or a shared virtual IP indicate an advertised endpoint problem. Compare the membership endpoint with the container bind, published host port, and actual destination reached by that mapping. See [Run Orleans in containers across multiple hosts](containers.md) for a diagnostic matrix.
 
 ## Clients can't connect
 

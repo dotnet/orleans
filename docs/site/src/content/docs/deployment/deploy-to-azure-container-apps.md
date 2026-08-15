@@ -1,7 +1,7 @@
 ---
 title: Host Orleans on Azure Container Apps
 description: Design, secure, deploy, and validate an Orleans cluster on Azure Container Apps.
-ms.date: 08/06/2026
+ms.date: 08/15/2026
 ms.topic: concept-article
 ---
 
@@ -44,8 +44,8 @@ Place clients in the same environment or in a connected private network that can
 
 Pass the environment's `properties.staticIp` and the app's unique exposed ports to every silo. Bind the listening endpoints to the container target ports:
 
-:::code language="csharp" source="../snippets/compiled/Deployment/DeploymentSnippets.cs" id="container_apps_endpoint_usings":::
-:::code language="csharp" source="../snippets/compiled/Deployment/DeploymentSnippets.cs" id="configure_container_apps_endpoints":::
+:::code language="csharp" source="../snippets/compiled/Deployment/DeploymentSnippets.cs" id="container_endpoint_usings":::
+:::code language="csharp" source="../snippets/compiled/Deployment/DeploymentSnippets.cs" id="configure_container_endpoints":::
 
 A **listening endpoint** is where the process binds inside its container. An **advertised endpoint** is what Orleans writes to membership for peers and clients. Binding to `0.0.0.0` doesn't discover an address to advertise. If ingress maps different exposed and target ports, configure <xref:Orleans.Configuration.EndpointOptions> directly so that:
 
@@ -54,7 +54,7 @@ A **listening endpoint** is where the process binds inside its container. An **a
 
 Container Apps provides `CONTAINER_APP_REPLICA_NAME` to identify a replica and `CONTAINER_APP_HOSTNAME` to identify a revision host. Neither value is a supported per-replica network address. Don't advertise an app or revision host name from multiple silo replicas: a peer can be routed to a different replica than the membership entry identifies.
 
-See [Networking in Azure Container Apps](https://learn.microsoft.com/azure/container-apps/networking), [Configure ingress](https://learn.microsoft.com/azure/container-apps/ingress-how-to), and [Topology, networking, and clustering](networking.md) for the underlying network requirements.
+See [Networking in Azure Container Apps](https://learn.microsoft.com/azure/container-apps/networking), [Configure ingress](https://learn.microsoft.com/azure/container-apps/ingress-how-to), [Run Orleans in containers across multiple hosts](containers.md), and [Topology, networking, and clustering](networking.md) for the underlying network requirements.
 
 ## Configure clustering and durable state
 
