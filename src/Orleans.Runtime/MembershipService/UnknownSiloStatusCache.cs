@@ -9,7 +9,8 @@ using Orleans.Caching;
 namespace Orleans.Runtime.MembershipService;
 
 /// <summary>
-/// Conservatively classifies silos which are absent from cluster membership.
+/// Classifies silos which remain absent after a fresh membership refresh as dead,
+/// and leaves their status unknown when validation fails.
 /// </summary>
 internal sealed partial class UnknownSiloStatusCache
 {
