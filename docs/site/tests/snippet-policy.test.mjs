@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { copyFile, mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { copyFile, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -19,8 +19,18 @@ async function temporaryDirectory() {
   return directory;
 }
 
-async function runPolicy(root, siteRoot, projectPolicyPath) {
-  const commandArguments = [validator, '-PolicyOnly', '-RootPath', root];
+async function runValidator(
+  root,
+  { policyOnly = false, parallel = false, siteRoot, projectPolicyPath } = {},
+) {
+  const commandArguments = [validator];
+  if (policyOnly) {
+    commandArguments.push('-PolicyOnly');
+  }
+  if (parallel) {
+    commandArguments.push('-Parallel');
+  }
+  commandArguments.push('-RootPath', root);
   if (siteRoot) {
     commandArguments.push('-SiteRootPath', siteRoot);
   }
@@ -42,6 +52,10 @@ async function runPolicy(root, siteRoot, projectPolicyPath) {
   }
 }
 
+async function runPolicy(root, siteRoot, projectPolicyPath) {
+  return runValidator(root, { policyOnly: true, siteRoot, projectPolicyPath });
+}
+
 async function writeValidatedProject(root, projectBody) {
   await writeFile(
     path.join(root, 'Directory.Build.props'),
@@ -61,6 +75,52 @@ afterEach(async () => {
 });
 
 describe('snippet project policy', { timeout: 30_000 }, () => {
+  test('isolates outputs for parallel builds with shared project references', async () => {
+    const root = await temporaryDirectory();
+    const firstProject = path.join(root, 'snippets', 'first');
+    const secondProject = path.join(root, 'snippets', 'second');
+    const sharedProject = path.join(root, 'shared');
+    await Promise.all([
+      mkdir(firstProject, { recursive: true }),
+      mkdir(secondProject, { recursive: true }),
+      mkdir(sharedProject, { recursive: true }),
+    ]);
+    await writeFile(
+      path.join(root, 'Directory.Build.props'),
+      '<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>',
+    );
+    await writeFile(
+      path.join(sharedProject, 'Shared.csproj'),
+      '<Project Sdk="Microsoft.NET.Sdk" />',
+    );
+
+    const projectBody = (marker) => [
+      '<Project Sdk="Microsoft.NET.Sdk">',
+      '  <ItemGroup>',
+      '    <ProjectReference Include="..\\..\\shared\\Shared.csproj" />',
+      '  </ItemGroup>',
+      '  <Target Name="RecordArtifactsPath" AfterTargets="Build">',
+      '    <Error Condition="\'$(ArtifactsPath)\' == \'\'" Text="Parallel validation must set ArtifactsPath." />',
+      `    <WriteLinesToFile File="$(MSBuildProjectDirectory)/${marker}" Lines="$(ArtifactsPath)" Overwrite="true" />`,
+      '  </Target>',
+      '</Project>',
+    ].join('\n');
+    await Promise.all([
+      writeFile(path.join(firstProject, 'First.csproj'), projectBody('artifacts-path.txt')),
+      writeFile(path.join(secondProject, 'Second.csproj'), projectBody('artifacts-path.txt')),
+    ]);
+
+    const result = await runValidator(root, { parallel: true });
+    expect(result).toMatchObject({ exitCode: 0 });
+    const [firstArtifactsPath, secondArtifactsPath] = await Promise.all([
+      readFile(path.join(firstProject, 'artifacts-path.txt'), 'utf8'),
+      readFile(path.join(secondProject, 'artifacts-path.txt'), 'utf8'),
+    ]);
+    expect(firstArtifactsPath.trim()).not.toBe('');
+    expect(secondArtifactsPath.trim()).not.toBe('');
+    expect(firstArtifactsPath.trim()).not.toBe(secondArtifactsPath.trim());
+  }, 120_000);
+
   test('executes the rendered Markdown resolver without npm packages installed', async () => {
     const root = await temporaryDirectory();
     const toolRoot = path.join(root, 'tool');

@@ -12,7 +12,7 @@
     documentation examples remain buildable and executable test examples pass.
 
 .PARAMETER Parallel
-    Run validations in parallel (default: false for clearer output)
+    Run validations in parallel with isolated build outputs (default: false for clearer output)
 
 .PARAMETER PolicyOnly
     Validate target frameworks and Orleans package versions without building.
@@ -449,24 +449,43 @@ function Invoke-ProjectValidation {
 
 if ($Parallel) {
     Write-Host "Running validations in parallel..." -ForegroundColor Cyan
-    $results = $snippetProjects | ForEach-Object -Parallel {
-        $ProjectPath = $_
-        $validationRoot = $using:validationRoot
-        $relativePath = [IO.Path]::GetRelativePath($validationRoot, $ProjectPath)
-        [xml] $projectXml = Get-Content -LiteralPath $ProjectPath -Raw
-        $isTestProject = $projectXml.Project.PropertyGroup.IsTestProject -contains "true"
-        $command = if ($isTestProject) { "test" } else { "build" }
-        
-        $output = & dotnet $command $ProjectPath --framework net10.0 --nologo -v q 2>&1
-        $exitCode = $LASTEXITCODE
-        
-        @{
-            Project = $relativePath
-            Action = $command
-            Success = ($exitCode -eq 0)
-            Output = $output -join "`n"
+    $artifactsRoot = Join-Path ([IO.Path]::GetTempPath()) "orleans-snippet-validation-$([Guid]::NewGuid().ToString("N"))"
+    New-Item -ItemType Directory -Path $artifactsRoot -ErrorAction Stop | Out-Null
+    try {
+        $validationTasks = for ($index = 0; $index -lt $snippetProjects.Count; $index++) {
+            @{
+                ProjectPath = $snippetProjects[$index]
+                ArtifactsPath = Join-Path $artifactsRoot $index.ToString("D3")
+            }
         }
-    } -ThrottleLimit 4
+        $results = $validationTasks | ForEach-Object -Parallel {
+            $ProjectPath = $_.ProjectPath
+            $ArtifactsPath = $_.ArtifactsPath
+            $validationRoot = $using:validationRoot
+            $relativePath = [IO.Path]::GetRelativePath($validationRoot, $ProjectPath)
+            [xml] $projectXml = Get-Content -LiteralPath $ProjectPath -Raw
+            $isTestProject = $projectXml.Project.PropertyGroup.IsTestProject -contains "true"
+            $command = if ($isTestProject) { "test" } else { "build" }
+
+            $output = & dotnet $command $ProjectPath --framework net10.0 --nologo -v q --artifacts-path $ArtifactsPath 2>&1
+            $exitCode = $LASTEXITCODE
+
+            @{
+                Project = $relativePath
+                Action = $command
+                Success = ($exitCode -eq 0)
+                Output = $output -join "`n"
+            }
+        } -ThrottleLimit 4
+    }
+    finally {
+        try {
+            Remove-Item -LiteralPath $artifactsRoot -Recurse -Force -ErrorAction Stop
+        }
+        catch {
+            Write-Warning "Could not remove temporary snippet artifacts '$artifactsRoot': $($_.Exception.Message)"
+        }
+    }
 } else {
     foreach ($project in $snippetProjects) {
         $result = Invoke-ProjectValidation -ProjectPath $project -IsTestProject (Test-IsTestProject -ProjectPath $project)
