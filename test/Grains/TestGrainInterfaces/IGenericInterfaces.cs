@@ -219,7 +219,7 @@ namespace UnitTests.GrainInterfaces
         Task<bool> CancellationTokenCallbackResolve(CancellationToken tc, Guid callId);
         Task<bool> CallOtherGrainCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target, Guid callId);
         Task<bool> CallOtherCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target, Guid callId);
-        Task GrainCancellationTokenCallbackThrow(GrainCancellationToken tc, Guid callId);
+        Task GrainCancellationTokenCallbackThrow(GrainCancellationToken tc, Guid callId, ILongRunningTaskObserver observer);
         Task CancellationTokenCallbackThrow(CancellationToken tc, Guid callId);
         Task<T> GetLastValue();
 

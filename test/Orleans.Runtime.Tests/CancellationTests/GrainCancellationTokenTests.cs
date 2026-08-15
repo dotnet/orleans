@@ -168,21 +168,23 @@ namespace UnitTests.CancellationTests
         public async Task CancellationTokenCallbacksThrow_ExceptionShouldBePropagated()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
+            var observer = new LongRunningTaskObserver();
+            var observerReference = fixture.GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
             using var cts = new GrainCancellationTokenSource();
-            var callId = Guid.NewGuid();
-            grain.GrainCancellationTokenCallbackThrow(cts.Token, callId).Ignore();
-            await Task.Delay(TimeSpan.FromMilliseconds(100));
             try
             {
-                await cts.Cancel();
-            }
-            catch (AggregateException ex)
-            {
-                Assert.True(ex.InnerException is InvalidOperationException, "Exception thrown has wrong type");
-                return;
-            }
+                var callId = Guid.NewGuid();
+                var grainTask = grain.GrainCancellationTokenCallbackThrow(cts.Token, callId, observerReference);
+                await observer.WaitForCallToStart(callId);
 
-            Assert.Fail("No exception was thrown");
+                var exception = await Assert.ThrowsAsync<AggregateException>(() => cts.Cancel());
+                Assert.IsType<InvalidOperationException>(Assert.Single(exception.InnerExceptions));
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => grainTask);
+            }
+            finally
+            {
+                fixture.GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+            }
         }
 
         [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
@@ -332,6 +334,19 @@ namespace UnitTests.CancellationTests
             }
 
             Assert.Fail("Did not encounter the expected call id");
+        }
+
+        private sealed class LongRunningTaskObserver : ILongRunningTaskObserver
+        {
+            private readonly TaskCompletionSource<Guid> _startedCall = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public void OnCallStarted(Guid callId) => _startedCall.TrySetResult(callId);
+
+            public async Task WaitForCallToStart(Guid callId)
+            {
+                var startedCallId = await _startedCall.Task.WaitAsync(TimeSpan.FromSeconds(30));
+                Assert.Equal(callId, startedCallId);
+            }
         }
     }
 }
