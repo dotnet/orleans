@@ -217,7 +217,12 @@ namespace Orleans.Runtime.ReminderService
             if (newEtag != null)
             {
                 entry.ETag = newEtag;
-                ReconcileLocalReminder(entry, _timeProvider.GetUtcNow().UtcDateTime);
+                // A request can arrive on a stale owner. Persist it here, but let the current owner load it.
+                if (RingRange.InRange(grainId))
+                {
+                    ReconcileLocalReminder(entry, _timeProvider.GetUtcNow().UtcDateTime);
+                }
+
                 LogDebugRegisterReminder(entry, localTableSequence);
 
                 if (logger.IsEnabled(LogLevel.Trace)) PrintReminders();

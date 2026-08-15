@@ -211,6 +211,7 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         using (var recorder = new ReminderEventRecorder(ReminderEvents.AllEvents))
         {
             await grain.StartReminder(DR);
+            await SynchronizeReminderSchedulesAsync(cts.Token, (grain, DR));
             await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), firstTickCount + 1, cts.Token);
 
             Assert.Contains(recorder.Events, evt => evt is ReminderEvents.Registered registered && registered.GrainId == grainId && registered.ReminderName == DR);
@@ -423,18 +424,7 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
 
         for (var i = 0; i < tickCount; i++)
         {
-            await Task.WhenAll(reminders.Select(async reminder =>
-            {
-                await observer.WaitForActiveReminderCountAsync(
-                    reminder.Grain,
-                    1,
-                    cancellationToken,
-                    reminder.ReminderName);
-                await observer.WaitForLocalReminderScheduleAsync(
-                    reminder.Grain,
-                    reminder.ReminderName,
-                    cancellationToken);
-            }));
+            await SynchronizeReminderSchedulesAsync(cancellationToken, reminders);
 
             var counterWaitTasks = new List<Task>(reminders.Length);
             var previousTickCounts = new int[reminders.Length];
@@ -475,11 +465,7 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
             await AdvanceReminderTimeAsync(period, cancellationToken);
             await Task.WhenAll(Task.WhenAll(counterWaitTasks), Task.WhenAll(tickTasks));
 
-            await Task.WhenAll(reminders.Select(reminder =>
-                observer.WaitForLocalReminderScheduleAsync(
-                    reminder.Grain,
-                    reminder.ReminderName,
-                    cancellationToken)));
+            await SynchronizeReminderSchedulesAsync(cancellationToken, reminders);
             for (var reminderIndex = 0; reminderIndex < reminders.Length; reminderIndex++)
             {
                 var reminder = reminders[reminderIndex];
@@ -600,7 +586,7 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
 
             var nextTickTarget = observer.GetTickCount(grainId, reminderName) + 1;
             var waitTask = observer.WaitForTickCountAsync(grainId, nextTickTarget, cancellationToken, reminderName);
-            await observer.WaitForLocalReminderScheduleAsync(grainId, reminderName, cancellationToken);
+            await SynchronizeReminderSchedulesAsync(cancellationToken, (grain, reminderName));
             var reminderPeriod = await GetReminderPeriodAsync(grain, reminderName);
             await AdvanceReminderTimeAsync(reminderPeriod, cancellationToken);
             await waitTask;
@@ -763,9 +749,45 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
 
     private async Task RefreshReminderServicesAsync(CancellationToken cancellationToken)
     {
-        var refreshTasks = HostedCluster.Silos.Select(silo =>
+        var refreshTasks = HostedCluster.GetActiveSilos().Select(silo =>
             silo.ServiceProvider.GetRequiredService<LocalReminderService>().TestOnlyRefresh());
         await Task.WhenAll(refreshTasks).WaitAsync(cancellationToken);
+    }
+
+    private async Task SynchronizeReminderSchedulesAsync(
+        CancellationToken cancellationToken,
+        params (IAddressable Grain, string ReminderName)[] reminders)
+    {
+        await RefreshReminderServicesAsync(cancellationToken);
+        try
+        {
+            await Task.WhenAll(reminders.Select(async reminder =>
+            {
+                await observer.WaitForActiveReminderCountAsync(
+                    reminder.Grain,
+                    1,
+                    cancellationToken,
+                    reminder.ReminderName);
+                await observer.WaitForLocalReminderScheduleAsync(
+                    reminder.Grain,
+                    reminder.ReminderName,
+                    cancellationToken);
+            }));
+        }
+        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
+        {
+            var states = reminders.Select(reminder =>
+            {
+                var grainId = reminder.Grain.GetGrainId();
+                return $"{grainId}/{reminder.ReminderName}: " +
+                    $"owners={observer.GetActiveReminderCount(grainId, reminder.ReminderName)}, " +
+                    $"silos=[{string.Join(", ", observer.GetActiveReminderSilos(grainId, reminder.ReminderName).Select(static silo => silo.ToString()))}], " +
+                    $"ticks={observer.GetTickCount(grainId, reminder.ReminderName)}";
+            });
+            throw new InvalidOperationException(
+                $"Timed out synchronizing reminder schedules at {ReminderUtcNow:O}: {string.Join("; ", states)}",
+                exception);
+        }
     }
 
     private async Task<bool> HandleError(Exception ex, long i)
