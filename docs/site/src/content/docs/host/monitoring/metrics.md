@@ -28,7 +28,7 @@ The instrument type determines which query is meaningful. Don't alert on every d
 
 OpenTelemetry can transport sums using cumulative or delta temporality. "Current" and "Delta" fields shown by older telemetry exporters were views over a counter, not separate Orleans instruments. Current OpenTelemetry guidance similarly distinguishes monotonic sums, gauges, and histograms and allows [temporality conversion and reaggregation](https://opentelemetry.io/docs/specs/otel/metrics/data-model/).
 
-Units in the tables are the metadata emitted by Orleans. Some established instruments use historical strings such as `ms`, `seconds`, `bytes`, and `MB`, while current [OpenTelemetry metric semantic conventions](https://opentelemetry.io/docs/specs/semconv/general/metrics/) generally recommend UCUM units such as `s` and `By`. Preserve the emitted unit in storage and convert explicitly in queries instead of inferring a unit from the metric name.
+Units in the tables describe each instrument's natural unit. Orleans doesn't set unit metadata on every instrument, so `count` can be the natural unit even when exporters receive no unit string. Where unit metadata is emitted, some established instruments use historical strings such as `ms`, `seconds`, `bytes`, and `MB`, while current [OpenTelemetry metric semantic conventions](https://opentelemetry.io/docs/specs/semconv/general/metrics/) generally recommend UCUM units such as `s` and `By`. Preserve emitted units in storage and convert explicitly in queries instead of inferring a unit from the metric name.
 
 ## Client signals
 
@@ -96,7 +96,7 @@ All storage instruments use `provider_type_name`, `state_name`, and `state_type`
 | Instrument | Type and unit | Meaning and interpretation |
 |---|---|---|
 | `orleans-runtime-available-memory` | Observable gauge, `MB` | GC-reported available memory budget. Values are calculated using 1,024² bytes per reported MB. Alert on the ratio to the total budget and correlate with working set, GC heap, allocation rate, and container limits. |
-| `orleans-runtime-total-physical-memory` | Observable gauge, `MB` | Despite the historical name, the implementation reports <xref:System.GC.GetGCMemoryInfo*> <xref:System.GCMemoryInfo.TotalAvailableMemoryBytes>, which can reflect a configured or container memory limit rather than host physical RAM. |
+| `orleans-runtime-total-physical-memory` | Observable gauge, `MB` | Despite the historical name, the implementation reports <xref:System.GC.GetGCMemoryInfo> <xref:System.GCMemoryInfo.TotalAvailableMemoryBytes>, which can reflect a configured or container memory limit rather than host physical RAM. |
 | `orleans-watchdog-health-checks` | Counter, count | Runtime watchdog checks performed. |
 | `orleans-watchdog-health-checks-failed` | Counter, count | Failed runtime watchdog checks. Alert on failures while confirming that checks continue to run. |
 
