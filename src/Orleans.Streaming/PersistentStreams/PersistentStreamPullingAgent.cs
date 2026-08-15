@@ -329,6 +329,11 @@ namespace Orleans.Streams
                 data.LastProcessedToken = startToken;
                 data.PendingStartToken = null;
                 data.IsRegistered = true;
+                if (streamDataCollection.AllConsumers().All(static consumer => consumer.IsRegistered))
+                {
+                    streamDataCollection.ReleaseRegistrationPin();
+                }
+
                 StreamingEvents.EmitSubscriptionAttached(streamProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, Silo);
                 if (data.State == StreamConsumerDataState.Inactive)
                     RunConsumerCursor(data).Ignore(); // Start delivering events if not actively doing so
@@ -421,7 +426,10 @@ namespace Orleans.Streams
             }
 
             if (streamData.Count == 0)
+            {
+                streamData.DisposeAll(logger);
                 pubSubCache.Remove(streamId);
+            }
         }
 
         private Task RunQueuePump(QueueId queueId, CancellationToken cancellationToken)
@@ -507,6 +515,11 @@ namespace Orleans.Streams
                 return false;
             }
 
+            if (pubSubCache.Values.Any(static stream => stream.RegistrationTask is { IsCompleted: false }))
+            {
+                return false;
+            }
+
             var now = _timeProvider.GetUtcNow().UtcDateTime;
             TagList? tags = null;
 
@@ -548,6 +561,14 @@ namespace Orleans.Streams
 
             if (queueCache is not null && queueCache.IsUnderPressure())
             {
+                foreach (var stream in pubSubCache.Values)
+                {
+                    if (stream.Count == 0 && stream.RegistrationTask is null)
+                    {
+                        stream.ReleaseRegistrationPin();
+                    }
+                }
+
                 // Under back pressure. Exit the loop. Will attempt again in the next timer callback.
                 LogInfoStreamCacheUnderPressure();
                 return false;
@@ -589,6 +610,18 @@ namespace Orleans.Streams
                 if (pubSubCache.TryGetValue(streamId, out var streamData))
                 {
                     streamData.RefreshActivity(now);
+                    if (streamData.Count == 0 || streamData.AllConsumers().Any(static consumer => !consumer.IsRegistered))
+                    {
+                        if (streamData.PendingStartToken is null || startToken.Older(streamData.PendingStartToken))
+                        {
+                            streamData.PendingStartToken = startToken;
+                        }
+                    }
+                    else
+                    {
+                        streamData.PendingStartToken = null;
+                    }
+
                     StartInactiveCursors(streamData, startToken);
                 }
                 else
@@ -690,13 +723,16 @@ namespace Orleans.Streams
                 return;
             }
 
-            var streamData = new StreamConsumerCollection(now);
+            var streamData = new StreamConsumerCollection(now)
+            {
+                PendingStartToken = firstToken
+            };
 
             // Create a fake cursor to point into a cache.
             // That way we will not purge the event from the cache, until we talk to pub sub.
             // This will help ensure the "casual consistency" between pre-existing subscripton (of a potentially new already subscribed consumer)
             // and later production.
-            var pinCursor = queueCache?.GetCacheCursor(streamId, firstToken);
+            streamData.RegistrationPin = queueCache?.GetCacheCursor(streamId, firstToken);
             streamData.RegistrationTask = RegisterStreamAsync();
             pubSubCache.Add(streamId, streamData);
 
@@ -747,9 +783,10 @@ namespace Orleans.Streams
                 {
                     streamData.RegistrationTask = null;
 
-                    // Disposed after all initial subscriber handshakes complete so the first
-                    // batch stays pinned until each subscriber has its own cache cursor.
-                    pinCursor?.Dispose();
+                    if (streamData.Count > 0 && streamData.AllConsumers().All(static consumer => consumer.IsRegistered))
+                    {
+                        streamData.ReleaseRegistrationPin();
+                    }
                 }
             }
 

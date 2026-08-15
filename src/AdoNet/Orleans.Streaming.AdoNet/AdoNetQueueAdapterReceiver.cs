@@ -43,7 +43,7 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
     private int _activeOperations;
     private TaskCompletionSource? _operationsCompleted;
 
-    internal AdoNetQueueAdapterReceiver(
+    public AdoNetQueueAdapterReceiver(
         string providerId,
         string queueId,
         AdoNetStreamOptions streamOptions,

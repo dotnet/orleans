@@ -60,10 +60,15 @@ namespace UnitTests.StreamingTests
 
             Assert.True(await readTask, "ReadFromQueue should return true indicating data was read");
 
+            Assert.False(await testAccessor.ReadFromQueue(queueId, receiver, 1));
+            await receiver.Received(1).GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
+
             // Completing registration should resolve the tracked task and clear it.
             registration.SetResult(new HashSet<PubSubSubscriptionState>());
             await registrationTask;
+            Assert.True(await testAccessor.ReadFromQueue(queueId, receiver, 1));
             Assert.Null(streamData.RegistrationTask);
+            await receiver.Received(2).GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
         }
 
         [TestSuite("BVT")]
@@ -104,6 +109,46 @@ namespace UnitTests.StreamingTests
             }
 
             Assert.True(streamData.StreamRegistered);
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task ReadFromQueue_PreservesColdStreamStartTokenForLateSubscriber()
+        {
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default)
+                .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
+
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var streamId = StreamId.Create("namespace", Guid.NewGuid());
+            var qualifiedStreamId = new QualifiedStreamId("provider", streamId);
+            var firstToken = new EventSequenceTokenV2(1);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult<IList<IBatchContainer>>(
+                [
+                    new GeneratedBatchContainer(streamId, 1, firstToken),
+                ]));
+
+            var agent = CreateAgent(pubSub, queueId);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+
+            Assert.True(await testAccessor.ReadFromQueue(queueId, receiver, 1));
+
+            var streamData = (await testAccessor.GetPubSubCache()).Single().Value;
+            Assert.Equal(firstToken, streamData.PendingStartToken);
+
+            var consumerData = streamData.AddConsumer(
+                GuidId.GetGuidId(Guid.NewGuid()),
+                qualifiedStreamId,
+                new RecordingConsumer(),
+                filterData: null,
+                now: DateTime.UtcNow);
+
+            Assert.Equal(firstToken, consumerData.PendingStartToken);
         }
 
         [TestSuite("BVT")]

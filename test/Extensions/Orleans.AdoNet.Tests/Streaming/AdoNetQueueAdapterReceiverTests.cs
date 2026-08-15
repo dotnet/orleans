@@ -3,6 +3,7 @@ using MySql.Data.MySqlClient;
 using Orleans.Configuration;
 using Orleans.Streaming.AdoNet;
 using Orleans.Tests.SqlUtils;
+using System.Runtime.CompilerServices;
 using TestExtensions;
 using UnitTests.General;
 using static System.String;
@@ -20,6 +21,10 @@ namespace Tester.AdoNet.Streaming;
 [TestArea("Streaming")]
 public class AdoNetQueueAdapterReceiverLifecycleTests(TestEnvironmentFixture fixture)
 {
+    [Fact]
+    public void AdoNetQueueAdapterReceiver_CanBeCreatedByAdapterFactory() =>
+        RuntimeHelpers.RunClassConstructor(typeof(AdoNetQueueAdapter).TypeHandle);
+
     [Fact]
     public async Task AdoNetQueueAdapterReceiver_Shutdown_WaitsForDequeueBookkeepingBeforeRelease()
     {
