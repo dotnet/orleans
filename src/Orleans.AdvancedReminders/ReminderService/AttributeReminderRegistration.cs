@@ -1,8 +1,10 @@
 using System;
+using System.Buffers;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using Orleans.DurableJobs;
 using Orleans.Runtime;
 
 namespace Orleans.AdvancedReminders.Runtime.ReminderService;
@@ -13,7 +15,7 @@ internal interface IAttributeReminderService
         GrainId grainId,
         string reminderName,
         ReminderSchedule schedule,
-        ReminderPriority priority,
+        DurableJobPriority priority,
         MissedReminderAction action,
         string declarationId);
 }
@@ -24,7 +26,7 @@ internal static class AttributeReminderRegistration
 
     public static string GetDeclarationId(
         ReminderSchedule schedule,
-        ReminderPriority priority,
+        DurableJobPriority priority,
         MissedReminderAction action)
     {
         ArgumentNullException.ThrowIfNull(schedule);
@@ -40,11 +42,41 @@ internal static class AttributeReminderRegistration
             _ => throw new ArgumentOutOfRangeException(nameof(schedule), schedule.Kind, "Unsupported reminder schedule kind."),
         };
 
+        var byteCount = Encoding.UTF8.GetByteCount(declaration);
+        byte[]? rentedBuffer = null;
+        Span<byte> utf8 = byteCount <= 512
+            ? stackalloc byte[byteCount]
+            : (rentedBuffer = ArrayPool<byte>.Shared.Rent(byteCount));
         Span<byte> hash = stackalloc byte[SHA256.HashSizeInBytes];
-        SHA256.HashData(Encoding.UTF8.GetBytes(declaration), hash);
-        return Convert.ToBase64String(hash[..DeclarationHashLength])
-            .TrimEnd('=')
-            .Replace('+', '-')
-            .Replace('/', '_');
+        try
+        {
+            _ = Encoding.UTF8.GetBytes(declaration, utf8);
+            SHA256.HashData(utf8[..byteCount], hash);
+        }
+        finally
+        {
+            if (rentedBuffer is not null)
+            {
+                ArrayPool<byte>.Shared.Return(rentedBuffer);
+            }
+        }
+
+        Span<char> encoded = stackalloc char[16];
+        if (!Convert.TryToBase64Chars(hash[..DeclarationHashLength], encoded, out var charsWritten))
+        {
+            throw new InvalidOperationException("Could not encode reminder declaration id.");
+        }
+
+        for (var index = 0; index < charsWritten; index++)
+        {
+            encoded[index] = encoded[index] switch
+            {
+                '+' => '-',
+                '/' => '_',
+                _ => encoded[index],
+            };
+        }
+
+        return new string(encoded[..charsWritten]);
     }
 }

@@ -48,6 +48,23 @@ public sealed class CleanupGrain : Grain, ICleanupGrain, Orleans.AdvancedReminde
 
 Use `GetAdvancedReminder`, `GetAdvancedReminders`, and `UnregisterAdvancedReminder` to inspect or remove registrations. `ReminderOptions.MinimumReminderPeriod` applies to both interval and cron registrations.
 
+Optional cleanup policies operate on each due reminder and do not scan the reminder table:
+
+```csharp
+siloBuilder.AddAdvancedReminders(options =>
+{
+    // Delete a due reminder when its grain type is absent from every active silo manifest.
+    options.DeleteReminderWhenGrainTypeIsUnavailable = true;
+
+    // Safety valve: remove a reminder which is still failing at Durable Jobs dequeue 3.
+    options.MaximumDeliveryAttempts = 3;
+});
+```
+
+Both policies are independent and disabled by default: `DeleteReminderWhenGrainTypeIsUnavailable` is `false` and `MaximumDeliveryAttempts` is `null`. Either policy can be enabled without the other. Type-based cleanup only deletes after the cluster manifest is complete for a stable set of active silos, but grain types can still be deliberately absent during deployment, so enable it only when that tradeoff is acceptable. `MaximumDeliveryAttempts` is a safety limit for preventing persistently broken reminders from consuming delivery resources indefinitely, not an exact callback-exception counter. If configured, it must be positive and the Durable Jobs retry policy must allow at least that many attempts.
+
+For an explicit administrative cleanup, page only matching entries with `EnumerateFilteredAsync(new ReminderQueryFilter { GrainType = Orleans.Runtime.GrainType.Create("credentialvaultkeyrotation") })`, inspect them, and call `DeleteAsync` for the selected rows. This is a bounded server-side filter but still scans storage because reminder tables are not indexed by grain type.
+
 Use `ReminderSchedule.OneShot(dueTime)` or `ReminderSchedule.OneShot(dueAtUtc)` for durable work which must fire once. A one-shot registration removes itself after its callback completes.
 
 ## Documentation

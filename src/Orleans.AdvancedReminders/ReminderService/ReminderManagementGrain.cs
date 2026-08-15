@@ -24,6 +24,9 @@ public sealed class ReminderManagementGrain(
     private const ulong ScanBucketWidth = (ulong)uint.MaxValue / ScanBucketCount + 1;
     private readonly IReminderTable _reminderTable = reminderTable;
     private readonly TimeProvider _timeProvider = timeProvider;
+    private List<ReminderEntry>? _cachedReminders;
+    private int _cachedBucket = -1;
+    private bool _cachedRemindersAreSorted;
 
     public ReminderManagementGrain(IReminderTable reminderTable)
         : this(reminderTable, TimeProvider.System)
@@ -84,36 +87,33 @@ public sealed class ReminderManagementGrain(
             candidates.RemoveRange(pageSize, candidates.Count - pageSize);
         }
 
-        return new ReminderManagementPage
+        var reminders = new List<ReminderEntry>(candidates.Count);
+        foreach (var candidate in candidates)
         {
-            Reminders = candidates.Select(candidate => candidate.Entry).ToList(),
-            ContinuationToken = hasMore && candidates.Count > 0
-                ? ReminderCursor.Create(candidates[^1].Entry, candidates[^1].Bucket)
-                : null,
-        };
-    }
-
-    public async Task<IEnumerable<ReminderEntry>> UpcomingAsync(TimeSpan horizon)
-    {
-        if (horizon < TimeSpan.Zero)
-        {
-            throw new ArgumentOutOfRangeException(nameof(horizon));
+            reminders.Add(candidate.Entry);
         }
 
-        var now = GetUtcNow();
-        var upper = horizon > DateTime.MaxValue - now ? DateTime.MaxValue : now.Add(horizon);
-        return (await GetAllAsync())
-            .Where(reminder => GetDueTime(reminder) >= now && GetDueTime(reminder) <= upper)
-            .OrderBy(reminder => reminder, ReminderEntryComparer.Instance)
-            .ToList();
+        var nextToken = hasMore && candidates.Count > 0
+            ? ReminderCursor.Create(candidates[^1].Entry, candidates[^1].Bucket)
+            : null;
+        if (nextToken is null)
+        {
+            _cachedBucket = -1;
+            _cachedReminders = null;
+            _cachedRemindersAreSorted = false;
+        }
+
+        return new ReminderManagementPage
+        {
+            Reminders = reminders,
+            ContinuationToken = nextToken,
+        };
     }
 
     public async Task<IEnumerable<ReminderEntry>> ListForGrainAsync(GrainId grainId)
         => (await _reminderTable.ReadRows(grainId)).Reminders.OrderBy(reminder => reminder, ReminderEntryComparer.Instance).ToList();
 
-    public async Task<int> CountAllAsync() => (await _reminderTable.ReadRows(0, 0)).Reminders.Count;
-
-    public async Task SetPriorityAsync(GrainId grainId, string name, Runtime.ReminderPriority priority)
+    public async Task SetPriorityAsync(GrainId grainId, string name, DurableJobPriority priority)
     {
         if (!Enum.IsDefined(priority))
         {
@@ -161,9 +161,6 @@ public sealed class ReminderManagementGrain(
         }
     }
 
-    private async Task<List<ReminderEntry>> GetAllAsync()
-        => (await _reminderTable.ReadRows(0, 0)).Reminders.ToList();
-
     private async Task<ReminderEntry> GetEntryAsync(GrainId grainId, string name)
         => await _reminderTable.ReadRow(grainId, name) ?? throw new Runtime.ReminderException($"Reminder '{name}' for grain '{grainId}' was not found.");
 
@@ -194,19 +191,62 @@ public sealed class ReminderManagementGrain(
         {
             var begin = bucket == 0 ? uint.MaxValue : (uint)((ulong)bucket * ScanBucketWidth - 1);
             var end = (uint)((ulong)(bucket + 1) * ScanBucketWidth - 1);
-            var reminders = (await _reminderTable.ReadRows(begin, end)).Reminders;
-            var candidates = new List<ReminderEntry>(reminders.Count);
+            List<ReminderEntry> reminders;
+            if (cursor is not null && bucket == cursor.Bucket && bucket == _cachedBucket && _cachedReminders is not null)
+            {
+                reminders = _cachedReminders;
+                if (!_cachedRemindersAreSorted)
+                {
+                    reminders.Sort(ReminderEntryComparer.Instance);
+                    _cachedRemindersAreSorted = true;
+                }
+
+                for (var index = FindFirstAfterCursor(reminders, cursor); index < reminders.Count && result.Count < take; index++)
+                {
+                    var reminder = reminders[index];
+                    if (MatchesFilter(reminder, filter, now))
+                    {
+                        result.Add(new BucketedReminder(bucket, reminder));
+                    }
+                }
+
+                continue;
+            }
+
+            var loadedReminders = (await _reminderTable.ReadRows(begin, end)).Reminders;
+            reminders = loadedReminders as List<ReminderEntry> ?? new List<ReminderEntry>(loadedReminders);
+            _cachedBucket = bucket;
+            _cachedReminders = reminders;
+            _cachedRemindersAreSorted = false;
+            var remaining = take - result.Count;
+            var candidates = new PriorityQueue<ReminderEntry, ReminderEntry>(
+                remaining,
+                ReverseReminderEntryComparer.Instance);
             foreach (var reminder in reminders)
             {
                 if (MatchesFilter(reminder, filter, now)
                     && (cursor is null || bucket != cursor.Bucket || IsAfterCursor(reminder, cursor)))
                 {
-                    candidates.Add(reminder);
+                    if (candidates.Count < remaining)
+                    {
+                        candidates.Enqueue(reminder, reminder);
+                    }
+                    else if (ReminderEntryComparer.Instance.Compare(reminder, candidates.Peek()) < 0)
+                    {
+                        candidates.Dequeue();
+                        candidates.Enqueue(reminder, reminder);
+                    }
                 }
             }
 
-            candidates.Sort(ReminderEntryComparer.Instance);
-            foreach (var reminder in candidates)
+            var orderedCandidates = new List<ReminderEntry>(candidates.Count);
+            while (candidates.TryDequeue(out var reminder, out _))
+            {
+                orderedCandidates.Add(reminder);
+            }
+
+            orderedCandidates.Sort(ReminderEntryComparer.Instance);
+            foreach (var reminder in orderedCandidates)
             {
                 result.Add(new BucketedReminder(bucket, reminder));
                 if (result.Count == take)
@@ -217,6 +257,26 @@ public sealed class ReminderManagementGrain(
         }
 
         return result;
+    }
+
+    private static int FindFirstAfterCursor(List<ReminderEntry> reminders, ReminderCursor cursor)
+    {
+        var lower = 0;
+        var upper = reminders.Count;
+        while (lower < upper)
+        {
+            var middle = lower + ((upper - lower) / 2);
+            if (ReminderCursor.Compare(reminders[middle], cursor) <= 0)
+            {
+                lower = middle + 1;
+            }
+            else
+            {
+                upper = middle;
+            }
+        }
+
+        return lower;
     }
 
     private bool MatchesFilter(ReminderEntry reminder, ReminderQueryFilter filter, DateTime now)
@@ -244,6 +304,11 @@ public sealed class ReminderManagementGrain(
         }
 
         if (filter.ScheduleKind is { } scheduleKind && GetScheduleKind(reminder) != scheduleKind)
+        {
+            return false;
+        }
+
+        if (filter.GrainType is { } grainType && reminder.GrainId.Type != grainType)
         {
             return false;
         }
@@ -473,4 +538,11 @@ public sealed class ReminderManagementGrain(
         }
     }
 
+    private sealed class ReverseReminderEntryComparer : IComparer<ReminderEntry>
+    {
+        public static ReverseReminderEntryComparer Instance { get; } = new();
+
+        public int Compare(ReminderEntry? x, ReminderEntry? y)
+            => ReminderEntryComparer.Instance.Compare(y, x);
+    }
 }

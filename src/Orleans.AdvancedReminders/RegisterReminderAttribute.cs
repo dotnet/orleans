@@ -18,7 +18,7 @@ public sealed class RegisterReminderAttribute : Attribute
         string name,
         double dueSeconds,
         double periodSeconds,
-        Runtime.ReminderPriority priority = Runtime.ReminderPriority.Normal,
+        DurableJobPriority priority = DurableJobPriority.Normal,
         Runtime.MissedReminderAction action = Runtime.MissedReminderAction.Skip)
     {
         ValidateName(name);
@@ -39,7 +39,7 @@ public sealed class RegisterReminderAttribute : Attribute
     public RegisterReminderAttribute(
         string name,
         string cron,
-        Runtime.ReminderPriority priority = Runtime.ReminderPriority.Normal,
+        DurableJobPriority priority = DurableJobPriority.Normal,
         Runtime.MissedReminderAction action = Runtime.MissedReminderAction.Skip)
     {
         ValidateName(name);
@@ -75,7 +75,7 @@ public sealed class RegisterReminderAttribute : Attribute
     /// <summary>
     /// Gets the reminder priority.
     /// </summary>
-    public Runtime.ReminderPriority Priority { get; }
+    public DurableJobPriority Priority { get; }
 
     /// <summary>
     /// Gets the missed reminder action.
@@ -98,7 +98,7 @@ public sealed class RegisterReminderAttribute : Attribute
         }
     }
 
-    private static void ValidatePriorityAndAction(Runtime.ReminderPriority priority, Runtime.MissedReminderAction action)
+    private static void ValidatePriorityAndAction(DurableJobPriority priority, Runtime.MissedReminderAction action)
     {
         if (!Enum.IsDefined(priority))
         {
