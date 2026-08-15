@@ -76,8 +76,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
                 {
                     await foreach (var update in ClusterMembershipService.MembershipUpdates.WithCancellation(_shutdownCts.Token))
                     {
-                        var view = new DirectoryMembershipSnapshot(update, _grainFactory, _partitionsPerSilo, _getRingBoundaries);
-                        _viewUpdates.Publish(view);
+                        PublishMembershipUpdate(update);
                     }
                 }
                 catch (Exception exception)
@@ -93,6 +92,12 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         {
             _viewUpdates.Dispose();
         }
+    }
+
+    internal void PublishMembershipUpdate(ClusterMembershipSnapshot update)
+    {
+        var view = new DirectoryMembershipSnapshot(update, _grainFactory, _partitionsPerSilo, _getRingBoundaries);
+        _viewUpdates.Publish(view);
     }
 
     public async ValueTask DisposeAsync()
