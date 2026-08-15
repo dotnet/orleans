@@ -30,21 +30,31 @@ public sealed class ReminderOptions
     public TimeSpan MissedReminderGracePeriod { get; set; } = TimeSpan.FromSeconds(ReminderOptionsDefaults.MissedReminderGracePeriodSeconds);
 
     /// <summary>
-    /// Gets or sets the initial delay used when retrying reminder persistence or durable-job scheduling.
-    /// Subsequent failures use exponential backoff with jitter.
-    /// </summary>
-    public TimeSpan SchedulingRetryInitialDelay { get; set; } = TimeSpan.FromSeconds(1);
-
-    /// <summary>
-    /// Gets or sets the maximum delay between reminder scheduling retries.
-    /// </summary>
-    public TimeSpan SchedulingRetryMaxDelay { get; set; } = TimeSpan.FromMinutes(1);
-
-    /// <summary>
     /// Gets or sets how long a reminder may remain overdue with a persisted durable-job handle before
     /// reconciliation treats the handle as stale and safely attempts to recreate the job.
     /// </summary>
     public TimeSpan StaleJobRecoveryDelay { get; set; } = TimeSpan.FromMinutes(15);
+
+    /// <summary>
+    /// Gets or sets whether a due reminder is deleted when no active silo declares its target grain type.
+    /// </summary>
+    /// <remarks>
+    /// The default is <see langword="false"/>. Enable this only when grain types are retired deliberately,
+    /// since a type can be temporarily unavailable during deployment or cluster recovery.
+    /// </remarks>
+    public bool DeleteReminderWhenGrainTypeIsUnavailable { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets the Durable Jobs dequeue-count limit used to remove a repeatedly failing reminder.
+    /// </summary>
+    /// <remarks>
+    /// This is a safety limit which prevents a broken reminder from consuming delivery resources indefinitely,
+    /// not an exact count of callback exceptions. A value of <see langword="null"/> preserves the default reminder
+    /// behavior: callback failures are logged and the recurring series continues. A positive value retries the same
+    /// occurrence through Durable Jobs and deletes the reminder when delivery fails at or beyond that dequeue count.
+    /// The Durable Jobs retry policy must allow at least this many attempts.
+    /// </remarks>
+    public int? MaximumDeliveryAttempts { get; set; }
 }
 
 /// <summary>
@@ -94,21 +104,14 @@ internal sealed partial class ReminderOptionsValidator : IConfigurationValidator
             throw new OrleansConfigurationException($"{nameof(ReminderOptions)}.{nameof(ReminderOptions.MissedReminderGracePeriod)} must be greater than {TimeSpan.Zero}");
         }
 
-        if (options.Value.SchedulingRetryInitialDelay <= TimeSpan.Zero
-            || options.Value.SchedulingRetryInitialDelay > maxTimerDelay)
-        {
-            throw new OrleansConfigurationException($"{nameof(ReminderOptions)}.{nameof(ReminderOptions.SchedulingRetryInitialDelay)} must be greater than zero and no greater than {maxTimerDelay}");
-        }
-
-        if (options.Value.SchedulingRetryMaxDelay < options.Value.SchedulingRetryInitialDelay
-            || options.Value.SchedulingRetryMaxDelay > maxTimerDelay)
-        {
-            throw new OrleansConfigurationException($"{nameof(ReminderOptions)}.{nameof(ReminderOptions.SchedulingRetryMaxDelay)} must be at least {nameof(ReminderOptions.SchedulingRetryInitialDelay)} and no greater than {maxTimerDelay}");
-        }
-
         if (options.Value.StaleJobRecoveryDelay <= TimeSpan.Zero)
         {
             throw new OrleansConfigurationException($"{nameof(ReminderOptions)}.{nameof(ReminderOptions.StaleJobRecoveryDelay)} must be greater than {TimeSpan.Zero}");
+        }
+
+        if (options.Value.MaximumDeliveryAttempts is <= 0)
+        {
+            throw new OrleansConfigurationException($"{nameof(ReminderOptions)}.{nameof(ReminderOptions.MaximumDeliveryAttempts)} must be greater than zero when configured");
         }
     }
 

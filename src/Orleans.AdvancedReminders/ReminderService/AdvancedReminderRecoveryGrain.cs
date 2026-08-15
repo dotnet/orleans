@@ -25,9 +25,10 @@ internal sealed class AdvancedReminderRecoveryGrain(
     [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider? timeProvider = null) : Grain, IAdvancedReminderRecoveryGrain
 {
     private const int BatchSize = 32;
-    private const int ScanBucketCount = 256;
+    private const int ScanBucketCount = 4_096;
+    internal const int ScanBucketsPerReconciliation = 256;
     private const ulong ScanBucketWidth = (ulong)uint.MaxValue / ScanBucketCount + 1;
-    internal static readonly TimeSpan ReconciliationPeriod = TimeSpan.FromMinutes(5);
+    internal static readonly TimeSpan ReconciliationPeriod = TimeSpan.FromMinutes(1);
     internal static readonly TimeSpan ReconciliationEntryTimeout = TimeSpan.FromMinutes(1);
     private readonly IReminderTable _reminderTable = reminderTable;
     private readonly IGrainFactory _grainFactory = grainFactory;
@@ -35,6 +36,8 @@ internal sealed class AdvancedReminderRecoveryGrain(
     private readonly ReminderOptions _options = options?.Value ?? new ReminderOptions();
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private bool _started;
+    private bool _forceCurrentScan;
+    private int _nextScanBucket;
     private DateTimeOffset _nextReconciliationUtc;
 
     public async Task StartAsync(bool force, CancellationToken cancellationToken)
@@ -46,7 +49,12 @@ internal sealed class AdvancedReminderRecoveryGrain(
             return;
         }
 
-        await ReconcileAsync(force: force && !_started, cancellationToken);
+        if (force && !_started)
+        {
+            _forceCurrentScan = true;
+        }
+
+        await ReconcileAsync(force: _forceCurrentScan, cancellationToken);
         _started = true;
         _nextReconciliationUtc = _timeProvider.GetUtcNow().Add(ReconciliationPeriod);
     }
@@ -54,9 +62,11 @@ internal sealed class AdvancedReminderRecoveryGrain(
     internal async Task ReconcileAsync(bool force, CancellationToken cancellationToken)
     {
         var tasks = new List<Task>(BatchSize);
-        for (var bucket = 0; bucket < ScanBucketCount; bucket++)
+        var bucketsScanned = 0;
+        while (bucketsScanned < ScanBucketsPerReconciliation)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var bucket = _nextScanBucket;
             var begin = bucket == 0 ? uint.MaxValue : (uint)((ulong)bucket * ScanBucketWidth - 1);
             var end = (uint)(((ulong)bucket + 1) * ScanBucketWidth - 1);
             var reminders = (await _reminderTable.ReadRows(begin, end)).Reminders;
@@ -76,6 +86,13 @@ internal sealed class AdvancedReminderRecoveryGrain(
                     await Task.WhenAll(tasks);
                     tasks.Clear();
                 }
+            }
+
+            bucketsScanned++;
+            _nextScanBucket = (_nextScanBucket + 1) % ScanBucketCount;
+            if (_nextScanBucket == 0)
+            {
+                _forceCurrentScan = false;
             }
         }
 

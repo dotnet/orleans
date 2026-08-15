@@ -122,7 +122,6 @@ namespace Orleans.AdvancedReminders
 
     public partial interface IReminderManagementGrain : IGrainWithIntegerKey, IGrain, Orleans.Runtime.IAddressable
     {
-        System.Threading.Tasks.Task<int> CountAllAsync();
         System.Threading.Tasks.Task DeleteAsync(Orleans.Runtime.GrainId grainId, string name);
         System.Threading.Tasks.Task<ReminderManagementPage> ListAllAsync(int pageSize = 256, string? continuationToken = null);
         System.Threading.Tasks.Task<ReminderManagementPage> ListDueInRangeAsync(System.DateTime fromUtcInclusive, System.DateTime toUtcInclusive, int pageSize = 256, string? continuationToken = null);
@@ -131,8 +130,7 @@ namespace Orleans.AdvancedReminders
         System.Threading.Tasks.Task<ReminderManagementPage> ListOverdueAsync(System.TimeSpan overdueBy, int pageSize = 256, string? continuationToken = null);
         System.Threading.Tasks.Task RepairAsync(Orleans.Runtime.GrainId grainId, string name);
         System.Threading.Tasks.Task SetActionAsync(Orleans.Runtime.GrainId grainId, string name, Runtime.MissedReminderAction action);
-        System.Threading.Tasks.Task SetPriorityAsync(Orleans.Runtime.GrainId grainId, string name, Runtime.ReminderPriority priority);
-        System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<ReminderEntry>> UpcomingAsync(System.TimeSpan horizon);
+        System.Threading.Tasks.Task SetPriorityAsync(Orleans.Runtime.GrainId grainId, string name, DurableJobs.DurableJobPriority priority);
     }
 
     public partial interface IReminderService
@@ -639,8 +637,6 @@ namespace Orleans.AdvancedReminders
 
         public ReminderManagementGrain(IReminderTable reminderTable) { }
 
-        public System.Threading.Tasks.Task<int> CountAllAsync() { throw null; }
-
         public System.Threading.Tasks.Task DeleteAsync(Orleans.Runtime.GrainId grainId, string name) { throw null; }
 
         public System.Threading.Tasks.Task<ReminderManagementPage> ListAllAsync(int pageSize = 256, string? continuationToken = null) { throw null; }
@@ -659,7 +655,6 @@ namespace Orleans.AdvancedReminders
 
         public System.Threading.Tasks.Task SetPriorityAsync(Orleans.Runtime.GrainId grainId, string name, Runtime.ReminderPriority priority) { throw null; }
 
-        public System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<ReminderEntry>> UpcomingAsync(System.TimeSpan horizon) { throw null; }
     }
 
     public static partial class ReminderManagementGrainExtensions
@@ -690,15 +685,15 @@ namespace Orleans.AdvancedReminders
 
     public sealed partial class ReminderOptions
     {
+        public bool DeleteReminderWhenGrainTypeIsUnavailable { get { throw null; } set { } }
+
         public System.TimeSpan InitializationTimeout { get { throw null; } set { } }
+
+        public int? MaximumDeliveryAttempts { get { throw null; } set { } }
 
         public System.TimeSpan MinimumReminderPeriod { get { throw null; } set { } }
 
         public System.TimeSpan MissedReminderGracePeriod { get { throw null; } set { } }
-
-        public System.TimeSpan SchedulingRetryInitialDelay { get { throw null; } set { } }
-
-        public System.TimeSpan SchedulingRetryMaxDelay { get { throw null; } set { } }
 
         public System.TimeSpan StaleJobRecoveryDelay { get { throw null; } set { } }
     }
@@ -714,6 +709,9 @@ namespace Orleans.AdvancedReminders
 
         [Id(1)]
         public System.DateTime? DueToUtcInclusive { get { throw null; } init { } }
+
+        [Id(8)]
+        public Orleans.Runtime.GrainType? GrainType { get { throw null; } init { } }
 
         [Id(7)]
         public System.TimeSpan MissedBy { get { throw null; } init { } }

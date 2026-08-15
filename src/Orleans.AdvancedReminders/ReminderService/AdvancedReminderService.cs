@@ -28,6 +28,8 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
     private readonly ILogger<AdvancedReminderService> _logger;
     private readonly ReminderOptions _options;
     private readonly TimeProvider _timeProvider;
+    private readonly IClusterManifestProvider _clusterManifestProvider;
+    private readonly IClusterMembershipService _clusterMembershipService;
     private readonly CancellationTokenSource _recoveryMonitorCts = new();
     private Task? _recoveryMonitorTask;
 
@@ -38,7 +40,9 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
         IGrainFactory grainFactory,
         IOptions<ReminderOptions> options,
         ILogger<AdvancedReminderService> logger,
-        [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider timeProvider)
+        [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider timeProvider,
+        IClusterManifestProvider clusterManifestProvider,
+        IClusterMembershipService clusterMembershipService)
     {
         _reminderTable = reminderTable;
         _jobManager = jobManager;
@@ -47,6 +51,8 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
         _logger = logger;
         _options = options.Value;
         _timeProvider = timeProvider;
+        _clusterManifestProvider = clusterManifestProvider;
+        _clusterMembershipService = clusterMembershipService;
     }
 
     public void Participate(ISiloLifecycle lifecycle)
@@ -62,7 +68,7 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
         GrainId grainId,
         string reminderName,
         ReminderSchedule schedule,
-        Runtime.ReminderPriority priority,
+        DurableJobPriority priority,
         Runtime.MissedReminderAction action)
     {
         ArgumentNullException.ThrowIfNull(schedule);
@@ -82,7 +88,7 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
         GrainId grainId,
         string reminderName,
         ReminderSchedule schedule,
-        Runtime.ReminderPriority priority,
+        DurableJobPriority priority,
         Runtime.MissedReminderAction action,
         string declarationId)
     {
@@ -216,7 +222,8 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
         GrainId grainId,
         string reminderName,
         string? expectedScheduleId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int durableJobDequeueCount = 0)
     {
         var entry = await _reminderTable.ReadRow(grainId, reminderName);
         if (entry is null || !MatchesScheduledOccurrence(entry, expectedScheduleId))
@@ -232,6 +239,17 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
             // Replace it with a new occurrence instead of firing the reminder early.
             PrepareNextOccurrence(entry);
             await PersistAndScheduleCoreAsync(entry, cancellationToken);
+            return;
+        }
+
+        if (_options.DeleteReminderWhenGrainTypeIsUnavailable && IsGrainTypeUnavailable(grainId.Type))
+        {
+            await RemoveReminderAsync(entry);
+            _logger.LogWarning(
+                "Deleted reminder {ReminderName} for grain {GrainId} because no active silo declares grain type {GrainType}.",
+                entry.ReminderName,
+                entry.GrainId,
+                grainId.Type);
             return;
         }
 
@@ -260,6 +278,7 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
                 entry.StartAt,
                 string.IsNullOrWhiteSpace(entry.CronExpression) ? entry.Period : TimeSpan.Zero,
                 now);
+            Exception? deliveryException = null;
             try
             {
                 await remindable.ReceiveReminder(entry.ReminderName, status);
@@ -270,13 +289,12 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
             }
             catch (Exception exception)
             {
-                // Match the classic reminder service: a callback failure is isolated to this
-                // tick and must not permanently stop a recurring reminder.
                 _logger.LogError(
                     exception,
                     "Error delivering reminder {ReminderName} to grain {GrainId}.",
                     reminderName,
                     grainId);
+                deliveryException = exception;
             }
 
             entry.LastFireUtc = now;
@@ -288,6 +306,24 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
                 || !string.Equals(current.ETag, entry.ETag, StringComparison.Ordinal)
                 || !string.Equals(current.ScheduleId, entry.ScheduleId, StringComparison.Ordinal))
             {
+                return;
+            }
+
+            if (deliveryException is not null
+                && durableJobDequeueCount > 0
+                && _options.MaximumDeliveryAttempts is { } maximumDeliveryAttempts)
+            {
+                if (durableJobDequeueCount < maximumDeliveryAttempts)
+                {
+                    throw new ReminderDeliveryException(grainId, reminderName, durableJobDequeueCount, deliveryException);
+                }
+
+                await RemoveReminderAsync(entry);
+                _logger.LogWarning(
+                    "Deleted reminder {ReminderName} for grain {GrainId} after its callback failed at Durable Jobs dequeue count {DequeueCount}.",
+                    entry.ReminderName,
+                    entry.GrainId,
+                    durableJobDequeueCount);
                 return;
             }
         }
@@ -306,6 +342,59 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
         entry.NextDueUtc = nextDue;
         PrepareNextOccurrence(entry);
         await PersistAndScheduleCoreAsync(entry, cancellationToken);
+    }
+
+    private bool IsGrainTypeUnavailable(GrainType grainType)
+    {
+        if (GenericGrainType.TryParse(grainType, out var generic) && generic.IsConstructed)
+        {
+            grainType = generic.GetUnconstructedGrainType().GrainType;
+        }
+
+        var membershipBefore = _clusterMembershipService.CurrentSnapshot;
+        var clusterManifest = _clusterManifestProvider.Current;
+        var membershipAfter = _clusterMembershipService.CurrentSnapshot;
+        if (membershipBefore.Version != membershipAfter.Version
+            || clusterManifest.Version.Major != membershipAfter.Version.Value)
+        {
+            // Membership changed while reading, or the manifest belongs to another membership
+            // version. Neither case proves that the grain type has been retired.
+            return false;
+        }
+
+        var activeSiloSeen = false;
+        foreach (var (siloAddress, member) in membershipAfter.Members)
+        {
+            if (siloAddress.IsClient || member.Status != SiloStatus.Active)
+            {
+                continue;
+            }
+
+            activeSiloSeen = true;
+            if (!clusterManifest.Silos.TryGetValue(siloAddress, out var siloManifest))
+            {
+                // ClusterManifestProvider publishes the membership version before it has
+                // necessarily retrieved every active silo manifest. Fail closed until complete.
+                return false;
+            }
+
+            if (siloManifest.Grains.ContainsKey(grainType))
+            {
+                return false;
+            }
+        }
+
+        // An empty active server set is not proof that a type has been retired.
+        return activeSiloSeen;
+    }
+
+    private async Task RemoveReminderAsync(ReminderEntry entry)
+    {
+        if (!await _reminderTable.RemoveRow(entry.GrainId, entry.ReminderName, entry.ETag))
+        {
+            throw new Runtime.ReminderException(
+                $"Could not remove reminder '{entry.ReminderName}' for grain '{entry.GrainId}' due to ETag mismatch.");
+        }
     }
 
     internal async Task EnsureScheduledCoreAsync(
@@ -332,11 +421,10 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
             return;
         }
 
-        if (string.IsNullOrEmpty(entry.ScheduleId))
-        {
-            entry.ScheduleId = Guid.NewGuid().ToString("N");
-        }
-
+        // The durable job can have been persisted even when persisting its handle failed.
+        // Rotate the occurrence token before every repair so that any orphaned job becomes
+        // harmless when it eventually runs instead of delivering the same occurrence twice.
+        PrepareNextOccurrence(entry);
         entry.JobId = string.Empty;
         entry.JobShardId = string.Empty;
         entry.ETag = await _reminderTable.UpsertRow(entry);
@@ -364,7 +452,7 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
                 Target = dispatcher.GetGrainId(),
                 JobName = string.Concat(JobNamePrefix, entry.ReminderName),
                 DueTime = dueTime,
-                Priority = ToDurableJobPriority(entry.Priority),
+                Priority = entry.Priority,
                 Metadata = new Dictionary<string, string>(capacity: 3, comparer: StringComparer.Ordinal)
                 {
                     [GrainIdMetadataKey] = grainIdText,
@@ -408,39 +496,72 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
     }
 
     private static void PrepareNextOccurrence(ReminderEntry entry)
-        => PrepareNewSchedule(entry, GetAttributeDeclarationId(entry.ScheduleId));
+    {
+        var currentScheduleId = entry.ScheduleId;
+        var declarationEnd = GetAttributeDeclarationEnd(currentScheduleId);
+        if (declarationEnd < 0)
+        {
+            entry.ScheduleId = Guid.NewGuid().ToString("N");
+        }
+        else
+        {
+            var prefixLength = declarationEnd + 1;
+            entry.ScheduleId = string.Create(
+                prefixLength + 32,
+                (CurrentScheduleId: currentScheduleId, PrefixLength: prefixLength, OccurrenceId: Guid.NewGuid()),
+                static (destination, state) =>
+                {
+                    state.CurrentScheduleId.AsSpan(0, state.PrefixLength).CopyTo(destination);
+                    _ = state.OccurrenceId.TryFormat(destination[state.PrefixLength..], out _, "N");
+                });
+        }
+
+        entry.JobId = string.Empty;
+        entry.JobShardId = string.Empty;
+    }
 
     private static void PrepareNewSchedule(ReminderEntry entry, string? declarationId = null)
     {
-        var occurrenceId = Guid.NewGuid().ToString("N");
         entry.ScheduleId = declarationId is null
-            ? occurrenceId
-            : string.Concat(AttributeScheduleIdPrefix, declarationId, ":", occurrenceId);
+            ? Guid.NewGuid().ToString("N")
+            : string.Create(
+                AttributeScheduleIdPrefix.Length + declarationId.Length + 1 + 32,
+                (DeclarationId: declarationId, OccurrenceId: Guid.NewGuid()),
+                static (destination, state) =>
+                {
+                    AttributeScheduleIdPrefix.CopyTo(destination);
+                    state.DeclarationId.CopyTo(destination[AttributeScheduleIdPrefix.Length..]);
+                    var occurrenceSeparator = AttributeScheduleIdPrefix.Length + state.DeclarationId.Length;
+                    destination[occurrenceSeparator] = ':';
+                    _ = state.OccurrenceId.TryFormat(destination[(occurrenceSeparator + 1)..], out _, "N");
+                });
         entry.JobId = string.Empty;
         entry.JobShardId = string.Empty;
     }
 
     private static bool HasAttributeDeclaration(string scheduleId, string declarationId)
-        => string.Equals(GetAttributeDeclarationId(scheduleId), declarationId, StringComparison.Ordinal);
+    {
+        var declarationEnd = GetAttributeDeclarationEnd(scheduleId);
+        return declarationEnd == AttributeScheduleIdPrefix.Length + declarationId.Length
+            && scheduleId.AsSpan(AttributeScheduleIdPrefix.Length, declarationId.Length).SequenceEqual(declarationId);
+    }
 
-    private static string? GetAttributeDeclarationId(string scheduleId)
+    private static int GetAttributeDeclarationEnd(string scheduleId)
     {
         if (!scheduleId.StartsWith(AttributeScheduleIdPrefix, StringComparison.Ordinal))
         {
-            return null;
+            return -1;
         }
 
         var declarationEnd = scheduleId.IndexOf(':', AttributeScheduleIdPrefix.Length);
-        return declarationEnd > AttributeScheduleIdPrefix.Length
-            ? scheduleId[AttributeScheduleIdPrefix.Length..declarationEnd]
-            : null;
+        return declarationEnd > AttributeScheduleIdPrefix.Length ? declarationEnd : -1;
     }
 
     private ReminderEntry CreateIntervalEntry(
         GrainId grainId,
         string reminderName,
         ReminderSchedule schedule,
-        Runtime.ReminderPriority priority,
+        DurableJobPriority priority,
         Runtime.MissedReminderAction action)
     {
         var period = schedule.Period!.Value;
@@ -462,7 +583,7 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
         GrainId grainId,
         string reminderName,
         ReminderSchedule schedule,
-        Runtime.ReminderPriority priority,
+        DurableJobPriority priority,
         Runtime.MissedReminderAction action)
     {
         var cronSchedule = ReminderCronSchedule.Parse(schedule.CronExpression!, schedule.CronTimeZoneId);
@@ -589,14 +710,6 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
         => string.IsNullOrEmpty(expectedScheduleId)
             || string.Equals(entry.ScheduleId, expectedScheduleId, StringComparison.Ordinal)
             || (string.IsNullOrEmpty(entry.ScheduleId) && string.Equals(entry.ETag, expectedScheduleId, StringComparison.Ordinal));
-
-    internal static DurableJobPriority ToDurableJobPriority(Runtime.ReminderPriority priority) => priority switch
-    {
-        Runtime.ReminderPriority.Low => DurableJobPriority.Low,
-        Runtime.ReminderPriority.Normal => DurableJobPriority.Normal,
-        Runtime.ReminderPriority.High => DurableJobPriority.High,
-        _ => throw new ArgumentOutOfRangeException(nameof(priority)),
-    };
 
     internal static bool TryGetReminderMetadata(
         IReadOnlyDictionary<string, string>? metadata,

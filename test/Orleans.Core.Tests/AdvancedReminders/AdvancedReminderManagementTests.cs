@@ -60,7 +60,7 @@ public class ReminderIteratorTests
             Status = ReminderQueryStatus.Overdue | ReminderQueryStatus.Missed,
             OverdueBy = TimeSpan.FromMinutes(2),
             MissedBy = TimeSpan.FromMinutes(1),
-            Priority = ReminderPriority.High,
+            Priority = DurableJobPriority.High,
         };
 
         var managementGrain = Substitute.For<IReminderManagementGrain>();
@@ -322,7 +322,7 @@ public class ReminderManagementGrainTests
                 CronExpression = "*/5 * * * * *",
                 NextDueUtc = now.AddMinutes(-10),
                 LastFireUtc = now.AddMinutes(-20),
-                Priority = ReminderPriority.High,
+                Priority = DurableJobPriority.High,
                 Action = MissedReminderAction.FireImmediately,
             },
             new ReminderEntry
@@ -334,7 +334,7 @@ public class ReminderManagementGrainTests
                 CronExpression = "*/5 * * * * *",
                 NextDueUtc = now.AddMinutes(-10),
                 LastFireUtc = null,
-                Priority = ReminderPriority.Normal,
+                Priority = DurableJobPriority.Normal,
                 Action = MissedReminderAction.FireImmediately,
             },
             new ReminderEntry
@@ -344,7 +344,19 @@ public class ReminderManagementGrainTests
                 StartAt = now.AddMinutes(2),
                 Period = TimeSpan.FromMinutes(1),
                 NextDueUtc = now.AddMinutes(2),
-                Priority = ReminderPriority.High,
+                Priority = DurableJobPriority.High,
+                Action = MissedReminderAction.FireImmediately,
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("other", "wrong-type"),
+                ReminderName = "wrong-type",
+                StartAt = now.AddMinutes(-20),
+                Period = TimeSpan.Zero,
+                CronExpression = "*/5 * * * * *",
+                NextDueUtc = now.AddMinutes(-10),
+                LastFireUtc = now.AddMinutes(-20),
+                Priority = DurableJobPriority.High,
                 Action = MissedReminderAction.FireImmediately,
             });
 
@@ -354,9 +366,10 @@ public class ReminderManagementGrainTests
             Status = ReminderQueryStatus.Overdue | ReminderQueryStatus.Missed,
             OverdueBy = TimeSpan.FromMinutes(2),
             MissedBy = TimeSpan.FromMinutes(1),
-            Priority = ReminderPriority.High,
+            Priority = DurableJobPriority.High,
             Action = MissedReminderAction.FireImmediately,
             ScheduleKind = ReminderScheduleKind.Cron,
+            GrainType = GrainType.Create("test"),
         };
 
         var page = await grain.ListFilteredAsync(filter, pageSize: 10);
@@ -539,19 +552,19 @@ public class ReminderManagementGrainTests
             StartAt = originalDue,
             NextDueUtc = originalDue,
             Period = TimeSpan.FromMinutes(1),
-            Priority = ReminderPriority.Normal,
+            Priority = DurableJobPriority.Normal,
             Action = MissedReminderAction.Skip,
             ETag = "etag-1",
         };
         var table = new InMemoryManagementReminderTable(entry);
         var grain = new ReminderManagementGrain(table);
 
-        await grain.SetPriorityAsync(grainId, "r", ReminderPriority.High);
+        await grain.SetPriorityAsync(grainId, "r", DurableJobPriority.High);
         await grain.SetActionAsync(grainId, "r", MissedReminderAction.Notify);
         await grain.RepairAsync(grainId, "r");
 
         var repaired = await table.ReadRow(grainId, "r");
-        Assert.Equal(ReminderPriority.High, repaired.Priority);
+        Assert.Equal(DurableJobPriority.High, repaired.Priority);
         Assert.Equal(MissedReminderAction.Notify, repaired.Action);
         Assert.True(repaired.NextDueUtc > DateTime.UtcNow);
 
@@ -571,7 +584,7 @@ public class ReminderManagementGrainTests
             StartAt = due,
             NextDueUtc = due,
             Period = TimeSpan.FromMinutes(5),
-            Priority = ReminderPriority.Normal,
+            Priority = DurableJobPriority.Normal,
             Action = MissedReminderAction.Skip,
             ETag = "etag-1",
         };
@@ -604,7 +617,9 @@ public class ReminderManagementGrainTests
             grainFactory,
             Options.Create(new Orleans.AdvancedReminders.ReminderOptions()),
             NullLogger<AdvancedReminderService>.Instance,
-            TimeProvider.System);
+            TimeProvider.System,
+            Substitute.For<IClusterManifestProvider>(),
+            Substitute.For<IClusterMembershipService>());
         dispatcher.Service = service;
         var grain = new ReminderManagementGrain(
             reminderTable,
@@ -612,7 +627,7 @@ public class ReminderManagementGrainTests
                 .AddSingleton(service)
                 .BuildServiceProvider());
 
-        await grain.SetPriorityAsync(grainId, "r", ReminderPriority.High);
+        await grain.SetPriorityAsync(grainId, "r", DurableJobPriority.High);
         await grain.SetActionAsync(grainId, "r", MissedReminderAction.Notify);
         await grain.RepairAsync(grainId, "r");
 
@@ -624,73 +639,6 @@ public class ReminderManagementGrainTests
                 && request.Metadata["grain-id"] == grainId.ToString()
                 && request.Metadata["reminder-name"] == "r"),
             Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task UpcomingAsync_UsesHorizon()
-    {
-        var now = DateTime.UtcNow;
-        var table = new InMemoryManagementReminderTable(
-            new ReminderEntry
-            {
-                GrainId = GrainId.Create("test", "in"),
-                ReminderName = "in",
-                StartAt = now.AddMinutes(2),
-                NextDueUtc = now.AddMinutes(2),
-                Period = TimeSpan.FromMinutes(1),
-            },
-            new ReminderEntry
-            {
-                GrainId = GrainId.Create("test", "out"),
-                ReminderName = "out",
-                StartAt = now.AddMinutes(20),
-                NextDueUtc = now.AddMinutes(20),
-                Period = TimeSpan.FromMinutes(1),
-            });
-
-        var grain = new ReminderManagementGrain(table);
-        var reminders = (await grain.UpcomingAsync(TimeSpan.FromMinutes(5))).ToArray();
-
-        Assert.Single(reminders);
-        Assert.Equal("in", reminders[0].ReminderName);
-    }
-
-    [Fact]
-    public async Task UpcomingAsync_ExcludesOverdueReminders()
-    {
-        var now = new DateTimeOffset(2026, 7, 22, 10, 0, 0, TimeSpan.Zero);
-        var table = new InMemoryManagementReminderTable(
-            new ReminderEntry
-            {
-                GrainId = GrainId.Create("test", "overdue"),
-                ReminderName = "overdue",
-                StartAt = now.UtcDateTime.AddMinutes(-1),
-                NextDueUtc = now.UtcDateTime.AddMinutes(-1),
-                Period = TimeSpan.FromMinutes(1),
-            },
-            new ReminderEntry
-            {
-                GrainId = GrainId.Create("test", "upcoming"),
-                ReminderName = "upcoming",
-                StartAt = now.UtcDateTime.AddMinutes(1),
-                NextDueUtc = now.UtcDateTime.AddMinutes(1),
-                Period = TimeSpan.FromMinutes(1),
-            });
-        var grain = new ReminderManagementGrain(table, new FakeTimeProvider(now));
-
-        var reminders = (await grain.UpcomingAsync(TimeSpan.FromMinutes(5))).ToArray();
-
-        Assert.Equal("upcoming", Assert.Single(reminders).ReminderName);
-    }
-
-    [Fact]
-    public async Task UpcomingAsync_NegativeHorizon_Throws()
-    {
-        var grain = new ReminderManagementGrain(new InMemoryManagementReminderTable());
-
-        var exception = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => grain.UpcomingAsync(TimeSpan.FromMinutes(-1)));
-
-        Assert.Equal("horizon", exception.ParamName);
     }
 
     [Fact]
@@ -736,7 +684,7 @@ public class ReminderManagementGrainTests
             DueFromUtcInclusive = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc),
             DueToUtcInclusive = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
         },
-        new() { Priority = (ReminderPriority)sbyte.MaxValue },
+        new() { Priority = (DurableJobPriority)sbyte.MaxValue },
         new() { Action = (MissedReminderAction)255 },
         new() { ScheduleKind = (ReminderScheduleKind)255 },
         new() { Status = (ReminderQueryStatus)128 },
@@ -756,10 +704,7 @@ public class ReminderManagementGrainTests
                 OverdueBy = TimeSpan.MaxValue,
                 MissedBy = TimeSpan.MaxValue,
             });
-        var upcoming = await grain.UpcomingAsync(TimeSpan.MaxValue);
-
         Assert.Empty(page.Reminders);
-        Assert.Empty(upcoming);
     }
 
     [Fact]
@@ -788,7 +733,7 @@ public class ReminderManagementGrainTests
         var grainId = GrainId.Create("test", "missing-mutation");
         var grain = new ReminderManagementGrain(new InMemoryManagementReminderTable());
 
-        await Assert.ThrowsAsync<AdvancedReminderException>(() => grain.SetPriorityAsync(grainId, "missing", ReminderPriority.High));
+        await Assert.ThrowsAsync<AdvancedReminderException>(() => grain.SetPriorityAsync(grainId, "missing", DurableJobPriority.High));
         await Assert.ThrowsAsync<AdvancedReminderException>(() => grain.SetActionAsync(grainId, "missing", MissedReminderAction.Notify));
         await Assert.ThrowsAsync<AdvancedReminderException>(() => grain.RepairAsync(grainId, "missing"));
         await Assert.ThrowsAsync<AdvancedReminderException>(() => grain.DeleteAsync(grainId, "missing"));
@@ -958,13 +903,13 @@ public class ReminderStressTests
 
         var filter = new ReminderQueryFilter
         {
-            Priority = ReminderPriority.High,
+            Priority = DurableJobPriority.High,
             ScheduleKind = ReminderScheduleKind.Cron,
             Status = ReminderQueryStatus.Upcoming,
         };
 
         var expectedCount = reminders.Count(reminder =>
-            reminder.Priority == ReminderPriority.High
+            reminder.Priority == DurableJobPriority.High
             && !string.IsNullOrWhiteSpace(reminder.CronExpression)
             && (reminder.NextDueUtc ?? reminder.StartAt) > now);
 
@@ -983,7 +928,9 @@ public class ReminderStressTests
         while (!string.IsNullOrEmpty(continuationToken));
 
         Assert.Equal(expectedCount, observedCount);
-        Assert.InRange(table.RangeReadCallCount, 1, pageRequests + 255);
+        // Every one of the 256 hash buckets is read once. The hot bucket is cached across
+        // continuation pages instead of rereading and re-materializing all 200K entries.
+        Assert.Equal(256, table.RangeReadCallCount);
     }
 
     [Fact]
@@ -1022,7 +969,7 @@ public class ReminderStressTests
                 LastFireUtc = due.AddSeconds(-1),
                 Period = TimeSpan.FromMinutes(1),
                 CronExpression = i % 2 == 0 ? "*/5 * * * * *" : null!,
-                Priority = i % 3 == 0 ? ReminderPriority.High : ReminderPriority.Normal,
+                Priority = i % 3 == 0 ? DurableJobPriority.High : DurableJobPriority.Normal,
                 Action = (i % 3) switch
                 {
                     0 => MissedReminderAction.FireImmediately,
@@ -1084,7 +1031,7 @@ public class ReminderStressTests
                     StartAt = DateTime.UnixEpoch,
                     NextDueUtc = DateTime.UnixEpoch,
                     Period = TimeSpan.FromMinutes(1),
-                    Priority = ReminderPriority.Normal,
+                    Priority = DurableJobPriority.Normal,
                     Action = MissedReminderAction.Skip,
                 });
             }
@@ -1100,10 +1047,8 @@ public class ReminderStressTests
         public Task<ReminderManagementPage> ListOverdueAsync(TimeSpan overdueBy, int pageSize = 256, string? continuationToken = null) => throw new NotSupportedException();
         public Task<ReminderManagementPage> ListDueInRangeAsync(DateTime fromUtcInclusive, DateTime toUtcInclusive, int pageSize = 256, string? continuationToken = null) => throw new NotSupportedException();
         public Task<ReminderManagementPage> ListFilteredAsync(ReminderQueryFilter filter, int pageSize = 256, string? continuationToken = null) => throw new NotSupportedException();
-        public Task<IEnumerable<ReminderEntry>> UpcomingAsync(TimeSpan horizon) => throw new NotSupportedException();
         public Task<IEnumerable<ReminderEntry>> ListForGrainAsync(GrainId grainId) => throw new NotSupportedException();
-        public Task<int> CountAllAsync() => throw new NotSupportedException();
-        public Task SetPriorityAsync(GrainId grainId, string name, ReminderPriority priority) => throw new NotSupportedException();
+        public Task SetPriorityAsync(GrainId grainId, string name, DurableJobPriority priority) => throw new NotSupportedException();
         public Task SetActionAsync(GrainId grainId, string name, MissedReminderAction action) => throw new NotSupportedException();
         public Task RepairAsync(GrainId grainId, string name) => throw new NotSupportedException();
         public Task DeleteAsync(GrainId grainId, string name) => throw new NotSupportedException();

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -58,6 +59,10 @@ internal sealed class ReminderRegistry(
 internal static class ReminderValidation
 {
     private const int MaxCronIntervalsToValidate = 10_000;
+    internal const int MaxCronValidationCacheEntries = 1_024;
+    private static readonly ConcurrentDictionary<CronValidationCacheKey, Lazy<bool>> CronValidationCache = new();
+    private static readonly ConcurrentQueue<CronValidationCacheKey> CronValidationInsertionOrder = new();
+    internal static int CronValidationCacheCount => CronValidationCache.Count;
 
     public static void Validate(
         ReminderOptions options,
@@ -151,7 +156,6 @@ internal static class ReminderValidation
             throw new ArgumentException("Cannot use null or empty cron expression for the reminder", nameof(schedule));
         }
 
-        var cron = ReminderCronSchedule.Parse(schedule.CronExpression, schedule.CronTimeZoneId);
         var precision = ReminderCronParser.DetectFormat(schedule.CronExpression) == CronFormat.IncludeSeconds
             ? TimeSpan.FromSeconds(1)
             : TimeSpan.FromMinutes(1);
@@ -159,6 +163,53 @@ internal static class ReminderValidation
         {
             return;
         }
+
+        var cacheKey = new CronValidationCacheKey(
+            schedule.CronExpression.Trim(),
+            string.IsNullOrWhiteSpace(schedule.CronTimeZoneId) ? null : schedule.CronTimeZoneId.Trim(),
+            options.MinimumReminderPeriod,
+            utcNow.Date);
+        if (CronValidationCache.TryGetValue(cacheKey, out var cachedValidation))
+        {
+            _ = cachedValidation.Value;
+            return;
+        }
+
+        var createdValidation = new Lazy<bool>(
+            () =>
+            {
+                ValidateCronIntervals(options, schedule, reminderName, utcNow);
+                return true;
+            },
+            LazyThreadSafetyMode.ExecutionAndPublication);
+        var validation = CronValidationCache.GetOrAdd(cacheKey, createdValidation);
+        try
+        {
+            _ = validation.Value;
+        }
+        catch
+        {
+            // Invalid schedules are not cached. Remove only this exact Lazy instance so a
+            // concurrent successful replacement cannot be removed by a late observer.
+            ((ICollection<KeyValuePair<CronValidationCacheKey, Lazy<bool>>>)CronValidationCache)
+                .Remove(new(cacheKey, validation));
+            throw;
+        }
+
+        if (ReferenceEquals(validation, createdValidation))
+        {
+            CronValidationInsertionOrder.Enqueue(cacheKey);
+            while (CronValidationCache.Count > MaxCronValidationCacheEntries
+                && CronValidationInsertionOrder.TryDequeue(out var oldest))
+            {
+                CronValidationCache.TryRemove(oldest, out _);
+            }
+        }
+    }
+
+    private static void ValidateCronIntervals(ReminderOptions options, ReminderSchedule schedule, string reminderName, DateTime utcNow)
+    {
+        var cron = ReminderCronSchedule.Parse(schedule.CronExpression!, schedule.CronTimeZoneId);
 
         var previous = cron.GetNextOccurrence(utcNow, inclusive: true);
         for (var index = 0; index < MaxCronIntervalsToValidate && previous is not null; index++)
@@ -181,6 +232,14 @@ internal static class ReminderValidation
         }
     }
 
+    internal static void ClearCronValidationCache()
+    {
+        CronValidationCache.Clear();
+        while (CronValidationInsertionOrder.TryDequeue(out _))
+        {
+        }
+    }
+
     private static void ValidatePriorityAndAction(DurableJobPriority priority, Runtime.MissedReminderAction action)
     {
         if (!Enum.IsDefined(priority))
@@ -193,4 +252,10 @@ internal static class ReminderValidation
             throw new ArgumentOutOfRangeException(nameof(action), action, "Invalid missed reminder action.");
         }
     }
+
+    private readonly record struct CronValidationCacheKey(
+        string Expression,
+        string? TimeZoneId,
+        TimeSpan MinimumPeriod,
+        DateTime ValidationDateUtc);
 }

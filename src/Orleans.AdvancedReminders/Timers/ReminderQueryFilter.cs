@@ -58,7 +58,7 @@ public sealed class ReminderQueryFilter
     /// Gets the optional reminder priority to match.
     /// </summary>
     [Id(2)]
-    public Runtime.ReminderPriority? Priority { get; init; }
+    public DurableJobPriority? Priority { get; init; }
 
     /// <summary>
     /// Gets the optional missed-reminder action to match.
@@ -89,4 +89,10 @@ public sealed class ReminderQueryFilter
     /// </summary>
     [Id(7)]
     public TimeSpan MissedBy { get; init; } = TimeSpan.Zero;
+
+    /// <summary>
+    /// Gets the optional target grain type to match.
+    /// </summary>
+    [Id(8)]
+    public GrainType? GrainType { get; init; }
 }

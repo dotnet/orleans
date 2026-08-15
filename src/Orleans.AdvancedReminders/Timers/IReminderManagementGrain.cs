@@ -55,19 +55,9 @@ public interface IReminderManagementGrain : IGrainWithIntegerKey
         string? continuationToken = null);
 
     /// <summary>
-    /// Returns reminders due within the specified horizon.
-    /// </summary>
-    Task<IEnumerable<ReminderEntry>> UpcomingAsync(TimeSpan horizon);
-
-    /// <summary>
     /// Returns all reminders for the specified grain.
     /// </summary>
     Task<IEnumerable<ReminderEntry>> ListForGrainAsync(GrainId grainId);
-
-    /// <summary>
-    /// Returns the total reminder count.
-    /// </summary>
-    Task<int> CountAllAsync();
 
     /// <summary>
     /// Sets reminder priority.
