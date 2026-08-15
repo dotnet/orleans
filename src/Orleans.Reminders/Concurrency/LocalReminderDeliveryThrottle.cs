@@ -86,6 +86,8 @@ public sealed class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, I
     /// <summary>The number of currently available concurrency permits, or <c>int.MaxValue</c> when concurrency is unbounded.</summary>
     public int AvailableConcurrencyPermits => _concurrencyGate?.AvailablePermits ?? int.MaxValue;
 
+    internal TimeProvider TimeProvider => _timeProvider;
+
     /// <summary>The current available token count in the rate bucket, or <c>int.MaxValue</c> when rate is unbounded.</summary>
     public int AvailableRateTokens => _rateGate?.AvailableTokens ?? int.MaxValue;
 
