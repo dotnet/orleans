@@ -10,6 +10,7 @@ interface Orleans.Dashboard.Core.IDashboardGrain [Version(0)]
   TopGrainMethods(int, string[]) -> Task<Orleans.Concurrency.Immutable<System.Collections.Generic.Dictionary<string, Orleans.Dashboard.Model.History.GrainMethodAggregate[]>>>
 
 interface Orleans.Dashboard.Core.IDashboardRemindersGrain [Version(0)]
+  GetAdvancedReminders(int, int) -> Task<Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.AdvancedReminderResponse>>
   GetReminders(int, int) -> Task<Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.ReminderResponse>>
 
 interface Orleans.Dashboard.Core.ISiloGrainProxy [Version(0)]

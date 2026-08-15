@@ -2,9 +2,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
-using Orleans.Runtime;
 using Orleans.Dashboard.Model;
 using Orleans.Dashboard.Model.History;
+using Orleans.Runtime;
 
 namespace Orleans.Dashboard.Core;
 
@@ -19,6 +19,8 @@ internal sealed class DashboardClient(IGrainFactory grainFactory) : IDashboardCl
     public async Task<Immutable<Dictionary<string, GrainTraceEntry>>> ClusterStats() => await _dashboardGrain.GetClusterTracing();
 
     public async Task<Immutable<ReminderResponse>> GetReminders(int pageNumber, int pageSize) => await _remindersGrain.GetReminders(pageNumber, pageSize);
+
+    public async Task<Immutable<AdvancedReminderResponse>> GetAdvancedReminders(int pageNumber, int pageSize) => await _remindersGrain.GetAdvancedReminders(pageNumber, pageSize);
 
     public async Task<Immutable<SiloRuntimeStatistics?[]>> HistoricalStats(string siloAddress) => await Silo(siloAddress).GetRuntimeStatistics();
 
