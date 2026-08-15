@@ -3,9 +3,9 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
-using Orleans.Runtime;
 using Orleans.Dashboard.Model;
 using Orleans.Dashboard.Model.History;
+using Orleans.Runtime;
 
 namespace Orleans.Dashboard.Core;
 
@@ -29,6 +29,12 @@ internal sealed class DashboardClient(IGrainFactory grainFactory) : IDashboardCl
         int pageSize,
         CancellationToken cancellationToken = default) =>
         await _remindersGrain.GetReminders(pageNumber, pageSize, cancellationToken);
+
+    public async Task<Immutable<AdvancedReminderResponse>> GetAdvancedReminders(
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default) =>
+        await _remindersGrain.GetAdvancedReminders(pageNumber, pageSize, cancellationToken);
 
     public async Task<Immutable<SiloRuntimeStatistics?[]>> HistoricalStats(
         string siloAddress,

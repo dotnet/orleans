@@ -247,3 +247,81 @@ h3 {
 .nav-sidebar .nav-link p {
   margin: 0;
 }
+
+.advanced-reminder-table {
+  min-width: 1635px;
+  table-layout: fixed;
+}
+
+.advanced-reminder-table th,
+.advanced-reminder-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.advanced-reminder-table code {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.advanced-reminder-value {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.advanced-reminder-name-value {
+  font-weight: 600;
+}
+
+.advanced-reminder-table .form-control {
+  min-width: 0;
+  width: 100%;
+}
+
+.advanced-reminder-grain-column {
+  width: 240px;
+}
+
+.advanced-reminder-key-column {
+  width: 120px;
+}
+
+.advanced-reminder-name-column {
+  width: 240px;
+}
+
+.advanced-reminder-schedule-column {
+  width: 255px;
+}
+
+.advanced-reminder-date-column {
+  width: 185px;
+}
+
+.advanced-reminder-priority-column {
+  width: 95px;
+}
+
+.advanced-reminder-action-column {
+  width: 130px;
+}
+
+.reminder-table-switch .card-body {
+  padding: 0.75rem;
+}
+
+.reminder-table-switch .btn {
+  min-width: 190px;
+}
+
+.reminder-table-switch .reminder-table-active {
+  background-color: #6f2da8 !important;
+  border-color: #6f2da8 !important;
+  color: #fff !important;
+}
