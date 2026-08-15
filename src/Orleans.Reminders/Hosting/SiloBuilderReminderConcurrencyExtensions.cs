@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
+using Orleans.Reminders;
 using Orleans.Runtime.Messaging;
 using Orleans.Reminders.Concurrency;
 using Orleans.Runtime;
@@ -50,7 +51,7 @@ public static class SiloBuilderReminderConcurrencyExtensions
             services.AddSingleton<IReminderDeliveryThrottle>(sp =>
             {
                 var opts = sp.GetRequiredService<IOptions<ReminderConcurrencyOptions>>().Value;
-                var timeProvider = sp.GetRequiredService<TimeProvider>();
+                var timeProvider = sp.GetRequiredKeyedService<TimeProvider>(ReminderTimeProviderNames.Reminders);
                 var logger = sp.GetRequiredService<ILogger<LocalReminderDeliveryThrottle>>();
 
                 if (opts.PerSilo is { } perSilo)

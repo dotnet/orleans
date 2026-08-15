@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Hosting;
 using Orleans.Internal;
+using Orleans.Reminders;
 using Orleans.Reminders.Concurrency;
 using Orleans.Runtime;
 using Orleans.Testing.Reminders;
@@ -86,6 +87,9 @@ public sealed class ReminderConcurrencyControlClusterTests
             var local = Assert.IsType<LocalReminderDeliveryThrottle>(throttle);
             Assert.Equal("per-silo", local.TierName);
             Assert.Equal(4, local.AvailableConcurrencyPermits);
+            Assert.Same(
+                sp.GetRequiredKeyedService<TimeProvider>(ReminderTimeProviderNames.Reminders),
+                local.TimeProvider);
         }
     }
 
