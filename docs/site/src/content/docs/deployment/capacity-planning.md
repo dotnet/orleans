@@ -1,7 +1,7 @@
 ---
 title: Capacity planning and scaling
 description: Size and scale Orleans clusters using measured workload and saturation signals.
-ms.date: 08/02/2026
+ms.date: 08/15/2026
 ms.topic: concept-article
 ---
 
@@ -42,14 +42,17 @@ CPU limits can throttle a process even when node CPU appears available. Memory l
 
 Scale out before saturation. Signals can include sustained CPU, scheduler delay, tail latency, activation pressure, gateway load shedding, and application queue depth. Don't scale on a single noisy metric.
 
+Adding a silo expands the candidate set for later placement decisions; it doesn't automatically move every active grain. New activations can use the added capacity immediately after membership converges, and grains which are collected or otherwise deactivated can use it when they reactivate. Experimental opt-in services can migrate eligible active grains. See [Grain placement and migration](../grains/grain-placement.md#scale-out-and-scale-in).
+
 Account for:
 
 - Time to schedule a host, start the process, join membership, and warm caches.
 - Capacity and connection impact on clustering and storage providers.
+- State-read and serialization load when many grains activate on new or remaining silos.
 - Placement constraints and grains that concentrate work.
 - The minimum number of silos required across failure domains.
 
-Scale in more slowly than scale out. Select one instance at a time where possible, use [graceful shutdown](upgrades.md#graceful-shutdown-and-scale-in), and wait for cluster health to stabilize.
+Scale in more slowly than scale out. Select one instance at a time where possible, use [graceful shutdown](upgrades.md#graceful-shutdown-and-scale-in), and wait for cluster health to stabilize. Ordinary activations on the departing silo are deactivated, not all live-migrated, so leave enough capacity for remaining silos to handle reactivation, state loading, and redirected traffic.
 
 ## Handle overload
 
@@ -58,8 +61,10 @@ Unlimited queues convert overload into high latency and memory pressure. Apply:
 - Admission control at application ingress.
 - Bounded queues and concurrency.
 - Request deadlines that include downstream calls.
-- Load shedding before the process becomes unresponsive.
+- <xref:Orleans.Configuration.LoadSheddingOptions> at the client gateway and stream providers before the process becomes unresponsive.
 - Per-tenant or per-key limits where one workload can starve others.
+
+Runtime load shedding is disabled by default. When enabled, it marks a silo overloaded after the configured CPU or memory threshold is exceeded, allows supported ingress work to be rejected, and causes resource-optimized placement to avoid that silo for new activations when alternatives exist. It doesn't move active grains or scale the cluster. Configure thresholds below hard platform limits and validate rejection and recovery behavior under load.
 
 Retries consume capacity. Include retry traffic in the load model and use exponential backoff with jitter, a retry budget, and an end-to-end deadline.
 

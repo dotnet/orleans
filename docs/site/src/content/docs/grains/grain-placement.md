@@ -1,7 +1,7 @@
 ---
 title: Grain placement and migration
 description: Understand placement, resource-optimized defaults, and activation movement in Orleans.
-ms.date: 08/08/2026
+ms.date: 08/15/2026
 ms.topic: concept-article
 ---
 
@@ -10,6 +10,21 @@ ms.topic: concept-article
 When a grain isn't active, Orleans selects a compatible silo and creates an activation there. This process is **placement**. Callers continue using location-transparent grain references, so placement doesn't change application call sites.
 
 This article covers application-facing placement configuration. For the runtime algorithms and coordination protocols behind placement and activation movement, see [Placement and activation balancing](../implementation/load-balancing.md).
+
+## What Orleans balances
+
+Placement, collection, migration, and load shedding solve different problems:
+
+| Event or mechanism | What Orleans does |
+|---|---|
+| A call needs an activation | Runs placement using the current compatible silos and current placement statistics. |
+| A silo joins | Includes it in later placement decisions after membership and compatibility information converge. Existing activations don't move merely because capacity was added. |
+| An activation remains idle | Collects it after the configured idle period. A later call runs placement again, so the replacement activation can use newly added capacity. |
+| A silo leaves or fails | Removes its activations. Calls are routed to activations on remaining silos or cause replacement activations to be placed there. |
+| Explicit or automatic migration is requested | Moves an eligible live activation after its current work completes. Cluster-wide automatic migration is experimental and opt-in. |
+| A silo is overloaded | Resource-optimized placement can avoid it and enabled load shedding can reject supported ingress work. This doesn't move existing activations or add capacity. |
+
+Orleans doesn't provide an autoscaler. A hosting platform or operator changes the silo count, and Orleans adapts placement and routing to the resulting membership.
 
 ## Default placement
 
@@ -21,6 +36,26 @@ Configure its weights through <xref:Orleans.Configuration.ResourceOptimizedPlace
 
 :::code language="csharp" source="../snippets/compiled/Grains/PlacementSnippets.cs" id="configure_resource_optimized_placement":::
 Weights are relative and don't need to total 100. Keep defaults until measurements show a workload-specific reason to change them.
+
+## Scale out and scale in
+
+On scale-out, new silos become candidates for new activations. Long-lived active grains remain where they are unless grain code requests migration or an opt-in rebalancing service selects them. Idle activation collection gradually makes more grain identities eligible for fresh placement, but it isn't a prompt or uniform redistribution algorithm.
+
+On graceful scale-in, the departing silo stops accepting placement and deactivates its ordinary activations during shutdown. Orleans doesn't bulk-migrate all of them to remaining silos. Subsequent calls reactivate those grain identities elsewhere. An abrupt loss follows the same placement outcome after failure detection, but in-flight calls can fail or time out and callers must follow the application's retry and idempotency policy.
+
+Scale gradually and preserve headroom for reactivation, state reads, cache warming, and temporarily concentrated traffic. See [Capacity planning and scaling](../deployment/capacity-planning.md) and [Graceful shutdown and scale-in](../deployment/upgrades.md#graceful-shutdown-and-scale-in).
+
+## Persistence and movement
+
+Persisted grain state belongs to the grain identity, not to a silo or activation. With <xref:Orleans.Runtime.IPersistentState`1>, Orleans reads configured state before <xref:Orleans.Grain.OnActivateAsync*> when it creates an ordinary replacement activation. Therefore, scale-out, scale-in, idle collection, and silo failure don't require moving storage records between silos. Every silo which can host the grain must be able to reach the configured storage provider.
+
+Live activation migration is different from deactivation followed by later reactivation. Orleans transfers runtime migration state to the target, including the in-memory state held by <xref:Orleans.Runtime.IPersistentState`1>. Application-owned in-memory state which must survive a live move must participate through <xref:Orleans.Runtime.IGrainMigrationParticipant>. Neither migration payload is a durability boundary: await the storage write before returning when a result must survive process failure. See [Grain persistence](grain-persistence/index.md) and [Activation lifecycle and migration](../implementation/activation-lifecycle.md#activation-migration).
+
+## Load shedding isn't rebalancing
+
+<xref:Orleans.Configuration.LoadSheddingOptions> is disabled by default. When enabled, its CPU and memory thresholds mark a silo as overloaded. The client gateway and stream providers can shed supported work, and resource-optimized placement excludes overloaded silos from new-activation candidates when alternatives are available.
+
+Load shedding doesn't relocate active grains, provision silos, or replace admission control and capacity planning. Set thresholds below the platform's hard limits, retain headroom for deactivation and recovery work, and monitor rejection rate with CPU, memory, queueing, and latency signals.
 
 ## Per-grain strategies
 

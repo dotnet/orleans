@@ -1,7 +1,7 @@
 ---
 title: Placement and activation balancing
 description: Understand Orleans resource-optimized placement, load signals, activation rebalancing, and repartitioning.
-ms.date: 08/02/2026
+ms.date: 08/15/2026
 ms.topic: concept-article
 ---
 
@@ -10,6 +10,8 @@ ms.topic: concept-article
 Placement chooses a silo when Orleans needs a new activation. Balancing can later move existing activations. Those are separate decisions with different information and costs.
 
 The default placement strategy is <xref:Orleans.Runtime.ResourceOptimizedPlacement>, not random placement.
+
+For the application and operational view of scale-out, scale-in, persistence, and configuration, see [Grain placement and migration](../grains/grain-placement.md).
 
 ## Resource-optimized placement
 
@@ -45,6 +47,8 @@ The default relative weights are:
 
 Public options: <xref:Orleans.Configuration.ResourceOptimizedPlacementOptions>. Implementation: [`ResourceOptimizedPlacementDirector`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Placement/ResourceOptimizedPlacementDirector.cs) and the default registration in [`DefaultSiloServices`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Hosting/DefaultSiloServices.cs).
 
+The `IsOverloaded` statistic is set only when <xref:Orleans.Configuration.LoadSheddingOptions.LoadSheddingEnabled> is enabled and either its CPU or memory threshold is exceeded. With load shedding disabled, resource-optimized placement still scores the resource measurements but doesn't categorically remove a candidate as overloaded. Load shedding is admission protection, not activation movement.
+
 ## Placement resolution and extension
 
 <xref:Orleans.Runtime.Placement.PlacementStrategyResolver> selects a grain-specific strategy when one is declared; otherwise it uses the default. `PlacementService` applies placement filters before calling the strategy's keyed <xref:Orleans.Runtime.Placement.IPlacementDirector>.
@@ -70,6 +74,8 @@ Resource-optimized placement only affects new activations. Long-lived activation
 - communicating grains are spread across silos.
 
 Moving an activation has a cost: dehydrate and rehydrate work, directory updates, cold caches, and a temporary interruption. Orleans therefore exposes opt-in protocols rather than continuously moving every activation.
+
+Membership changes don't invoke placement again for activations which remain valid. A joining silo receives activations through later creation or opt-in migration. During graceful shutdown, ordinary activations on the departing silo are deactivated rather than bulk-migrated; later calls create replacements on remaining compatible silos.
 
 ## Experimental activation rebalancer
 
