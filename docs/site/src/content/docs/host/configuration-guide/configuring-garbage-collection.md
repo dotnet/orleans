@@ -20,11 +20,11 @@ Orleans uses the .NET garbage collector (GC) for managed memory. The best GC mod
 
 ## Configure the silo project
 
-Enable server GC in the executable project that hosts the silo:
+Enable server GC in the executable project that hosts the silo. The documentation snippet project is a class library so that the example can be compiled, but an application must put this property in its silo host executable project:
 
 :::code language="xml" source="../snippets/hosting/Hosting.csproj" id="server_gc":::
 
-The `ServerGarbageCollection` MSBuild property writes `System.GC.Server` to the generated `.runtimeconfig.json` file. Put the property in the executable host project, not only in a grain class library.
+The `ServerGarbageCollection` MSBuild property writes `System.GC.Server` to the generated `.runtimeconfig.json` file. Setting it only in a referenced grain class library doesn't configure the host process.
 
 [Background GC](https://learn.microsoft.com/dotnet/standard/garbage-collection/background-gc) is enabled by default for both workstation and server GC. The `<ConcurrentGarbageCollection>` property controls that setting, but Orleans doesn't require it to be specified. Set it to `false` only when representative benchmarks show that non-concurrent GC is preferable.
 
