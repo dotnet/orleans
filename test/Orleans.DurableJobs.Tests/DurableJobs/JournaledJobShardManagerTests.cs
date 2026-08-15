@@ -175,12 +175,21 @@ public class JournaledJobShardManagerTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         const int JobCount = 32;
+        const int PendingOperationCapacity = 4;
         var storageProvider = new CountingJournalStorageProvider(delayAppends: true);
         using var services = CreateServices(storageProvider);
         var membership = new TestClusterMembershipService();
         var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5016), 0);
         membership.SetSiloStatus(silo, SiloStatus.Active);
-        var manager = CreateManager(services, membership, silo);
+        var manager = CreateManager(
+            services,
+            membership,
+            silo,
+            new DurableJobsOptions
+            {
+                MaxPendingOperationsPerShard = PendingOperationCapacity,
+                MaxShardBatchOperationCount = 2,
+            });
         var start = DateTimeOffset.UtcNow.AddMinutes(-1);
         var end = start.AddHours(1);
         var shard = await manager.CreateShardAsync(
@@ -231,6 +240,132 @@ public class JournaledJobShardManagerTests
             scheduledJobs.Select(job => job!.Id).ToHashSet(StringComparer.Ordinal));
 
         await reopenedManager.UnregisterShardAsync(reopenedShard, cancellationToken);
+    }
+
+    [Fact]
+    public async Task ConcurrentSchedules_WhenShardCapacityIsReached_RejectOverflowBeforeIngress()
+    {
+        const int JobCount = 32;
+        const int MaxJobsPerShard = 4;
+        const int PendingOperationCapacity = 2;
+        var storageProvider = new CountingJournalStorageProvider(delayAppends: true);
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 50165), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(
+            services,
+            membership,
+            silo,
+            new DurableJobsOptions
+            {
+                MaxJobsPerShard = MaxJobsPerShard,
+                MaxPendingOperationsPerShard = PendingOperationCapacity,
+                MaxShardBatchOperationCount = 1,
+            });
+        var start = DateTimeOffset.UtcNow.AddMinutes(-1);
+        var shard = await manager.CreateShardAsync(start, start.AddHours(1), new Dictionary<string, string>(), CancellationToken.None);
+
+        var schedules = Enumerable.Range(0, JobCount)
+            .Select(index => shard.TryScheduleJobAsync(new()
+            {
+                Target = GrainId.Create("type", $"capacity-{index}"),
+                JobName = $"capacity-{index}",
+                DueTime = start.AddSeconds(1),
+                Metadata = null,
+            }, CancellationToken.None))
+            .ToArray();
+
+        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(
+            JobCount - MaxJobsPerShard,
+            schedules.Count(static task => task.IsCompletedSuccessfully && task.Result is null));
+
+        storageProvider.AllowAppends();
+        var results = await Task.WhenAll(schedules).WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(MaxJobsPerShard, results.Count(static job => job is not null));
+        Assert.Equal(JobCount - MaxJobsPerShard, results.Count(static job => job is null));
+        Assert.Equal(MaxJobsPerShard, await shard.GetJobCountAsync());
+
+        await manager.UnregisterShardAsync(shard, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ConcurrentSchedules_StorageBatchNeverExceedsConfiguredOperationCount()
+    {
+        const int JobCount = 32;
+        const int MaxBatchOperationCount = 4;
+        var storageProvider = new CountingJournalStorageProvider(delayAppends: true);
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5018), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(
+            services,
+            membership,
+            silo,
+            new DurableJobsOptions { MaxShardBatchOperationCount = MaxBatchOperationCount });
+        var start = DateTimeOffset.UtcNow.AddMinutes(-1);
+        var shard = await manager.CreateShardAsync(start, start.AddHours(1), new Dictionary<string, string>(), CancellationToken.None);
+        var observedBatchSizes = new ConcurrentBag<long>();
+        using var listener = CreateStorageBatchSizeListener(observedBatchSizes);
+
+        var tasks = Enumerable.Range(0, JobCount)
+            .Select(index => shard.TryScheduleJobAsync(new()
+            {
+                Target = GrainId.Create("type", $"bounded-{index}"),
+                JobName = $"bounded-{index}",
+                DueTime = start.AddSeconds(1),
+                Metadata = null,
+            }, CancellationToken.None))
+            .ToArray();
+
+        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5));
+        storageProvider.AllowAppends();
+        Assert.All(await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(5)), Assert.NotNull);
+        Assert.NotEmpty(observedBatchSizes);
+        Assert.All(observedBatchSizes, size => Assert.InRange(size, 1, MaxBatchOperationCount));
+
+        await manager.UnregisterShardAsync(shard, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ConcurrentSchedules_StorageBatchHonorsConfiguredSizeBudget()
+    {
+        const int JobCount = 8;
+        var storageProvider = new CountingJournalStorageProvider(delayAppends: true);
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5019), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(
+            services,
+            membership,
+            silo,
+            new DurableJobsOptions { MaxShardBatchSizeBytes = 1_024 });
+        var start = DateTimeOffset.UtcNow.AddMinutes(-1);
+        var shard = await manager.CreateShardAsync(start, start.AddHours(1), new Dictionary<string, string>(), CancellationToken.None);
+        var observedBatchSizes = new ConcurrentBag<long>();
+        using var listener = CreateStorageBatchSizeListener(observedBatchSizes);
+        var metadataValue = new string('x', 1_024);
+
+        var tasks = Enumerable.Range(0, JobCount)
+            .Select(index => shard.TryScheduleJobAsync(new()
+            {
+                Target = GrainId.Create("type", $"large-{index}"),
+                JobName = $"large-{index}",
+                DueTime = start.AddSeconds(1),
+                Metadata = new Dictionary<string, string> { ["payload"] = metadataValue },
+            }, CancellationToken.None))
+            .ToArray();
+
+        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5));
+        storageProvider.AllowAppends();
+        Assert.All(await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(5)), Assert.NotNull);
+        Assert.NotEmpty(observedBatchSizes);
+        Assert.All(observedBatchSizes, size => Assert.Equal(1, size));
+
+        await manager.UnregisterShardAsync(shard, CancellationToken.None);
     }
 
     [Fact]
@@ -330,6 +465,50 @@ public class JournaledJobShardManagerTests
         Assert.Equal(DurableJobMutationResult.JobNotFound, await startAttemptTask);
 
         await manager.UnregisterShardAsync(shard, cancellationToken);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_WithActiveAndQueuedMutations_CompletesEveryCaller()
+    {
+        const int JobCount = 32;
+        var storageProvider = new CountingJournalStorageProvider(delayAppends: true);
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5022), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(
+            services,
+            membership,
+            silo,
+            new DurableJobsOptions
+            {
+                MaxPendingOperationsPerShard = 2,
+                MaxShardBatchOperationCount = 1,
+            });
+        var start = DateTimeOffset.UtcNow.AddMinutes(-1);
+        var shard = await manager.CreateShardAsync(
+            start,
+            start.AddHours(1),
+            new Dictionary<string, string> { ["Purpose"] = "DisposePendingMutations" },
+            CancellationToken.None);
+
+        var schedules = Enumerable.Range(0, JobCount)
+            .Select(index => shard.TryScheduleJobAsync(new()
+            {
+                Target = GrainId.Create("type", $"dispose-{index}"),
+                JobName = $"dispose-{index}",
+                DueTime = start.AddSeconds(1),
+                Metadata = null,
+            }, CancellationToken.None))
+            .ToArray();
+
+        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5));
+        await shard.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+
+        foreach (var schedule in schedules)
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => schedule);
+        }
     }
 
     [Fact]

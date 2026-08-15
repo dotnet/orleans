@@ -371,7 +371,13 @@ internal sealed class JournaledJobShardManager : JobShardManager
     private async ValueTask<JournaledJobShard> OpenShardAsync(ShardCatalogProperties descriptor, CancellationToken cancellationToken)
     {
         var codec = CreateOperationCodec();
-        var state = new JournaledJobShardState(descriptor.ShardId, descriptor.StartTime, descriptor.EndTime, codec, _timeProvider);
+        var state = new JournaledJobShardState(
+            descriptor.ShardId,
+            descriptor.StartTime,
+            descriptor.EndTime,
+            codec,
+            _timeProvider,
+            _options.MaxJobsPerShard);
         var manager = _stateManagerFactory.Create(descriptor.StorageId);
         try
         {
@@ -402,7 +408,10 @@ internal sealed class JournaledJobShardManager : JobShardManager
             this,
             _timeProvider,
             _options.ShardBatchLingerDelay,
-            _durableJobsInstruments);
+            _durableJobsInstruments,
+            _options.MaxShardBatchOperationCount,
+            _options.MaxShardBatchSizeBytes,
+            _options.MaxPendingOperationsPerShard);
     }
 
     private IDurableValueCommandCodec<DurableJobShardJournalRecord> CreateOperationCodec()

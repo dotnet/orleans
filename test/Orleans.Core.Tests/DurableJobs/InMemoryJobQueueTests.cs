@@ -132,6 +132,168 @@ public class InMemoryJobQueueTests
     }
 
     [Fact]
+    public async Task GetAsyncEnumerator_OrdersOneHundredDueTimeBucketsByTimeThenPriority()
+    {
+        const int bucketCount = 100;
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var queue = new InMemoryJobQueue(timeProvider);
+        var now = timeProvider.GetUtcNow();
+        DurableJobPriority[] enqueueOrder =
+        [
+            DurableJobPriority.Normal,
+            DurableJobPriority.Low,
+            DurableJobPriority.High,
+        ];
+
+        // Enqueue the newest bucket first and priorities out of order so the test exercises
+        // both due-time bucket ordering and priority ordering within every bucket.
+        for (var bucketIndex = 0; bucketIndex < bucketCount; bucketIndex++)
+        {
+            var dueTime = now.AddMilliseconds(-(bucketIndex + 1));
+            foreach (var priority in enqueueOrder)
+            {
+                var jobName = $"bucket-{bucketIndex:D3}-{priority}";
+                queue.Enqueue(CreateJob(jobName, dueTime, priority: priority), 0);
+            }
+        }
+
+        queue.MarkAsComplete();
+
+        var results = new List<(DateTimeOffset DueTime, DurableJobPriority Priority)>();
+        await foreach (var context in queue.WithCancellation(CancellationToken.None))
+        {
+            results.Add((context.Job.DueTime, context.Job.Priority));
+            if (results.Count == bucketCount * enqueueOrder.Length)
+            {
+                break;
+            }
+        }
+
+        Assert.Equal(bucketCount * enqueueOrder.Length, results.Count);
+        for (var resultBucketIndex = 0; resultBucketIndex < bucketCount; resultBucketIndex++)
+        {
+            var resultOffset = resultBucketIndex * enqueueOrder.Length;
+            var expectedDueTime = now.AddMilliseconds(-(bucketCount - resultBucketIndex));
+            Assert.All(
+                results.GetRange(resultOffset, enqueueOrder.Length),
+                result => Assert.Equal(expectedDueTime, result.DueTime));
+            Assert.Equal(
+                [DurableJobPriority.High, DurableJobPriority.Normal, DurableJobPriority.Low],
+                results.Skip(resultOffset).Take(enqueueOrder.Length).Select(static result => result.Priority));
+        }
+    }
+
+    [Fact]
+    public async Task GetAsyncEnumerator_ThirtyThousandJobsAcrossMinuteBuckets_DoesNotLoseDuplicateOrReorderJobs()
+    {
+        const int bucketCount = 6;
+        const int jobsPerBucket = 5_000;
+        const int jobCount = bucketCount * jobsPerBucket;
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 10, 0, TimeSpan.Zero));
+        var queue = new InMemoryJobQueue(timeProvider);
+        var now = timeProvider.GetUtcNow();
+
+        // Enqueue newest frames first and mix priorities so neither insertion order nor
+        // a large same-minute backlog can hide due-time or priority ordering defects.
+        for (var bucketIndex = bucketCount - 1; bucketIndex >= 0; bucketIndex--)
+        {
+            var dueTime = now.AddMinutes(bucketIndex - bucketCount);
+            for (var jobIndex = 0; jobIndex < jobsPerBucket; jobIndex++)
+            {
+                var priority = (DurableJobPriority)((jobIndex % 3) - 1);
+                var id = $"bucket-{bucketIndex:D2}-job-{jobIndex:D4}";
+                queue.Enqueue(CreateJob(id, dueTime, priority: priority), 0);
+            }
+        }
+
+        queue.MarkAsComplete();
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        DateTimeOffset? previousDueTime = null;
+        var previousPriority = DurableJobPriority.High;
+        await foreach (var context in queue.WithCancellation(CancellationToken.None))
+        {
+            Assert.True(seen.Add(context.Job.Id), $"Job '{context.Job.Id}' was dequeued more than once.");
+
+            if (previousDueTime == context.Job.DueTime)
+            {
+                Assert.True(
+                    context.Job.Priority <= previousPriority,
+                    $"Priority increased within bucket {context.Job.DueTime:O}: {previousPriority} -> {context.Job.Priority}.");
+            }
+            else
+            {
+                Assert.True(
+                    previousDueTime is null || context.Job.DueTime > previousDueTime,
+                    $"Due time moved backwards: {previousDueTime:O} -> {context.Job.DueTime:O}.");
+            }
+
+            previousDueTime = context.Job.DueTime;
+            previousPriority = context.Job.Priority;
+            Assert.True(queue.CancelJob(context.Job.Id));
+        }
+
+        Assert.Equal(jobCount, seen.Count);
+        Assert.Equal(0, queue.Count);
+    }
+
+    [Fact]
+    public async Task GetAsyncEnumerator_WhenNewMinuteFramesArriveDuringBacklog_DrainsEveryJobExactlyOnce()
+    {
+        const int bucketCount = 6;
+        const int jobsPerBucket = 5_000;
+        const int jobCount = bucketCount * jobsPerBucket;
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 10, 0, TimeSpan.Zero));
+        var queue = new InMemoryJobQueue(timeProvider);
+        var now = timeProvider.GetUtcNow();
+
+        EnqueueBucket(bucketIndex: 0);
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        DateTimeOffset? previousDueTime = null;
+        await foreach (var context in queue.WithCancellation(CancellationToken.None))
+        {
+            Assert.True(seen.Add(context.Job.Id), $"Job '{context.Job.Id}' was dequeued more than once.");
+            Assert.True(
+                previousDueTime is null || context.Job.DueTime >= previousDueTime,
+                $"Due time moved backwards: {previousDueTime:O} -> {context.Job.DueTime:O}.");
+            previousDueTime = context.Job.DueTime;
+            Assert.True(queue.CancelJob(context.Job.Id));
+
+            if (seen.Count == 100)
+            {
+                // Simulate five new minute frames arriving while the first 5,000-job
+                // frame is still being drained by a slower executor.
+                for (var bucketIndex = 1; bucketIndex < bucketCount; bucketIndex++)
+                {
+                    EnqueueBucket(bucketIndex);
+                }
+
+                queue.MarkAsComplete();
+            }
+
+            if (seen.Count % 1_000 == 0)
+            {
+                await Task.Yield();
+            }
+        }
+
+        Assert.Equal(jobCount, seen.Count);
+        Assert.Equal(0, queue.Count);
+
+        void EnqueueBucket(int bucketIndex)
+        {
+            var dueTime = now.AddMinutes(bucketIndex - bucketCount);
+            for (var jobIndex = 0; jobIndex < jobsPerBucket; jobIndex++)
+            {
+                var priority = (DurableJobPriority)((jobIndex % 3) - 1);
+                var id = $"bucket-{bucketIndex:D2}-job-{jobIndex:D4}";
+                queue.Enqueue(CreateJob(id, dueTime, priority: priority), 0);
+            }
+        }
+    }
+
+    [Fact]
     public async Task GetAsyncEnumerator_IncrementsDequeueCount()
     {
         var queue = new InMemoryJobQueue();
@@ -359,7 +521,12 @@ public class InMemoryJobQueueTests
         const string traceParent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
         const string traceState = "vendor=value";
         var queue = new InMemoryJobQueue();
-        var job = CreateJob("job1", DateTimeOffset.UtcNow.AddSeconds(1), traceParent, traceState);
+        var job = CreateJob(
+            "job1",
+            DateTimeOffset.UtcNow.AddSeconds(1),
+            traceParent,
+            traceState,
+            priority: DurableJobPriority.High);
 
         queue.Enqueue(job, 0);
         queue.RetryJobLater(CreateJobContext(job, "run1", 1), DateTimeOffset.UtcNow.AddSeconds(10));
@@ -367,6 +534,7 @@ public class InMemoryJobQueueTests
         var retriedJob = Assert.Single(queue.GetSnapshot()).Job;
         Assert.Equal(traceParent, retriedJob.TraceParent);
         Assert.Equal(traceState, retriedJob.TraceState);
+        Assert.Equal(DurableJobPriority.High, retriedJob.Priority);
     }
 
     [Fact]
@@ -584,7 +752,96 @@ public class InMemoryJobQueueTests
         Assert.Equal(0, queue.Count);
     }
 
-    private static DurableJob CreateJob(string id, DateTimeOffset dueTime, string? traceParent = null, string? traceState = null)
+    [Fact]
+    public async Task CancelLastDetachedJob_AfterCompletion_WakesWaitingEnumerator()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 8, 16, 0, 0, 0, TimeSpan.Zero));
+        var queue = new InMemoryJobQueue(timeProvider);
+        var job = CreateJob("in-flight", timeProvider.GetUtcNow().AddMilliseconds(-100));
+        queue.Enqueue(job, 0);
+
+        await using var enumerator = queue.GetAsyncEnumerator(CancellationToken.None);
+        Assert.True(await enumerator.MoveNextAsync());
+
+        queue.MarkAsComplete();
+        var completion = enumerator.MoveNextAsync().AsTask();
+        Assert.False(completion.IsCompleted);
+
+        Assert.True(queue.CancelJob(job.Id));
+        Assert.False(await completion.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
+    public async Task Enqueue_SameJobIdMovedDuringBucketDrain_YieldsOnlyLatestVersion()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 10, 0, TimeSpan.Zero));
+        var queue = new InMemoryJobQueue(timeProvider);
+        var staleDueTime = timeProvider.GetUtcNow().AddMinutes(-2);
+        var replacementDueTime = timeProvider.GetUtcNow().AddMinutes(-1);
+        var stale = CreateJob("replaced-job", staleDueTime, priority: DurableJobPriority.Low);
+        var sentinel = CreateJob("sentinel", staleDueTime, priority: DurableJobPriority.High);
+        var replacement = CreateJob("replaced-job", replacementDueTime, priority: DurableJobPriority.High);
+
+        queue.Enqueue(stale, 0);
+        queue.Enqueue(sentinel, 0);
+
+        await using var enumerator = queue.GetAsyncEnumerator(CancellationToken.None);
+
+        // Taking the first item snapshots the stale version in the dequeued bucket.
+        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(sentinel.Id, enumerator.Current.Job.Id);
+        Assert.True(queue.CancelJob(sentinel.Id));
+
+        // Moving the same ID to a new bucket must invalidate the stale snapshot item.
+        queue.Enqueue(replacement, 7);
+        queue.MarkAsComplete();
+
+        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(replacement.Id, enumerator.Current.Job.Id);
+        Assert.Equal(replacementDueTime, enumerator.Current.Job.DueTime);
+        Assert.Equal(DurableJobPriority.High, enumerator.Current.Job.Priority);
+        Assert.Equal(8, enumerator.Current.DequeueCount);
+        Assert.True(queue.CancelJob(replacement.Id));
+
+        Assert.False(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
+    [Trait("Category", "Stress")]
+    public async Task OneMillionSameTimeJobs_DequeueInBoundedPriorityOrder()
+    {
+        const int JobCount = 1_000_000;
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 8, 16, 0, 0, 0, TimeSpan.Zero));
+        var queue = new InMemoryJobQueue(timeProvider);
+        var dueTime = timeProvider.GetUtcNow().AddMinutes(-1);
+
+        for (var index = 0; index < JobCount; index++)
+        {
+            var priority = (index % 3) switch
+            {
+                0 => DurableJobPriority.Low,
+                1 => DurableJobPriority.Normal,
+                _ => DurableJobPriority.High,
+            };
+            queue.Enqueue(CreateJob(index.ToString(), dueTime, priority: priority), 0);
+        }
+
+        await using var enumerator = queue.GetAsyncEnumerator(CancellationToken.None);
+        for (var index = 0; index < InMemoryJobQueue.MaxDequeueBatchSize; index++)
+        {
+            Assert.True(await enumerator.MoveNextAsync());
+            Assert.Equal(DurableJobPriority.High, enumerator.Current.Job.Priority);
+        }
+
+        Assert.Equal(JobCount, queue.Count);
+    }
+
+    private static DurableJob CreateJob(
+        string id,
+        DateTimeOffset dueTime,
+        string? traceParent = null,
+        string? traceState = null,
+        DurableJobPriority priority = DurableJobPriority.Normal)
     {
         return new DurableJob
         {
@@ -596,6 +853,7 @@ public class InMemoryJobQueueTests
             Metadata = null,
             TraceParent = traceParent,
             TraceState = traceState,
+            Priority = priority,
         };
     }
 
