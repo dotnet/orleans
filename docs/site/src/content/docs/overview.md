@@ -81,6 +81,8 @@ Orleans is a strong fit when an application has many independently addressable e
 
 Orleans can run in a single process during development and scale to a cluster without changing grain interfaces. Production deployments still require deliberate choices for clustering, storage, retries, observability, capacity, and deployment.
 
+For a decision guide with concrete examples and counterexamples, see [Orleans scenarios and use cases](scenarios.md).
+
 ## Next step
 
 > [!div class="nextstepaction"]

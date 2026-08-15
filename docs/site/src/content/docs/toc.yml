@@ -8,6 +8,8 @@ items:
         href: overview.md
       - name: Why Orleans?
         href: benefits.md
+      - name: Scenarios and use cases
+        href: scenarios.md
   - name: Get started
     items:
       - name: Hello World
