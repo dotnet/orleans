@@ -111,6 +111,35 @@ public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper
         Assert.Equal(host, report.Host);
     }
 
+    [Fact]
+    public async Task Explicit_Suspension_Should_Reflect_The_Latest_Requested_Duration()
+    {
+        var serviceProvider = Cluster.GetSiloServiceProvider();
+        var rebalancer = serviceProvider.GetRequiredService<IActivationRebalancer>();
+
+        await rebalancer.ResumeRebalancing();
+
+        var longerDuration = TimeSpan.FromSeconds(10);
+        var shorterDuration = TimeSpan.FromSeconds(2);
+
+        await rebalancer.SuspendRebalancing(longerDuration);
+        var afterLongerCall = await rebalancer.GetRebalancingReport();
+
+        await rebalancer.SuspendRebalancing(shorterDuration);
+        var afterShorterCall = await rebalancer.GetRebalancingReport();
+
+        Assert.Equal(RebalancerStatus.Suspended, afterShorterCall.Status);
+        Assert.True(afterShorterCall.SuspensionDuration.HasValue);
+        Assert.Equal(afterLongerCall.Host, afterShorterCall.Host);
+        Assert.InRange(afterShorterCall.SuspensionDuration.Value, TimeSpan.FromTicks(1), shorterDuration);
+
+        await rebalancer.SuspendRebalancing(longerDuration);
+        var afterLongerRequest = await rebalancer.GetRebalancingReport();
+
+        Assert.True(afterLongerRequest.SuspensionDuration.HasValue);
+        Assert.InRange(afterLongerRequest.SuspensionDuration.Value, shorterDuration, longerDuration);
+    }
+
     private static string Format(RebalancingReport report) =>
         $"Host={report.Host}, Status={report.Status}, SuspensionDuration={report.SuspensionDuration?.ToString() ?? "<null>"}";
 
