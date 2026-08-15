@@ -1,7 +1,7 @@
 ---
 title: Server configuration
 description: Configure Orleans silos, providers, and network endpoints.
-ms.date: 08/02/2026
+ms.date: 08/15/2026
 ms.topic: how-to
 ---
 
@@ -75,4 +75,4 @@ Prefer defaults until measurements or deployment requirements justify a change. 
 - Run at least three silos across failure domains when availability requirements demand quorum-like failure tolerance.
 - Configure readiness so traffic starts only after host startup completes.
 - Let the Generic Host receive termination signals and complete [graceful shutdown](shutting-down-orleans.md).
-- Use server GC and size CPU/memory limits from load tests.
+- Choose the [.NET GC mode](configuring-garbage-collection.md) and size CPU/memory limits from representative load tests.

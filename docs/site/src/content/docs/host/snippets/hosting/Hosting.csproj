@@ -5,7 +5,6 @@
     <OutputType>Library</OutputType>
     <!-- <server_gc> -->
     <ServerGarbageCollection>true</ServerGarbageCollection>
-    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
     <!-- </server_gc> -->
   </PropertyGroup>
 
