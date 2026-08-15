@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
+using Orleans.Runtime.Placement;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -109,10 +110,20 @@ namespace UnitTests.StreamingTests
         {
             var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
-            Assert.Equal(0, await pubSubGrain.ProducerCount(streamId));
+            var primarySilo = this.fixture.HostedCluster.Primary!;
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, primarySilo.SiloAddress);
+            try
+            {
+                Assert.Equal(0, await pubSubGrain.ProducerCount(streamId));
+            }
+            finally
+            {
+                RequestContext.Remove(IPlacementDirector.PlacementHintKey);
+            }
+
             var managementGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
             var rendezvousSilo = await managementGrain.GetActivationAddress(pubSubGrain);
-            Assert.NotNull(rendezvousSilo);
+            Assert.Equal(primarySilo.SiloAddress, rendezvousSilo);
             var restartedSilo = this.fixture.HostedCluster.GetActiveSilos().First(silo => silo.SiloAddress != rendezvousSilo);
             var staleProducer = SystemTargetGrainId.Create(
                 Constants.StreamPullingAgentType,
@@ -127,7 +138,7 @@ namespace UnitTests.StreamingTests
             await this.fixture.HostedCluster.WaitForLivenessToStabilizeAsync();
             var replacementProducer = SystemTargetGrainId.Create(
                 Constants.StreamPullingAgentType,
-                rendezvousSilo,
+                replacementSilo.SiloAddress,
                 "ProviderName_1_test-queue").GrainId;
 
             await pubSubGrain.RegisterProducer(streamId, replacementProducer);
