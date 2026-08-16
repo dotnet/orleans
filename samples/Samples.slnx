@@ -14,6 +14,10 @@
     <Project Path="BankAccount/BankClient/BankClient.csproj" />
     <Project Path="BankAccount/BankServer/BankServer.csproj" />
   </Folder>
+  <Folder Name="/BasicClustering/">
+    <Project Path="BasicClustering/BasicClustering.AppHost/BasicClustering.AppHost.csproj" />
+    <Project Path="BasicClustering/BasicClustering.Silo/BasicClustering.Silo.csproj" />
+  </Folder>
   <Folder Name="/Blazor/">
     <Project Path="Blazor/BlazorServer/BlazorServer.csproj" />
   </Folder>

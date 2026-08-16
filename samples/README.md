@@ -37,6 +37,7 @@ The command checks the gallery manifest and builds every project in `Samples.sln
 | [Adventure](Adventure) | A text adventure game demonstrating grains, external clients, and application modeling. | C# | games, clients, grains | [dotnet/samples](https://github.com/dotnet/samples) |
 | [AWS Kinesis and DynamoDB](AWS/KinesisDynamoDB) | An AWS-hosted Orleans application using DynamoDB for clustering, persistence, reminders, and Kinesis checkpoints. | C# | aws, kinesis, dynamodb, streaming | [dotnet/orleans](https://github.com/dotnet/orleans) |
 | [Bank Account](BankAccount) | A bank transfer simulation demonstrating ACID transactions across stateful grains. | C# | transactions, persistence | [dotnet/samples](https://github.com/dotnet/samples) |
+| [Basic Clustering](BasicClustering) | A minimal Aspire-hosted Orleans cluster with two silo replicas and Redis membership. | C# | clustering, aspire, redis, getting-started | [dotnet/orleans](https://github.com/dotnet/orleans) |
 | [Blazor Server](Blazor/BlazorServer) | An interactive Blazor Server application backed by Orleans grains. | C#, Razor | blazor, aspnet-core, web | [dotnet/samples](https://github.com/dotnet/samples) |
 | [Blazor WebAssembly](Blazor/BlazorWasm) | A hosted Blazor WebAssembly application with an Orleans-backed server. | C#, Razor | blazor, webassembly, web | [dotnet/samples](https://github.com/dotnet/samples) |
 | [Chat Room](ChatRoom) | A terminal chat application demonstrating Orleans Streams. | C# | streaming, client, terminal | [dotnet/samples](https://github.com/dotnet/samples) |

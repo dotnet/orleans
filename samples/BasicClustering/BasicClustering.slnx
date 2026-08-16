@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="BasicClustering.AppHost/BasicClustering.AppHost.csproj" />
+  <Project Path="BasicClustering.Silo/BasicClustering.Silo.csproj" />
+</Solution>
