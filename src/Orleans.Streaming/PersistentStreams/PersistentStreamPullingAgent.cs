@@ -515,6 +515,7 @@ namespace Orleans.Streams
                 return false;
             }
 
+            // Pause all queue reads so a cold stream's first batch stays pinned until registration completes.
             if (pubSubCache.Values.Any(static stream => stream.RegistrationTask is { IsCompleted: false }))
             {
                 return false;
