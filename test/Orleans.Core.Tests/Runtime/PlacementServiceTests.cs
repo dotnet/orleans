@@ -98,6 +98,22 @@ namespace UnitTests.Runtime
         }
 
         [Fact]
+        public async Task GetOrPlaceActivationAsync_ExpiredMessage_DoesNotRetry()
+        {
+            var target = CreateTarget();
+            var message = new Message
+            {
+                TargetGrain = GrainId.Create("test", "grain-1"),
+                InterfaceType = GrainInterfaceType.Create("test.interface"),
+                InterfaceVersion = 1,
+                TimeToLive = TimeSpan.Zero,
+            };
+
+            await Assert.ThrowsAsync<OperationCanceledException>(() => GetTestAccessor(target).GetOrPlaceActivationAsync(message));
+            await StopAsync(target);
+        }
+
+        [Fact]
         public async Task GetCompatibleSilos_AfterLifecycleStop_ThrowsSiloUnavailableException()
         {
             var target = CreateTarget();

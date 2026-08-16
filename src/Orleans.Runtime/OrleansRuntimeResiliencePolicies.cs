@@ -13,7 +13,7 @@ namespace Orleans.Runtime;
 /// <summary>
 /// Resilience policies used by the Orleans runtime.
 /// </summary>
-public static class OrleansRuntimeResiliencePolicies
+internal static class OrleansRuntimeResiliencePolicies
 {
     /// <summary>
     /// The key used to identify the placement resilience pipeline in <see cref="Polly.Registry.ResiliencePipelineProvider{TKey}"/>.

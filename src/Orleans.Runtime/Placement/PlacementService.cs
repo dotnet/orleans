@@ -16,7 +16,6 @@ using Orleans.Runtime.Internal;
 using Orleans.Runtime.Placement.Filtering;
 using Orleans.Runtime.Versions;
 using Polly;
-using Polly.DependencyInjection;
 using Polly.Registry;
 
 namespace Orleans.Runtime.Placement
@@ -520,7 +519,7 @@ namespace Orleans.Runtime.Placement
                 if (firstMessage.IsExpired)
                 {
                     LogMessageExpiredDuringPlacement(_logger, firstMessage.TargetGrain);
-                    throw new TimeoutException($"Message expired before placement could complete for grain {firstMessage.TargetGrain}.");
+                    throw new OperationCanceledException($"Message expired before placement could complete for grain {firstMessage.TargetGrain}.");
                 }
 
                 var target = new PlacementTarget(
@@ -552,7 +551,7 @@ namespace Orleans.Runtime.Placement
                 if (firstMessage.IsExpired)
                 {
                     LogMessageExpiredDuringPlacement(_logger, targetGrain);
-                    throw new TimeoutException($"Message expired before placement could complete for grain {targetGrain}.");
+                    throw new OperationCanceledException($"Message expired before placement could complete for grain {targetGrain}.");
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
