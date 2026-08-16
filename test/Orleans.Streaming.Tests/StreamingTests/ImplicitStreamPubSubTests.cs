@@ -32,9 +32,10 @@ public sealed class ImplicitStreamPubSubTests
             serviceProvider);
         var pubSub = new ImplicitStreamPubSub(subscriberTable);
         var streamId = new QualifiedStreamId(providerName, StreamId.Create("namespace", Guid.NewGuid()));
+        var grainId = GrainId.Create("stream-consumer", "test");
 
         var exception = Assert.Throws<ArgumentOutOfRangeException>(
-            () => pubSub.CreateSubscriptionId(streamId, default));
+            () => pubSub.CreateSubscriptionId(streamId, grainId));
 
         Assert.Contains($"stream provider '{providerName}'", exception.Message);
         Assert.Contains($"{nameof(StreamPubSubType)}.{nameof(StreamPubSubType.ImplicitOnly)}", exception.Message);
