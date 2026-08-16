@@ -106,7 +106,7 @@ namespace UnitTests.Runtime
                 TargetGrain = GrainId.Create("test", "grain-1"),
                 InterfaceType = GrainInterfaceType.Create("test.interface"),
                 InterfaceVersion = 1,
-                TimeToLive = TimeSpan.Zero,
+                TimeToLive = TimeSpan.FromMilliseconds(-1),
             };
 
             await Assert.ThrowsAsync<OperationCanceledException>(() => GetTestAccessor(target).GetOrPlaceActivationAsync(message));
