@@ -130,7 +130,7 @@ namespace Orleans.Storage
 
         private IMemoryStorageGrain GetStorageGrain(string id)
         {
-            var idx = (uint)id.GetHashCode() % (uint)storageGrains.Length;
+            var idx = StableHash.ComputeHash(id) % (uint)storageGrains.Length;
             return storageGrains[idx].Value;
         }
 
