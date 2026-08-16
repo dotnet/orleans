@@ -525,7 +525,7 @@ namespace Orleans.Runtime.Placement
 
                 var target = new PlacementTarget(
                     firstMessage.TargetGrain,
-                    firstMessage.RequestContextData,
+                    firstMessage.RequestContextData!,
                     firstMessage.InterfaceType,
                     firstMessage.InterfaceVersion);
 
