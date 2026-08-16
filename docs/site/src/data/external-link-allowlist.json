@@ -12,6 +12,8 @@
     "https://www.nuget.org/packages/Microsoft.Orleans.Journaling.Redis": "The new Redis journaling package is documented but not yet published; remove this entry and its unpublished API-package entry after publication.",
     "https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Firestore": "The new Firestore persistence package is documented but not yet published; remove this entry and its unpublished API-package entry after publication.",
     "https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Firestore": "The new Firestore reminders package is documented but not yet published; remove this entry and its unpublished API-package entry after publication.",
-    "https://www.nuget.org/packages/Microsoft.Orleans.Streaming.Kinesis": "The new Kinesis streaming package is documented but not yet published; remove this entry and its unpublished API-package entry after publication."
+    "https://www.nuget.org/packages/Microsoft.Orleans.Streaming.Kinesis": "The new Kinesis streaming package is documented but not yet published; remove this entry and its unpublished API-package entry after publication.",
+    "https://en.wikipedia.org/wiki/Kalman_filter": "Wikipedia serves this public article to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",
+    "https://www.f5.com/company/blog/nginx/nginx-power-of-two-choices-load-balancing-algorithm": "The F5 site serves this canonical NGINX article to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403."
   }
 }
