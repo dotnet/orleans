@@ -224,9 +224,78 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
+        public async Task SiloHealthMonitor_TimeoutDuringGcPause_IsInconclusive()
+        {
+            var timeProvider = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(
+                new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero));
+            var options = new ClusterMembershipOptions
+            {
+                ProbeTimeout = TimeSpan.FromSeconds(5),
+                MaxProbeTimeout = TimeSpan.FromSeconds(45),
+                EnableIndirectProbes = false,
+            };
+            var optionsMonitor = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
+            optionsMonitor.CurrentValue.Returns(options);
+            var prober = Substitute.For<IRemoteSiloProber>();
+            var probeEntered = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var pendingProbe = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            prober.Probe(default!, default, default).ReturnsForAnyArgs(call =>
+            {
+                probeEntered.TrySetResult(call.ArgAt<CancellationToken>(2));
+                return pendingProbe.Task;
+            });
+            var probeResult = new TaskCompletionSource<ProbeResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var timer = new DilationProbeTimer();
+            var monitor = new SiloHealthMonitor(
+                _targetSilo,
+                (_, result) =>
+                {
+                    probeResult.TrySetResult(result);
+                    return Task.CompletedTask;
+                },
+                optionsMonitor,
+                _loggerFactory,
+                prober,
+                new DelegateAsyncTimerFactory((_, _) => timer),
+                _localSiloHealthMonitor,
+                _membershipService,
+                _localSiloDetails,
+                timeProvider);
+            var totalPauseDuration = TimeSpan.Zero;
+            ((ITestAccessor)monitor).GetTotalPauseDuration = () => totalPauseDuration;
+
+            try
+            {
+                monitor.Start();
+                var firstTick = await timer.Ticks.ReadAsync();
+                firstTick.Completion.SetResult(true);
+                var cancellationToken = await probeEntered.Task;
+
+                totalPauseDuration = TimeSpan.FromSeconds(2);
+                timeProvider.Advance(options.ProbeTimeout);
+
+                Assert.True(cancellationToken.IsCancellationRequested);
+                var result = await probeResult.Task;
+                Assert.Equal(ProbeResultStatus.Unknown, result.Status);
+                Assert.Equal(0, result.FailedProbeCount);
+                Assert.Equal(0, ((ITestAccessor)monitor).MissedProbes);
+
+                var nextTick = await timer.Ticks.ReadAsync();
+                nextTick.Completion.SetResult(false);
+            }
+            finally
+            {
+                await monitor.StopAsync(CancellationToken.None);
+            }
+        }
+
+        [Fact]
         public async Task SiloHealthMonitor_FailedProbe_Exception()
         {
             _clusterMembershipOptions.ProbeTimeout = TimeSpan.FromSeconds(2);
+            var pauseSample = 0;
+            ((ITestAccessor)_monitor).GetTotalPauseDuration = () =>
+                Interlocked.Increment(ref pauseSample) % 2 == 1 ? TimeSpan.Zero : _clusterMembershipOptions.ProbeTimeout;
 
             _prober.Probe(default!, default).ThrowsAsyncForAnyArgs(new Exception("nope"));
             _prober.ProbeIndirectly(default!, default!, default, default).ThrowsAsyncForAnyArgs(new InvalidOperationException("No"));

@@ -30,6 +30,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILocalSiloDetails _localSiloDetails;
         private readonly TimeProvider _timeProvider;
         private readonly CancellationTokenSource _stoppingCancellation = new();
+        private Func<TimeSpan> _getTotalPauseDuration = GC.GetTotalPauseDuration;
 #if NET9_0_OR_GREATER
         private readonly Lock _lockObj = new();
 #else
@@ -97,6 +98,7 @@ namespace Orleans.Runtime.MembershipService
             int MissedProbes { get; }
             int ProbeTimeoutSampleCount { get; }
             TimeSpan CurrentProbeTimeout { get; }
+            Func<TimeSpan> GetTotalPauseDuration { set; }
         }
 
         /// <summary>
@@ -112,6 +114,7 @@ namespace Orleans.Runtime.MembershipService
         int ITestAccessor.MissedProbes => _failedProbes;
         int ITestAccessor.ProbeTimeoutSampleCount => _failureDetector?.SampleCount ?? 0;
         TimeSpan ITestAccessor.CurrentProbeTimeout => _failureDetector?.GetTimeout() ?? _clusterMembershipOptions.CurrentValue.ProbeTimeout;
+        Func<TimeSpan> ITestAccessor.GetTotalPauseDuration { set => _getTotalPauseDuration = value; }
 
         /// <summary>
         /// Start the monitor.
@@ -328,10 +331,11 @@ namespace Orleans.Runtime.MembershipService
             var id = ++_nextProbeId;
             LogTraceGoingToSendPing(_log, id, TargetSiloAddress);
 
-            var gcPauseBefore = GC.GetTotalPauseDuration();
+            var gcPauseBefore = _getTotalPauseDuration();
             var roundTripTimer = TimeProviderValueStopwatch.StartNew(_timeProvider);
             ProbeResult probeResult;
             Exception? failureException;
+            var probeTimedOut = false;
             try
             {
                 await _prober.Probe(TargetSiloAddress, id, cancellation).WaitAsync(cancellation);
@@ -339,6 +343,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (OperationCanceledException exception)
             {
+                probeTimedOut = cancellation.IsCancellationRequested;
                 failureException = new OperationCanceledException(
                     $"The ping attempt was cancelled after {roundTripTimer.GetElapsedTime(out _)}. Ping #{id}",
                     exception);
@@ -366,8 +371,8 @@ namespace Orleans.Runtime.MembershipService
                 // Check if a GC pause consumed a significant portion of the probe timeout.
                 // If so, the local silo may have been unable to process the response in time,
                 // so we treat this as an inconclusive result rather than a failure.
-                var gcPauseDuring = GC.GetTotalPauseDuration() - gcPauseBefore;
-                if (gcPauseDuring > probeTimeout.Multiply(0.25))
+                var gcPauseDuring = _getTotalPauseDuration() - gcPauseBefore;
+                if (probeTimedOut && gcPauseDuring > probeTimeout.Multiply(0.25))
                 {
                     LogWarningProbeFailureDuringGcPause(_log, id, TargetSiloAddress, roundTripTime, gcPauseDuring, _failedProbes);
                     probeResult = ProbeResult.CreateDirect(_failedProbes, ProbeResultStatus.Unknown);
@@ -552,7 +557,7 @@ namespace Orleans.Runtime.MembershipService
 
         [LoggerMessage(
             Level = LogLevel.Warning,
-            Message = "Probe #{Id} to silo {SiloAddress} failed after {Elapsed}, but a GC pause of {GcPauseDuration} was detected during the probe. Treating as inconclusive. Consecutive failed probes remains at {FailedProbeCount}."
+            Message = "Probe #{Id} to silo {SiloAddress} failed after {Elapsed}, but a GC pause of {GcPauseDuration} was detected during the probe. Treating as inconclusive. Consecutive failed probe count remains at {FailedProbeCount}."
         )]
         private static partial void LogWarningProbeFailureDuringGcPause(ILogger logger, int id, SiloAddress siloAddress, TimeSpan elapsed, TimeSpan gcPauseDuration, int failedProbeCount);
     }
