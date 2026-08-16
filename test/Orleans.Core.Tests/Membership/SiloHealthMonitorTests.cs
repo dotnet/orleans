@@ -271,7 +271,7 @@ namespace NonSilo.Tests.Membership
                 firstTick.Completion.SetResult(true);
                 var cancellationToken = await probeEntered.Task;
 
-                totalPauseDuration = TimeSpan.FromSeconds(2);
+                totalPauseDuration = options.ProbeTimeout.Multiply(0.25);
                 timeProvider.Advance(options.ProbeTimeout);
 
                 Assert.True(cancellationToken.IsCancellationRequested);

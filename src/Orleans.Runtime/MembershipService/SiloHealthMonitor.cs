@@ -372,7 +372,7 @@ namespace Orleans.Runtime.MembershipService
                 // If so, the local silo may have been unable to process the response in time,
                 // so we treat this as an inconclusive result rather than a failure.
                 var gcPauseDuring = _getTotalPauseDuration() - gcPauseBefore;
-                if (probeTimedOut && gcPauseDuring > probeTimeout.Multiply(0.25))
+                if (probeTimedOut && gcPauseDuring >= probeTimeout.Multiply(0.25))
                 {
                     LogWarningProbeFailureDuringGcPause(_log, id, TargetSiloAddress, roundTripTime, gcPauseDuring, _failedProbes);
                     probeResult = ProbeResult.CreateDirect(_failedProbes, ProbeResultStatus.Unknown);
