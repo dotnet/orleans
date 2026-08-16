@@ -64,7 +64,7 @@ public sealed class DistributedGrainDirectoryMembershipTests
 
             var siloAddress = silo.SiloAddress;
             var activeMember = activeView.ClusterMembershipSnapshot.Members[siloAddress];
-            var joiningVersion = activeView.Version;
+            var joiningVersion = new MembershipVersion(membership.CurrentView.Version.Value + 1);
             membership.PublishMembershipUpdate(CreateSnapshot(siloAddress, activeMember.Name, SiloStatus.Joining, joiningVersion));
             Assert.Empty(membership.CurrentView.Members);
 
@@ -76,7 +76,7 @@ public sealed class DistributedGrainDirectoryMembershipTests
                 siloAddress,
                 activeMember.Name,
                 SiloStatus.Active,
-                new MembershipVersion(joiningVersion.Value + 1)));
+                new MembershipVersion(membership.CurrentView.Version.Value + 1)));
 
             Assert.Equal(siloAddress, await primaryTask);
         }
