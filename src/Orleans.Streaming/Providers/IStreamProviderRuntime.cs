@@ -48,17 +48,17 @@ namespace Orleans.Streams
     public enum StreamPubSubType
     {        
         /// <summary>
-        /// Explicit and implicit pub/sub.
+        /// Supports explicit subscriptions created at runtime and implicit subscriptions declared on grain types.
         /// </summary>
         ExplicitGrainBasedAndImplicit,
 
         /// <summary>
-        /// Explicit pub/sub.
+        /// Supports only explicit subscriptions created at runtime.
         /// </summary>
         ExplicitGrainBasedOnly,
 
         /// <summary>
-        /// Implicit pub/sub.
+        /// Supports only implicit subscriptions declared on grain types. Attempts to create explicit subscriptions will fail.
         /// </summary>
         ImplicitOnly,
     }

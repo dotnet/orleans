@@ -45,7 +45,7 @@ namespace Orleans.Streams
             // TODO BPETIT filter data?
             if (!IsImplicitSubscriber(streamConsumer, streamId))
             {
-                throw new ArgumentOutOfRangeException(streamId.ToString(), "Only implicit subscriptions are supported.");
+                throw CreateExplicitSubscriptionNotSupportedException(streamId);
             }
             return Task.CompletedTask;
         }
@@ -54,7 +54,7 @@ namespace Orleans.Streams
         {
             if (!IsImplicitSubscriber(subscriptionId, streamId))
             {
-                throw new ArgumentOutOfRangeException(streamId.ToString(), "Only implicit subscriptions are supported.");
+                throw CreateExplicitSubscriptionNotSupportedException(streamId);
             }
             return Task.CompletedTask;
         }
@@ -108,7 +108,7 @@ namespace Orleans.Streams
             Guid subscriptionGuid;
             if (!implicitTable.TryGetImplicitSubscriptionGuid(grainId, streamId, out subscriptionGuid))
             {
-                throw new ArgumentOutOfRangeException(streamId.ToString(), "Only implicit subscriptions are supported.");
+                throw CreateExplicitSubscriptionNotSupportedException(streamId);
             }
             return GuidId.GetGuidId(subscriptionGuid);
         }
@@ -117,5 +117,12 @@ namespace Orleans.Streams
         {
             return Task.FromResult(false);
         }
+
+        private static ArgumentOutOfRangeException CreateExplicitSubscriptionNotSupportedException(QualifiedStreamId streamId) =>
+            new(
+                streamId.ToString(),
+                $"The stream provider '{streamId.ProviderName}' is configured with {nameof(StreamPubSubType)}.{nameof(StreamPubSubType.ImplicitOnly)}, which does not support explicit subscriptions. "
+                + $"To enable explicit subscriptions, configure the provider with {nameof(StreamPubSubType)}.{nameof(StreamPubSubType.ExplicitGrainBasedAndImplicit)} or "
+                + $"{nameof(StreamPubSubType)}.{nameof(StreamPubSubType.ExplicitGrainBasedOnly)} using ConfigureStreamPubSub.");
     }
 }

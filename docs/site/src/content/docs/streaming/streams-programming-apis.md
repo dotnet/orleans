@@ -45,6 +45,8 @@ Streams are multicast. Each subscription receives each item, and one grain can c
 
 ## Explicit and implicit subscriptions
 
+The provider's <xref:Orleans.Streams.StreamPubSubType> controls which subscription models are available. The default, `ExplicitGrainBasedAndImplicit`, supports both models. A provider configured with `ImplicitOnly` rejects calls to <xref:Orleans.Streams.IAsyncObservable`1.SubscribeAsync*>; use `ExplicitGrainBasedAndImplicit` or `ExplicitGrainBasedOnly` when the application creates explicit subscriptions.
+
 ### Explicit subscriptions
 
 <a id="recovering-from-failures"></a>
