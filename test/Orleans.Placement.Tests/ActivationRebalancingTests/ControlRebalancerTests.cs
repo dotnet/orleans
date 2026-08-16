@@ -137,7 +137,7 @@ public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper
         var afterLongerRequest = await rebalancer.GetRebalancingReport();
 
         Assert.True(afterLongerRequest.SuspensionDuration.HasValue);
-        Assert.InRange(afterLongerRequest.SuspensionDuration.Value, shorterDuration, longerDuration);
+        Assert.InRange(afterLongerRequest.SuspensionDuration.Value, shorterDuration + TimeSpan.FromTicks(1), longerDuration);
     }
 
     private static string Format(RebalancingReport report) =>
