@@ -97,7 +97,7 @@
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.16.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.16.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.16.0" />
-    <PackageVersion Include="Polly" Version="8.5.2" />
+    <PackageVersion Include="Polly" Version="8.6.4" />
     <PackageVersion Include="Polly.Extensions" Version="8.6.4" />
     <PackageVersion Include="protobuf-net" Version="3.2.56" />
     <PackageVersion Include="SSH.NET" Version="2026.0.0" />
