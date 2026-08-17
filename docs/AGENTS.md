@@ -96,6 +96,9 @@ tutorial into a reference or burying architecture detail inside a how-to.
 
 - Keep ordinary conceptual and how-to documentation timeless. Name Orleans releases only in migration or upgrade guidance where the release boundary matters.
 - Document implemented behavior and verified limitations. Don't promise planned capabilities.
+- Rewrite guidance around affirmative runtime behavior and outcomes. Describe relevant triggers, runtime actions, resulting states, and operator responses when those details help readers understand or operate the feature.
+- Assign each responsibility to the mechanism which performs it. For example, an autoscaler changes cluster capacity, placement selects an activation host, and a rebalancer migrates activations.
+- State what a feature is and does. Remove obvious statements and descriptions framed around what the feature isn't, doesn't do, or doesn't replace.
 - Prefer correcting or enhancing useful content over deleting it. Preserve
   authoritative references during rewrites, and remove them only when obsolete,
   redundant, or replaced with a clearer current source.

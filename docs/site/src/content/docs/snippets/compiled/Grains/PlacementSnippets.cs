@@ -118,6 +118,18 @@ siloBuilder.AddActivationRebalancer();
 #pragma warning restore ORLEANSEXP002
             // </configure_activation_rebalancing>
         }
+
+        internal static void ConfigureLoadShedding(ISiloBuilder siloBuilder)
+        {
+            // <configure_load_shedding>
+siloBuilder.Configure<LoadSheddingOptions>(options =>
+{
+    options.LoadSheddingEnabled = true;
+    options.CpuThreshold = 90;
+    options.MemoryThreshold = 85;
+});
+            // </configure_load_shedding>
+        }
     }
 
     // <prefer_local_grain>

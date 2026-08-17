@@ -1,7 +1,7 @@
 ---
 title: Capacity planning and scaling
 description: Size and scale Orleans clusters using measured workload and saturation signals.
-ms.date: 08/02/2026
+ms.date: 08/17/2026
 ms.topic: concept-article
 ---
 
@@ -42,14 +42,17 @@ CPU limits can throttle a process even when node CPU appears available. Memory l
 
 Scale out before saturation. Signals can include sustained CPU, scheduler delay, tail latency, activation pressure, gateway load shedding, and application queue depth. Don't scale on a single noisy metric.
 
+Adding a silo expands the candidate set for later resource-optimized placement decisions. Existing active grains continue running on their current silos. New activations can use the added capacity immediately after membership converges, and grains which are collected or otherwise deactivated can use it when they reactivate. The experimental activation rebalancer can migrate eligible grains to reduce count and memory skew; the experimental activation repartitioner instead migrates eligible grains to improve call locality. See [Grain placement and migration](../grains/grain-placement.md#scale-out-and-scale-in).
+
 Account for:
 
 - Time to schedule a host, start the process, join membership, and warm caches.
 - Capacity and connection impact on clustering and storage providers.
+- State-read and serialization load when many grains activate on new or remaining silos.
 - Placement constraints and grains that concentrate work.
 - The minimum number of silos required across failure domains.
 
-Scale in more slowly than scale out. Select one instance at a time where possible, use [graceful shutdown](upgrades.md#graceful-shutdown-and-scale-in), and wait for cluster health to stabilize.
+Scale in more slowly than scale out. Select one instance at a time where possible, use [graceful shutdown](upgrades.md#graceful-shutdown-and-scale-in), and wait for cluster health to stabilize. Ordinary activations on the departing silo deactivate during shutdown. Leave enough capacity for remaining silos to handle reactivation, state loading, and redirected traffic.
 
 ## Handle overload
 
@@ -58,8 +61,10 @@ Unlimited queues convert overload into high latency and memory pressure. Apply:
 - Admission control at application ingress.
 - Bounded queues and concurrency.
 - Request deadlines that include downstream calls.
-- Load shedding before the process becomes unresponsive.
+- Client-gateway request rejection and stream queue flow control through <xref:Orleans.Configuration.LoadSheddingOptions>.
 - Per-tenant or per-key limits where one workload can starve others.
+
+Set <xref:Orleans.Configuration.LoadSheddingOptions.LoadSheddingEnabled> to `true` to activate runtime load shedding. Crossing its CPU or memory threshold marks the silo overloaded, enables client-gateway request rejection, and makes resource-optimized placement favor non-overloaded candidates. Stream queue flow control uses CPU thresholds to pause reads. Configure thresholds below hard platform limits, validate rejection and recovery behavior under load, and use a hosting-platform autoscaler to adjust cluster capacity.
 
 Retries consume capacity. Include retry traffic in the load model and use exponential backoff with jitter, a retry budget, and an end-to-end deadline.
 

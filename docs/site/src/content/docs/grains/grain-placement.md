@@ -1,7 +1,7 @@
 ---
 title: Grain placement and migration
 description: Understand placement, resource-optimized defaults, and activation movement in Orleans.
-ms.date: 08/08/2026
+ms.date: 08/17/2026
 ms.topic: concept-article
 ---
 
@@ -11,9 +11,24 @@ When a grain isn't active, Orleans selects a compatible silo and creates an acti
 
 This article covers application-facing placement configuration. For the runtime algorithms and coordination protocols behind placement and activation movement, see [Placement and activation balancing](../implementation/load-balancing.md).
 
+## What Orleans balances
+
+Placement, collection, migration, and load shedding solve different problems:
+
+| Event or mechanism | What Orleans does |
+|---|---|
+| A call needs an activation | Runs placement using the current compatible silos and current placement statistics. |
+| A silo joins | Includes it in later placement decisions after membership and compatibility information converge. Existing activations continue running on their current silos. |
+| An activation remains idle | Collects it after the configured idle period. A later call runs placement again, so the replacement activation can use newly added capacity. |
+| A silo leaves or fails | Removes its activations. Calls are routed to activations on remaining silos or cause replacement activations to be placed there. |
+| Explicit or automatic migration is requested | Moves an eligible live activation after its current work completes. Cluster-wide automatic migration is experimental and opt-in. |
+| Enabled load shedding marks a silo overloaded | The client gateway rejects requests, stream queue flow control pauses reads at its CPU threshold, and resource-optimized placement favors non-overloaded candidates. |
+
+A hosting platform or operator controls the silo count. Orleans adapts placement and routing to the resulting membership.
+
 ## Default placement
 
-<xref:Orleans.Runtime.ResourceOptimizedPlacement> is the default placement strategy. It uses sampled silo runtime statistics and a power-of-k-choices algorithm to balance new activations while avoiding overloaded silos. It considers CPU, memory, available memory, activation count, and a preference for the local silo.
+<xref:Orleans.Runtime.ResourceOptimizedPlacement> is the default placement strategy. It uses sampled silo runtime statistics and a power-of-k-choices algorithm to balance new activations. It considers CPU, memory, available memory, activation count, and a preference for the local silo. When load shedding marks silos overloaded, placement favors non-overloaded candidates.
 
 For design background on its resource scoring and signal smoothing, see [Resource-based placement with cooperative dual-mode Kalman filtering](https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/).
 
@@ -21,6 +36,32 @@ Configure its weights through <xref:Orleans.Configuration.ResourceOptimizedPlace
 
 :::code language="csharp" source="../snippets/compiled/Grains/PlacementSnippets.cs" id="configure_resource_optimized_placement":::
 Weights are relative and don't need to total 100. Keep defaults until measurements show a workload-specific reason to change them.
+
+## Scale out and scale in
+
+On scale-out, new silos become candidates for new activations. Long-lived active grains continue running on their current silos. Grain code or an opt-in rebalancing service can request their migration. Idle activation collection gradually makes more grain identities eligible for fresh placement.
+
+On graceful scale-in, the departing silo leaves active membership and deactivates its ordinary activations during shutdown. Subsequent calls reactivate those grain identities on remaining silos. After an abrupt loss, failure detection enables the same replacement placement path. In-flight calls can fail or time out, so callers must follow the application's retry and idempotency policy.
+
+Scale gradually and preserve headroom for reactivation, state reads, cache warming, and temporarily concentrated traffic. See [Capacity planning and scaling](../deployment/capacity-planning.md) and [Graceful shutdown and scale-in](../deployment/upgrades.md#graceful-shutdown-and-scale-in).
+
+## Persistence and movement
+
+Persisted grain state belongs to the grain identity and remains in the configured storage provider across activation lifetimes. With <xref:Orleans.Runtime.IPersistentState`1>, Orleans reads configured state before <xref:Orleans.Grain.OnActivateAsync*> when it creates an ordinary replacement activation. Every silo which can host the grain must be able to reach the configured storage provider.
+
+Live activation migration transfers runtime migration state directly to the target, including the in-memory state held by <xref:Orleans.Runtime.IPersistentState`1>. Application-owned in-memory state which must survive a live move must participate through <xref:Orleans.Runtime.IGrainMigrationParticipant>. Awaited storage writes provide durability across process failure; migration state provides continuity during a live move. See [Grain persistence](grain-persistence/index.md) and [Activation lifecycle and migration](../implementation/activation-lifecycle.md#activation-migration).
+
+## Load shedding
+
+Set <xref:Orleans.Configuration.LoadSheddingOptions.LoadSheddingEnabled> to `true` to activate load shedding. Crossing either the CPU or memory threshold marks the silo as overloaded, enables client-gateway request rejection, and makes resource-optimized placement favor non-overloaded candidates. Stream providers which use `LoadShedQueueFlowController` pause queue reads according to CPU usage.
+
+Configure it on every silo and choose thresholds from measured headroom:
+
+:::code language="csharp" source="../snippets/compiled/Grains/PlacementSnippets.cs" id="configure_load_shedding":::
+
+Use load shedding for admission protection, a hosting-platform autoscaler for cluster capacity, and activation rebalancing or repartitioning for eligible activation movement. Set thresholds below the platform's hard limits, retain headroom for deactivation and recovery work, and monitor rejection rate with CPU, memory, queueing, and latency signals.
+
+Gateway load shedding rejects incoming requests after CPU or memory crosses its threshold. Stream queue flow control uses CPU thresholds to pause reads. [Memory-based activation shedding](../host/configuration-guide/activation-collection.md#enable-memory-based-activation-shedding) deactivates selected activations to reduce process memory.
 
 ## Per-grain strategies
 
@@ -79,6 +120,8 @@ Enable them independently:
 
 :::code language="csharp" source="../snippets/compiled/Grains/PlacementSnippets.cs" id="configure_activation_rebalancing":::
 Both features migrate eligible activations and can operate together. They add cluster coordination and state-transfer costs, so benchmark representative workloads before production use. Stateless workers, system targets, grain services, client objects, and immovable activations aren't candidates.
+
+Choose the activation rebalancer when uneven activation count or activation memory is the problem. Choose the activation repartitioner when cross-silo calls between grains are the problem. Enabling both lets the repartitioner's default tolerance rule incorporate the rebalancer's view of cluster imbalance. Pair them with a hosting-platform autoscaler for capacity and load shedding for overload admission control. See [Placement and activation balancing](../implementation/load-balancing.md#choosing-the-mechanism) for tuning and observability details.
 
 ## Implement custom placement
 
