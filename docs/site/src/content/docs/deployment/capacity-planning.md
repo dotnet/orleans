@@ -42,7 +42,7 @@ Test these paths separately:
 - **Sustained churn:** Activations are collected and soon needed again.
 - **Recovery:** A restart or silo loss causes concurrent reactivation and state reads.
 
-Record activation and deactivation rate and latency by grain type together with directory, storage, CPU, allocation, garbage collection, and request-latency signals. If churn is the bottleneck, remove unnecessary work from <xref:Orleans.Grain.OnActivateAsync*>, batch dependency access, and tune [activation collection](../host/configuration-guide/activation-collection.md) for the affected grain types. Retaining activations trades memory for fewer cold starts.
+Record the built-in aggregate activation and deactivation counters and latencies together with directory, storage, CPU, allocation, garbage collection, and request-latency signals. Add application instrumentation around grain lifecycle code when analysis requires rates or latencies by grain type. If churn is the bottleneck, remove unnecessary work from <xref:Orleans.Grain.OnActivateAsync*>, batch dependency access, and tune [activation collection](../host/configuration-guide/activation-collection.md) for the affected grain types. Retaining activations trades memory for fewer cold starts.
 
 Don't model every storage page or scan item as a grain solely to parallelize a data operation. A grain per page can be appropriate when each page is an independently addressed consistency boundary, but a scan which immediately cold-activates many pages pays activation, messaging, and backend access for each page. Compare that design against coarser grains, bounded batches using the storage backend's range or batch APIs, or a dedicated indexing service. Bound fan-out in every design.
 

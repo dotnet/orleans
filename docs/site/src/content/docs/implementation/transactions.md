@@ -38,7 +38,7 @@ Transactional storage is not just ordinary grain persistence with a transaction 
 
 The agent distinguishes a successful decision, a participant response timeout, a transaction-manager response timeout, and a presumed abort. A timeout does not mean that no participant changed: the manager may have durably committed while its response was lost. When the result is definitely aborted and the manager has not taken ownership of notifications, the agent sends cancel messages to release participant locks.
 
-The manager's durable decision owns later participant notification. Recovery replays commit confirmations and aborts from the manager or participant queue records. If a participant cannot be reached, the transaction remains observable as recovering or failed rather than being treated as successfully committed by the caller.
+The manager's durable local commit completes the caller's transaction promise. It then schedules the confirmation worker to notify and collect the remaining participants. Recovery replays pending commit confirmations and aborts from manager or participant queue records, so participant notification can continue after the caller receives a successful result.
 
 Disabled transactions use a separate agent which rejects transactional operations instead of silently providing weaker semantics. Overload throttling is also explicit: callers receive a transaction-start failure rather than an unbounded queue.
 

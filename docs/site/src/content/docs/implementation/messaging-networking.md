@@ -23,7 +23,7 @@ When `MessageCenter.SendMessage` has a target silo, it first uses an existing co
 
 The connection pipeline performs the protocol preamble and then exchanges framed payloads. `MessageSerializer` encodes the message header and body using Orleans serialization; the frame helper validates lengths and rejects malformed input before dispatch. TLS, when configured, is middleware around the connection rather than a different message protocol.
 
-The transport queues writes and applies its own flow control. A successful socket write means the frame was handed to the transport, not that the target grain completed the request. Disconnects remove the connection from the endpoint entry and cause later sends to establish a replacement.
+The connection accepts outgoing messages through an unbounded channel. Its socket writer observes transport flow control while concurrent senders can continue adding messages to that channel, so a slow connection can accumulate queued messages until it recovers or closes. A successful socket write means the frame was handed to the transport; the grain result confirms request completion. Disconnects remove the connection from the endpoint entry and cause later sends to establish a replacement.
 
 ## Failure and shutdown
 
