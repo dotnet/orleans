@@ -73,7 +73,7 @@ For deployed applications, replace local secrets with managed identity or your p
 Before this exercise, replace `Guid.NewGuid()` in `Client/Program.cs` with a fixed GUID so that each client run publishes to the same stream.
 
 1. Run the silo normally.
-1. Run the client with `dotnet run --project .\samples\Streaming\Simple\Client -- --pause-after-checkpoint`.
+1. Run the client with `dotnet run --project .\Client -- --pause-after-checkpoint`.
 1. The client allows two 10-second checkpoint intervals, then stops the stream pulling agents while the producer grain continues publishing.
 1. Record the frozen consumer sequence token and the next ten event numbers reported by the producer in the silo log. These events form a backlog beyond the stored checkpoint.
 1. Terminate the silo process while the pulling agents remain paused, then stop the client. Leave Event Hubs and Azure Storage running.

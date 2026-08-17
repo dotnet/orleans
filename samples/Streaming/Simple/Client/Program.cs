@@ -85,8 +85,7 @@ internal class Program
             {
                 var checkpointWindow = TimeSpan.FromSeconds(20);
                 Console.WriteLine(
-                    "Allowing {CheckpointWindow} for the 10-second checkpoint interval before pausing stream delivery.",
-                    checkpointWindow);
+                    $"Allowing {checkpointWindow} for the 10-second checkpoint interval before pausing stream delivery.");
                 await Task.Delay(checkpointWindow, cts.Token);
 
                 var management = clusterClient.GetGrain<IManagementGrain>(0);
