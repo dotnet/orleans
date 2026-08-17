@@ -59,6 +59,31 @@ async function walk(directory, predicate = () => true) {
   return files.sort();
 }
 
+export async function collectXmlDocumentationExternalUrls(sourceRoot) {
+  const urls = new Set();
+
+  async function visit(directory) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      if (entry.isDirectory() && ['bin', 'obj', 'node_modules'].includes(entry.name)) continue;
+
+      const entryPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        await visit(entryPath);
+      } else if (entry.isFile() && entry.name.endsWith('.cs')) {
+        const source = await readFile(entryPath, 'utf8');
+        for (const match of source.matchAll(
+          /<(?:see|seealso)\b[^>]*\bhref\s*=\s*["'](https?:\/\/[^"']+)["']/gi,
+        )) {
+          urls.add(match[1]);
+        }
+      }
+    }
+  }
+
+  await visit(sourceRoot);
+  return urls;
+}
+
 export async function collectLinkAuditDocuments({ sourceRoot, allowedRoot }) {
   const contentFiles = await walk(
     sourceRoot,
@@ -1069,6 +1094,7 @@ async function probeOnce(url, options) {
 export async function probeExternalTargets({
   externalTargets,
   allowlist = { urls: {} },
+  allowlistReferences = new Set(),
   requestImpl = pinnedHttpRequest,
   lookupImpl = dnsLookup,
   concurrency = 8,
@@ -1092,7 +1118,7 @@ export async function probeExternalTargets({
     if (typeof reason !== 'string' || reason.trim().length < 20) {
       failures.push(`External link allowlist entry '${url}' lacks a meaningful reason.`);
     }
-    if (!externalTargets.has(url)) {
+    if (!externalTargets.has(url) && !allowlistReferences.has(url)) {
       failures.push(`External link allowlist entry '${url}' is stale and no longer referenced.`);
     }
     try {
