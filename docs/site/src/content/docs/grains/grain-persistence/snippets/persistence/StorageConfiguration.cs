@@ -206,6 +206,23 @@ public static class StorageConfiguration
         // </configure_cosmos_default>
     }
 
+    public static void ConfigureDefaultAndPubSubStorage(
+        ISiloBuilder siloBuilder,
+        string connectionString)
+    {
+        // <configure_adonet_default_and_pubsub>
+        Action<AdoNetGrainStorageOptions> configureStorage = options =>
+        {
+            options.Invariant = "Npgsql";
+            options.ConnectionString = connectionString;
+        };
+
+        siloBuilder
+            .AddAdoNetGrainStorageAsDefault(configureStorage)
+            .AddAdoNetGrainStorage("PubSubStore", configureStorage);
+        // </configure_adonet_default_and_pubsub>
+    }
+
     public static void ConfigureAdoNetSerializer()
     {
         // <configure_adonet_serializer>

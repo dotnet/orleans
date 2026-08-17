@@ -1,7 +1,7 @@
 ---
 title: Grain persistence
 description: Persist Orleans grain state using IPersistentState and storage providers.
-ms.date: 08/02/2026
+ms.date: 08/17/2026
 ms.topic: overview
 ---
 
@@ -54,6 +54,14 @@ Configure every provider name referenced by `[PersistentState]` on the silo:
 :::code language="csharp" source="./snippets/persistence/StorageConfiguration.cs" id="configure_managed_identity":::
 
 The state name distinguishes records owned by the same grain. The provider name selects a keyed <xref:Orleans.Storage.IGrainStorage> registration. Different records aren't required to share a provider or backing store.
+
+When `[PersistentState]` omits the storage name, Orleans resolves the default <xref:Orleans.Storage.IGrainStorage> registration instead. Configure that registration with the provider's `Add*GrainStorageAsDefault` extension, or pass <xref:Orleans.Providers.ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME> (`"Default"`) to the corresponding `Add*GrainStorage` extension. Any other name only adds that named provider; it doesn't configure a default.
+
+Default and named registrations represent separate roles even when they use the same provider type and backing database. For example, grain-based stream pub/sub conventionally uses the named provider `PubSubStore`, independently of the default provider used by grain state. Register both roles when a silo needs both:
+
+:::code language="csharp" source="./snippets/persistence/StorageConfiguration.cs" id="configure_adonet_default_and_pubsub":::
+
+The default and `PubSubStore` registrations can share configuration, but neither role aliases the other. For details about the streaming role, see [Configure PubSub storage](../../streaming/pubsub-storage).
 
 ## Consistency and atomicity
 
