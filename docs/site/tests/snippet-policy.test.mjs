@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { copyFile, mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -138,6 +138,160 @@ describe('snippet project policy', { timeout: 30_000 }, () => {
     );
 
     expect(await runPolicy(root)).toMatchObject({ exitCode: 0 });
+  });
+
+  test('parallel validation separates related Aspire projects while keeping independent projects concurrent', async () => {
+    const root = await temporaryDirectory();
+    const toolDirectory = path.join(root, 'tools');
+    const aspireDirectory = path.join(root, 'snippets', 'aspire');
+    const dependencyDirectory = path.join(root, 'dependencies');
+    const independentDirectory = path.join(root, 'snippets', 'independent');
+    await mkdir(toolDirectory);
+    await mkdir(dependencyDirectory);
+    await mkdir(independentDirectory, { recursive: true });
+    await writeFile(
+      path.join(root, 'Directory.Build.props'),
+      '<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>',
+    );
+
+    for (const projectName of ['Silo', 'Client']) {
+      const projectDirectory = path.join(aspireDirectory, projectName);
+      await mkdir(projectDirectory, { recursive: true });
+      await writeFile(
+        path.join(projectDirectory, `${projectName}.csproj`),
+        [
+          '<Project Sdk="Microsoft.NET.Sdk">',
+          `  <ItemGroup><ProjectReference Include="../../../dependencies/${projectName}Defaults/${projectName}Defaults.csproj" /></ItemGroup>`,
+          '</Project>',
+        ].join('\n'),
+      );
+    }
+
+    for (const projectName of ['ServiceDefaults', 'SiloDefaults', 'ClientDefaults']) {
+      await mkdir(path.join(dependencyDirectory, projectName));
+    }
+    await writeFile(
+      path.join(dependencyDirectory, 'ServiceDefaults', 'ServiceDefaults.csproj'),
+      '<Project Sdk="Microsoft.NET.Sdk" />',
+    );
+    await writeFile(
+      path.join(dependencyDirectory, 'SiloDefaults', 'SiloDefaults.csproj'),
+      [
+        '<Project Sdk="Microsoft.NET.Sdk">',
+        '  <ItemGroup><ProjectReference Include="../ServiceDefaults/ServiceDefaults.csproj" /></ItemGroup>',
+        '</Project>',
+      ].join('\n'),
+    );
+    await writeFile(
+      path.join(dependencyDirectory, 'ClientDefaults', 'ClientDefaults.csproj'),
+      [
+        '<Project Sdk="Microsoft.NET.Sdk">',
+        '  <PropertyGroup><TargetFrameworks>net8.0;net10.0</TargetFrameworks></PropertyGroup>',
+        '  <ItemGroup Condition="\'$(TargetFramework)\' == \'net10.0\'">',
+        '    <ProjectReference Include="../ServiceDefaults/ServiceDefaults.csproj" />',
+        '  </ItemGroup>',
+        '</Project>',
+      ].join('\n'),
+    );
+
+    for (const projectName of ['IndependentA', 'IndependentB']) {
+      await writeFile(
+        path.join(independentDirectory, `${projectName}.csproj`),
+        '<Project Sdk="Microsoft.NET.Sdk" />',
+      );
+    }
+
+    const fakeDotnet = path.join(toolDirectory, 'fake-dotnet.ps1');
+    await writeFile(
+      fakeDotnet,
+      [
+        'param([Parameter(ValueFromRemainingArguments = $true)][string[]]$CommandArguments)',
+        '$projectName = [IO.Path]::GetFileNameWithoutExtension($CommandArguments[1])',
+        'if ($projectName -in @("Silo", "Client")) {',
+        '    try {',
+        '        $lock = [IO.File]::Open($env:SHARED_BUILD_LOCK, "OpenOrCreate", "ReadWrite", "None")',
+        '    } catch {',
+        '        Write-Error "Related projects attempted to build their shared output concurrently."',
+        '        exit 1',
+        '    }',
+        '    try { Start-Sleep -Milliseconds 750 } finally { $lock.Dispose() }',
+        '} elseif ($projectName -in @("IndependentA", "IndependentB")) {',
+        '    $marker = Join-Path $env:BUILD_SYNC_DIRECTORY "$projectName.ready"',
+        '    [IO.File]::WriteAllText($marker, "")',
+        '    $partnerName = if ($projectName -eq "IndependentA") { "IndependentB" } else { "IndependentA" }',
+        '    $partner = Join-Path $env:BUILD_SYNC_DIRECTORY "$partnerName.ready"',
+        '    $deadline = [DateTime]::UtcNow.AddSeconds(5)',
+        '    while (-not (Test-Path -LiteralPath $partner) -and [DateTime]::UtcNow -lt $deadline) {',
+        '        Start-Sleep -Milliseconds 50',
+        '    }',
+        '    if (-not (Test-Path -LiteralPath $partner)) {',
+        '        Write-Error "Independent projects were not validated concurrently."',
+        '        exit 1',
+        '    }',
+        '}',
+        'exit 0',
+        '',
+      ].join('\n'),
+    );
+    await writeFile(
+      path.join(toolDirectory, 'dotnet.cmd'),
+      [
+        '@echo off',
+        'if "%~1"=="msbuild" (',
+        '  "%REAL_DOTNET%" %*',
+        ') else (',
+        '  pwsh -NoProfile -File "%~dp0fake-dotnet.ps1" %*',
+        ')',
+        '',
+      ].join('\r\n'),
+    );
+    const unixDotnet = path.join(toolDirectory, 'dotnet');
+    await writeFile(
+      unixDotnet,
+      [
+        '#!/bin/sh',
+        'if [ "$1" = "msbuild" ]; then',
+        '  exec "$REAL_DOTNET" "$@"',
+        'fi',
+        'exec pwsh -NoProfile -File "$(dirname "$0")/fake-dotnet.ps1" "$@"',
+        '',
+      ].join('\n'),
+    );
+    await chmod(unixDotnet, 0o755);
+
+    const locator = process.platform === 'win32'
+      ? await execFileAsync('where.exe', ['dotnet'])
+      : await execFileAsync('which', ['dotnet']);
+    const realDotnet = locator.stdout.trim().split(/\r?\n/u)[0];
+    const pathVariable = Object.keys(process.env).find((name) => name.toLowerCase() === 'path') ?? 'PATH';
+    const environment = {
+      ...process.env,
+      [pathVariable]: `${toolDirectory}${path.delimiter}${process.env[pathVariable] ?? ''}`,
+      REAL_DOTNET: realDotnet,
+      SHARED_BUILD_LOCK: path.join(root, 'shared-build.lock'),
+      BUILD_SYNC_DIRECTORY: root,
+      DOTNET_NOLOGO: 'true',
+    };
+
+    let result;
+    try {
+      const execution = await execFileAsync(
+        'pwsh',
+        [validator, '-Parallel', '-RootPath', root, '-SiteRootPath', root],
+        { env: environment },
+      );
+      result = { exitCode: 0, output: `${execution.stdout}${execution.stderr}` };
+    } catch (error) {
+      result = {
+        exitCode: error.code,
+        output: `${error.stdout ?? ''}${error.stderr ?? ''}`,
+      };
+    }
+
+    expect(result, result.output).toMatchObject({ exitCode: 0 });
+    expect(result.output).toContain('Succeeded: 4');
+    expect(result.output).toContain('Failed:    0');
+    expect(result.output).toContain('dependency-safe parallel batch(es)');
   });
 
   test('evaluates central PackageVersion metadata', async () => {

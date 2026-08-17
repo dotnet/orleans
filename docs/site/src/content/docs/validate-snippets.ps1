@@ -12,7 +12,7 @@
     documentation examples remain buildable and executable test examples pass.
 
 .PARAMETER Parallel
-    Run validations in parallel (default: false for clearer output)
+    Run validations in dependency-safe parallel batches (default: false for clearer output)
 
 .PARAMETER PolicyOnly
     Validate target frameworks and Orleans package versions without building.
@@ -32,7 +32,8 @@
 .EXAMPLE
     .\validate-snippets.ps1 -Parallel
     
-    Validates all snippet projects in parallel for faster validation.
+    Validates independent snippet projects in parallel while serializing projects whose
+    transitive project-reference closures overlap.
 
 .NOTES
     Exit codes:
@@ -113,7 +114,8 @@ function Get-EvaluatedProject {
         "-getProperty:OrleansDocumentationVersionException",
         "-getItem:PackageReference",
         "-getItem:PackageVersion",
-        "-getItem:Compile"
+        "-getItem:Compile",
+        "-getItem:ProjectReference"
     )
     if ($ForNet10) {
         $arguments += "-property:TargetFramework=net10.0"
@@ -132,6 +134,7 @@ function Get-EvaluatedProject {
 
 $pathComparer = $(if ($IsWindows) { [StringComparer]::OrdinalIgnoreCase } else { [StringComparer]::Ordinal })
 $compiledSources = [Collections.Generic.HashSet[string]]::new($pathComparer)
+$projectReferences = [Collections.Generic.Dictionary[string, string[]]]::new($pathComparer)
 $policyIssues = @()
 
 function Test-ContainedPath {
@@ -210,6 +213,10 @@ foreach ($project in $snippetProjects) {
             continue
         }
     }
+
+    $projectReferences[$project] = @($evaluation.Items.ProjectReference |
+        Where-Object { $_.FullPath } |
+        ForEach-Object { [IO.Path]::GetFullPath([string]$_.FullPath) })
 
     $exceptionReason = ([string]$evaluation.Properties.OrleansDocumentationVersionException).Trim()
     $isMigrationProject = $relativePath -split '[\\/]' -contains 'migration'
@@ -447,26 +454,136 @@ function Invoke-ProjectValidation {
     }
 }
 
-if ($Parallel) {
-    Write-Host "Running validations in parallel..." -ForegroundColor Cyan
-    $results = $snippetProjects | ForEach-Object -Parallel {
-        $ProjectPath = $_
-        $validationRoot = $using:validationRoot
-        $relativePath = [IO.Path]::GetRelativePath($validationRoot, $ProjectPath)
-        [xml] $projectXml = Get-Content -LiteralPath $ProjectPath -Raw
-        $isTestProject = $projectXml.Project.PropertyGroup.IsTestProject -contains "true"
-        $command = if ($isTestProject) { "test" } else { "build" }
-        
-        $output = & dotnet $command $ProjectPath --framework net10.0 --nologo -v q 2>&1
-        $exitCode = $LASTEXITCODE
-        
-        @{
-            Project = $relativePath
-            Action = $command
-            Success = ($exitCode -eq 0)
-            Output = $output -join "`n"
+function Get-EvaluatedProjectReferences {
+    param([string]$ProjectPath)
+
+    $arguments = @(
+        "msbuild",
+        $ProjectPath,
+        "-nologo",
+        "-getItem:ProjectReference",
+        "-property:TargetFramework=net10.0"
+    )
+    $output = @(& dotnet @arguments 2>&1)
+    if ($LASTEXITCODE -ne 0) {
+        throw "MSBuild project-reference evaluation failed with exit code $LASTEXITCODE.`n$($output -join "`n")"
+    }
+
+    try {
+        $evaluation = ($output -join "`n") | ConvertFrom-Json
+    }
+    catch {
+        throw "MSBuild returned invalid project-reference evaluation JSON.`n$($output -join "`n")"
+    }
+
+    return @($evaluation.Items.ProjectReference |
+        Where-Object { $_.FullPath } |
+        ForEach-Object { [IO.Path]::GetFullPath([string]$_.FullPath) })
+}
+
+function Get-ProjectReferenceClosure {
+    param([string]$ProjectPath)
+
+    $closure = [Collections.Generic.HashSet[string]]::new($pathComparer)
+    $pending = [Collections.Generic.Queue[string]]::new()
+    $pending.Enqueue([IO.Path]::GetFullPath($ProjectPath))
+
+    while ($pending.Count -gt 0) {
+        $current = $pending.Dequeue()
+        if (-not $closure.Add($current)) {
+            continue
         }
-    } -ThrottleLimit 4
+
+        if (-not $projectReferences.ContainsKey($current)) {
+            if (Test-Path -LiteralPath $current -PathType Leaf) {
+                $projectReferences[$current] = @(Get-EvaluatedProjectReferences -ProjectPath $current)
+            } else {
+                $projectReferences[$current] = @()
+            }
+        }
+
+        foreach ($reference in $projectReferences[$current]) {
+            $pending.Enqueue($reference)
+        }
+    }
+
+    return @($closure)
+}
+
+function Get-ParallelValidationBatches {
+    param([string[]]$ProjectPaths)
+
+    $batches = [Collections.Generic.List[object]]::new()
+    foreach ($project in $ProjectPaths) {
+        $closure = @(Get-ProjectReferenceClosure -ProjectPath $project)
+        $selectedBatch = $null
+
+        foreach ($batch in $batches) {
+            $overlaps = $false
+            foreach ($path in $closure) {
+                if ($batch.Closure.Contains($path)) {
+                    $overlaps = $true
+                    break
+                }
+            }
+
+            if (-not $overlaps) {
+                $selectedBatch = $batch
+                break
+            }
+        }
+
+        if (-not $selectedBatch) {
+            $selectedBatch = [pscustomobject]@{
+                Projects = [Collections.Generic.List[string]]::new()
+                Closure = [Collections.Generic.HashSet[string]]::new($pathComparer)
+            }
+            [void]$batches.Add($selectedBatch)
+        }
+
+        [void]$selectedBatch.Projects.Add($project)
+        foreach ($path in $closure) {
+            [void]$selectedBatch.Closure.Add($path)
+        }
+    }
+
+    return $batches
+}
+
+if ($Parallel) {
+    try {
+        $parallelBatches = @(Get-ParallelValidationBatches -ProjectPaths $snippetProjects)
+    }
+    catch {
+        Write-Host "Could not build the project-reference graph required for parallel validation." -ForegroundColor Red
+        Write-Host $_.Exception.Message -ForegroundColor Red
+        exit 1
+    }
+
+    Write-Host "Running validations in $($parallelBatches.Count) dependency-safe parallel batch(es)..." -ForegroundColor Cyan
+    for ($batchIndex = 0; $batchIndex -lt $parallelBatches.Count; $batchIndex++) {
+        $batch = $parallelBatches[$batchIndex]
+        Write-Host "  Batch $($batchIndex + 1): $($batch.Projects.Count) project(s)" -ForegroundColor Gray
+        $batchResults = $batch.Projects | ForEach-Object -Parallel {
+            $ProjectPath = $_
+            $validationRoot = $using:validationRoot
+            $relativePath = [IO.Path]::GetRelativePath($validationRoot, $ProjectPath)
+            [xml] $projectXml = Get-Content -LiteralPath $ProjectPath -Raw
+            $isTestProject = $projectXml.Project.PropertyGroup.IsTestProject -contains "true"
+            $command = if ($isTestProject) { "test" } else { "build" }
+
+            $output = & dotnet $command $ProjectPath --framework net10.0 --nologo -v q 2>&1
+            $exitCode = $LASTEXITCODE
+
+            @{
+                Project = $relativePath
+                Action = $command
+                Success = ($exitCode -eq 0)
+                Output = $output -join "`n"
+            }
+        } -ThrottleLimit 4
+        $results += @($batchResults)
+    }
 } else {
     foreach ($project in $snippetProjects) {
         $result = Invoke-ProjectValidation -ProjectPath $project -IsTestProject (Test-IsTestProject -ProjectPath $project)
