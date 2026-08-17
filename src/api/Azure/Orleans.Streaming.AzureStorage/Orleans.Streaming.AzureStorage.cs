@@ -137,9 +137,30 @@ namespace Orleans.Hosting
 
     public static partial class ClientBuilderExtensions
     {
+        [System.Diagnostics.CodeAnalysis.Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
+        public static IClientBuilder AddAzureQueueJsonStreams(this IClientBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureQueueOptions>> configureOptions) { throw null; }
+
+        [System.Diagnostics.CodeAnalysis.Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
+        public static IClientBuilder AddAzureQueueJsonStreams(this IClientBuilder builder, string name, System.Action<ClusterClientAzureQueueJsonStreamConfigurator> configure) { throw null; }
+
         public static IClientBuilder AddAzureQueueStreams(this IClientBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureQueueOptions>> configureOptions) { throw null; }
 
         public static IClientBuilder AddAzureQueueStreams(this IClientBuilder builder, string name, System.Action<ClusterClientAzureQueueStreamConfigurator> configure) { throw null; }
+    }
+
+    [System.Diagnostics.CodeAnalysis.Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
+    public partial class ClusterClientAzureQueueJsonStreamConfigurator : ClusterClientPersistentStreamConfigurator, IClusterClientAzureQueueJsonStreamConfigurator, IAzureQueueStreamConfigurator, INamedServiceConfigurator, IClusterClientPersistentStreamConfigurator, IPersistentStreamConfigurator
+    {
+        public ClusterClientAzureQueueJsonStreamConfigurator(string name, IClientBuilder builder) : base(default!, default!, default!) { }
+    }
+
+    public static partial class ClusterClientAzureQueueJsonStreamConfiguratorExtensions
+    {
+        [System.Diagnostics.CodeAnalysis.Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
+        public static void ConfigureJsonAdapter(this IClusterClientAzureQueueJsonStreamConfigurator configurator, System.Action<Streaming.AzureStorage.Providers.Streams.AzureQueue.Json.AzureQueueJsonDataAdapterOptions> configureAdapterOptions) { }
+
+        [System.Diagnostics.CodeAnalysis.Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
+        public static void ConfigureJsonSerialization(this IClusterClientAzureQueueJsonStreamConfigurator configurator, System.Action<Serialization.OrleansJsonSerializerOptions> configureJsonOptions) { }
     }
 
     public partial class ClusterClientAzureQueueStreamConfigurator : ClusterClientPersistentStreamConfigurator, IClusterClientAzureQueueStreamConfigurator, IAzureQueueStreamConfigurator, INamedServiceConfigurator, IClusterClientPersistentStreamConfigurator, IPersistentStreamConfigurator
@@ -151,12 +172,40 @@ namespace Orleans.Hosting
     {
     }
 
+    [System.Diagnostics.CodeAnalysis.Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
+    public partial interface IClusterClientAzureQueueJsonStreamConfigurator : IAzureQueueStreamConfigurator, INamedServiceConfigurator, IClusterClientPersistentStreamConfigurator, IPersistentStreamConfigurator
+    {
+    }
+
     public partial interface IClusterClientAzureQueueStreamConfigurator : IAzureQueueStreamConfigurator, INamedServiceConfigurator, IClusterClientPersistentStreamConfigurator, IPersistentStreamConfigurator
+    {
+    }
+
+    [System.Diagnostics.CodeAnalysis.Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
+    public partial interface ISiloAzureQueueJsonStreamConfigurator : IAzureQueueStreamConfigurator, INamedServiceConfigurator, ISiloPersistentStreamConfigurator, IPersistentStreamConfigurator
     {
     }
 
     public partial interface ISiloAzureQueueStreamConfigurator : IAzureQueueStreamConfigurator, INamedServiceConfigurator, ISiloPersistentStreamConfigurator, IPersistentStreamConfigurator
     {
+    }
+
+    [System.Diagnostics.CodeAnalysis.Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
+    public partial class SiloAzureQueueJsonStreamConfigurator : SiloPersistentStreamConfigurator, ISiloAzureQueueJsonStreamConfigurator, IAzureQueueStreamConfigurator, INamedServiceConfigurator, ISiloPersistentStreamConfigurator, IPersistentStreamConfigurator
+    {
+        public SiloAzureQueueJsonStreamConfigurator(string name, System.Action<System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>> configureServicesDelegate) : base(default!, default!, default!) { }
+    }
+
+    public static partial class SiloAzureQueueJsonStreamConfiguratorExtensions
+    {
+        [System.Diagnostics.CodeAnalysis.Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
+        public static void ConfigureCacheSize(this ISiloAzureQueueJsonStreamConfigurator configurator, int cacheSize = 4096) { }
+
+        [System.Diagnostics.CodeAnalysis.Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
+        public static void ConfigureJsonAdapter(this ISiloAzureQueueJsonStreamConfigurator configurator, System.Action<Streaming.AzureStorage.Providers.Streams.AzureQueue.Json.AzureQueueJsonDataAdapterOptions> configureAdapterOptions) { }
+
+        [System.Diagnostics.CodeAnalysis.Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
+        public static void ConfigureJsonSerialization(this ISiloAzureQueueJsonStreamConfigurator configurator, System.Action<Serialization.OrleansJsonSerializerOptions> configureJsonOptions) { }
     }
 
     public partial class SiloAzureQueueStreamConfigurator : SiloPersistentStreamConfigurator, ISiloAzureQueueStreamConfigurator, IAzureQueueStreamConfigurator, INamedServiceConfigurator, ISiloPersistentStreamConfigurator, IPersistentStreamConfigurator
@@ -171,6 +220,12 @@ namespace Orleans.Hosting
 
     public static partial class SiloBuilderExtensions
     {
+        [System.Diagnostics.CodeAnalysis.Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
+        public static ISiloBuilder AddAzureQueueJsonStreams(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureQueueOptions>> configureOptions) { throw null; }
+
+        [System.Diagnostics.CodeAnalysis.Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
+        public static ISiloBuilder AddAzureQueueJsonStreams(this ISiloBuilder builder, string name, System.Action<SiloAzureQueueJsonStreamConfigurator> configure) { throw null; }
+
         public static ISiloBuilder AddAzureQueueStreams(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AzureQueueOptions>> configureOptions) { throw null; }
 
         public static ISiloBuilder AddAzureQueueStreams(this ISiloBuilder builder, string name, System.Action<SiloAzureQueueStreamConfigurator> configure) { throw null; }
@@ -238,6 +293,16 @@ namespace Orleans.Providers.Streams.AzureQueue
         public Orleans.Streams.IBatchContainer FromQueueMessage(string cloudMsg, long sequenceId) { throw null; }
 
         void Serialization.IOnDeserialized.OnDeserialized(Serialization.DeserializationContext context) { }
+
+        public string ToQueueMessage<T>(Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Orleans.Streams.StreamSequenceToken? token, System.Collections.Generic.Dictionary<string, object>? requestContext) { throw null; }
+    }
+
+    [System.Diagnostics.CodeAnalysis.Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
+    public partial class AzureQueueJsonDataAdapter : Orleans.Streams.IQueueDataAdapter<string, Orleans.Streams.IBatchContainer>, Orleans.Streams.IQueueDataAdapter<string>
+    {
+        public AzureQueueJsonDataAdapter(Serialization.OrleansJsonSerializer jsonSerializer, AzureQueueDataAdapterV2 fallbackAdapter, Streaming.AzureStorage.Providers.Streams.AzureQueue.Json.AzureQueueJsonDataAdapterOptions options, Microsoft.Extensions.Logging.ILogger<AzureQueueJsonDataAdapter> logger) { }
+
+        public Orleans.Streams.IBatchContainer FromQueueMessage(string cloudMsg, long sequenceId) { throw null; }
 
         public string ToQueueMessage<T>(Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Orleans.Streams.StreamSequenceToken? token, System.Collections.Generic.Dictionary<string, object>? requestContext) { throw null; }
     }
@@ -364,5 +429,16 @@ namespace Orleans.Streaming.AzureStorage
         public System.TimeSpan PauseBetweenCreationRetries { get { throw null; } set { } }
 
         public System.TimeSpan PauseBetweenOperationRetries { get { throw null; } set { } }
+    }
+}
+
+namespace Orleans.Streaming.AzureStorage.Providers.Streams.AzureQueue.Json
+{
+    [System.Diagnostics.CodeAnalysis.Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
+    public partial class AzureQueueJsonDataAdapterOptions
+    {
+        public bool EnableFallback { get { throw null; } set { } }
+
+        public bool PreferJson { get { throw null; } set { } }
     }
 }
