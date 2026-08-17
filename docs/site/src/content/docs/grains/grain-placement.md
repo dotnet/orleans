@@ -55,7 +55,13 @@ Live activation migration is different from deactivation followed by later react
 
 <xref:Orleans.Configuration.LoadSheddingOptions> is disabled by default. When enabled, its CPU and memory thresholds mark a silo as overloaded. The client gateway and stream providers can shed supported work, and resource-optimized placement excludes overloaded silos from new-activation candidates when alternatives are available.
 
+Configure it on every silo, choosing thresholds from measured headroom rather than copying the example values:
+
+:::code language="csharp" source="../snippets/compiled/Grains/PlacementSnippets.cs" id="configure_load_shedding":::
+
 Load shedding doesn't relocate active grains, provision silos, or replace admission control and capacity planning. Set thresholds below the platform's hard limits, retain headroom for deactivation and recovery work, and monitor rejection rate with CPU, memory, queueing, and latency signals.
+
+Don't confuse request load shedding with [memory-based activation shedding](../host/configuration-guide/activation-collection.md#enable-memory-based-activation-shedding). Request load shedding rejects supported ingress work after CPU or memory crosses a threshold. Activation shedding deactivates selected activations to reduce process memory.
 
 ## Per-grain strategies
 
@@ -114,6 +120,8 @@ Enable them independently:
 
 :::code language="csharp" source="../snippets/compiled/Grains/PlacementSnippets.cs" id="configure_activation_rebalancing":::
 Both features migrate eligible activations and can operate together. They add cluster coordination and state-transfer costs, so benchmark representative workloads before production use. Stateless workers, system targets, grain services, client objects, and immovable activations aren't candidates.
+
+Choose the activation rebalancer when uneven activation count or activation memory is the problem. Choose the activation repartitioner when cross-silo calls between grains are the problem. Enabling both lets the repartitioner's default tolerance rule incorporate the rebalancer's view of cluster imbalance, but neither feature scales the cluster or provides overload admission control. See [Placement and activation balancing](../implementation/load-balancing.md#choosing-the-mechanism) for tuning and observability details.
 
 ## Implement custom placement
 

@@ -42,7 +42,7 @@ CPU limits can throttle a process even when node CPU appears available. Memory l
 
 Scale out before saturation. Signals can include sustained CPU, scheduler delay, tail latency, activation pressure, gateway load shedding, and application queue depth. Don't scale on a single noisy metric.
 
-Adding a silo expands the candidate set for later placement decisions; it doesn't automatically move every active grain. New activations can use the added capacity immediately after membership converges, and grains which are collected or otherwise deactivated can use it when they reactivate. Experimental opt-in services can migrate eligible active grains. See [Grain placement and migration](../grains/grain-placement.md#scale-out-and-scale-in).
+Adding a silo expands the candidate set for later resource-optimized placement decisions; it doesn't automatically move every active grain. New activations can use the added capacity immediately after membership converges, and grains which are collected or otherwise deactivated can use it when they reactivate. The experimental activation rebalancer can migrate eligible grains to reduce count and memory skew; the experimental activation repartitioner instead migrates eligible grains to improve call locality. See [Grain placement and migration](../grains/grain-placement.md#scale-out-and-scale-in).
 
 Account for:
 

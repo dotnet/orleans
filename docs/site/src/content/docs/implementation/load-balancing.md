@@ -49,6 +49,12 @@ Public options: <xref:Orleans.Configuration.ResourceOptimizedPlacementOptions>. 
 
 The `IsOverloaded` statistic is set only when <xref:Orleans.Configuration.LoadSheddingOptions.LoadSheddingEnabled> is enabled and either its CPU or memory threshold is exceeded. With load shedding disabled, resource-optimized placement still scores the resource measurements but doesn't categorically remove a candidate as overloaded. Load shedding is admission protection, not activation movement.
 
+## Load shedding
+
+<xref:Orleans.Configuration.LoadSheddingOptions> is disabled by default. When enabled, <xref:Orleans.Configuration.LoadSheddingOptions.CpuThreshold> defaults to 95 percent and <xref:Orleans.Configuration.LoadSheddingOptions.MemoryThreshold> defaults to 90 percent. Crossing either threshold marks the silo's published runtime statistics as overloaded. The client gateway and stream providers can reject supported work, and resource-optimized placement omits the silo from the scored candidate set.
+
+This is a threshold, not a queueing or balancing algorithm. It doesn't migrate activations, deactivate them, or create capacity. A deployment still needs ingress admission control, bounded work, deadlines, and an external scaling policy. It is also separate from [memory-based activation shedding](../host/configuration-guide/activation-collection.md#enable-memory-based-activation-shedding), which deactivates activations to reduce memory use.
+
 ## Placement resolution and extension
 
 <xref:Orleans.Runtime.Placement.PlacementStrategyResolver> selects a grain-specific strategy when one is declared; otherwise it uses the default. `PlacementService` applies placement filters before calling the strategy's keyed <xref:Orleans.Runtime.Placement.IPlacementDirector>.
@@ -83,7 +89,18 @@ Membership changes don't invoke placement again for activations which remain val
 
 The protocol optimizes distribution of activation count and memory use. It does not inspect the communication graph, so a more balanced cluster can still have cross-silo hot paths.
 
-Public options: <xref:Orleans.Configuration.ActivationRebalancerOptions>. Implementation: [`ActivationRebalancerWorker`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Placement/Rebalancing/ActivationRebalancerWorker.cs).
+The most operationally significant <xref:Orleans.Configuration.ActivationRebalancerOptions> are:
+
+| Option | Default | Effect |
+| --- | ---: | --- |
+| <xref:Orleans.Configuration.ActivationRebalancerOptions.RebalancerDueTime> | 60 seconds | Delay before the first balancing session. |
+| <xref:Orleans.Configuration.ActivationRebalancerOptions.SessionCyclePeriod> | 15 seconds | Time between cycles in a session. It must be at least twice the deployment-statistics refresh period. |
+| <xref:Orleans.Configuration.ActivationRebalancerOptions.MaxStagnantCycles> | 3 | Stop a session after consecutive cycles without significant improvement. |
+| <xref:Orleans.Configuration.ActivationRebalancerOptions.ActivationMigrationCountLimit> | `int.MaxValue` | Maximum requested migrations per cycle. Set a finite initial limit to bound churn while evaluating the feature. |
+
+The entropy quantum, allowed deviation, and cycle and silo weights control convergence and migration rate. Keep their defaults until representative measurements justify a change. Resolve <xref:Orleans.Placement.Rebalancing.IActivationRebalancer> from silo services to suspend or resume sessions, request a <xref:Orleans.Placement.Rebalancing.RebalancingReport>, or subscribe to reports. Reports contain an approximate cluster imbalance and per-silo acquired and dispersed activation counts. Also observe migration rate, activation latency, state-transfer failures, memory, and cross-silo calls.
+
+Implementation: [`ActivationRebalancerWorker`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Placement/Rebalancing/ActivationRebalancerWorker.cs).
 
 ## Experimental activation repartitioner
 
@@ -95,7 +112,19 @@ Public options: <xref:Orleans.Configuration.ActivationRebalancerOptions>. Implem
 
 Periodically, peer repartitioners exchange graph information and negotiate activation moves which improve locality while respecting an imbalance-tolerance rule. The default `RebalancerCompatibleRule` can incorporate the resource rebalancer's cluster-imbalance report.
 
-Public options: <xref:Orleans.Configuration.ActivationRepartitionerOptions>. Implementation: [`ActivationRepartitioner`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Placement/Repartitioning/ActivationRepartitioner.cs) and [`RepartitionerMessageFilter`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Placement/Repartitioning/RepartitionerMessageFilter.cs).
+The most operationally significant <xref:Orleans.Configuration.ActivationRepartitionerOptions> are:
+
+| Option | Default | Effect |
+| --- | ---: | --- |
+| <xref:Orleans.Configuration.ActivationRepartitionerOptions.MaxEdgeCount> | 10,000 | Bounds the probabilistic top communication edges retained for a round. |
+| <xref:Orleans.Configuration.ActivationRepartitionerOptions.MaxUnprocessedEdges> | 100,000 | Bounds the pending edge buffer; the oldest entries are discarded when full. |
+| <xref:Orleans.Configuration.ActivationRepartitionerOptions.MinRoundPeriod> / <xref:Orleans.Configuration.ActivationRepartitionerOptions.MaxRoundPeriod> | 1 / 2 minutes | Defines the randomized interval between rounds. |
+| <xref:Orleans.Configuration.ActivationRepartitionerOptions.RecoveryPeriod> | 1 minute | Prevents a silo from immediately entering another round. |
+| <xref:Orleans.Configuration.ActivationRepartitionerOptions.AnchoringFilterEnabled> | `true` | Reduces graph size by probabilistically collapsing well-partitioned local vertices. |
+
+Larger edge and buffer limits improve the chance of retaining useful communication data but consume more memory. Shorter round and recovery periods react faster but increase coordination and migration churn. For large clusters, allow enough time for round exchanges; the options guidance recommends adding approximately 10 seconds per anticipated silo to the maximum round period. Evaluate effectiveness using cross-silo call volume and latency together with migration rate and repartitioner logs.
+
+Implementation: [`ActivationRepartitioner`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Placement/Repartitioning/ActivationRepartitioner.cs) and [`RepartitionerMessageFilter`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Placement/Repartitioning/RepartitionerMessageFilter.cs).
 
 ## Choosing the mechanism
 
@@ -104,5 +133,6 @@ Public options: <xref:Orleans.Configuration.ActivationRepartitionerOptions>. Imp
 | Resource-optimized placement | Activation creation | CPU, memory, capacity, activation count | None |
 | Activation rebalancer | Opt-in balancing sessions | Cluster resource imbalance | Random eligible activations |
 | Activation repartitioner | Opt-in exchange rounds | Grain call graph and tolerance rule | Communication-aware activations |
+| Load shedding | CPU or memory threshold exceeded | Local CPU and memory use | None; rejects supported work and marks the silo overloaded |
 
-The experimental protocols use [activation migration](activation-lifecycle.md). Neither replaces capacity planning, admission control, or deployment health monitoring. Operational guidance belongs in the [deployment section](../deployment/index.md).
+Resource-optimized placement is the default and is usually the first mechanism to tune. Add the activation rebalancer for persistent count or memory skew and the repartitioner for call-locality problems only after measuring the workload. Enable load shedding for overload protection, not redistribution. The experimental movement protocols use [activation migration](activation-lifecycle.md). None replaces capacity planning, admission control, or deployment health monitoring. Operational guidance belongs in the [deployment section](../deployment/index.md).
