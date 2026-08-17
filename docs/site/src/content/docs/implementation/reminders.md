@@ -23,7 +23,7 @@ This is deliberately reconciliation, not a distributed lock around every tick. A
 
 ## Tick delivery
 
-Each local reminder has a small state machine: stopped, runnable, running, and stopping. Its loop computes the next due time from the stored start time and period, waits using the reminder `TimeProvider`, and invokes the target grain through the normal messaging path. The service counts active deliveries and refuses new ticks after shutdown begins, then waits for active deliveries to quiesce.
+Each local reminder reports one of three states: stopped, running, or tombstone. A stopped reminder has no active run task. A running reminder computes the next due time from the stored start time and period, waits using the reminder `TimeProvider`, and invokes the target grain through the normal messaging path. A tombstone records a stop reason while refresh reconciliation observes the scheduling decision. The service counts active deliveries and refuses new ticks after shutdown begins, then waits for active deliveries to quiesce.
 
 A tick is not a durable queue item. If the owner or process fails, the next owner reconstructs the schedule from the row. A slow or unavailable grain can therefore delay a tick, and a process failure can result in a later delivery without a durable record of every missed occurrence. Reminder callbacks should be idempotent and should not assume exactly-once execution.
 

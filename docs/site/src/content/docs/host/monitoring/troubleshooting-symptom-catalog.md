@@ -159,7 +159,7 @@ An exception or event identifies where Orleans noticed a problem, not necessaril
 
 **Remedy:** use reminders for work which must survive activation loss, restore provider health, reduce scheduler pressure, and make callbacks idempotent. Reconcile missed business work from durable application state rather than relying only on callback count.
 
-**Prevent:** choose timers only for activation-scoped scheduling, make reminder work idempotent, monitor provider health and scheduling delay, and don't use either mechanism as a precision real-time clock. <xref:Orleans.Hosting.ReminderOptions.MinimumReminderPeriod> defaults to one minute; registering a shorter period fails.
+**Prevent:** choose timers only for activation-scoped scheduling, make reminder work idempotent, monitor provider health and scheduling delay, and don't use either mechanism as a precision real-time clock. <xref:Orleans.Hosting.ReminderOptions.MinimumReminderPeriod> defaults to one minute; registration rejects periods below the configured value. Configuring a lower value emits a production-suitability warning.
 
 ## Memory pressure
 
