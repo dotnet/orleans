@@ -448,14 +448,37 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
     public async Task InterleavingGrainTaskCancellation(int delay)
     {
         var grain = fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
-        using var cts = new CancellationTokenSource();
-        var callId = Guid.NewGuid();
-        var grainTask = grain.LongWaitInterleaving(cts.Token, TimeSpan.FromSeconds(10), callId);
-        cts.CancelAfter(delay);
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => grainTask);
-        if (delay > 0)
+        var observer = new LongRunningTaskObserver();
+        var observerReference = fixture.GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
+        try
         {
-            await WaitForCallCancellation(grain, callId);
+            using var cts = new CancellationTokenSource();
+            var callId = Guid.NewGuid();
+            var grainTask = delay > 0
+                ? grain.LongWaitInterleavingWithStartNotification(
+                    TimeSpan.FromSeconds(10),
+                    callId,
+                    observerReference,
+                    cts.Token)
+                : grain.LongWaitInterleaving(
+                    cts.Token,
+                    TimeSpan.FromSeconds(10),
+                    callId);
+            if (delay > 0)
+            {
+                await observer.WaitForCallToStart(callId);
+            }
+
+            cts.CancelAfter(delay);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => grainTask);
+            if (delay > 0)
+            {
+                await WaitForCallCancellation(grain, callId);
+            }
+        }
+        finally
+        {
+            fixture.GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
         }
     }
 
