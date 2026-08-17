@@ -33,6 +33,17 @@
     "featured": false
   },
   {
+    "slug": "basic-clustering",
+    "title": "Basic Clustering",
+    "description": "A minimal Aspire-hosted Orleans cluster with two silo replicas and Redis membership.",
+    "path": "BasicClustering",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "image": null,
+    "languages": ["C#"],
+    "tags": ["clustering", "aspire", "redis", "getting-started"],
+    "featured": false
+  },
+  {
     "slug": "blazor-server",
     "title": "Blazor Server",
     "description": "An interactive Blazor Server application backed by Orleans grains.",
