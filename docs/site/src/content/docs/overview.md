@@ -77,7 +77,7 @@ For more information, see [Transactions](grains/transactions.md).
 
 ## When to use Orleans
 
-Orleans is a strong fit when an application has many independently addressable entities, benefits from per-entity isolation, and needs to distribute work across processes or machines. Common examples include games, device management, collaboration, financial workflows, shopping, and online services.
+Orleans is a strong fit when an application has many independently addressable entities, benefits from per-entity isolation, and needs to distribute work across processes or machines. Common examples include AI agent sessions, games, device management, collaboration, financial workflows, shopping, and online services.
 
 Orleans can run in a single process during development and scale to a cluster without changing grain interfaces. Production deployments still require deliberate choices for clustering, storage, retries, observability, capacity, and deployment.
 

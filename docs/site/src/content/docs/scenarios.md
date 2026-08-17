@@ -1,7 +1,7 @@
 ---
 title: Orleans scenarios and use cases
 description: Decide whether the Orleans virtual actor model fits an application's workload.
-ms.date: 08/15/2026
+ms.date: 08/17/2026
 ms.topic: conceptual
 ---
 
@@ -58,6 +58,14 @@ Rooms, channels, documents, users, and sessions can be independently addressed a
 Use a dedicated broker or storage system when the primary requirement is durable message retention, competing consumers, large broadcast fan-out, or analytics over the full event history. Orleans can complement those systems by applying per-entity state and behavior to selected events.
 
 The [Chat Room sample](https://github.com/dotnet/orleans/tree/main/samples/ChatRoom) combines a grain per channel with Orleans streams.
+
+### AI agents and conversational sessions
+
+An AI agent session is a natural grain identity. A session grain can own conversation state, model and tool configuration, pending work, and coordination with other agents or services. Orleans activates sessions on demand, removes idle activations, routes each request to the current activation, and processes turns one at a time by default. This simplifies lifecycle management and prevents simultaneous requests from racing to update the same session state.
+
+Model inference and tool calls are typically asynchronous external operations. A grain can await them without blocking a thread, use [response streaming](grains/response-streaming.md) to return generated tokens or progress to one caller, and use timers, reminders, or durable jobs to schedule later work. Response streams are live call results, not durable or replayable token logs; use an appropriate stream or storage system when consumers must reconnect and resume.
+
+Orleans provides recovery mechanics rather than automatic fault tolerance for the whole agent operation. After a silo failure, a later request can reactivate the session on a healthy silo, but only [persisted session state](grains/grain-persistence/index.md) is restored. Applications must still define durability points, make tool calls and retries idempotent where possible, and reconcile model or tool operations whose outcome is uncertain.
 
 ### Per-entity orchestration
 
