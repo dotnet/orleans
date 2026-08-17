@@ -1,7 +1,7 @@
 ---
 title: Placement and activation balancing
 description: Understand Orleans resource-optimized placement, load signals, activation rebalancing, and repartitioning.
-ms.date: 08/15/2026
+ms.date: 08/17/2026
 ms.topic: concept-article
 ---
 
@@ -9,7 +9,7 @@ ms.topic: concept-article
 
 Placement chooses a silo when Orleans needs a new activation. Balancing can later move existing activations. Those are separate decisions with different information and costs.
 
-The default placement strategy is <xref:Orleans.Runtime.ResourceOptimizedPlacement>, not random placement.
+The default placement strategy is <xref:Orleans.Runtime.ResourceOptimizedPlacement>.
 
 For the application and operational view of scale-out, scale-in, persistence, and configuration, see [Grain placement and migration](../grains/grain-placement.md).
 
@@ -43,17 +43,17 @@ The default relative weights are:
 | <xref:Orleans.Configuration.ResourceOptimizedPlacementOptions.MaxAvailableMemoryWeight?displayProperty=nameWithType> | 5 |
 | <xref:Orleans.Configuration.ResourceOptimizedPlacementOptions.ActivationCountWeight?displayProperty=nameWithType> | 15 |
 
-<xref:Orleans.Configuration.ResourceOptimizedPlacementOptions.LocalSiloPreferenceMargin?displayProperty=nameWithType> defaults to 5. If the local silo's score is within that margin of the best candidate, placement can preserve locality. If statistics are not yet available, the director falls back to a random compatible silo.
+<xref:Orleans.Configuration.ResourceOptimizedPlacementOptions.LocalSiloPreferenceMargin?displayProperty=nameWithType> defaults to 5. If the local silo's score is within that margin of the best candidate, placement can preserve locality. During statistics startup, the director selects a random compatible silo.
 
 Public options: <xref:Orleans.Configuration.ResourceOptimizedPlacementOptions>. Implementation: [`ResourceOptimizedPlacementDirector`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Placement/ResourceOptimizedPlacementDirector.cs) and the default registration in [`DefaultSiloServices`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Hosting/DefaultSiloServices.cs).
 
-The `IsOverloaded` statistic is set only when <xref:Orleans.Configuration.LoadSheddingOptions.LoadSheddingEnabled> is enabled and either its CPU or memory threshold is exceeded. With load shedding disabled, resource-optimized placement still scores the resource measurements but doesn't categorically remove a candidate as overloaded. Load shedding is admission protection, not activation movement.
+Enabling <xref:Orleans.Configuration.LoadSheddingOptions.LoadSheddingEnabled> sets the `IsOverloaded` statistic when either its CPU or memory threshold is exceeded. Resource-optimized placement removes overloaded silos from its scored candidate set and continues using CPU, memory, capacity, and activation-count measurements for the remaining candidates.
 
 ## Load shedding
 
-<xref:Orleans.Configuration.LoadSheddingOptions> is disabled by default. When enabled, <xref:Orleans.Configuration.LoadSheddingOptions.CpuThreshold> defaults to 95 percent and <xref:Orleans.Configuration.LoadSheddingOptions.MemoryThreshold> defaults to 90 percent. Crossing either threshold marks the silo's published runtime statistics as overloaded. The client gateway and stream providers can reject supported work, and resource-optimized placement omits the silo from the scored candidate set.
+Set <xref:Orleans.Configuration.LoadSheddingOptions.LoadSheddingEnabled> to `true` to activate load shedding. <xref:Orleans.Configuration.LoadSheddingOptions.CpuThreshold> defaults to 95 percent and <xref:Orleans.Configuration.LoadSheddingOptions.MemoryThreshold> defaults to 90 percent. Crossing either threshold marks the silo's published runtime statistics as overloaded. The client gateway and stream providers can reject supported work, and resource-optimized placement omits the silo from the scored candidate set.
 
-This is a threshold, not a queueing or balancing algorithm. It doesn't migrate activations, deactivate them, or create capacity. A deployment still needs ingress admission control, bounded work, deadlines, and an external scaling policy. It is also separate from [memory-based activation shedding](../host/configuration-guide/activation-collection.md#enable-memory-based-activation-shedding), which deactivates activations to reduce memory use.
+Use load shedding as one layer of admission control alongside bounded work and deadlines. Use a hosting-platform autoscaler to create capacity, activation rebalancing or repartitioning to move eligible activations, and [memory-based activation shedding](../host/configuration-guide/activation-collection.md#enable-memory-based-activation-shedding) to deactivate activations under memory pressure.
 
 ## Placement resolution and extension
 
@@ -69,7 +69,7 @@ Placement filters are orthogonal constraints. They can remove candidates based o
 
 API: <xref:Orleans.Runtime.Placement.PlacementStrategyResolver> and <xref:Orleans.Hosting.PlacementStrategyExtensions.AddPlacementDirector*?displayProperty=nameWithType>. Implementation: [`PlacementService`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Placement/PlacementService.cs), [strategy resolution](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Placement/PlacementStrategyResolver.cs), and [registration extensions](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Hosting/PlacementStrategyExtensions.cs).
 
-## Why initial placement is not enough
+## Balancing long-lived activations
 
 Resource-optimized placement only affects new activations. Long-lived activations can become unbalanced after:
 
@@ -81,13 +81,13 @@ Resource-optimized placement only affects new activations. Long-lived activation
 
 Moving an activation has a cost: dehydrate and rehydrate work, directory updates, cold caches, and a temporary interruption. Orleans therefore exposes opt-in protocols rather than continuously moving every activation.
 
-Membership changes don't invoke placement again for activations which remain valid. A joining silo receives activations through later creation or opt-in migration. During graceful shutdown, ordinary activations on the departing silo are deactivated rather than bulk-migrated; later calls create replacements on remaining compatible silos.
+Valid activations continue running on their current silos across membership changes. A joining silo receives activations through later creation or opt-in migration. During graceful shutdown, ordinary activations on the departing silo deactivate; later calls create replacements on remaining compatible silos.
 
 ## Experimental activation rebalancer
 
 <xref:Orleans.Hosting.ActivationRebalancerExtensions.AddActivationRebalancer*?displayProperty=nameWithType> enables the resource rebalancer and produces compiler warning **`ORLEANSEXP002`**. A worker observes cluster statistics in sessions, estimates imbalance using entropy, and asks source silos to migrate random activations toward underloaded silos. A monitor can wake or relocate the worker after failure.
 
-The protocol optimizes distribution of activation count and memory use. It does not inspect the communication graph, so a more balanced cluster can still have cross-silo hot paths.
+The protocol optimizes distribution of activation count and memory use. The activation repartitioner complements it by optimizing the communication graph and cross-silo hot paths.
 
 The most operationally significant <xref:Orleans.Configuration.ActivationRebalancerOptions> are:
 
@@ -95,7 +95,7 @@ The most operationally significant <xref:Orleans.Configuration.ActivationRebalan
 | --- | ---: | --- |
 | <xref:Orleans.Configuration.ActivationRebalancerOptions.RebalancerDueTime> | 60 seconds | Delay before the first balancing session. |
 | <xref:Orleans.Configuration.ActivationRebalancerOptions.SessionCyclePeriod> | 15 seconds | Time between cycles in a session. It must be at least twice the deployment-statistics refresh period. |
-| <xref:Orleans.Configuration.ActivationRebalancerOptions.MaxStagnantCycles> | 3 | Stop a session after consecutive cycles without significant improvement. |
+| <xref:Orleans.Configuration.ActivationRebalancerOptions.MaxStagnantCycles> | 3 | Stop a session after consecutive cycles whose improvement remains below the entropy quantum. |
 | <xref:Orleans.Configuration.ActivationRebalancerOptions.ActivationMigrationCountLimit> | `int.MaxValue` | Maximum requested migrations per cycle. Set a finite initial limit to bound churn while evaluating the feature. |
 
 The entropy quantum, allowed deviation, and cycle and silo weights control convergence and migration rate. Keep their defaults until representative measurements justify a change. Resolve <xref:Orleans.Placement.Rebalancing.IActivationRebalancer> from silo services to suspend or resume sessions, request a <xref:Orleans.Placement.Rebalancing.RebalancingReport>, or subscribe to reports. Reports contain an approximate cluster imbalance and per-silo acquired and dispersed activation counts. Also observe migration rate, activation latency, state-transfer failures, memory, and cross-silo calls.
@@ -128,11 +128,11 @@ Implementation: [`ActivationRepartitioner`](https://github.com/dotnet/orleans/bl
 
 ## Choosing the mechanism
 
-| Mechanism | When it acts | Primary signal | Movement |
+| Mechanism | When it acts | Primary signal | Effect |
 | --- | --- | --- | --- |
-| Resource-optimized placement | Activation creation | CPU, memory, capacity, activation count | None |
+| Resource-optimized placement | Activation creation | CPU, memory, capacity, activation count | Places the new activation |
 | Activation rebalancer | Opt-in balancing sessions | Cluster resource imbalance | Random eligible activations |
 | Activation repartitioner | Opt-in exchange rounds | Grain call graph and tolerance rule | Communication-aware activations |
-| Load shedding | CPU or memory threshold exceeded | Local CPU and memory use | None; rejects supported work and marks the silo overloaded |
+| Load shedding | CPU or memory threshold exceeded | Local CPU and memory use | Rejects supported work and marks the silo overloaded |
 
-Resource-optimized placement is the default and is usually the first mechanism to tune. Add the activation rebalancer for persistent count or memory skew and the repartitioner for call-locality problems only after measuring the workload. Enable load shedding for overload protection, not redistribution. The experimental movement protocols use [activation migration](activation-lifecycle.md). None replaces capacity planning, admission control, or deployment health monitoring. Operational guidance belongs in the [deployment section](../deployment/index.md).
+Resource-optimized placement is the default and is usually the first mechanism to tune. Add the activation rebalancer for persistent count or memory skew and the repartitioner for call-locality problems after measuring the workload. Enable load shedding for overload protection. The experimental movement protocols use [activation migration](activation-lifecycle.md). Apply capacity planning, admission control, and deployment health monitoring alongside these runtime mechanisms. Operational guidance belongs in the [deployment section](../deployment/index.md).
