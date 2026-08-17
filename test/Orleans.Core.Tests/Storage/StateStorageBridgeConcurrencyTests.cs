@@ -507,20 +507,18 @@ namespace UnitTests.Storage;
         }
 
         [Fact]
-        public async Task InterfaceCancellation_CancelsWaiterButDoesNotCancelQueuedOperationAsync()
+        public async Task CanceledQueuedWrite_ReachesProviderAfterPredecessorAndPropagatesCancellationAsync()
         {
             using var context = TestGrainContext.Create();
             var storage = new ControllableGrainStorage();
             IStorage bridge = CreateBridge(context, storage);
             var readCompletion = CreateCompletionSource();
-            var writeCompletion = CreateCompletionSource();
-            var writeFinished = CreateCompletionSource();
             using var cancellationTokenSource = new CancellationTokenSource();
             storage.ReadAsync = _ => readCompletion.Task;
-            storage.WriteAsync = async _ =>
+            storage.WriteWithCancellationAsync = (_, cancellationToken) =>
             {
-                await writeCompletion.Task;
-                writeFinished.SetResult();
+                cancellationToken.ThrowIfCancellationRequested();
+                return Task.CompletedTask;
             };
 
             await RunInGrainContextAsync(context, async () =>
@@ -530,17 +528,40 @@ namespace UnitTests.Storage;
                 var canceledWriteWaiter = bridge.WriteStateAsync(cancellationTokenSource.Token);
                 await cancellationTokenSource.CancelAsync();
 
-                await Assert.ThrowsAsync<TaskCanceledException>(() => canceledWriteWaiter);
+                Assert.False(canceledWriteWaiter.IsCompleted);
                 Assert.Equal(0, storage.WriteCallCount);
 
                 readCompletion.SetResult();
-                await WaitUntilAsync(() => storage.WriteCallCount == 1);
-
-                writeCompletion.SetResult();
-                await writeFinished.Task;
+                var exception = await Assert.ThrowsAsync<OperationCanceledException>(() => canceledWriteWaiter);
+                Assert.Equal(cancellationTokenSource.Token, exception.CancellationToken);
                 await readTask;
             });
 
+            Assert.Equal(1, storage.WriteCallCount);
+        }
+
+        [Fact]
+        public async Task CancelableWrite_DoesNotCoalesceWithUncancelableWriteAsync()
+        {
+            using var context = TestGrainContext.Create();
+            var storage = new ControllableGrainStorage();
+            IStorage bridge = CreateBridge(context, storage);
+            var readCompletion = CreateCompletionSource();
+            using var cancellationTokenSource = new CancellationTokenSource();
+            storage.ReadAsync = _ => readCompletion.Task;
+
+            await RunInGrainContextAsync(context, async () =>
+            {
+                var readTask = bridge.ReadStateAsync();
+                await WaitUntilAsync(() => storage.ReadCallCount == 1);
+                var cancelableWrite = bridge.WriteStateAsync(cancellationTokenSource.Token);
+                var uncancelableWrite = bridge.WriteStateAsync();
+
+                readCompletion.SetResult();
+                await Task.WhenAll(readTask, cancelableWrite, uncancelableWrite);
+            });
+
+            Assert.Equal(2, storage.WriteCallCount);
             AssertLatestEtag(bridge, storage);
         }
 
@@ -634,7 +655,7 @@ namespace UnitTests.Storage;
         public sealed class TestState
         {
             [Id(0)]
-            public string Value { get; set; }
+            public string Value { get; set; } = null!;
         }
 
         private sealed class ControllableGrainStorage : IGrainStorage
@@ -645,11 +666,13 @@ namespace UnitTests.Storage;
             private int _readCallCount;
             private int _writeCallCount;
             private int _clearCallCount;
-            private string _lastEtag;
+            private string _lastEtag = null!;
 
             public Func<IGrainState<TestState>, Task> ReadAsync { get; set; } = _ => Task.CompletedTask;
 
             public Func<IGrainState<TestState>, Task> WriteAsync { get; set; } = _ => Task.CompletedTask;
+
+            public Func<IGrainState<TestState>, CancellationToken, Task>? WriteWithCancellationAsync { get; set; }
 
             public Func<IGrainState<TestState>, Task> ClearAsync { get; set; } = _ => Task.CompletedTask;
 
@@ -710,7 +733,14 @@ namespace UnitTests.Storage;
                 await ReadAsync(testState);
             }
 
-            public async Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+            public Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+                => WriteStateAsync(stateName, grainId, grainState, CancellationToken.None);
+
+            public async Task WriteStateAsync<T>(
+                string stateName,
+                GrainId grainId,
+                IGrainState<T> grainState,
+                CancellationToken cancellationToken)
             {
                 var testState = GetTestState(grainState);
 
@@ -720,7 +750,9 @@ namespace UnitTests.Storage;
                     _operations.Add($"write-{_writeCallCount}");
                 }
 
-                await WriteAsync(testState);
+                await (WriteWithCancellationAsync is { } write
+                    ? write(testState, cancellationToken)
+                    : WriteAsync(testState));
                 ResetEtag(testState, recordExists: true);
             }
 
@@ -780,7 +812,7 @@ namespace UnitTests.Storage;
 
         private sealed class TestGrainContext : IGrainContext, IDisposable
         {
-            private ServiceProvider _activationServices;
+            private ServiceProvider _activationServices = null!;
 
             private TestGrainContext()
             {
@@ -817,7 +849,7 @@ namespace UnitTests.Storage;
                 return context;
             }
 
-            public WorkItemGroup WorkItemGroup { get; private set; }
+            public WorkItemGroup WorkItemGroup { get; private set; } = null!;
 
             public GrainReference GrainReference => throw new NotImplementedException();
 
@@ -833,7 +865,7 @@ namespace UnitTests.Storage;
 
             public IDictionary<object, object> Items { get; } = new Dictionary<object, object>();
 
-            public IGrainLifecycle ObservableLifecycle { get; private set; }
+            public IGrainLifecycle ObservableLifecycle { get; private set; } = null!;
 
             public IWorkItemScheduler Scheduler => WorkItemGroup;
 
@@ -843,7 +875,7 @@ namespace UnitTests.Storage;
 
             object IGrainContext.GrainInstance => throw new NotImplementedException();
 
-            public void Activate(Dictionary<string, object> requestContext, CancellationToken cancellationToken) => throw new NotImplementedException();
+            public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
             public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken)
             {
@@ -863,12 +895,12 @@ namespace UnitTests.Storage;
 
             public void ReceiveMessage(object message) => throw new NotImplementedException();
 
-            public void SetComponent<TComponent>(TComponent value) where TComponent : class => throw new NotImplementedException();
+            public void SetComponent<TComponent>(TComponent? value) where TComponent : class => throw new NotImplementedException();
 
-            bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
+            bool IEquatable<IGrainContext>.Equals(IGrainContext? other) => ReferenceEquals(this, other);
 
             void IGrainContext.Rehydrate(IRehydrationContext context) => throw new NotImplementedException();
 
-            void IGrainContext.Migrate(Dictionary<string, object> requestContext, CancellationToken cancellationToken) => throw new NotImplementedException();
+            void IGrainContext.Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken) => throw new NotImplementedException();
         }
     }
