@@ -1,4 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 
 namespace Orleans.Docs.Snippets.Streaming;
