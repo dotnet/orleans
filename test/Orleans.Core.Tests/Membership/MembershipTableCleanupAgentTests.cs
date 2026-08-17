@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -67,12 +68,11 @@ namespace NonSilo.Tests.Membership
             ((ILifecycleParticipant<ISiloLifecycle>)cleanupAgent).Participate(lifecycle);
 
             await lifecycle.OnStart();
-            membershipManager.Publish(Snapshot(
+            await membershipManager.PublishAndWaitForProcessing(Snapshot(
                 Entry(Silo("127.0.0.1:200@1"), SiloStatus.Active, now),
                 Entry(this.localSilo, SiloStatus.Active, now)));
-            var completed = await Task.WhenAny(cleanupCalled.Task, Task.Delay(TimeSpan.FromMilliseconds(200)));
 
-            Assert.NotSame(cleanupCalled.Task, completed);
+            Assert.False(cleanupCalled.Task.IsCompleted);
             Assert.DoesNotContain(table.Calls, c => c.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntries)));
 
             await lifecycle.OnStop();
@@ -98,13 +98,12 @@ namespace NonSilo.Tests.Membership
             ((ILifecycleParticipant<ISiloLifecycle>)cleanupAgent).Participate(lifecycle);
 
             await lifecycle.OnStart();
-            membershipManager.Publish(Snapshot(
+            await membershipManager.PublishAndWaitForProcessing(Snapshot(
                 Entry(this.localSilo, SiloStatus.Active, now),
                 Entry(Silo("127.0.0.1:200@200"), SiloStatus.Active, now),
                 oldestDefunctEntry,
                 removedDefunctEntry,
                 retainedDefunctEntry));
-            await Until(() => table.Calls.Any(call => call.Method == nameof(IMembershipTable.CleanupDefunctSiloEntries)));
             Assert.DoesNotContain(table.Calls, call => call.Method == nameof(IMembershipTable.ReadAll));
 
             var updatedTable = await table.ReadAll();
@@ -140,12 +139,11 @@ namespace NonSilo.Tests.Membership
             ((ILifecycleParticipant<ISiloLifecycle>)cleanupAgent).Participate(lifecycle);
 
             await lifecycle.OnStart();
-            membershipManager.Publish(Snapshot(
+            await membershipManager.PublishAndWaitForProcessing(Snapshot(
                 Entry(this.localSilo, SiloStatus.Active, now),
                 Entry(Silo("127.0.0.1:200@200"), SiloStatus.Active, now),
                 newerAliveEntry,
                 recentlySuspectedEntry));
-            await Until(() => table.Calls.Any(call => call.Method == nameof(IMembershipTable.CleanupDefunctSiloEntries)));
 
             var updatedTable = await table.ReadAll();
             Assert.Single(updatedTable.Members, member => member.Item1.Status == SiloStatus.Dead);
@@ -171,28 +169,27 @@ namespace NonSilo.Tests.Membership
 
             await lifecycle.OnStart();
             var now = this.timeProvider.GetUtcNow();
-            membershipManager.Publish(Snapshot(Entry(this.localSilo, SiloStatus.Active, now)));
-            await Until(() => CleanupCallCount(table) == 1);
+            await membershipManager.PublishAndWaitForProcessing(Snapshot(Entry(this.localSilo, SiloStatus.Active, now)));
+            Assert.Equal(1, CleanupCallCount(table));
 
             table.ClearCalls();
-            membershipManager.Publish(Snapshot(Entry(this.localSilo, SiloStatus.Active, now)));
-            await Task.Delay(TimeSpan.FromMilliseconds(200));
+            await membershipManager.PublishAndWaitForProcessing(Snapshot(Entry(this.localSilo, SiloStatus.Active, now)));
             Assert.Equal(0, CleanupCallCount(table));
 
             var expiredNonActiveEntry = Entry(
                 Silo("127.0.0.1:500@100"),
                 SiloStatus.Joining,
                 now - options.DefunctSiloExpiration - TimeSpan.FromTicks(1));
-            membershipManager.Publish(Snapshot(
+            await membershipManager.PublishAndWaitForProcessing(Snapshot(
                 Entry(this.localSilo, SiloStatus.Active, now),
                 expiredNonActiveEntry));
-            await Until(() => CleanupCallCount(table) == 1);
+            Assert.Equal(1, CleanupCallCount(table));
 
             table.ClearCalls();
             this.timeProvider.Advance(options.DefunctSiloCleanupPeriod.Value);
             var later = this.timeProvider.GetUtcNow();
-            membershipManager.Publish(Snapshot(Entry(this.localSilo, SiloStatus.Active, later)));
-            await Until(() => CleanupCallCount(table) == 1);
+            await membershipManager.PublishAndWaitForProcessing(Snapshot(Entry(this.localSilo, SiloStatus.Active, later)));
+            Assert.Equal(1, CleanupCallCount(table));
 
             await lifecycle.OnStop();
         }
@@ -206,12 +203,8 @@ namespace NonSilo.Tests.Membership
                 MaxDefunctSiloEntries = null
             };
             var membershipManager = new TestMembershipManager();
-            var cleanupCalled = new TaskCompletionSource<DateTimeOffset>(TaskCreationOptions.RunContinuationsAsynchronously);
             var now = this.timeProvider.GetUtcNow();
-            var table = new InMemoryMembershipTable
-            {
-                OnCleanupDefunctSiloEntries = beforeDate => cleanupCalled.TrySetResult(beforeDate)
-            };
+            var table = new InMemoryMembershipTable();
             var cleanupAgent = this.CreateCleanupAgent(options, table, membershipManager);
             var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
             ((ILifecycleParticipant<ISiloLifecycle>)cleanupAgent).Participate(lifecycle);
@@ -219,21 +212,28 @@ namespace NonSilo.Tests.Membership
             await lifecycle.OnStart();
             Assert.DoesNotContain(table.Calls, c => c.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntries)));
 
-            membershipManager.Publish(Snapshot(Entry(this.localSilo, SiloStatus.Active, now)));
             if (enabled)
             {
-                await Until(() => cleanupCalled.Task.IsCompleted);
-                Assert.Equal(now - options.DefunctSiloExpiration, cleanupCalled.Task.Result);
-                Assert.Contains(table.Calls, c => c.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntries)));
+                await membershipManager.PublishAndWaitForProcessing(Snapshot(Entry(this.localSilo, SiloStatus.Active, now)));
             }
             else
             {
-                var completed = await Task.WhenAny(cleanupCalled.Task, Task.Delay(TimeSpan.FromMilliseconds(200)));
-                Assert.NotSame(cleanupCalled.Task, completed);
-                Assert.DoesNotContain(table.Calls, c => c.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntries)));
+                membershipManager.Publish(Snapshot(Entry(this.localSilo, SiloStatus.Active, now)));
             }
 
             await lifecycle.OnStop();
+
+            if (enabled)
+            {
+                var cleanupCall = Assert.Single(
+                    table.Calls,
+                    call => call.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntries)));
+                Assert.Equal(now - options.DefunctSiloExpiration, cleanupCall.Arguments);
+            }
+            else
+            {
+                Assert.DoesNotContain(table.Calls, c => c.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntries)));
+            }
         }
 
         private MembershipTableCleanupAgent CreateCleanupAgent(
@@ -248,13 +248,6 @@ namespace NonSilo.Tests.Membership
                 this.localSiloDetails,
                 this.timeProvider,
                 this.loggerFactory.CreateLogger<MembershipTableCleanupAgent>());
-        }
-
-        private static async Task Until(Func<bool> condition)
-        {
-            var maxTimeout = 40_000;
-            while (!condition() && (maxTimeout -= 10) > 0) await Task.Delay(10);
-            Assert.True(maxTimeout > 0);
         }
 
         private static int CleanupCallCount(InMemoryMembershipTable table) => table.Calls.Count(call => call.Method == nameof(IMembershipTable.CleanupDefunctSiloEntries));
@@ -274,16 +267,25 @@ namespace NonSilo.Tests.Membership
 
         private sealed class TestMembershipManager : IMembershipManager
         {
-            private readonly Channel<MembershipTableSnapshot> updates = Channel.CreateUnbounded<MembershipTableSnapshot>();
+            private readonly Channel<(MembershipTableSnapshot Snapshot, TaskCompletionSource Processed)> updates =
+                Channel.CreateUnbounded<(MembershipTableSnapshot, TaskCompletionSource)>();
 
             public MembershipTableSnapshot CurrentSnapshot { get; private set; } = Snapshot();
-            public IAsyncEnumerable<MembershipTableSnapshot> MembershipUpdates => this.updates.Reader.ReadAllAsync();
+            public IAsyncEnumerable<MembershipTableSnapshot> MembershipUpdates => this.GetMembershipUpdates();
             public SiloStatus LocalSiloStatus => SiloStatus.Active;
 
             public void Publish(MembershipTableSnapshot snapshot)
             {
                 this.CurrentSnapshot = snapshot;
-                Assert.True(this.updates.Writer.TryWrite(snapshot));
+                Assert.True(this.updates.Writer.TryWrite((snapshot, new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously))));
+            }
+
+            public async Task PublishAndWaitForProcessing(MembershipTableSnapshot snapshot)
+            {
+                this.CurrentSnapshot = snapshot;
+                var processed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                Assert.True(this.updates.Writer.TryWrite((snapshot, processed)));
+                await processed.Task.WaitAsync(TimeSpan.FromSeconds(10));
             }
 
             public Task UpdateLocalStatus(SiloStatus status, CancellationToken cancellationToken) => Task.CompletedTask;
@@ -293,6 +295,16 @@ namespace NonSilo.Tests.Membership
             public Task ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) => Task.CompletedTask;
             public Task UpdateIAmAlive(CancellationToken cancellationToken) => Task.CompletedTask;
             public void Participate(ISiloLifecycle lifecycle) { }
+
+            private async IAsyncEnumerable<MembershipTableSnapshot> GetMembershipUpdates(
+                [EnumeratorCancellation] CancellationToken cancellationToken = default)
+            {
+                await foreach (var (snapshot, processed) in this.updates.Reader.ReadAllAsync(cancellationToken))
+                {
+                    yield return snapshot;
+                    processed.TrySetResult();
+                }
+            }
 
             public bool CheckHealth(DateTime lastCheckTime, out string reason)
             {
