@@ -448,33 +448,30 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
     public async Task InterleavingGrainTaskCancellation(int delay)
     {
         var grain = fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
+        using var cts = new CancellationTokenSource();
+        var callId = Guid.NewGuid();
+        if (delay == 0)
+        {
+            var grainTask = grain.LongWaitInterleaving(cts.Token, TimeSpan.FromSeconds(10), callId);
+            cts.CancelAfter(delay);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => grainTask);
+            return;
+        }
+
         var observer = new LongRunningTaskObserver();
         var observerReference = fixture.GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
         try
         {
-            using var cts = new CancellationTokenSource();
-            var callId = Guid.NewGuid();
-            var grainTask = delay > 0
-                ? grain.LongWaitInterleavingWithStartNotification(
-                    TimeSpan.FromSeconds(10),
-                    callId,
-                    observerReference,
-                    cts.Token)
-                : grain.LongWaitInterleaving(
-                    cts.Token,
-                    TimeSpan.FromSeconds(10),
-                    callId);
-            if (delay > 0)
-            {
-                await observer.WaitForCallToStart(callId);
-            }
+            var grainTask = grain.LongWaitInterleavingWithStartNotification(
+                TimeSpan.FromSeconds(10),
+                callId,
+                observerReference,
+                cts.Token);
+            await observer.WaitForCallToStart(callId);
 
             cts.CancelAfter(delay);
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => grainTask);
-            if (delay > 0)
-            {
-                await WaitForCallCancellation(grain, callId);
-            }
+            await WaitForCallCancellation(grain, callId);
         }
         finally
         {
