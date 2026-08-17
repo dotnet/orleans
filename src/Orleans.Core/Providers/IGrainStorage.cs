@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using System.Net;
@@ -19,6 +20,17 @@ namespace Orleans.Storage
         /// <returns>Completion promise for the Read operation on the specified grain.</returns>
         Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState);
 
+        /// <summary>Read data function for this storage instance.</summary>
+        /// <param name="stateName">Name of the state for this grain.</param>
+        /// <param name="grainId">Grain ID.</param>
+        /// <param name="grainState">State data object to be populated for this grain.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <typeparam name="T">The grain state type.</typeparam>
+        /// <returns>Completion promise for the Read operation on the specified grain.</returns>
+        /// <remarks>The default implementation delegates to the overload without a cancellation token.</remarks>
+        Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
+            => ReadStateAsync(stateName, grainId, grainState);
+
         /// <summary>Write data function for this storage instance.</summary>
         /// <param name="stateName">Name of the state for this grain</param>
         /// <param name="grainId">Grain ID</param>
@@ -27,6 +39,17 @@ namespace Orleans.Storage
         /// <returns>Completion promise for the Write operation on the specified grain.</returns>
         Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState);
 
+        /// <summary>Write data function for this storage instance.</summary>
+        /// <param name="stateName">Name of the state for this grain.</param>
+        /// <param name="grainId">Grain ID.</param>
+        /// <param name="grainState">State data object to be written for this grain.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <typeparam name="T">The grain state type.</typeparam>
+        /// <returns>Completion promise for the Write operation on the specified grain.</returns>
+        /// <remarks>The default implementation delegates to the overload without a cancellation token.</remarks>
+        Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
+            => WriteStateAsync(stateName, grainId, grainState);
+
         /// <summary>Delete / Clear data function for this storage instance.</summary>
         /// <param name="stateName">Name of the state for this grain</param>
         /// <param name="grainId">Grain ID</param>
@@ -34,6 +57,17 @@ namespace Orleans.Storage
         /// <typeparam name="T">The grain state type.</typeparam>
         /// <returns>Completion promise for the Delete operation on the specified grain.</returns>
         Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState);
+
+        /// <summary>Delete / Clear data function for this storage instance.</summary>
+        /// <param name="stateName">Name of the state for this grain.</param>
+        /// <param name="grainId">Grain ID.</param>
+        /// <param name="grainState">Copy of last-known state data object for this grain.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <typeparam name="T">The grain state type.</typeparam>
+        /// <returns>Completion promise for the Delete operation on the specified grain.</returns>
+        /// <remarks>The default implementation delegates to the overload without a cancellation token.</remarks>
+        Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
+            => ClearStateAsync(stateName, grainId, grainState);
     }
 
     /// <summary>

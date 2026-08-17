@@ -67,21 +67,21 @@ namespace Orleans.Storage
         }
 
         /// <summary> Read state data function for this storage provider. </summary>
-        /// <see cref="IGrainStorage.ReadStateAsync{T}"/>
+        /// <see cref="IGrainStorage.ReadStateAsync{T}(string, GrainId, IGrainState{T})"/>
         public Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             return MakeFixedLatencyCall(() => baseGranStorage.ReadStateAsync(grainType, grainId, grainState));
         }
 
         /// <summary> Write state data function for this storage provider. </summary>
-        /// <see cref="IGrainStorage.WriteStateAsync{T}"/>
+        /// <see cref="IGrainStorage.WriteStateAsync{T}(string, GrainId, IGrainState{T})"/>
         public Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
            return MakeFixedLatencyCall(() => baseGranStorage.WriteStateAsync(grainType, grainId, grainState));
         }
 
         /// <summary> Delete / Clear state data function for this storage provider. </summary>
-        /// <see cref="IGrainStorage.ClearStateAsync{T}"/>
+        /// <see cref="IGrainStorage.ClearStateAsync{T}(string, GrainId, IGrainState{T})"/>
         public Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             return MakeFixedLatencyCall(() => baseGranStorage.ClearStateAsync(grainType, grainId, grainState));

@@ -61,7 +61,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Read state data function for this storage provider. </summary>
-        /// <see cref="IGrainStorage.ReadStateAsync{T}"/>
+        /// <see cref="IGrainStorage.ReadStateAsync{T}(string, GrainId, IGrainState{T})"/>
         public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
@@ -87,7 +87,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Write state data function for this storage provider. </summary>
-        /// <see cref="IGrainStorage.WriteStateAsync{T}"/>
+        /// <see cref="IGrainStorage.WriteStateAsync{T}(string, GrainId, IGrainState{T})"/>
         public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
@@ -121,7 +121,7 @@ namespace Orleans.Storage
         /// for this grain will be deleted / removed, otherwise the table row will be
         /// cleared by overwriting with default / null values.
         /// </remarks>
-        /// <see cref="IGrainStorage.ClearStateAsync{T}"/>
+        /// <see cref="IGrainStorage.ClearStateAsync{T}(string, GrainId, IGrainState{T})"/>
         public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
