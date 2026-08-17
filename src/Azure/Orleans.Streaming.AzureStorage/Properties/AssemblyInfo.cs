@@ -3,5 +3,8 @@ using Orleans.CodeGeneration;
 using Orleans.Providers.Streams.AzureQueue;
 
 [assembly: InternalsVisibleTo("Tester")]
+[assembly: InternalsVisibleTo("Orleans.Streaming.AzureStorage.Migration")]
+
+[assembly: InternalsVisibleTo("Tester.AzureUtils.Migration")]
 
 [assembly: GenerateSerializer(typeof(AzureQueueBatchContainerV2))]
