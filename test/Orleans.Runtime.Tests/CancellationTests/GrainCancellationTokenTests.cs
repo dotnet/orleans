@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
@@ -168,21 +169,23 @@ namespace UnitTests.CancellationTests
         public async Task CancellationTokenCallbacksThrow_ExceptionShouldBePropagated()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
-            using var cts = new GrainCancellationTokenSource();
-            var callId = Guid.NewGuid();
-            grain.GrainCancellationTokenCallbackThrow(cts.Token, callId).Ignore();
-            await Task.Delay(TimeSpan.FromMilliseconds(100));
+            var observer = new LongRunningTaskObserver();
+            var observerReference = fixture.GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
             try
             {
-                await cts.Cancel();
-            }
-            catch (AggregateException ex)
-            {
-                Assert.True(ex.InnerException is InvalidOperationException, "Exception thrown has wrong type");
-                return;
-            }
+                using var cts = new GrainCancellationTokenSource();
+                var callId = Guid.NewGuid();
+                var grainTask = grain.GrainCancellationTokenCallbackThrow(cts.Token, callId, observerReference);
+                await observer.WaitForCallToStart(callId);
 
-            Assert.Fail("No exception was thrown");
+                var exception = await Assert.ThrowsAsync<AggregateException>(() => cts.Cancel());
+                Assert.IsType<InvalidOperationException>(exception.InnerException);
+                await Assert.ThrowsAsync<TaskCanceledException>(() => grainTask);
+            }
+            finally
+            {
+                fixture.GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+            }
         }
 
         [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
@@ -332,6 +335,18 @@ namespace UnitTests.CancellationTests
             }
 
             Assert.Fail("Did not encounter the expected call id");
+        }
+
+        private sealed class LongRunningTaskObserver : ILongRunningTaskObserver
+        {
+            private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _startedCalls = new();
+
+            public void OnCallStarted(Guid callId) => GetCallStarted(callId).TrySetResult();
+
+            public Task WaitForCallToStart(Guid callId) => GetCallStarted(callId).Task.WaitAsync(TimeSpan.FromSeconds(30));
+
+            private TaskCompletionSource GetCallStarted(Guid callId) =>
+                _startedCalls.GetOrAdd(callId, static _ => new(TaskCreationOptions.RunContinuationsAsynchronously));
         }
     }
 }

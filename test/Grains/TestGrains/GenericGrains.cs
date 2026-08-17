@@ -639,13 +639,14 @@ namespace UnitTests.Grains
         [MaybeNull]
         private T lastValue;
 
-        public async Task GrainCancellationTokenCallbackThrow(GrainCancellationToken ct, Guid callId)
+        public async Task GrainCancellationTokenCallbackThrow(GrainCancellationToken ct, Guid callId, ILongRunningTaskObserver observer)
         {
             ct.CancellationToken.Register(() =>
             {
                 _cancelledCalls.Writer.TryWrite((callId, null!));
                 throw new InvalidOperationException("From cancellation token callback");
             });
+            observer.OnCallStarted(callId);
 
             await Task.Delay(TimeSpan.FromSeconds(10), ct.CancellationToken);
         }
