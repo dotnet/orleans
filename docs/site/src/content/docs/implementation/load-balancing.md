@@ -43,7 +43,7 @@ The default relative weights are:
 | <xref:Orleans.Configuration.ResourceOptimizedPlacementOptions.MaxAvailableMemoryWeight?displayProperty=nameWithType> | 5 |
 | <xref:Orleans.Configuration.ResourceOptimizedPlacementOptions.ActivationCountWeight?displayProperty=nameWithType> | 15 |
 
-<xref:Orleans.Configuration.ResourceOptimizedPlacementOptions.LocalSiloPreferenceMargin?displayProperty=nameWithType> defaults to 5. If the local silo's score is within that margin of the best candidate, placement can preserve locality. During statistics startup, the director selects a random compatible silo.
+<xref:Orleans.Configuration.ResourceOptimizedPlacementOptions.LocalSiloPreferenceMargin?displayProperty=nameWithType> defaults to 5. If the local silo's score is within that margin of the best candidate, placement can preserve locality. Before usable statistics are available, the director selects a compatible silo.
 
 Public options: <xref:Orleans.Configuration.ResourceOptimizedPlacementOptions>. Implementation: [`ResourceOptimizedPlacementDirector`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Placement/ResourceOptimizedPlacementDirector.cs) and the default registration in [`DefaultSiloServices`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Hosting/DefaultSiloServices.cs).
 
@@ -51,7 +51,7 @@ Enabling <xref:Orleans.Configuration.LoadSheddingOptions.LoadSheddingEnabled> se
 
 ## Load shedding
 
-Set <xref:Orleans.Configuration.LoadSheddingOptions.LoadSheddingEnabled> to `true` to activate load shedding. <xref:Orleans.Configuration.LoadSheddingOptions.CpuThreshold> defaults to 95 percent and <xref:Orleans.Configuration.LoadSheddingOptions.MemoryThreshold> defaults to 90 percent. Crossing either threshold marks the silo's published runtime statistics as overloaded. The client gateway and stream providers can reject supported work. Resource-optimized placement favors compatible silos with non-overloaded statistics.
+Set <xref:Orleans.Configuration.LoadSheddingOptions.LoadSheddingEnabled> to `true` to activate load shedding. <xref:Orleans.Configuration.LoadSheddingOptions.CpuThreshold> defaults to 95 percent and <xref:Orleans.Configuration.LoadSheddingOptions.MemoryThreshold> defaults to 90 percent. Crossing either threshold marks the silo's published runtime statistics as overloaded and enables client-gateway request rejection. Stream providers which use `LoadShedQueueFlowController` pause queue reads according to CPU usage. Resource-optimized placement favors compatible silos with non-overloaded statistics.
 
 Use load shedding as one layer of admission control alongside bounded work and deadlines. Use a hosting-platform autoscaler to create capacity, activation rebalancing or repartitioning to move eligible activations, and [memory-based activation shedding](../host/configuration-guide/activation-collection.md#enable-memory-based-activation-shedding) to deactivate activations under memory pressure.
 
@@ -133,6 +133,6 @@ Implementation: [`ActivationRepartitioner`](https://github.com/dotnet/orleans/bl
 | Resource-optimized placement | Activation creation | CPU, memory, capacity, activation count | Places the new activation |
 | Activation rebalancer | Opt-in balancing sessions | Cluster resource imbalance | Random eligible activations |
 | Activation repartitioner | Opt-in exchange rounds | Grain call graph and tolerance rule | Communication-aware activations |
-| Load shedding | CPU or memory threshold exceeded | Local CPU and memory use | Rejects supported work and marks the silo overloaded |
+| Load shedding | CPU or memory threshold exceeded | Local CPU and memory use | Rejects gateway requests, controls stream queue reads using CPU, and marks the silo overloaded |
 
 Resource-optimized placement is the default and is usually the first mechanism to tune. Add the activation rebalancer for persistent count or memory skew and the repartitioner for call-locality problems after measuring the workload. Enable load shedding for overload protection. The experimental movement protocols use [activation migration](activation-lifecycle.md). Apply capacity planning, admission control, and deployment health monitoring alongside these runtime mechanisms. Operational guidance belongs in the [deployment section](../deployment/index.md).

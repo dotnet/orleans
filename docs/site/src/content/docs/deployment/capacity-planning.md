@@ -61,10 +61,10 @@ Unlimited queues convert overload into high latency and memory pressure. Apply:
 - Admission control at application ingress.
 - Bounded queues and concurrency.
 - Request deadlines that include downstream calls.
-- <xref:Orleans.Configuration.LoadSheddingOptions> at the client gateway and stream providers before the process becomes unresponsive.
+- Client-gateway request rejection and stream queue flow control through <xref:Orleans.Configuration.LoadSheddingOptions>.
 - Per-tenant or per-key limits where one workload can starve others.
 
-Set <xref:Orleans.Configuration.LoadSheddingOptions.LoadSheddingEnabled> to `true` to activate runtime load shedding. It marks a silo overloaded after the configured CPU or memory threshold is exceeded, allows supported ingress work to be rejected, and causes resource-optimized placement to choose other candidates for new activations. Configure thresholds below hard platform limits, validate rejection and recovery behavior under load, and use a hosting-platform autoscaler to adjust cluster capacity.
+Set <xref:Orleans.Configuration.LoadSheddingOptions.LoadSheddingEnabled> to `true` to activate runtime load shedding. Crossing its CPU or memory threshold marks the silo overloaded, enables client-gateway request rejection, and makes resource-optimized placement favor non-overloaded candidates. Stream queue flow control uses CPU thresholds to pause reads. Configure thresholds below hard platform limits, validate rejection and recovery behavior under load, and use a hosting-platform autoscaler to adjust cluster capacity.
 
 Retries consume capacity. Include retry traffic in the load model and use exponential backoff with jitter, a retry budget, and an end-to-end deadline.
 

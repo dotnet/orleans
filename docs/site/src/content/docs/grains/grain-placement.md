@@ -22,13 +22,13 @@ Placement, collection, migration, and load shedding solve different problems:
 | An activation remains idle | Collects it after the configured idle period. A later call runs placement again, so the replacement activation can use newly added capacity. |
 | A silo leaves or fails | Removes its activations. Calls are routed to activations on remaining silos or cause replacement activations to be placed there. |
 | Explicit or automatic migration is requested | Moves an eligible live activation after its current work completes. Cluster-wide automatic migration is experimental and opt-in. |
-| A silo is overloaded | Resource-optimized placement directs new activations to other candidates and enabled load shedding can reject supported ingress work. |
+| Enabled load shedding marks a silo overloaded | The client gateway rejects requests, stream queue flow control pauses reads at its CPU threshold, and resource-optimized placement favors non-overloaded candidates. |
 
 A hosting platform or operator controls the silo count. Orleans adapts placement and routing to the resulting membership.
 
 ## Default placement
 
-<xref:Orleans.Runtime.ResourceOptimizedPlacement> is the default placement strategy. It uses sampled silo runtime statistics and a power-of-k-choices algorithm to balance new activations while avoiding overloaded silos. It considers CPU, memory, available memory, activation count, and a preference for the local silo.
+<xref:Orleans.Runtime.ResourceOptimizedPlacement> is the default placement strategy. It uses sampled silo runtime statistics and a power-of-k-choices algorithm to balance new activations. It considers CPU, memory, available memory, activation count, and a preference for the local silo. When load shedding marks silos overloaded, placement favors non-overloaded candidates.
 
 For design background on its resource scoring and signal smoothing, see [Resource-based placement with cooperative dual-mode Kalman filtering](https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/).
 
@@ -53,15 +53,15 @@ Live activation migration transfers runtime migration state directly to the targ
 
 ## Load shedding
 
-<xref:Orleans.Configuration.LoadSheddingOptions> is disabled by default. When enabled, its CPU and memory thresholds mark a silo as overloaded. The client gateway and stream providers can shed supported work, and resource-optimized placement excludes overloaded silos from new-activation candidates when alternatives are available.
+Set <xref:Orleans.Configuration.LoadSheddingOptions.LoadSheddingEnabled> to `true` to activate load shedding. Crossing either the CPU or memory threshold marks the silo as overloaded, enables client-gateway request rejection, and makes resource-optimized placement favor non-overloaded candidates. Stream providers which use `LoadShedQueueFlowController` pause queue reads according to CPU usage.
 
-Configure it on every silo, choosing thresholds from measured headroom rather than copying the example values:
+Configure it on every silo and choose thresholds from measured headroom:
 
 :::code language="csharp" source="../snippets/compiled/Grains/PlacementSnippets.cs" id="configure_load_shedding":::
 
 Use load shedding for admission protection, a hosting-platform autoscaler for cluster capacity, and activation rebalancing or repartitioning for eligible activation movement. Set thresholds below the platform's hard limits, retain headroom for deactivation and recovery work, and monitor rejection rate with CPU, memory, queueing, and latency signals.
 
-Request load shedding rejects supported ingress work after CPU or memory crosses a threshold. [Memory-based activation shedding](../host/configuration-guide/activation-collection.md#enable-memory-based-activation-shedding) deactivates selected activations to reduce process memory.
+Gateway load shedding rejects incoming requests after CPU or memory crosses its threshold. Stream queue flow control uses CPU thresholds to pause reads. [Memory-based activation shedding](../host/configuration-guide/activation-collection.md#enable-memory-based-activation-shedding) deactivates selected activations to reduce process memory.
 
 ## Per-grain strategies
 
