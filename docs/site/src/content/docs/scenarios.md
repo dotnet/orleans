@@ -27,45 +27,65 @@ Scalability comes from grain boundaries, key distribution, call patterns, storag
 
 ## Common scenarios
 
-### Multiplayer games and presence
-
-Players, game sessions, rooms, parties, and matches have natural identities and typically own mutable state. Grains can serialize operations for each entity, coordinate interactions through grain calls, and notify connected clients through observers or streams.
-
-Use Orleans for authoritative game and social state, matchmaking coordination, presence, and session lifecycle. Keep latency-critical simulation, rendering, and other CPU-intensive loops in an execution model designed for that work.
-
-See the [Adventure game](tutorials-and-samples/adventure.md) explanation and the maintained [Presence Service sample](https://github.com/dotnet/orleans/tree/main/samples/Presence).
-
-### Devices and digital twins
-
-A grain per device can maintain last-known state, apply commands in order, manage configuration, and coordinate periodic or scheduled work. Grain identity lets callers address devices directly while Orleans resolves their current hosts, and persistence restores explicitly written state after reactivation.
-
-Grains can consume selected telemetry events and own the stateful behavior of each device. Brokers, time-series stores, and stream-processing systems provide high-volume ingestion, long-term retention, and fleet-wide analytics for the surrounding telemetry pipeline.
-
-The [GPS Tracker sample](https://github.com/dotnet/orleans/tree/main/samples/GPSTracker) models devices as grains and integrates Orleans with ASP.NET Core SignalR.
-
-### Commerce, accounts, and business processes
-
-Shopping carts, orders, accounts, reservations, and similar entities often have clear ownership boundaries and rules which must hold for one key. A grain can keep those rules with the state they protect, persist changes deliberately, and use reminders or durable jobs for later work.
-
-Orleans supports distributed ACID transactions for operations spanning supported transactional state across multiple entities. Idempotent commands, explicit coordination, and reconciliation support workflows whose consistency model permits independent state transitions.
-
-See the [Shopping Cart sample](https://github.com/dotnet/orleans/tree/main/samples/ShoppingCart), the [Bank Account transactions sample](https://github.com/dotnet/orleans/tree/main/samples/BankAccount), and [Orleans transactions](grains/transactions.md).
-
-### Collaboration, messaging, and live sessions
-
-Rooms, channels, documents, users, and sessions can be independently addressed and can retain behavior between client requests. Grain observers fit transient callbacks to connected clients, while Orleans streams fit multicast event flows and subscriptions whose guarantees depend on the selected provider.
-
-Use a dedicated broker or storage system when the primary requirement is durable message retention, competing consumers, large broadcast fan-out, or analytics over the full event history. Orleans can complement those systems by applying per-entity state and behavior to selected events.
-
-The [Chat Room sample](https://github.com/dotnet/orleans/tree/main/samples/ChatRoom) combines a grain per channel with Orleans streams.
-
 ### AI agents and conversational sessions
 
 An AI agent session is a natural grain identity. A session grain can own conversation state, model and tool configuration, pending work, and coordination with other agents or services. Orleans activates sessions on demand, removes idle activations, routes each request to the current activation, and processes turns one at a time by default. This provides lifecycle management and serializes concurrent session updates.
 
-Model inference and tool calls are typically asynchronous external operations. A grain can await them efficiently, use [response streaming](grains/response-streaming.md) to return generated tokens or progress during a live invocation, and use timers, reminders, or durable jobs to schedule later work. A stream provider with retention and replay capabilities, or durable storage, can retain output for reconnection and later consumption.
+Model inference and tool calls are typically asynchronous external operations. A grain can await them efficiently, use [response streaming](grains/response-streaming.md) to return generated tokens or progress during one live invocation, and use timers, reminders, or durable jobs to schedule later work. A stream provider with retention and replay capabilities, or durable storage, can retain output for reconnection and later consumption.
 
 After membership converges following a silo failure, a later request can reactivate the session on a healthy silo, and [grain persistence](grains/grain-persistence/index.md) restores state written to durable storage. Explicit durability points, idempotent tool calls, bounded retries, and reconciliation preserve application-level outcomes across failures.
+
+### Fraud protection, risk, and low-latency decisioning
+
+Fraud protection, financial services, actuarial systems, and regulated online gaming often make decisions from rapidly changing state. A grain can maintain low-latency *soft state*: reconstructible in-memory working data derived from durable records, event streams, market feeds, or model outputs. Turn-based execution keeps each entity's updates and decisions ordered.
+
+Account, payment instrument, merchant, policy, portfolio, market, and gaming-event grains can track recent activity, risk signals, limits, exposure, and current odds. Grain calls coordinate decisions across related entities, while streams distribute changing inputs and outputs. Durable stores and event logs retain the authoritative history used to rebuild working state and support audit.
+
+The same pattern supports real-time pricing, auctions, inventory allocation, recommendations, and other decisions which combine an entity's current context with incoming events. Parallel compute and data platforms can produce models or large analytical results which grains apply during online decisioning.
+
+The [Stocks sample](https://github.com/dotnet/orleans/tree/main/samples/Stocks) demonstrates per-symbol temporary caching and periodic updates. The [Bank Account transactions sample](https://github.com/dotnet/orleans/tree/main/samples/BankAccount) demonstrates coordinated state changes across accounts.
+
+### Internet of Things and digital twins
+
+Internet of Things (IoT) devices, vehicles, sensors, industrial assets, robots, buildings, and edge gateways have stable identities and evolving state. A grain per asset can maintain last-known state, apply commands in order, manage configuration, evaluate local rules, and coordinate periodic or scheduled work. Grain identity lets callers address each asset directly while Orleans resolves its current host, and persistence restores explicitly written state after reactivation.
+
+Grains can consume selected telemetry events and own the stateful behavior of each asset. Brokers, time-series stores, and stream-processing systems provide high-volume ingestion, long-term retention, fleet-wide analytics, and model training for the surrounding telemetry pipeline.
+
+The [GPS Tracker sample](https://github.com/dotnet/orleans/tree/main/samples/GPSTracker) models IoT devices as grains and integrates Orleans with ASP.NET Core SignalR.
+
+### Monitoring, resource governance, and job orchestration
+
+Servers, services, containers, clusters, tenants, quotas, jobs, and hardware resources map naturally to grains. A resource grain can combine heartbeats, health signals, desired configuration, capacity, reservations, and remediation state. Timers detect stale health reports, reminders trigger recurring checks, and durable jobs schedule one-time follow-up actions.
+
+Job grains can own submission state, dependencies, retries, progress, and completion. Resource grains can own hardware availability and allocation. Partitioned scheduler grains match jobs to eligible resources, and external workers execute assigned work and report status through grain calls or streams. Stable grain identities let operators and automation address the same job or resource throughout its lifecycle.
+
+This model supports fleet health monitoring, automated remediation, quota enforcement, workload placement, batch and build farms, and orchestration across specialized hardware. [Heterogeneous silos](host/heterogeneous-silos.md) and [placement filtering](grains/grain-placement-filtering.md) also direct Orleans grain workloads to hosts with specific capabilities.
+
+### Multiplayer and online games
+
+Players, game sessions, rooms, parties, matches, tournaments, and leaderboards have natural identities and typically own mutable state. Grains can serialize operations for each entity, coordinate interactions through grain calls, and notify connected clients through observers or streams.
+
+Use Orleans for authoritative game and social state, matchmaking coordination, presence, progression, and session lifecycle. Real-time simulation, rendering, and other CPU-intensive loops can run in specialized compute services while grains coordinate durable and interactive state.
+
+See the [Adventure game](tutorials-and-samples/adventure.md) explanation and the maintained [Presence Service sample](https://github.com/dotnet/orleans/tree/main/samples/Presence).
+
+### Commerce, reservations, and customer services
+
+Shopping carts, orders, accounts, reservations, subscriptions, and customer profiles often have clear ownership boundaries and rules which must hold for one key. A grain can keep those rules with the state they protect, persist changes deliberately, and use reminders or durable jobs for later work.
+
+Per-user grains can maintain preferences, session context, entitlements, notification state, quotas, and recent interactions for responsive personalization. Recommendation and search services can provide ranked results which the grain combines with current user and business state.
+
+Orleans supports distributed ACID transactions for operations spanning supported transactional state across multiple entities. Idempotent commands, explicit coordination, and reconciliation support workflows whose consistency model permits independent state transitions.
+
+See the [Shopping Cart sample](https://github.com/dotnet/orleans/tree/main/samples/ShoppingCart) and [Orleans transactions](grains/transactions.md).
+
+### Collaboration, social applications, and live sessions
+
+Rooms, channels, documents, users, social profiles, and sessions can be independently addressed and can retain behavior between client requests. Grain observers fit transient callbacks to connected clients, while Orleans streams fit multicast event flows and subscriptions whose guarantees depend on the selected provider.
+
+Brokers and storage systems provide durable message retention, competing consumers, large broadcast fan-out, and analytics over full event histories. Grains apply per-entity state and behavior to selected events and coordinate live interactions.
+
+The [Chat Room sample](https://github.com/dotnet/orleans/tree/main/samples/ChatRoom) combines a grain per channel with Orleans streams. The [Chirper sample](https://github.com/dotnet/orleans/tree/main/samples/Chirper) models a social network with user grains, persistence, and observers.
 
 ### Per-entity orchestration
 
