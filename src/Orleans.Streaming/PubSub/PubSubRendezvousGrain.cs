@@ -199,7 +199,9 @@ namespace Orleans.Streams
                 return (true, false);
             }
 
-            var siloAddresses = systemTargetProducers?.Select(producer => producer.SiloAddress).ToList() ?? [];
+            HashSet<SiloAddress> siloAddresses = systemTargetProducers is null
+                ? []
+                : [.. systemTargetProducers.Select(producer => producer.SiloAddress)];
             if (registeringSiloAddress is not null)
             {
                 siloAddresses.Add(registeringSiloAddress);
@@ -207,7 +209,8 @@ namespace Orleans.Streams
 
             var statuses = await _unknownSiloStatusCache.GetSiloStatuses(
                 membershipSnapshot,
-                siloAddresses);
+                siloAddresses,
+                CancellationToken.None);
             List<PubSubPublisherState>? removedProducers = null;
             if (systemTargetProducers is not null)
             {

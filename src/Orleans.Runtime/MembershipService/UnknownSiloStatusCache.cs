@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -27,11 +26,12 @@ internal sealed partial class UnknownSiloStatusCache
 
     public async ValueTask<Dictionary<SiloAddress, SiloStatus>> GetSiloStatuses(
         ClusterMembershipSnapshot snapshot,
-        IEnumerable<SiloAddress> siloAddresses)
+        IReadOnlySet<SiloAddress> siloAddresses,
+        CancellationToken cancellationToken)
     {
         var result = new Dictionary<SiloAddress, SiloStatus>();
         List<SiloAddress>? unknownSilos = null;
-        foreach (var siloAddress in siloAddresses.Distinct())
+        foreach (var siloAddress in siloAddresses)
         {
             var status = snapshot.GetSiloStatus(siloAddress);
             if (status != SiloStatus.None)
@@ -59,7 +59,7 @@ internal sealed partial class UnknownSiloStatusCache
         {
             await _membershipManager.Refresh(
                 targetVersion: null,
-                cancellationToken: CancellationToken.None,
+                cancellationToken,
                 requireFresh: true);
 
             var refreshedSnapshot = _membershipManager.CurrentSnapshot;
@@ -75,7 +75,7 @@ internal sealed partial class UnknownSiloStatusCache
                 result.Add(siloAddress, status);
             }
         }
-        catch (Exception exception)
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
             LogWarningUnableToValidateUnknownSilos(_logger, exception);
             foreach (var siloAddress in unknownSilos)

@@ -22,7 +22,10 @@ public class UnknownSiloStatusCacheTests
         var secondSilo = CreateSiloAddress(port: 11112);
         var snapshot = CreateSnapshot(1);
 
-        var statuses = await cache.GetSiloStatuses(snapshot, [firstSilo, secondSilo]);
+        var statuses = await cache.GetSiloStatuses(
+            snapshot,
+            SiloAddresses(firstSilo, secondSilo),
+            CancellationToken.None);
 
         Assert.Equal(SiloStatus.Dead, statuses[firstSilo]);
         Assert.Equal(SiloStatus.Dead, statuses[secondSilo]);
@@ -37,10 +40,16 @@ public class UnknownSiloStatusCacheTests
         var silo = CreateSiloAddress();
         var unknownSnapshot = CreateSnapshot(1);
 
-        Assert.Equal(SiloStatus.Dead, (await cache.GetSiloStatuses(unknownSnapshot, [silo]))[silo]);
+        Assert.Equal(
+            SiloStatus.Dead,
+            (await cache.GetSiloStatuses(unknownSnapshot, SiloAddresses(silo), CancellationToken.None))[silo]);
         var activeSnapshot = CreateSnapshot(1, new ClusterMember(silo, SiloStatus.Active, "silo"));
-        Assert.Equal(SiloStatus.Active, (await cache.GetSiloStatuses(activeSnapshot, [silo]))[silo]);
-        Assert.Equal(SiloStatus.Dead, (await cache.GetSiloStatuses(unknownSnapshot, [silo]))[silo]);
+        Assert.Equal(
+            SiloStatus.Active,
+            (await cache.GetSiloStatuses(activeSnapshot, SiloAddresses(silo), CancellationToken.None))[silo]);
+        Assert.Equal(
+            SiloStatus.Dead,
+            (await cache.GetSiloStatuses(unknownSnapshot, SiloAddresses(silo), CancellationToken.None))[silo]);
         Assert.Equal(2, membershipManager.SourceRefreshCount);
     }
 
@@ -52,8 +61,25 @@ public class UnknownSiloStatusCacheTests
         var silo = CreateSiloAddress();
         var snapshot = CreateSnapshot(1, new ClusterMember(silo, SiloStatus.Dead, "silo"));
 
-        Assert.Equal(SiloStatus.Dead, (await cache.GetSiloStatuses(snapshot, [silo]))[silo]);
+        Assert.Equal(
+            SiloStatus.Dead,
+            (await cache.GetSiloStatuses(snapshot, SiloAddresses(silo), CancellationToken.None))[silo]);
         Assert.Equal(0, membershipManager.SourceRefreshCount);
+    }
+
+    [Fact]
+    public async Task CancellationIsPropagatedToSourceRefresh()
+    {
+        var membershipManager = new TestMembershipManager(CreateMembershipTableSnapshot(1));
+        var cache = new UnknownSiloStatusCache(membershipManager, NullLogger<UnknownSiloStatusCache>.Instance);
+        var cancellation = new CancellationToken(canceled: true);
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => cache.GetSiloStatuses(
+                CreateSnapshot(1),
+                SiloAddresses(CreateSiloAddress()),
+                cancellation).AsTask());
+        Assert.Equal(cancellation, membershipManager.LastRefreshCancellationToken);
     }
 
     private static ClusterMembershipSnapshot CreateSnapshot(long version, params ClusterMember[] members) =>
@@ -65,9 +91,13 @@ public class UnknownSiloStatusCacheTests
     private static SiloAddress CreateSiloAddress(int port = 11111) =>
         SiloAddress.New(new IPEndPoint(IPAddress.Loopback, port), 1);
 
+    private static HashSet<SiloAddress> SiloAddresses(params SiloAddress[] addresses) => [.. addresses];
+
     private sealed class TestMembershipManager(MembershipTableSnapshot snapshot) : IMembershipManager
     {
         public int SourceRefreshCount { get; private set; }
+
+        public CancellationToken LastRefreshCancellationToken { get; private set; }
 
         public MembershipTableSnapshot CurrentSnapshot { get; } = snapshot;
 
@@ -80,6 +110,8 @@ public class UnknownSiloStatusCacheTests
             CancellationToken cancellationToken,
             bool requireFresh = false)
         {
+            LastRefreshCancellationToken = cancellationToken;
+            cancellationToken.ThrowIfCancellationRequested();
             if (requireFresh)
             {
                 SourceRefreshCount++;
