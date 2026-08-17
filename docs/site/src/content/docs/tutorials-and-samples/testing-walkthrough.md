@@ -7,7 +7,7 @@ ms.topic: tutorial
 
 # Test an Orleans application end to end
 
-This walkthrough builds a test suite in layers: pure logic tests, a real in-process Orleans cluster, a shared cluster fixture, and a topology change. The complete, buildable source is in the documentation's `grains/snippets/testing/orleans-testing` project.
+This walkthrough builds Orleans runtime tests in layers: a first in-process cluster test, a shared cluster fixture, and a topology change. The complete, buildable source is in the documentation's `grains/snippets/testing/orleans-testing` project.
 
 ## Choose the right boundary
 

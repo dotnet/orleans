@@ -60,7 +60,7 @@ async function walk(directory, predicate = () => true) {
 }
 
 export async function collectXmlDocumentationExternalUrls(sourceRoot) {
-  const urls = new Set();
+  const urls = new Map();
 
   async function visit(directory) {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -74,7 +74,13 @@ export async function collectXmlDocumentationExternalUrls(sourceRoot) {
         for (const match of source.matchAll(
           /<(?:see|seealso)\b[^>]*\bhref\s*=\s*["'](https?:\/\/[^"']+)["']/gi,
         )) {
-          urls.add(match[1]);
+          const references = urls.get(match[1]) ?? [];
+          references.push({
+            relativeFile: toPosix(path.relative(sourceRoot, entryPath)),
+            line:
+              (source.slice(0, match.index ?? 0).match(/\n/g)?.length ?? 0) + 1,
+          });
+          urls.set(match[1], references);
         }
       }
     }
@@ -1094,7 +1100,7 @@ async function probeOnce(url, options) {
 export async function probeExternalTargets({
   externalTargets,
   allowlist = { urls: {} },
-  allowlistReferences = new Set(),
+  allowlistReferences = new Map(),
   requestImpl = pinnedHttpRequest,
   lookupImpl = dnsLookup,
   concurrency = 8,
@@ -1130,7 +1136,12 @@ export async function probeExternalTargets({
       );
     }
   }
-  const entries = [...externalTargets.entries()].filter(
+  const probeTargets = new Map(externalTargets);
+  for (const [url, references] of allowlistReferences) {
+    if (!Object.hasOwn(allowlist.urls ?? {}, url)) continue;
+    probeTargets.set(url, [...(probeTargets.get(url) ?? []), ...references]);
+  }
+  const entries = [...probeTargets.entries()].filter(
     ([url]) =>
       !Object.hasOwn(allowlist.urls ?? {}, url) || validAllowlistUrls.has(url),
   );

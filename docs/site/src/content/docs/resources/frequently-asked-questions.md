@@ -59,7 +59,7 @@ Model a grain around a domain entity or consistency boundary. A grain is probabl
 
 ### Does Orleans replicate grain state automatically?
 
-An ordinary stateful grain normally has one activation in the cluster. Volatile state follows that process lifetime. A configured storage provider and successful grain writes provide durable recovery. Applications design and operate any replicas or caches required by their workload.
+An ordinary stateful grain normally has one activation in the cluster. Volatile state follows that activation's lifetime and is discarded when the activation deactivates, migrates, or fails. A configured storage provider and successful grain writes provide durable recovery. Applications design and operate any replicas or caches required by their workload.
 
 ### How do I avoid hot grains?
 

@@ -43,7 +43,16 @@ test('collects external URLs from C# XML documentation', async () => {
   );
 
   await expect(collectXmlDocumentationExternalUrls(sourceRoot)).resolves.toEqual(
-    new Set(['https://example.com/reference', 'https://example.com/other']),
+    new Map([
+      [
+        'https://example.com/reference',
+        [{ relativeFile: 'nested/Example.cs', line: 1 }],
+      ],
+      [
+        'https://example.com/other',
+        [{ relativeFile: 'nested/Example.cs', line: 1 }],
+      ],
+    ]),
   );
 });
 
@@ -922,14 +931,19 @@ describe('external link audit', () => {
           'https://example.com/stale': 'This exact target is no longer referenced anywhere.',
         },
       },
-      allowlistReferences: new Set([xmlDocumentationUrl]),
+      allowlistReferences: new Map([
+        [
+          xmlDocumentationUrl,
+          [{ relativeFile: 'ApiExample.cs', line: 10 }],
+        ],
+      ]),
       lookupImpl: async () => [{ address: '8.8.8.8', family: 4 }],
       requestImpl: async (target) =>
         response(target.pathname === '/reachable' ? 200 : 403),
       retries: 0,
     });
 
-    expect(result.probed).toBe(2);
+    expect(result.probed).toBe(3);
     expect(result.warnings).toContainEqual(expect.stringContaining('Allowlisted'));
     expect(result.failures).toEqual(
       expect.arrayContaining([
