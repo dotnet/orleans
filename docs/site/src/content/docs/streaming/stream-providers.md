@@ -80,4 +80,4 @@ Register [Redis Streams](https://redis.io/docs/latest/develop/data-types/streams
 
 <a id="queue-adapters"></a>
 
-<xref:Orleans.Providers.Streams.Common.PersistentStreamProvider> hosts providers built on <xref:Orleans.Streams.IQueueAdapter>. A custom adapter supplies enqueue/dequeue behavior, queue mapping, rewindability, and failure handling while Orleans supplies pulling agents, subscription routing, and caches. See [stream implementation architecture](../implementation/streams-implementation/index.md) before building one.
+<xref:Orleans.Providers.Streams.Common.PersistentStreamProvider> hosts providers built on <xref:Orleans.Streams.IQueueAdapter>. A custom adapter supplies enqueue/dequeue behavior, queue mapping, rewindability, and failure handling while Orleans supplies pulling agents, subscription routing, and caches. See [Write a custom persistent-stream queue adapter](custom-queue-adapter.md) for an implementation guide and [stream implementation architecture](../implementation/streams-implementation/index.md) for the runtime design.
