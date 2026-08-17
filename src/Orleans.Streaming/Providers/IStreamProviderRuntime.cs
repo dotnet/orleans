@@ -58,7 +58,8 @@ namespace Orleans.Streams
         ExplicitGrainBasedOnly,
 
         /// <summary>
-        /// Supports only implicit subscriptions declared on grain types. Attempts to create explicit subscriptions will fail.
+        /// Supports implicit subscriptions declared on grain types and resolves them from grain metadata for minimum pub/sub control-plane overhead.
+        /// Explicit subscriptions use <see cref="ExplicitGrainBasedAndImplicit"/> or <see cref="ExplicitGrainBasedOnly"/>.
         /// </summary>
         ImplicitOnly,
     }
