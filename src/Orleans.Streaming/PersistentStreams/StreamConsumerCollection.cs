@@ -23,14 +23,6 @@ namespace Orleans.Streams
         [NonSerialized]
         public Task? RegistrationTask;
 
-        // Retains the first cached token until subscriptions discovered after producer registration
-        // have attached their cursors.
-        [NonSerialized]
-        public StreamSequenceToken? PendingStartToken;
-
-        [NonSerialized]
-        public IQueueCacheCursor? RegistrationPin;
-
         public StreamConsumerCollection(DateTime now)
         {
             queueData = new Dictionary<GuidId, StreamConsumerData>();
@@ -39,10 +31,7 @@ namespace Orleans.Streams
 
         public StreamConsumerData AddConsumer(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string? filterData, DateTime now)
         {
-            var consumerData = new StreamConsumerData(subscriptionId, streamId, streamConsumer, filterData)
-            {
-                PendingStartToken = PendingStartToken
-            };
+            var consumerData = new StreamConsumerData(subscriptionId, streamId, streamConsumer, filterData);
             queueData.Add(subscriptionId, consumerData);
             lastActivityTime = now;
             return consumerData;
@@ -73,21 +62,12 @@ namespace Orleans.Streams
 
         public void DisposeAll(ILogger logger)
         {
-            ReleaseRegistrationPin();
             foreach (StreamConsumerData consumer in queueData.Values)
             {
                 consumer.SafeDisposeCursor(logger);
             }
             queueData.Clear();
         }
-
-        public void ReleaseRegistrationPin()
-        {
-            RegistrationPin?.Dispose();
-            RegistrationPin = null;
-            PendingStartToken = null;
-        }
-
 
         public int Count
         {
