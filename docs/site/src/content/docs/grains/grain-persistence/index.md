@@ -55,7 +55,7 @@ Configure every provider name referenced by `[PersistentState]` on the silo:
 
 The state name distinguishes records owned by the same grain. The provider name selects a keyed <xref:Orleans.Storage.IGrainStorage> registration. Different records aren't required to share a provider or backing store.
 
-When `[PersistentState]` omits the storage name, Orleans resolves the default <xref:Orleans.Storage.IGrainStorage> registration instead. Configure that registration with the provider's `Add*GrainStorageAsDefault` extension, or pass <xref:Orleans.Runtime.ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME> (`"Default"`) to the corresponding `Add*GrainStorage` extension. Any other name only adds that named provider; it doesn't configure a default.
+When `[PersistentState]` omits the storage name, Orleans resolves the default <xref:Orleans.Storage.IGrainStorage> registration instead. Configure that registration with the provider's `Add*GrainStorageAsDefault` extension, or pass <xref:Orleans.Providers.ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME> (`"Default"`) to the corresponding `Add*GrainStorage` extension. Any other name only adds that named provider; it doesn't configure a default.
 
 Default and named registrations represent separate roles even when they use the same provider type and backing database. For example, grain-based stream pub/sub conventionally uses the named provider `PubSubStore`, independently of the default provider used by grain state. Register both roles when a silo needs both:
 
