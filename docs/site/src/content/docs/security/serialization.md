@@ -1,19 +1,19 @@
 ---
 title: Serialization security
 description: Limit the Orleans serializer type surface and validate data received from clients and storage.
-ms.date: 08/12/2026
+ms.date: 08/17/2026
 ms.topic: concept-article
 ---
 
 # Serialization security
 
-Orleans serializes grain calls, responses, request context, persisted state, reminders, and stream data. Serialization reconstructs application objects from bytes supplied by another process or provider. It doesn't authenticate the sender, authorize the requested operation, validate application invariants, encrypt data, or prove that stored data hasn't been modified.
+Orleans serializes grain calls, responses, request context, persisted state, reminders, and stream data. Serialization reconstructs application objects from bytes supplied by another process or provider. TLS and provider authentication establish source identity, application policy authorizes the operation, domain validation enforces invariants, and provider controls protect stored bytes.
 
 Limit who can supply serialized input using [network controls](networking.md), [TLS](../host/transport-layer-security.md), provider authentication, and application authorization. Then keep the set of types and data accepted by each boundary as narrow as possible.
 
 ## Keep type-name resolution restricted
 
-Orleans-generated serializers use the application's known type manifest. External serializers can support types which include runtime type names, particularly in polymorphic contracts. Registering an external serializer selects a codec; it doesn't authorize every CLR type that codec could resolve.
+Orleans-generated serializers use the application's known type manifest. External serializers can support types which include runtime type names, particularly in polymorphic contracts. Registering an external serializer selects a codec, while the type policy determines which CLR types the codec may resolve.
 
 <xref:Orleans.Serialization.Configuration.TypeManifestOptions.AllowAllTypes?displayProperty=nameWithType> defaults to `false`. Preserve that default when any connected client, stream, queue, or storage system can be influenced by a less-trusted party. Enabling it bypasses Orleans type-name validation and permits any resolvable type.
 
@@ -23,7 +23,7 @@ Use the narrowest applicable mechanism:
 
 1. Prefer generated serializers and explicit grain contracts for types the application owns.
 1. Add individual polymorphic types with <xref:Orleans.Serialization.Configuration.TypeManifestOptions.AddAllowedType*>.
-1. Allow an assembly only when every relevant type in that assembly belongs inside the same trust boundary.
+1. Allow assemblies whose relevant types belong inside the same trust boundary.
 1. Implement <xref:Orleans.Serialization.ITypeNameFilter> or <xref:Orleans.Serialization.ITypeFilter> when trust requires an explicit policy.
 
 A denial from a registered type-name filter takes precedence over assembly trust. Constructed generic arguments and array element types are checked independently, so all components must be trusted. See [configure serialization](../host/configuration-guide/serialization-configuration.md#authorize-type-name-resolution) for the supported APIs and examples.
@@ -32,9 +32,9 @@ A denial from a registered type-name filter takes precedence over assembly trust
 
 Custom and generalized codecs execute inside the Orleans process. Review them as application code which processes untrusted data:
 
-- Restrict `IsSupportedType` predicates to the intended contracts. A namespace-prefix predicate is selection logic, not authorization.
-- Reject malformed, truncated, oversized, or semantically invalid values without partially applying state changes.
-- Bound collection sizes, nesting, allocations, and CPU work for formats which don't already enforce suitable limits.
+- Restrict `IsSupportedType` predicates to the intended contracts, and pair namespace-prefix selection with an explicit type policy.
+- Reject malformed, truncated, oversized, or semantically invalid values and preserve the previous state.
+- Bound collection sizes, nesting, allocations, and CPU work at the codec or application boundary.
 - Avoid type-name handling, reflection, callbacks, or constructors that expand the accepted surface beyond the configured policy.
 - Configure the same compatible serializer policy on every silo and client which handles the contract.
 
@@ -42,10 +42,10 @@ The [serialization customization guidance](../host/configuration-guide/serializa
 
 ## Validate application data after deserialization
 
-Successfully deserialized data isn't necessarily valid or authorized. Validate identifiers, lengths, ranges, state transitions, tenant ownership, and other domain invariants before changing grain state or invoking dependencies.
+Successful deserialization confirms that bytes match the configured format and type policy. Validate identifiers, lengths, ranges, state transitions, tenant ownership, and other domain invariants before changing grain state or invoking dependencies.
 
-Use dedicated request data-transfer types instead of passing provider SDK objects, credentials, service containers, or broad domain graphs across grain interfaces. Don't include secrets in exception messages, request context, grain keys, or fields which telemetry and dashboard tooling can display.
+Use dedicated request data-transfer types with the fields required by each grain operation. Keep provider SDK objects, credentials, service containers, and broad domain graphs inside their owning process, and keep secrets in protected stores that stay outside exception messages, request context, grain keys, telemetry, and dashboard-visible fields.
 
-Persisted state and queued stream data should be treated according to the provider's trust boundary. Use least-privileged provider identities, encryption and integrity controls supplied by the platform, and separate storage for environments or tenants that require isolation. A serializer allow list reduces the type-resolution surface; it doesn't make a compromised provider trustworthy.
+Persisted state and queued stream data follow the provider's trust boundary. Use least-privileged provider identities, encryption and integrity controls supplied by the platform, and separate storage for environments or tenants that require isolation. A serializer allow list reduces the type-resolution surface, while provider authentication and integrity controls establish the provenance of stored data.
 
 For caller and operation controls around serialized grain calls, see [client and grain-call security](authentication-authorization.md).
