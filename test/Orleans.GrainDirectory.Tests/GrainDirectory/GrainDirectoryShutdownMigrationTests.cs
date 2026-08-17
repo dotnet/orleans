@@ -178,7 +178,11 @@ public sealed class ShutdownMigrationGrain : Grain, IShutdownMigrationGrain, IGr
                 await ShutdownMigrationTestCoordinator.WaitForDirectoryHandoff(cancellationToken);
             }
 
-            this.MigrateOnIdle();
+            // A migration must not honor a hint targeting the shutting-down source silo.
+            GrainContext.Migrate(new()
+            {
+                [IPlacementDirector.PlacementHintKey] = GrainContext.Address.SiloAddress!
+            });
         }
 
         await base.OnDeactivateAsync(reason, cancellationToken);
