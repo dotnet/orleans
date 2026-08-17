@@ -275,9 +275,10 @@ public class TransactionQueueStorageWorkTests
 
         failFirstStore.TrySetResult(null);
         await firstRestoreStarted.Task;
+        var backgroundWork = queue.WaitForBackgroundWorkAsync();
         failFirstRestore.TrySetResult(null);
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(queue.WaitForBackgroundWorkAsync);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => backgroundWork);
         Assert.Equal("restore failed", exception.Message);
         Assert.Same(replacementBatch, queue.CurrentStorageBatch);
         Assert.False(replacementCompleted.Task.IsCompleted);
