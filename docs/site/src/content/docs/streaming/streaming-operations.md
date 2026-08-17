@@ -1,7 +1,7 @@
 ---
 title: Operate and tune Orleans streams
 description: Apply backpressure, tune persistent providers, and observe Orleans streaming health.
-ms.date: 08/02/2026
+ms.date: 08/17/2026
 ms.topic: concept-article
 ---
 
@@ -21,6 +21,20 @@ Keep consumer turns bounded:
 - Scale by choosing enough provider queues or partitions and by distributing stream keys. One hot stream targeting one stateful grain remains limited by that grain's processing rate.
 
 Backpressure on the consumer side doesn't imply producer completion. `OnNextAsync` on the producer reports provider acceptance, not that downstream consumers caught up.
+
+### Protect a slow Event Hubs consumer
+
+The Event Hubs provider maintains an independent cache cursor for each subscription, so a fast subscription can continue while another subscription falls behind. All cursors for an Event Hubs partition share the same silo-side cache, however. By default, the provider averages the pressure reported by those cursors. This policy favors aggregate throughput, but faster subscriptions can outweigh a small number of lagging subscriptions.
+
+<xref:Orleans.Configuration.StreamCacheEvictionOptions.DataMinTimeInCache> and <xref:Orleans.Configuration.StreamCacheEvictionOptions.DataMaxAgeInCache> control time-based cache eviction; they don't guarantee that every subscription remains within the cache. If eviction advances past a lagging cursor, delivery reports `Item not found in cache`.
+
+When every subscription must be protected from time-based eviction, replace the default averaging monitor with the slow-consuming monitor:
+
+:::code source="snippets/streaming/EventHubCachePressure.cs" id="event_hub_slow_consumer_pressure":::
+
+In this example, any subscription which falls more than 70% behind the newest cached position stops new Event Hubs reads for at least 10 seconds. Tune both values from measured lag and processing time. The slow-consuming policy intentionally limits partition ingestion to protect the slowest subscription: cache misses are less likely, but end-to-end lag for every subscription can increase and backlog can move into Event Hubs. Ensure that Event Hubs retention can absorb that backlog and that sustained ingress doesn't exceed the slowest required subscription's capacity.
+
+First reduce blocking work, CPU saturation, and hot-grain bottlenecks. If workloads need independent throughput or retention policies, isolate them using separate Orleans stream providers and Event Hubs consumer groups instead of coupling them through one partition cache.
 
 ## Tune the pulling pipeline
 
