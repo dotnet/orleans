@@ -63,7 +63,11 @@ Add a silo, wait for membership to stabilize, then stop it gracefully:
 
 :::code language="csharp" source="../grains/snippets/testing/orleans-testing/Sample.OrleansTesting/ClusterConfiguration.cs" id="change_topology":::
 
-Use this pattern to test behavior which depends on membership changes. A same-process cluster exercises membership changes. Use a separate environment to exercise process crashes, network partitions, socket transport, and production membership providers.
+Invoke the helper from a test and verify an application call after the membership changes:
+
+:::code language="csharp" source="../grains/snippets/testing/orleans-testing/Sample.OrleansTesting/TopologyTests.cs" id="topology_change_test":::
+
+The documented `dotnet test` command executes this test. A same-process cluster exercises membership changes. Use a separate environment to exercise process crashes, network partitions, socket transport, and production membership providers.
 
 ## Add production-provider tests
 

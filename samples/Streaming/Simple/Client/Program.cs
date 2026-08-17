@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Orleans.Streams;
 using Common;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 
 internal class Program
@@ -79,6 +80,23 @@ internal class Program
             await stream.SubscribeAsync(OnNextAsync);
 
             // Now the client will also log received events
+
+            if (useEventHub && args.Contains("--pause-after-checkpoint", StringComparer.OrdinalIgnoreCase))
+            {
+                var checkpointWindow = TimeSpan.FromSeconds(20);
+                Console.WriteLine(
+                    "Allowing {CheckpointWindow} for the 10-second checkpoint interval before pausing stream delivery.",
+                    checkpointWindow);
+                await Task.Delay(checkpointWindow, cts.Token);
+
+                var management = clusterClient.GetGrain<IManagementGrain>(0);
+                await management.SendControlCommandToProvider<PersistentStreamProvider>(
+                    Constants.StreamProvider,
+                    (int)PersistentStreamProviderCommand.StopAgents);
+
+                Console.WriteLine(
+                    "Stream pulling agents are paused. The producer remains active; record the next ten event numbers from the silo log, then terminate the silo.");
+            }
 
             // Wait until cancelled
             try
