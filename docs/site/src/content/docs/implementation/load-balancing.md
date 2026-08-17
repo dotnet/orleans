@@ -47,11 +47,11 @@ The default relative weights are:
 
 Public options: <xref:Orleans.Configuration.ResourceOptimizedPlacementOptions>. Implementation: [`ResourceOptimizedPlacementDirector`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Placement/ResourceOptimizedPlacementDirector.cs) and the default registration in [`DefaultSiloServices`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Hosting/DefaultSiloServices.cs).
 
-Enabling <xref:Orleans.Configuration.LoadSheddingOptions.LoadSheddingEnabled> sets the `IsOverloaded` statistic when either its CPU or memory threshold is exceeded. Resource-optimized placement removes overloaded silos from its scored candidate set and continues using CPU, memory, capacity, and activation-count measurements for the remaining candidates.
+Enabling <xref:Orleans.Configuration.LoadSheddingOptions.LoadSheddingEnabled> sets the `IsOverloaded` statistic when either its CPU or memory threshold is exceeded. When non-overloaded compatible silos have published statistics, resource-optimized placement scores that set using CPU, memory, capacity, and activation-count measurements. When every compatible silo is overloaded or lacks current statistics, placement selects a compatible silo so activation can proceed.
 
 ## Load shedding
 
-Set <xref:Orleans.Configuration.LoadSheddingOptions.LoadSheddingEnabled> to `true` to activate load shedding. <xref:Orleans.Configuration.LoadSheddingOptions.CpuThreshold> defaults to 95 percent and <xref:Orleans.Configuration.LoadSheddingOptions.MemoryThreshold> defaults to 90 percent. Crossing either threshold marks the silo's published runtime statistics as overloaded. The client gateway and stream providers can reject supported work, and resource-optimized placement omits the silo from the scored candidate set.
+Set <xref:Orleans.Configuration.LoadSheddingOptions.LoadSheddingEnabled> to `true` to activate load shedding. <xref:Orleans.Configuration.LoadSheddingOptions.CpuThreshold> defaults to 95 percent and <xref:Orleans.Configuration.LoadSheddingOptions.MemoryThreshold> defaults to 90 percent. Crossing either threshold marks the silo's published runtime statistics as overloaded. The client gateway and stream providers can reject supported work. Resource-optimized placement favors compatible silos with non-overloaded statistics.
 
 Use load shedding as one layer of admission control alongside bounded work and deadlines. Use a hosting-platform autoscaler to create capacity, activation rebalancing or repartitioning to move eligible activations, and [memory-based activation shedding](../host/configuration-guide/activation-collection.md#enable-memory-based-activation-shedding) to deactivate activations under memory pressure.
 
