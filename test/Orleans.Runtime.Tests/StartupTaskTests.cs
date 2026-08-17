@@ -56,7 +56,7 @@ namespace DefaultCluster.Tests
                     hostBuilder.ConfigureServices(services =>
                     {
                         services.AddSingleton<DelayedDirectoryMembershipService>();
-                        services.Replace(ServiceDescriptor.Singleton(sp => new DirectoryMembershipService(
+                        services.Replace(ServiceDescriptor.Singleton(static sp => new DirectoryMembershipService(
                             sp.GetRequiredService<DelayedDirectoryMembershipService>(),
                             sp.GetRequiredService<IInternalGrainFactory>(),
                             sp.GetRequiredService<ILogger<DirectoryMembershipService>>(),
@@ -139,7 +139,7 @@ namespace DefaultCluster.Tests
                             Volatile.Write(ref this.staleDirectoryVersion, staleVersion);
                             Volatile.Write(ref this.activeDirectoryVersion, update.Version.Value);
                             yield return new ClusterMembershipSnapshot(joiningMembers, new(staleVersion));
-                            await this.releaseActiveUpdate.Task.WaitAsync(cancellationToken);
+                            await this.releaseActiveUpdate.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
                         }
 
                         yield return update;
