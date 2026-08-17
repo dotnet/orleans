@@ -26,7 +26,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
 
     public IAsyncEnumerable<DirectoryMembershipSnapshot> ViewUpdates => _viewUpdates;
 
-    public ClusterMembershipService ClusterMembershipService { get; }
+    public IClusterMembershipService ClusterMembershipService { get; }
 
     public async ValueTask<DirectoryMembershipSnapshot> RefreshViewAsync(MembershipVersion version, CancellationToken cancellationToken)
     {
@@ -46,7 +46,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     }
 
     public DirectoryMembershipService(
-        ClusterMembershipService clusterMembershipService,
+        IClusterMembershipService clusterMembershipService,
         IInternalGrainFactory grainFactory,
         ILogger<DirectoryMembershipService> logger,
         int partitionsPerSilo,

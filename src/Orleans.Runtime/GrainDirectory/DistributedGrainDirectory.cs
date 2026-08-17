@@ -243,8 +243,11 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
             var initialRecoveryMembershipVersion = _recoveryMembershipVersion;
             if (view.Version.Value < initialRecoveryMembershipVersion || !view.TryGetOwner(grainId, out var owner, out var partitionReference))
             {
-                // If there are no members, bail out with the default return value.
-                if (view.Members.Length == 0 && view.Version.Value > 0)
+                // If there are no members and this view is current, bail out with the default return value.
+                // Otherwise, wait for the directory to observe the newer cluster membership view.
+                if (view.Members.Length == 0
+                    && view.Version.Value > 0
+                    && LatestClusterMembershipSnapshot.Version <= view.Version)
                 {
                     return default;
                 }
