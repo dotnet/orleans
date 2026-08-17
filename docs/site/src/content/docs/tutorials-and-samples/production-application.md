@@ -60,6 +60,8 @@ Each launch profile selects the Development environment and connects to Azurite.
 1. Call `GET /providers` and confirm that grain key `0` appears.
 1. Stop the worker and confirm that API calls continue; clients aren't cluster members and can restart independently.
 
+The sample dashboard uses open access for local development. Keep that endpoint on a trusted local host. For a deployed environment, [secure the dashboard](../dashboard/index.md#secure-the-dashboard-before-exposing-it) with HTTPS, operator authentication and authorization, and a private administrative path.
+
 ## Understand the production configuration
 
 Development uses a storage emulator. Deployed processes instead use <xref:Azure.Identity.DefaultAzureCredential> with a user-assigned managed identity and an Azure Table service URI. The deployment grants data-plane access without distributing storage keys.
@@ -74,13 +76,14 @@ Review the sample's [deployment README](https://github.com/dotnet/orleans/blob/m
 1. Configure a GitHub OIDC identity restricted to your fork and a protected `azure-container-apps` environment.
 1. Run the sample's one-time privileged bootstrap to create the registry, membership storage, runtime identity, and least-privilege role assignments.
 1. Copy `samples/Deployment/AzureContainerApps/deployment/deploy.yml` to `.github/workflows/deploy-orleans-container-apps.yml`.
+1. Configure the dashboard host and ingress for the operator controls described above.
 1. Add the environment variables listed in the sample README, then run the workflow.
 
 The workflow builds images, pushes immutable Git-SHA tags, deploys by image digest, and authenticates without a client secret.
 
 ## Verify the deployment
 
-Connect from the environment's virtual network, then:
+Connect through the operator-only administrative path, then:
 
 1. Confirm that every expected silo is active in the dashboard.
 1. Exercise `GET /hello/0`, `GET /hello/255`, and `GET /providers`.
