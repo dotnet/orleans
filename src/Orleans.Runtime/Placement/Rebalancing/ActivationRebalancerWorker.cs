@@ -566,6 +566,6 @@ internal sealed partial class ActivationRebalancerWorker(
             suspendUntil = long.MaxValue;
         }
 
-        _suspendedUntilTs = Math.Max(_suspendedUntilTs, suspendUntil);
+        _suspendedUntilTs = suspendUntil;
     }
 }
