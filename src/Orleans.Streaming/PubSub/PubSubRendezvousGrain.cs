@@ -167,7 +167,7 @@ namespace Orleans.Streams
 
             if (registrationRejected)
             {
-                throw new OrleansException($"Cannot register stream producer {streamProducer} because its silo is no longer active.");
+                throw new OrleansException($"Cannot register stream producer {streamProducer} because its silo could not be confirmed as non-terminating.");
             }
 
             // The LINQ query is non-null, so ToSet cannot return null.
@@ -230,9 +230,12 @@ namespace Orleans.Streams
                 RecordRemovedProducers(removedProducers);
             }
 
-            var shouldRegister = registeringSiloAddress is null || !statuses[registeringSiloAddress].IsTerminating();
+            var shouldRegister = registeringSiloAddress is null || IsValidSystemTargetRegistrationStatus(statuses[registeringSiloAddress]);
             return (shouldRegister, removedProducers is not null);
         }
+
+        internal static bool IsValidSystemTargetRegistrationStatus(SiloStatus status) =>
+            status != SiloStatus.None && !status.IsTerminating();
 
         public async Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
         {
