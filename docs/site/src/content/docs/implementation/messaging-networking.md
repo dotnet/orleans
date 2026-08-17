@@ -27,7 +27,7 @@ The transport queues writes and applies its own flow control. A successful socke
 
 ## Failure and shutdown
 
-Transport retries repair a connection attempt or a failed write; they do not intentionally invoke a grain method a second time. Application-level response timeouts remain ambiguous because a request can have reached the target before a connection failed.
+When a connection terminates, the base connection sends each in-flight message to the connection-specific `OnSendMessageFailure` implementation and calls `RetryMessage` for messages which remain queued. Silo and gateway inbound connections fail in-flight messages; client outbound connections return them to `MessageCenter` for routing. Application-level response timeouts remain ambiguous because a request can have reached the target before the connection failed.
 
 Shutdown first blocks new application traffic while allowing responses and membership traffic needed to complete the stop protocol. `MessageCenter` rejects or drops blocked messages, stops accepting client messages, and then closes connections. Inbound requests arriving at a stopping silo are rejected or dropped according to message direction, so callers must still handle a rejection or timeout.
 

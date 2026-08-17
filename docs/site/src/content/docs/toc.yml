@@ -30,8 +30,6 @@ items:
         href: tutorials-and-samples/testing-walkthrough.md
       - name: Build and recover a streaming application
         href: tutorials-and-samples/streaming-walkthrough.md
-      - name: Perform a rolling upgrade
-        href: tutorials-and-samples/rolling-upgrade.md
   - name: How-to guides
     items:
       - name: Recipe index

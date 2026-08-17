@@ -88,4 +88,4 @@ Connect from the environment's virtual network, then:
 1. Confirm that startup, readiness, and liveness probes are healthy.
 1. Inspect traces and logs in Application Insights and confirm that requests cross the API-to-grain boundary.
 
-Before adapting this system for production, work through the [production-readiness checklist](../deployment/production-readiness.md), configure [durable grain storage](../grains/grain-persistence/index.md), and rehearse the [rolling-upgrade walkthrough](rolling-upgrade.md).
+Before adapting this system for production, work through the [production-readiness checklist](../deployment/production-readiness.md), configure [durable grain storage](../grains/grain-persistence/index.md), and plan [graceful shutdown and upgrades](../deployment/upgrades.md).
