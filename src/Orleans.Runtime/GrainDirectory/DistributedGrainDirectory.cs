@@ -241,17 +241,15 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         {
             cancellationToken.ThrowIfCancellationRequested();
             var initialRecoveryMembershipVersion = _recoveryMembershipVersion;
-            var resolvedView = await GetViewWithOwnerAsync(grainId, view, initialRecoveryMembershipVersion, cancellationToken);
-            if (resolvedView is null)
+            var resolved = await GetViewWithOwnerAsync(grainId, view, initialRecoveryMembershipVersion, cancellationToken);
+            if (resolved is not { } ownerView)
             {
                 return default;
             }
 
-            view = resolvedView;
-            if (!view.TryGetOwner(grainId, out var owner, out var partitionReference))
-            {
-                throw new InvalidOperationException($"Directory membership view {view.Version} does not have an owner for grain '{grainId}'.");
-            }
+            view = ownerView.View;
+            var owner = ownerView.Owner;
+            var partitionReference = ownerView.PartitionReference;
 
 #if false
             if (logger.IsEnabled(LogLevel.Trace))
@@ -318,14 +316,20 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         }
     }
 
-    private async ValueTask<DirectoryMembershipSnapshot?> GetViewWithOwnerAsync(
+    private async ValueTask<(DirectoryMembershipSnapshot View, SiloAddress Owner, IGrainDirectoryPartition PartitionReference)?> GetViewWithOwnerAsync(
         GrainId grainId,
         DirectoryMembershipSnapshot view,
         long minimumVersion,
         CancellationToken cancellationToken)
     {
-        while (view.Version.Value < minimumVersion || !view.TryGetOwner(grainId, out _, out _))
+        while (true)
         {
+            if (view.Version.Value >= minimumVersion
+                && view.TryGetOwner(grainId, out var owner, out var partitionReference))
+            {
+                return (view, owner, partitionReference);
+            }
+
             // Cluster membership advances before the directory's asynchronous view. If the latest cluster view
             // still has an active member, this empty directory view is stale; otherwise it is terminal, as on shutdown.
             if (view.Members.Length == 0
@@ -338,8 +342,6 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
             var targetVersion = Math.Max(view.Version.Value + 1, minimumVersion);
             view = await _membershipService.RefreshViewAsync(new(targetVersion), cancellationToken);
         }
-
-        return view;
     }
 
     private static bool HasActiveMembers(ClusterMembershipSnapshot snapshot)
@@ -634,12 +636,12 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
     async Task<SiloAddress?> ITestHooks.WaitForPrimaryForGrain(GrainId grainId, CancellationToken cancellationToken)
     {
-        var view = await GetViewWithOwnerAsync(
+        var result = await GetViewWithOwnerAsync(
             grainId,
             _membershipService.CurrentView,
             _recoveryMembershipVersion,
             cancellationToken);
-        return view is not null && view.TryGetOwner(grainId, out var owner, out _) ? owner : null;
+        return result?.Owner;
     }
 
     async Task<GrainAddress?> ITestHooks.GetLocalRecord(GrainId grainId)
