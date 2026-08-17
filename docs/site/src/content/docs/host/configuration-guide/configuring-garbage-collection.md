@@ -53,7 +53,7 @@ Load-test with the same CPU and memory constraints used in production. See [Capa
 Verify the deployed runtime configuration using these signals:
 
 - `System.GC.Server: true` in the published application's `.runtimeconfig.json` records a server GC request. An absent key applies the CoreCLR workstation GC default.
-- At startup, Orleans logs `Silo starting with GC settings: ServerGC={value} GCLatencyMode={value}` and emits an advisory warning for workstation GC.
+- At startup, Orleans logs `Silo starting with GC settings: ServerGC={ServerGC} GCLatencyMode={GCLatencyMode}` and emits an advisory warning for workstation GC.
 - At runtime, <xref:System.Runtime.GCSettings.IsServerGC> reports the active GC flavor, and <xref:System.Environment.ProcessorCount> reports the processor count used during runtime initialization.
 - With server GC active, <xref:System.GC.GetConfigurationVariables*> reports `GCDynamicAdaptationMode=1` while DATAS adapts the heap count. On .NET 10, a fixed heap count reports `0`.
 
