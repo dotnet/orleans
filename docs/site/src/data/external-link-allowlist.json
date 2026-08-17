@@ -1,6 +1,7 @@
 {
   "description": "Exact external URLs which cannot be probed reliably. Every entry requires a narrow reason.",
   "urls": {
+    "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-networking.html": "AWS serves this public ECS task-networking page to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",
     "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html": "AWS serves this public SQS visibility-timeout page to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",
     "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/standard-queues-at-least-once-delivery.html": "AWS serves this public SQS delivery-semantics page to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",
     "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html": "AWS serves this public SQS overview page to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",

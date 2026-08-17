@@ -1,7 +1,7 @@
 ---
 title: Deploy and operate Orleans
 description: Plan, deploy, and operate an Orleans application in production.
-ms.date: 08/02/2026
+ms.date: 08/15/2026
 ms.topic: overview
 ---
 
@@ -26,6 +26,7 @@ Use these articles together:
 
 ## Choose a platform
 
+- [Containers across multiple hosts](containers.md)
 - [Kubernetes](kubernetes.md)
 - [Service Fabric](service-fabric.md)
 - [Azure App Service on Windows](deploy-to-azure-app-service.md)

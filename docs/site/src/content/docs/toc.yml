@@ -233,6 +233,8 @@ items:
         href: deployment/production-readiness.md
       - name: Topology, networking, and clustering
         href: deployment/networking.md
+      - name: Run containers across multiple hosts
+        href: deployment/containers.md
       - name: Platform requirements
         href: deployment/platform-guides.md
       - name: Host on Kubernetes

@@ -1,7 +1,7 @@
 ---
 title: Platform requirements
 description: Evaluate whether a hosting platform can run an Orleans production cluster safely.
-ms.date: 08/02/2026
+ms.date: 08/15/2026
 ms.topic: concept-article
 ---
 
@@ -28,6 +28,7 @@ An HTTP-only platform isn't sufficient unless Orleans silos can also establish d
 
 ## Platform guidance
 
+- [Multi-host container deployments](containers.md) require either direct per-container private addresses or unique, peer-reachable host-port mappings for every silo.
 - [Kubernetes](kubernetes.md) provides direct pod networking. Explicit endpoint configuration is recommended; the Orleans hosting package is optional and limited to simple one-`Deployment`-per-cluster topologies.
 - [Service Fabric](service-fabric.md) uses an application-authored stateless Reliable Service integration with runtime-allocated endpoints and an external Orleans clustering provider.
 - Azure App Service requires validation of private per-instance address and port mapping on [Windows](deploy-to-azure-app-service.md) and [Linux](deploy-to-azure-app-service-linux.md).
