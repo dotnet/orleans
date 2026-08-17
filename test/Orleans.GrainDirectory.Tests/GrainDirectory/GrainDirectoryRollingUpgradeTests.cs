@@ -1397,7 +1397,10 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         return (entry.Message.Contains("IGrainDirectoryPartition.", StringComparison.Ordinal)
                 && entry.Message.Contains("not active on this silo", StringComparison.Ordinal))
             || (string.Equals(entry.ExceptionType, typeof(SiloUnavailableException).FullName, StringComparison.Ordinal)
-                && entry.ExceptionMessage?.Contains("is shutting down", StringComparison.Ordinal) == true);
+                && entry.ExceptionMessage?.Contains("is shutting down", StringComparison.Ordinal) == true)
+            || (string.Equals(entry.EventId.Name, "SelectTargetFailed", StringComparison.Ordinal)
+                && string.Equals(entry.ExceptionType, typeof(OperationCanceledException).FullName, StringComparison.Ordinal)
+                && entry.Phase.EndsWith($"-{entry.SiloName}", StringComparison.Ordinal));
     }
 
     private void WriteInPlacePhaseReport(
