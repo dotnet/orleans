@@ -7,21 +7,21 @@ ms.topic: concept-article
 
 # Transport and networking internals
 
-Orleans separates message routing from transport management. `MessageCenter` decides where a message should go; `ConnectionManager` obtains a usable connection to the target silo; the connection implementation frames, queues, and writes messages to a socket. This separation lets routing repair an activation address without making the transport responsible for grain placement.
+Orleans separates message routing from transport management. `MessageCenter` decides where a message should go; `ConnectionManager` obtains a usable connection to the target silo; the connection implementation frames, queues, and writes messages to a socket. This separation lets routing repair activation addresses while transport focuses on connection management.
 
 ## Connection lifecycle
 
-For each remote `SiloAddress`, `ConnectionManager` keeps a `ConnectionEntry` containing active connections, a pending connection attempt, and the last failure time. `GetConnection` reuses an existing connection when one is suitable and starts at most one new attempt per endpoint when none is available. Concurrent senders await the same pending attempt instead of opening an unbounded connection storm.
+For each remote `SiloAddress`, `ConnectionManager` keeps a `ConnectionEntry` containing active connections, a pending connection attempt, and the last failure time. `GetConnection` reuses a suitable active connection. When active connections are exhausted, it starts one shared pending attempt per endpoint, and concurrent senders await that attempt.
 
-Connection establishment has a bounded `OpenConnectionTimeout`. A failed attempt clears the pending task, removes defunct connections, records the failure, and applies the configured retry delay before another attempt. A timeout is therefore a transport failure, not evidence that the application message was processed.
+Connection establishment has a bounded `OpenConnectionTimeout`. A failed attempt clears the pending task, removes defunct connections, records the failure, and applies the configured retry delay before another attempt. A timeout classifies the transport attempt as failed; application processing outcome requires separate reconciliation.
 
 Source: [`ConnectionManager`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Networking/ConnectionManager.cs), [`Connection`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Networking/Connection.cs), and [`SiloConnection`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Networking/SiloConnection.cs).
 
 ## Message path and framing
 
-When `MessageCenter.SendMessage` has a target silo, it first uses an existing connection, otherwise it asks `ConnectionManager` for one. A local target loops back through receive processing without a socket. A known-dead target is rejected for requests and one-way messages rather than triggering a new connection attempt. Expired messages are dropped before they consume transport work.
+When `MessageCenter.SendMessage` has a target silo, it reuses an existing connection or obtains one from `ConnectionManager`. A local target uses receive processing directly. A known-dead target causes a transient rejection for request and one-way messages, and expired messages are dropped before consuming transport work.
 
-The connection pipeline performs the protocol preamble and then exchanges framed payloads. `MessageSerializer` encodes the message header and body using Orleans serialization; the frame helper validates lengths and rejects malformed input before dispatch. TLS, when configured, is middleware around the connection rather than a different message protocol.
+The connection pipeline performs the protocol preamble and then exchanges framed payloads. `MessageSerializer` encodes the message header and body using Orleans serialization; the frame helper validates lengths and rejects malformed input before dispatch. TLS wraps the same Orleans framing and message protocol as connection middleware.
 
 The connection accepts outgoing messages through an unbounded channel. Its socket writer observes transport flow control while concurrent senders can continue adding messages to that channel, so a slow connection can accumulate queued messages until it recovers or closes. A successful socket write means the frame was handed to the transport; the grain result confirms request completion. Disconnects remove the connection from the endpoint entry and cause later sends to establish a replacement.
 
@@ -35,6 +35,6 @@ Shutdown first blocks new application traffic while allowing responses and membe
 
 - Per-endpoint connection state avoids global coordination but means every silo must observe and repair its own broken paths.
 - Reusing connections reduces handshake and allocation cost, while multiple connections can improve throughput and avoid head-of-line blocking.
-- Dropping expired messages protects a saturated runtime from work whose callback can no longer complete, at the cost of losing a late response that might have been useful to an application retry.
+- Dropping expired messages protects a saturated runtime from work whose callback deadline has elapsed. Applications use operation IDs and durable state to reconcile the operation's outcome.
 
 For end-to-end semantics, see [messaging and delivery semantics](messaging-delivery-guarantees.md). Network endpoint selection and firewall requirements belong in [topology, networking, and clustering](../deployment/networking.md).

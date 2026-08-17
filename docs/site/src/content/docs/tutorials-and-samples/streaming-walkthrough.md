@@ -26,7 +26,7 @@ dotnet run --project .\SiloHost
 dotnet run --project .\Client
 ```
 
-Without `Secrets.json`, both hosts register the named in-memory stream provider. The client asks a producer grain to publish integer events. The stream identity determines which implicitly subscribed consumer grain receives each event.
+The default local configuration registers the named in-memory stream provider on both hosts. The client asks a producer grain to publish integer events. The stream identity determines which implicitly subscribed consumer grain receives each event.
 
 Observe these transitions in the silo log:
 
@@ -35,7 +35,7 @@ Observe these transitions in the silo log:
 1. The grain resumes the subscription with its observer.
 1. `OnNextAsync` logs the event and its sequence token.
 
-No caller creates the consumer activation directly. <xref:Orleans.ImplicitStreamSubscriptionAttribute> maps the stream namespace and identity to the matching grain identity.
+<xref:Orleans.ImplicitStreamSubscriptionAttribute> maps the stream namespace and identity to the consumer grain identity and activates that consumer when matching events arrive.
 
 ## Trace the code
 
@@ -50,7 +50,7 @@ The `PubSubStore` name is significant. Persistent stream providers use it for su
 
 ## Switch to a persistent provider
 
-Create an Azure Event Hubs namespace, an event hub named `my-path`, a consumer group named `my-group`, and an Azure Storage account in a nonproduction subscription. Create `Secrets.json` in the sample directory with this content, replacing both values with connection strings. Don't commit this file.
+Create an Azure Event Hubs namespace, an event hub named `my-path`, a consumer group named `my-group`, and an Azure Storage account in a nonproduction subscription. Create `Secrets.json` in the sample directory with this content, replacing both values with connection strings. Keep `Secrets.json` outside source control.
 
 ```json
 {
@@ -59,7 +59,7 @@ Create an Azure Event Hubs namespace, an event hub named `my-path`, a consumer g
 }
 ```
 
-Restart the silo and client. The startup log should now report Azure Event Hubs streaming instead of in-memory streaming. The silo configures:
+Restart the silo and client. The startup log should report the provider switch from in-memory streaming to Azure Event Hubs. The silo configures:
 
 - Azure Table grain storage for `PubSubStore`;
 - the Event Hubs stream provider;
@@ -76,9 +76,9 @@ Before this exercise, replace `Guid.NewGuid()` in `Client/Program.cs` with a fix
 1. Stop the client, then stop the silo gracefully, leaving Event Hubs and Azure Storage running.
 1. Restart the silo with the same service ID, cluster ID, provider name, hub, and consumer group.
 1. Restart the client so that it calls `StartProducing` for the same stream and recreates the producer's activation-scoped timer.
-1. Verify that the consumer resumes without recreating the subscription and that it continues from the stored checkpoint instead of replaying the complete partition.
+1. Verify that the consumer resumes its existing subscription at the stored checkpoint and processes events following that checkpoint.
 
-Delivery guarantees are provider-specific. In this Event Hubs scenario, a consumer can observe duplicates around failures, so production handlers should be idempotent or deduplicate using an application-owned event identity. Don't treat a sequence token as a globally meaningful business identifier.
+Delivery guarantees are provider-specific. In this Event Hubs scenario, a consumer can observe duplicates around failures, so production handlers should be idempotent or deduplicate using an application-owned event identity. Sequence tokens represent provider delivery position; application-owned event identities support business deduplication.
 
 ## Test failure boundaries
 

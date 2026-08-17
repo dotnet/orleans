@@ -30,7 +30,7 @@ When a provider requires a connection string, password, access key, or certifica
 - Restrict read access to the workload identity and to the operators responsible for rotation.
 - Pass secrets through protected configuration channels designed to limit process inspection and diagnostic exposure.
 - Redact credentials from logs, traces, metrics, exception messages, health responses, and dashboard-visible state.
-- Keep grain keys and request context limited to non-secret identifiers and application metadata.
+- Keep grain keys and request context limited to identifiers and application metadata approved for disclosure.
 
 The [.NET configuration system](https://learn.microsoft.com/dotnet/core/extensions/configuration) combines multiple providers. Review the final precedence and give the production secret source the intended priority. Pass SDK credential objects through programmatic provider configuration.
 

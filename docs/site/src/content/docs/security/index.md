@@ -28,7 +28,7 @@ Every process with access to a gateway operates as an Orleans client within the 
 A production design should account for:
 
 - An unauthorized workload reaching a gateway, silo, provider, or administrative port.
-- A connected Orleans client invoking a method or grain key that its user wasn't intended to access.
+- A connected Orleans client invoking a method or grain key outside its user's authorized scope.
 - Forged caller-supplied identity, role, or tenant values.
 - Serialized input selecting more CLR types than the application intended.
 - Credentials, connection strings, certificates, grain state, or logs being disclosed.
@@ -49,7 +49,7 @@ Grains and tenants within a silo share its process security context. Grain code 
 
 Security controls should fail closed when identity or policy data is missing, invalid, or unavailable. Exercise authentication failures, authorization denials, certificate rotation, credential expiry, and dependency isolation before production traffic is admitted.
 
-## In this section
+## Security guidance by boundary
 
 - [Client and grain-call security](authentication-authorization.md)
 - [Serialization security](serialization.md)

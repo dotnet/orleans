@@ -7,9 +7,9 @@ ms.topic: overview
 
 # Orleans runtime architecture
 
-The implementation track explains how Orleans realizes the virtual actor model. It is intended for runtime contributors, provider authors, and operators who need to reason about failure, consistency, scheduling, and extensibility. For application programming guidance, start with the conceptual and task-oriented sections of this documentation instead.
+The implementation track explains how Orleans realizes the virtual actor model for runtime contributors, provider authors, and operators who reason about failure, consistency, scheduling, and extensibility. The conceptual and task-oriented sections provide application programming guidance.
 
-The pages in this track use Orleans source and tests as the specification. Internal types are named so that readers can follow an operation through the repository, but those types are not public compatibility contracts unless the page explicitly identifies an extension point.
+The pages in this track use Orleans source and tests as the specification. Internal type names let readers follow an operation through the repository. Public APIs and explicitly identified extension points carry compatibility contracts.
 
 ## A runtime map
 
@@ -31,7 +31,7 @@ flowchart LR
     Serialization --> Network
 ```
 
-Use the map below to choose the right depth. The [runtime architecture](runtime-architecture.md) page follows the normal call path; the messaging, serialization, reminder, transaction, and version-skew pages explain the boundaries where failure, persistence, and rolling upgrades change the guarantees.
+Use this runtime map and the following topic list to choose the required depth. The [runtime architecture](runtime-architecture.md) page follows the normal call path; the messaging, serialization, reminder, transaction, and version-skew pages explain the boundaries where failure, persistence, and rolling upgrades change the guarantees.
 
 ## Runtime core
 

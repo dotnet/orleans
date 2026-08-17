@@ -24,25 +24,25 @@ The built-in strategies have intentionally different upgrade behavior:
 | Minimum selector | Choose the lowest compatible version. |
 | All compatible selector | Keep all compatible versions as placement candidates. |
 
-The selector does not make an incompatible contract safe. It only turns the compatibility decision into a placement set.
+The selector converts the compatibility decision into a placement set; applications preserve contract compatibility across that set.
 
 ## Activation checks
 
-Placement chooses a suitable silo, but an activation also validates the incoming interface version against its local implementation. If the activation's version is not compatible, the runtime invalidates the stale route and returns the message to routing rather than executing the method against an incompatible implementation. This is why a version change can cause activation movement or a retry of routing without being an application-level call retry.
+Placement chooses a suitable silo, and an activation validates the incoming interface version against its local implementation. An incompatible activation invalidates the stale route and returns the existing message to routing. Version changes can therefore move activation or repeat routing while preserving the logical call.
 
 ## Wire compatibility is a separate contract
 
-Version routing cannot repair incompatible bytes. Request and response types must remain readable by both old and new builds for as long as mixed traffic, queued messages, reminders, streams, or persisted state can cross the boundary. Keep serialization IDs stable, add fields instead of reusing IDs, retain aliases when CLR names move, and ensure custom codecs skip fields they do not understand. See [serialization and code generation internals](serialization.md) for the wire-level rules.
+Version routing requires request and response types readable by both old and new builds for as long as mixed traffic, queued messages, reminders, streams, or persisted state can cross the boundary. Keep serialization IDs stable, add fields with new IDs, retain aliases when CLR names move, and ensure custom codecs skip unknown fields. See [serialization and code generation internals](serialization.md) for the wire-level rules.
 
-Interface versioning also does not version grain state. Both implementations must read the stored representation and tolerate writes from the other while rollback or mixed placement remains possible.
+Grain-state compatibility remains an application schema responsibility. Both implementations read the stored representation and tolerate writes from the other while rollback or mixed placement remains possible.
 
 ## Failure modes and rollout implications
 
-- If no compatible silo is available, placement cannot complete the request and the caller receives a rejection or eventually a timeout.
-- If a stale activation receives a request, cache invalidation and routing repair can locate a compatible activation; this is not an automatic duplicate invocation policy.
+- An empty compatible-silo set causes placement to reject or time out the request.
+- A stale activation triggers cache invalidation and routing repair for the same logical message; the runtime preserves its message identity while locating a compatible activation.
 - Changing a selector or compatibility strategy resets the suitable-silo cache, so subsequent placements reflect the new policy.
 - Removing the old implementation before all callers and durable data are compatible can turn a planned rolling deployment into an outage.
 
-The [interface versioning guide](../grains/grain-versioning/grain-versioning.md) and [deployment and rollback guidance](../migration/deployment-and-rollback.md) own configuration and rollout procedures. This page documents the runtime decision chain.
+The [interface versioning guide](../grains/grain-versioning/grain-versioning.md) and [deployment and rollback guidance](../migration/deployment-and-rollback.md) cover configuration and rollout procedures. This runtime decision chain connects interface manifests, compatibility selection, placement, activation validation, and wire compatibility.
 
 Source: [`GrainVersionManifest`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Manifest/GrainVersionManifest.cs), [`CachedVersionSelectorManager`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Versions/CachedVersionSelectorManager.cs), [`AllCompatibleVersionsSelector`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Versions/Selector/AllCompatibleVersionsSelector.cs), and [`ActivationData`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Catalog/ActivationData.cs).

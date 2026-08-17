@@ -37,9 +37,9 @@ Source: [`GrainReferenceRuntime`](https://github.com/dotnet/orleans/blob/main/sr
 
 ## Address repair and dispatch boundaries
 
-The target grain address is a routing hint, not a lease. `MessageCenter` checks for a local delivery, a proxied client, a usable remote connection, and a known-dead target. At the target, `Catalog` and `ActivationData` validate the grain address and interface version before admitting the request. A stale activation can therefore be invalidated and the request forwarded or rerouted without changing its logical message identity.
+The target grain address is a routing hint whose validity `Catalog` and `ActivationData` confirm before dispatch. `MessageCenter` checks for a local delivery, a proxied client, a usable remote connection, and a known-dead target. At the target, `Catalog` and `ActivationData` validate the grain address and interface version before admitting the request. A stale activation can therefore be invalidated and the request forwarded or rerouted while preserving its logical message identity.
 
-The dispatch boundary is also where shutdown policy applies. When application messages are blocked, responses and membership traffic remain eligible while new application requests are rejected or dropped. This allows the lifecycle protocol to drain without pretending that a stopping silo can accept arbitrary new work.
+The dispatch boundary is also where shutdown policy applies. When application messages are blocked, responses and membership traffic remain eligible while new application requests are rejected or dropped. This lets the lifecycle protocol drain while the stopping silo admits responses and membership traffic and rejects new application work.
 
 ## Routing repair is not call retry
 
@@ -84,7 +84,7 @@ The runtime can return a rejection when it knows that it cannot process a reques
 
 Messages have expiration metadata derived from the response timeout. With <xref:Orleans.Configuration.MessagingOptions.DropExpiredMessages?displayProperty=nameWithType> set to `true` (the default), an expired request or response can be dropped instead of consuming work which can no longer complete the original callback.
 
-Rejections carry more information than a timeout because the runtime has made an explicit decision not to process the message. They still do not imply that a prior attempt did not execute: a rejection can be generated after forwarding, activation lookup, or a transport failure. Treat the rejection type as a routing or availability signal, not as a universal rollback.
+Rejections carry more information than a timeout because the runtime has made an explicit decision for the current processing attempt. Earlier forwarded or transported attempts remain outcome-uncertain. Treat the rejection type as a routing or availability signal.
 
 ## Designing callers
 

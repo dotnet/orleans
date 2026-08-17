@@ -11,9 +11,9 @@ This walkthrough builds a test suite in layers: pure logic tests, a real in-proc
 
 ## Choose the right boundary
 
-Use ordinary unit tests for code which doesn't depend on activation, scheduling, serialization, placement, or providers. Use <xref:Orleans.TestingHost.InProcessTestCluster> when any of those Orleans behaviors matters. Finally, test against production providers when their external-system contract is part of the behavior.
+Use ordinary unit tests for pure application logic, <xref:Orleans.TestingHost.InProcessTestCluster> for Orleans runtime behavior, and production-provider tests for external contracts.
 
-Keeping these boundaries explicit makes the fast tests fast without creating false confidence from mocked runtime behavior.
+These boundaries preserve fast feedback and runtime fidelity.
 
 ## Run the first cluster test
 
@@ -39,7 +39,7 @@ Production grains commonly depend on services registered through dependency inje
 
 Each host owns a service provider. Registering a service type creates one instance per host. Registering a captured instance intentionally shares it across silos and the client, so shared test doubles must be thread-safe.
 
-Run the tests again after each configuration change. A deployment failure should fail the test setup rather than be converted into a passing assertion.
+Run the tests again after each configuration change. Propagate deployment failures through test setup so the test run reports them as failures.
 
 ## Reuse an expensive cluster
 
@@ -51,11 +51,11 @@ Register the fixture as a collection:
 
 :::code language="csharp" source="../grains/snippets/testing/orleans-testing/Sample.OrleansTesting/ClusterCollection.cs" id="cluster_collection":::
 
-Then consume the cluster without starting it in every test:
+Then consume the fixture's already-started cluster from every test:
 
 :::code language="csharp" source="../grains/snippets/testing/orleans-testing/Sample.OrleansTesting/HelloGrainTestsWithFixture.cs" id="shared_cluster_test":::
 
-Give each test unique grain identities, reset shared external state, and don't depend on test execution order.
+Give each test unique grain identities, reset shared external state, and make every test order-independent.
 
 ## Exercise a topology change
 
@@ -63,7 +63,7 @@ Add a silo, wait for membership to stabilize, then stop it gracefully:
 
 :::code language="csharp" source="../grains/snippets/testing/orleans-testing/Sample.OrleansTesting/ClusterConfiguration.cs" id="change_topology":::
 
-Use this pattern to test behavior which depends on membership changes. A same-process cluster doesn't reproduce process crashes, network partitions, socket transport, or a production membership provider. Add a separate environment for those failure modes instead of treating this test as equivalent.
+Use this pattern to test behavior which depends on membership changes. A same-process cluster exercises membership changes. Use a separate environment to exercise process crashes, network partitions, socket transport, and production membership providers.
 
 ## Add production-provider tests
 
@@ -75,4 +75,4 @@ For persistence, reminders, clustering, or streams, add an opt-in suite which:
 1. Verifies behavior across a silo restart.
 1. Cleans up owned resources even when an assertion fails.
 
-Keep credentials out of source control and make missing prerequisites explicit. For API details and fidelity boundaries, see [Test Orleans applications](../grains/testing.md) and [TestingHost architecture](../implementation/testing.md).
+Store credentials in the test environment's secret facility and report missing prerequisites explicitly. For API details and fidelity boundaries, see [Test Orleans applications](../grains/testing.md) and [TestingHost architecture](../implementation/testing.md).

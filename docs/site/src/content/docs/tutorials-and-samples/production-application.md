@@ -9,7 +9,7 @@ ms.topic: tutorial
 
 This walkthrough takes you from an empty directory to a deployed, observable Orleans cluster. You use the maintained [Azure Container Apps sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureContainerApps) so that the application, infrastructure, and deployment workflow stay buildable together.
 
-The finished system has dedicated silos, an HTTP API and worker client, Azure Table Storage clustering, managed identity, health probes, Application Insights, and an Orleans Dashboard. Grain state isn't persisted in this sample; add a grain-storage provider before storing application state.
+The finished system has dedicated silos, an HTTP API and worker client, Azure Table Storage clustering, managed identity, health probes, Application Insights, and an Orleans Dashboard. This sample demonstrates clustering and deployment; add a grain-storage provider to persist application state.
 
 ## Prerequisites
 
@@ -58,15 +58,15 @@ Each launch profile selects the Development environment and connects to Azurite.
 1. Open the dashboard URL printed by the `Dashboard` process and confirm that its silo and the dedicated silo are active.
 1. Call `GET /hello/0` on the Minimal API and confirm that it returns a greeting.
 1. Call `GET /providers` and confirm that grain key `0` appears.
-1. Stop the worker and confirm that API calls continue; clients aren't cluster members and can restart independently.
+1. Stop the worker and confirm that API calls continue; the worker and Minimal API are separate Orleans clients, so restarting the worker leaves the API client connected to the silo cluster.
 
 The sample dashboard uses open access for local development. Keep that endpoint on a trusted local host. For a deployed environment, [secure the dashboard](../dashboard/index.md#secure-the-dashboard-before-exposing-it) with HTTPS, operator authentication and authorization, and a private administrative path.
 
 ## Understand the production configuration
 
-Development uses a storage emulator. Deployed processes instead use <xref:Azure.Identity.DefaultAzureCredential> with a user-assigned managed identity and an Azure Table service URI. The deployment grants data-plane access without distributing storage keys.
+Development uses a storage emulator. Deployed processes use <xref:Azure.Identity.DefaultAzureCredential> with a user-assigned managed identity and an Azure Table service URI. Token-based data-plane access supplies storage authorization.
 
-Every deployed silo has a unique advertised silo and gateway endpoint. Azure Container Apps replicas within one app don't provide Orleans with unique, documented replica addresses, so the sample deploys each silo as a separate one-replica Container App. Add capacity by adding another silo app with unused ports, not by increasing a silo app's replica count.
+Every deployed silo has a unique advertised silo and gateway endpoint. Azure Container Apps assigns the documented endpoint at the app boundary, so the sample deploys each silo as a separate one-replica Container App. Add capacity by adding silo apps with unused ports.
 
 Review the sample's [deployment README](https://github.com/dotnet/orleans/blob/main/samples/Deployment/AzureContainerApps/README.md) and `Azure/bootstrap.bicep` before assigning roles. The privileged bootstrap and routine deployment are deliberately separate.
 
@@ -79,7 +79,7 @@ Review the sample's [deployment README](https://github.com/dotnet/orleans/blob/m
 1. Configure the dashboard host and ingress for the operator controls described above.
 1. Add the environment variables listed in the sample README, then run the workflow.
 
-The workflow builds images, pushes immutable Git-SHA tags, deploys by image digest, and authenticates without a client secret.
+The workflow builds images, pushes immutable Git-SHA tags, deploys by image digest, and authenticates through GitHub OIDC and workload identity.
 
 ## Verify the deployment
 

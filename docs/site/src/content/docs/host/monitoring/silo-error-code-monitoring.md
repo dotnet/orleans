@@ -7,9 +7,7 @@ ms.topic: reference
 
 # Silo diagnostic events
 
-The previous hand-maintained silo error-code table was removed because it drifted from the runtime and mixed implementation event IDs with operational alert thresholds.
-
-For current definitions, use the generated <xref:Orleans.ErrorCode> API reference. To inspect definitions under active development, see the [error-code source on the `main` branch](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core.Abstractions/Logging/ErrorCodes.cs). Alert on sustained service symptoms and use event IDs to narrow an investigation.
+The generated <xref:Orleans.ErrorCode> API reference tracks the runtime's current silo event definitions. The [error-code source on the `main` branch](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core.Abstractions/Logging/ErrorCodes.cs) shows definitions under active development.
 
 Search for the structured event ID in <xref:Orleans.ErrorCode>, then use its log category, exception, and surrounding metrics to select a remedy:
 
@@ -23,4 +21,4 @@ Search for the structured event ID in <xref:Orleans.ErrorCode>, then use its log
 | Reminder or timer | [Reminder and timer timing](troubleshooting-symptom-catalog.md#reminder-and-timer-timing) |
 | Overload, rejection, memory, or shutdown | [Orleans symptom and signal catalog](troubleshooting-symptom-catalog.md) |
 
-Don't alert on a numeric range alone. Follow [Interpret Orleans observability signals](signals.md) to combine event IDs with sustained service symptoms.
+Base alerts on sustained service symptoms correlated with event IDs and runtime signals. Follow [Interpret Orleans observability signals](signals.md).

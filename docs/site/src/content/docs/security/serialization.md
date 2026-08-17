@@ -17,7 +17,7 @@ Orleans-generated serializers use the application's known type manifest. Externa
 
 <xref:Orleans.Serialization.Configuration.TypeManifestOptions.AllowAllTypes?displayProperty=nameWithType> defaults to `false`. Preserve that default when any connected client, stream, queue, or storage system can be influenced by a less-trusted party. Enabling it bypasses Orleans type-name validation and permits any resolvable type.
 
-An open type-resolution surface lets input select code paths from types which weren't designed as message contracts. Depending on the configured serializer and available types, deserialization gadget behavior can result in unintended side effects or code execution. An allow list reduces that attack surface, but each allowed type and serializer must still be safe for the data source.
+An open type-resolution surface lets input select code paths from types outside the application's declared message contracts. Depending on the configured serializer and available types, deserialization gadget behavior can result in unintended side effects or code execution. An allow list reduces that attack surface, and each allowed type and serializer must be safe for the data source.
 
 Use the narrowest applicable mechanism:
 
