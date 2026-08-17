@@ -59,7 +59,7 @@ Create an Azure Event Hubs namespace, an event hub named `my-path`, a consumer g
 }
 ```
 
-Restart the silo and client. The startup log should now report Azure Event Hub streaming instead of in-memory streaming. The silo configures:
+Restart the silo and client. The startup log should now report Azure Event Hubs streaming instead of in-memory streaming. The silo configures:
 
 - Azure Table grain storage for `PubSubStore`;
 - the Event Hubs stream provider;

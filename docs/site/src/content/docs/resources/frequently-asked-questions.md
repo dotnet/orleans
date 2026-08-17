@@ -7,7 +7,7 @@ ms.topic: faq
 
 # Frequently asked questions
 
-For symptom-based incident runbooks, see [Troubleshoot Orleans incidents](../host/monitoring/troubleshooting.md). For task-oriented setup and deployment recipes, see the [how-to guide index](../how-to/index.md).
+For symptom-based diagnosis, start with the [troubleshooting symptom catalog](../host/monitoring/troubleshooting-symptom-catalog.md), then follow the [incident runbook](../host/monitoring/troubleshooting.md). For task-oriented setup and deployment recipes, see the [how-to guide index](../how-to/index.md).
 
 ## Availability and support
 
