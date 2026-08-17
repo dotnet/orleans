@@ -49,22 +49,22 @@ The provider's <xref:Orleans.Streams.StreamPubSubType> controls which subscripti
 
 | Value | Choose this value when | Tradeoff |
 |---|---|---|
-| `ExplicitGrainBasedAndImplicit` (default) | The application uses both models, or its future subscription model isn't yet known. | Provides the most flexibility. Producer registration checks both the grain-based rendezvous and implicit grain metadata, and the explicit portion requires a [`PubSubStore`](pubsub-storage.md). |
-| `ExplicitGrainBasedOnly` | Grains or clients must add and remove subscriptions at runtime, and no grain types use implicit subscriptions. | Avoids implicit-subscriber discovery, but explicit subscription and producer changes use rendezvous grains and `PubSubStore`. The application must manage subscription handles and recovery. |
-| `ImplicitOnly` | Every consumer is a grain declared with <xref:Orleans.ImplicitStreamSubscriptionAttribute>, and the application doesn't need runtime-created or client subscriptions. | Avoids grain-based rendezvous and `PubSubStore` storage operations. It offers less flexibility: calls to <xref:Orleans.Streams.IAsyncObservable`1.SubscribeAsync*> fail, subscriptions can't be individually removed, and clients can't consume streams. |
+| `ExplicitGrainBasedAndImplicit` (default) | The application uses both models or expects its subscription requirements to evolve. | Provides the most flexibility. Producer registration checks both the grain-based rendezvous and implicit grain metadata, and the explicit portion requires a [`PubSubStore`](pubsub-storage.md). |
+| `ExplicitGrainBasedOnly` | Every consumer uses runtime-created subscriptions, including client consumers. | Focuses discovery on explicit subscriptions. Subscription and producer changes use rendezvous grains and `PubSubStore`, and the application manages subscription handles and recovery. |
+| `ImplicitOnly` | Every consumer is a grain declared with <xref:Orleans.ImplicitStreamSubscriptionAttribute>. | Resolves subscriptions from grain metadata and removes grain-based rendezvous and `PubSubStore` operations from the control plane. Runtime-created, individually removable, and client subscriptions use an explicit-capable mode. |
 
-These differences affect subscription discovery, coordination, and storage rather than event transport or delivery. Restrictive modes can reduce control-plane overhead, but choose a mode based on the required subscription semantics and measure the effect in the application's workload.
+The mode determines the subscription discovery, coordination, and storage work. Event transport and delivery follow the selected stream provider. Specialized modes can reduce control-plane overhead; choose a mode based on the required subscription semantics and measure the effect in the application's workload.
 
 ### Change the configured mode
 
-The pub/sub type is startup configuration, not a runtime switch. To change it, update the <xref:Orleans.Hosting.PersistentStreamConfiguratorExtensions.ConfigureStreamPubSub*> configuration and restart every silo and client which uses that named provider. Keep the value consistent across the deployment; a rolling change through mixed modes can make hosts disagree about which subscriptions exist.
+Apply a pub/sub type change by updating <xref:Orleans.Hosting.PersistentStreamConfiguratorExtensions.ConfigureStreamPubSub*> and restarting every silo and client which uses that named provider. Restart them as a coordinated deployment so every host uses the same value and computes the same subscription set.
 
-Changing the value doesn't convert or delete subscriptions:
+Each subscription model retains its own lifecycle across a change:
 
-- Implicit subscriptions are derived from grain metadata. Changing to `ExplicitGrainBasedOnly` stops using them; changing back makes matching metadata effective again.
-- Explicit subscription records remain in the configured `PubSubStore` according to that store's durability, but `ImplicitOnly` doesn't use or manage them. Unsubscribe or otherwise account for existing explicit subscriptions before switching to `ImplicitOnly`. If explicit support is later re-enabled with the same service ID, provider name, and durable `PubSubStore`, retained records are available again, but each activated consumer must still resume its handle.
+- Implicit subscriptions come from grain metadata. `ExplicitGrainBasedOnly` selects explicit records, while either implicit-capable mode applies matching metadata.
+- Explicit subscription records follow the configured `PubSubStore` durability. `ImplicitOnly` selects metadata-derived subscriptions and leaves retained explicit records in the store. Account for those records before changing modes. Re-enabling explicit support with the same service ID, provider name, and durable `PubSubStore` makes retained records available again; each activated consumer then resumes its handle.
 
-Use the default combined mode when subscription requirements are expected to evolve and avoiding a coordinated configuration change is more important than minimizing pub/sub control-plane work.
+Use the default combined mode when subscription requirements are expected to evolve and continuous support for both models outweighs the additional pub/sub control-plane work.
 
 ### Explicit subscriptions
 
