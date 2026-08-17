@@ -175,8 +175,7 @@ namespace NonSilo.Tests.Membership
             await Until(() => CleanupCallCount(table) == 1);
 
             table.ClearCalls();
-            membershipManager.Publish(Snapshot(Entry(this.localSilo, SiloStatus.Active, now)));
-            await Task.Delay(TimeSpan.FromMilliseconds(200));
+            await membershipManager.PublishAndWaitForRead(Snapshot(Entry(this.localSilo, SiloStatus.Active, now)));
             Assert.Equal(0, CleanupCallCount(table));
 
             var expiredNonActiveEntry = Entry(
@@ -274,16 +273,48 @@ namespace NonSilo.Tests.Membership
 
         private sealed class TestMembershipManager : IMembershipManager
         {
+            private readonly object syncRoot = new();
             private readonly Channel<MembershipTableSnapshot> updates = Channel.CreateUnbounded<MembershipTableSnapshot>();
+            private MembershipTableSnapshot currentSnapshot = Snapshot();
+            private TaskCompletionSource? currentSnapshotRead;
 
-            public MembershipTableSnapshot CurrentSnapshot { get; private set; } = Snapshot();
+            public MembershipTableSnapshot CurrentSnapshot
+            {
+                get
+                {
+                    lock (this.syncRoot)
+                    {
+                        this.currentSnapshotRead?.TrySetResult();
+                        this.currentSnapshotRead = null;
+                        return this.currentSnapshot;
+                    }
+                }
+            }
+
             public IAsyncEnumerable<MembershipTableSnapshot> MembershipUpdates => this.updates.Reader.ReadAllAsync();
             public SiloStatus LocalSiloStatus => SiloStatus.Active;
 
             public void Publish(MembershipTableSnapshot snapshot)
             {
-                this.CurrentSnapshot = snapshot;
-                Assert.True(this.updates.Writer.TryWrite(snapshot));
+                lock (this.syncRoot)
+                {
+                    this.currentSnapshot = snapshot;
+                    Assert.True(this.updates.Writer.TryWrite(snapshot));
+                }
+            }
+
+            public async Task PublishAndWaitForRead(MembershipTableSnapshot snapshot)
+            {
+                var snapshotRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                lock (this.syncRoot)
+                {
+                    Assert.Null(this.currentSnapshotRead);
+                    this.currentSnapshotRead = snapshotRead;
+                    this.currentSnapshot = snapshot;
+                    Assert.True(this.updates.Writer.TryWrite(snapshot));
+                }
+
+                await snapshotRead.Task.WaitAsync(TimeSpan.FromSeconds(40));
             }
 
             public Task UpdateLocalStatus(SiloStatus status, CancellationToken cancellationToken) => Task.CompletedTask;
