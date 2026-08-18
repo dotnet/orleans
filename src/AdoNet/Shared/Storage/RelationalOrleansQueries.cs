@@ -495,10 +495,46 @@ namespace Orleans.Tests.SqlUtils
                 return Task.FromResult<IList<AdoNetStreamConfirmationAck>>([]);
             }
 
-            // this builds a string in the form "1:2|3:4|5:6" where the first number is the message id and the second is the dequeue counter which acts as a receipt
-            // while we have more efficient ways of passing this data per RDMS, we use a string here to ensure call compatibility across ADONET providers
-            // it is the responsibility of the RDMS implementation to parse this string and apply it correctly
-            var items = messages.Aggregate(new StringBuilder(), (b, m) => b.Append(b.Length > 0 ? "|" : "").Append(m.MessageId).Append(':').Append(m.Dequeued), b => b.ToString());
+            return ReadAsync<AdoNetStreamConfirmationAck, IList<AdoNetStreamConfirmationAck>>(
+                dbStoredQueries.ConfirmStreamMessagesKey,
+                record => new AdoNetStreamConfirmationAck(
+                    (string)record[nameof(AdoNetStreamConfirmationAck.ServiceId)],
+                    (string)record[nameof(AdoNetStreamConfirmationAck.ProviderId)],
+                    (string)record[nameof(AdoNetStreamConfirmationAck.QueueId)],
+                    (long)record[nameof(AdoNetStreamConfirmationAck.MessageId)]),
+                command => new DbStoredQueries.Columns(command)
+                {
+                    ServiceId = serviceId,
+                    ProviderId = providerId,
+                    QueueId = queueId,
+                    Items = FormatStreamConfirmations(messages, release: false)
+                },
+                result => result.ToList());
+        }
+
+        /// <summary>
+        /// Makes unconfirmed stream messages immediately available for redelivery.
+        /// </summary>
+        /// <param name="serviceId">The service identifier.</param>
+        /// <param name="providerId">The provider identifier.</param>
+        /// <param name="queueId">The queue identifier.</param>
+        /// <param name="messages">The messages to release.</param>
+        /// <returns>A list of released messages.</returns>
+        /// <remarks>
+        /// The dequeue counter acts as a receipt so that a stale receiver cannot release a message
+        /// which has already been dequeued by a new receiver.
+        /// </remarks>
+        internal Task<IList<AdoNetStreamConfirmationAck>> ReleaseStreamMessagesAsync(string serviceId, string providerId, string queueId, IList<AdoNetStreamConfirmation> messages)
+        {
+            ArgumentNullException.ThrowIfNull(serviceId);
+            ArgumentNullException.ThrowIfNull(providerId);
+            ArgumentNullException.ThrowIfNull(queueId);
+            ArgumentNullException.ThrowIfNull(messages);
+
+            if (messages.Count == 0)
+            {
+                return Task.FromResult<IList<AdoNetStreamConfirmationAck>>([]);
+            }
 
             return ReadAsync<AdoNetStreamConfirmationAck, IList<AdoNetStreamConfirmationAck>>(
                 dbStoredQueries.ConfirmStreamMessagesKey,
@@ -512,10 +548,21 @@ namespace Orleans.Tests.SqlUtils
                     ServiceId = serviceId,
                     ProviderId = providerId,
                     QueueId = queueId,
-                    Items = items
+                    Items = FormatStreamConfirmations(messages, release: true)
                 },
                 result => result.ToList());
         }
+
+        // Builds a provider-neutral receipt list in the form "1:2|3:4|5:6".
+        private static string FormatStreamConfirmations(IList<AdoNetStreamConfirmation> messages, bool release) =>
+            messages.Aggregate(
+                new StringBuilder(),
+                (builder, message) => builder
+                    .Append(builder.Length > 0 ? "|" : "")
+                    .Append(message.MessageId)
+                    .Append(':')
+                    .Append(release ? -message.Dequeued : message.Dequeued),
+                static builder => builder.ToString());
 
         /// <summary>
         /// Applies delivery failure logic to a stream message, such as making the message visible again or moving it to dead letters.

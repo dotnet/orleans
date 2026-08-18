@@ -473,6 +473,47 @@ FROM
 /* count the number of messages to delete so we can use order by in the next query */
 DECLARE @Count INT = (SELECT COUNT(*) FROM @ItemsTable);
 
+/* negative dequeue receipts release messages for immediate redelivery */
+IF EXISTS (SELECT 1 FROM @ItemsTable WHERE Dequeued < 0)
+BEGIN
+    DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
+
+    WITH Batch AS
+    (
+        SELECT TOP (@Count)
+            M.*
+        FROM
+            OrleansStreamMessage AS M WITH (UPDLOCK, READPAST, READCOMMITTEDLOCK, ROWLOCK)
+        WHERE
+            ServiceId = @ServiceId
+            AND ProviderId = @ProviderId
+            AND QueueId = @QueueId
+            AND EXISTS
+            (
+                SELECT *
+                FROM @ItemsTable AS I
+                WHERE I.MessageId = M.MessageId
+                AND -I.Dequeued = M.Dequeued
+            )
+        ORDER BY
+            ServiceId,
+            ProviderId,
+            QueueId,
+            MessageId
+    )
+    UPDATE Batch
+    SET
+        VisibleOn = @Now,
+        ModifiedOn = @Now
+    OUTPUT
+        Inserted.ServiceId,
+        Inserted.ProviderId,
+        Inserted.QueueId,
+        Inserted.MessageId;
+
+    RETURN;
+END;
+
 /* delete messages in the exact same order as the clustered index to avoid deadlocks with other queries */
 /* skip messages being changed concurrently since their dequeue receipt may no longer match */
 WITH Batch AS

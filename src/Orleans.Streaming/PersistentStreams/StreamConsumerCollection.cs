@@ -69,7 +69,6 @@ namespace Orleans.Streams
             queueData.Clear();
         }
 
-
         public int Count
         {
             get { return queueData.Count; }

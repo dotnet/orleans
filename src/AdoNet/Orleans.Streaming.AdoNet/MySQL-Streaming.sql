@@ -375,8 +375,8 @@ WHILE LOCATE(_Delimiter1, _Items) > 0 DO
 
     SET _Value = SUBSTRING_INDEX(_Items, _Delimiter1, 1);
     SET _MessageId = CAST(SUBSTRING_INDEX(_Value, _Delimiter2, 1) AS UNSIGNED);
-    SET _Dequeued = CAST(SUBSTRING_INDEX(_Value, _Delimiter2, -1) AS UNSIGNED);
-    
+    SET _Dequeued = CAST(SUBSTRING_INDEX(_Value, _Delimiter2, -1) AS SIGNED);
+
     INSERT INTO _ItemsTable
     (
         ServiceId,
@@ -414,7 +414,7 @@ FROM
         AND M.ProviderId = I.ProviderId
         AND M.QueueId = I.QueueId
         AND M.MessageId = I.MessageId
-        AND M.Dequeued = I.Dequeued
+        AND M.Dequeued = ABS(I.Dequeued)
 ORDER BY
     M.ServiceId,
     M.ProviderId,
@@ -422,14 +422,27 @@ ORDER BY
 	M.MessageId
 FOR UPDATE;
 
-/* delete the elected batch */
-DELETE M
-FROM OrleansStreamMessage AS M
-INNER JOIN _Batch AS B
-    ON M.ServiceId = B.ServiceId
-    AND M.ProviderId = B.ProviderId
-    AND M.QueueId = B.QueueId
-    AND M.MessageId = B.MessageId;
+IF EXISTS (SELECT 1 FROM _ItemsTable WHERE Dequeued < 0) THEN
+    /* negative dequeue receipts release messages for immediate redelivery */
+    UPDATE OrleansStreamMessage AS M
+    INNER JOIN _Batch AS B
+        ON M.ServiceId = B.ServiceId
+        AND M.ProviderId = B.ProviderId
+        AND M.QueueId = B.QueueId
+        AND M.MessageId = B.MessageId
+    SET
+        M.VisibleOn = UTC_TIMESTAMP(6),
+        M.ModifiedOn = UTC_TIMESTAMP(6);
+ELSE
+    /* delete the elected batch */
+    DELETE M
+    FROM OrleansStreamMessage AS M
+    INNER JOIN _Batch AS B
+        ON M.ServiceId = B.ServiceId
+        AND M.ProviderId = B.ProviderId
+        AND M.QueueId = B.QueueId
+        AND M.MessageId = B.MessageId;
+END IF;
 
 /* return the ack */
 SELECT

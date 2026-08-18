@@ -360,7 +360,16 @@ namespace Orleans.Streams
                     if (requestedToken != null)
                     {
                         consumerData.SafeDisposeCursor(logger);
-                        consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, requestedToken);
+                        try
+                        {
+                            consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, requestedToken);
+                        }
+                        catch (QueueCacheMissException) when (cacheToken is not null)
+                        {
+                            // A cold stream's triggering batch is the receiver's first available
+                            // message, so resume there if the consumer's prior token was evicted.
+                            consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, cacheToken);
+                        }
                     }
                     else
                     {
@@ -503,6 +512,12 @@ namespace Orleans.Streams
         private async Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver? rcvr, int maxCacheAddCount, CancellationToken cancellationToken)
         {
             if (rcvr is null || IsShutdown || cancellationToken.IsCancellationRequested)
+            {
+                return false;
+            }
+
+            // Pause all queue reads so a cold stream's first batch stays pinned until registration completes.
+            if (pubSubCache.Values.Any(static stream => stream.RegistrationTask is { IsCompleted: false }))
             {
                 return false;
             }
@@ -746,9 +761,6 @@ namespace Orleans.Streams
                 finally
                 {
                     streamData.RegistrationTask = null;
-
-                    // Disposed after all initial subscriber handshakes complete so the first
-                    // batch stays pinned until each subscriber has its own cache cursor.
                     pinCursor?.Dispose();
                 }
             }
@@ -889,10 +901,20 @@ namespace Orleans.Streams
                             {
                                 consumerData.LastProcessedToken = newToken.Token;
                                 consumerData.LastToken = newToken;
-                                IQueueCacheCursor newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, newToken.Token); // queueCache must be non-null here: consumerData.Cursor was only ever populated via queueCache.GetCacheCursor.
-                                // The handshake token points to an already processed event, we need to advance the cursor to
-                                // the next event.
-                                newCursor.MoveNext();
+                                IQueueCacheCursor newCursor;
+                                try
+                                {
+                                    newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, newToken.Token); // queueCache must be non-null here: consumerData.Cursor was only ever populated via queueCache.GetCacheCursor.
+                                    // The handshake token points to an already processed event, so advance past it.
+                                    newCursor.MoveNext();
+                                }
+                                catch (QueueCacheMissException)
+                                {
+                                    // The current batch is the receiver's first available message.
+                                    // Keep it pending when the consumer resumes from an evicted token.
+                                    newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, batch.SequenceToken);
+                                }
+
                                 consumerData.SafeDisposeCursor(logger);
                                 consumerData.Cursor = newCursor;
                             }

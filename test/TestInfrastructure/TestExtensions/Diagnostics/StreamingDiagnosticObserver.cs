@@ -178,13 +178,25 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// </remarks>
     public async Task WaitForItemDeliveryCountAsync(StreamId streamId, int expectedCount, string? streamProvider, CancellationToken cancellationToken)
     {
-        await _events
-            .OfType<StreamingEvents.ItemDelivered>()
-            .Where(e => MatchesStream(e.StreamId, e.StreamProvider, streamId, streamProvider))
-            .Take(expectedCount)
-            .LastOrDefaultAsync()
-            .ToTask(cancellationToken)
-            .ConfigureAwait(false);
+        var actualCount = 0;
+        try
+        {
+            await _events
+                .OfType<StreamingEvents.ItemDelivered>()
+                .Where(e => MatchesStream(e.StreamId, e.StreamProvider, streamId, streamProvider))
+                .Do(_ => Interlocked.Increment(ref actualCount))
+                .Take(expectedCount)
+                .LastOrDefaultAsync()
+                .ToTask(cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(
+                $"Canceled while waiting for {expectedCount} item deliveries on stream {streamId} from provider '{streamProvider ?? "<any>"}'; observed {Volatile.Read(ref actualCount)}.",
+                exception,
+                cancellationToken);
+        }
     }
 
     /// <summary>
@@ -192,13 +204,25 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// </summary>
     public async Task WaitForItemDeliveryCountAsync(StreamId streamId, Guid subscriptionId, int expectedCount, string? streamProvider, CancellationToken cancellationToken)
     {
-        await _events
-            .OfType<StreamingEvents.ItemDelivered>()
-            .Where(e => MatchesSubscription(e.StreamId, e.SubscriptionId, e.StreamProvider, streamId, subscriptionId, streamProvider))
-            .Take(expectedCount)
-            .LastOrDefaultAsync()
-            .ToTask(cancellationToken)
-            .ConfigureAwait(false);
+        var actualCount = 0;
+        try
+        {
+            await _events
+                .OfType<StreamingEvents.ItemDelivered>()
+                .Where(e => MatchesSubscription(e.StreamId, e.SubscriptionId, e.StreamProvider, streamId, subscriptionId, streamProvider))
+                .Do(_ => Interlocked.Increment(ref actualCount))
+                .Take(expectedCount)
+                .LastOrDefaultAsync()
+                .ToTask(cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(
+                $"Canceled while waiting for {expectedCount} item deliveries on stream {streamId}, subscription {subscriptionId}, from provider '{streamProvider ?? "<any>"}'; observed {Volatile.Read(ref actualCount)}.",
+                exception,
+                cancellationToken);
+        }
     }
 
     /// <summary>

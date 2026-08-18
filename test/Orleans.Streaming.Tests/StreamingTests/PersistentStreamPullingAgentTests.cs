@@ -60,10 +60,15 @@ namespace UnitTests.StreamingTests
 
             Assert.True(await readTask, "ReadFromQueue should return true indicating data was read");
 
+            Assert.False(await testAccessor.ReadFromQueue(queueId, receiver, 1));
+            await receiver.Received(1).GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
+
             // Completing registration should resolve the tracked task and clear it.
             registration.SetResult(new HashSet<PubSubSubscriptionState>());
             await registrationTask;
+            Assert.True(await testAccessor.ReadFromQueue(queueId, receiver, 1));
             Assert.Null(streamData.RegistrationTask);
+            await receiver.Received(2).GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
         }
 
         [TestSuite("BVT")]

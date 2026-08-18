@@ -316,6 +316,7 @@ AS $$
 #VARIABLE_CONFLICT USE_COLUMN
 DECLARE
 	_Count INT;
+    _Now TIMESTAMP(6) WITHOUT TIME ZONE := CURRENT_TIMESTAMP AT TIME ZONE 'UTC';
 BEGIN
 
 CREATE TEMP TABLE _ItemsTable
@@ -334,6 +335,48 @@ SELECT
 	CAST(split_part(Value, ':', 2) AS INT) AS Dequeued
 FROM
 	UNNEST(string_to_array(_Items, '|')) AS Value;
+
+/* negative dequeue receipts release messages for immediate redelivery */
+IF EXISTS (SELECT 1 FROM _ItemsTable WHERE Dequeued < 0) THEN
+    RETURN QUERY
+    WITH Batch AS
+    (
+        SELECT
+            M.*
+        FROM
+            OrleansStreamMessage AS M
+            INNER JOIN _ItemsTable AS I
+                ON I.MessageId = M.MessageId
+                AND -I.Dequeued = M.Dequeued
+        WHERE
+            ServiceId = _ServiceId
+            AND ProviderId = _ProviderId
+            AND QueueId = _QueueId
+        ORDER BY
+            ServiceId,
+            ProviderId,
+            QueueId,
+            MessageId
+        FOR UPDATE
+    )
+    UPDATE OrleansStreamMessage AS M
+    SET
+        VisibleOn = _Now,
+        ModifiedOn = _Now
+    FROM
+        Batch AS B
+    WHERE
+        M.ServiceId = B.ServiceId
+        AND M.ProviderId = B.ProviderId
+        AND M.QueueId = B.QueueId
+        AND M.MessageId = B.MessageId
+    RETURNING
+        M.ServiceId,
+        M.ProviderId,
+        M.QueueId,
+        M.MessageId;
+    RETURN;
+END IF;
 
 RETURN QUERY
 WITH Batch AS
