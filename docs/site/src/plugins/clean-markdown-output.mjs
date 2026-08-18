@@ -108,6 +108,42 @@ export async function publishMarkdownOverview(outputRoot, site) {
     }
   }
   const overviewPaths = new Set(overviewFiles.map((file) => path.resolve(file)));
+  for (const file of files) {
+    const relativePath = path.relative(docsRoot, file).replaceAll('\\', '/');
+    if (relativePath.split('/').length !== 3) {
+      continue;
+    }
+
+    const parentPage = `${path.dirname(file)}.md`;
+    if (overviewPaths.has(path.resolve(parentPage))) {
+      overviewFiles.push(file);
+      overviewPaths.add(path.resolve(file));
+    }
+  }
+  const depthByPath = new Map();
+  depthByPath.set(path.resolve(docsIndex), 0);
+  function getOverviewDepth(file) {
+    const resolvedFile = path.resolve(file);
+    const existingDepth = depthByPath.get(resolvedFile);
+    if (existingDepth !== undefined) {
+      return existingDepth;
+    }
+    const docsRelativeSegments = path.relative(docsRoot, file).split(path.sep);
+    if (docsRelativeSegments.length === 1) {
+      depthByPath.set(resolvedFile, 1);
+      return 1;
+    }
+
+    const parentPage = `${path.dirname(file)}.md`;
+    const depth = overviewPaths.has(path.resolve(parentPage))
+      ? getOverviewDepth(parentPage) + 1
+      : 1;
+    depthByPath.set(resolvedFile, depth);
+    return depth;
+  }
+  for (const file of overviewFiles) {
+    getOverviewDepth(file);
+  }
   const entries = await Promise.all(
     overviewFiles.map(async (file) => {
       const markdown = await readFile(file, 'utf8');
@@ -117,16 +153,8 @@ export async function publishMarkdownOverview(outputRoot, site) {
       }
 
       const relativePath = path.relative(root, file).replaceAll('\\', '/');
-      const docsRelativeSegments = path.relative(docsRoot, file).split(path.sep);
-      let depth = file === docsIndex ? 0 : docsRelativeSegments.length;
-      if (depth === 2) {
-        const parentPage = path.join(docsRoot, `${docsRelativeSegments[0]}.md`);
-        if (!overviewPaths.has(path.resolve(parentPage))) {
-          depth = 1;
-        }
-      }
       return {
-        depth,
+        depth: depthByPath.get(path.resolve(file)) ?? 0,
         title,
         url: new URL(relativePath, site).pathname,
       };

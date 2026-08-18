@@ -65,10 +65,20 @@ if (files.includes(llmsEntryPoint)) {
   const overviewUrls = [
     ...overview.matchAll(/\/orleans\/docs\/([^)\s]+)\.md/g),
   ].map((match) => match[1]);
-  if (overviewUrls.some((url) => url.split('/').length > 2)) {
-    fail(llmsEntryPoint, 'documentation overview includes pages below the second level');
+  if (overviewUrls.some((url) => url.split('/').length > 3)) {
+    fail(llmsEntryPoint, 'documentation overview includes pages below the third level');
   }
+  const overviewUrlSet = new Set(overviewUrls);
   for (const url of overviewUrls) {
+    const segments = url.split('/');
+    if (segments.length === 3) {
+      const parentUrl = segments.slice(0, -1).join('/');
+      if (!overviewUrlSet.has(parentUrl)) {
+        fail(llmsEntryPoint, `third-level overview entry '${url}' has no parent hub`);
+      }
+      continue;
+    }
+
     const overviewDirectory = path.join(distRoot, 'docs', ...url.split('/'));
     try {
       const children = await readdir(overviewDirectory, { withFileTypes: true });

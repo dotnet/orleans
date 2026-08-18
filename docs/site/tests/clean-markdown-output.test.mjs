@@ -66,7 +66,7 @@ builder.UseOrleans();
     assert.equal(await readFile(api, 'utf8'), '# API\n');
   });
 
-  test('adds a two-level conceptual overview to llms.txt', async () => {
+  test('adds a three-level conceptual overview to llms.txt', async () => {
     const outputRoot = await mkdtemp(path.join(os.tmpdir(), 'orleans-docs-overview-'));
     temporaryDirectories.push(outputRoot);
     const docsIndex = path.join(outputRoot, 'docs.md');
@@ -89,7 +89,7 @@ builder.UseOrleans();
 
     assert.equal(
       await publishMarkdownOverview(outputRoot, new URL('https://dotnet.github.io/orleans/')),
-      3,
+      4,
     );
     const llmsText = await readFile(path.join(outputRoot, 'llms.txt'), 'utf8');
     assert.match(llmsText, /## Documentation Overview/);
@@ -105,6 +105,10 @@ builder.UseOrleans();
       llmsText,
       /    - \[Event sourcing\]\(\/orleans\/docs\/grains\/event-sourcing\.md\)/,
     );
-    assert.doesNotMatch(llmsText, /Event sourcing details|Grain identity|\[API\]/);
+    assert.match(
+      llmsText,
+      /      - \[Event sourcing details\]\(\/orleans\/docs\/grains\/event-sourcing\/details\.md\)/,
+    );
+    assert.doesNotMatch(llmsText, /Grain identity|\[API\]/);
   });
 });
