@@ -20,6 +20,10 @@
   <ItemGroup>
     <Compile Include="..\Orleans.CodeGenerator.Shared\InvokableBaseTypeResolver.cs" Link="InvokableBaseTypeResolver.cs" />
     <Compile Include="..\Shared\CodeGeneration\RpcMethodIdGenerator.cs" Link="RpcMethodIdGenerator.cs" />
+    <Compile Include="..\Orleans.CodeGenerator\Hashing\BitOperations.cs" Link="Hashing\BitOperations.cs" />
+    <Compile Include="..\Orleans.CodeGenerator\Hashing\NonCryptographicHashAlgorithm.cs" Link="Hashing\NonCryptographicHashAlgorithm.cs" />
+    <Compile Include="..\Orleans.CodeGenerator\Hashing\XxHash32.cs" Link="Hashing\XxHash32.cs" />
+    <Compile Include="..\Orleans.CodeGenerator\Hashing\XxHash32.State.cs" Link="Hashing\XxHash32.State.cs" />
   </ItemGroup>
 
   <ItemGroup>
