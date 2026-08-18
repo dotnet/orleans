@@ -60,7 +60,7 @@ namespace Tester.EventSourcingTests
             {
                 public override bool CanConvert(Type typeToConvert) => typeToConvert == typeof(object);
 
-                public override object Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+                public override object? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
                 {
                     if (reader.TokenType is JsonTokenType.Null)
                     {
