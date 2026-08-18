@@ -1,9 +1,13 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Providers;
+using Orleans.Runtime;
+using Orleans.Streams;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
+using UnitTests.Grains;
 using Xunit;
 
 namespace UnitTests.StreamingTests
@@ -19,12 +23,11 @@ namespace UnitTests.StreamingTests
     {
         private readonly Fixture fixture;
 
-        private readonly ILogger logger;
-
         public class Fixture : BaseTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
+                builder.Options.InitialSilosCount = 1;
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
                 builder.AddClientBuilderConfigurator<ClientConfiguretor>();
             }
@@ -33,8 +36,11 @@ namespace UnitTests.StreamingTests
             {
                 public void Configure(ISiloBuilder hostBuilder)
                 {
-                    hostBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProvider)
-                         .AddMemoryGrainStorage("PubSubStore");
+                    hostBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(
+                            StreamProvider,
+                            streams => streams.ConfigurePartitioning(PartitionCount))
+                        .AddMemoryGrainStorage("PubSubStore");
+                    hostBuilder.Services.AddSingleton<StatelessWorkerStreamConsumerState>();
                 }
             }
 
@@ -42,56 +48,119 @@ namespace UnitTests.StreamingTests
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
                 {
-                    clientBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProvider);
+                    clientBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(
+                        StreamProvider,
+                        streams => streams.ConfigurePartitioning(PartitionCount));
                 }
             }
         }
 
+        private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
+        private const int PartitionCount = 4;
         private const string StreamProvider = StreamTestsConstants.MEMORY_STREAM_PROVIDER_NAME;
 
         public StatelessWorkersStreamTests(Fixture fixture)
         {
             this.fixture = fixture;
-            logger = this.fixture.Logger;
         }
 
         [Fact, TestCategory("Functional")]
-        public async Task SubscribeToStream_FromStatelessWorker_Fail()
+        public async Task ExplicitSubscription_DeliversToStatelessWorker_AndCanBeRemovedAtGrainScope()
         {
-            this.logger.LogInformation($"************************ { nameof(SubscribeToStream_FromStatelessWorker_Fail) } *********************************");
-            var runner = new StatelessWorkersStreamTestsRunner(StreamProvider, this.logger, this.fixture.HostedCluster);
-            await Assert.ThrowsAsync<InvalidOperationException>( () => runner.BecomeConsumer(Guid.NewGuid()));
-        }
-    }
+            var state = GetConsumerState();
+            state.Reset(expectedDeliveries: 1);
+            var streamId = Guid.NewGuid();
+            var consumer = fixture.GrainFactory.GetGrain<IStatelessWorkerStreamConsumerGrain>(0);
 
-    /// <summary>
-    /// Test runner class for executing stateless worker stream tests with producer and consumer functionality.
-    /// </summary>
-    public class StatelessWorkersStreamTestsRunner
-    {
-        private const string StreamNamespace = "SampleStreamNamespace";
+            await consumer.BecomeConsumer([streamId], StreamProvider);
+            await GetStream(StatelessWorkerStreamConsumerGrain.ExplicitStreamNamespace, streamId).OnNextAsync("first");
+            await state.WaitForDeliveriesAsync(Timeout);
 
-        private readonly string streamProvider;
-        private readonly ILogger logger;
-        private readonly TestCluster cluster;
-
-        public StatelessWorkersStreamTestsRunner(string streamProvider, ILogger logger, TestCluster cluster)
-        {
-            this.streamProvider = streamProvider;
-            this.logger = logger;
-            this.cluster = cluster;
+            Assert.Equal(1, state.DeliveryCount);
+            Assert.Equal(1, await consumer.StopConsuming(streamId, StreamProvider));
+            Assert.Equal(0, await consumer.StopConsuming(streamId, StreamProvider));
         }
 
-        public async Task BecomeConsumer(Guid streamId)
+        [Fact, TestCategory("Functional")]
+        public async Task ImplicitSubscription_AttachesObserverBeforeFirstDelivery()
         {
-            var consumer = this.cluster.GrainFactory!.GetGrain<IStatelessWorkerStreamConsumerGrain>(0);
-            await consumer.BecomeConsumer(streamId, streamProvider);
+            var state = GetConsumerState();
+            state.Reset(expectedDeliveries: 1);
+            var streamId = Guid.NewGuid();
+
+            await GetStream(ImplicitStatelessWorkerStreamConsumerGrain.StreamNamespace, streamId).OnNextAsync("first");
+            await state.WaitForDeliveriesAsync(Timeout);
+
+            Assert.Equal(1, state.DeliveryCount);
+            Assert.Equal(1, state.ObserverActivationCount);
         }
 
-        public async Task ProduceMessage(Guid streamId)
+        [Fact, TestCategory("Functional")]
+        public async Task ConcurrentQueueDeliveries_UseMultipleLocalWorkerActivations()
         {
-            var producer = this.cluster.GrainFactory!.GetGrain<IStatelessWorkerStreamProducerGrain>(0);
-            await producer.Produce(streamId, streamProvider, string.Empty);
+            var state = GetConsumerState();
+            state.Reset(expectedDeliveries: PartitionCount, blockDeliveries: true);
+            var streamIds = CreateStreamIdsForDistinctQueues();
+            var consumer = fixture.GrainFactory.GetGrain<IStatelessWorkerStreamConsumerGrain>(1);
+            await consumer.BecomeConsumer(streamIds, StreamProvider);
+
+            await Task.WhenAll(streamIds.Select((streamId, index) =>
+                GetStream(StatelessWorkerStreamConsumerGrain.ExplicitStreamNamespace, streamId)
+                    .OnNextAsync($"item-{index}")));
+            await state.WaitForBlockedDeliveriesAsync(Timeout);
+
+            Assert.Equal(PartitionCount, state.WaitingDeliveryCount);
+            Assert.Equal(PartitionCount, state.DeliveryActivationCount);
+            Assert.Equal(PartitionCount, state.ObserverActivationCount);
+
+            state.ReleaseDeliveries(PartitionCount);
+            await state.WaitForReleasedDeliveriesAsync(Timeout);
+            Assert.Equal(PartitionCount, state.DeliveryCount);
+        }
+
+        [Fact, TestCategory("Functional")]
+        public async Task SubscribeToStream_FromStatelessWorkerWithoutSubscriptionObserver_Fails()
+        {
+            var consumer = fixture.GrainFactory.GetGrain<IUnsupportedStatelessWorkerStreamConsumerGrain>(0);
+
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => consumer.BecomeConsumer(Guid.NewGuid(), StreamProvider));
+
+            Assert.Contains(typeof(Orleans.Streams.Core.IStreamSubscriptionObserver).FullName!, exception.Message);
+        }
+
+        [Fact, TestCategory("Functional")]
+        public async Task SubscribeToStream_FromStatelessWorkerWithSequenceToken_Fails()
+        {
+            var consumer = fixture.GrainFactory.GetGrain<IStatelessWorkerStreamConsumerGrain>(2);
+
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => consumer.BecomeConsumerFromToken(Guid.NewGuid(), StreamProvider));
+
+            Assert.Contains("null sequence token", exception.Message);
+        }
+
+        private StatelessWorkerStreamConsumerState GetConsumerState() =>
+            fixture.HostedCluster.GetSiloServiceProvider().GetRequiredService<StatelessWorkerStreamConsumerState>();
+
+        private IAsyncStream<string> GetStream(string streamNamespace, Guid streamId) =>
+            fixture.Client.GetStreamProvider(StreamProvider).GetStream<string>(streamNamespace, streamId);
+
+        private static Guid[] CreateStreamIdsForDistinctQueues()
+        {
+            var mapper = new HashRingBasedStreamQueueMapper(
+                new HashRingStreamQueueMapperOptions { TotalQueueCount = PartitionCount },
+                StreamProvider);
+            var result = new Dictionary<QueueId, Guid>();
+            while (result.Count < PartitionCount)
+            {
+                var streamId = Guid.NewGuid();
+                var queueId = mapper.GetQueueForStream(
+                    StreamId.Create(StatelessWorkerStreamConsumerGrain.ExplicitStreamNamespace, streamId));
+                result.TryAdd(queueId, streamId);
+            }
+
+            return result.Values.ToArray();
         }
     }
 }

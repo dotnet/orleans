@@ -41,10 +41,16 @@ namespace Orleans.Streams
         // then this will be not null, otherwise, it will be null
         [NonSerialized]
         private readonly IStreamSubscriptionObserver? streamSubscriptionObserver;
+        [NonSerialized]
+        private readonly bool isStatelessWorker;
 
-        internal StreamConsumerExtension(IStreamProviderRuntime providerRt, IStreamSubscriptionObserver? streamSubscriptionObserver = null)
+        internal StreamConsumerExtension(
+            IStreamProviderRuntime providerRt,
+            IStreamSubscriptionObserver? streamSubscriptionObserver = null,
+            bool isStatelessWorker = false)
         {
             this.streamSubscriptionObserver = streamSubscriptionObserver;
+            this.isStatelessWorker = isStatelessWorker;
             providerRuntime = providerRt;
             logger = providerRt.ServiceProvider.GetRequiredService<ILogger<StreamConsumerExtension>>();
         }
@@ -58,13 +64,24 @@ namespace Orleans.Streams
             string? filterData)
         {
             if (null == stream) throw new ArgumentNullException(nameof(stream));
+            if (isStatelessWorker && token is not null)
+            {
+                throw new InvalidOperationException("Stateless worker stream subscriptions use provider-managed live delivery and require a null sequence token.");
+            }
 
             try
             {
                 LogDebugAddObserver(providerRuntime.ExecutingEntityIdentity(), stream.InternalStreamId);
 
                 // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
-                var handle = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, batchObserver, stream, token, filterData);
+                var handle = new StreamSubscriptionHandleImpl<T>(
+                    subscriptionId,
+                    observer,
+                    batchObserver,
+                    stream,
+                    token,
+                    filterData,
+                    disableHandshake: isStatelessWorker);
                 allStreamObservers[subscriptionId] = handle;
                 return handle;
             }

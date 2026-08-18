@@ -23,6 +23,8 @@ namespace Orleans.Streams
         private readonly GuidId subscriptionId;
         [Id(3)]
         private readonly bool isRewindable;
+        [Id(4)]
+        private readonly bool disableHandshake;
 
         [NonSerialized]
         private IAsyncObserver<T>? observer;
@@ -56,7 +58,8 @@ namespace Orleans.Streams
             IAsyncBatchObserver<T>? batchObserver,
             StreamImpl<T> streamImpl,
             StreamSequenceToken? token,
-            string? filterData)
+            string? filterData,
+            bool disableHandshake = false)
         {
             this.subscriptionId = subscriptionId ?? throw new ArgumentNullException(nameof(subscriptionId));
             this.observer = observer;
@@ -64,7 +67,8 @@ namespace Orleans.Streams
             this.streamImpl = streamImpl ?? throw new ArgumentNullException(nameof(streamImpl));
             this.filterData = filterData;
             this.isRewindable = streamImpl.IsRewindable;
-            if (IsRewindable)
+            this.disableHandshake = disableHandshake;
+            if (IsRewindable && !disableHandshake)
             {
                 expectedToken = StreamHandshakeToken.CreateStartToken(token);
             }
@@ -79,7 +83,7 @@ namespace Orleans.Streams
 
         public StreamHandshakeToken? GetSequenceToken()
         {
-            return this.expectedToken;
+            return disableHandshake ? null : expectedToken;
         }
 
         public override Task UnsubscribeAsync()
@@ -146,7 +150,7 @@ namespace Orleans.Streams
                 }
             }
 
-            if (IsRewindable)
+            if (IsRewindable && !disableHandshake)
             {
                 this.expectedToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken);
             }
@@ -203,7 +207,7 @@ namespace Orleans.Streams
                 if (!this.expectedToken.Equals(handshakeToken))
                     return this.expectedToken;
             }
-            if (IsRewindable)
+            if (IsRewindable && !disableHandshake)
             {
                 this.expectedToken = StreamHandshakeToken.CreateDeliveyToken(currentToken);
             }
