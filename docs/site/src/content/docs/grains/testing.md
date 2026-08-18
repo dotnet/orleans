@@ -67,24 +67,10 @@ Wait for liveness to stabilize before asserting behavior which depends on the ne
 
 <xref:Orleans.TestingHost.TestCluster> remains available for suites built around class-based configurators such as <xref:Orleans.TestingHost.ISiloConfigurator>. Its built-in hosts run in process; a custom silo-creation delegate is required for another isolation model. New Orleans tests should generally use <xref:Orleans.TestingHost.InProcessTestCluster> for its delegate-based configuration and direct access to each host's service provider.
 
-## Unit test grain logic with mocks
+## Unit test application logic
 
-The Orleans runtime creates grain activations through dependency injection. A grain constructor can receive application services and Orleans abstractions, and an isolated test can pass test doubles through the same constructor:
+Use <xref:Orleans.TestingHost.InProcessTestCluster> for behavior implemented by a grain. The cluster creates activations through the Orleans runtime and preserves turn scheduling, interleaving, serialization, dependency injection, persistence integration, placement, message routing, timers, reminders, and lifecycle behavior.
 
-| Grain behavior | Constructor dependency |
-| --- | --- |
-| Call another grain | <xref:Orleans.IGrainFactory> or the application-specific grain interface |
-| Read the activation identity | <xref:Orleans.Runtime.IGrainContext> |
-| Read and write persistent state | <xref:Orleans.Runtime.IPersistentState`1> with <xref:Orleans.Runtime.PersistentStateAttribute> |
-| Register a timer | <xref:Orleans.Timers.ITimerRegistry> |
-| Register or inspect reminders | <xref:Orleans.Timers.IReminderRegistry> |
+Pure domain logic can be extracted into an ordinary class or service and tested directly. Keep that boundary independent of Orleans runtime abstractions. A cluster test can replace application-owned collaborators through dependency injection while the runtime continues to create and execute the grain.
 
-The following grain implements <xref:Orleans.IGrainBase> directly so that every dependency is visible in its constructor. The runtime supplies the activation context, persistent-state facet, and registered services when it creates the activation:
-
-:::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/ShoppingCartGrain.cs" id="mockable_grain":::
-
-The unit tests construct the grain with NSubstitute test doubles. The configured <xref:Orleans.Runtime.IGrainContext.GrainId> makes `GetPrimaryKeyString()` return the activation's string key, so key-dependent logic uses the same identity path as a runtime activation. The persistence test verifies the state mutation and write request. The lifecycle test captures the timer callback, invokes its application logic, and verifies reminder registration:
-
-:::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/ShoppingCartGrainTests.cs" id="mocked_grain_tests":::
-
-This test boundary verifies application decisions and interactions. Use <xref:Orleans.TestingHost.InProcessTestCluster> to exercise activation and deactivation, turn scheduling, interleaving, serialization, placement, directory lookup, message routing, and timer delivery. Configure the production storage or reminder provider when the test covers its external-system contract, concurrency behavior, or restart recovery.
+Configure the production storage or reminder provider when the test covers its external-system contract, concurrency behavior, or restart recovery.
