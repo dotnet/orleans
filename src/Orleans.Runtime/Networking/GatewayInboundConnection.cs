@@ -14,11 +14,12 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
         private readonly ConnectionOptions connectionOptions;
         private readonly Gateway gateway;
-        private readonly Action<Message, Action> sendMessage;
+        private readonly Action<Message, Connection?, Exception?> sendMessage;
         private readonly GatewayInstruments gatewayInstruments;
         private readonly OverloadDetector overloadDetector;
         private readonly SiloAddress myAddress;
         private readonly string myClusterId;
+        private Gateway.ClientState? clientState;
 
         public GatewayInboundConnection(
             MessageTransport transport,
@@ -34,7 +35,7 @@ namespace Orleans.Runtime.Messaging
         {
             this.connectionOptions = connectionOptions;
             this.gateway = gateway;
-            this.sendMessage = gateway.SendMessage;
+            this.sendMessage = SendMessage;
             this.gatewayInstruments = gatewayInstruments;
             this.overloadDetector = overloadDetector;
             this.messageCenter = messageCenter;
@@ -97,7 +98,14 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 MessagingMetrics.OnMessageReRoute(msg);
-                this.messageCenter.RerouteMessage(msg, this.sendMessage);
+                if (ShouldTrackRequest(msg))
+                {
+                    this.messageCenter.RerouteMessage(msg, this.sendMessage);
+                }
+                else
+                {
+                    this.messageCenter.RerouteMessage(msg);
+                }
             }
             else
             {
@@ -109,9 +117,22 @@ namespace Orleans.Runtime.Messaging
                     msg.TargetGrain = systemTargetId.WithSiloAddress(targetAddress).GrainId;
                 }
 
-                this.messageCenter.SendMessage(msg, this.sendMessage);
+                if (ShouldTrackRequest(msg))
+                {
+                    this.messageCenter.SendMessage(msg, this.sendMessage);
+                }
+                else
+                {
+                    this.messageCenter.SendMessage(msg);
+                }
             }
         }
+
+        private static bool ShouldTrackRequest(Message message) =>
+            message.Direction == Message.Directions.Request && !message.TargetGrain.IsSystemTarget();
+
+        private void SendMessage(Message message, Connection? destination, Exception? exception) =>
+            this.gateway.SendMessage(this.clientState!, message, destination, exception);
 
         protected override async Task RunAsyncCore()
         {
@@ -139,8 +160,16 @@ namespace Orleans.Runtime.Messaging
 
             try
             {
+<<<<<<< HEAD
                 this.gateway.RecordOpenedConnection(this, clientId);
                 await base.RunAsyncCore();
+||||||| parent of 137098443e (perf(messaging): reduce gateway tracking overhead)
+                this.gateway.RecordOpenedConnection(this, clientId);
+                await base.RunInternal();
+=======
+                this.clientState = this.gateway.RecordOpenedConnection(this, clientId);
+                await base.RunInternal();
+>>>>>>> 137098443e (perf(messaging): reduce gateway tracking overhead)
             }
             finally
             {
