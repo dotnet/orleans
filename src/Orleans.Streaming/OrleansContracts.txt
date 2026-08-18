@@ -28,6 +28,7 @@ interface Orleans.Streams.IPubSubRendezvousGrain [Version(0)]
   ProducerCount(Orleans.Runtime.QualifiedStreamId) -> Task<int>
   RegisterConsumer(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, string?) -> Task
   RegisterProducer(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId) -> Task<System.Collections.Generic.ISet<Orleans.Streams.PubSubSubscriptionState>>
+  RegisterProducer(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, Orleans.Runtime.MembershipVersion) -> Task<System.Collections.Generic.ISet<Orleans.Streams.PubSubSubscriptionState>>
   UnregisterConsumer(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId) -> Task
   UnregisterProducer(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId) -> Task
   Validate() -> Task

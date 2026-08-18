@@ -40,7 +40,9 @@ namespace Orleans.Runtime.Providers
             this.consistentRingProvider = consistentRingProvider;
             this.runtimeClient = runtimeClient;
             this.logger = this.loggerFactory.CreateLogger<SiloProviderRuntime>();
-            this.grainBasedPubSub = new GrainBasedPubSubRuntime(this.GrainFactory);
+            this.grainBasedPubSub = new GrainBasedPubSubRuntime(
+                this.GrainFactory,
+                this.ServiceProvider.GetRequiredService<IClusterMembershipService>());
             var tmp = new ImplicitStreamPubSub(implicitStreamSubscriberTable);
             this.implictPubSub = tmp;
             this.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(this.grainBasedPubSub, tmp);

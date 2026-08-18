@@ -9,6 +9,11 @@ namespace Orleans.Streams
     {
         Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer);
 
+        Task<ISet<PubSubSubscriptionState>> RegisterProducer(
+            QualifiedStreamId streamId,
+            GrainId streamProducer,
+            MembershipVersion membershipVersion);
+
         Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer);
 
         Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string? filterData);
