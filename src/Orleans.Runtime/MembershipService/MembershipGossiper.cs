@@ -22,7 +22,7 @@ internal partial class MembershipGossiper(IServiceProvider serviceProvider, ILog
 
         LogDebugGossipingStatusToPartners(logger, updatedSilo, updatedStatus, gossipPartners.Count);
 
-        if (await TryGossipViaDissemination(gossipPartners, snapshot))
+        if (await TryGossipViaDissemination(snapshot))
         {
             return;
         }
@@ -31,7 +31,7 @@ internal partial class MembershipGossiper(IServiceProvider serviceProvider, ILog
         await systemTarget.GossipToRemoteSilos(gossipPartners, snapshot, updatedSilo, updatedStatus);
     }
 
-    private async Task<bool> TryGossipViaDissemination(List<SiloAddress> gossipPartners, MembershipTableSnapshot snapshot)
+    private async Task<bool> TryGossipViaDissemination(MembershipTableSnapshot snapshot)
     {
         try
         {
