@@ -96,12 +96,13 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <summary>
     /// The internal client interface.
     /// </summary>
-    internal IInternalClusterClient InternalClient => ClientHost?.Services.GetRequiredService<IInternalClusterClient>() ?? throw new InvalidOperationException("Client not initialized");
+    internal IInternalClusterClient InternalClient => ClientHost?.Services.GetRequiredService<IInternalClusterClient>() ?? throw new InvalidOperationException(
+        "The test cluster client is unavailable because the cluster has not been deployed or has been stopped.");
 
     /// <summary>
     /// The client.
     /// </summary>
-    public IClusterClient Client => ClientHost?.Services.GetRequiredService<IInternalClusterClient>() ?? throw new InvalidOperationException("Client not initialized");
+    public IClusterClient Client => InternalClient;
 
     /// <summary>
     /// The port allocator.
@@ -855,8 +856,16 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         }
 
         var clientHost = CreateClientHost("default");
-        ClientHost = clientHost;
-        await ClientHost.StartAsync();
+        try
+        {
+            await clientHost.StartAsync();
+            ClientHost = clientHost;
+        }
+        catch
+        {
+            await DisposeAsync(clientHost);
+            throw;
+        }
     }
 
     private IHost CreateClientHost(string name, Action<IHostApplicationBuilder>? configure = null)
@@ -917,8 +926,16 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         if (!_clientHosts.TryGetValue(name, out var host))
         {
             host = CreateClientHost(name, configure);
-            _clientHosts[name] = host;
-            await host.StartAsync();
+            try
+            {
+                await host.StartAsync();
+                _clientHosts.Add(name, host);
+            }
+            catch
+            {
+                await DisposeAsync(host);
+                throw;
+            }
         }
 
         return host.Services.GetRequiredService<IInternalClusterClient>();
