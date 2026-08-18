@@ -16,7 +16,12 @@ namespace Orleans.Runtime.MembershipService
                     && entry.SuspectTimes is { Count: > 0 } suspectTimes
                     && suspectTimes.All(suspect => !suspect.Item1.Equals(entry.SiloAddress));
                 memberBuilder[entry.SiloAddress] = entry.Metadata is { } metadata
-                    ? new ClusterMember(entry.SiloAddress, entry.Status, entry.SiloName, new SiloMetadataModel(metadata), wasDeclaredDead)
+                    ? new ClusterMember(
+                        entry.SiloAddress,
+                        entry.Status,
+                        entry.SiloName,
+                        metadata.Count == 0 ? SiloMetadataModel.Empty : new SiloMetadataModel(metadata),
+                        wasDeclaredDead)
                     : new ClusterMember(entry.SiloAddress, entry.Status, entry.SiloName, wasDeclaredDead);
             }
 
