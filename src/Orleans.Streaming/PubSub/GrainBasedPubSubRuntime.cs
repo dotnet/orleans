@@ -10,10 +10,19 @@ namespace Orleans.Streams
     internal class GrainBasedPubSubRuntime : IStreamPubSub
     {
         private readonly IGrainFactory grainFactory;
+        private readonly IClusterMembershipService? clusterMembershipService;
 
         public GrainBasedPubSubRuntime(IGrainFactory grainFactory)
         {
             this.grainFactory = grainFactory;
+        }
+
+        public GrainBasedPubSubRuntime(
+            IGrainFactory grainFactory,
+            IClusterMembershipService clusterMembershipService)
+        {
+            this.grainFactory = grainFactory;
+            this.clusterMembershipService = clusterMembershipService;
         }
 
         public Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
@@ -22,7 +31,20 @@ namespace Orleans.Streams
         public Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer, CancellationToken cancellationToken)
         {
             var streamRendezvous = GetRendezvousGrain(streamId);
-            return streamRendezvous.RegisterProducer(streamId, streamProducer, cancellationToken);
+            if (clusterMembershipService is not null
+                && SystemTargetGrainId.TryParse(streamProducer, out var systemTarget))
+            {
+                var snapshot = clusterMembershipService.CurrentSnapshot;
+                var status = snapshot.GetSiloStatus(systemTarget.GetSiloAddress());
+                if (status != SiloStatus.None
+                    && snapshot.Version != default
+                    && snapshot.Version != MembershipVersion.MinValue)
+                {
+                    return streamRendezvous.RegisterProducer(streamId, streamProducer, snapshot.Version, cancellationToken);
+                }
+            }
+
+            return streamRendezvous.RegisterProducer(streamId, streamProducer, cancellationToken: cancellationToken);
         }
 
         public Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
