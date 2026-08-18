@@ -1,6 +1,6 @@
 # Microsoft Orleans project templates
 
-This package provides maintained templates for common Orleans application layouts.
+This package provides templates for common Orleans application layouts.
 
 Install the templates:
 
@@ -8,7 +8,7 @@ Install the templates:
 dotnet new install Microsoft.Orleans.Templates
 ```
 
-Create a solution with separate grain contracts, grain implementations, silo, and external client projects:
+Create an Aspire solution with separate grain contracts, grain implementations, silo, external client, and AppHost projects:
 
 ```dotnetcli
 dotnet new orleans --name MyOrleansApp
@@ -32,4 +32,4 @@ Templates reference the current stable Orleans release. Pass `--orleans-version`
 dotnet new orleans-web --name MyOrleansWebApp --orleans-version 10.2.2
 ```
 
-The generated applications use localhost clustering for local development. Configure a shared clustering provider, durable storage, and production endpoints before deploying a multi-silo cluster. See the [Orleans hosting documentation](https://dotnet.github.io/orleans/docs/host/configuration-guide/) for production configuration guidance.
+The `orleans` template uses the Aspire Orleans integration to orchestrate the silo, client, and Azurite-backed Azure Table clustering and Azure Blob grain storage. The `orleans-web` template uses localhost clustering for a one-node local development host. See the [Orleans hosting documentation](https://dotnet.github.io/orleans/docs/host/configuration-guide/) for production configuration guidance.

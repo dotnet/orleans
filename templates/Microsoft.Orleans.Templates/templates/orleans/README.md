@@ -1,7 +1,8 @@
 # OrleansApp
 
-This solution separates the application into four projects:
+This solution separates the application into five projects:
 
+- `OrleansApp.AppHost` orchestrates the application and its Azurite resources.
 - `OrleansApp.Contracts` defines grain interfaces shared by callers and implementations.
 - `OrleansApp.Grains` implements those grain interfaces.
 - `OrleansApp.Silo` hosts the Orleans runtime and grain activations.
@@ -13,18 +14,14 @@ Build the solution:
 dotnet build
 ```
 
-Start the silo:
+Start the application:
 
 ```dotnetcli
-dotnet run --project OrleansApp.Silo
+dotnet run --project OrleansApp.AppHost
 ```
 
-After the silo reports that it has started, run the client in another terminal:
+The AppHost starts Azurite, the silo, and the external client. Open the Aspire dashboard using the URL printed in the terminal to inspect the resources and their logs.
 
-```dotnetcli
-dotnet run --project OrleansApp.Client
-```
+The client prints `Hello, friend! Call count: 1.`. The grain stores its call count in Azure Blob Storage, and both the silo and client discover the cluster through Azure Table Storage. The AppHost runs both services through Azurite for local development.
 
-The client prints `Hello, friend!`.
-
-The generated projects use localhost clustering for local development. Configure the silo and client with the same service ID, cluster ID, and production clustering provider before deploying them as separate processes.
+A container runtime must be running so that Aspire can start Azurite. When the application is published, configure the Azure Storage resource for the target environment.

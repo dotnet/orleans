@@ -8,7 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Azure.Data.Tables" />
+    <PackageReference Include="Aspire.Azure.Storage.Blobs" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" />
     <PackageReference Include="Microsoft.Orleans.Server" />
   </ItemGroup>
 

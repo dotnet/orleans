@@ -4,7 +4,8 @@ using OrleansApp.Contracts;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-builder.UseOrleansClient(clientBuilder => clientBuilder.UseLocalhostClustering());
+builder.AddKeyedAzureTableServiceClient("clustering");
+builder.UseOrleansClient();
 
 using var host = builder.Build();
 await host.StartAsync();

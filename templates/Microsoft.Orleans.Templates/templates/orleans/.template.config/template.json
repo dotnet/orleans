@@ -4,7 +4,8 @@
   "classifications": [
     "Cloud",
     "Distributed Systems",
-    "Orleans"
+    "Orleans",
+    "Aspire"
   ],
   "identity": "Microsoft.Orleans.Templates.Application.CSharp",
   "groupIdentity": "Microsoft.Orleans.Templates.Application",
@@ -47,6 +48,13 @@
       "valueTransform": "xmlEncode",
       "replaces": "__ORLEANS_VERSION__"
     },
+    "aspireVersion": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "The Aspire package and AppHost SDK version.",
+      "defaultValue": "13.4.6",
+      "replaces": "__ASPIRE_VERSION__"
+    },
     "skipRestore": {
       "type": "parameter",
       "datatype": "bool",
@@ -57,6 +65,12 @@
   "primaryOutputs": [
     {
       "path": "OrleansApp.slnx"
+    },
+    {
+      "path": "aspire.config.json"
+    },
+    {
+      "path": "OrleansApp.AppHost/OrleansApp.AppHost.csproj"
     },
     {
       "path": "OrleansApp.Contracts/OrleansApp.Contracts.csproj"

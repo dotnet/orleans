@@ -9,6 +9,10 @@
       "longName": "orleans-version",
       "shortName": ""
     },
+    "aspireVersion": {
+      "longName": "aspire-version",
+      "shortName": ""
+    },
     "skipRestore": {
       "longName": "no-restore",
       "shortName": ""

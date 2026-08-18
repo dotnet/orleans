@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="OrleansApp.AppHost/OrleansApp.AppHost.csproj" />
     <Project Path="OrleansApp.Client/OrleansApp.Client.csproj" />
     <Project Path="OrleansApp.Contracts/OrleansApp.Contracts.csproj" />
     <Project Path="OrleansApp.Grains/OrleansApp.Grains.csproj" />

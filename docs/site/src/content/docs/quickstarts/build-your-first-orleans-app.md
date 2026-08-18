@@ -28,14 +28,14 @@ The example uses localhost clustering and omits production concerns such as dura
 
 ## Create the solution
 
-Create a solution with four projects:
+Create a solution with four Orleans projects:
 
 - **GrainInterfaces** contains grain contracts shared by callers and implementations.
 - **Grains** contains the grain implementations.
 - **Silo** hosts the Orleans runtime and grain activations.
 - **Client** is an external process that connects to the silo and calls grains.
 
-The maintained `Microsoft.Orleans.Templates` package can create this layout for you:
+The `Microsoft.Orleans.Templates` package creates this layout and adds an Aspire AppHost that orchestrates the silo, client, and Azurite-backed Azure Storage resources:
 
 ```dotnetcli
 dotnet new install Microsoft.Orleans.Templates
