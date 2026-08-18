@@ -62,7 +62,7 @@ namespace Orleans.Runtime
             GrainInterfaceTypeResolver interfaceIdResolver,
             GrainInterfaceTypeToGrainTypeResolver interfaceToTypeResolver,
             DeepCopier deepCopier,
-            TimeProvider timeProvider,
+            [FromKeyedServices(TimeProviderNames.Messaging)] TimeProvider timeProvider,
             InterfaceToImplementationMappingCache interfaceToImplementationMapping,
             OrleansInstruments orleansInstruments)
         {
@@ -497,6 +497,11 @@ namespace Orleans.Runtime
 
         private async Task OnRuntimeInitializeStop(CancellationToken tc)
         {
+            foreach (var (_, callback) in callbacks)
+            {
+                callback.OnHostShutdown();
+            }
+
             this.callbackTimer.Dispose();
             if (this.callbackTimerTask is { } task)
             {
