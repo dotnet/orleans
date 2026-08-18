@@ -32,12 +32,14 @@ internal sealed class WorkItemGroupWaiter(WorkItemGroup workItemGroup) : IValueT
 
     private Action<object?>? _continuation;
     private object? _continuationState;
-    private volatile uint _status;
+    private uint _status;
 
     ValueTaskSourceStatus IValueTaskSource.GetStatus(short token)
     {
         // We only support success completion (no exception/cancellation paths)
-        return Volatile.Read(ref _continuation) is null ? ValueTaskSourceStatus.Pending : ValueTaskSourceStatus.Succeeded;
+        return (Volatile.Read(ref _status) & SignaledFlag) == 0
+            ? ValueTaskSourceStatus.Pending
+            : ValueTaskSourceStatus.Succeeded;
     }
 
     void IValueTaskSource.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags)
