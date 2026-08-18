@@ -41,7 +41,7 @@ interface [GrainInterfaceType("Orleans.Streams.IPubSubRendezvousGrain")] Orleans
   7DBE84FA: GetAllSubscriptions(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, System.Threading.CancellationToken) -> Task<System.Collections.Generic.List<Orleans.Streams.Core.StreamSubscription>>
   29B61035: ProducerCount(Orleans.Runtime.QualifiedStreamId, System.Threading.CancellationToken) -> Task<int>
   5E7E20BC: RegisterConsumer(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, string?, System.Threading.CancellationToken) -> Task
-  B5FFB7F3: RegisterProducer(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, System.Threading.CancellationToken) -> Task<System.Collections.Generic.ISet<Orleans.Streams.PubSubSubscriptionState>>
+  B5FFB7F3: RegisterProducer(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, Orleans.Runtime.MembershipVersion, System.Threading.CancellationToken) -> Task<System.Collections.Generic.ISet<Orleans.Streams.PubSubSubscriptionState>>
   974334B6: UnregisterConsumer(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, System.Threading.CancellationToken) -> Task
   C017B47D: UnregisterProducer(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, System.Threading.CancellationToken) -> Task
   20AA72BF: Validate(System.Threading.CancellationToken) -> Task
