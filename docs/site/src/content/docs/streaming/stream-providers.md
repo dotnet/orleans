@@ -1,7 +1,7 @@
 ---
 title: Orleans stream providers
 description: Compare built-in Orleans stream providers by durability, rewindability, status, and prerequisites.
-ms.date: 08/02/2026
+ms.date: 08/18/2026
 ms.topic: concept-article
 ---
 
@@ -80,4 +80,6 @@ Register [Redis Streams](https://redis.io/docs/latest/develop/data-types/streams
 
 <a id="queue-adapters"></a>
 
-<xref:Orleans.Providers.Streams.Common.PersistentStreamProvider> hosts providers built on <xref:Orleans.Streams.IQueueAdapter>. A custom adapter supplies enqueue/dequeue behavior, queue mapping, rewindability, and failure handling while Orleans supplies pulling agents, subscription routing, and caches. See [Write a custom persistent-stream queue adapter](custom-queue-adapter.md) for an implementation guide and [stream implementation architecture](../implementation/streams-implementation/index.md) for the runtime design.
+A [persistent-stream data adapter](data-adapters.md) customizes the wire format used by Azure Queue Storage or Azure Event Hubs while retaining that provider's transport, partitioning, acknowledgement, cache, and recovery behavior.
+
+<xref:Orleans.Providers.Streams.Common.PersistentStreamProvider> hosts providers built on <xref:Orleans.Streams.IQueueAdapter>. A custom queue adapter supplies enqueue/dequeue behavior, queue mapping, rewindability, and failure handling while Orleans supplies pulling agents, subscription routing, and caches. See [Write a custom persistent-stream queue adapter](custom-queue-adapter.md) for an implementation guide and [stream implementation architecture](../implementation/streams-implementation/index.md) for the runtime design.

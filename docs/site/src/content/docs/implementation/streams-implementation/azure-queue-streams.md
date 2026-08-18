@@ -1,7 +1,7 @@
 ---
 title: Azure Queue stream implementation
 description: Understand the Orleans Azure Queue adapter, receiver acknowledgement, queue mapping, and configuration surfaces.
-ms.date: 08/02/2026
+ms.date: 08/18/2026
 ms.topic: concept-article
 ---
 
@@ -19,7 +19,7 @@ API: <xref:Orleans.Hosting.SiloBuilderExtensions.AddAzureQueueStreams*?displayPr
 
 ## Adapter behavior
 
-`AzureQueueAdapter` is read-write and not rewindable. A producer encodes the stream identity, payload, request context, and sequence metadata using an `IAzureQueueDataAdapter`, then sends an Azure Queue message to the mapped queue.
+`AzureQueueAdapter` is read-write and not rewindable. A producer encodes the stream identity, payload, and request context using an <xref:Orleans.Streams.IQueueDataAdapter`2>, then sends an Azure Queue message to the mapped queue. The receiver assigns the local sequence token used for delivery and acknowledgement.
 
 Because Azure Queue Storage does not expose a durable arbitrary stream offset, a non-null rewind token is rejected. <xref:Orleans.Providers.Streams.AzureQueue.AzureQueueDataAdapterV2> is the default encoding. Version 1 remains for compatibility with existing messages, not as the preferred format for new providers.
 
@@ -77,6 +77,6 @@ A <xref:Orleans.Configuration.AzureQueueOptions.MessageVisibilityTimeout?display
 
 ## Extension and compatibility points
 
-A custom <xref:Orleans.Streams.IQueueDataAdapter`2> can change payload encoding while retaining the Azure transport. It must preserve stream identity, request context, and any sequence information needed by consumers. Encoding changes should be versioned so a rolling cluster can read messages produced by both versions.
+A custom <xref:Orleans.Streams.IQueueDataAdapter`2> changes payload encoding while retaining the Azure transport. It preserves stream identity, the request-context values defined by the wire contract, and the sequence information used by consumers. Follow [Customize persistent-stream data formats](../../streaming/data-adapters.md) for a compiling implementation and versioned rollout guidance.
 
 Configuration binding behavior is tested by [`AzureQueueStreamProviderBuilderTests`](https://github.com/dotnet/orleans/blob/main/test/Extensions/Orleans.Azure.Tests/Streaming/AzureQueueStreamProviderBuilderTests.cs). Adapter acknowledgement and cursor behavior are covered by [`AzureQueueAdapterTests`](https://github.com/dotnet/orleans/blob/main/test/Extensions/Orleans.Azure.Tests/Streaming/AzureQueueAdapterTests.cs).
