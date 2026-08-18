@@ -1,8 +1,11 @@
 using System.Collections.Immutable;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CodeActions;
+using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Text;
 using Orleans.Analyzers;
 using Xunit;
 
@@ -118,6 +121,52 @@ public class GenerateAliasAttributesAnalyzerTest : DiagnosticAnalyzerTestBase<Ge
         var diagnostics = await GetDiagnosticsWithReferencedAssemblyAsync("public class C {}", referencedSource);
 
         Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task GrainMethodWithoutAlias_CodeFixPinsGeneratedMethodId()
+    {
+        const string code = """
+            namespace TestProject;
+
+            public sealed class ComplexData
+            {
+            }
+
+            [Alias("TestProject.IComplexGrain")]
+            public interface IComplexGrain : IGrainWithIntegerKey
+            {
+                Task<ComplexData> ProcessData(
+                    int inputInt,
+                    string inputString,
+                    ComplexData data,
+                    CancellationToken cancellationToken);
+            }
+            """;
+        var (diagnostics, source) = await GetDiagnosticsAsync(code, "System.Threading");
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal("67FE5808", diagnostic.Properties["MethodId"]);
+
+        var changedSource = await ApplyCodeFix(source, diagnostic);
+
+        Assert.Contains("[Alias(\"67FE5808\")]", changedSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("[Alias(\"ProcessData\")]", changedSource, StringComparison.Ordinal);
+        Assert.Empty(await GetDiagnosticsFullSourceAsync(changedSource));
+    }
+
+    [Fact]
+    public Task GrainMethodWithIdAttribute_ShouldNotTriggerDiagnostic()
+    {
+        const string code = """
+            [Alias("I")]
+            public interface I : IGrain
+            {
+                [Id(42)]
+                Task<int> M();
+            }
+            """;
+
+        return VerifyHasNoDiagnostic(code);
     }
 
     #endregion
@@ -248,5 +297,32 @@ public class GenerateAliasAttributesAnalyzerTest : DiagnosticAnalyzerTestBase<Ge
         metadataReferences.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.Runtime.dll")));
 
         return metadataReferences;
+    }
+
+    private async Task<string> ApplyCodeFix(string source, Diagnostic diagnostic)
+    {
+        var projectId = ProjectId.CreateNewId(debugName: "TestProject");
+        var documentId = DocumentId.CreateNewId(projectId, "Test.cs");
+        var solution = new AdhocWorkspace()
+            .CurrentSolution
+            .AddProject(projectId, "TestProject", "TestProject", LanguageNames.CSharp)
+            .AddMetadataReferences(projectId, GetMetadataReferences())
+            .AddDocument(documentId, "Test.cs", SourceText.From(source));
+        var project = solution.GetProject(projectId)!
+            .WithCompilationOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var document = project.GetDocument(documentId)!;
+        var actions = new List<CodeAction>();
+        var context = new CodeFixContext(
+            document,
+            diagnostic,
+            (action, _) => actions.Add(action),
+            CancellationToken.None);
+
+        await new GenerateAliasAttributesCodeFix().RegisterCodeFixesAsync(context);
+        var action = Assert.Single(actions);
+        var operations = await action.GetOperationsAsync(CancellationToken.None);
+        var changedSolution = Assert.Single(operations.OfType<ApplyChangesOperation>()).ChangedSolution;
+        var changedDocument = changedSolution.GetDocument(documentId)!;
+        return (await changedDocument.GetTextAsync()).ToString();
     }
 }

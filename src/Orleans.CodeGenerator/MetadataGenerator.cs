@@ -438,10 +438,9 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
         MethodModel method,
         TypeRef targetType)
     {
-        var result = ImmutableArray.CreateBuilder<CompoundTypeAliasModel>(3);
+        var result = ImmutableArray.CreateBuilder<CompoundTypeAliasModel>(2);
         AddAlias(method.MethodId);
         AddAlias(method.GeneratedMethodId);
-        AddAlias(method.LegacyGeneratedMethodId);
         return result.ToImmutable();
 
         void AddAlias(string methodId)

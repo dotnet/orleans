@@ -22,26 +22,35 @@ interface Orleans.Streams.IPersistentStreamPullingManager [Version(0)]
 
 interface Orleans.Streams.IPubSubRendezvousGrain [Version(0)]
   ConsumerCount(Orleans.Runtime.QualifiedStreamId) -> Task<int>
-  ConsumerCount(Orleans.Runtime.QualifiedStreamId, System.Threading.CancellationToken) -> Task<int>
+  # Orleans.Streams.IPubSubRendezvousGrain.ConsumerCount(QualifiedStreamId streamId, CancellationToken cancellationToken) -> Task<int>
+  5F72C5CF(Orleans.Runtime.QualifiedStreamId, System.Threading.CancellationToken) -> Task<int>
   DiagGetConsumers(Orleans.Runtime.QualifiedStreamId) -> Task<Orleans.Streams.PubSubSubscriptionState[]>
-  DiagGetConsumers(Orleans.Runtime.QualifiedStreamId, System.Threading.CancellationToken) -> Task<Orleans.Streams.PubSubSubscriptionState[]>
+  # Orleans.Streams.IPubSubRendezvousGrain.DiagGetConsumers(QualifiedStreamId streamId, CancellationToken cancellationToken) -> Task<PubSubSubscriptionState[]>
+  8A033955(Orleans.Runtime.QualifiedStreamId, System.Threading.CancellationToken) -> Task<Orleans.Streams.PubSubSubscriptionState[]>
   FaultSubscription(Orleans.Runtime.GuidId) -> Task
-  FaultSubscription(Orleans.Runtime.GuidId, System.Threading.CancellationToken) -> Task
+  # Orleans.Streams.IPubSubRendezvousGrain.FaultSubscription(GuidId subscriptionId, CancellationToken cancellationToken) -> Task
+  2821FCF5(Orleans.Runtime.GuidId, System.Threading.CancellationToken) -> Task
   GetAllSubscriptions(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId) -> Task<System.Collections.Generic.List<Orleans.Streams.Core.StreamSubscription>>
-  GetAllSubscriptions(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, System.Threading.CancellationToken) -> Task<System.Collections.Generic.List<Orleans.Streams.Core.StreamSubscription>>
+  # Orleans.Streams.IPubSubRendezvousGrain.GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer, CancellationToken cancellationToken) -> Task<List<StreamSubscription>>
+  7DBE84FA(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, System.Threading.CancellationToken) -> Task<System.Collections.Generic.List<Orleans.Streams.Core.StreamSubscription>>
   ProducerCount(Orleans.Runtime.QualifiedStreamId) -> Task<int>
-  ProducerCount(Orleans.Runtime.QualifiedStreamId, System.Threading.CancellationToken) -> Task<int>
+  # Orleans.Streams.IPubSubRendezvousGrain.ProducerCount(QualifiedStreamId streamId, CancellationToken cancellationToken) -> Task<int>
+  29B61035(Orleans.Runtime.QualifiedStreamId, System.Threading.CancellationToken) -> Task<int>
   RegisterConsumer(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, string?) -> Task
-  RegisterConsumer(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, string?, System.Threading.CancellationToken) -> Task
+  # Orleans.Streams.IPubSubRendezvousGrain.RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string? filterData, CancellationToken cancellationToken) -> Task
+  5E7E20BC(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, string?, System.Threading.CancellationToken) -> Task
   RegisterProducer(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId) -> Task<System.Collections.Generic.ISet<Orleans.Streams.PubSubSubscriptionState>>
   # Orleans.Streams.IPubSubRendezvousGrain.RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer, MembershipVersion membershipVersion, CancellationToken cancellationToken) -> Task<ISet<PubSubSubscriptionState>>
   B5FFB7F3(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, Orleans.Runtime.MembershipVersion, System.Threading.CancellationToken) -> Task<System.Collections.Generic.ISet<Orleans.Streams.PubSubSubscriptionState>>
   UnregisterConsumer(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId) -> Task
-  UnregisterConsumer(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, System.Threading.CancellationToken) -> Task
+  # Orleans.Streams.IPubSubRendezvousGrain.UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, CancellationToken cancellationToken) -> Task
+  974334B6(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, System.Threading.CancellationToken) -> Task
   UnregisterProducer(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId) -> Task
-  UnregisterProducer(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, System.Threading.CancellationToken) -> Task
+  # Orleans.Streams.IPubSubRendezvousGrain.UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer, CancellationToken cancellationToken) -> Task
+  C017B47D(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, System.Threading.CancellationToken) -> Task
   Validate() -> Task
-  Validate(System.Threading.CancellationToken) -> Task
+  # Orleans.Streams.IPubSubRendezvousGrain.Validate(CancellationToken cancellationToken) -> Task
+  20AA72BF(System.Threading.CancellationToken) -> Task
 
 interface Orleans.Streams.IStreamCheckpointerGrain [Version(0)]
   Load(System.Threading.CancellationToken) -> ValueTask<string>

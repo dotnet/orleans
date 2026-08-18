@@ -205,10 +205,9 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
 
     internal static List<CompoundTypeAliasComponent[]> GetCompoundTypeAliasAttributeArguments(InvokableMethodDescription methodDescription, InvokableMethodId invokableId)
     {
-        var result = new List<CompoundTypeAliasComponent[]>(3);
+        var result = new List<CompoundTypeAliasComponent[]>(2);
         AddAlias(methodDescription.MethodId);
         AddAlias(methodDescription.GeneratedMethodId);
-        AddAlias(methodDescription.LegacyGeneratedMethodId);
         return result;
 
         void AddAlias(string methodId)

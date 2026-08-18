@@ -20,8 +20,7 @@ namespace UnitTests.StreamingTests;
 public class RegisterProducerVersionToleranceTests
 {
     private const string LegacyMethodId = "B5FFB7F3";
-    private const string CurrentMethodId = "CDCAB1B2";
-    private const string CancellationSensitiveMethodId = "13D8CA40";
+    private const string GeneratedMethodId = "13D8CA40";
 
     [Fact]
     public void LegacyRegisterProducerRequest_DeserializesAsCurrentRequest()
@@ -86,22 +85,22 @@ public class RegisterProducerVersionToleranceTests
     [InlineData("29B61035", "7774F1DA")]
     [InlineData("8A033955", "FB50AC30")]
     [InlineData("5F72C5CF", "FC03F44B")]
-    public void CancellationSensitiveMethodIdentity_ResolvesAsCurrentRequest(
-        string currentMethodId,
-        string cancellationSensitiveMethodId)
+    public void GeneratedMethodIdentity_ResolvesAsCurrentRequest(
+        string alias,
+        string generatedMethodId)
     {
         using var currentEndpoint = CreateEndpoint();
-        var requestType = GetRequestType(currentMethodId);
+        var requestType = GetRequestType(alias);
         var currentIdentity = RuntimeTypeNameFormatter.Format(requestType);
-        Assert.EndsWith($",\"{currentMethodId}\")", currentIdentity, StringComparison.Ordinal);
-        var cancellationSensitiveIdentity = currentIdentity.Replace(
-            $",\"{currentMethodId}\")",
-            $",\"{cancellationSensitiveMethodId}\")",
+        Assert.EndsWith($",\"{alias}\")", currentIdentity, StringComparison.Ordinal);
+        var generatedIdentity = currentIdentity.Replace(
+            $",\"{alias}\")",
+            $",\"{generatedMethodId}\")",
             StringComparison.Ordinal);
 
         Assert.Equal(
             requestType,
-            currentEndpoint.GetRequiredService<TypeConverter>().Parse(cancellationSensitiveIdentity));
+            currentEndpoint.GetRequiredService<TypeConverter>().Parse(generatedIdentity));
     }
 
     private static (Type RequestType, string TypeIdentity) AssertCurrentRequestIdentity(
@@ -114,8 +113,7 @@ public class RegisterProducerVersionToleranceTests
 
         var typeIdentity = RuntimeTypeNameFormatter.Format(requestType);
         Assert.EndsWith($",\"{LegacyMethodId}\")", typeIdentity, StringComparison.Ordinal);
-        Assert.DoesNotContain(CurrentMethodId, typeIdentity, StringComparison.Ordinal);
-        Assert.DoesNotContain(CancellationSensitiveMethodId, typeIdentity, StringComparison.Ordinal);
+        Assert.DoesNotContain(GeneratedMethodId, typeIdentity, StringComparison.Ordinal);
         Assert.Equal(
             requestType,
             currentEndpoint.GetRequiredService<TypeConverter>().Parse(typeIdentity));
@@ -123,7 +121,7 @@ public class RegisterProducerVersionToleranceTests
             requestType,
             currentEndpoint.GetRequiredService<TypeConverter>().Parse(typeIdentity.Replace(
                 $",\"{LegacyMethodId}\")",
-                $",\"{CurrentMethodId}\")",
+                $",\"{GeneratedMethodId}\")",
                 StringComparison.Ordinal)));
 
         return (requestType, typeIdentity);
