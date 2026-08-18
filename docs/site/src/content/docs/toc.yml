@@ -150,6 +150,8 @@ items:
             href: streaming/stream-providers.md
           - name: External producers and consumers
             href: streaming/external-streams.md
+          - name: Customize stream data formats
+            href: streaming/data-adapters.md
           - name: Write a custom queue adapter
             href: streaming/custom-queue-adapter.md
           - name: Amazon Kinesis

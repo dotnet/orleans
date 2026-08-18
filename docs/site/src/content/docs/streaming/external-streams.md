@@ -1,24 +1,24 @@
 ---
 title: Integrate external stream producers and consumers
 description: Connect non-Orleans applications to Orleans streams by defining a provider-specific wire-format adapter.
-ms.date: 08/14/2026
+ms.date: 08/18/2026
 ms.topic: how-to
 ---
 
 # Integrate external stream producers and consumers
 
-Orleans streams don't define a transport-independent wire format. An external application can interoperate only when the selected [stream provider](stream-providers.md) exposes a suitable extension point and every participant agrees on:
+An Orleans persistent-stream provider maps its transport messages to logical streams through a provider-specific wire format. An external application interoperates through that format when every participant agrees on:
 
 - How transport messages map to an Orleans <xref:Orleans.Runtime.StreamId>.
 - How event types, payloads, and batches are encoded.
 - How partitioning, ordering, and sequence positions are represented.
 - Which metadata, such as request context, crosses the boundary.
 
-This integration is provider-specific. Don't assume that an external application can publish or consume the default binary messages of every persistent-stream provider.
+The provider's [data adapter](data-adapters.md) owns this boundary. Azure Event Hubs exposes the full inbound and outbound mapping required for external producers and consumers.
 
 ## Use an Event Hubs data adapter
 
-The built-in Azure Event Hubs provider supports a custom <xref:Orleans.Streaming.EventHubs.IEventHubDataAdapter>. Derive from <xref:Orleans.Streaming.EventHubs.EventHubDataAdapter> when its cache representation and checkpoint behavior are suitable, then override only the wire-format and stream-mapping behavior that your application needs.
+The built-in Azure Event Hubs provider supports a custom <xref:Orleans.Streaming.EventHubs.IEventHubDataAdapter>. Derive from <xref:Orleans.Streaming.EventHubs.EventHubDataAdapter> when its cache representation and checkpoint behavior are suitable, then override the wire-format and stream-mapping behavior defined by the external contract.
 
 Register the adapter with <xref:Orleans.Hosting.EventHubStreamConfiguratorExtensions.UseDataAdapter*>. Configure the same adapter for every silo and Orleans client that uses the provider. A silo needs it to read Event Hubs messages and to publish through Orleans streams; an Orleans client needs it when the client publishes.
 
@@ -37,18 +37,18 @@ The adapter determines logical stream identity; Event Hubs determines the physic
 ## Publish events for an external consumer
 
 1. Override `ToQueueMessage<T>` to encode Orleans events in the external consumer's agreed format.
-1. Override `GetPartitionKey` when the default stream-key partitioning doesn't match the external contract.
+1. Override `GetPartitionKey` when the external contract uses a different partition mapping.
 1. Preserve stream identity and schema-version metadata so consumers can route and decode the event without Orleans.
 1. Configure the external application as an ordinary Event Hubs consumer, preferably with a consumer group dedicated to that application.
 
-An external Event Hubs consumer isn't an Orleans stream subscription. It doesn't appear in Orleans pub-sub storage, doesn't receive Orleans subscription notifications, and doesn't acknowledge delivery to Orleans. Its delivery, checkpoint, retry, and replay behavior are controlled by Event Hubs and the external consumer.
+An external consumer participates directly in Event Hubs. Its consumer group controls delivery, checkpoint, retry, and replay behavior, while Orleans pub-sub storage and subscription notifications apply to Orleans stream subscriptions.
 
 If an adapter is intentionally one-way, fail explicitly in the unsupported conversion method. For example, an ingest-only adapter can throw <xref:System.NotSupportedException> from `ToQueueMessage<T>` rather than emitting a message in an unintended format.
 
 ## Operational requirements
 
 - Use a dedicated Event Hubs consumer group for the Orleans provider and a different group for each independent external consumer.
-- Grant producers, consumers, and checkpoint storage only the permissions they require. Don't put credentials or connection strings in event properties.
+- Grant producers, consumers, and checkpoint storage only the permissions they require. Keep credentials and connection strings in protected configuration rather than event properties.
 - Version the payload contract and deploy readers before writers when adding a new format.
 - Expect duplicate delivery and make consumers idempotent. Event Hubs retention and Orleans checkpoint persistence bound replay and recovery.
 - Monitor adapter deserialization failures, Event Hubs lag, checkpoint age, cache pressure, and poison events.

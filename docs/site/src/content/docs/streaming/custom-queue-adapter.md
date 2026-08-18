@@ -1,15 +1,17 @@
 ---
 title: Write a custom persistent-stream queue adapter
 description: Implement and register an Orleans persistent-stream queue adapter for an external queue technology.
-ms.date: 08/14/2026
+ms.date: 08/18/2026
 ms.topic: how-to
 ---
 
 # Write a custom persistent-stream queue adapter
 
-Use a custom queue adapter when Orleans doesn't include a provider for the queue technology you need. The adapter translates between Orleans stream batches and the external queue. Orleans supplies the persistent stream provider, pulling agents, subscription routing, queue balancing, and cache management.
+Use a custom queue adapter to connect the Orleans persistent-stream runtime to a queue technology with its own transport and delivery semantics. The adapter translates between Orleans stream batches and the external queue. Orleans supplies the persistent stream provider, pulling agents, subscription routing, queue balancing, and cache management.
 
-You don't create a subclass of `PersistentStreamProvider`. Register an <xref:Orleans.Streams.IQueueAdapterFactory> with `AddPersistentStreams`; Orleans creates and hosts the provider.
+When Azure Queue Storage or Azure Event Hubs already provides the required transport behavior, a [data adapter](data-adapters.md) customizes its wire format while retaining the built-in queue adapter.
+
+Register an <xref:Orleans.Streams.IQueueAdapterFactory> with `AddPersistentStreams`; Orleans creates and hosts <xref:Orleans.Providers.Streams.Common.PersistentStreamProvider>.
 
 Before implementing an adapter, understand the [persistent stream pulling architecture](../implementation/streams-implementation/index.md). In particular, decide the adapter's delivery, acknowledgement, ordering, partitioning, and rewind semantics.
 
@@ -49,7 +51,7 @@ The factory composes the adapter with queue mapping, caching, and failure handli
 
 `SimpleQueueAdapterCache` is suitable for a non-rewindable adapter whose queue remains the durability boundary. A rewindable adapter usually needs a cache and sequence-token implementation which can position cursors at retained historical messages.
 
-Checkpointing is adapter-specific, not a requirement imposed by `AddPersistentStreams`. The non-rewindable example acknowledges completed messages through its receiver and therefore has no independent checkpoint. For a retained-log transport, implement an <xref:Orleans.Streams.IStreamQueueCheckpointerFactory>, have the receiver or cache load and update the per-partition position, and register it as a named component with `ConfigureComponent`. Persist a checkpoint only after all consumers have advanced beyond the corresponding cached messages. A no-op checkpointer is suitable only when replay position is deliberately disposable.
+`AddPersistentStreams` leaves checkpointing to the adapter. The non-rewindable example acknowledges completed messages through its receiver and therefore has no independent checkpoint. For a retained-log transport, implement an <xref:Orleans.Streams.IStreamQueueCheckpointerFactory>, have the receiver or cache load and update the per-partition position, and register it as a named component with `ConfigureComponent`. Persist a checkpoint only after all consumers have advanced beyond the corresponding cached messages. A no-op checkpointer is suitable only when replay position is deliberately disposable.
 
 ## Register the provider
 
@@ -61,7 +63,7 @@ Register the same provider name and compatible mapping on Orleans clients which 
 
 :::code language="csharp" source="snippets/streaming/CustomQueueAdapter.cs" id="custom_queue_client_registration":::
 
-Keep the provider name and partition count stable. Changing either can map an existing stream to a different queue and strand previously enqueued messages. Configure durable `PubSubStore` grain storage for explicit subscriptions in production; queue durability doesn't preserve Orleans subscription records.
+Keep the provider name and partition count stable. Changing either can map an existing stream to a different queue and strand previously enqueued messages. Configure durable `PubSubStore` grain storage for explicit subscriptions in production; `PubSubStore` preserves subscription records independently from queue durability.
 
 ## Validate failure behavior
 
