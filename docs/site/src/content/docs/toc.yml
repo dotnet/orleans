@@ -2,7 +2,7 @@ items:
   - name: Microsoft Orleans documentation
     href: index.yml
     homepage: index.yml
-  - name: Overview
+  - name: Concepts
     items:
       - name: Introduction to Orleans
         href: overview.md
@@ -18,12 +18,22 @@ items:
         href: quickstarts/build-your-first-orleans-app.md
       - name: Deploy and scale on Azure
         href: quickstarts/deploy-scale-orleans-on-azure.md
-  - name: Tutorials
+  - name: Walkthroughs and tutorials
     items:
       - name: Model an adventure game
         href: tutorials-and-samples/adventure.md
       - name: Build custom grain storage
         href: tutorials-and-samples/custom-grain-storage.md
+      - name: Build and deploy a production-shaped application
+        href: tutorials-and-samples/production-application.md
+      - name: Test an Orleans application end to end
+        href: tutorials-and-samples/testing-walkthrough.md
+      - name: Build and recover a streaming application
+        href: tutorials-and-samples/streaming-walkthrough.md
+  - name: How-to guides
+    items:
+      - name: Recipe index
+        href: how-to/index.md
   - name: Develop applications
     items:
       - name: Grains
@@ -229,6 +239,18 @@ items:
             href: host/monitoring/client-error-code-monitoring.md
           - name: Orleans Dashboard
             href: dashboard/index.md
+  - name: Security
+    items:
+      - name: Security overview
+        href: security/index.md
+      - name: Client and grain-call security
+        href: security/authentication-authorization.md
+      - name: Serialization security
+        href: security/serialization.md
+      - name: Secrets and credentials
+        href: security/secrets.md
+      - name: Network hardening
+        href: security/networking.md
   - name: Deploy and operate
     items:
       - name: Overview
@@ -285,10 +307,18 @@ items:
         href: implementation/scheduler.md
       - name: Messaging and delivery semantics
         href: implementation/messaging-delivery-guarantees.md
+      - name: Transport and networking internals
+        href: implementation/messaging-networking.md
       - name: Placement and activation balancing
         href: implementation/load-balancing.md
       - name: Serialization and code generation
         href: implementation/serialization.md
+      - name: Reminders
+        href: implementation/reminders.md
+      - name: Transactions
+        href: implementation/transactions.md
+      - name: Rolling version skew
+        href: implementation/rolling-version-skew.md
       - name: Persistent streams
         items:
           - name: Architecture
@@ -307,12 +337,12 @@ items:
         href: /samples/
       - name: Samples repository
         href: https://github.com/dotnet/orleans/tree/main/samples
-  - name: Reference/API
+  - name: Reference
     items:
       - name: C# API reference
         href: /docs/api/csharp/
-      - name: Frequently asked questions
-        href: resources/frequently-asked-questions.md
+      - name: API context and examples
+        href: resources/api-reference-guide.md
       - name: Best practices
         href: resources/best-practices.md
       - name: NuGet packages
@@ -321,6 +351,12 @@ items:
         href: resources/student-projects.md
       - name: Community and external links
         href: resources/links.md
+  - name: FAQ and troubleshooting
+    items:
+      - name: Frequently asked questions
+        href: resources/frequently-asked-questions.md
+      - name: Symptom and signal catalog
+        href: host/monitoring/troubleshooting-symptom-catalog.md
   - name: Upgrade to Orleans 10
     items:
       - name: Migration overview

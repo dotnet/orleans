@@ -9,7 +9,7 @@ metadata:
     description: Samples, tutorials, and education for .NET Orleans. Microsoft's cloud native and distributed systems platform.
     ms.topic: hub-page
     ms.service: dotnet-orleans
-    ms.date: 08/02/2026
+    ms.date: 08/12/2026
 
 highlightedContent:
     # itemType: architecture | concept | deploy | download | get-started | how-to-guide | learn | overview | quickstart | reference | tutorial | whats-new
@@ -20,6 +20,9 @@ highlightedContent:
         - itemType: deploy
           title: Deploy Orleans apps
           url: deployment/index.md
+        - itemType: overview
+          title: Secure Orleans applications
+          url: security/index.md
         - itemType: quickstart
           title: Orleans Hello World
           url: tutorials-and-samples/hello-world.md
@@ -35,6 +38,15 @@ highlightedContent:
         - itemType: overview
           title: Orleans transactions
           url: grains/transactions.md
+        - itemType: how-to-guide
+          title: Orleans how-to guides
+          url: how-to/index.md
+        - itemType: architecture
+          title: Orleans architecture and internals
+          url: implementation/index.md
+        - itemType: reference
+          title: C# API reference
+          url: https://dotnet.github.io/orleans/docs/api/csharp/
 
 conceptualContent:
     title: Featured content

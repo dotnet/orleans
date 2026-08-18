@@ -35,6 +35,12 @@ The source generator emits a proxy and an invokable request type. `GrainReferenc
 
 Source: [`GrainReferenceRuntime`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Runtime/GrainReferenceRuntime.cs), [`MessageFactory`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Messaging/MessageFactory.cs), [`MessageCenter`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Messaging/MessageCenter.cs), and [`InsideRuntimeClient`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Core/InsideRuntimeClient.cs).
 
+## Address repair and dispatch boundaries
+
+The target grain address is a routing hint whose validity `Catalog` and `ActivationData` confirm before dispatch. `MessageCenter` checks for a local delivery, a proxied client, a usable remote connection, and a known-dead target. At the target, `Catalog` and `ActivationData` validate the grain address and interface version before admitting the request. A stale activation can therefore be invalidated and the request forwarded or rerouted while preserving its logical message identity.
+
+The dispatch boundary is also where shutdown policy applies. When application messages are blocked, responses and membership traffic remain eligible while new application requests are rejected or dropped. This lets the lifecycle protocol drain while the stopping silo admits responses and membership traffic and rejects new application work.
+
 ## Routing repair is not call retry
 
 A message can encounter a stale activation address because an activation deactivated, moved, or its silo failed. The runtime can reject, invalidate, forward, or reroute that same logical request while locating the current activation. Forwarding is bounded by silo messaging options.
@@ -77,6 +83,8 @@ Repeated retry can approximate at-least-once delivery only while the cluster and
 The runtime can return a rejection when it knows that it cannot process a request, for example because of invalid routing or overload. A rejection is stronger evidence than a timeout, but application code must still interpret the rejection type.
 
 Messages have expiration metadata derived from the response timeout. With <xref:Orleans.Configuration.MessagingOptions.DropExpiredMessages?displayProperty=nameWithType> set to `true` (the default), an expired request or response can be dropped instead of consuming work which can no longer complete the original callback.
+
+Rejections carry more information than a timeout because the runtime has made an explicit decision for the current processing attempt. Earlier forwarded or transported attempts remain outcome-uncertain. Treat the rejection type as a routing or availability signal.
 
 ## Designing callers
 

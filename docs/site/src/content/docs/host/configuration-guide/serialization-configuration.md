@@ -63,3 +63,5 @@ As a compatibility escape hatch, you can disable the boundary:
 
 > [!WARNING]
 > `AllowAllTypes` bypasses type-name validation, including custom filters, and permits any resolvable type. Use it only when serialized input is fully trusted. Prefer allowing individual types or trusted assemblies.
+
+For the full trust-boundary and data-validation guidance, see [serialization security](../../security/serialization.md).

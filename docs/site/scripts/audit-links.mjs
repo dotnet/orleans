@@ -4,6 +4,7 @@ import {
   auditRenderedInternalLinks,
   auditSourceLinks,
   collectLinkAuditDocuments,
+  collectXmlDocumentationExternalUrls,
   probeExternalTargets,
 } from './lib/link-audit.mjs';
 import allowlist from '../src/data/external-link-allowlist.json' with { type: 'json' };
@@ -13,6 +14,7 @@ const repositoryRoot = path.resolve(siteRoot, '..', '..');
 const sourceRoot = path.join(siteRoot, 'src', 'content', 'docs');
 const includeRoot = path.join(siteRoot, 'src');
 const distRoot = path.join(siteRoot, 'dist');
+const sourceCodeRoot = path.join(repositoryRoot, 'src');
 
 const documents = await collectLinkAuditDocuments({ sourceRoot, allowedRoot: includeRoot });
 const sourceAudit = await auditSourceLinks({ documents, sourceRoot });
@@ -22,9 +24,12 @@ const renderedIssues = await auditRenderedInternalLinks({
   internalProvenance: sourceAudit.internalProvenance,
   externalTargets: sourceAudit.externalTargets,
 });
+const xmlDocumentationExternalUrls =
+  await collectXmlDocumentationExternalUrls(sourceCodeRoot);
 const externalAudit = await probeExternalTargets({
   externalTargets: sourceAudit.externalTargets,
   allowlist,
+  allowlistReferences: xmlDocumentationExternalUrls,
 });
 
 for (const warning of externalAudit.warnings) {

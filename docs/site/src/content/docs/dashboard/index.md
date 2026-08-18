@@ -94,5 +94,7 @@ Generate calls to the grain method, keep the page active, and confirm neither th
 
 ## See also
 
+- [Orleans security](../security/index.md)
+- [Network hardening](../security/networking.md)
 - [Orleans observability](../host/monitoring/index.md)
 - [Interpret Orleans observability signals](../host/monitoring/signals.md)

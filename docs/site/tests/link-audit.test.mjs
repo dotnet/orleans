@@ -6,6 +6,7 @@ import {
   auditRenderedInternalLinks,
   auditSourceLinks,
   collectLinkAuditDocuments,
+  collectXmlDocumentationExternalUrls,
   collectYamlLinkReferences,
   createPinnedRequestOptions,
   isPublicInternetAddress,
@@ -25,6 +26,33 @@ afterEach(async () => {
     temporaryDirectories.splice(0).map((directory) =>
       rm(directory, { recursive: true, force: true }),
     ),
+  );
+});
+
+test('collects external URLs from C# XML documentation', async () => {
+  const sourceRoot = await temporaryDirectory();
+  await mkdir(path.join(sourceRoot, 'nested'));
+  await mkdir(path.join(sourceRoot, 'obj'));
+  await writeFile(
+    path.join(sourceRoot, 'nested', 'Example.cs'),
+    '/// See <see href="https://example.com/reference"/> and <seealso href="https://example.com/other"/>.',
+  );
+  await writeFile(
+    path.join(sourceRoot, 'obj', 'Generated.cs'),
+    '/// See <see href="https://example.com/generated"/>.',
+  );
+
+  await expect(collectXmlDocumentationExternalUrls(sourceRoot)).resolves.toEqual(
+    new Map([
+      [
+        'https://example.com/reference',
+        [{ relativeFile: 'nested/Example.cs', line: 1 }],
+      ],
+      [
+        'https://example.com/other',
+        [{ relativeFile: 'nested/Example.cs', line: 1 }],
+      ],
+    ]),
   );
 });
 
@@ -886,6 +914,7 @@ describe('external link audit', () => {
     const url = 'https://example.com/unprobeable';
     const reachableUrl = 'https://example.com/reachable';
     const privateUrl = 'http://127.0.0.1/internal';
+    const xmlDocumentationUrl = 'https://example.com/xml-documentation';
     const result = await probeExternalTargets({
       externalTargets: new Map([
         [url, [{ relativeFile: 'guide.md', line: 1 }]],
@@ -897,17 +926,24 @@ describe('external link audit', () => {
           [url]: 'This endpoint blocks automated probes but is reviewed manually.',
           [reachableUrl]: 'This endpoint was unavailable but should now fail stale.',
           [privateUrl]: 'This reason is deliberately long but cannot bypass destination safety.',
+          [xmlDocumentationUrl]: 'This target is referenced by generated API documentation.',
           'not a URL': 'This reason is long enough but the URL is malformed.',
           'https://example.com/stale': 'This exact target is no longer referenced anywhere.',
         },
       },
+      allowlistReferences: new Map([
+        [
+          xmlDocumentationUrl,
+          [{ relativeFile: 'ApiExample.cs', line: 10 }],
+        ],
+      ]),
       lookupImpl: async () => [{ address: '8.8.8.8', family: 4 }],
       requestImpl: async (target) =>
         response(target.pathname === '/reachable' ? 200 : 403),
       retries: 0,
     });
 
-    expect(result.probed).toBe(2);
+    expect(result.probed).toBe(3);
     expect(result.warnings).toContainEqual(expect.stringContaining('Allowlisted'));
     expect(result.failures).toEqual(
       expect.arrayContaining([

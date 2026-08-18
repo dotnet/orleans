@@ -121,6 +121,8 @@ Certificate selectors are called during authentication, but certificate loading,
 
 ## See also
 
+- [Orleans security](../security/index.md)
+- [Network hardening](../security/networking.md)
 - <xref:Orleans.Connections.Security.TlsOptions>
 - <xref:Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseTls*>
 - [Client configuration](configuration-guide/client-configuration.md)
