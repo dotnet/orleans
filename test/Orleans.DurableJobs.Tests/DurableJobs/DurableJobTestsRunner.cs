@@ -223,9 +223,13 @@ public class DurableJobTestsRunner
         await TestingUtils.WaitUntilAsync(
             async (lastTry, token) =>
             {
-                foreach (var job in pendingJobs.Values.ToArray())
+                var jobResults = await Task.WhenAll(
+                    pendingJobs.Values.Select(
+                        async job => (Job: job, HasRun: await grain.HasJobRan(job.Id).WaitAsync(token))));
+
+                foreach (var (job, hasRun) in jobResults)
                 {
-                    if (await grain.HasJobRan(job.Id).WaitAsync(token))
+                    if (hasRun)
                     {
                         pendingJobs.Remove(job.Id);
                     }
