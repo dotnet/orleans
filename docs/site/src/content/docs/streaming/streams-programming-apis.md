@@ -103,6 +103,8 @@ Grains marked with <xref:Orleans.Concurrency.StatelessWorkerAttribute> can publi
 
 Use a regular grain as the stream consumer so that the stream-to-grain binding has a stable virtual identity which can own state and the subscription lifecycle. If processing after delivery is stateless and parallelizable, have that grain call stateless worker grains and await the required work before its consumer task completes. This keeps stream acknowledgment and recovery at the regular grain boundary instead of treating a multicast subscription as a competing-consumer work queue.
 
+Support for subscribing directly from stateless worker grains is tracked by [dotnet/orleans#433](https://github.com/dotnet/orleans/issues/433).
+
 <a id="stream-order-and-sequence-tokens"></a>
 <a id="rewindable-streams"></a>
 
