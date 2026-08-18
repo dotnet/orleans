@@ -31,8 +31,6 @@ All three methods receive the same arguments:
 | `grainState` | The state container Orleans passes to the provider. Its <xref:Orleans.IGrainState`1.State> property contains the application state, <xref:Orleans.IGrainState`1.ETag> carries the provider's optimistic-concurrency token, and <xref:Orleans.IGrainState`1.RecordExists> indicates whether the record exists. A read populates these properties; a write or clear updates them to reflect the completed operation. |
 | `T` | The declared .NET type of the state payload. Use `T` (or `typeof(T)`) for serialization and type metadata. It isn't a record identifier and can be shared by many grains and named state records. |
 
-Each operation also has an overload which accepts a `CancellationToken`. Orleans passes the caller's token through to that overload, so providers can propagate cancellation to their backend client. Parameterless storage operations use `CancellationToken.None`. The interface's default cancellation-overload implementations delegate to the corresponding overloads shown in this tutorial, preserving compatibility for existing providers.
-
 Therefore, `stateName` and `grainState.State?.GetType().Name` aren't interchangeable. The first identifies one of a grain's logical state records and is stable independently of the payload implementation. The second is only the runtime type name of the current payload; it can be `null`, can differ from `typeof(T)` when polymorphism is involved, and can change during a refactoring. The sample uses `stateName` and `grainId` for identity and delegates payload type handling to the configured serializer.
 
 The <xref:Orleans.ILifecycleParticipant`1.Participate*?displayProperty=nameWithType> method subscribes to the silo's lifecycle.
