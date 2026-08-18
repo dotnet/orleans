@@ -78,7 +78,11 @@ public class CallbackDataTests
             cancelOnTimeout: false,
             waitForCancellationAcknowledgement: false,
             cancellationManager: null);
-        return new CallbackData(shared, completion, new Message(), instruments);
+        var message = new Message();
+        message.InitializeRefCount();
+        var callback = new CallbackData(shared, completion, message, instruments);
+        message.Release();
+        return callback;
     }
 
     private static ServiceProvider CreateServiceProvider()

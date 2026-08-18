@@ -482,6 +482,7 @@ namespace Orleans.Runtime.Messaging
 
                     // Send the error response and continue processing the next message.
                     this.Send(response);
+                    message.ReleaseDropped("ReceiveMessageDeserializationFailure");
                 }
                 else if (message.Direction == Message.Directions.Response)
                 {

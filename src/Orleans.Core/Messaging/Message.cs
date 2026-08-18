@@ -296,7 +296,10 @@ namespace Orleans.Runtime
                     // Another thread initialized it, add to the existing list
                     lock (_cacheInvalidationHeader)
                     {
-                        _cacheInvalidationHeader.Add(grainAddressCacheUpdate);
+                        if (_cacheInvalidationHeader.Count < MaxCacheInvalidationHeaderEntries)
+                        {
+                            _cacheInvalidationHeader.Add(grainAddressCacheUpdate);
+                        }
                     }
                 }
                 else
@@ -308,7 +311,10 @@ namespace Orleans.Runtime
             {
                 lock (_cacheInvalidationHeader)
                 {
-                    _cacheInvalidationHeader.Add(grainAddressCacheUpdate);
+                    if (_cacheInvalidationHeader.Count < MaxCacheInvalidationHeaderEntries)
+                    {
+                        _cacheInvalidationHeader.Add(grainAddressCacheUpdate);
+                    }
                 }
             }
         }

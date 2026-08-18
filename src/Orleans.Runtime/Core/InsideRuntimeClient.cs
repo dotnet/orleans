@@ -113,10 +113,10 @@ namespace Orleans.Runtime
         public GrainFactory ConcreteGrainFactory { get; }
 
         private GrainLocator GrainLocator
-            => this.grainLocator ?? (this.grainLocator = this.ServiceProvider.GetRequiredService<GrainLocator>());
+            => this.grainLocator;
 
         private List<IIncomingGrainCallFilter> GrainCallFilters
-            => this.grainCallFilters ??= new List<IIncomingGrainCallFilter>(this.ServiceProvider.GetServices<IIncomingGrainCallFilter>());
+            => this.grainCallFilters;
 
         private MessageCenter MessageCenter => this.messageCenter ?? (this.messageCenter = this.ServiceProvider.GetRequiredService<MessageCenter>());
 
@@ -510,6 +510,11 @@ namespace Orleans.Runtime
 
         private async Task OnRuntimeInitializeStop(CancellationToken tc)
         {
+            foreach (var callback in callbacks.Values)
+            {
+                callback.OnHostShutdown();
+            }
+
             this.callbackTimer.Dispose();
             if (this.callbackTimerTask is { } task)
             {
@@ -549,6 +554,8 @@ namespace Orleans.Runtime
 
         public void Participate(ISiloLifecycle lifecycle)
         {
+            grainLocator = ServiceProvider.GetRequiredService<GrainLocator>();
+            grainCallFilters = new List<IIncomingGrainCallFilter>(ServiceProvider.GetServices<IIncomingGrainCallFilter>());
             _cancellationManager = this.ServiceProvider.GetRequiredService<IGrainCallCancellationManager>();
             sharedCallbackData.CancellationManager = _cancellationManager;
             systemSharedCallbackData.CancellationManager = _cancellationManager;

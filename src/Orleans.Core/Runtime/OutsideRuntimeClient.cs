@@ -155,6 +155,12 @@ namespace Orleans
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
+            disposing = true;
+            foreach (var callback in callbacks.Values)
+            {
+                callback.OnHostShutdown();
+            }
+
             this.callbackTimer.Dispose();
 
             if (this.callbackTimerTask is { } task)
@@ -505,7 +511,7 @@ namespace Orleans
 
         private void ThrowIfDisposed()
         {
-            if (disposed)
+            if (disposing || disposed)
             {
                 ThrowObjectDisposedException();
             }
