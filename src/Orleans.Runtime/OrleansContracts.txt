@@ -11,6 +11,8 @@ class Orleans.Runtime.Development.DevelopmentLeaseProviderGrain
 interface Orleans.Runtime.Development.IDevelopmentLeaseProviderGrain [Version(0)]
   Reset() -> Task
 
+class Orleans.Runtime.Dissemination.DisseminationSystemTarget
+
 class Orleans.Runtime.GrainCallCancellationManager
 
 class Orleans.Runtime.GrainDirectory.ClientDirectory
