@@ -236,7 +236,7 @@ namespace Orleans.Runtime.Messaging
         }
 
         // There is NO need to acquire individual ClientState lock, since we only close an older socket.
-        internal void DropDisconnectedClients(bool excludeRecent = false)
+        internal void DropDisconnectedClients(bool excludeRecent = true)
         {
             var trackDroppedClients = GatewayEvents.IsClientDroppedEnabled();
             List<(GrainId ClientId, TimeSpan DisconnectedDuration)>? droppedClients = null;
@@ -443,7 +443,7 @@ namespace Orleans.Runtime.Messaging
                                 else
                                 {
                                     _pendingToSend.Enqueue((WorkItemType.SendMessageToClient, message));
-                                    return;
+                                    break;
                                 }
                             }
                             else if (workItemType is WorkItemType.ReceivedResponseFromClient)
