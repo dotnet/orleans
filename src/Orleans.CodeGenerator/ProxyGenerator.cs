@@ -22,14 +22,16 @@ namespace Orleans.CodeGenerator
         private const string CopyContextPoolMemberName = "CopyContextPool";
         private const string CodecProviderMemberName = "CodecProvider";
         private const string SharedMemberName = "Shared";
-        private readonly CodeGenerator _codeGenerator;
+        private readonly IGeneratorServices _generatorServices;
+        private readonly CopierGenerator _copierGenerator;
 
-        public ProxyGenerator(CodeGenerator codeGenerator)
+        public ProxyGenerator(IGeneratorServices generatorServices, CopierGenerator copierGenerator)
         {
-            _codeGenerator = codeGenerator;
+            _generatorServices = generatorServices;
+            _copierGenerator = copierGenerator;
         }
 
-        private LibraryTypes LibraryTypes => _codeGenerator.LibraryTypes;
+        private LibraryTypes LibraryTypes => _generatorServices.LibraryTypes;
 
         public (ClassDeclarationSyntax, GeneratedProxyDescription) Generate(ProxyInterfaceDescription interfaceDescription)
         {
@@ -61,7 +63,7 @@ namespace Orleans.CodeGenerator
                     SimpleBaseType(interfaceDescription.ProxyBaseType.ToTypeSyntax()),
                     SimpleBaseType(interfaceDescription.InterfaceType.ToTypeSyntax()))
                 .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(CodeGenerator.GetGeneratedCodeAttributes())
+                .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
                 .AddMembers(fieldDeclarations)
                 .AddMembers(activatorMembers)
                 .AddMembers(ctors)
@@ -77,7 +79,10 @@ namespace Orleans.CodeGenerator
         }
 
         public static string GetSimpleClassName(ProxyInterfaceDescription interfaceDescription)
-            => $"Proxy_{SyntaxGeneration.Identifier.SanitizeIdentifierName(interfaceDescription.Name)}";
+            => GetSimpleClassName(interfaceDescription.Name);
+
+        public static string GetSimpleClassName(string name)
+            => $"Proxy_{SyntaxGeneration.Identifier.SanitizeIdentifierName(name)}";
 
         private List<GeneratedFieldDescription> GetFieldDescriptions(
             ProxyInterfaceDescription interfaceDescription)
@@ -88,7 +93,7 @@ namespace Orleans.CodeGenerator
             var paramCopiers = interfaceDescription.Methods
                 .Where(method => method.MethodTypeParameters.Count == 0)
                 .SelectMany(method => method.GeneratedInvokable.Members);
-            _codeGenerator.CopierGenerator.GetCopierFieldDescriptions(paramCopiers, fields);
+            _copierGenerator.GetCopierFieldDescriptions(paramCopiers, fields);
             return fields;
         }
 
@@ -237,7 +242,7 @@ namespace Orleans.CodeGenerator
                                     EqualsValueClause(createRequestExpr))))));
 
             var codecs = fieldDescriptions.OfType<ICopierDescription>()
-                    .Concat(_codeGenerator.LibraryTypes.StaticCopiers)
+                    .Concat(_generatorServices.LibraryTypes.StaticCopiers)
                     .ToList();
 
             // Set request object fields from method parameters.
@@ -264,7 +269,7 @@ namespace Orleans.CodeGenerator
                     hasCopyContext = true;
                 }
 
-                var valueExpression = _codeGenerator.CopierGenerator.GenerateMemberCopy(
+                var valueExpression = _copierGenerator.GenerateMemberCopy(
                     fieldDescriptions,
                     IdentifierName($"arg{parameterIndex}"),
                     copyContextVariable,

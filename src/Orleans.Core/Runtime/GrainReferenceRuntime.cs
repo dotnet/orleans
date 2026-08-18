@@ -106,7 +106,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private ValueTask<TResult> InvokeMethodAsyncCore<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        private ValueTask<TResult?> InvokeMethodAsyncCore<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             ResponseCompletionSource<TResult> responseCompletionSource;
             try
@@ -123,7 +123,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private static async ValueTask<TResult> CompleteInvokeAsync<TResult>(ResponseCompletionSource<TResult> responseCompletionSource, IInvokable request, InvokeMethodOptions options)
+        private static async ValueTask<TResult?> CompleteInvokeAsync<TResult>(ResponseCompletionSource<TResult> responseCompletionSource, IInvokable request, InvokeMethodOptions options)
         {
             try
             {

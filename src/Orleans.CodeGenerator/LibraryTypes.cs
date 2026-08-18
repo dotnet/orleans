@@ -54,6 +54,7 @@ namespace Orleans.CodeGenerator
             RegisterActivatorAttribute = Type("Orleans.RegisterActivatorAttribute");
             RegisterConverterAttribute = Type("Orleans.RegisterConverterAttribute");
             RegisterCopierAttribute = Type("Orleans.RegisterCopierAttribute");
+            RegisterProviderAttribute = Type("Orleans.RegisterProviderAttribute");
             UseActivatorAttribute = Type("Orleans.UseActivatorAttribute");
             SuppressReferenceTrackingAttribute = Type("Orleans.SuppressReferenceTrackingAttribute");
             OmitDefaultMemberValuesAttribute = Type("Orleans.OmitDefaultMemberValuesAttribute");
@@ -252,6 +253,7 @@ namespace Orleans.CodeGenerator
         public WellKnownCopierDescription[] StaticCopiers { get; private set; }
         public WellKnownCopierDescription[] WellKnownCopiers { get; private set; }
         public INamedTypeSymbol RegisterCopierAttribute { get; private set; }
+        public INamedTypeSymbol RegisterProviderAttribute { get; private set; }
         public INamedTypeSymbol RegisterSerializerAttribute { get; private set; }
         public INamedTypeSymbol ResponseTimeoutAttribute { get; private set; }
         public INamedTypeSymbol RegisterConverterAttribute { get; private set; }

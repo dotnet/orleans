@@ -13,10 +13,11 @@ namespace Orleans.Serialization.Invocation
         }
     }
 
-    internal class ConcurrentObjectPool<T, TPoolPolicy> : ObjectPool<T> where T : class where TPoolPolicy : IPooledObjectPolicy<T>
+    internal class ConcurrentObjectPool<T, TPoolPolicy> : ObjectPool<T>, IDisposable where T : class where TPoolPolicy : IPooledObjectPolicy<T>
     {
         private readonly TPoolPolicy _policy;
         private readonly ThreadLocal<Stack<T>> _objects = new(static () => new());
+        private int _disposed;
 
         public ConcurrentObjectPool(TPoolPolicy policy) => _policy = policy;
 
@@ -24,6 +25,7 @@ namespace Orleans.Serialization.Invocation
 
         public override T Get()
         {
+            ThrowIfDisposed();
             var stack = _objects.Value!;
             if (stack.TryPop(out var result))
             {
@@ -37,11 +39,41 @@ namespace Orleans.Serialization.Invocation
         {
             if (_policy.Return(obj))
             {
-                var stack = _objects.Value!;
+                if (Volatile.Read(ref _disposed) != 0)
+                {
+                    return;
+                }
+
+                Stack<T> stack;
+                try
+                {
+                    stack = _objects.Value!;
+                }
+                catch (ObjectDisposedException)
+                {
+                    return;
+                }
+
                 if (stack.Count < MaxPoolSize)
                 {
                     stack.Push(obj);
                 }
+            }
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+            {
+                _objects.Dispose();
+            }
+        }
+
+        private void ThrowIfDisposed()
+        {
+            if (Volatile.Read(ref _disposed) != 0)
+            {
+                throw new ObjectDisposedException(typeof(ConcurrentObjectPool<T, TPoolPolicy>).FullName);
             }
         }
     }

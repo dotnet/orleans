@@ -9,7 +9,6 @@ namespace Orleans.Serialization.Invocation
 {
     /// <summary>
     /// Thread-local object pool for <see cref="IInvokable"/> implementations.
-    /// Registered as an open generic singleton and injected into generated activators.
     /// </summary>
     /// <typeparam name="T">The invokable type.</typeparam>
     public sealed class InvokablePool<T> : IDisposable where T : class, IInvokable
@@ -35,8 +34,6 @@ namespace Orleans.Serialization.Invocation
         /// <summary>
         /// Tries to get an instance from the pool.
         /// </summary>
-        /// <param name="item">The pooled item, if available.</param>
-        /// <returns>True if an item was retrieved from the pool; false if the pool was empty.</returns>
         public bool TryGet([NotNullWhen(true)] out T? item)
         {
             if (TryGetStack(out var stack))
@@ -51,7 +48,6 @@ namespace Orleans.Serialization.Invocation
         /// <summary>
         /// Returns an instance to the pool.
         /// </summary>
-        /// <param name="item">The item to return.</param>
         public void Return(T item)
         {
             if (TryGetStack(out var stack) && stack.Count < MaxPoolSizePerThread)

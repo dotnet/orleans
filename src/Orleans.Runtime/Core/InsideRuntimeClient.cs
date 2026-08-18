@@ -386,7 +386,7 @@ namespace Orleans.Runtime
             {
                 if (disposeRequest)
                 {
-                    request.Dispose();
+                    request!.Dispose();
                     if (ReferenceEquals(message.BodyObject, request))
                     {
                         message.BodyObject = null;

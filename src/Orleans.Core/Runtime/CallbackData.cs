@@ -83,6 +83,12 @@ namespace Orleans.Runtime
 
         private TimeSpan GetResponseTimeout() => (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;
 
+        private string GetTargetGrainType()
+        {
+            var type = Message.TargetGrain.Type;
+            return type.IsDefault ? "unknown" : type.ToString()!;
+        }
+
         private void OnCancellation()
         {
             // If waiting for acknowledgement is enabled, simply signal to the remote grain that cancellation
@@ -104,7 +110,7 @@ namespace Orleans.Runtime
             SignalCancellation();
             shared.Unregister(Message);
             _applicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
-            _applicationRequestInstruments.OnAppRequestsTimedOut();
+            _applicationRequestInstruments.OnAppRequestsTimedOut(GetTargetGrainType());
             OrleansCallBackDataEvent.Instance.OnCanceled(Message);
             context.Complete(Response.FromException(new OperationCanceledException(_cancellationTokenRegistration.Token)));
             _cancellationTokenRegistration.Dispose();
@@ -126,7 +132,7 @@ namespace Orleans.Runtime
             this.shared.Unregister(this.Message);
             _cancellationTokenRegistration.Dispose();
             _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
-            _applicationRequestInstruments.OnAppRequestsTimedOut();
+            _applicationRequestInstruments.OnAppRequestsTimedOut(GetTargetGrainType());
 
             OrleansCallBackDataEvent.Instance.OnTimeout(this.Message);
 
@@ -158,6 +164,23 @@ namespace Orleans.Runtime
             LogTargetSiloFail(this.shared.Logger, msg, statusMessage, Constants.TroubleshootingHelpLink);
             var exception = new SiloUnavailableException($"The target silo became unavailable for message: {msg}. {statusMessage}See {Constants.TroubleshootingHelpLink} for troubleshooting help.");
             this.context.Complete(Response.FromException(exception));
+        }
+
+        public void OnHostShutdown()
+        {
+            if (Interlocked.CompareExchange(ref completed, 1, 0) != 0)
+            {
+                return;
+            }
+
+            stopwatch.Stop();
+            shared.Unregister(Message);
+            _cancellationTokenRegistration.Dispose();
+            _applicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
+
+            var message = Message;
+            var exception = new SiloUnavailableException($"The local Orleans host is shutting down and can no longer process the request: {message}.");
+            context.Complete(Response.FromException(exception));
         }
 
         public void DoCallback(Message response)

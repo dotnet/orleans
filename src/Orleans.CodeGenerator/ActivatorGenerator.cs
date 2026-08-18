@@ -9,7 +9,7 @@ namespace Orleans.CodeGenerator
 {
     internal class ActivatorGenerator
     {
-        private readonly CodeGenerator _codeGenerator;
+        private readonly IGeneratorServices _generatorServices;
 
         private struct ConstructorArgument
         {
@@ -19,16 +19,16 @@ namespace Orleans.CodeGenerator
             public bool IsPool { get; set; }
         }
 
-        public ActivatorGenerator(CodeGenerator codeGenerator)
+        public ActivatorGenerator(IGeneratorServices generatorServices)
         {
-            _codeGenerator = codeGenerator;
+            _generatorServices = generatorServices;
         }
 
         public ClassDeclarationSyntax GenerateActivator(ISerializableTypeDescription type)
         {
             var simpleClassName = GetSimpleClassName(type);
 
-            var baseInterface = _codeGenerator.LibraryTypes.IActivator_1.ToTypeSyntax(type.TypeSyntax);
+            var baseInterface = _generatorServices.LibraryTypes.IActivator_1.ToTypeSyntax(type.TypeSyntax);
 
             var orderedFields = new List<ConstructorArgument>();
             var index = 0;
@@ -37,7 +37,9 @@ namespace Orleans.CodeGenerator
                 foreach (var arg in parameters)
                 {
                     // Detect if this is an InvokablePool<T> parameter
-                    var isPool = arg is GenericNameSyntax gns && gns.Identifier.Text == "InvokablePool";
+                    var isPool = arg.DescendantNodesAndSelf()
+                        .OfType<GenericNameSyntax>()
+                        .Any(gns => gns.Identifier.Text == "InvokablePool");
                     orderedFields.Add(new ConstructorArgument { Type = arg, FieldName = $"_arg{index}", ParameterName = $"arg{index}", IsPool = isPool });
                     index++;
                 }
@@ -61,7 +63,7 @@ namespace Orleans.CodeGenerator
             var classDeclaration = ClassDeclaration(simpleClassName)
                 .AddBaseListTypes(SimpleBaseType(baseInterface))
                 .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(CodeGenerator.GetGeneratedCodeAttributes())
+                .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
                 .AddMembers(members.ToArray());
 
             if (type.IsGenericType)
@@ -72,7 +74,20 @@ namespace Orleans.CodeGenerator
             return classDeclaration;
         }
 
-        public static string GetSimpleClassName(ISerializableTypeDescription serializableType) => $"Activator_{serializableType.Name}";
+        public static string GetSimpleClassName(ISerializableTypeDescription serializableType) => GetSimpleClassName(serializableType.Name);
+
+        public static string GetSimpleClassName(string name) => $"Activator_{name}";
+
+        internal static bool ShouldGenerateActivator(ISerializableTypeDescription type)
+        {
+            return !type.IsAbstractType
+                && !type.IsEnumType
+                && (!type.IsValueType
+                    && type.IsEmptyConstructable
+                    && !type.UseActivator
+                    && type is not GeneratedInvokableDescription
+                    || type.HasActivatorConstructor);
+        }
 
         private ConstructorDeclarationSyntax GenerateConstructor(
             string simpleClassName,

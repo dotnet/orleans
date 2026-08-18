@@ -37,7 +37,7 @@ namespace Orleans.Serialization.UnitTests
 
         private sealed class TestInvokable : IInvokable
         {
-            public object GetTarget() => null;
+            public object GetTarget() => null!;
 
             public void SetTarget(ITargetHolder holder) { }
 
@@ -55,7 +55,7 @@ namespace Orleans.Serialization.UnitTests
 
             public string GetActivityName() => nameof(TestInvokable);
 
-            public MethodInfo GetMethod() => null;
+            public MethodInfo GetMethod() => null!;
 
             public Type GetInterfaceType() => typeof(TestInvokable);
 
