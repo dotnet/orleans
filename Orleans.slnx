@@ -147,6 +147,9 @@
     <Project Path="test/Orleans.EventSourcing.Tests/Orleans.EventSourcing.Tests.csproj" />
     <Project Path="test/Orleans.DurableJobs.Tests/Orleans.DurableJobs.Tests.csproj" />
   </Folder>
+  <Folder Name="/templates/">
+    <Project Path="templates/Microsoft.Orleans.Templates/Microsoft.Orleans.Templates.csproj" />
+  </Folder>
   <Folder Name="/test/Dashboard/">
     <Project Path="test/Orleans.Dashboard.Tests/Orleans.Dashboard.TestGrains/Orleans.Dashboard.TestGrains.csproj" />
     <Project Path="test/Orleans.Dashboard.Tests/Orleans.Dashboard.UnitTests/Orleans.Dashboard.UnitTests.csproj" />

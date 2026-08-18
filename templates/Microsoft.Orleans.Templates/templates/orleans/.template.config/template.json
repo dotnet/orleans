@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [
+    "Cloud",
+    "Distributed Systems",
+    "Orleans"
+  ],
+  "identity": "Microsoft.Orleans.Templates.Application.CSharp",
+  "groupIdentity": "Microsoft.Orleans.Templates.Application",
+  "name": "Orleans application",
+  "shortName": "orleans",
+  "defaultName": "OrleansApp",
+  "sourceName": "OrleansApp",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "symbols": {
+    "framework": {
+      "type": "parameter",
+      "datatype": "choice",
+      "description": "The target framework for the generated projects.",
+      "defaultValue": "net10.0",
+      "replaces": "net10.0",
+      "choices": [
+        {
+          "choice": "net10.0",
+          "description": "Target .NET 10."
+        },
+        {
+          "choice": "net8.0",
+          "description": "Target .NET 8."
+        }
+      ]
+    },
+    "orleansVersion": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "The Microsoft Orleans package version.",
+      "defaultValue": "10.2.2"
+    },
+    "orleansVersionXml": {
+      "type": "derived",
+      "valueSource": "orleansVersion",
+      "valueTransform": "xmlEncode",
+      "replaces": "__ORLEANS_VERSION__"
+    },
+    "skipRestore": {
+      "type": "parameter",
+      "datatype": "bool",
+      "description": "Skip automatic package restore.",
+      "defaultValue": "false"
+    }
+  },
+  "primaryOutputs": [
+    {
+      "path": "OrleansApp.slnx"
+    },
+    {
+      "path": "OrleansApp.Contracts/OrleansApp.Contracts.csproj"
+    },
+    {
+      "path": "OrleansApp.Grains/OrleansApp.Grains.csproj"
+    },
+    {
+      "path": "OrleansApp.Silo/OrleansApp.Silo.csproj"
+    },
+    {
+      "path": "OrleansApp.Client/OrleansApp.Client.csproj"
+    }
+  ],
+  "postActions": [
+    {
+      "id": "restore",
+      "condition": "(!skipRestore)",
+      "description": "Restore NuGet packages required by this solution.",
+      "manualInstructions": [
+        {
+          "text": "Run 'dotnet restore'."
+        }
+      ],
+      "actionId": "210D431B-A78B-4D2F-B762-4ED3E3EA9025",
+      "args": {
+        "files": "OrleansApp.slnx"
+      },
+      "continueOnError": true
+    }
+  ]
+}

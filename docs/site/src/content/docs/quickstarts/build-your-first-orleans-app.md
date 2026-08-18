@@ -1,7 +1,7 @@
 ---
 title: 'Tutorial: Build your first Orleans app'
 description: Build a multi-project Orleans application with a silo and external client.
-ms.date: 08/08/2026
+ms.date: 08/18/2026
 ms.topic: tutorial
 ms.devlang: csharp
 ---
@@ -34,6 +34,15 @@ Create a solution with four projects:
 - **Grains** contains the grain implementations.
 - **Silo** hosts the Orleans runtime and grain activations.
 - **Client** is an external process that connects to the silo and calls grains.
+
+The maintained `Microsoft.Orleans.Templates` package can create this layout for you:
+
+```dotnetcli
+dotnet new install Microsoft.Orleans.Templates
+dotnet new orleans --name OrleansHelloWorld --output OrleansHelloWorld
+```
+
+Continue with the manual steps below to learn how the projects and references fit together.
 
 Run the following commands in an empty directory:
 
