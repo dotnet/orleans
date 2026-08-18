@@ -241,21 +241,15 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         {
             cancellationToken.ThrowIfCancellationRequested();
             var initialRecoveryMembershipVersion = _recoveryMembershipVersion;
-            if (view.Version.Value < initialRecoveryMembershipVersion || !view.TryGetOwner(grainId, out var owner, out var partitionReference))
+            var resolved = await GetViewWithOwnerAsync(grainId, view, initialRecoveryMembershipVersion, cancellationToken);
+            if (resolved is not { } ownerView)
             {
-                // If there are no members and this view is current, bail out with the default return value.
-                // Otherwise, wait for the directory to observe the newer cluster membership view.
-                if (view.Members.Length == 0
-                    && view.Version.Value > 0
-                    && LatestClusterMembershipSnapshot.Version <= view.Version)
-                {
-                    return default;
-                }
-
-                var targetVersion = Math.Max(view.Version.Value + 1, initialRecoveryMembershipVersion);
-                view = await _membershipService.RefreshViewAsync(new(targetVersion), cancellationToken);
-                continue;
+                return default;
             }
+
+            view = ownerView.View;
+            var owner = ownerView.Owner;
+            var partitionReference = ownerView.PartitionReference;
 
 #if false
             if (logger.IsEnabled(LogLevel.Trace))
@@ -320,6 +314,47 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
             return result;
         }
+    }
+
+    private async ValueTask<(DirectoryMembershipSnapshot View, SiloAddress Owner, IGrainDirectoryPartition PartitionReference)?> GetViewWithOwnerAsync(
+        GrainId grainId,
+        DirectoryMembershipSnapshot view,
+        long minimumVersion,
+        CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            if (view.Version.Value >= minimumVersion
+                && view.TryGetOwner(grainId, out var owner, out var partitionReference))
+            {
+                return (view, owner, partitionReference);
+            }
+
+            // Cluster membership advances before the directory's asynchronous view. If the latest cluster view
+            // still has an active member, this empty directory view is stale; otherwise it is terminal, as on shutdown.
+            if (view.Members.Length == 0
+                && view.Version.Value > 0
+                && !HasActiveMembers(LatestClusterMembershipSnapshot))
+            {
+                return null;
+            }
+
+            var targetVersion = Math.Max(view.Version.Value + 1, minimumVersion);
+            view = await _membershipService.RefreshViewAsync(new(targetVersion), cancellationToken);
+        }
+    }
+
+    private static bool HasActiveMembers(ClusterMembershipSnapshot snapshot)
+    {
+        foreach (var member in snapshot.Members.Values)
+        {
+            if (member.Status == SiloStatus.Active)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     internal static bool CanInvokeClusterMember(ClusterMembershipSnapshot snapshot, SiloAddress siloAddress)
@@ -599,6 +634,16 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         return owner;
     }
 
+    async Task<SiloAddress?> ITestHooks.WaitForPrimaryForGrain(GrainId grainId, CancellationToken cancellationToken)
+    {
+        var result = await GetViewWithOwnerAsync(
+            grainId,
+            _membershipService.CurrentView,
+            _recoveryMembershipVersion,
+            cancellationToken);
+        return result?.Owner;
+    }
+
     async Task<GrainAddress?> ITestHooks.GetLocalRecord(GrainId grainId)
     {
         var view = _membershipService.CurrentView;
@@ -617,6 +662,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     internal interface ITestHooks
     {
         SiloAddress? GetPrimaryForGrain(GrainId grainId);
+        Task<SiloAddress?> WaitForPrimaryForGrain(GrainId grainId, CancellationToken cancellationToken);
         Task<GrainAddress?> GetLocalRecord(GrainId grainId);
     }
 
