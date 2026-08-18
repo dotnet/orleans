@@ -205,6 +205,7 @@ namespace Orleans.Core
                     readSatisfiedByPredecessor = predecessor.Completion.IsCompletedSuccessfully;
                 }
 
+                GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
                 MarkStorageOperationStarted(operation);
 
                 if (readSatisfiedByPredecessor)
@@ -243,6 +244,7 @@ namespace Orleans.Core
                         predecessor.Completion.IsCompletedSuccessfully;
                 }
 
+                GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
                 MarkStorageOperationStarted(operation);
 
                 if (!clearSatisfiedByPredecessor)
