@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -186,7 +187,8 @@ internal sealed class StripedCallbackDictionary<TValue> : IEnumerable<KeyValuePa
     {
         private readonly StripedCallbackDictionary<TValue> _dictionary;
         private int _stripeIndex;
-        private List<KeyValuePair<CorrelationId, TValue>>? _currentSnapshot;
+        private KeyValuePair<CorrelationId, TValue>[]? _currentSnapshot;
+        private int _snapshotCount;
         private int _snapshotIndex;
 
         internal Enumerator(StripedCallbackDictionary<TValue> dictionary)
@@ -194,6 +196,7 @@ internal sealed class StripedCallbackDictionary<TValue> : IEnumerable<KeyValuePa
             _dictionary = dictionary;
             _stripeIndex = -1;
             _currentSnapshot = null;
+            _snapshotCount = 0;
             _snapshotIndex = -1;
         }
 
@@ -209,10 +212,12 @@ internal sealed class StripedCallbackDictionary<TValue> : IEnumerable<KeyValuePa
                 if (_currentSnapshot != null)
                 {
                     _snapshotIndex++;
-                    if (_snapshotIndex < _currentSnapshot.Count)
+                    if (_snapshotIndex < _snapshotCount)
                     {
                         return true;
                     }
+
+                    ReturnSnapshot();
                 }
 
                 // Move to next stripe
@@ -229,7 +234,12 @@ internal sealed class StripedCallbackDictionary<TValue> : IEnumerable<KeyValuePa
                 {
                     if (stripe.Dictionary.Count > 0)
                     {
-                        _currentSnapshot = new List<KeyValuePair<CorrelationId, TValue>>(stripe.Dictionary);
+                        _currentSnapshot = ArrayPool<KeyValuePair<CorrelationId, TValue>>.Shared.Rent(stripe.Dictionary.Count);
+                        _snapshotCount = 0;
+                        foreach (var pair in stripe.Dictionary)
+                        {
+                            _currentSnapshot[_snapshotCount++] = pair;
+                        }
                         _snapshotIndex = -1;
                     }
                     else
@@ -243,13 +253,20 @@ internal sealed class StripedCallbackDictionary<TValue> : IEnumerable<KeyValuePa
         public void Reset()
         {
             _stripeIndex = -1;
-            _currentSnapshot = null;
+            ReturnSnapshot();
             _snapshotIndex = -1;
         }
 
-        public void Dispose()
+        public void Dispose() => ReturnSnapshot();
+
+        private void ReturnSnapshot()
         {
-            _currentSnapshot = null;
+            if (_currentSnapshot is { } snapshot)
+            {
+                ArrayPool<KeyValuePair<CorrelationId, TValue>>.Shared.Return(snapshot, clearArray: true);
+                _currentSnapshot = null;
+                _snapshotCount = 0;
+            }
         }
     }
 }

@@ -72,7 +72,7 @@ namespace Orleans
             IOptions<ClientMessagingOptions> clientMessagingOptions,
             MessagingTrace messagingTrace,
             IServiceProvider serviceProvider,
-            TimeProvider timeProvider,
+            [FromKeyedServices(TimeProviderNames.Messaging)] TimeProvider timeProvider,
             InterfaceToImplementationMappingCache interfaceToImplementationMapping,
             OrleansInstruments orleansInstruments)
         {
@@ -155,6 +155,11 @@ namespace Orleans
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
+            foreach (var (_, callback) in callbacks)
+            {
+                callback.OnHostShutdown();
+            }
+
             this.callbackTimer.Dispose();
 
             if (this.callbackTimerTask is { } task)
