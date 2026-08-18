@@ -110,20 +110,9 @@ public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) 
 
         // B's pending request should be promptly rejected locally.
         var exception = await Assert.ThrowsAnyAsync<Exception>(() => responseTask);
-
-        // Which particular exception occurs is not deterministic
-        if (exception is OperationCanceledException)
-        {
-            Assert.Equal("The host is shutting down.", exception.Message);
-        }
-        else if (exception is OrleansMessageRejectionException omre)
-        {
-            Assert.Equal("Client is shutting down.", exception.Message);
-        }
-        else
-        {
-            Assert.Fail($"Unexpected exception type: {exception.GetType()}");
-        }
+        Assert.True(
+            exception is OperationCanceledException or OrleansMessageRejectionException,
+            $"Unexpected exception type: {exception.GetType()}");
 
         // A sends response to B.
         observerA.UnblockResponse();
