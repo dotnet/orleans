@@ -12,6 +12,7 @@ Orleans applications benefit from tests at more than one level:
 | Test level | Best suited for |
 | --- | --- |
 | Isolated unit test | Pure application logic and constructor-injected collaborators |
+| [OrleansTestKit](https://github.com/OrleansContrib/OrleansTestKit) | A single grain's decisions and interactions using a simulated activation context |
 | <xref:Orleans.TestingHost.InProcessTestCluster> | Grain calls, activation, scheduling, serialization, dependency injection, and cluster behavior |
 | Test cluster with production providers | Storage, clustering, reminders, and streams whose external-system contract matters |
 
@@ -67,10 +68,30 @@ Wait for liveness to stabilize before asserting behavior which depends on the ne
 
 <xref:Orleans.TestingHost.TestCluster> remains available for suites built around class-based configurators such as <xref:Orleans.TestingHost.ISiloConfigurator>. Its built-in hosts run in process; a custom silo-creation delegate is required for another isolation model. New Orleans tests should generally use <xref:Orleans.TestingHost.InProcessTestCluster> for its delegate-based configuration and direct access to each host's service provider.
 
-## Unit test application logic
+## Choose the runtime boundary
 
-Use <xref:Orleans.TestingHost.InProcessTestCluster> for behavior implemented by a grain. The cluster creates activations through the Orleans runtime and preserves turn scheduling, interleaving, serialization, dependency injection, persistence integration, placement, message routing, timers, reminders, and lifecycle behavior.
+Use <xref:Orleans.TestingHost.InProcessTestCluster> when an assertion depends on runtime behavior. The cluster creates activations through the Orleans runtime and preserves turn scheduling, interleaving, serialization, dependency injection, persistence integration, placement, message routing, timers, reminders, and lifecycle behavior.
 
 Pure domain logic can be extracted into an ordinary class or service and tested directly. Keep that boundary independent of Orleans runtime abstractions. A cluster test can replace application-owned collaborators through dependency injection while the runtime continues to create and execute the grain.
 
 Configure the production storage or reminder provider when the test covers its external-system contract, concurrency behavior, or restart recovery.
+
+## Test a grain in isolation with OrleansTestKit
+
+[OrleansTestKit](https://github.com/OrleansContrib/OrleansTestKit) is a community-maintained project in the OrleansContrib organization. Its releases and issue tracking are managed in that repository. It creates a simulated grain activation context and supplies test implementations for activation identity, persistent state, grain references, timers, reminders, and streams. Match the OrleansTestKit major version to the Orleans major version used by the application.
+
+Install the package in the test project:
+
+```dotnetcli
+dotnet add package OrleansTestKit
+```
+
+The following grain uses its string identity to address another grain and persists an item before making that call:
+
+:::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/ShoppingCartGrain.cs" id="testkit_grain":::
+
+Derive the test class from `TestKitBase`. Register persistent state and grain probes on `Silo` before creating the grain with its test identity:
+
+:::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/ShoppingCartGrainTests.cs" id="testkit_grain_test":::
+
+The test verifies the grain's state mutation, storage write request, key-derived grain reference, and outgoing call. OrleansTestKit invokes the grain using its simulated activation context. Use <xref:Orleans.TestingHost.InProcessTestCluster> for assertions governed by Orleans turn scheduling, interleaving, reentrancy, serialization, activation lifecycle, placement, or message routing.
