@@ -307,39 +307,24 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
 
         var reminder1 = await g1.StartReminder(DR);
         Assert.Equal(DR, reminder1.ReminderName);
-        await observer.WaitForActiveReminderCountAsync(g1, 1, cts.Token, DR);
-        await AdvanceReminderTimeAndWaitForTickAsync(g1, DR, period, cts.Token);
+        await AdvanceRemindersByTicksAsync(1, cts.Token, (g1, DR));
 
         var reminder2 = await g2.StartReminder(DR);
         Assert.Equal(DR, reminder2.ReminderName);
-        await observer.WaitForActiveReminderCountAsync(g2, 1, cts.Token, DR);
-
-        await AdvanceReminderTimeAsync(TimeSpan.Zero, cts.Token);
-        var g1TickTask = observer.WaitForAdditionalTickCountAsync(g1, 1, cts.Token, DR);
-        var g2TickTask = observer.WaitForAdditionalTickCountAsync(g2, 1, cts.Token, DR);
-        await AdvanceReminderTimeAsync(period, cts.Token);
-        await Task.WhenAll(g1TickTask, g2TickTask);
+        await AdvanceRemindersByTicksAsync(1, cts.Token, (g1, DR), (g2, DR));
 
         await StopReminderAndWaitForQuiescenceAsync(g1, DR, g1.StopReminder, cts.Token);
         Assert.Null(await g1.GetReminderObject(DR));
         Assert.Equal(1, observer.GetActiveReminderCount(g2.GetGrainId(), DR));
 
         var stopped1TickCount = observer.GetTickCount(g1.GetGrainId(), DR);
-        await AdvanceReminderTimeAndWaitForTickAsync(g2, DR, period, cts.Token);
+        await AdvanceRemindersByTicksAsync(1, cts.Token, (g2, DR));
         Assert.Equal(stopped1TickCount, observer.GetTickCount(g1.GetGrainId(), DR));
 
         await StopReminderAndWaitForQuiescenceAsync(g2, DR, g2.StopReminder, cts.Token);
         var stopped2TickCount = observer.GetTickCount(g2.GetGrainId(), DR);
         await AdvanceReminderTimeAsync(period, cts.Token);
         Assert.Equal(stopped2TickCount, observer.GetTickCount(g2.GetGrainId(), DR));
-    }
-
-    private async Task AdvanceReminderTimeAndWaitForTickAsync(IAddressable grain, string reminderName, TimeSpan amount, CancellationToken cancellationToken)
-    {
-        await AdvanceReminderTimeAsync(TimeSpan.Zero, cancellationToken);
-        var tickTask = observer.WaitForAdditionalTickCountAsync(grain, 1, cancellationToken, reminderName);
-        await AdvanceReminderTimeAsync(amount, cancellationToken);
-        await tickTask;
     }
 
     [TestSuite("Functional")]
