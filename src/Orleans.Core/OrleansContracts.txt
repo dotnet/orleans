@@ -37,7 +37,14 @@ interface Orleans.Placement.Repartitioning.IActivationRepartitionerSystemTarget 
 
 interface Orleans.Runtime.IClusterManifestSystemTarget [Version(0)]
   GetClusterManifest() -> ValueTask<Orleans.Metadata.ClusterManifest>
+  GetClusterManifestHashSummary() -> ValueTask<Orleans.Runtime.ClusterManifestHashSummary>
   GetClusterManifestUpdate(Orleans.Metadata.MajorMinorVersion) -> ValueTask<Orleans.Runtime.ClusterManifestUpdate?>
+  GetSiloManifestByHash(Orleans.Runtime.ManifestHash) -> ValueTask<Orleans.Metadata.GrainManifest?>
+  GetSiloManifestHash() -> ValueTask<Orleans.Runtime.ManifestHash>
+
+interface Orleans.Runtime.IDisseminationSystemTarget [Version(0)]
+  ExchangeAntiEntropy(Orleans.Runtime.DisseminationAntiEntropyRequest, System.Threading.CancellationToken) -> Task<Orleans.Runtime.DisseminationAntiEntropyResponse>
+  PushBroadcast(Orleans.Runtime.DisseminationBroadcastBatch, System.Threading.CancellationToken) -> Task<Orleans.Runtime.DisseminationBroadcastResponse>
 
 interface Orleans.Runtime.IDeploymentLoadPublisher [Version(0)]
   UpdateRuntimeStatistics(Orleans.Runtime.SiloAddress, Orleans.Runtime.SiloRuntimeStatistics) -> Task
