@@ -122,7 +122,7 @@ namespace Orleans.Streams
         public Task<ISet<PubSubSubscriptionState>> RegisterProducer(
             QualifiedStreamId streamId,
             GrainId streamProducer) =>
-            RegisterProducer(streamId, streamProducer, default);
+            RegisterProducer(streamId, streamProducer, PubSubPublisherState.UnknownMembershipVersion);
 
         public async Task<ISet<PubSubSubscriptionState>> RegisterProducer(
             QualifiedStreamId streamId,
@@ -191,7 +191,8 @@ namespace Orleans.Streams
 
             if (registrationRejected)
             {
-                throw new OrleansException($"Cannot register stream producer {streamProducer} because its silo could not be confirmed as non-terminating.");
+                throw new OrleansException(
+                    $"Cannot register stream producer {streamProducer}. Registration requires a known, non-terminating producer silo.");
             }
 
             // The LINQ query is non-null, so ToSet cannot return null.
@@ -228,7 +229,7 @@ namespace Orleans.Streams
                 return (true, false);
             }
 
-            var targetVersion = default(MembershipVersion);
+            var targetVersion = PubSubPublisherState.UnknownMembershipVersion;
             foreach (var version in siloMembershipVersions.Values)
             {
                 if (HasMembershipVersion(version)
@@ -311,8 +312,8 @@ namespace Orleans.Streams
             }
         }
 
-        private static bool HasMembershipVersion(MembershipVersion membershipVersion) =>
-            membershipVersion != default;
+        internal static bool HasMembershipVersion(MembershipVersion membershipVersion) =>
+            membershipVersion != PubSubPublisherState.UnknownMembershipVersion;
 
         internal static bool IsValidSystemTargetRegistrationStatus(SiloStatus status) =>
             status != SiloStatus.None && !status.IsTerminating();
@@ -772,7 +773,7 @@ namespace Orleans.Streams
 
         [LoggerMessage(
             Level = LogLevel.Warning,
-            Message = "Producer {Producer} on stream {StreamId} is no longer active - ignoring registration."
+            Message = "Rejecting producer {Producer} on stream {StreamId}. Registration requires a known, non-terminating producer silo."
         )]
         private partial void LogWarningProducerRegistrationIgnored(PubSubPublisherState producer, QualifiedStreamId streamId);
 
