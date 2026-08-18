@@ -1,3 +1,8 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using NSubstitute;
+using Orleans.Configuration;
+using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
 using Xunit;
 
@@ -41,5 +46,28 @@ public class WorkItemGroupWaiterTests
 
         Assert.True(wait.IsCompleted);
         await wait;
+    }
+
+    [Fact]
+    public async Task PendingContinuationRunsThroughWorkItemGroup()
+    {
+        using var services = new ServiceCollection()
+            .AddLogging()
+            .AddMetrics()
+            .AddSingleton<OrleansInstruments>()
+            .AddSingleton<SchedulerInstruments>()
+            .BuildServiceProvider();
+        var context = Substitute.For<IGrainContext>();
+        context.ActivationServices.Returns(services);
+        var workItemGroup = new WorkItemGroup(
+            context,
+            Options.Create(new SchedulingOptions()),
+            services.GetRequiredService<SchedulerInstruments>());
+        var waiter = new WorkItemGroupWaiter(workItemGroup);
+        var wait = waiter.WaitAsync().AsTask();
+
+        waiter.Signal();
+
+        await wait.WaitAsync(TimeSpan.FromSeconds(10));
     }
 }
