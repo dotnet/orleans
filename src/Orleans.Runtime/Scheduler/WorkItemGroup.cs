@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -61,7 +62,6 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
         Running = 2
     }
 
-    private readonly ILogger _log;
 #if NET9_0_OR_GREATER
     private readonly Lock _lockObj = new();
 #else
@@ -69,6 +69,7 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
 #endif
     private readonly Queue<WorkItem> _workItems = new();
     private readonly SchedulingOptions _schedulingOptions;
+    private readonly SchedulerInstruments _schedulerInstruments;
 
     private long _totalItemsEnqueued;
     private long _totalItemsProcessed;
@@ -85,6 +86,13 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
 
     public IGrainContext GrainContext { get; set; }
 
+    internal ILogger Logger => GrainContext switch
+    {
+        ActivationData activation => activation.Shared.SchedulerLogger,
+        SystemTarget systemTarget => systemTarget.SchedulerLogger,
+        _ => GrainContext.ActivationServices.GetRequiredService<ILogger<WorkItemGroup>>()
+    };
+
     internal int ExternalWorkItemCount
     {
         get { lock (_lockObj) { return _workItems.Count; } }
@@ -92,16 +100,15 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
 
     public WorkItemGroup(
         IGrainContext grainContext,
-        ILogger<WorkItemGroup> logger,
-        ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
-        IOptions<SchedulingOptions> schedulingOptions)
+        IOptions<SchedulingOptions> schedulingOptions,
+        SchedulerInstruments schedulerInstruments)
     {
         ArgumentNullException.ThrowIfNull(grainContext);
         GrainContext = grainContext;
         _schedulingOptions = schedulingOptions.Value;
+        _schedulerInstruments = schedulerInstruments;
         _state = WorkGroupStatus.Waiting;
-        _log = logger;
-        TaskScheduler = new ActivationTaskScheduler(this, activationTaskSchedulerLogger);
+        TaskScheduler = new ActivationTaskScheduler(this);
 
         // Create a dummy task associated with our scheduler (never actually runs)
         // We set m_taskScheduler directly so TaskScheduler.Current returns our scheduler
@@ -117,9 +124,9 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
     public void EnqueueTask(Task task)
     {
 #if DEBUG
-        if (_log.IsEnabled(LogLevel.Trace))
+        if (Logger.IsEnabled(LogLevel.Trace))
         {
-            LogTraceEnqueueWorkItem(_log, task, GrainContext, System.Threading.Tasks.TaskScheduler.Current);
+            LogTraceEnqueueWorkItem(Logger, task, GrainContext, System.Threading.Tasks.TaskScheduler.Current);
         }
 #endif
 
@@ -153,9 +160,9 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
 
             _state = WorkGroupStatus.Runnable;
 #if DEBUG
-            if (_log.IsEnabled(LogLevel.Trace))
+            if (Logger.IsEnabled(LogLevel.Trace))
             {
-                _log.LogTrace(
+                Logger.LogTrace(
                     "Add to RunQueue #{SequenceNumber}, onto {GrainContext}",
                     thisSequenceNumber,
                     GrainContext);
@@ -168,7 +175,7 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void LogTooManyTasksInQueue(int count, int maxPendingItemsLimit)
     {
-        LogWarningTooManyPendingItems(_log, count, GrainContext?.ToString() ?? "Unknown", maxPendingItemsLimit);
+        LogWarningTooManyPendingItems(Logger, count, GrainContext?.ToString() ?? "Unknown", maxPendingItemsLimit);
     }
 
     /// <summary>
@@ -254,7 +261,7 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
                     taskStart = taskEnd;
                     if (taskDurationMs > turnWarningDurationMs)
                     {
-                        SchedulerInstruments.LongRunningTurnsCounter.Add(1);
+                        _schedulerInstruments.OnLongRunningTurn();
                         if (workItem.Type == WorkItem.WorkItemType.Task)
                         {
                             LogLongRunningTurn(Unsafe.As<Task>(workItem.Callback), taskDurationMs);
@@ -296,9 +303,9 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void LogTaskStart(Task task)
     {
-        if (_log.IsEnabled(LogLevel.Trace))
+        if (Logger.IsEnabled(LogLevel.Trace))
         {
-            LogTraceAboutToExecuteTask(_log, task, GrainContext);
+            LogTraceAboutToExecuteTask(Logger, task, GrainContext);
         }
     }
 #endif
@@ -306,7 +313,7 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void LogTaskLoopError(Exception ex)
     {
-        LogErrorTaskLoop(_log, ex, Environment.CurrentManagedThreadId);
+        LogErrorTaskLoop(Logger, ex, Environment.CurrentManagedThreadId);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -319,7 +326,7 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
 
         var taskDuration = TimeSpan.FromMilliseconds(taskDurationMs);
         LogWarningLongRunningTurn(
-            _log,
+            Logger,
             task.AsyncState ?? task,
             GrainContext?.ToString() ?? "Unknown",
             taskDuration.ToString("g"),
