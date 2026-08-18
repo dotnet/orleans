@@ -130,7 +130,7 @@ namespace UnitTests.StreamingTests
                 restartedSilo.SiloAddress,
                 "ProviderName_1_test-queue").GrainId;
 
-            await pubSubGrain.RegisterProducer(streamId, staleProducer);
+            await pubSubGrain.RegisterProducer(streamId, staleProducer, new MembershipVersion(1));
             Assert.Equal(1, await pubSubGrain.ProducerCount(streamId));
 
             var replacementSilo = await this.fixture.HostedCluster.RestartSiloAsync(restartedSilo);
@@ -141,7 +141,7 @@ namespace UnitTests.StreamingTests
                 replacementSilo.SiloAddress,
                 "ProviderName_1_test-queue").GrainId;
 
-            await pubSubGrain.RegisterProducer(streamId, replacementProducer);
+            await pubSubGrain.RegisterProducer(streamId, replacementProducer, new MembershipVersion(1));
 
             Assert.Equal(1, await pubSubGrain.ProducerCount(streamId));
             await managementGrain.ForceActivationCollection(TimeSpan.Zero);
@@ -172,6 +172,8 @@ namespace UnitTests.StreamingTests
             await pubSubGrain.RegisterProducer(streamId, replacementProducer);
             await Assert.ThrowsAsync<OrleansException>(() => pubSubGrain.RegisterProducer(streamId, defunctProducer));
 
+            Assert.Equal(1, await pubSubGrain.ProducerCount(streamId));
+            await managementGrain.ForceActivationCollection(TimeSpan.Zero);
             Assert.Equal(1, await pubSubGrain.ProducerCount(streamId));
             await pubSubGrain.UnregisterProducer(streamId, replacementProducer);
             Assert.Equal(0, await pubSubGrain.ProducerCount(streamId));
