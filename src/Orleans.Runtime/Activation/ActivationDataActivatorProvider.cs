@@ -1,6 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Metadata;
@@ -12,9 +11,8 @@ internal partial class ActivationDataActivatorProvider(
     GrainClassMap grainClassMap,
     IServiceProvider serviceProvider,
     GrainTypeSharedContextResolver sharedComponentsResolver,
-    ILogger<WorkItemGroup> workItemGroupLogger,
-    ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
     IOptions<SchedulingOptions> schedulingOptions,
+    SchedulerInstruments schedulerInstruments,
     IOptions<StatelessWorkerOptions> statelessWorkerOptions) : IGrainContextActivatorProvider
 {
     public bool TryGet(GrainType grainType, [NotNullWhen(true)] out IGrainContextActivator? activator)
@@ -36,9 +34,8 @@ internal partial class ActivationDataActivatorProvider(
             instanceActivator,
             serviceProvider,
             sharedContext,
-            workItemGroupLogger,
-            activationTaskSchedulerLogger,
-            schedulingOptions);
+            schedulingOptions,
+            schedulerInstruments);
 
         if (sharedContext.PlacementStrategy is StatelessWorkerPlacement)
         {
@@ -55,8 +52,6 @@ internal partial class ActivationDataActivatorProvider(
 
     private partial class ActivationDataActivator : IGrainContextActivator
     {
-        private readonly ILogger<WorkItemGroup> _workItemGroupLogger;
-        private readonly ILogger<ActivationTaskScheduler> _activationTaskSchedulerLogger;
         private readonly IOptions<SchedulingOptions> _schedulingOptions;
         private readonly IGrainActivator _grainActivator;
         private readonly IServiceProvider _serviceProvider;
@@ -68,31 +63,32 @@ internal partial class ActivationDataActivatorProvider(
             IGrainActivator grainActivator,
             IServiceProvider serviceProvider,
             GrainTypeSharedContext sharedComponents,
-            ILogger<WorkItemGroup> workItemGroupLogger,
-            ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
-            IOptions<SchedulingOptions> schedulingOptions)
+            IOptions<SchedulingOptions> schedulingOptions,
+            SchedulerInstruments schedulerInstruments)
         {
-            _workItemGroupLogger = workItemGroupLogger;
-            _activationTaskSchedulerLogger = activationTaskSchedulerLogger;
             _schedulingOptions = schedulingOptions;
             _grainActivator = grainActivator;
             _serviceProvider = serviceProvider;
             _sharedComponents = sharedComponents;
             _createWorkItemGroup = context => new WorkItemGroup(
                 context,
-                _workItemGroupLogger,
-                _activationTaskSchedulerLogger,
-                _schedulingOptions);
+                _schedulingOptions,
+                schedulerInstruments);
             _startActivation = state => ((ActivationData)state!).Start(_grainActivator);
         }
 
-        public IGrainContext CreateContext(GrainAddress activationAddress)
+        public IGrainContext CreateContext(GrainAddress activationAddress, IConfigureGrainContext[] configureActions)
         {
             var context = new ActivationData(
                 activationAddress,
                 _createWorkItemGroup,
                 _serviceProvider,
                 _sharedComponents);
+
+            foreach (var configure in configureActions)
+            {
+                configure.Configure(context);
+            }
 
             using var ecSuppressor = ExecutionContext.SuppressFlow();
             context.WorkItemGroup.Post(_startActivation, context);
@@ -103,5 +99,6 @@ internal partial class ActivationDataActivatorProvider(
 
 internal class StatelessWorkerActivator(StatelessWorkerGrainTypeSharedContext sharedContext, IGrainContextActivator innerActivator) : IGrainContextActivator
 {
-    public IGrainContext CreateContext(GrainAddress address) => new StatelessWorkerGrainContext(address, sharedContext, innerActivator);
+    public IGrainContext CreateContext(GrainAddress address, IConfigureGrainContext[] configureActions)
+        => new StatelessWorkerGrainContext(address, sharedContext, innerActivator, configureActions);
 }
