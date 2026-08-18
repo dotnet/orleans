@@ -78,7 +78,7 @@ namespace Orleans.Runtime
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
         /// <param name="types">Array of grain types to filter the results with</param>
         /// <returns>Detailed grain statistics.</returns>
-        Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(string[] types = null, SiloAddress[] hostsIds = null);
+        Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(string[]? types = null, SiloAddress[]? hostsIds = null);
         /// <summary>
         /// Gets the grain activation count for a specific grain type.
         /// </summary>
@@ -105,7 +105,7 @@ namespace Orleans.Runtime
         /// <param name="arg">An opaque command argument.
         /// This is an opaque value to the Orleans runtime - the control protocol semantics are decided between the sender and provider.</param>
         /// <returns>Completion promise for this operation.</returns>
-        public Task<object[]> SendControlCommandToProvider<T>(string providerName, int command, object arg = null) where T : IControllable;
+        public Task<object?[]> SendControlCommandToProvider<T>(string providerName, int command, object? arg = null) where T : IControllable;
 
         /// <summary>
         /// Return the <see cref="Orleans.Runtime.SiloAddress"/> where a given Grain is activated (if any).
@@ -116,7 +116,7 @@ namespace Orleans.Runtime
         /// </remarks>
         /// <param name="reference">The <see cref="Orleans.Runtime.IAddressable"/> to look up.</param>
         /// <returns>The <see cref="Orleans.Runtime.SiloAddress"/> where the Grain is activated or null if not activated taken from a snapshot of the last known state of the Grain Catalog.</returns>
-        ValueTask<SiloAddress> GetActivationAddress(IAddressable reference);
+        ValueTask<SiloAddress?> GetActivationAddress(IAddressable reference);
 
         /// <summary>
         /// Returns all activations of the specified grain type.
@@ -133,14 +133,14 @@ namespace Orleans.Runtime
         /// <remarks>
         /// Note that this resulting collection does not necessarily contain all grain calls. It contains an estimation of the calls with the highest frequency.
         /// </remarks>
-        Task<List<GrainCallFrequency>> GetGrainCallFrequencies(SiloAddress[] hostsIds = null);
+        Task<List<GrainCallFrequency>> GetGrainCallFrequencies(SiloAddress[]? hostsIds = null);
 
         /// <summary>
         /// For testing only. Resets grain call frequency counts on the specified hosts.
         /// </summary>
         /// <param name="hostsIds">The hosts to invoke the operation on.</param>
         /// <returns>A task representing the work performed.</returns>
-        ValueTask ResetGrainCallFrequencies(SiloAddress[] hostsIds = null);
+        ValueTask ResetGrainCallFrequencies(SiloAddress[]? hostsIds = null);
 
         /// <summary>
         /// Instructs all gateways to drop defunct (disconnected and expired) clients.

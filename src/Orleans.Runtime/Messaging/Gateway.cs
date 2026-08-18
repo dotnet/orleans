@@ -2,14 +2,17 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.ClientObservers;
 using Orleans.Configuration;
+using Orleans.Core.Diagnostics;
 using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime.Messaging
@@ -22,12 +25,14 @@ namespace Orleans.Runtime.Messaging
         // Anything that appears in those 2 collections should also appear in the main clients collection.
         private readonly ConcurrentDictionary<ClientGrainId, ClientState> clients = new();
         private readonly Dictionary<GatewayInboundConnection, ClientState> clientConnections = new();
+        private readonly SiloAddress siloAddress;
         private readonly SiloAddress gatewayAddress;
         private readonly IAsyncTimer gatewayMaintenanceTimer;
         private readonly Task gatewayMaintenanceTask;
 
         private readonly ClientsReplyRoutingCache clientsReplyRoutingCache;
         private readonly MessageCenter messageCenter;
+        private readonly MessagingInstruments _messagingInstruments;
 
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
@@ -40,18 +45,26 @@ namespace Orleans.Runtime.Messaging
             ILocalSiloDetails siloDetails,
             ILoggerFactory loggerFactory,
             IOptions<SiloMessagingOptions> options,
-            IAsyncTimerFactory timerFactory)
+            IAsyncTimerFactory timerFactory,
+            OrleansInstruments orleansInstruments,
+            MessagingInstruments messagingInstruments,
+            [FromKeyedServices(TimeProviderNames.SystemTimers)] TimeProvider timeProvider)
         {
             this.messageCenter = messageCenter;
+            _messagingInstruments = messagingInstruments;
             this.messagingOptions = options.Value;
             this.loggerFactory = loggerFactory;
             this.logger = this.loggerFactory.CreateLogger<Gateway>();
             this.clientDropTimeout = messagingOptions.ClientDropTimeout;
             clientsReplyRoutingCache = new ClientsReplyRoutingCache(messagingOptions.ResponseTimeout);
+            this.siloAddress = siloDetails.SiloAddress;
             this.gatewayAddress = siloDetails.GatewayAddress;
-            this.gatewayMaintenanceTimer = timerFactory.Create(messagingOptions.ClientDropTimeout, nameof(PerformGatewayMaintenance));
+            this.GatewayInstruments = new(orleansInstruments);
+            this.gatewayMaintenanceTimer = timerFactory.Create(messagingOptions.ClientDropTimeout, nameof(PerformGatewayMaintenance), timeProvider);
             this.gatewayMaintenanceTask = Task.Run(PerformGatewayMaintenance);
         }
+
+        internal GatewayInstruments GatewayInstruments { get; }
 
         public static GrainAddress GetClientActivationAddress(GrainId clientId, SiloAddress siloAddress)
         {
@@ -84,7 +97,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        internal async Task SendStopSendMessages(IInternalGrainFactory grainFactory)
+        internal async Task SendStopSendMessages(IInternalGrainFactory grainFactory, CancellationToken cancellationToken = default)
         {
             lock (clients)
             {
@@ -98,7 +111,7 @@ namespace Orleans.Runtime.Messaging
                 }
             }
 
-            await Task.Delay(this.messagingOptions.ClientGatewayShutdownNotificationTimeout);
+            await Task.Delay(this.messagingOptions.ClientGatewayShutdownNotificationTimeout, cancellationToken);
         }
 
         internal async Task StopAsync()
@@ -138,7 +151,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     clientState = new ClientState(this, clientId);
                     clients[clientId] = clientState;
-                    MessagingInstruments.ConnectedClient.Add(1);
+                    _messagingInstruments.ConnectedClient.Add(1);
                 }
                 clientState.RecordConnection(connection);
                 clientConnections[connection] = clientState;
@@ -150,7 +163,7 @@ namespace Orleans.Runtime.Messaging
         {
             if (connection == null) return;
 
-            ClientState clientState;
+            ClientState? clientState;
             lock (clients)
             {
                 if (!clientConnections.Remove(connection, out clientState)) return;
@@ -162,7 +175,7 @@ namespace Orleans.Runtime.Messaging
             LogInformationGatewayClientClosedSocket(logger, connection.RemoteEndPoint?.ToString() ?? "null", clientState.Id);
         }
 
-        internal SiloAddress TryToReroute(Message msg)
+        internal SiloAddress? TryToReroute(Message msg)
         {
             // ** Special routing rule for system target here **
             // When a client make a request/response to/from a SystemTarget, the TargetSilo can be set to either
@@ -174,7 +187,7 @@ namespace Orleans.Runtime.Messaging
             // it to this address...
             // EXCEPT if the value is equal to the current GatewayAddress: in this case we will return
             // null and the local dispatcher will forward the Message to a local SystemTarget activation
-            if (msg.TargetGrain.IsSystemTarget() && !IsTargetingLocalGateway(msg.TargetSilo))
+            if (msg.TargetGrain.IsSystemTarget() && !IsTargetingLocalGateway(msg.TargetSilo!))
             {
                 return msg.TargetSilo;
             }
@@ -223,6 +236,8 @@ namespace Orleans.Runtime.Messaging
         // There is NO need to acquire individual ClientState lock, since we only close an older socket.
         internal void DropDisconnectedClients(bool excludeRecent = false)
         {
+            var trackDroppedClients = GatewayEvents.IsClientDroppedEnabled();
+            List<(GrainId ClientId, TimeSpan DisconnectedDuration)>? droppedClients = null;
             foreach (var kv in clients)
             {
                 if (ShouldDrop(excludeRecent, kv.Value))
@@ -231,29 +246,35 @@ namespace Orleans.Runtime.Messaging
                     {
                         if (clients.TryGetValue(kv.Key, out var client) && ShouldDrop(excludeRecent, client))
                         {
-                            LogInformationGatewayDroppingClient(logger, kv.Key, client.DisconnectedSince);
+                            var disconnectedDuration = client.DisconnectedSince;
+                            LogInformationGatewayDroppingClient(logger, kv.Key, disconnectedDuration);
 
                             if (clients.TryRemove(kv.Key, out _))
                             {
                                 // Reject all pending messages from the client.
                                 client.Drop();
+                                if (trackDroppedClients)
+                                {
+                                    droppedClients ??= [];
+                                    droppedClients.Add((kv.Key.GrainId, disconnectedDuration));
+                                }
+
                                 clientsCollectionVersion++;
-                                MessagingInstruments.ConnectedClient.Add(-1);
+                                _messagingInstruments.ConnectedClient.Add(-1);
                             }
                         }
                     }
                 }
+
+                static bool ShouldDrop(bool excludeRecent, ClientState client)
+                    => excludeRecent ? client.ReadyToDrop() : !client.IsConnected;
             }
 
-            static bool ShouldDrop(bool excludeRecent, ClientState client)
+            if (droppedClients is not null)
             {
-                if (excludeRecent)
+                foreach (var droppedClient in droppedClients)
                 {
-                    return client.ReadyToDrop();
-                }
-                else
-                {
-                    return !client.IsConnected;
+                    GatewayEvents.EmitClientDropped(siloAddress, droppedClient.ClientId, droppedClient.DisconnectedDuration);
                 }
             }
         }
@@ -282,7 +303,7 @@ namespace Orleans.Runtime.Messaging
             // it will use this Gateway to re-route the REPLY from Y back to X.
             if (msg.SendingGrain.IsClient())
             {
-                clientsReplyRoutingCache.RecordClientRoute(msg.SendingGrain, msg.SendingSilo);
+                clientsReplyRoutingCache.RecordClientRoute(msg.SendingGrain, msg.SendingSilo!);
             }
 
             msg.TargetSilo = null;
@@ -303,7 +324,7 @@ namespace Orleans.Runtime.Messaging
                 RunContinuationsAsynchronously = true
             };
 
-            private GatewayInboundConnection _connection;
+            private GatewayInboundConnection? _connection;
             private int _dropped;
             private CoarseStopwatch _disconnectedSince;
 
@@ -328,7 +349,7 @@ namespace Orleans.Runtime.Messaging
 
             private bool IsDropped => Volatile.Read(ref _dropped) == 1;
 
-            public GatewayInboundConnection Connection => _connection;
+            public GatewayInboundConnection? Connection => _connection;
 
             public TimeSpan DisconnectedSince => _disconnectedSince.Elapsed;
 
@@ -419,14 +440,12 @@ namespace Orleans.Runtime.Messaging
                                 }
                                 else
                                 {
-                                    // Re-enqueue the message. It's ok that it is at the end of the queue: message ordering is not guaranteed.
                                     _pendingToSend.Enqueue((WorkItemType.SendMessageToClient, message));
                                     return;
                                 }
                             }
                             else if (workItemType is WorkItemType.ReceivedResponseFromClient)
                             {
-                                // This is a response from the client, we need to remove it from the outstanding requests.
                                 _outstandingRequestsToClient.Remove((message.TargetGrain, message.Id));
                             }
                         }
@@ -440,14 +459,14 @@ namespace Orleans.Runtime.Messaging
 
             private void RejectDroppedClientMessages()
             {
-                ClientNotAvailableException exception = null;
+                ClientNotAvailableException? exception = null;
                 while (_pendingToSend.TryDequeue(out var workItem))
                 {
                     if (workItem.Type == WorkItemType.SendMessageToClient)
                     {
                         RejectMessage(ref exception, workItem.Message);
                     }
-                    else if (workItem.Type == WorkItemType.ReceivedResponseFromClient)
+                    else
                     {
                         _outstandingRequestsToClient.Remove((workItem.Message.TargetGrain, workItem.Message.Id));
                     }
@@ -460,11 +479,17 @@ namespace Orleans.Runtime.Messaging
 
                 _outstandingRequestsToClient.Clear();
 
-                void RejectMessage(ref ClientNotAvailableException exception, Message message)
+                void RejectMessage(ref ClientNotAvailableException? error, Message message)
                 {
-                    exception ??= new ClientNotAvailableException(Id.GrainId);
-                    _gateway.messageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exc: exception, rejectInfo: "Client dropped");
+                    error ??= new ClientNotAvailableException(Id.GrainId);
+                    _gateway.messageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exc: error, rejectInfo: "Client dropped");
                 }
+            }
+
+            internal void OnClientResponse(Message message)
+            {
+                _pendingToSend.Enqueue((WorkItemType.ReceivedResponseFromClient, message));
+                _signal.Signal();
             }
 
             private bool TrySend(GatewayInboundConnection connection, Message message)
@@ -477,7 +502,7 @@ namespace Orleans.Runtime.Messaging
                 try
                 {
                     connection.Send(message);
-                    GatewayInstruments.GatewaySent.Add(1);
+                    _gateway.GatewayInstruments.OnGatewaySent();
                     return true;
                 }
                 catch (Exception exception)
@@ -486,11 +511,6 @@ namespace Orleans.Runtime.Messaging
                     connection.CloseAsync(new ConnectionAbortedException("Exception posting a message to sender. See InnerException for details.", exception)).Ignore();
                     return false;
                 }
-            }
-
-            internal void OnClientResponse(Message msg)
-            {
-                _pendingToSend.Enqueue((WorkItemType.ReceivedResponseFromClient, msg));
             }
         }
 
@@ -514,7 +534,7 @@ namespace Orleans.Runtime.Messaging
                 clientRoutes[client] = new(gateway, DateTime.UtcNow);
             }
 
-            internal bool TryFindClientRoute(GrainId client, out SiloAddress gateway)
+            internal bool TryFindClientRoute(GrainId client, [NotNullWhen(true)] out SiloAddress? gateway)
             {
                 if (clientRoutes.TryGetValue(client, out var tuple))
                 {

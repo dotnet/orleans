@@ -40,7 +40,7 @@ public sealed class InProcessTestSiloSpecificOptions
 
         if (assignNewPort)
         {
-            var (siloPort, gatewayPort) = testCluster.PortAllocator.AllocateConsecutivePortPairs(1);
+            var (siloPort, gatewayPort) = testCluster.PortAllocator!.AllocateConsecutivePortPairs(1);
             result.SiloPort = siloPort;
             result.GatewayPort = (instanceNumber == 0 || testClusterOptions.GatewayPerSilo) ? gatewayPort : 0;
         }
