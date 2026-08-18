@@ -1,7 +1,7 @@
 ---
 title: Orleans configuration guide
 description: Configure Orleans silos, clients, providers, and endpoints.
-ms.date: 08/02/2026
+ms.date: 08/18/2026
 ms.topic: overview
 ---
 
@@ -24,7 +24,13 @@ For a first local process, see [Local development configuration](local-developme
 
 ## Programmatic configuration
 
-Configure Orleans through <xref:Orleans.Hosting.ISiloBuilder> or <xref:Orleans.Hosting.IClientBuilder>. Provider extension methods validate configuration when the host starts. Prefer programmatic configuration when credentials require SDK objects such as <xref:Azure.Core.TokenCredential>, when configuration is computed, or when compile-time discoverability is important.
+Create the [.NET Generic Host](https://learn.microsoft.com/dotnet/core/extensions/generic-host) with <xref:Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder*>, call <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*> to add a silo, then build and run the host:
+
+:::code language="csharp" source="../snippets/hosting/HostingExamples.cs" id="run_silo":::
+
+Starting the host starts the silo and its co-hosted <xref:Orleans.IClusterClient>. The client is available through dependency injection, and stopping the host coordinates a [graceful Orleans shutdown](shutting-down-orleans.md).
+
+Configure the silo through the <xref:Orleans.Hosting.ISiloBuilder> passed to `UseOrleans`. External client processes use <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*> and configure the <xref:Orleans.Hosting.IClientBuilder> passed to it. Provider extension methods validate configuration when the host starts. Programmatic configuration supports credentials supplied as SDK objects such as <xref:Azure.Core.TokenCredential>, computed configuration, and compile-time API discovery.
 
 See [Server configuration](server-configuration.md) and [Client configuration](client-configuration.md) for compiled examples.
 
