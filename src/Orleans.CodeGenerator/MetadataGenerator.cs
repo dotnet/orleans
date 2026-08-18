@@ -216,9 +216,19 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
             .ToImmutableArray();
 
         var aliasTree = CompoundTypeAliasEmissionTree.Create();
-        foreach (var alias in aliases.Concat(generatedAliases).Concat(_metadataModel.GeneratedCompoundTypeAliases))
+        var referencedAliasKeys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var alias in aliases)
         {
             aliasTree.Add(alias.Components, alias.TargetType);
+            referencedAliasKeys.Add(ReferenceAssemblyModelExtractor.GetCompoundTypeAliasOrderKey(alias));
+        }
+
+        foreach (var alias in generatedAliases.Concat(_metadataModel.GeneratedCompoundTypeAliases))
+        {
+            if (!referencedAliasKeys.Contains(ReferenceAssemblyModelExtractor.GetCompoundTypeAliasOrderKey(alias)))
+            {
+                aliasTree.Add(alias.Components, alias.TargetType);
+            }
         }
 
         var nodeId = 0;
@@ -428,14 +438,23 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
         MethodModel method,
         TypeRef targetType)
     {
-        var result = ImmutableArray.CreateBuilder<CompoundTypeAliasModel>(2);
-        if (!string.Equals(method.MethodId, method.GeneratedMethodId, StringComparison.Ordinal))
-        {
-            result.Add(CreateGeneratedInvokableAlias(proxy, method, method.MethodId, targetType));
-        }
-
-        result.Add(CreateGeneratedInvokableAlias(proxy, method, method.GeneratedMethodId, targetType));
+        var result = ImmutableArray.CreateBuilder<CompoundTypeAliasModel>(3);
+        AddAlias(method.MethodId);
+        AddAlias(method.GeneratedMethodId);
+        AddAlias(method.LegacyGeneratedMethodId);
         return result.ToImmutable();
+
+        void AddAlias(string methodId)
+        {
+            if (result.Any(alias =>
+                alias.Components[alias.Components.Length - 1].StringValue is { } existingMethodId
+                && string.Equals(existingMethodId, methodId, StringComparison.Ordinal)))
+            {
+                return;
+            }
+
+            result.Add(CreateGeneratedInvokableAlias(proxy, method, methodId, targetType));
+        }
     }
 
     private static CompoundTypeAliasModel CreateGeneratedInvokableAlias(

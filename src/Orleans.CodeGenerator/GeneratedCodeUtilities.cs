@@ -25,61 +25,171 @@ internal static class GeneratedCodeUtilities
             : null;
     }
 
-    internal static string CreateHashedMethodId(IMethodSymbol methodSymbol)
+    internal static string CreateHashedMethodId(
+        IMethodSymbol methodSymbol,
+        INamedTypeSymbol cancellationTokenType)
     {
-        var methodSignature = Format(methodSymbol);
+        var includeCancellationTokens =
+            HasNonTrailingCancellationToken(methodSymbol, cancellationTokenType)
+            || HasEquivalentOverloadWithoutCancellation(methodSymbol, cancellationTokenType);
+        return CreateHashedMethodId(
+            methodSymbol,
+            cancellationTokenType,
+            includeCancellationTokens);
+    }
+
+    internal static string CreateLegacyHashedMethodId(
+        IMethodSymbol methodSymbol,
+        INamedTypeSymbol cancellationTokenType) =>
+        CreateHashedMethodId(
+            methodSymbol,
+            cancellationTokenType,
+            includeCancellationTokens: true);
+
+    private static string CreateHashedMethodId(
+        IMethodSymbol methodSymbol,
+        INamedTypeSymbol cancellationTokenType,
+        bool includeCancellationTokens)
+    {
+        var methodSignature = Format(
+            methodSymbol,
+            cancellationTokenType,
+            includeCancellationTokens);
         var hash = XxHash32.Hash(Encoding.UTF8.GetBytes(methodSignature));
         return $"{HexConverter.ToString(hash)}";
+    }
 
-        static string Format(IMethodSymbol methodInfo)
+    private static string Format(
+        IMethodSymbol methodInfo,
+        INamedTypeSymbol cancellationTokenType,
+        bool includeCancellationTokens)
+    {
+        var result = new StringBuilder();
+        result.Append(methodInfo.ContainingType.ToDisplayName());
+        result.Append('.');
+        result.Append(methodInfo.Name);
+
+        if (methodInfo.IsGenericMethod)
         {
-            var result = new StringBuilder();
-            result.Append(methodInfo.ContainingType.ToDisplayName());
-            result.Append('.');
-            result.Append(methodInfo.Name);
-
-            if (methodInfo.IsGenericMethod)
+            result.Append('<');
+            var first = true;
+            foreach (var typeArgument in methodInfo.TypeArguments)
             {
-                result.Append('<');
-                var first = true;
-                foreach (var typeArgument in methodInfo.TypeArguments)
-                {
-                    if (!first) result.Append(',');
-                    else first = false;
-                    result.Append(typeArgument.Name);
-                }
-
-                result.Append('>');
+                if (!first) result.Append(',');
+                else first = false;
+                result.Append(typeArgument.Name);
             }
 
+            result.Append('>');
+        }
+
+        {
+            result.Append('(');
+            var parameters = methodInfo.Parameters;
+            var first = true;
+            foreach (var parameter in parameters)
             {
-                result.Append('(');
-                var parameters = methodInfo.Parameters;
-                var first = true;
-                foreach (var parameter in parameters)
+                var parameterType = parameter.Type;
+                if (!includeCancellationTokens
+                    && SymbolEqualityComparer.Default.Equals(parameterType, cancellationTokenType))
                 {
-                    if (!first)
-                    {
-                        result.Append(',');
-                    }
-
-                    var parameterType = parameter.Type;
-                    switch (parameterType)
-                    {
-                        case ITypeParameterSymbol _:
-                            result.Append(parameterType.Name);
-                            break;
-                        default:
-                            result.Append(parameterType.ToDisplayName());
-                            break;
-                    }
-
-                    first = false;
+                    continue;
                 }
+
+                if (!first)
+                {
+                    result.Append(',');
+                }
+
+                switch (parameterType)
+                {
+                    case ITypeParameterSymbol _:
+                        result.Append(parameterType.Name);
+                        break;
+                    default:
+                        result.Append(parameterType.ToDisplayName());
+                        break;
+                }
+
+                first = false;
+            }
+        }
+
+        result.Append(')');
+        return result.ToString();
+    }
+
+    private static bool HasEquivalentOverloadWithoutCancellation(
+        IMethodSymbol method,
+        INamedTypeSymbol cancellationTokenType)
+    {
+        foreach (var candidate in method.ContainingType.GetMembers(method.Name).OfType<IMethodSymbol>())
+        {
+            if (SymbolEqualityComparer.Default.Equals(candidate, method)
+                || candidate.Arity != method.Arity)
+            {
+                continue;
             }
 
-            result.Append(')');
-            return result.ToString();
+            using var methodParameters = GetSerializedParameterTypes(method, cancellationTokenType).GetEnumerator();
+            using var candidateParameters = GetSerializedParameterTypes(candidate, cancellationTokenType).GetEnumerator();
+            while (true)
+            {
+                var methodHasNext = methodParameters.MoveNext();
+                var candidateHasNext = candidateParameters.MoveNext();
+                if (methodHasNext != candidateHasNext)
+                {
+                    break;
+                }
+
+                if (!methodHasNext)
+                {
+                    return true;
+                }
+
+                if (!string.Equals(
+                    methodParameters.Current.ToDisplayName(),
+                    candidateParameters.Current.ToDisplayName(),
+                    StringComparison.Ordinal))
+                {
+                    break;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasNonTrailingCancellationToken(
+        IMethodSymbol method,
+        INamedTypeSymbol cancellationTokenType)
+    {
+        var foundCancellationToken = false;
+        foreach (var parameter in method.Parameters)
+        {
+            if (SymbolEqualityComparer.Default.Equals(parameter.Type, cancellationTokenType))
+            {
+                foundCancellationToken = true;
+            }
+            else if (foundCancellationToken)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static IEnumerable<ITypeSymbol> GetSerializedParameterTypes(
+        IMethodSymbol method,
+        INamedTypeSymbol cancellationTokenType)
+    {
+        foreach (var parameter in method.Parameters)
+        {
+            if (!SymbolEqualityComparer.Default.Equals(parameter.Type, cancellationTokenType))
+            {
+                yield return parameter.Type;
+            }
         }
     }
 

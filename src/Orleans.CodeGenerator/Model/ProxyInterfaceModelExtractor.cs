@@ -300,7 +300,12 @@ internal static class ProxyInterfaceModelExtractor
         INamedTypeSymbol containingInterface,
         LibraryTypes libraryTypes)
     {
-        var generatedMethodId = GeneratedCodeUtilities.CreateHashedMethodId(originalMethod);
+        var generatedMethodId = GeneratedCodeUtilities.CreateHashedMethodId(
+            originalMethod,
+            libraryTypes.CancellationToken);
+        var legacyGeneratedMethodId = GeneratedCodeUtilities.CreateLegacyHashedMethodId(
+            originalMethod,
+            libraryTypes.CancellationToken);
 
         // Determine method ID: explicit ID → alias → generated hash
         string methodId;
@@ -357,6 +362,7 @@ internal static class ProxyInterfaceModelExtractor
             GeneratedCodeUtilities.GetGeneratedNamespaceName(containingInterface),
             containingInterface.GetAllTypeParameters().Count(),
             generatedMethodId,
+            legacyGeneratedMethodId,
             methodId,
             responseTimeoutTicks,
             customInitializers,

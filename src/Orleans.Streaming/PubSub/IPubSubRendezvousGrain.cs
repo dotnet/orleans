@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Streams.Core;
@@ -7,29 +8,51 @@ namespace Orleans.Streams
 {
     internal interface IPubSubRendezvousGrain : IGrainWithStringKey
     {
-        Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer);
-
+        [Alias("B5FFB7F3")]
         Task<ISet<PubSubSubscriptionState>> RegisterProducer(
             QualifiedStreamId streamId,
             GrainId streamProducer,
-            MembershipVersion membershipVersion);
+            MembershipVersion membershipVersion = default,
+            CancellationToken cancellationToken = default);
 
-        Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer);
+        Task UnregisterProducer(
+            QualifiedStreamId streamId,
+            GrainId streamProducer,
+            CancellationToken cancellationToken = default);
 
-        Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string? filterData);
+        Task RegisterConsumer(
+            GuidId subscriptionId,
+            QualifiedStreamId streamId,
+            GrainId streamConsumer,
+            string? filterData,
+            CancellationToken cancellationToken = default);
 
-        Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId);
+        Task UnregisterConsumer(
+            GuidId subscriptionId,
+            QualifiedStreamId streamId,
+            CancellationToken cancellationToken = default);
 
-        Task<int> ProducerCount(QualifiedStreamId streamId);
+        Task<int> ProducerCount(
+            QualifiedStreamId streamId,
+            CancellationToken cancellationToken = default);
 
-        Task<int> ConsumerCount(QualifiedStreamId streamId);
+        Task<int> ConsumerCount(
+            QualifiedStreamId streamId,
+            CancellationToken cancellationToken = default);
 
-        Task<PubSubSubscriptionState[]> DiagGetConsumers(QualifiedStreamId streamId);
+        Task<PubSubSubscriptionState[]> DiagGetConsumers(
+            QualifiedStreamId streamId,
+            CancellationToken cancellationToken = default);
 
-        Task Validate();
+        Task Validate(CancellationToken cancellationToken = default);
 
-        Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer = default);
+        Task<List<StreamSubscription>> GetAllSubscriptions(
+            QualifiedStreamId streamId,
+            GrainId streamConsumer = default,
+            CancellationToken cancellationToken = default);
 
-        Task FaultSubscription(GuidId subscriptionId);
+        Task FaultSubscription(
+            GuidId subscriptionId,
+            CancellationToken cancellationToken = default);
     }
 }

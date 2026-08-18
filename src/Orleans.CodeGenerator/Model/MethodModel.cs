@@ -19,6 +19,7 @@ internal sealed record class MethodModel(
     string ContainingInterfaceGeneratedNamespace,
     int ContainingInterfaceTypeParameterCount,
     string GeneratedMethodId,
+    string LegacyGeneratedMethodId,
     string MethodId,
     long? ResponseTimeoutTicks,
     EquatableArray<CustomInitializerModel> CustomInitializerMethods,

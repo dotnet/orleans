@@ -236,21 +236,19 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
             }
 
             AddMember(compatInvokable.GeneratedNamespace, compatInvokable.ClassDeclarationSyntax);
-            var aliasComponents = InvokableGenerator.GetCompoundTypeAliasComponents(
-                compatInvokableId,
-                interfaceType,
-                compatMethodDescription.GeneratedMethodId);
-            var alias = new CompoundTypeAliasModel(
-                aliasComponents.Select(static component => component.IsType
-                    ? new CompoundAliasComponentModel(new TypeRef(component.TypeValue!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)))
-                    : new CompoundAliasComponentModel(component.StringValue!)).ToImmutableArray(),
-                new TypeRef(compatInvokable.OpenTypeSyntax.ToString()));
             if (!_compatibilityInvokableAliases.TryGetValue(interfaceType.OriginalDefinition, out var aliases))
             {
                 aliases = _compatibilityInvokableAliases[interfaceType.OriginalDefinition] = [];
             }
 
-            aliases.Add(alias);
+            foreach (var aliasComponents in compatInvokable.CompoundTypeAliases)
+            {
+                aliases.Add(new CompoundTypeAliasModel(
+                    aliasComponents.Select(static component => component.IsType
+                        ? new CompoundAliasComponentModel(new TypeRef(component.TypeValue!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)))
+                        : new CompoundAliasComponentModel(component.StringValue!)).ToImmutableArray(),
+                    new TypeRef(compatInvokable.OpenTypeSyntax.ToString())));
+            }
         }
 
         return proxyMethodDescription;

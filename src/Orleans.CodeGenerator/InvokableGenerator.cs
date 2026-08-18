@@ -27,6 +27,10 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         var (ctor, ctorArgs) = GenerateConstructor(generatedClassName, invokableMethodInfo, baseClassType);
         var accessibility = GetAccessibility(method);
         var compoundTypeAliases = GetCompoundTypeAliasAttributeArguments(invokableMethodInfo, invokableMethodInfo.Key);
+        var primaryCompoundTypeAlias = GetCompoundTypeAliasComponents(
+            invokableMethodInfo.Key,
+            invokableMethodInfo.ContainingInterface,
+            invokableMethodInfo.MethodId);
 
         List<INamedTypeSymbol> serializationHooks = new();
         if (baseClassType.GetAttributes(LibraryTypes.SerializationCallbacksAttribute, out var hookAttributes))
@@ -53,7 +57,7 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
             fieldDescriptions,
             fields,
             ctor,
-            compoundTypeAliases,
+            primaryCompoundTypeAlias,
             targetField,
             accessibilityKind);
 
@@ -107,7 +111,7 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         List<InvokerFieldDescription> fieldDescriptions,
         MemberDeclarationSyntax[] fields,
         ConstructorDeclarationSyntax? ctor,
-        List<CompoundTypeAliasComponent[]> compoundTypeAliases,
+        CompoundTypeAliasComponent[] primaryCompoundTypeAlias,
         TargetFieldDescription targetField,
         SyntaxKind accessibilityKind)
     {
@@ -117,11 +121,8 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
             .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
             .AddMembers(fields);
 
-        foreach (var alias in compoundTypeAliases)
-        {
-            classDeclaration = classDeclaration.AddAttributeLists(
-                AttributeList(SingletonSeparatedList(GetCompoundTypeAliasAttribute(alias))));
-        }
+        classDeclaration = classDeclaration.AddAttributeLists(
+            AttributeList(SingletonSeparatedList(GetCompoundTypeAliasAttribute(primaryCompoundTypeAlias))));
 
         if (ctor != null)
         {
@@ -204,15 +205,26 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
 
     internal static List<CompoundTypeAliasComponent[]> GetCompoundTypeAliasAttributeArguments(InvokableMethodDescription methodDescription, InvokableMethodId invokableId)
     {
-        var result = new List<CompoundTypeAliasComponent[]>(2);
-        var containingInterface = methodDescription.ContainingInterface;
-        if (methodDescription.HasAlias)
-        {
-            result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, methodDescription.MethodId));
-        }
-
-        result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, methodDescription.GeneratedMethodId));
+        var result = new List<CompoundTypeAliasComponent[]>(3);
+        AddAlias(methodDescription.MethodId);
+        AddAlias(methodDescription.GeneratedMethodId);
+        AddAlias(methodDescription.LegacyGeneratedMethodId);
         return result;
+
+        void AddAlias(string methodId)
+        {
+            if (result.Any(alias =>
+                alias[alias.Length - 1].StringValue is { } existingMethodId
+                && string.Equals(existingMethodId, methodId, StringComparison.Ordinal)))
+            {
+                return;
+            }
+
+            result.Add(GetCompoundTypeAliasComponents(
+                invokableId,
+                methodDescription.ContainingInterface,
+                methodId));
+        }
     }
 
     public static CompoundTypeAliasComponent[] GetCompoundTypeAliasComponents(
