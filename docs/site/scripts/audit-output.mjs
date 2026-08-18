@@ -83,9 +83,12 @@ for (const file of files.filter((candidate) => candidate.endsWith('.html'))) {
   }
 }
 
-const apiMarkdown = files.filter(
-  (file) => file.endsWith('.md') && relative(file).startsWith('docs/api/csharp/'),
-);
+function isApiMarkdown(file) {
+  const filePath = relative(file);
+  return filePath === 'docs/api/csharp.md' || filePath.startsWith('docs/api/csharp/');
+}
+
+const apiMarkdown = files.filter((file) => file.endsWith('.md') && isApiMarkdown(file));
 for (const file of apiMarkdown) {
   const markdown = await readFile(file, 'utf8');
   if (/\bconst\s+static\b/.test(markdown)) {
@@ -98,9 +101,7 @@ for (const file of apiMarkdown) {
 
 const renderedMarkdown = files.filter(
   (file) =>
-    file.endsWith('.md') &&
-    !relative(file).startsWith('docs/api/csharp/') &&
-    path.basename(file) !== 'index.md',
+    file.endsWith('.md') && !isApiMarkdown(file) && path.basename(file) !== 'index.md',
 );
 if (renderedMarkdown.length === 0) {
   failures.push('No rendered Markdown pages were generated.');
