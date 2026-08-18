@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
@@ -64,6 +65,7 @@ namespace UnitTests.MembershipTests
         [Fact, TestCategory("Functional"), TestCategory("Liveness")]
         public async Task SiloUngracefulShutdown_GatewayForwardedRequestBreaks()
         {
+            Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>().SetResponseTimeout(TimeSpan.FromMinutes(1));
             var target = await GetGrainOnTargetSilo(HostedCluster.SecondarySilos[0]);
             Assert.NotNull(target);
 
@@ -84,7 +86,7 @@ namespace UnitTests.MembershipTests
                 await HostedCluster.KillSiloAsync(HostedCluster.SecondarySilos[0]);
 
                 await Assert.ThrowsAsync<SiloUnavailableException>(
-                    () => promise.WaitAsync(TimeSpan.FromSeconds(30)));
+                    () => promise.WaitAsync(TimeSpan.FromSeconds(20)));
             }
             finally
             {
@@ -117,19 +119,14 @@ namespace UnitTests.MembershipTests
 
         private sealed class LongRunningTaskObserver : ILongRunningTaskObserver
         {
-            private readonly TaskCompletionSource _started = new(TaskCreationOptions.RunContinuationsAsynchronously);
-            private Guid _callId;
+            private readonly TaskCompletionSource<Guid> _startedCall = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            public void OnCallStarted(Guid callId)
-            {
-                _callId = callId;
-                _started.TrySetResult();
-            }
+            public void OnCallStarted(Guid callId) => _startedCall.TrySetResult(callId);
 
             public async Task WaitForCallToStart(Guid callId)
             {
-                await _started.Task.WaitAsync(TimeSpan.FromSeconds(30));
-                Assert.Equal(callId, _callId);
+                var startedCallId = await _startedCall.Task.WaitAsync(TimeSpan.FromSeconds(30));
+                Assert.Equal(callId, startedCallId);
             }
         }
     }
