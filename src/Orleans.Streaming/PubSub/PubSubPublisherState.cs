@@ -10,6 +10,8 @@ namespace Orleans.Streams
     [GenerateSerializer]
     internal sealed class PubSubPublisherState : IEquatable<PubSubPublisherState?>
     {
+        public static MembershipVersion UnknownMembershipVersion => default;
+
         // IMPORTANT!!!!!
         // These fields have to be public non-readonly for JsonSerialization to work!
         // Implement ISerializable if changing any of them to readonly
@@ -23,7 +25,8 @@ namespace Orleans.Streams
 
         [JsonProperty]
         [Id(2)]
-        // MembershipVersion is excluded from equality so re-registration can advance it in place.
+        // Older state has the default value because this field was absent. MembershipVersion is excluded
+        // from equality so re-registration can advance it in place.
         public MembershipVersion MembershipVersion;
 
         // This constructor has to be public for JsonSerialization to work!
