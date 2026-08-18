@@ -27,6 +27,12 @@ npm run build
 npm run preview
 ```
 
+The production build publishes `/llms.txt`, `/llms-small.txt`, and
+`/llms-full.txt`. Each documentation page also has a rendered Markdown companion
+at the page URL with a `.md` suffix. These companions use the same prepared
+content collection entries as Starlight, so includes, code directives, xrefs,
+and DocFX transformations have already been applied.
+
 Run the focused conversion tests, Astro type checks, strict snippet expansion,
 source-quality and aggregate project policy audits, Starlight link validation,
 Pagefind indexing, and production build with:

@@ -2,9 +2,11 @@ import { unified } from '@astrojs/markdown-remark';
 import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
 import remarkDirective from 'remark-directive';
+import starlightDotMd from 'starlight-dot-md';
 import starlightLinksValidator from 'starlight-links-validator';
 import starlightLlmsTxt from 'starlight-llms-txt';
 import { createSidebar } from './scripts/lib/docfx.mjs';
+import { cleanMarkdownOutput } from './src/plugins/clean-markdown-output.mjs';
 import { remarkMermaid } from './src/plugins/remark-mermaid.mjs';
 import { remarkVersionZones } from './src/plugins/remark-version-zones.mjs';
 
@@ -58,9 +60,13 @@ export default defineConfig({
           errorOnRelativeLinks: false,
           exclude: ['/orleans/docs/api/csharp/**'],
         }),
+        starlightDotMd({
+          includePatterns: ['docs', 'docs/**'],
+        }),
         starlightLlmsTxt(),
       ],
     }),
+    cleanMarkdownOutput(),
   ],
   markdown: {
     processor: unified({

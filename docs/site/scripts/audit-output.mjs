@@ -37,6 +37,13 @@ const totalBytes = (await Promise.all(files.map(async (file) => (await stat(file
   (total, size) => total + size,
   0,
 );
+
+for (const requiredFile of ['llms.txt', 'llms-small.txt', 'llms-full.txt']) {
+  if (!files.includes(path.join(distRoot, requiredFile))) {
+    failures.push(`Missing generated ${requiredFile}.`);
+  }
+}
+
 if (totalBytes > maxPublishedBytes) {
   failures.push(`Published site is ${(totalBytes / 1024 / 1024).toFixed(1)} MiB; limit is 1024 MiB.`);
 }
@@ -86,6 +93,35 @@ for (const file of apiMarkdown) {
   }
   if (/^# .*\.op_[A-Za-z]/m.test(markdown)) {
     fail(file, 'CLR operator metadata name leaked into heading');
+  }
+}
+
+const renderedMarkdown = files.filter(
+  (file) =>
+    file.endsWith('.md') &&
+    !relative(file).startsWith('docs/api/csharp/') &&
+    path.basename(file) !== 'index.md',
+);
+if (renderedMarkdown.length === 0) {
+  failures.push('No rendered Markdown pages were generated.');
+}
+for (const file of renderedMarkdown) {
+  const markdown = await readFile(file, 'utf8');
+  if (!/^# .+/m.test(markdown)) {
+    fail(file, 'rendered Markdown has no H1');
+  }
+  for (const [pattern, description] of [
+    [/\[!INCLUDE\b/i, 'unconverted INCLUDE directive'],
+    [/:::\s*code\b/i, 'unconverted code directive'],
+    [/<xref:|\(xref:/i, 'unconverted xref'],
+    [/^\s*import\s+.+\s+from\s+['"]/m, 'MDX import'],
+    [/<\/?(?:Aside|Card|CardGrid|Steps|TabItem|Tabs)\b/, 'Starlight MDX component'],
+    [/\{\/\*/, 'MDX comment'],
+    [/<!doctype html>|<html\b/i, 'HTML document emitted as Markdown'],
+  ]) {
+    if (pattern.test(markdown)) {
+      fail(file, description);
+    }
   }
 }
 
