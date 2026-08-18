@@ -66,7 +66,9 @@ internal partial class SiloMetadataCache(
                 {
                     if (membershipEntry.Value.Metadata is { } membershipMetadata)
                     {
-                        _metadata[membershipEntry.Key] = new SiloMetadata(membershipMetadata);
+                        _metadata[membershipEntry.Key] = membershipMetadata.Count == 0
+                            ? SiloMetadata.Empty
+                            : new SiloMetadata(membershipMetadata);
                         _negativeCache.Remove(membershipEntry.Key, out _);
                         continue;
                     }
