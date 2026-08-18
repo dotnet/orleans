@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Diagnostics;
@@ -78,7 +79,12 @@ namespace Orleans.Core
         }
 
         /// <inheritdoc />
-        public async Task ReadStateAsync()
+        public Task ReadStateAsync() => ReadStateAsync(CancellationToken.None);
+
+        /// <inheritdoc />
+        Task IStorage.ReadStateAsync(CancellationToken cancellationToken) => ReadStateAsync(cancellationToken);
+
+        private async Task ReadStateAsync(CancellationToken cancellationToken)
         {
             try
             {
@@ -101,9 +107,13 @@ namespace Orleans.Core
                 activity?.SetTag(ActivityTagKeys.StorageStateType, _shared.StateTypeName);
 
                 var sw = ValueStopwatch.StartNew();
-                await _shared.Store.ReadStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
+                await _shared.Store.ReadStateAsync(_shared.Name, _grainContext.GrainId, GrainState, cancellationToken);
                 IsStateInitialized = true;
                 _storageInstruments.OnStorageRead(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exc)
             {
@@ -113,7 +123,12 @@ namespace Orleans.Core
         }
 
         /// <inheritdoc />
-        public async Task WriteStateAsync()
+        public Task WriteStateAsync() => WriteStateAsync(CancellationToken.None);
+
+        /// <inheritdoc />
+        Task IStorage.WriteStateAsync(CancellationToken cancellationToken) => WriteStateAsync(cancellationToken);
+
+        private async Task WriteStateAsync(CancellationToken cancellationToken)
         {
             try
             {
@@ -135,8 +150,12 @@ namespace Orleans.Core
                 activity?.SetTag(ActivityTagKeys.StorageStateType, _shared.StateTypeName);
 
                 var sw = ValueStopwatch.StartNew();
-                await _shared.Store.WriteStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
+                await _shared.Store.WriteStateAsync(_shared.Name, _grainContext.GrainId, GrainState, cancellationToken);
                 _storageInstruments.OnStorageWrite(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exc)
             {
@@ -146,7 +165,12 @@ namespace Orleans.Core
         }
 
         /// <inheritdoc />
-        public async Task ClearStateAsync()
+        public Task ClearStateAsync() => ClearStateAsync(CancellationToken.None);
+
+        /// <inheritdoc />
+        Task IStorage.ClearStateAsync(CancellationToken cancellationToken) => ClearStateAsync(cancellationToken);
+
+        private async Task ClearStateAsync(CancellationToken cancellationToken)
         {
             try
             {
@@ -170,11 +194,15 @@ namespace Orleans.Core
                 var sw = ValueStopwatch.StartNew();
 
                 // Clear state in external storage
-                await _shared.Store.ClearStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
+                await _shared.Store.ClearStateAsync(_shared.Name, _grainContext.GrainId, GrainState, cancellationToken);
                 sw.Stop();
 
                 // Update counters
                 _storageInstruments.OnStorageDelete(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exc)
             {
