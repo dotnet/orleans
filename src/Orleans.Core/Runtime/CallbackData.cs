@@ -32,7 +32,7 @@ namespace Orleans.Runtime
 
         public Message Message { get; } // might hold metadata used by response pipeline
 
-        public bool IsCompleted => this.completed == 1;
+        public bool IsCompleted => Volatile.Read(ref completed) != 0;
 
         public void SubscribeForCancellation(CancellationToken cancellationToken)
         {

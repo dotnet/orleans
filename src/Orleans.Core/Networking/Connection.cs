@@ -402,22 +402,11 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     var flushResult = await output.FlushAsync();
+                    DisposeOneWayRequestBodies(inflight);
                     if (flushResult.IsCompleted || flushResult.IsCanceled)
                     {
                         break;
                     }
-
-                    // Dispose one-way request bodies after they've been sent.
-                    // Request-response bodies are disposed when the invocation completes.
-                    foreach (var msg in inflight)
-                    {
-                        if (msg.Direction == Message.Directions.OneWay)
-                        {
-                            msg.DisposeBody();
-                        }
-                    }
-
-                    inflight.Clear();
                 }
             }
             catch (Exception exception)
@@ -431,9 +420,23 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
+                DisposeOneWayRequestBodies(inflight);
                 _transport!.Output.Complete();
                 this.StartClosing(error);
             }
+        }
+
+        private static void DisposeOneWayRequestBodies(List<Message> messages)
+        {
+            foreach (var message in messages)
+            {
+                if (message.Direction == Message.Directions.OneWay)
+                {
+                    message.DisposeBody();
+                }
+            }
+
+            messages.Clear();
         }
 
         private void RerouteMessage(Message message)
