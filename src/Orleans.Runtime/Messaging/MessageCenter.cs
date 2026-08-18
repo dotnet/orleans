@@ -19,6 +19,8 @@ namespace Orleans.Runtime.Messaging
         private readonly MessageFactory messageFactory;
         private readonly ConnectionManager connectionManager;
         private readonly RuntimeMessagingTrace messagingTrace;
+        private readonly MessagingInstruments _messagingInstruments;
+        private readonly MessagingProcessingInstruments _messagingProcessingInstruments;
         private readonly SiloAddress _siloAddress;
         private readonly SiloMessagingOptions messagingOptions;
         private readonly PlacementService placementService;
@@ -39,6 +41,8 @@ namespace Orleans.Runtime.Messaging
             ISiloStatusOracle siloStatusOracle,
             ConnectionManager senderManager,
             RuntimeMessagingTrace messagingTrace,
+            MessagingInstruments messagingInstruments,
+            MessagingProcessingInstruments messagingProcessingInstruments,
             IOptions<SiloMessagingOptions> messagingOptions,
             PlacementService placementService,
             GrainLocator grainLocator,
@@ -49,6 +53,8 @@ namespace Orleans.Runtime.Messaging
             this.siloStatusOracle = siloStatusOracle;
             this.connectionManager = senderManager;
             this.messagingTrace = messagingTrace;
+            _messagingInstruments = messagingInstruments;
+            _messagingProcessingInstruments = messagingProcessingInstruments;
             this.placementService = placementService;
             _grainLocator = grainLocator;
             _messageObserver = messageStatisticsSink.GetMessageObserver();
@@ -184,7 +190,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     LogTraceMessageLoopedBack(log, msg);
 
-                    MessagingInstruments.LocalMessagesSentCounterAggregator.Add(1);
+                    _messagingInstruments.LocalMessagesSentCounterAggregator.Add(1);
 
                     this.ReceiveMessage(msg);
                 }
@@ -411,7 +417,7 @@ namespace Orleans.Runtime.Messaging
             if (!MayForward(message, this.messagingOptions)) return false;
 
             message.ForwardCount = message.ForwardCount + 1;
-            MessagingProcessingInstruments.OnDispatcherMessageForwared(message);
+            _messagingProcessingInstruments.OnDispatcherMessageForwared(message);
 
             ResendMessageImpl(message, forwardingAddress);
             return true;
@@ -545,7 +551,7 @@ namespace Orleans.Runtime.Messaging
 
             void HandleReceiveFailure(Message msg, Exception ex)
             {
-                MessagingProcessingInstruments.OnDispatcherMessageProcessedError(msg);
+                _messagingProcessingInstruments.OnDispatcherMessageProcessedError(msg);
                 LogErrorCreatingActivation(log, ex, msg.TargetGrain, msg.InterfaceType, msg);
 
                 this.RejectMessage(msg, Message.RejectionTypes.Transient, ex);
@@ -557,7 +563,7 @@ namespace Orleans.Runtime.Messaging
             var target = msg.TargetGrain;
             if (target.IsSystemTarget())
             {
-                MessagingInstruments.OnRejectedMessage(msg);
+                _messagingInstruments.OnRejectedMessage(msg);
                 LogWarningUnknownSystemTarget(log, msg, msg.TargetGrain);
 
                 // Send a rejection only on a request
@@ -583,12 +589,12 @@ namespace Orleans.Runtime.Messaging
 
         internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason, Exception? exception = null)
         {
-            MessagingInstruments.OnRejectedMessage(msg);
+            _messagingInstruments.OnRejectedMessage(msg);
 
             if (msg.Direction is Message.Directions.Response && msg.Result is Message.ResponseTypes.Rejection)
             {
                 // Do not send reject a rejection locally, it will create a stack overflow
-                MessagingInstruments.OnDroppedSentMessage(msg);
+                _messagingInstruments.OnDroppedSentMessage(msg);
                 LogDebugDroppingRejection(log, msg);
             }
             else

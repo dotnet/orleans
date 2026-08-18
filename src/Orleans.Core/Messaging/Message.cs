@@ -12,6 +12,7 @@ namespace Orleans.Runtime
     {
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
+        internal const int MaxCacheInvalidationHeaderEntries = 16;
 
         [NonSerialized]
         private short _retryCount;

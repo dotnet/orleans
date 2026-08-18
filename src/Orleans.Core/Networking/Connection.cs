@@ -40,6 +40,7 @@ namespace Orleans.Runtime.Messaging
         private Task _processIncomingTask;
         private Task _processOutgoingTask;
         private Task _closeTask;
+        private long _lastMessageReceivedTimestamp;
 
         protected Connection(
             ConnectionContext connection,
@@ -66,6 +67,8 @@ namespace Orleans.Runtime.Messaging
         protected ConnectionContext Context { get; }
         protected ILogger Log => this.shared.Logger;
         protected MessagingTrace MessagingTrace => this.shared.MessagingTrace;
+        protected MessagingInstruments MessagingMetrics => this.shared.MessagingInstruments;
+        protected NetworkingInstruments NetworkingMetrics => this.shared.NetworkingInstruments;
         protected abstract ConnectionDirection ConnectionDirection { get; }
         protected MessageFactory MessageFactory => this.shared.MessageFactory;
         protected abstract IMessageCenter MessageCenter { get; }
@@ -73,6 +76,17 @@ namespace Orleans.Runtime.Messaging
         public bool IsValid => _closeTask is null;
 
         public Task Initialized => _initializationTcs.Task;
+
+        public TimeSpan? ElapsedSinceLastMessageReceived
+        {
+            get
+            {
+                var timestamp = Volatile.Read(ref _lastMessageReceivedTimestamp);
+                return timestamp == 0 ? null : TimeSpan.FromMilliseconds(CoarseStopwatch.GetTimestamp() - timestamp);
+            }
+        }
+
+        protected void MarkMessageReceived() => Volatile.Write(ref _lastMessageReceivedTimestamp, CoarseStopwatch.GetTimestamp());
 
         public static void ConfigureBuilder(ConnectionBuilder builder) => builder.Run(OnConnectedDelegate);
 
@@ -103,7 +117,7 @@ namespace Orleans.Runtime.Messaging
             var connection = context.Features.Get<Connection>();
             context.ConnectionClosed.Register(OnConnectionClosedDelegate, connection);
 
-            NetworkingInstruments.OnOpenedSocket(connection.ConnectionDirection);
+            connection.NetworkingMetrics.OnOpenedSocket(connection.ConnectionDirection);
             return connection.RunInternal();
         }
 
@@ -163,7 +177,7 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         private async Task CloseAsync()
         {
-            NetworkingInstruments.OnClosedSocket(this.ConnectionDirection);
+            NetworkingMetrics.OnClosedSocket(this.ConnectionDirection);
 
             // Signal the outgoing message processor to exit gracefully.
             this.outgoingMessageWriter.TryComplete();
@@ -296,6 +310,7 @@ namespace Orleans.Runtime.Messaging
                                 if (requiredBytes == 0)
                                 {
                                     Debug.Assert(message is not null);
+                                    MarkMessageReceived();
                                     RecordMessageReceive(message, bodyLength + headerLength, headerLength);
                                     var handler = MessageHandlerPool.Get();
                                     handler.Set(message, this);
@@ -454,7 +469,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             // The message body was not successfully decoded, but the headers were.
-            MessagingInstruments.OnRejectedMessage(message);
+            MessagingMetrics.OnRejectedMessage(message);
 
             if (message.HasDirection)
             {
@@ -494,7 +509,7 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
-            MessagingInstruments.OnFailedSentMessage(message);
+            MessagingMetrics.OnFailedSentMessage(message);
 
             if (message.Direction == Message.Directions.Request)
             {
@@ -523,7 +538,7 @@ namespace Orleans.Runtime.Messaging
                     exception,
                     message);
 
-                MessagingInstruments.OnDroppedSentMessage(message);
+                MessagingMetrics.OnDroppedSentMessage(message);
                 message.MarkTransferred("Connection.HandleSendMessageFailure:Dropped");
                 message.Release();
             }
