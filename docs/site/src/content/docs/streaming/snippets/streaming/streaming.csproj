@@ -8,6 +8,7 @@
     <PackageReference Include="Microsoft.Orleans.Server" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Client" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Streaming" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Streaming.EventHubs" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Streaming.AzureStorage" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.2" />
     <PackageReference Include="Azure.Identity" Version="1.18.0" />
