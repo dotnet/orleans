@@ -37,8 +37,7 @@ namespace Orleans.Streams
                 var snapshot = clusterMembershipService.CurrentSnapshot;
                 var status = snapshot.GetSiloStatus(systemTarget.GetSiloAddress());
                 if (status != SiloStatus.None
-                    && snapshot.Version != default
-                    && snapshot.Version != MembershipVersion.MinValue)
+                    && snapshot.Version != PubSubPublisherState.UnknownMembershipVersion)
                 {
                     return streamRendezvous.RegisterProducer(streamId, streamProducer, snapshot.Version, cancellationToken);
                 }
