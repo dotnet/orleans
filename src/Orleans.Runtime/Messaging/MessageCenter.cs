@@ -143,7 +143,7 @@ namespace Orleans.Runtime.Messaging
 
         public void SendMessage(Message msg) => SendMessage(msg, sendMessage: null);
 
-        internal void SendMessage(Message msg, Action<Message, Action>? sendMessage)
+        internal void SendMessage(Message msg, Action<Message, Connection?, Exception?>? sendMessage)
         {
             Debug.Assert(!msg.IsLocalOnly);
 
@@ -220,7 +220,7 @@ namespace Orleans.Runtime.Messaging
                         }
                         else
                         {
-                            sendMessage(msg, () => existingConnection.Send(msg));
+                            sendMessage(msg, existingConnection, null);
                         }
 
                         return;
@@ -236,7 +236,8 @@ namespace Orleans.Runtime.Messaging
                             }
                             else
                             {
-                                sendMessage(msg, RejectMessage);
+                                this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
+                                sendMessage(msg, null, null);
                             }
                         }
 
@@ -260,7 +261,7 @@ namespace Orleans.Runtime.Messaging
                             }
                             else
                             {
-                                sendMessage(msg, () => sender.Send(msg));
+                                sendMessage(msg, sender, null);
                             }
                         }
                         else
@@ -271,7 +272,7 @@ namespace Orleans.Runtime.Messaging
                                 MessageCenter messageCenter,
                                 ValueTask<Connection> connectionTask,
                                 Message msg,
-                                Action<Message, Action>? sendMessage)
+                                Action<Message, Connection?, Exception?>? sendMessage)
                             {
                                 try
                                 {
@@ -282,7 +283,7 @@ namespace Orleans.Runtime.Messaging
                                     }
                                     else
                                     {
-                                        sendMessage(msg, () => sender.Send(msg));
+                                        sendMessage(msg, sender, null);
                                     }
                                 }
                                 catch (Exception exception)
@@ -293,7 +294,7 @@ namespace Orleans.Runtime.Messaging
                                     }
                                     else
                                     {
-                                        sendMessage(msg, RejectMessage);
+                                        sendMessage(msg, null, exception);
                                     }
 
                                     void RejectMessage() => messageCenter.SendRejection(
@@ -478,7 +479,14 @@ namespace Orleans.Runtime.Messaging
         /// Reroute a message coming in through a gateway
         /// </summary>
         /// <param name="message"></param>
-        internal void RerouteMessage(Message message, Action<Message, Action> sendMessage)
+        internal void RerouteMessage(Message message)
+        {
+            ResendMessageImpl(message);
+        }
+
+        internal void RerouteMessage(
+            Message message,
+            Action<Message, Connection?, Exception?> sendMessage)
         {
             ResendMessageImpl(message, sendMessage: sendMessage);
         }
@@ -494,14 +502,17 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        private void ResendMessageImpl(Message message, SiloAddress? forwardingAddress = null, Action<Message, Action>? sendMessage = null)
+        private void ResendMessageImpl(
+            Message message,
+            SiloAddress? forwardingAddress = null,
+            Action<Message, Connection?, Exception?>? sendMessage = null)
         {
             LogDebugResend(log, message);
 
             if (message.TargetGrain.IsSystemTarget())
             {
                 message.IsSystemMessage = true;
-                SendMessage(message, sendMessage);
+                SendMessage(message);
             }
             else if (forwardingAddress != null)
             {
@@ -529,7 +540,9 @@ namespace Orleans.Runtime.Messaging
         /// - add ordering info and maintain send order
         ///
         /// </summary>
-        internal Task AddressAndSendMessage(Message message, Action<Message, Action>? sendMessage = null)
+        internal Task AddressAndSendMessage(
+            Message message,
+            Action<Message, Connection?, Exception?>? sendMessage = null)
         {
             try
             {
