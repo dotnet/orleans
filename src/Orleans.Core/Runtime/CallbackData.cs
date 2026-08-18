@@ -14,6 +14,7 @@ namespace Orleans.Runtime
         private int completed;
         private StatusResponse? lastKnownStatus;
         private ValueStopwatch stopwatch;
+        private CancellationToken _cancellationToken;
         private CancellationTokenRegistration _cancellationTokenRegistration;
 
         public CallbackData(
@@ -40,12 +41,21 @@ namespace Orleans.Runtime
                 return;
             }
 
-            cancellationToken.ThrowIfCancellationRequested();
-            _cancellationTokenRegistration = cancellationToken.UnsafeRegister(static arg =>
+            _cancellationToken = cancellationToken;
+            var registration = cancellationToken.UnsafeRegister(static arg =>
             {
                 var callbackData = (CallbackData)arg!;
                 callbackData.OnCancellation();
             }, this);
+
+            if (IsCompleted)
+            {
+                registration.Dispose();
+            }
+            else
+            {
+                _cancellationTokenRegistration = registration;
+            }
         }
 
         private void SignalCancellation()
@@ -110,9 +120,9 @@ namespace Orleans.Runtime
             SignalCancellation();
             shared.Unregister(Message);
             _applicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
-            _applicationRequestInstruments.OnAppRequestsTimedOut(GetTargetGrainType());
+            _applicationRequestInstruments.OnAppRequestsCanceled(GetTargetGrainType());
             OrleansCallBackDataEvent.Instance.OnCanceled(Message);
-            context.Complete(Response.FromException(new OperationCanceledException(_cancellationTokenRegistration.Token)));
+            context.Complete(Response.FromException(new OperationCanceledException(_cancellationToken)));
             _cancellationTokenRegistration.Dispose();
         }
 

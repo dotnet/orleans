@@ -94,8 +94,7 @@ namespace Orleans.Runtime
             => _ = GetOrCreateActivator<TInvokable>(index);
 
         /// <summary>
-        /// Gets an activator from the cached array at the specified index.
-        /// Callers must ensure <see cref="EnsureActivator{TInvokable}(int)"/> has been called first.
+        /// Gets or creates an activator at the specified index.
         /// </summary>
         /// <typeparam name="TInvokable">The invokable type.</typeparam>
         /// <param name="index">The index of the activator in the array.</param>
