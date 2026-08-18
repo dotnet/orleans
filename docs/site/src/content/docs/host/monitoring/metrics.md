@@ -13,7 +13,7 @@ Orleans emits metrics from a <xref:System.Diagnostics.Metrics.Meter> named `Micr
 dotnet-counters monitor -n <ProcessName> --counters Microsoft.Orleans
 ```
 
-The names below are .NET instrument names. An exporter can normalize them for its backend, for example by replacing hyphens with underscores. To inspect definitions under active development, see [InstrumentNames.cs](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Diagnostics/Metrics/InstrumentNames.cs) and the adjacent instrument implementations.
+The names below are .NET instrument names. An exporter can normalize them for its backend, for example by replacing hyphens with underscores. See the [complete Orleans metrics catalog](metrics-catalog.md) for every current instrument and its source-derived description. To inspect definitions under active development, see [InstrumentNames.cs](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Diagnostics/Metrics/InstrumentNames.cs) and the adjacent instrument implementations.
 
 ## Interpret instrument types
 

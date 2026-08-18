@@ -233,6 +233,8 @@ items:
             href: host/monitoring/signals.md
           - name: Metrics
             href: host/monitoring/metrics.md
+          - name: Metrics catalog
+            href: host/monitoring/metrics-catalog.md
           - name: Troubleshooting workflow
             href: host/monitoring/troubleshooting.md
           - name: Silo error codes
