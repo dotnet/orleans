@@ -68,7 +68,8 @@ export default defineConfig({
         starlightLlmsTxt({
           details:
             'Every documentation page is available as Markdown. Replace the trailing `/` in a page URL with `.md` to retrieve it. ' +
-            `For example, https://dotnet.github.io/orleans/docs/implementation/streams-implementation/ becomes ${markdownPageExample}.`,
+            `For example, https://dotnet.github.io/orleans/docs/implementation/streams-implementation/ becomes ${markdownPageExample}. ` +
+            'The Documentation Overview section below links to the first two levels of conceptual documentation.',
         }),
       ],
     }),

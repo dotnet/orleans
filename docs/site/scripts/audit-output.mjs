@@ -55,6 +55,30 @@ if (files.includes(llmsEntryPoint)) {
   if (!llmsText.includes(markdownPageExample)) {
     fail(llmsEntryPoint, 'missing per-page Markdown URL example');
   }
+  if (!llmsText.includes('## Documentation Overview')) {
+    fail(llmsEntryPoint, 'missing conceptual documentation overview');
+  }
+  if (/https:\/\/dotnet\.github\.io\/orleans\/docs\/api\//.test(llmsText)) {
+    fail(llmsEntryPoint, 'documentation overview includes API reference pages');
+  }
+  const overview = llmsText.split('## Documentation Overview\n\n')[1] ?? '';
+  const overviewUrls = [
+    ...overview.matchAll(/https:\/\/dotnet\.github\.io\/orleans\/docs\/([^)\s]+)\.md/g),
+  ].map((match) => match[1]);
+  if (overviewUrls.some((url) => url.split('/').length > 2)) {
+    fail(llmsEntryPoint, 'documentation overview includes pages below the second level');
+  }
+  for (const url of overviewUrls) {
+    const overviewDirectory = path.join(distRoot, 'docs', ...url.split('/'));
+    try {
+      const children = await readdir(overviewDirectory, { withFileTypes: true });
+      if (!children.some((entry) => entry.isFile() && entry.name.endsWith('.md'))) {
+        fail(llmsEntryPoint, `documentation overview entry '${url}' is not a hub page`);
+      }
+    } catch {
+      fail(llmsEntryPoint, `documentation overview entry '${url}' is not a hub page`);
+    }
+  }
 }
 
 if (totalBytes > maxPublishedBytes) {
@@ -136,6 +160,13 @@ for (const file of renderedMarkdown) {
     if (pattern.test(markdown)) {
       fail(file, description);
     }
+  }
+  if (
+    /\]\((?:https:\/\/dotnet\.github\.io)?\/orleans\/docs\/[^)\s]*\/(?:[?#][^)]*)?\)/.test(
+      markdown,
+    )
+  ) {
+    fail(file, 'documentation link points to HTML instead of Markdown');
   }
 }
 
