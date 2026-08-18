@@ -284,6 +284,30 @@ describe('DocFX conversion', () => {
     expect(converted).toContain('List&lt;T> outside.');
   });
 
+  test('preserves angle brackets in inline code while escaping prose for MDX', async () => {
+    const directory = await temporaryDirectory();
+    const sourcePath = path.join(directory, 'guide.md');
+    const converted = await convertDocfxMarkdown({
+      source: [
+        '---',
+        'title: Inline code',
+        '---',
+        'Use `IGrainFactory.GetGrain<TGrainInterface>(key)` with <TGrainInterface>.',
+        'Use ``Map<`key`, TValue>`` and `Dictionary<string, List<int>>`.',
+      ].join('\n'),
+      sourcePath,
+      sourceRoot: directory,
+    });
+
+    expect(converted).toContain(
+      'Use `IGrainFactory.GetGrain<TGrainInterface>(key)` with &lt;TGrainInterface>.',
+    );
+    expect(converted).toContain(
+      'Use ``Map<`key`, TValue>`` and `Dictionary<string, List<int>>`.',
+    );
+    expect(converted).not.toContain('GetGrain&lt;TGrainInterface>');
+  });
+
   test.each([
     ['tilde fence', '~~~~text', '~~~~'],
     ['longer tilde close', '~~~text', '~~~~~'],
