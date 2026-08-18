@@ -207,7 +207,11 @@ namespace Orleans.Core
 
                 MarkStorageOperationStarted(operation);
 
-                if (!readSatisfiedByPredecessor)
+                if (readSatisfiedByPredecessor)
+                {
+                    IsStateInitialized = true;
+                }
+                else
                 {
                     await ReadStateCoreAsync(operation.CancellationToken);
                 }

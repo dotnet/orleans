@@ -176,6 +176,7 @@ namespace UnitTests.Storage;
 
             Assert.Equal(1, storage.WriteCallCount);
             Assert.Equal(0, storage.ReadCallCount);
+            Assert.True(bridge.RecordExists);
             AssertLatestEtag(bridge, storage);
         }
 
@@ -369,6 +370,7 @@ namespace UnitTests.Storage;
 
             Assert.Equal(1, storage.ClearCallCount);
             Assert.Equal(0, storage.ReadCallCount);
+            Assert.False(bridge.RecordExists);
             AssertLatestEtag(bridge, storage);
         }
 
