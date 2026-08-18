@@ -59,7 +59,7 @@ internal sealed partial class UnknownSiloStatusCache
         {
             await _membershipManager.Refresh(
                 targetVersion: null,
-                cancellationToken,
+                cancellationToken: cancellationToken,
                 requireFresh: true);
 
             var refreshedSnapshot = _membershipManager.CurrentSnapshot;
