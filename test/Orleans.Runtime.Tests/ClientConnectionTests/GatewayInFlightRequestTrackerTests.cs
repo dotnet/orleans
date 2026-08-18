@@ -14,14 +14,13 @@ public class GatewayInFlightRequestTrackerTests
 {
     private static readonly SiloAddress Silo1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 1);
     private static readonly SiloAddress Silo2 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 22222), 2);
-    private readonly TestClient _client = new();
 
     [Fact, TestCategory("BVT")]
     public void OneWayMessagesAreNotTracked()
     {
         var tracker = CreateTracker();
 
-        var tracked = tracker.Track(_client, CreateMessage(1, Message.Directions.OneWay, Silo1));
+        var tracked = tracker.Track(CreateMessage(1, Message.Directions.OneWay, Silo1));
 
         Assert.False(tracked);
         Assert.Equal(0, tracker.Count);
@@ -34,7 +33,7 @@ public class GatewayInFlightRequestTrackerTests
         var request = CreateMessage(1, Message.Directions.Request, Silo1);
         request.TargetSilo = null;
 
-        var tracked = tracker.Track(_client, request);
+        var tracked = tracker.Track(request);
 
         Assert.False(tracked);
         Assert.Equal(0, tracker.Count);
@@ -47,7 +46,7 @@ public class GatewayInFlightRequestTrackerTests
         var request = CreateMessage(1, Message.Directions.Request, Silo1);
         request.TargetGrain = SystemTargetGrainId.Create(Constants.CatalogType, Silo1).GrainId;
 
-        var tracked = tracker.Track(_client, request);
+        var tracked = tracker.Track(request);
 
         Assert.False(tracked);
         Assert.Equal(0, tracker.Count);
@@ -58,9 +57,9 @@ public class GatewayInFlightRequestTrackerTests
     {
         var tracker = CreateTracker();
         var request = CreateMessage(1, Message.Directions.Request, Silo1);
-        Assert.True(tracker.Track(_client, request));
+        Assert.True(tracker.Track(request));
 
-        var completed = tracker.TryComplete(_client, CreateResponse(request, Message.ResponseTypes.Status));
+        var completed = tracker.TryComplete(CreateResponse(request, Message.ResponseTypes.Status));
 
         Assert.False(completed);
         Assert.Equal(1, tracker.Count);
@@ -74,9 +73,9 @@ public class GatewayInFlightRequestTrackerTests
     {
         var tracker = CreateTracker();
         var request = CreateMessage(1, Message.Directions.Request, Silo1);
-        Assert.True(tracker.Track(_client, request));
+        Assert.True(tracker.Track(request));
 
-        var completed = tracker.TryComplete(_client, CreateResponse(request, (Message.ResponseTypes)responseType));
+        var completed = tracker.TryComplete(CreateResponse(request, (Message.ResponseTypes)responseType));
 
         Assert.True(completed);
         Assert.Equal(0, tracker.Count);
@@ -87,9 +86,9 @@ public class GatewayInFlightRequestTrackerTests
     {
         var tracker = CreateTracker();
         var request = CreateMessage(1, Message.Directions.Request, Silo1);
-        Assert.True(tracker.Track(_client, request));
+        Assert.True(tracker.Track(request));
 
-        var completed = tracker.TryComplete(_client, request);
+        var completed = tracker.TryComplete(request);
 
         Assert.False(completed);
         Assert.Equal(1, tracker.Count);
@@ -102,24 +101,19 @@ public class GatewayInFlightRequestTrackerTests
         var request1 = CreateMessage(1, Message.Directions.Request, Silo1);
         var request2 = CreateMessage(2, Message.Directions.Request, Silo2);
         var request3 = CreateMessage(3, Message.Directions.Request, Silo1);
-        var otherClient = new TestClient();
-        Assert.True(tracker.Track(_client, request1));
-        Assert.True(tracker.Track(otherClient, request2));
-        Assert.True(tracker.Track(_client, request3));
-        Assert.Equal(2, tracker.ActiveClientCount);
+        Assert.True(tracker.Track(request1));
+        Assert.True(tracker.Track(request2));
+        Assert.True(tracker.Track(request3));
 
         var removed = tracker.RemoveForSilo(Silo1);
 
         Assert.NotNull(removed);
         Assert.Equal(2, removed.Count);
-        Assert.All(removed, entry => Assert.Same(_client, entry.Client));
-        Assert.Contains(removed, entry => entry.Request.Id == request1.Id && Silo1.Equals(entry.Request.TargetSilo));
-        Assert.Contains(removed, entry => entry.Request.Id == request3.Id && Silo1.Equals(entry.Request.TargetSilo));
+        Assert.Contains(removed, message => message.Id == request1.Id && Silo1.Equals(message.TargetSilo));
+        Assert.Contains(removed, message => message.Id == request3.Id && Silo1.Equals(message.TargetSilo));
         Assert.Equal(1, tracker.Count);
-        Assert.Equal(1, tracker.ActiveClientCount);
-        Assert.True(tracker.TryComplete(otherClient, CreateResponse(request2, Message.ResponseTypes.Success)));
+        Assert.True(tracker.TryComplete(CreateResponse(request2, Message.ResponseTypes.Success)));
         Assert.Equal(0, tracker.Count);
-        Assert.Equal(0, tracker.ActiveClientCount);
     }
 
     [Fact, TestCategory("BVT")]
@@ -128,17 +122,14 @@ public class GatewayInFlightRequestTrackerTests
         var tracker = CreateTracker();
         var request1 = CreateMessage(1, Message.Directions.Request, Silo1);
         var request2 = CreateMessage(2, Message.Directions.Request, Silo2);
-        var otherClient = new TestClient();
-        Assert.True(tracker.Track(_client, request1));
-        Assert.True(tracker.Track(otherClient, request2));
+        Assert.True(tracker.Track(request1));
+        Assert.True(tracker.Track(request2));
 
-        tracker.Clear(_client);
+        tracker.Clear();
 
-        Assert.Equal(1, tracker.Count);
-        Assert.Equal(1, tracker.ActiveClientCount);
-        Assert.False(tracker.TryComplete(_client, CreateResponse(request1, Message.ResponseTypes.Success)));
-        Assert.True(tracker.TryComplete(otherClient, CreateResponse(request2, Message.ResponseTypes.Error)));
-        Assert.Equal(0, tracker.ActiveClientCount);
+        Assert.Equal(0, tracker.Count);
+        Assert.False(tracker.TryComplete(CreateResponse(request1, Message.ResponseTypes.Success)));
+        Assert.False(tracker.TryComplete(CreateResponse(request2, Message.ResponseTypes.Error)));
     }
 
     [Fact, TestCategory("BVT")]
@@ -148,7 +139,7 @@ public class GatewayInFlightRequestTrackerTests
         var request = CreateMessage(1, Message.Directions.Request, Silo1);
         request.BodyObject = new object();
         request.CacheInvalidationHeader = [];
-        Assert.True(tracker.Track(_client, request));
+        Assert.True(tracker.Track(request));
 
         request.CacheInvalidationHeader.Add(new GrainAddressCacheUpdate(
             new GrainAddress
@@ -160,7 +151,7 @@ public class GatewayInFlightRequestTrackerTests
             validAddress: null));
         var removed = tracker.RemoveForSilo(Silo1);
 
-        var snapshot = Assert.Single(removed!).Request;
+        var snapshot = Assert.Single(removed!);
         Assert.Null(snapshot.BodyObject);
         Assert.Empty(snapshot.CacheInvalidationHeader!);
     }
@@ -172,7 +163,7 @@ public class GatewayInFlightRequestTrackerTests
         var tracker = CreateTracker(timeProvider, TimeSpan.FromMinutes(1));
         var request = CreateMessage(1, Message.Directions.Request, Silo1);
         request.TimeToLive = TimeSpan.FromSeconds(10);
-        Assert.True(tracker.Track(_client, request));
+        Assert.True(tracker.Track(request));
 
         timeProvider.Advance(TimeSpan.FromSeconds(9));
         tracker.RemoveExpired();
@@ -188,7 +179,7 @@ public class GatewayInFlightRequestTrackerTests
     {
         var timeProvider = new FakeTimeProvider();
         var tracker = CreateTracker(timeProvider, TimeSpan.FromSeconds(20));
-        Assert.True(tracker.Track(_client, CreateMessage(1, Message.Directions.Request, Silo1)));
+        Assert.True(tracker.Track(CreateMessage(1, Message.Directions.Request, Silo1)));
 
         timeProvider.Advance(TimeSpan.FromSeconds(19));
         tracker.RemoveExpired();
@@ -204,13 +195,13 @@ public class GatewayInFlightRequestTrackerTests
     {
         var tracker = CreateTracker(responseTimeout: TimeSpan.Zero);
 
-        var tracked = tracker.Track(_client, CreateMessage(1, Message.Directions.Request, Silo1));
+        var tracked = tracker.Track(CreateMessage(1, Message.Directions.Request, Silo1));
 
         Assert.False(tracked);
         Assert.Equal(0, tracker.Count);
     }
 
-    private static GatewayInFlightRequestTracker<TestClient> CreateTracker(
+    private static GatewayInFlightRequestTracker CreateTracker(
         TimeProvider? timeProvider = null,
         TimeSpan? responseTimeout = null) =>
         new(timeProvider ?? TimeProvider.System, responseTimeout ?? TimeSpan.FromSeconds(30));
@@ -232,7 +223,4 @@ public class GatewayInFlightRequestTrackerTests
             Result = responseType,
         };
 
-    private sealed class TestClient
-    {
-    }
 }
