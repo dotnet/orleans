@@ -1,5 +1,7 @@
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
@@ -19,11 +21,11 @@ public sealed class TransactionalStateStorageProviderWrapperTests
     public async Task FailedWriteDoesNotMutateCachedStateAndAllowsSameInstanceReuse()
     {
         using var fixture = new Fixture(CreateInitialState());
-        var loaded = await fixture.Storage.Load();
+        var loaded = await fixture.Load();
         var speculativeMetadata = CreateMetadata(20);
         fixture.Provider.FailNextWrite = true;
 
-        await Assert.ThrowsAsync<OrleansException>(() => fixture.Storage.Store(
+        await Assert.ThrowsAsync<OrleansException>(() => fixture.Store(
             loaded.ETag,
             speculativeMetadata,
             [CreatePendingState(3, "speculative")],
@@ -45,7 +47,7 @@ public sealed class TransactionalStateStorageProviderWrapperTests
         Assert.Collection(loaded.PendingStates, state => AssertPendingState(state, 2, "prepared"));
 
         var recoveryMetadata = CreateMetadata(30);
-        var etag = await fixture.Storage.Store(
+        var etag = await fixture.Store(
             loaded.ETag,
             recoveryMetadata,
             statesToPrepare: null,
@@ -65,18 +67,18 @@ public sealed class TransactionalStateStorageProviderWrapperTests
     public async Task LoadAfterAmbiguousFailureRecoversPersistedState()
     {
         using var fixture = new Fixture(CreateInitialState());
-        var loaded = await fixture.Storage.Load();
+        var loaded = await fixture.Load();
         fixture.Provider.FailNextWrite = true;
         fixture.Provider.PersistFailedWrite = true;
 
-        await Assert.ThrowsAsync<OrleansException>(() => fixture.Storage.Store(
+        await Assert.ThrowsAsync<OrleansException>(() => fixture.Store(
             loaded.ETag,
             CreateMetadata(20),
             statesToPrepare: null,
             commitUpTo: 2,
             abortAfter: null));
 
-        var recovered = await fixture.Storage.Load();
+        var recovered = await fixture.Load();
 
         Assert.Equal("etag-ambiguous", recovered.ETag);
         Assert.Equal(2, recovered.CommittedSequenceId);
@@ -84,7 +86,7 @@ public sealed class TransactionalStateStorageProviderWrapperTests
         Assert.Equal(20, recovered.Metadata.TimeStamp.Ticks);
         Assert.Empty(recovered.PendingStates);
 
-        var etag = await fixture.Storage.Store(
+        var etag = await fixture.Store(
             recovered.ETag,
             recovered.Metadata,
             statesToPrepare: null,
@@ -100,9 +102,9 @@ public sealed class TransactionalStateStorageProviderWrapperTests
     public async Task StoreRequiresMatchingETagAndPreservesNoChangeWrites()
     {
         using var fixture = new Fixture(CreateInitialState());
-        var loaded = await fixture.Storage.Load();
+        var loaded = await fixture.Load();
 
-        await Assert.ThrowsAsync<ArgumentException>(() => fixture.Storage.Store(
+        await Assert.ThrowsAsync<ArgumentException>(() => fixture.Store(
             "stale-etag",
             loaded.Metadata,
             statesToPrepare: null,
@@ -111,7 +113,7 @@ public sealed class TransactionalStateStorageProviderWrapperTests
 
         Assert.Equal(0, fixture.Provider.WriteCount);
 
-        var etag = await fixture.Storage.Store(
+        var etag = await fixture.Store(
             loaded.ETag,
             loaded.Metadata,
             statesToPrepare: null,
@@ -134,9 +136,9 @@ public sealed class TransactionalStateStorageProviderWrapperTests
         initialState.PendingStates.Add(CreatePendingState(4, "replace-me"));
         initialState.PendingStates.Add(CreatePendingState(5, "abort-me"));
         using var fixture = new Fixture(initialState);
-        var loaded = await fixture.Storage.Load();
+        var loaded = await fixture.Load();
 
-        var etag = await fixture.Storage.Store(
+        var etag = await fixture.Store(
             loaded.ETag,
             CreateMetadata(40),
             [
@@ -184,7 +186,9 @@ public sealed class TransactionalStateStorageProviderWrapperTests
     private sealed class Fixture : IDisposable
     {
         private readonly ServiceProvider _serviceProvider;
-        private readonly RuntimeContextScope _runtimeContextScope;
+        private readonly object _workItemGroup;
+        private readonly TaskScheduler _taskScheduler;
+        private readonly TransactionalStateStorageProviderWrapper<TestState> _storage;
 
         public Fixture(TransactionalStateRecord<TestState> initialState)
         {
@@ -192,54 +196,68 @@ public sealed class TransactionalStateStorageProviderWrapperTests
             var services = new ServiceCollection();
             services.AddLogging();
             services.AddMetrics();
+            services.AddOptions();
             services.AddSingleton<OrleansInstruments>();
             services.AddSerializer();
+            services.Configure<SchedulingOptions>(options =>
+            {
+                options.DelayWarningThreshold = TimeSpan.FromMilliseconds(100);
+                options.ActivationSchedulingQuantum = TimeSpan.FromMilliseconds(100);
+                options.TurnWarningLengthThreshold = TimeSpan.FromMilliseconds(100);
+                options.StoppedActivationWarningInterval = TimeSpan.FromMilliseconds(200);
+            });
             var storageInstrumentsType = typeof(OrleansInstruments).Assembly.GetType(
                 "Orleans.Runtime.StorageInstruments",
                 throwOnError: true)!;
+            var schedulerInstrumentsType = typeof(OrleansInstruments).Assembly.GetType(
+                "Orleans.Runtime.SchedulerInstruments",
+                throwOnError: true)!;
             services.AddSingleton(storageInstrumentsType);
+            services.AddSingleton(schedulerInstrumentsType);
             _serviceProvider = services.BuildServiceProvider();
 
             var context = new TestGrainContext(
                 GrainId.Create("transactional-state-storage-test", Guid.NewGuid().ToString("N")),
                 _serviceProvider);
-            _runtimeContextScope = new RuntimeContextScope(context);
-            Storage = new TransactionalStateStorageProviderWrapper<TestState>(Provider, "state", context);
+            var workItemGroupType = typeof(Orleans.Core.StateStorageBridge<>).Assembly.GetType(
+                "Orleans.Runtime.Scheduler.WorkItemGroup",
+                throwOnError: true)!;
+            _workItemGroup = Activator.CreateInstance(
+                workItemGroupType,
+                context,
+                _serviceProvider.GetRequiredService<IOptions<SchedulingOptions>>(),
+                _serviceProvider.GetRequiredService(schedulerInstrumentsType))!;
+            _taskScheduler = (TaskScheduler)workItemGroupType.GetProperty(
+                "TaskScheduler",
+                BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(_workItemGroup)!;
+            context.WorkItemScheduler = (IWorkItemScheduler)_workItemGroup;
+            _storage = new TransactionalStateStorageProviderWrapper<TestState>(Provider, "state", context);
         }
 
         public TestGrainStorage Provider { get; }
 
-        public TransactionalStateStorageProviderWrapper<TestState> Storage { get; }
+        public Task<TransactionalStorageLoadResponse<TestState>> Load() => RunInGrainContextAsync(_storage.Load);
+
+        public Task<string> Store(
+            string? expectedETag,
+            TransactionalStateMetaData metadata,
+            List<PendingTransactionState<TestState>>? statesToPrepare,
+            long? commitUpTo,
+            long? abortAfter) =>
+            RunInGrainContextAsync(() => _storage.Store(expectedETag, metadata, statesToPrepare, commitUpTo, abortAfter));
+
+        private Task<T> RunInGrainContextAsync<T>(Func<Task<T>> action) =>
+            Task.Factory.StartNew(
+                action,
+                CancellationToken.None,
+                TaskCreationOptions.None,
+                _taskScheduler).Unwrap();
 
         public void Dispose()
         {
-            _runtimeContextScope.Dispose();
+            (_workItemGroup as IDisposable)?.Dispose();
             _serviceProvider.Dispose();
         }
-    }
-
-    private sealed class RuntimeContextScope : IDisposable
-    {
-        private static readonly Type RuntimeContextType = typeof(IGrainContext).Assembly.GetType(
-            "Orleans.Runtime.RuntimeContext",
-            throwOnError: true)!;
-        private static readonly MethodInfo SetExecutionContext = RuntimeContextType.GetMethod(
-            "SetExecutionContext",
-            BindingFlags.Static | BindingFlags.NonPublic)!;
-        private static readonly MethodInfo ResetExecutionContext = RuntimeContextType.GetMethod(
-            "ResetExecutionContext",
-            BindingFlags.Static | BindingFlags.NonPublic)!;
-
-        private readonly IGrainContext? _originalContext;
-
-        public RuntimeContextScope(IGrainContext context)
-        {
-            object?[] arguments = [context, null];
-            SetExecutionContext.Invoke(null, arguments);
-            _originalContext = (IGrainContext?)arguments[1];
-        }
-
-        public void Dispose() => ResetExecutionContext.Invoke(null, [_originalContext]);
     }
 
     private sealed class TestGrainStorage(
@@ -338,6 +356,8 @@ public sealed class TransactionalStateStorageProviderWrapperTests
 
     private sealed class TestGrainContext(GrainId grainId, IServiceProvider activationServices) : IGrainContext
     {
+        public IWorkItemScheduler WorkItemScheduler { get; set; } = null!;
+
         public GrainReference GrainReference => throw new NotSupportedException();
         public GrainId GrainId => grainId;
         public object? GrainInstance => null;
@@ -345,7 +365,7 @@ public sealed class TransactionalStateStorageProviderWrapperTests
         public GrainAddress Address => throw new NotSupportedException();
         public IServiceProvider ActivationServices => activationServices;
         public IGrainLifecycle ObservableLifecycle => throw new NotSupportedException();
-        public IWorkItemScheduler Scheduler => throw new NotSupportedException();
+        public IWorkItemScheduler Scheduler => WorkItemScheduler;
         public Task Deactivated => Task.CompletedTask;
 
         public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) =>
