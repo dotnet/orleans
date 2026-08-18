@@ -220,7 +220,7 @@ internal sealed class DisseminationBroadcastValue
     [Id(0)]
     public DisseminationValue Value { get; init; }
 
-    [Id(2)]
+    [Id(1)]
     public DateTimeOffset ExpiresAt { get; init; }
 }
 
