@@ -94,4 +94,21 @@ Derive the test class from `TestKitBase`. Register persistent state and grain pr
 
 :::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/ShoppingCartGrainTests.cs" id="testkit_grain_test":::
 
-The test verifies the grain's state mutation, storage write request, key-derived grain reference, and outgoing call. OrleansTestKit invokes the grain using its simulated activation context. Use <xref:Orleans.TestingHost.InProcessTestCluster> for assertions governed by Orleans turn scheduling, interleaving, reentrancy, serialization, activation lifecycle, placement, or message routing.
+The test verifies the grain's state mutation, storage write request, key-derived grain reference, and outgoing call. OrleansTestKit invokes one grain using its simulated activation context and resolves collaborating grains as probes. Its timer and reminder helpers invoke registered callbacks directly. Use <xref:Orleans.TestingHost.InProcessTestCluster> for assertions governed by Orleans turn scheduling, interleaving, reentrancy, serialization, activation lifecycle, placement, timer or reminder scheduling, or message routing.
+
+### More OrleansTestKit examples
+
+The OrleansTestKit [README](https://github.com/OrleansContrib/OrleansTestKit/blob/main/README.md) documents version compatibility and package setup. The project's CI-run test suite provides additional recipes:
+
+| Scenario | Upstream examples |
+| --- | --- |
+| Activation, deactivation, and lifecycle callbacks | [`BasicGrainTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/BasicGrainTests.cs) and [`ActivationGrainTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/ActivationGrainTests.cs) |
+| Constructor and keyed service injection | [`DependencyGrainTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/DependencyGrainTests.cs) |
+| Grain identities and activation context | [`GrainContextTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/GrainContextTests.cs) and [`GrainIdTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/GrainIdTests.cs) |
+| `Grain<TState>` and persistent-state facets | [`StorageTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/StorageTests.cs) and [`StorageFacetTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/StorageFacetTests.cs) |
+| Timers | [`TimerTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/TimerTests.cs) |
+| Reminders | [`ReminderTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/ReminderTests.cs) |
+| Streams, batches, and persistent subscriptions | [`StreamTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/StreamTests.cs), [`StreamBatchTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/StreamBatchTests.cs), and [`PersistentStreamWithinGrainStateTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/PersistentStreamWithinGrainStateTests.cs) |
+| Strict grain and stream probes | [`StrictGrainProbeTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/StrictGrainProbeTests.cs) and [`StrictStreamTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/StrictStreamTests.cs) |
+
+See the complete [OrleansTestKit test suite](https://github.com/OrleansContrib/OrleansTestKit/tree/main/test/OrleansTestKit.Tests/Tests) for probe factories, compound keys, class prefixes, stream IDs, storage failures, and custom service probes.
