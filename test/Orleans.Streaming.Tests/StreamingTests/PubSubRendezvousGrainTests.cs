@@ -189,6 +189,14 @@ namespace UnitTests.StreamingTests
         public void SystemTargetRegistrationRequiresKnownNonTerminatingSilo(SiloStatus status, bool expected) =>
             Assert.Equal(expected, PubSubRendezvousGrain.IsValidSystemTargetRegistrationStatus(status));
 
+        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
+        public void DefaultMembershipVersionIdentifiesLegacyPublisherState()
+        {
+            Assert.Equal(default, PubSubPublisherState.UnknownMembershipVersion);
+            Assert.False(PubSubRendezvousGrain.HasMembershipVersion(default));
+            Assert.True(PubSubRendezvousGrain.HasMembershipVersion(new MembershipVersion(1)));
+        }
+
         /// <summary>
         /// This test fails because the producer must be grain reference which is not implied by the IStreamProducerExtension in the producer management calls.
         /// TODO: Fix rendezvous implementation.
