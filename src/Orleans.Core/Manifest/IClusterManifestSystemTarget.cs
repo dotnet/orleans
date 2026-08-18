@@ -80,7 +80,7 @@ namespace Orleans.Runtime
             Dictionary<SiloAddress, ManifestHash> siloManifestHashes)
         {
             Version = version;
-            SiloManifestHashes = siloManifestHashes;
+            SiloManifestHashes = siloManifestHashes.ToImmutableDictionary();
         }
 
         /// <summary>
@@ -93,7 +93,7 @@ namespace Orleans.Runtime
         /// Gets the manifest hash for each silo.
         /// </summary>
         [Id(1)]
-        public Dictionary<SiloAddress, ManifestHash> SiloManifestHashes { get; }
+        public ImmutableDictionary<SiloAddress, ManifestHash> SiloManifestHashes { get; }
     }
 
     /// <summary>
