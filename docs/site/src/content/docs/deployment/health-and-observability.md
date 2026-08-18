@@ -1,7 +1,7 @@
 ---
 title: Health and observability
 description: Design Orleans startup, readiness, liveness, dependency health, telemetry, and alerts.
-ms.date: 08/02/2026
+ms.date: 08/15/2026
 ms.topic: concept-article
 ---
 
@@ -64,7 +64,7 @@ Apply timeouts and concurrency limits at every remote boundary. Use circuit brea
 
 ## Telemetry
 
-Orleans uses `Microsoft.Extensions.Logging`, `System.Diagnostics.Metrics`, and distributed tracing. Configure a central exporter and see [Orleans observability](../host/monitoring/index.md) for the runtime instruments.
+Orleans uses `Microsoft.Extensions.Logging`, `System.Diagnostics.Metrics`, and distributed tracing. Configure a central exporter, see [Orleans observability](../host/monitoring/index.md) for signal configuration, and use [Monitor Orleans metrics](../host/monitoring/metrics.md) to interpret runtime instruments.
 
 At minimum, correlate these dimensions:
 
