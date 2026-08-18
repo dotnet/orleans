@@ -44,6 +44,19 @@ for (const requiredFile of ['llms.txt', 'llms-small.txt', 'llms-full.txt']) {
   }
 }
 
+const llmsEntryPoint = path.join(distRoot, 'llms.txt');
+if (files.includes(llmsEntryPoint)) {
+  const llmsText = await readFile(llmsEntryPoint, 'utf8');
+  const markdownPageExample =
+    'https://dotnet.github.io/orleans/docs/implementation/streams-implementation.md';
+  if (!llmsText.includes('Replace the trailing `/` in a page URL with `.md`')) {
+    fail(llmsEntryPoint, 'missing per-page Markdown URL guidance');
+  }
+  if (!llmsText.includes(markdownPageExample)) {
+    fail(llmsEntryPoint, 'missing per-page Markdown URL example');
+  }
+}
+
 if (totalBytes > maxPublishedBytes) {
   failures.push(`Published site is ${(totalBytes / 1024 / 1024).toFixed(1)} MiB; limit is 1024 MiB.`);
 }

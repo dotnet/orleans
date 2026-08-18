@@ -12,6 +12,8 @@ import { remarkVersionZones } from './src/plugins/remark-version-zones.mjs';
 
 const sidebar = await createSidebar(new URL('./src/content/docs/toc.yml', import.meta.url));
 const buildConcurrency = Number(process.env.ORLEANS_DOCS_BUILD_CONCURRENCY) || 4;
+const markdownPageExample =
+  'https://dotnet.github.io/orleans/docs/implementation/streams-implementation.md';
 sidebar.unshift({ label: 'Documentation', link: '/docs/' });
 
 export default defineConfig({
@@ -63,7 +65,11 @@ export default defineConfig({
         starlightDotMd({
           includePatterns: ['docs', 'docs/**'],
         }),
-        starlightLlmsTxt(),
+        starlightLlmsTxt({
+          details:
+            'Every documentation page is available as Markdown. Replace the trailing `/` in a page URL with `.md` to retrieve it. ' +
+            `For example, https://dotnet.github.io/orleans/docs/implementation/streams-implementation/ becomes ${markdownPageExample}.`,
+        }),
       ],
     }),
     cleanMarkdownOutput(),
