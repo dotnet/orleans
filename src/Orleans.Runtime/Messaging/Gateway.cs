@@ -192,6 +192,13 @@ namespace Orleans.Runtime.Messaging
                 return msg.TargetSilo;
             }
 
+            if (msg.Direction == Message.Directions.Response
+                && ClientGrainId.TryParse(msg.SendingGrain, out var respondingClientId)
+                && clients.TryGetValue(respondingClientId, out var respondingClient))
+            {
+                respondingClient.OnClientResponse(msg);
+            }
+
             // for responses from ClientAddressableObject to ClientGrain try to use clientsReplyRoutingCache for sending replies directly back.
             if (!msg.SendingGrain.IsClient() || !msg.TargetGrain.IsClient())
             {
@@ -200,11 +207,6 @@ namespace Orleans.Runtime.Messaging
 
             if (msg.Direction != Message.Directions.Response)
             {
-                if (ClientGrainId.TryParse(msg.SendingGrain, out var clientId) && clients.TryGetValue(clientId, out var clientState))
-                {
-                    clientState.OnClientResponse(msg);
-                }
-
                 return null;
             }
 

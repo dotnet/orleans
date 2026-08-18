@@ -1368,13 +1368,13 @@ namespace Orleans.Runtime
         public GrainId SourceGrain { get { throw null; } set { } }
 
         [Id(2)]
-        public SiloAddress? SourceHost { get { throw null; } set { } }
+        public SiloAddress SourceHost { get { throw null; } set { } }
 
         [Id(1)]
         public GrainId TargetGrain { get { throw null; } set { } }
 
         [Id(3)]
-        public SiloAddress? TargetHost { get { throw null; } set { } }
+        public SiloAddress TargetHost { get { throw null; } set { } }
     }
 
     public partial interface IClusterManifestProvider
