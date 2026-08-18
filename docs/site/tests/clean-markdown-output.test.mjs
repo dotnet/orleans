@@ -95,15 +95,15 @@ builder.UseOrleans();
     assert.match(llmsText, /## Documentation Overview/);
     assert.match(
       llmsText,
-      /- \[Orleans documentation\]\(https:\/\/dotnet\.github\.io\/orleans\/docs\.md\)/,
+      /- \[Orleans documentation\]\(\/orleans\/docs\.md\)/,
     );
     assert.match(
       llmsText,
-      /  - \[Grains\]\(https:\/\/dotnet\.github\.io\/orleans\/docs\/grains\.md\)/,
+      /  - \[Grains\]\(\/orleans\/docs\/grains\.md\)/,
     );
     assert.match(
       llmsText,
-      /    - \[Event sourcing\]\(https:\/\/dotnet\.github\.io\/orleans\/docs\/grains\/event-sourcing\.md\)/,
+      /    - \[Event sourcing\]\(\/orleans\/docs\/grains\/event-sourcing\.md\)/,
     );
     assert.doesNotMatch(llmsText, /Event sourcing details|Grain identity|\[API\]/);
   });

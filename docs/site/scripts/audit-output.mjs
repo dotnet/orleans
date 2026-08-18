@@ -58,12 +58,12 @@ if (files.includes(llmsEntryPoint)) {
   if (!llmsText.includes('## Documentation Overview')) {
     fail(llmsEntryPoint, 'missing conceptual documentation overview');
   }
-  if (/https:\/\/dotnet\.github\.io\/orleans\/docs\/api\//.test(llmsText)) {
+  if (/\/orleans\/docs\/api\//.test(llmsText)) {
     fail(llmsEntryPoint, 'documentation overview includes API reference pages');
   }
   const overview = llmsText.split('## Documentation Overview\n\n')[1] ?? '';
   const overviewUrls = [
-    ...overview.matchAll(/https:\/\/dotnet\.github\.io\/orleans\/docs\/([^)\s]+)\.md/g),
+    ...overview.matchAll(/\/orleans\/docs\/([^)\s]+)\.md/g),
   ].map((match) => match[1]);
   if (overviewUrls.some((url) => url.split('/').length > 2)) {
     fail(llmsEntryPoint, 'documentation overview includes pages below the second level');

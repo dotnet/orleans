@@ -128,7 +128,7 @@ export async function publishMarkdownOverview(outputRoot, site) {
       return {
         depth,
         title,
-        url: new URL(relativePath, site).href,
+        url: new URL(relativePath, site).pathname,
       };
     }),
   );
