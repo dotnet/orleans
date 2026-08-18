@@ -120,6 +120,39 @@ public class StateStorageBridgeConcurrencyTests
     }
 
     [Fact]
+    public async Task WriteStateAsync_CoalescingFromOutsideRuntimeContext_ThrowsAsync()
+    {
+        using var context = TestGrainContext.Create();
+        var storage = new ControllableGrainStorage();
+        var bridge = CreateBridge(context, storage);
+        var pendingWrite = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var releaseTurn = new ManualResetEventSlim();
+
+        var scheduledWrite = RunInGrainContextAsync(context, () =>
+        {
+            var writeTask = bridge.WriteStateAsync();
+            pendingWrite.SetResult(writeTask);
+            Assert.True(releaseTurn.Wait(WaitTimeout));
+            return writeTask;
+        });
+
+        InvalidOperationException invalidOperation;
+        try
+        {
+            await pendingWrite.Task.WaitAsync(WaitTimeout);
+            invalidOperation = Assert.Throws<InvalidOperationException>(() => { _ = bridge.WriteStateAsync(); });
+        }
+        finally
+        {
+            releaseTurn.Set();
+            await scheduledWrite;
+        }
+
+        Assert.Contains("Activation access violation", invalidOperation.Message);
+        Assert.Equal(1, storage.WriteCallCount);
+    }
+
+    [Fact]
     public async Task WriteStateAsync_QueuedAfterWriteStarts_PerformsSecondWriteAfterFirstCompletesAsync()
     {
         using var context = TestGrainContext.Create();
@@ -181,7 +214,7 @@ public class StateStorageBridgeConcurrencyTests
     }
 
     [Fact]
-    public async Task ReadStateAsync_SatisfiedByWrite_EnforcesRuntimeContextAsync()
+    public async Task ReadStateAsync_OutsideRuntimeContextWhileWritePending_ThrowsAsync()
     {
         using var context = TestGrainContext.Create();
         var storage = new ControllableGrainStorage();
@@ -191,12 +224,11 @@ public class StateStorageBridgeConcurrencyTests
 
         var writeTask = RunInGrainContextAsync(context, () => bridge.WriteStateAsync());
         await WaitUntilAsync(() => storage.WriteCallCount == 1);
-        var readTask = bridge.ReadStateAsync();
+        var exception = Assert.Throws<InvalidOperationException>(() => { _ = bridge.ReadStateAsync(); });
 
         writeCompletion.SetResult();
         await writeTask;
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => readTask);
         Assert.Contains("Activation access violation", exception.Message);
     }
 
@@ -310,6 +342,39 @@ public class StateStorageBridgeConcurrencyTests
     }
 
     [Fact]
+    public async Task ClearStateAsync_CoalescingFromOutsideRuntimeContext_ThrowsAsync()
+    {
+        using var context = TestGrainContext.Create();
+        var storage = new ControllableGrainStorage();
+        var bridge = CreateBridge(context, storage);
+        var pendingClear = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var releaseTurn = new ManualResetEventSlim();
+
+        var scheduledClear = RunInGrainContextAsync(context, () =>
+        {
+            var clearTask = bridge.ClearStateAsync();
+            pendingClear.SetResult(clearTask);
+            Assert.True(releaseTurn.Wait(WaitTimeout));
+            return clearTask;
+        });
+
+        InvalidOperationException invalidOperation;
+        try
+        {
+            await pendingClear.Task.WaitAsync(WaitTimeout);
+            invalidOperation = Assert.Throws<InvalidOperationException>(() => { _ = bridge.ClearStateAsync(); });
+        }
+        finally
+        {
+            releaseTurn.Set();
+            await scheduledClear;
+        }
+
+        Assert.Contains("Activation access violation", invalidOperation.Message);
+        Assert.Equal(1, storage.ClearCallCount);
+    }
+
+    [Fact]
     public async Task ClearStateAsync_AfterSuccessfulClear_WaitsForClearAndDoesNotClearAgainAsync()
     {
         using var context = TestGrainContext.Create();
@@ -395,7 +460,7 @@ public class StateStorageBridgeConcurrencyTests
     }
 
     [Fact]
-    public async Task ClearStateAsync_SatisfiedByClear_EnforcesRuntimeContextAsync()
+    public async Task ClearStateAsync_OutsideRuntimeContextWhileClearPending_ThrowsAsync()
     {
         using var context = TestGrainContext.Create();
         var storage = new ControllableGrainStorage();
@@ -405,12 +470,11 @@ public class StateStorageBridgeConcurrencyTests
 
         var firstClear = RunInGrainContextAsync(context, () => bridge.ClearStateAsync());
         await WaitUntilAsync(() => storage.ClearCallCount == 1);
-        var secondClear = bridge.ClearStateAsync();
+        var exception = Assert.Throws<InvalidOperationException>(() => { _ = bridge.ClearStateAsync(); });
 
         clearCompletion.SetResult();
         await firstClear;
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => secondClear);
         Assert.Contains("Activation access violation", exception.Message);
     }
 

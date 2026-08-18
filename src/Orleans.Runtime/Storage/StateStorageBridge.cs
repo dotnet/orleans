@@ -100,6 +100,7 @@ namespace Orleans.Core
 
         private Task ReadStateInternalAsync(CancellationToken cancellationToken)
         {
+            GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
             QueuedStorageOperation operation;
 
             lock (_storageOperationLock)
@@ -115,6 +116,7 @@ namespace Orleans.Core
 
         private Task WriteStateInternalAsync(CancellationToken cancellationToken)
         {
+            GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
             QueuedStorageOperation operation;
 
             lock (_storageOperationLock)
@@ -138,6 +140,7 @@ namespace Orleans.Core
 
         private Task ClearStateInternalAsync(CancellationToken cancellationToken)
         {
+            GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
             QueuedStorageOperation operation;
 
             lock (_storageOperationLock)
