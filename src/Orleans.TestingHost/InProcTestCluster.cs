@@ -37,6 +37,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     private readonly List<InProcessSiloHandle> _silos = [];
     private readonly StringBuilder _log = new();
     private readonly InMemoryTransportConnectionHub _transportHub = new();
+    private readonly GrainDirectoryObserver _grainDirectoryObserver = new();
     private readonly InProcessGrainDirectory _grainDirectory;
     private readonly InProcessMembershipTable _membershipTable;
     private bool _disposed;
@@ -268,10 +269,24 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     public async Task WaitForLivenessToStabilizeAsync(bool didKill = false)
     {
         var clusterMembershipOptions = Client.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
-        TimeSpan stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
-        WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
-        await Task.Delay(stabilizationTime);
-        WriteLog("WaitForLivenessToStabilize is done sleeping");
+        var stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
+        var activeSilos = GetActiveSilos().ToArray();
+        var testHooks = activeSilos.Select(static silo => (ITestHooks)silo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>()).ToArray();
+        var gatewayManager = Client.ServiceProvider.GetRequiredService<GatewayManager>();
+        Func<TimeSpan, Task<bool>>? waitForGrainDirectoryConvergence =
+            GrainDirectoryObserver.CanObserve(activeSilos)
+                ? timeout => _grainDirectoryObserver.WaitForConvergenceAsync(activeSilos, timeout)
+                : null;
+
+        if (!await LivenessStabilizationHelper.WaitForExpectedActiveSilosAndGatewaysAsync(
+                activeSilos,
+                testHooks,
+                gatewayManager,
+                stabilizationTime,
+                waitForGrainDirectoryConvergence))
+        {
+            WriteLog("WaitForLivenessToStabilize reached the fallback wait of {0}", stabilizationTime);
+        }
     }
 
     /// <summary>
@@ -324,7 +339,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         if (didKill)
         {
             // in case of hard kill (kill and not Stop), we should give silos time to detect failures first.
-            stabilizationTime = TestingUtils.Multiply(clusterMembershipOptions.ProbeTimeout, clusterMembershipOptions.NumMissedProbesLimit);
+            stabilizationTime = TestingUtils.Multiply(clusterMembershipOptions.MaxProbeTimeout, clusterMembershipOptions.NumMissedProbesLimit);
         }
         if (clusterMembershipOptions.UseLivenessGossip)
         {
@@ -588,7 +603,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         await ClientHost.StartAsync();
     }
 
-    private IHost CreateClientHost(string name)
+    private IHost CreateClientHost(string name, Action<IHostApplicationBuilder>? configure = null)
     {
         var hostBuilder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
         {
@@ -601,6 +616,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         {
             hostDelegate(hostBuilder);
         }
+        configure?.Invoke(hostBuilder);
 
         hostBuilder.UseOrleansClient(clientBuilder =>
         {
@@ -644,7 +660,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     {
         if (!_clientHosts.TryGetValue(name, out var host))
         {
-            host = CreateClientHost(name);
+            host = CreateClientHost(name, configure);
             _clientHosts[name] = host;
             await host.StartAsync();
         }
@@ -734,7 +750,19 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                 if (Options.UseTestClusterMembership)
                 {
                     services.AddSingleton<IMembershipTable>(_membershipTable);
-                    siloBuilder.AddGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (_, _) => _grainDirectory);
+#pragma warning disable ORLEANSEXP003
+                    if (!Options.UseDistributedGrainDirectory && Options.UseTestClusterGrainDirectory)
+#pragma warning restore ORLEANSEXP003
+                    {
+                        siloBuilder.AddGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (_, _) => _grainDirectory);
+                    }
+                }
+
+#pragma warning disable ORLEANSEXP003
+                if (Options.UseDistributedGrainDirectory)
+#pragma warning restore ORLEANSEXP003
+                {
+                    new ConfigureDistributedGrainDirectory().Configure(siloBuilder);
                 }
 
                 siloBuilder.UseInMemoryConnectionTransport(_transportHub);
@@ -874,9 +902,6 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                 await DisposeAsync(handle).ConfigureAwait(false);
             }
 
-            await DisposeAsync(ClientHost).ConfigureAwait(false);
-            ClientHost = null;
-
             foreach (var clientHost in _clientHosts.Values)
             {
                 await DisposeAsync(clientHost).ConfigureAwait(false);
@@ -884,6 +909,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             _clientHosts.Clear();
 
             PortAllocator?.Dispose();
+            _grainDirectoryObserver.Dispose();
         });
 
         _disposed = true;
@@ -902,8 +928,6 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             handle.Dispose();
         }
 
-        ClientHost?.Dispose();
-
         foreach (var clientHost in _clientHosts.Values)
         {
             clientHost.Dispose();
@@ -911,6 +935,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         _clientHosts.Clear();
 
         PortAllocator?.Dispose();
+        _grainDirectoryObserver.Dispose();
 
         _disposed = true;
     }
