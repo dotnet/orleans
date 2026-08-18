@@ -841,6 +841,10 @@ namespace Orleans.Streams
                 var deliveredAny = false;
                 while (!IsShutdown && consumerData.Cursor is not null)
                 {
+                    var batchCursor = options.BatchContainerBatchSize > 1
+                        ? consumerData.Cursor as IQueueCacheCursorBatchDelivery
+                        : null;
+                    using var deliveryBatch = batchCursor?.ProtectDeliveryBatch();
                     ConsumerBatch nextBatch = default;
                     Exception? exceptionOccured = null;
                     try
@@ -927,7 +931,15 @@ namespace Orleans.Streams
                     }
                     catch (Exception exc)
                     {
-                        consumerData.Cursor?.RecordDeliveryFailure();
+                        if (batchCursor is not null && nextBatch.Batch is not null)
+                        {
+                            batchCursor.RecordDeliveryFailure(nextBatch.Batch);
+                        }
+                        else
+                        {
+                            consumerData.Cursor?.RecordDeliveryFailure();
+                        }
+
                         LogErrorDeliveringMessages(consumerData.StreamId, exc);
 
                         exceptionOccured = exc is ClientNotAvailableException
