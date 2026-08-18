@@ -94,7 +94,7 @@ internal sealed class WorkItemGroupWaiter(WorkItemGroup workItemGroup) : IValueT
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Signal()
     {
-        if ((_status & SignaledFlag) == SignaledFlag)
+        if ((Volatile.Read(ref _status) & SignaledFlag) == SignaledFlag)
         {
             // The event is already signaled.
             return;
