@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
@@ -61,6 +62,36 @@ namespace UnitTests.MembershipTests
             await Assert.ThrowsAsync<SiloUnavailableException>(() => promise);
         }
 
+        [Fact, TestCategory("Functional"), TestCategory("Liveness")]
+        public async Task SiloUngracefulShutdown_GatewayForwardedClientRequestBreaks()
+        {
+            Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>().SetResponseTimeout(TimeSpan.FromMinutes(1));
+            var target = await GetGrainOnTargetSilo(HostedCluster.SecondarySilos[0]);
+            Assert.NotNull(target);
+
+            var observer = new LongRunningTaskObserver();
+            var observerReference = GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
+            try
+            {
+                var callId = Guid.NewGuid();
+                var promise = target.LongWaitWithStartNotification(
+                    TimeSpan.FromMinutes(1),
+                    callId,
+                    observerReference,
+                    CancellationToken.None);
+
+                await observer.WaitForCallToStart(callId);
+                await HostedCluster.KillSiloAsync(HostedCluster.SecondarySilos[0]);
+
+                await Assert.ThrowsAsync<SiloUnavailableException>(
+                    () => promise.WaitAsync(TimeSpan.FromSeconds(20)));
+            }
+            finally
+            {
+                GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+            }
+        }
+
         private async Task<ILongRunningTaskGrain<bool>?> GetGrainOnTargetSilo(SiloHandle siloHandle)
         {
             const int maxRetry = 10;
@@ -74,6 +105,19 @@ namespace UnitTests.MembershipTests
                 await Task.Delay(100);
             }
             return null;
+        }
+
+        private sealed class LongRunningTaskObserver : ILongRunningTaskObserver
+        {
+            private readonly TaskCompletionSource<Guid> _startedCall = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public void OnCallStarted(Guid callId) => _startedCall.TrySetResult(callId);
+
+            public async Task WaitForCallToStart(Guid callId)
+            {
+                var startedCallId = await _startedCall.Task.WaitAsync(TimeSpan.FromSeconds(30));
+                Assert.Equal(callId, startedCallId);
+            }
         }
     }
 }

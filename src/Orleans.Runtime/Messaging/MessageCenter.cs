@@ -186,6 +186,8 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
+                var isGatewayClientRequest = Gateway?.TrackRequest(msg) is true;
+
                 // First check to see if it's really destined for a proxied client, instead of a local grain.
                 if (TryDeliverToProxy(msg))
                 {
@@ -212,7 +214,12 @@ namespace Orleans.Runtime.Messaging
                 }
                 else
                 {
-                    if (this.connectionManager.TryGetConnection(targetSilo, out var existingConnection))
+                    if (isGatewayClientRequest && this.siloStatusOracle.IsDeadSilo(targetSilo))
+                    {
+                        this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
+                        this.SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead", new SiloUnavailableException());
+                    }
+                    else if (this.connectionManager.TryGetConnection(targetSilo, out var existingConnection))
                     {
                         existingConnection.Send(msg);
                         return;
