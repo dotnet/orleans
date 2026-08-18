@@ -677,6 +677,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     public async ValueTask DeleteStateAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        _shutdownCancellation.Token.ThrowIfCancellationRequested();
 
         Task task;
         bool didEnqueue;
