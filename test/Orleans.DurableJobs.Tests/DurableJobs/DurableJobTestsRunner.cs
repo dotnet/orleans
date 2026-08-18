@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.DurableJobs;
+using Orleans.TestingHost.Utils;
 using Xunit;
 using UnitTests.GrainInterfaces;
 
@@ -217,8 +218,42 @@ public class DurableJobTestsRunner
         Assert.Equal(jobCount, jobs.Length);
         Assert.Equal(jobCount, jobs.Select(j => j.Id).Distinct().Count());
 
-        var waitTasks = jobs.Select(j => grain.WaitForJobToRun(j.Id));
-        await Task.WhenAll(waitTasks).WaitAsync(cancellationToken);
+        // Avoid holding grain calls open until the client response timeout while the provider is under load.
+        var pendingJobs = jobs.ToDictionary(job => job.Id);
+        await TestingUtils.WaitUntilAsync(
+            async (lastTry, token) =>
+            {
+                var jobResults = await Task.WhenAll(
+                    pendingJobs.Values.Select(
+                        async job => (Job: job, HasRun: await grain.HasJobRan(job.Id).WaitAsync(token))));
+
+                foreach (var (job, hasRun) in jobResults)
+                {
+                    if (hasRun)
+                    {
+                        pendingJobs.Remove(job.Id);
+                    }
+                }
+
+                if (pendingJobs.Count == 0)
+                {
+                    return true;
+                }
+
+                if (lastTry)
+                {
+                    var pendingJobDetails = string.Join(
+                        ", ",
+                        pendingJobs.Values
+                            .OrderBy(job => job.Name)
+                            .Select(job => $"{job.Name} ({job.Id})"));
+                    Assert.Fail($"The following durable jobs did not run within the expected time: {pendingJobDetails}");
+                }
+
+                return false;
+            },
+            timeout: TimeSpan.FromMinutes(2),
+            cancellationToken: cancellationToken);
 
         foreach (var job in jobs)
         {
