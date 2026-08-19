@@ -1,7 +1,7 @@
 ---
 title: Develop Orleans grains
 description: Define grain contracts, implement grains, and call them in Orleans.
-ms.date: 08/11/2026
+ms.date: 08/19/2026
 ms.topic: article
 ---
 
@@ -77,6 +77,10 @@ Override the current lifecycle methods when a grain needs activation-scoped setu
 <xref:Orleans.Grain.OnActivateAsync*> accepts a <xref:System.Threading.CancellationToken>; there is no parameterless overload. Deactivation callbacks are best effort and don't run after process termination or some failures, so don't rely on them to persist critical state.
 
 See [Grain lifecycle](grain-lifecycle.md) for collection, lifecycle participation, and migration.
+
+## Test grain behavior
+
+Use ordinary unit tests for application logic, [OrleansTestKit](https://github.com/OrleansContrib/OrleansTestKit) for a single grain's decisions and interactions in a simulated activation context, and <xref:Orleans.TestingHost.InProcessTestCluster> when assertions depend on Orleans runtime behavior. [Test Orleans applications](testing.md) explains these boundaries and provides maintained, executable examples.
 
 ## Choose basic or advanced features
 
