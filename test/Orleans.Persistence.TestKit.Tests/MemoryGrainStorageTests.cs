@@ -12,7 +12,7 @@ namespace Orleans.Persistence.Memory.Tests;
 /// <summary>
 /// Example test fixture showing how to configure MemoryGrainStorage for testing.
 /// </summary>
-public class MemoryGrainStorageTestFixture : GrainStorageTestFixture
+public class MemoryGrainStorageTestFixture : GrainStorageTestFixture, IAsyncLifetime
 {
     protected override string StorageProviderName => "MemoryStore";
 
@@ -48,6 +48,18 @@ public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<Mem
     {
         _fixture = fixture;
     }
+
+    [Fact]
+    public async Task ProviderViolation_ThrowsFrameworkNeutralException()
+    {
+        var runner = new TestRunner(new InvalidGrainStorage());
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(runner.PersistenceStorage_WriteRead_StringKey);
+
+        Assert.StartsWith("Expected", exception.Message);
+    }
+
+    private sealed class TestRunner(IGrainStorage storage) : GrainStorageTestRunner(storage);
 
     [Fact]
     public override Task PersistenceStorage_WriteReadIdCyrillic()

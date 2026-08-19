@@ -1,6 +1,6 @@
 # Orleans.Persistence.TestKit
 
-A comprehensive testing kit for Orleans `IGrainStorage` providers. This package provides a reusable test suite that helps developers test their custom storage providers to ensure they conform to expected behavior.
+A comprehensive, framework-neutral testing kit for Orleans `IGrainStorage` providers. This package provides reusable asynchronous test methods which throw when a provider violates the expected behavior, so they can run under any .NET testing framework.
 
 ## Features
 
@@ -8,11 +8,11 @@ A comprehensive testing kit for Orleans `IGrainStorage` providers. This package 
 - **Concurrency Testing**: Validates correct behavior under concurrent operations
 - **ETag Consistency**: Ensures proper optimistic concurrency control
 - **Easy Integration**: Simple base classes for quick test setup
-- **xUnit Compatible**: Works seamlessly with xUnit testing framework
+- **Framework Neutral**: Integrates with xUnit, NUnit, MSTest, and other .NET testing frameworks
 
 ## Installation
 
-Add the test kit to an xUnit test project and use the same version as the other Microsoft Orleans packages in the project:
+Add the test kit to a test project and use the same version as the other Microsoft Orleans packages in the project:
 
 ```bash
 dotnet add package Microsoft.Orleans.Persistence.TestKit
@@ -20,15 +20,22 @@ dotnet add package Microsoft.Orleans.Persistence.TestKit
 
 ## Quick Start
 
-### Step 1: Create a Test Fixture
+The runner methods return `Task` and report conformance failures by throwing exceptions. Apply your framework's test attributes to overrides which call the corresponding base methods.
 
-Inherit from `GrainStorageTestFixture` and configure your storage provider:
+The fixture exposes `InitializeAsync()` and `DisposeAsync()` lifecycle methods. Connect them to the fixture lifecycle supported by your test framework.
+
+### xUnit Example
+
+#### Step 1: Create a Test Fixture
+
+Inherit from `GrainStorageTestFixture`, implement xUnit's `IAsyncLifetime`, and configure your storage provider:
 
 ```csharp
 using Orleans.Persistence.TestKit;
 using Orleans.Hosting;
+using Xunit;
 
-public class MyStorageTestFixture : GrainStorageTestFixture
+public class MyStorageTestFixture : GrainStorageTestFixture, IAsyncLifetime
 {
     protected override string StorageProviderName => "MyStorage";
 
@@ -43,7 +50,9 @@ public class MyStorageTestFixture : GrainStorageTestFixture
 }
 ```
 
-### Step 2: Create Test Class
+For NUnit, MSTest, and other frameworks, connect `InitializeAsync()` and `DisposeAsync()` to the corresponding setup and teardown hooks. The runner itself requires no framework adapter.
+
+#### Step 2: Create Test Class
 
 Inherit from `GrainStorageTestRunner` and implement your tests:
 
@@ -192,7 +201,7 @@ public class MyCustomStateTests : GrainStorageTestRunner, IClassFixture<MyStorag
 You can customize the test cluster configuration by overriding `ConfigureTestCluster`:
 
 ```csharp
-public class MyStorageTestFixture : GrainStorageTestFixture
+public class MyStorageTestFixture : GrainStorageTestFixture, IAsyncLifetime
 {
     protected override string StorageProviderName => "MyStorage";
 
@@ -214,7 +223,7 @@ The `GrainStorageTestRunner` class provides protected helper methods you can use
 
 - **`GetTestReferenceAndState(long grainId, string? version)`**: Creates a test grain ID and state with an integer key
 - **`GetTestReferenceAndState(string grainId, string? version)`**: Creates a test grain ID and state with a string key
-- **`Store_WriteRead<T>(string grainTypeName, GrainId grainId, GrainState<T> grainState)`**: Writes and reads state, asserting correctness
+- **`Store_WriteRead<T>(string grainTypeName, GrainId grainId, GrainState<T> grainState)`**: Writes and reads state, validating correctness
 - **`Store_WriteClearRead<T>(string grainTypeName, GrainId grainId, GrainState<T> grainState)`**: Writes, clears, and reads state
 
 ## Example: Testing Memory Storage
@@ -225,7 +234,7 @@ using Orleans.Hosting;
 using Xunit;
 
 // Fixture
-public class MemoryStorageTestFixture : GrainStorageTestFixture
+public class MemoryStorageTestFixture : GrainStorageTestFixture, IAsyncLifetime
 {
     protected override string StorageProviderName => "MemoryStore";
 
@@ -259,8 +268,8 @@ public class MemoryStorageTests : GrainStorageTestRunner, IClassFixture<MemorySt
 ## Requirements
 
 - .NET 8.0 or later
-- xUnit 2.0 or later
 - Orleans 10.0 or later
+- A .NET testing framework with asynchronous test support
 
 ## Contributing
 

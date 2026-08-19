@@ -3,8 +3,8 @@
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Microsoft.Orleans.Persistence.TestKit</PackageId>
-    <Title>Microsoft Orleans Persistence test kit for xUnit</Title>
-    <Description>Reusable xUnit test kit for validating custom Orleans IGrainStorage implementations</Description>
+    <Title>Microsoft Orleans Persistence test kit</Title>
+    <Description>Reusable test kit for validating custom Orleans IGrainStorage implementations</Description>
     <PackageTags>$(PackageTags) PersistenceTestKit</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
@@ -18,8 +18,6 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Accordant" />
-    <PackageReference Include="xunit.extensibility.core" />
-    <PackageReference Include="xunit.assert" />
   </ItemGroup>
 
   <ItemGroup>

@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Storage;
 using Orleans.TestingHost;
-using Xunit;
 
 namespace Orleans.Persistence.TestKit;
 
@@ -14,7 +13,7 @@ namespace Orleans.Persistence.TestKit;
 /// This fixture provides an in-process Orleans cluster for testing storage providers.
 /// Implement the abstract methods to configure your storage provider and retrieve it for testing.
 /// </remarks>
-public abstract class GrainStorageTestFixture : IAsyncLifetime
+public abstract class GrainStorageTestFixture
 {
     private ExceptionDispatchInfo? _preconditionException;
     private InProcessTestCluster? _cluster;
@@ -51,7 +50,7 @@ public abstract class GrainStorageTestFixture : IAsyncLifetime
     /// Checks preconditions before initializing the cluster.
     /// Override this to check for external dependencies (e.g., Azure Storage emulator).
     /// </summary>
-    /// <exception cref="Xunit.Sdk.SkipException">Thrown if preconditions are not met.</exception>
+    /// <exception cref="Exception">Thrown if preconditions are not met.</exception>
     protected virtual void CheckPreconditionsOrThrow()
     {
     }
@@ -86,7 +85,10 @@ public abstract class GrainStorageTestFixture : IAsyncLifetime
     {
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Initializes the test cluster and resolves the configured storage provider.
+    /// </summary>
+    /// <returns>A task which represents the asynchronous initialization operation.</returns>
     public virtual async Task InitializeAsync()
     {
         try
@@ -111,7 +113,10 @@ public abstract class GrainStorageTestFixture : IAsyncLifetime
         _storage = cluster.Silos[0].ServiceProvider.GetRequiredKeyedService<IGrainStorage>(StorageProviderName);
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Stops and disposes the test cluster.
+    /// </summary>
+    /// <returns>A task which represents the asynchronous disposal operation.</returns>
     public virtual async Task DisposeAsync()
     {
         if (_cluster is not { } cluster)

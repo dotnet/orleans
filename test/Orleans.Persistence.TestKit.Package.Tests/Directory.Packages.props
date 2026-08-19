@@ -1,8 +1,0 @@
-<Project>
-  <Import Project="..\..\Directory.Packages.props" />
-
-  <ItemGroup>
-    <PackageVersion Include="Microsoft.Orleans.Persistence.Memory" Version="$(OrleansPackageVersion)" />
-    <PackageVersion Include="Microsoft.Orleans.Persistence.TestKit" Version="$(OrleansPackageVersion)" />
-  </ItemGroup>
-</Project>
