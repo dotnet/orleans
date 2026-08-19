@@ -239,7 +239,8 @@ namespace Orleans.Providers.Streams.Common
 
             LinkedListNode<CachedMessageBlock> newestBlock = messageBlocks.First!; // messageBlocks.Count != 0 (checked above).
 
-            // if sequenceToken is null, iterate from newest message in cache
+            // A cursor which waited on an empty cache starts at the oldest message;
+            // otherwise, a null token starts at the newest message.
             if (sequenceToken == null)
             {
                 if (cursor.State == CursorStates.Idle)
