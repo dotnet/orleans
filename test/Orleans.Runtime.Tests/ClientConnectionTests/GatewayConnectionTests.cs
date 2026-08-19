@@ -12,6 +12,7 @@ using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Microsoft.Extensions.Hosting;
 using Orleans.Runtime.Messaging;
+using Orleans.TestingHost.Utils;
 
 namespace Tester
 {
@@ -122,10 +123,11 @@ namespace Tester
             var timeoutCount = 0;
 
             // The cluster-owned allocator reserves the port for the lifetime of the fixture.
-            var (_, port) = this.HostedCluster.PortAllocator.AllocateConsecutivePortPairs(1);
-            var endpoint = new IPEndPoint(IPAddress.Loopback, port);
+            var (_, gatewayPort) = this.HostedCluster.PortAllocator.AllocateConsecutivePortPairs(1);
+            var endpoint = new IPEndPoint(IPAddress.Loopback, gatewayPort);
             var evt = new SocketAsyncEventArgs();
             var gatewayManager = this.runtimeClient.ServiceProvider.GetService<TestGatewayManager>()!;
+            var clientGatewayManager = this.runtimeClient.ServiceProvider.GetRequiredService<GatewayManager>();
             evt.Completed += (sender, args) =>
             {
                 connectionCount++;
@@ -140,7 +142,11 @@ namespace Tester
 
                 // Add the fake gateway and wait for the client to refresh its gateway list.
                 gatewayManager.Gateways.Add(endpoint.ToGatewayUri());
-                await Task.Delay(200);
+                var gatewayAddress = endpoint.ToGatewayUri().ToGatewayAddress()!;
+                await TestingUtils.WaitUntilAsync(
+                    (_, _) => Task.FromResult(clientGatewayManager.IsGatewayAvailable(gatewayAddress)),
+                    TimeSpan.FromSeconds(3),
+                    TimeSpan.FromMilliseconds(20));
 
                 // Make a bunch of calls
                 for (var i = 0; i < 100; i++)
