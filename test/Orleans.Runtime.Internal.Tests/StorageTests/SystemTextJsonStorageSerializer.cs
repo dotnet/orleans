@@ -18,12 +18,17 @@ namespace UnitTests.StorageTests
 
     interface IAdditionalInterface : IGrainWithGuidKey
     {
-        public ValueTask<int> GetAlt() => ValueTask.FromResult(731131);
+        ValueTask<int> GetAlt();
     }
 
     class ReferenceTesterGrain : Grain, IReferenceTesterGrain, IAdditionalInterface
     {
         public ValueTask<Guid> GetId() => ValueTask.FromResult(this.GetPrimaryKey());
+        public ValueTask<int> GetAlt() => ValueTask.FromResult(731131);
+    }
+
+    interface ICustomAsyncStream : IAsyncStream<int>
+    {
     }
 
     public sealed class SystemTextJsonStorageSerializerTests : IDisposable
@@ -160,6 +165,11 @@ namespace UnitTests.StorageTests
             var stream = _testCluster.Silos.First().ServiceProvider.GetRequiredKeyedService<IStreamProvider>("test").GetStream<int>(StreamId.Create("Test_namespace", "Test_key"));
             Assert.Throws<JsonException>(() => _systemTextJson.Deserialize<IAsyncStream>(_systemTextJson.Serialize(stream)));
         }
+
+        [Fact]
+        public void AsyncStreamReferenceConverterDoesNotClaimCustomInterfaces()
+            => Assert.Throws<JsonException>(() => _systemTextJson.Deserialize<ICustomAsyncStream>(
+                BinaryData.FromString("""["test",["Test_namespace","Test_key"]]""")));
 
         [Fact]
         public void SiloAddressJsonConverter()

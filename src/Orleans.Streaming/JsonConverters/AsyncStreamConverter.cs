@@ -16,7 +16,9 @@ namespace Orleans.Streaming.JsonConverters
     {
         private readonly Type _asyncStreamType = typeof(IAsyncStream);
 
-        public override bool CanConvert(Type typeToConvert) => _asyncStreamType.IsAssignableFrom(typeToConvert);
+        public override bool CanConvert(Type typeToConvert)
+            => typeToConvert == _asyncStreamType
+                || typeToConvert.IsGenericType && typeToConvert.GetGenericTypeDefinition() == typeof(IAsyncStream<>);
 
         public override IAsyncStream? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
