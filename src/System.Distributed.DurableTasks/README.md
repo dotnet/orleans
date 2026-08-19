@@ -22,12 +22,14 @@ cancellation. Task definitions and application code depend only on this package.
 - A wait cancellation token abandons that scheduling, polling, or wait operation. It does
   not request durable task cancellation.
 - `CancelAsync` requests durable cancellation. The request is monotonic and idempotent, and
-  hosts retain it with task state.
+  hosts retain it with task state. The durable token enters the canceled state before cancellation
+  is published to durable callbacks, including callbacks registered concurrently with the request.
 - Callbacks registered through `RegisterCancellationCallbackAsync` execute with their durable
   context ambient. Callbacks registered directly on `CancellationToken` follow standard .NET
   registration `ExecutionContext` capture semantics instead.
 - Disposing a durable cancellation registration prevents a snapshotted callback which has not
-  started, or waits for an active callback to finish, including when that callback fails.
+  started, or waits for an active callback to finish, including when that callback fails. A callback
+  can dispose its own registration without blocking.
 - Delays use `DurableExecutionContext.UtcNow`, supplied by the host, so replay observes the
   same logical time.
 
@@ -45,6 +47,10 @@ replay when the input order is stable. Their durable results contain task IDs ra
 runtime handles. `WhenAny` asks the host to persist its selected winner under a deterministic
 decision ID, then leaves all other scheduled tasks running. A host can obtain a handle for a
 returned ID when cancellation or further observation is required.
+
+`ScheduledTask.WhenAny` returns the first task whose durable response arrives, including a
+failed or canceled response. Caller cancellation and host wait failures are propagated. After
+selection, it cancels and drains the losing wait operations without canceling the durable tasks.
 
 ## Host responsibilities
 
