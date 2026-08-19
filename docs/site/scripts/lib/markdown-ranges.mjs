@@ -371,10 +371,10 @@ export function markdownLiteralLineRanges(source) {
     : fallbackProtectedLineRanges(source);
 }
 
-export function markdownCodeOffsetRanges(source) {
-  return fromMarkdown
+export function markdownCodeOffsetRanges(source, options = {}) {
+  return fromMarkdown && !options.dependencyFree
     ? markdownAstOffsetRanges(source, new Set(['code', 'inlineCode']))
-    : [];
+    : undefined;
 }
 
 export function lineOverlapsRanges(line, ranges) {
