@@ -8,7 +8,7 @@ using static System.String;
 
 namespace Benchmarks.AdoNet.Streaming;
 
-public class SqlServerRetainedLogReadCheckpointBenchmark() : RetainedLogReadCheckpointBenchmark(AdoNetInvariants.InvariantNameSqlServer, "OrleansStreamTest")
+public class SqlServerStreamPartitionReadCheckpointBenchmark() : StreamPartitionReadCheckpointBenchmark(AdoNetInvariants.InvariantNameSqlServer, "OrleansStreamTest")
 {
     public override void GlobalSetup()
     {
@@ -21,7 +21,7 @@ public class SqlServerRetainedLogReadCheckpointBenchmark() : RetainedLogReadChec
 /// Measures exclusive ordered reads and epoch-fenced checkpoint updates across partitions.
 /// </summary>
 [WarmupCount(1), IterationCount(3), InvocationCount(1), MarkdownExporter]
-public abstract class RetainedLogReadCheckpointBenchmark(string invariant, string database)
+public abstract class StreamPartitionReadCheckpointBenchmark(string invariant, string database)
 {
     private const int OperationsPerInvoke = 1_000;
 
@@ -126,7 +126,7 @@ public abstract class RetainedLogReadCheckpointBenchmark(string invariant, strin
     }
 }
 
-public class SqlServerRetainedLogCleanupBenchmark() : RetainedLogCleanupBenchmark(AdoNetInvariants.InvariantNameSqlServer, "OrleansStreamTest")
+public class SqlServerStreamPartitionCleanupBenchmark() : StreamPartitionCleanupBenchmark(AdoNetInvariants.InvariantNameSqlServer, "OrleansStreamTest")
 {
     public override void GlobalSetup()
     {
@@ -139,7 +139,7 @@ public class SqlServerRetainedLogCleanupBenchmark() : RetainedLogCleanupBenchmar
 /// Measures bounded cleanup sweeps while varying partition count, batch size, and eligible-row density.
 /// </summary>
 [WarmupCount(1), IterationCount(3), InvocationCount(1), MarkdownExporter]
-public abstract class RetainedLogCleanupBenchmark(string invariant, string database)
+public abstract class StreamPartitionCleanupBenchmark(string invariant, string database)
 {
     private const int MessagesPerPartition = 1_000;
 
@@ -241,7 +241,7 @@ public abstract class RetainedLogCleanupBenchmark(string invariant, string datab
 
     [Benchmark]
     [BenchmarkCategory("Cleanup", "CleanupImpact")]
-    public async Task CleanupRetainedPartitions()
+    public async Task CleanupStreamPartitions()
     {
         var results = await Task.WhenAll(_partitionIds.Select(partitionId =>
             _queries.CleanupStreamMessagesAsync(
