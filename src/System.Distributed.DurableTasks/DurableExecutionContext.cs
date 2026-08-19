@@ -47,9 +47,16 @@ public abstract class DurableExecutionContext
     }
 
     /// <summary>
-    /// Gets the durable cancellation token for this execution. Callbacks registered directly on this
-    /// token follow the standard .NET registration execution-context semantics.
+    /// Gets the durable cancellation token for this execution.
     /// </summary>
+    /// <remarks>
+    /// Registrations on this token are ordinary synchronous .NET cancellation observers. They run
+    /// under the execution context captured when they are registered and, when requested by the
+    /// registration overload, its synchronization context. They must return promptly and must not
+    /// synchronously wait for <see cref="DurableTaskRuntimeHelper.RequestCancellationAsync"/> or
+    /// another durable cancellation operation. Use <see cref="RegisterCancellationCallbackAsync"/>
+    /// for asynchronous callbacks, durable cancellation dependencies, and failure aggregation.
+    /// </remarks>
     public CancellationToken CancellationToken => _cancellationSource.Token;
 
     /// <summary>Schedules or reattaches to a child definition under an exact identifier.</summary>
@@ -102,11 +109,22 @@ public abstract class DurableExecutionContext
         => TaskId.Child($"${kind}-{Interlocked.Increment(ref _nextOperationId).ToString(CultureInfo.InvariantCulture)}");
 
     /// <summary>
-    /// Registers a callback which observes the durable cancellation request and executes with this
-    /// durable context as <see cref="Current"/>. Disposing the returned registration prevents an
-    /// invocation which has not started, or asynchronously waits for an active invocation to finish.
-    /// A callback can dispose its own registration without blocking.
+    /// Registers an asynchronous callback which observes the durable cancellation request.
     /// </summary>
+    /// <remarks>
+    /// The callback executes with this durable context as <see cref="Current"/> and participates in
+    /// durable cancellation dependency tracking and failure aggregation. Its cancellation operation
+    /// flows with <see cref="ExecutionContext"/> across ordinary awaits and safe thread-pool dispatch,
+    /// including <see cref="Task.Run(Action)"/>. Suppressing execution-context flow or using an unsafe
+    /// dispatch API detaches that work, so cancellation requests made by it are external observers
+    /// rather than durable dependencies.
+    ///
+    /// <para>
+    /// Disposing the returned registration prevents an invocation which has not started, or
+    /// asynchronously waits for an active invocation to finish. A callback can dispose its own
+    /// registration without blocking.
+    /// </para>
+    /// </remarks>
     public async ValueTask<IAsyncDisposable> RegisterCancellationCallbackAsync(
         Func<CancellationToken, ValueTask> callback,
         CancellationToken cancellationToken = default)
@@ -161,23 +179,20 @@ public abstract class DurableExecutionContext
         List<Exception>? exceptions = null;
         using (operation.Enter())
         {
-            using (Enter(this))
+            try
             {
-                try
+                using (operation.Detach())
                 {
-                    using (operation.EnterCancellationCallbacks())
-                    {
-                        _cancellationSource.Cancel();
-                    }
+                    _cancellationSource.Cancel();
                 }
-                catch (AggregateException exception)
-                {
-                    (exceptions ??= []).AddRange(exception.InnerExceptions);
-                }
-                catch (Exception exception)
-                {
-                    (exceptions ??= []).Add(exception);
-                }
+            }
+            catch (AggregateException exception)
+            {
+                (exceptions ??= []).AddRange(exception.InnerExceptions);
+            }
+            catch (Exception exception)
+            {
+                (exceptions ??= []).Add(exception);
             }
 
             List<CancellationRegistration> callbacks;
@@ -240,17 +255,13 @@ public abstract class DurableExecutionContext
     {
         private static readonly object GraphLock = new();
         private static readonly AsyncLocal<CancellationOperation?> AmbientOperation = new();
-        // CTS callbacks run synchronously but under their captured execution context, which can hide AmbientOperation.
-        [ThreadStatic]
-        private static CancellationOperation? _cancellationCallbackOperation;
         private readonly TaskCompletionSource _completion =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
         private HashSet<CancellationOperation>? _dependencies;
         private bool _graphCompleted;
         private int _started;
 
-        public static CancellationOperation? Current
-            => _cancellationCallbackOperation ?? AmbientOperation.Value;
+        public static CancellationOperation? Current => AmbientOperation.Value;
 
         public Task Task => _completion.Task;
 
@@ -295,10 +306,10 @@ public abstract class DurableExecutionContext
             return new(previous);
         }
 
-        public CancellationCallbackScope EnterCancellationCallbacks()
+        public OperationScope Detach()
         {
-            var previous = _cancellationCallbackOperation;
-            _cancellationCallbackOperation = this;
+            var previous = AmbientOperation.Value;
+            AmbientOperation.Value = null;
             return new(previous);
         }
 
@@ -357,11 +368,6 @@ public abstract class DurableExecutionContext
         public readonly struct OperationScope(CancellationOperation? previous) : IDisposable
         {
             public void Dispose() => AmbientOperation.Value = previous;
-        }
-
-        public readonly struct CancellationCallbackScope(CancellationOperation? previous) : IDisposable
-        {
-            public void Dispose() => _cancellationCallbackOperation = previous;
         }
     }
 
