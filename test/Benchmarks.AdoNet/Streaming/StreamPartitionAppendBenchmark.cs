@@ -7,7 +7,7 @@ using static System.String;
 
 namespace Benchmarks.AdoNet.Streaming;
 
-public class SqlServerRetainedLogAppendBenchmark() : RetainedLogAppendBenchmark(AdoNetInvariants.InvariantNameSqlServer, "OrleansStreamTest")
+public class SqlServerStreamPartitionAppendBenchmark() : StreamPartitionAppendBenchmark(AdoNetInvariants.InvariantNameSqlServer, "OrleansStreamTest")
 {
     public override void GlobalSetup()
     {
@@ -17,11 +17,11 @@ public class SqlServerRetainedLogAppendBenchmark() : RetainedLogAppendBenchmark(
 }
 
 /// <summary>
-/// Measures immutable log append throughput while varying payload size, concurrency, and partition contention.
+/// Measures stream partition append throughput while varying payload size, concurrency, and partition contention.
 /// A partition count of one is the lock-wait baseline for database-side wait telemetry.
 /// </summary>
 [WarmupCount(1), IterationCount(3), InvocationCount(1), MarkdownExporter]
-public abstract class RetainedLogAppendBenchmark(string invariant, string database)
+public abstract class StreamPartitionAppendBenchmark(string invariant, string database)
 {
     private const int OperationsPerInvoke = 1_000;
 

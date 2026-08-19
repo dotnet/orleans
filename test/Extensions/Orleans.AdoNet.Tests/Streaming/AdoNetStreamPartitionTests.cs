@@ -13,12 +13,12 @@ using static System.String;
 namespace Tester.AdoNet.Streaming;
 
 /// <summary>
-/// Tests the immutable partition-log storage layer via <see cref="RelationalOrleansQueries"/> against Sql Server.
+/// Tests the stream partition storage layer via <see cref="RelationalOrleansQueries"/> against Sql Server.
 /// </summary>
 [TestCategory("SqlServer"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
 [TestProvider("SqlServer")]
 [TestSuite("Functional")]
-public class SqlServerAdoNetStreamPartitionLogTests() : AdoNetStreamPartitionLogTests(AdoNetInvariants.InvariantNameSqlServer)
+public class SqlServerAdoNetStreamPartitionTests() : AdoNetStreamPartitionTests(AdoNetInvariants.InvariantNameSqlServer)
 {
     /// <summary>
     /// Concurrent appends to the same partition must be serialized by the partition-row lock, and a
@@ -41,14 +41,14 @@ public class SqlServerAdoNetStreamPartitionLogTests() : AdoNetStreamPartitionLog
 }
 
 /// <summary>
-/// Tests the immutable partition-log storage layer via <see cref="RelationalOrleansQueries"/> against MySQL.
+/// Tests the stream partition storage layer via <see cref="RelationalOrleansQueries"/> against MySQL.
 /// </summary>
 [TestCategory("MySql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
 [TestProvider("MySql")]
 [TestSuite("Functional")]
-public class MySqlAdoNetStreamPartitionLogTests : AdoNetStreamPartitionLogTests
+public class MySqlAdoNetStreamPartitionTests : AdoNetStreamPartitionTests
 {
-    public MySqlAdoNetStreamPartitionLogTests() : base(AdoNetInvariants.InvariantNameMySql)
+    public MySqlAdoNetStreamPartitionTests() : base(AdoNetInvariants.InvariantNameMySql)
     {
         MySqlConnection.ClearAllPools();
     }
@@ -58,14 +58,14 @@ public class MySqlAdoNetStreamPartitionLogTests : AdoNetStreamPartitionLogTests
 }
 
 /// <summary>
-/// Tests the immutable partition-log storage layer via <see cref="RelationalOrleansQueries"/> against PostgreSQL.
+/// Tests the stream partition storage layer via <see cref="RelationalOrleansQueries"/> against PostgreSQL.
 /// </summary>
 [TestCategory("PostgreSql"), TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("Streaming")]
 [TestProvider("PostgreSql")]
 [TestSuite("Functional")]
-public class PostgreSqlAdoNetStreamPartitionLogTests : AdoNetStreamPartitionLogTests
+public class PostgreSqlAdoNetStreamPartitionTests : AdoNetStreamPartitionTests
 {
-    public PostgreSqlAdoNetStreamPartitionLogTests() : base(AdoNetInvariants.InvariantNamePostgreSql)
+    public PostgreSqlAdoNetStreamPartitionTests() : base(AdoNetInvariants.InvariantNamePostgreSql)
     {
         NpgsqlConnection.ClearAllPools();
     }
@@ -75,7 +75,7 @@ public class PostgreSqlAdoNetStreamPartitionLogTests : AdoNetStreamPartitionLogT
 }
 
 /// <summary>
-/// Tests the immutable partition-log storage layer via <see cref="RelationalOrleansQueries"/>: transactional
+/// Tests the stream partition storage layer via <see cref="RelationalOrleansQueries"/>: transactional
 /// append with rollback-safe allocation, exclusive ordered reads, epoch-fenced monotonic checkpoints,
 /// bounded retention/cleanup with hard-ceiling diagnostics, partition independence, and explicit schema
 /// version/query-key enforcement.
@@ -83,7 +83,7 @@ public class PostgreSqlAdoNetStreamPartitionLogTests : AdoNetStreamPartitionLogT
 [TestCategory("AdoNet"), TestCategory("Streaming")]
 [TestSuite("Functional")]
 [TestArea("Streaming")]
-public abstract class AdoNetStreamPartitionLogTests(string invariant) : IAsyncLifetime
+public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifetime
 {
     private const string TestDatabaseName = "OrleansStreamTest";
 
@@ -745,11 +745,11 @@ public abstract class AdoNetStreamPartitionLogTests(string invariant) : IAsyncLi
     #region Explicit schema mismatch
 
     /// <summary>
-    /// An old or partially-migrated schema that is missing partition-log query keys must fail
+    /// An old or partially-migrated schema that is missing stream partition query keys must fail
     /// explicitly and name the missing keys, rather than fail lazily or silently on first use.
     /// </summary>
     [SkippableFact]
-    public async Task CreateInstance_MissingPartitionLogQueryKeys_FailsExplicitly()
+    public async Task CreateInstance_MissingStreamPartitionQueryKeys_FailsExplicitly()
     {
         await _storage.ExecuteAsync(
             "DELETE FROM OrleansQuery WHERE QueryKey IN ('AppendStreamMessageKey', 'StreamSchemaVersionKey')",
@@ -763,7 +763,7 @@ public abstract class AdoNetStreamPartitionLogTests(string invariant) : IAsyncLi
     }
 
     [SkippableFact]
-    public async Task CreateInstance_MixedLegacyAndPartitionLogQueryKeys_FailsExplicitly()
+    public async Task CreateInstance_MixedLegacyAndStreamPartitionQueryKeys_FailsExplicitly()
     {
         await _storage.ExecuteAsync(
             "INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES ('QueueStreamMessageKey', 'legacy')",

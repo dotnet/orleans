@@ -1,7 +1,7 @@
 namespace Orleans.Streaming.AdoNet;
 
 /// <summary>
-/// Logs subscriber failures without mutating the shared retained log.
+/// Logs subscriber failures while preserving shared partition records.
 /// </summary>
 internal partial class AdoNetStreamFailureHandler : IStreamFailureHandler
 {
@@ -50,7 +50,7 @@ internal partial class AdoNetStreamFailureHandler : IStreamFailureHandler
 
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "ADO.NET stream delivery failed for subscription {SubscriptionId} on provider {ProviderName}, stream {StreamId}, at {SequenceToken}. The retained source record was not modified.")]
+        Message = "ADO.NET stream delivery failed for subscription {SubscriptionId} on provider {ProviderName}, stream {StreamId}, at {SequenceToken}. The partition record remains available.")]
     private static partial void LogDeliveryFailure(
         ILogger logger,
         GuidId subscriptionId,
@@ -60,7 +60,7 @@ internal partial class AdoNetStreamFailureHandler : IStreamFailureHandler
 
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "ADO.NET stream subscription {SubscriptionId} failed on provider {ProviderName}, stream {StreamId}, at {SequenceToken}. The retained source record was not modified.")]
+        Message = "ADO.NET stream subscription {SubscriptionId} failed on provider {ProviderName}, stream {StreamId}, at {SequenceToken}. The partition record remains available.")]
     private static partial void LogSubscriptionFailure(
         ILogger logger,
         GuidId subscriptionId,

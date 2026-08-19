@@ -1,7 +1,7 @@
 namespace Orleans.Streaming.AdoNet;
 
 /// <summary>
-/// Describes one bounded retained-log cleanup operation.
+/// Describes one bounded stream partition retention cleanup operation.
 /// </summary>
 internal record AdoNetStreamCleanupResult(
     bool Ran,
