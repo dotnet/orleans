@@ -166,25 +166,36 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         using var cts = new CancellationTokenSource(CHURN_ENDWAIT);
-
-        await Test_Reminders_MultiGrainMultiReminders(
-            async cancellationToken =>
-            {
-                await using (await PauseReminderTimeAsync(cancellationToken))
+        InProcessSiloHandle? additionalSilo = null;
+        try
+        {
+            await Test_Reminders_MultiGrainMultiReminders(
+                async cancellationToken =>
                 {
-                    log.LogInformation("Starting another silo");
-                    await this.StartAdditionalSilosAndWaitForReminderServicesAsync(
-                        1,
-                        cancellationToken,
-                        startAdditionalSiloOnNewPort: true);
-                }
-            },
-            cts.Token,
-            g1,
-            g2,
-            g3,
-            g4,
-            g5);
+                    await using (await PauseReminderTimeAsync(cancellationToken))
+                    {
+                        log.LogInformation("Starting another silo");
+                        additionalSilo = Assert.Single(await this.StartAdditionalSilosAndWaitForReminderServicesAsync(
+                            1,
+                            cancellationToken,
+                            startAdditionalSiloOnNewPort: true));
+                    }
+                },
+                cts.Token,
+                g1,
+                g2,
+                g3,
+                g4,
+                g5);
+        }
+        finally
+        {
+            if (additionalSilo is not null)
+            {
+                await StopSiloAsync(additionalSilo);
+                await WaitForLivenessToStabilizeAsync();
+            }
+        }
     }
 
     public async Task Test_Reminders_ReminderNotFound()

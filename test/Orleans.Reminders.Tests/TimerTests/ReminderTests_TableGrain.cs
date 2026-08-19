@@ -618,7 +618,7 @@ namespace UnitTests.TimerTests
         /// <summary>
         /// Tests single join scenario with multiple grains and multiple reminders.
         /// </summary>
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4318")]
+        [Fact]
         public async Task Rem_Grain_1J_MultiGrainMultiReminders()
         {
             await Test_Reminders_1J_MultiGrainMultiReminders();
