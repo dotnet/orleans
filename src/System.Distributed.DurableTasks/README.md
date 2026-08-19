@@ -25,13 +25,34 @@ cancellation. Task definitions and application code depend only on this assembly
   hosts retain it with task state. The durable token enters the canceled state before cancellation
   is published to durable callbacks, including callbacks registered concurrently with the request.
 - Callbacks registered through `RegisterCancellationCallbackAsync` execute with their durable
-  context ambient. Callbacks registered directly on `CancellationToken` follow standard .NET
-  registration `ExecutionContext` capture semantics instead.
+  context ambient and participate in durable dependency and failure tracking. Their explicit
+  cancellation-operation causality flows through ordinary awaits and safe `Task.Run` dispatch.
+  Suppressed `ExecutionContext` flow and unsafe dispatch detach that causality and behave as
+  external observers.
+- Callbacks registered directly on `CancellationToken` are ordinary synchronous .NET observers,
+  not durable cancellation callbacks. They run using standard registration-time `ExecutionContext`
+  capture and optional `SynchronizationContext` dispatch. They must return promptly and must not
+  synchronously block on `RequestCancellationAsync` or any other durable cancellation completion.
+  Use `RegisterCancellationCallbackAsync` for asynchronous work, cross-context cancellation
+  dependencies, and failure aggregation.
 - Disposing a durable cancellation registration prevents a snapshotted callback which has not
   started, or waits for an active callback to finish, including when that callback fails. A callback
   can dispose its own registration without blocking.
 - Delays use `DurableExecutionContext.UtcNow`, supplied by the host, so replay observes the
   same logical time.
+
+### Cancellation completion and cycles
+
+`RequestCancellationAsync` starts the durable request once and all callers observe the same
+monotonic completion. External callers and acyclic durable callback dependencies wait until all
+observers finish and receive their aggregated failures. Dependency edges are created only from
+the explicit cancellation operation flowed by `RegisterCancellationCallbackAsync`; there is no
+global active-operation inference. If adding an edge would close a durable callback cycle, the
+target cancellation is initiated but the cycle-closing call returns without waiting on that edge.
+Completed operations release their graph edges.
+
+The cancellation token passed to `RequestCancellationAsync` only abandons that caller's wait.
+It cannot reverse or withdraw the durable request.
 
 ## Responses
 
