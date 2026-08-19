@@ -1,5 +1,3 @@
-using System.Globalization;
-using System.Numerics;
 using Amazon.Kinesis;
 using Amazon.Kinesis.Model;
 using Orleans.Providers.Streams.Common;
@@ -230,9 +228,28 @@ internal sealed class KinesisRecoverableStreamDataAdapter(
 
         var offset = 0;
         var shardSequence = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref offset)!;
-        var difference = BigInteger.Parse(shardSequence, NumberStyles.None, CultureInfo.InvariantCulture)
-            .CompareTo(BigInteger.Parse(kinesisToken.ShardSequence, NumberStyles.None, CultureInfo.InvariantCulture));
+        var difference = CompareShardSequences(shardSequence, kinesisToken.ShardSequence);
         return difference != 0 ? difference : cachedMessage.EventIndex.CompareTo(kinesisToken.EventIndex);
+    }
+
+    private static int CompareShardSequences(string left, string right)
+    {
+        var leftStart = 0;
+        while (leftStart < left.Length && left[leftStart] == '0')
+        {
+            leftStart++;
+        }
+
+        var rightStart = 0;
+        while (rightStart < right.Length && right[rightStart] == '0')
+        {
+            rightStart++;
+        }
+
+        var lengthComparison = (left.Length - leftStart).CompareTo(right.Length - rightStart);
+        return lengthComparison != 0
+            ? lengthComparison
+            : left.AsSpan(leftStart).SequenceCompareTo(right.AsSpan(rightStart));
     }
 
     public string GetOffset(ref CachedMessage cachedMessage)
