@@ -1,7 +1,7 @@
 # Microsoft Orleans Streaming for ADO.NET
 
 ## Introduction
-Microsoft Orleans Streaming for ADO.NET provides a stream provider implementation for Orleans using ADO.NET-compatible databases (SQL Server, MySQL, PostgreSQL, etc.). This allows for publishing and subscribing to streams of events with relational databases as the underlying infrastructure.
+Microsoft Orleans Streaming for ADO.NET provides a partitioned stream provider for Orleans using ADO.NET-compatible databases (SQL Server, MySQL, PostgreSQL, etc.). This allows for publishing and subscribing to streams of events with relational databases as the underlying infrastructure.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -48,17 +48,17 @@ var builder = Host.CreateApplicationBuilder(args)
 await builder.RunAsync();
 ```
 
-The provider stores each queue as an immutable partition log. Configure retained-log behavior with:
+The provider stores each queue as an immutable, ordered stream partition. Its stream partition pipeline appends records, reads partition history, and advances an ownership-fenced checkpoint. Configure it with:
 
-- `StartFromNow`: initialize a new checkpoint at the retained tail instead of before the earliest retained message.
-- `FaultOnDeliveryFailure`: optionally fault a failing subscription without altering the shared retained log.
+- `StartFromNow`: initialize a new checkpoint at the current partition history tail instead of before the earliest retained record.
+- `FaultOnDeliveryFailure`: optionally fault a failing subscription while preserving the shared partition records.
 - `MaxMessagesPerRead`: bound each ordered storage read.
 - `CheckpointPersistInterval`: throttle durable checkpoint updates.
-- `RetentionPeriod`: retain checkpointed messages for at least this period (one day by default).
-- `MaximumRetentionPeriod`: optionally delete older messages even when they are not checkpointed. This is a hard capacity ceiling and can create a diagnosed delivery gap.
+- `RetentionPeriod`: retain checkpointed records for at least this period (one day by default).
+- `MaximumRetentionPeriod`: optionally delete older records even when they are not checkpointed. This is a hard capacity ceiling and can create a diagnosed retention gap.
 - `CleanupInterval` and `CleanupBatchSize`: bound cleanup frequency and work.
 
-The provider is rewindable while requested records remain retained. It resumes strictly after its durable, ownership-fenced checkpoint and can redeliver records after a crash without skipping uncheckpointed data.
+The partitioned stream provider is rewindable while requested records remain retained. It resumes strictly after its durable, ownership-fenced checkpoint and can redeliver records after a crash without skipping uncheckpointed data.
 
 ## Alpha schema upgrade
 

@@ -132,13 +132,13 @@ internal sealed partial class AdoNetRecoverableStream(
         {
             throw new DataNotAvailableException(
                 $"ADO.NET stream partition '{serviceId}/{providerId}/{queueId}' has a retention gap: "
-                + $"checkpoint {checkpoint}, earliest retained message {earliest}, tail {state.TailMessageId?.ToString(CultureInfo.InvariantCulture) ?? "<empty>"}.");
+                + $"checkpoint {checkpoint}, earliest retained record {earliest}, tail {state.TailMessageId?.ToString(CultureInfo.InvariantCulture) ?? "<empty>"}.");
         }
     }
 
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "Hard stream retention deleted {DeletedCount} messages for {ServiceId}/{ProviderId}/{QueueId} from {DeletedFrom} through {DeletedThrough}, crossing checkpoint {Checkpoint}.")]
+        Message = "Hard stream retention deleted {DeletedCount} records for {ServiceId}/{ProviderId}/{QueueId} from {DeletedFrom} through {DeletedThrough}, crossing checkpoint {Checkpoint}.")]
     private static partial void LogHardRetentionCrossed(
         ILogger logger,
         string serviceId,

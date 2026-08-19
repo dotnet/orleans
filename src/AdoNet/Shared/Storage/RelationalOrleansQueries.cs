@@ -392,7 +392,7 @@ namespace Orleans.Tests.SqlUtils
 #if STREAMING_ADONET || TESTER_SQLUTILS
 
         /// <summary>
-        /// Appends an immutable message to a stream partition.
+        /// Appends an immutable stream record to a stream partition.
         /// </summary>
         /// <param name="serviceId">The service identifier.</param>
         /// <param name="providerId">The provider identifier.</param>
@@ -472,7 +472,7 @@ namespace Orleans.Tests.SqlUtils
         }
 
         /// <summary>
-        /// Reads retained messages with identifiers strictly greater than <paramref name="afterMessageId"/>.
+        /// Reads retained stream records with identifiers strictly greater than <paramref name="afterMessageId"/>.
         /// </summary>
         internal Task<IList<AdoNetStreamMessage>> ReadStreamMessagesAsync(
             string serviceId,
@@ -546,7 +546,7 @@ namespace Orleans.Tests.SqlUtils
         }
 
         /// <summary>
-        /// Reads the current checkpoint, ownership epoch, and retained message bounds.
+        /// Reads the current checkpoint, ownership epoch, and retained bounds of partition history.
         /// </summary>
         internal Task<AdoNetStreamPartitionState?> GetStreamPartitionBoundsAsync(
             string serviceId,
@@ -577,7 +577,7 @@ namespace Orleans.Tests.SqlUtils
         }
 
         /// <summary>
-        /// Deletes an ordered, bounded batch of retained messages.
+        /// Deletes an ordered, bounded batch of retained stream records.
         /// </summary>
         internal Task<AdoNetStreamCleanupResult> CleanupStreamMessagesAsync(
             string serviceId,
