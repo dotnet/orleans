@@ -18,10 +18,11 @@ namespace UnitTests.Grains
         private TaskCompletionSource _deliveriesReleased = CreateCompletionSource();
         private TaskCompletionSource _deliveryTargetReached = CreateCompletionSource();
         private int _blockDeliveries;
+        private int _deliveryCount;
         private int _expectedDeliveries;
         private int _waitingDeliveryCount;
 
-        public int DeliveryCount => _deliveryCounts.Values.Sum();
+        public int DeliveryCount => Volatile.Read(ref _deliveryCount);
 
         public int DeliveryActivationCount => _deliveryCounts.Count;
 
@@ -42,6 +43,7 @@ namespace UnitTests.Grains
 
             _deliveryCounts.Clear();
             _observerCounts.Clear();
+            Interlocked.Exchange(ref _deliveryCount, 0);
             _expectedDeliveries = expectedDeliveries;
             Volatile.Write(ref _blockDeliveries, blockDeliveries ? 1 : 0);
             _blockedDeliveriesReached = CreateCompletionSource();
@@ -62,7 +64,7 @@ namespace UnitTests.Grains
         internal async Task RecordDelivery(Guid activationId)
         {
             _deliveryCounts.AddOrUpdate(activationId, 1, static (_, count) => count + 1);
-            if (_deliveryCounts.Values.Sum() >= _expectedDeliveries)
+            if (Interlocked.Increment(ref _deliveryCount) >= _expectedDeliveries)
             {
                 _deliveryTargetReached.TrySetResult();
             }

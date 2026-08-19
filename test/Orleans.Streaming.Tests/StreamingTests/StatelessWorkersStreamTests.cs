@@ -107,6 +107,7 @@ namespace UnitTests.StreamingTests
             await Task.WhenAll(streamIds.Select((streamId, index) =>
                 GetStream(StatelessWorkerStreamConsumerGrain.ExplicitStreamNamespace, streamId)
                     .OnNextAsync($"item-{index}")));
+            await state.WaitForDeliveriesAsync(Timeout);
             await state.WaitForBlockedDeliveriesAsync(Timeout);
 
             Assert.Equal(PartitionCount, state.WaitingDeliveryCount);
