@@ -349,7 +349,10 @@ public struct ConfiguredDurableTask
 
     /// <summary>Gets an awaiter which runs or attaches to the task.</summary>
     public DurableTaskAwaiter GetAwaiter() => new(_core.RunAsync(CancellationToken.None));
-    /// <summary>Assigns a stable logical identifier segment.</summary>
+    /// <summary>
+    /// Assigns a stable logical identifier segment. Within a durable execution, segments beginning
+    /// with <c>$</c> are reserved for generated identifiers.
+    /// </summary>
     public ConfiguredDurableTask WithId(string segment) { _core.SetId(segment); return this; }
 
     /// <summary>Schedules the configured definition and returns its handle.</summary>
@@ -385,7 +388,10 @@ public struct ConfiguredDurableTask<TResult>
 
     /// <summary>Gets an awaiter which runs or attaches to the task.</summary>
     public DurableTaskAwaiter<TResult> GetAwaiter() => new(_core.RunAsync(CancellationToken.None));
-    /// <summary>Assigns a stable logical identifier segment.</summary>
+    /// <summary>
+    /// Assigns a stable logical identifier segment. Within a durable execution, segments beginning
+    /// with <c>$</c> are reserved for generated identifiers.
+    /// </summary>
     public ConfiguredDurableTask<TResult> WithId(string segment) { _core.SetId(segment); return this; }
 
     /// <summary>Schedules the configured definition and returns its typed handle.</summary>
