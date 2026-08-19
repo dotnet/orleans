@@ -120,6 +120,30 @@ public sealed class RecoverableStreamReceiverTests
     }
 
     [Fact]
+    public void Cache_CursorCreatedWhileEmptyReadsFirstLaterRecord()
+    {
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var adapter = new TestDataAdapter();
+        var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
+            100,
+            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(4 * 1024)),
+            adapter,
+            new NoOpEvictionStrategy(),
+            NullLogger.Instance);
+        var initial = cache.Add([new TestQueueMessage(streamId, 10, "initial")], DateTime.UnixEpoch);
+        cache.UpdateDeliveryProgress(initial[0].SequenceToken, DateTime.UtcNow);
+        Assert.Equal(0, cache.ItemCount);
+
+        using var cursor = cache.GetCacheCursor(streamId, token: null);
+        Assert.False(cursor.MoveNext());
+
+        _ = cache.Add([new TestQueueMessage(streamId, 11, "payload")], DateTime.UnixEpoch);
+
+        Assert.True(cursor.MoveNext());
+        Assert.Equal("payload", Assert.IsType<TestBatchContainer>(cursor.GetCurrent(out _)).Payload);
+    }
+
+    [Fact]
     public void CachePressure_BlocksUnsafeTimePurgeUntilDeliveryProgressAdvances()
     {
         var streamId = StreamId.Create("namespace", Guid.NewGuid());
