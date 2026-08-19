@@ -10,7 +10,7 @@ public abstract class DurableExecutionContext
     private readonly object _lock = new();
     private readonly CancellationTokenSource _cancellationSource = new();
     private List<CancellationRegistration>? _registrations;
-    private Task? _cancellationTask;
+    private CancellationOperation? _cancellationOperation;
     private bool _cancellationRequested;
     private long _nextChildId;
     private long _nextOperationId;
@@ -136,87 +136,80 @@ public abstract class DurableExecutionContext
 
     internal Task RequestCancellationAsync(CancellationToken cancellationToken)
     {
-        if (CancellationRegistration.IsInvokingCallbackFor(this))
+        CancellationOperation operation;
+        lock (_lock)
+        {
+            operation = _cancellationOperation ??= new(this);
+        }
+
+        var waitForCompletion = CancellationOperation.TryAddDependency(
+            CancellationOperation.Current,
+            operation);
+        operation.Start();
+        if (!waitForCompletion)
         {
             return Task.CompletedTask;
         }
 
-        Task cancellationTask;
-        TaskCompletionSource? completion = null;
-        lock (_lock)
-        {
-            if (_cancellationTask is null)
-            {
-                completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-                cancellationTask = _cancellationTask = completion.Task;
-            }
-            else
-            {
-                cancellationTask = _cancellationTask;
-            }
-        }
-
-        if (completion is not null)
-        {
-            _ = CompleteCancellationAsync(completion);
-        }
-
         return cancellationToken.CanBeCanceled
-            ? cancellationTask.WaitAsync(cancellationToken)
-            : cancellationTask;
+            ? operation.Task.WaitAsync(cancellationToken)
+            : operation.Task;
     }
 
-    private async Task CompleteCancellationAsync(TaskCompletionSource completion)
+    private async Task CompleteCancellationAsync(CancellationOperation operation)
     {
         List<Exception>? exceptions = null;
-        using (Enter(this))
+        using (operation.Enter())
         {
-            try
+            using (Enter(this))
             {
-                _cancellationSource.Cancel();
-            }
-            catch (AggregateException exception)
-            {
-                (exceptions ??= []).AddRange(exception.InnerExceptions);
-            }
-            catch (Exception exception)
-            {
-                (exceptions ??= []).Add(exception);
-            }
-        }
-
-        List<CancellationRegistration> callbacks;
-        lock (_lock)
-        {
-            _cancellationRequested = true;
-            callbacks = _registrations ?? [];
-            _registrations = null;
-        }
-
-        foreach (var callback in callbacks)
-        {
-            try
-            {
-                using (Enter(this))
+                try
                 {
-                    await callback.InvokeAsync(CancellationToken);
+                    _cancellationSource.Cancel();
+                }
+                catch (AggregateException exception)
+                {
+                    (exceptions ??= []).AddRange(exception.InnerExceptions);
+                }
+                catch (Exception exception)
+                {
+                    (exceptions ??= []).Add(exception);
                 }
             }
-            catch (Exception exception)
+
+            List<CancellationRegistration> callbacks;
+            lock (_lock)
             {
-                (exceptions ??= []).Add(exception);
+                _cancellationRequested = true;
+                callbacks = _registrations ?? [];
+                _registrations = null;
+            }
+
+            foreach (var callback in callbacks)
+            {
+                try
+                {
+                    using (Enter(this))
+                    {
+                        await callback.InvokeAsync(CancellationToken);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    (exceptions ??= []).Add(exception);
+                }
             }
         }
 
         if (exceptions is not null)
         {
-            completion.SetException(new AggregateException(
+            operation.SetException(new AggregateException(
                 "One or more durable cancellation callbacks failed.",
                 exceptions));
         }
         else
         {
-            completion.SetResult();
+            operation.SetResult();
         }
     }
 
@@ -238,6 +231,119 @@ public abstract class DurableExecutionContext
     internal readonly struct ContextScope(DurableExecutionContext? previous) : IDisposable
     {
         public void Dispose() => AmbientContext.Value = previous;
+    }
+
+    private sealed class CancellationOperation(DurableExecutionContext context)
+    {
+        private static readonly object GraphLock = new();
+        private static readonly AsyncLocal<CancellationOperation?> AmbientOperation = new();
+        private readonly TaskCompletionSource _completion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private HashSet<CancellationOperation>? _dependencies;
+        private bool _graphCompleted;
+        private int _started;
+
+        public static CancellationOperation? Current => AmbientOperation.Value;
+
+        public Task Task => _completion.Task;
+
+        public void Start()
+        {
+            if (Interlocked.Exchange(ref _started, 1) == 0)
+            {
+                _ = context.CompleteCancellationAsync(this);
+            }
+        }
+
+        public static bool TryAddDependency(
+            CancellationOperation? source,
+            CancellationOperation target)
+        {
+            if (source is null)
+            {
+                return true;
+            }
+
+            lock (GraphLock)
+            {
+                if (source._graphCompleted || target._graphCompleted)
+                {
+                    return true;
+                }
+
+                if (ReferenceEquals(source, target) || HasPath(target, source))
+                {
+                    return false;
+                }
+
+                (source._dependencies ??= []).Add(target);
+                return true;
+            }
+        }
+
+        public OperationScope Enter()
+        {
+            var previous = AmbientOperation.Value;
+            AmbientOperation.Value = this;
+            return new(previous);
+        }
+
+        public void SetException(Exception exception)
+        {
+            CompleteGraph();
+            _completion.SetException(exception);
+        }
+
+        public void SetResult()
+        {
+            CompleteGraph();
+            _completion.SetResult();
+        }
+
+        private static bool HasPath(
+            CancellationOperation start,
+            CancellationOperation destination)
+        {
+            var pending = new Stack<CancellationOperation>();
+            var visited = new HashSet<CancellationOperation>();
+            pending.Push(start);
+            while (pending.TryPop(out var current))
+            {
+                if (!visited.Add(current))
+                {
+                    continue;
+                }
+
+                if (ReferenceEquals(current, destination))
+                {
+                    return true;
+                }
+
+                if (current._dependencies is { } dependencies)
+                {
+                    foreach (var dependency in dependencies)
+                    {
+                        pending.Push(dependency);
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private void CompleteGraph()
+        {
+            lock (GraphLock)
+            {
+                _graphCompleted = true;
+                _dependencies = null;
+            }
+        }
+
+        public readonly struct OperationScope(CancellationOperation? previous) : IDisposable
+        {
+            public void Dispose() => AmbientOperation.Value = previous;
+        }
     }
 
     private sealed class CancellationRegistration : IAsyncDisposable
@@ -331,20 +437,6 @@ public abstract class DurableExecutionContext
             }
 
             return completion.Task;
-        }
-
-        public static bool IsInvokingCallbackFor(DurableExecutionContext context)
-        {
-            for (var current = Current.Value; current is not null; current = current._previous)
-            {
-                if (ReferenceEquals(current._context, context)
-                    && Volatile.Read(ref current._state) == Invoking)
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private static bool IsCurrentCallback(CancellationRegistration registration)
