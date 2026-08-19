@@ -94,7 +94,7 @@ namespace Orleans.Tests.SqlUtils
                 ? string.Join(", ", legacyKeys)
                 : "none";
             throw new InvalidOperationException(
-                $"The ADO.NET streaming schema is incompatible. Expected immutable partition-log schema version {CurrentStreamingSchemaVersion}, " +
+                $"The ADO.NET streaming schema is incompatible. Expected stream partition schema version {CurrentStreamingSchemaVersion}, " +
                 $"but detected '{detectedVersion}'. Missing query keys: {missingDescription}. Legacy query keys: {legacyDescription}. " +
                 "This alpha schema has no in-place migration. Drop the legacy OrleansStreamMessage, " +
                 "OrleansStreamDeadLetter, OrleansStreamControl, and OrleansStreamMessageSequence objects, drop OrleansStreamPartition if it " +
@@ -200,12 +200,12 @@ namespace Orleans.Tests.SqlUtils
 #if STREAMING_ADONET || TESTER_SQLUTILS
 
         /// <summary>
-        /// The immutable partition-log schema version marker.
+        /// The stream partition schema version marker.
         /// </summary>
         internal string StreamSchemaVersionKey => queries[nameof(StreamSchemaVersionKey)];
 
         /// <summary>
-        /// A query template to append a message to a stream partition.
+        /// A query template to append a record to a stream partition.
         /// </summary>
         internal string AppendStreamMessageKey => queries[nameof(AppendStreamMessageKey)];
 
@@ -215,7 +215,7 @@ namespace Orleans.Tests.SqlUtils
         internal string AcquireStreamPartitionKey => queries[nameof(AcquireStreamPartitionKey)];
 
         /// <summary>
-        /// A query template to read ordered messages after an exclusive position.
+        /// A query template to read ordered stream records after an exclusive position.
         /// </summary>
         internal string ReadStreamMessagesKey => queries[nameof(ReadStreamMessagesKey)];
 
@@ -225,12 +225,12 @@ namespace Orleans.Tests.SqlUtils
         internal string AdvanceStreamCheckpointKey => queries[nameof(AdvanceStreamCheckpointKey)];
 
         /// <summary>
-        /// A query template to read partition checkpoint and retained bounds.
+        /// A query template to read a partition checkpoint and partition history bounds.
         /// </summary>
         internal string GetStreamPartitionBoundsKey => queries[nameof(GetStreamPartitionBoundsKey)];
 
         /// <summary>
-        /// A query template to perform bounded retained-log cleanup.
+        /// A query template to perform bounded stream partition retention cleanup.
         /// </summary>
         internal string CleanupStreamMessagesKey => queries[nameof(CleanupStreamMessagesKey)];
 

@@ -73,4 +73,4 @@ Page on user impact or imminent data/availability risk. Route isolated warnings 
 
 ## Dashboard and telemetry backends
 
-The Orleans Dashboard provides a current operational view and method profiling. It isn't a replacement for retained logs, metrics, traces, or alerts. Secure it as an administrative endpoint and use OTLP for durable telemetry. See [Orleans Dashboard](../../dashboard/index.md).
+The Orleans Dashboard provides a current operational view and method profiling. Use logs, metrics, traces, and alerts for durable telemetry. Secure the dashboard as an administrative endpoint and export telemetry through OTLP. See [Orleans Dashboard](../../dashboard/index.md).
