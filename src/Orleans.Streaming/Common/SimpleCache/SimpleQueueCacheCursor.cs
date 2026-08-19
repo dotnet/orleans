@@ -9,12 +9,13 @@ namespace Orleans.Providers.Streams.Common
     /// <summary>
     /// Cursor into a simple queue cache.
     /// </summary>
-    public partial class SimpleQueueCacheCursor : IQueueCacheCursor
+    public partial class SimpleQueueCacheCursor : IQueueCacheCursor, IQueueCacheCursorBatchDelivery
     {
         private readonly StreamId streamId;
         private readonly SimpleQueueCache cache;
         private readonly ILogger logger;
         private IBatchContainer? current; // this is a pointer to the current element in the cache. It is what will be returned by GetCurrent().
+        private DeliveryBatch? deliveryBatch;
 
         // This is also a pointer to the current element in the cache. It differs from current, in
         // that current is just the batch, and is null before the first call to MoveNext after
@@ -76,6 +77,7 @@ namespace Orleans.Providers.Streams.Common
             if (current == null && IsSet && IsInStream(Element!.Value.Batch)) // IsSet is true, so Element is non-null.
             {
                 current = Element!.Value.Batch;
+                deliveryBatch?.Track(Element);
                 return true;
             }
 
@@ -89,6 +91,7 @@ namespace Orleans.Providers.Streams.Common
             if (!IsInStream(next))
                 return false;
 
+            deliveryBatch?.Track(Element!);
             return true;
         }
 
@@ -108,6 +111,26 @@ namespace Orleans.Providers.Streams.Common
             {
                 Element!.Value.DeliveryFailure = true; // IsSet is true, so Element is non-null.
             }
+        }
+
+        IDisposable IQueueCacheCursorBatchDelivery.ProtectDeliveryBatch()
+        {
+            if (deliveryBatch is not null)
+            {
+                throw new InvalidOperationException("A delivery batch is already active for this cursor.");
+            }
+
+            return deliveryBatch = new DeliveryBatch(this);
+        }
+
+        void IQueueCacheCursorBatchDelivery.RecordDeliveryFailure(IBatchContainer batch)
+        {
+            if (deliveryBatch is null)
+            {
+                throw new InvalidOperationException("No delivery batch is active for this cursor.");
+            }
+
+            deliveryBatch.RecordDeliveryFailure(batch);
         }
 
         private bool IsInStream(IBatchContainer? batchContainer)
@@ -130,8 +153,75 @@ namespace Orleans.Providers.Streams.Common
         {
             if (disposing)
             {
+                deliveryBatch?.Dispose();
                 cache.UnsetCursor(this, null);
                 current = null;
+            }
+        }
+
+        private sealed class DeliveryBatch : IDisposable
+        {
+            private readonly SimpleQueueCacheCursor owner;
+            private readonly CacheBucket? pinnedBucket;
+            private readonly LinkedListNode<SimpleQueueCacheItem>? firstElement;
+            private LinkedListNode<SimpleQueueCacheItem>? lastElement;
+            private bool disposed;
+
+            public DeliveryBatch(SimpleQueueCacheCursor owner)
+            {
+                this.owner = owner;
+                firstElement = owner.Element;
+                pinnedBucket = firstElement?.Value.CacheBucket;
+                pinnedBucket?.UpdateNumCursors(1);
+            }
+
+            public void Track(LinkedListNode<SimpleQueueCacheItem> item)
+            {
+                ObjectDisposedException.ThrowIf(disposed, this);
+                lastElement = item;
+            }
+
+            public void RecordDeliveryFailure(IBatchContainer batch)
+            {
+                ObjectDisposedException.ThrowIf(disposed, this);
+
+                if (batch is IBatchContainerBatch batchGroup)
+                {
+                    foreach (var item in batchGroup.BatchContainers)
+                    {
+                        RecordDeliveryFailure(item);
+                    }
+                }
+                else
+                {
+                    for (var item = firstElement; item is not null; item = item.Previous)
+                    {
+                        if (ReferenceEquals(item.Value.Batch, batch))
+                        {
+                            item.Value.DeliveryFailure = true;
+                            return;
+                        }
+
+                        if (ReferenceEquals(item, lastElement))
+                        {
+                            break;
+                        }
+                    }
+
+                    throw new InvalidOperationException("The failed delivery was not read by this cursor.");
+                }
+            }
+
+            public void Dispose()
+            {
+                if (disposed)
+                {
+                    return;
+                }
+
+                disposed = true;
+                owner.deliveryBatch = null;
+                pinnedBucket?.UpdateNumCursors(-1);
             }
         }
 

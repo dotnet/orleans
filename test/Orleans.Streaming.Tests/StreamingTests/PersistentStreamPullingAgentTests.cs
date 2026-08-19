@@ -223,7 +223,106 @@ namespace UnitTests.StreamingTests
             Assert.Empty(await testAccessor.GetPubSubCache());
         }
 
-        private static PersistentStreamPullingAgent CreateAgent(IStreamPubSub? pubSub, QueueId queueId, IQueueAdapterReceiver? receiver = null, IQueueAdapterCache? queueAdapterCache = null, TimeProvider? timeProvider = null)
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task ReadFromQueue_DoesNotAcknowledgeBatchedMessagesDuringConsumerDelivery()
+        {
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default)
+                .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
+
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var streamId = StreamId.Create("namespace", Guid.NewGuid());
+            var qualifiedStreamId = new QualifiedStreamId("provider", streamId);
+            var firstToken = new EventSequenceTokenV2(1);
+            var secondToken = new EventSequenceTokenV2(2);
+            var messages = new List<IBatchContainer>
+            {
+                new TestBatchContainer(streamId, firstToken),
+                new TestBatchContainer(streamId, secondToken),
+            };
+
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+                .Returns(
+                    Task.FromResult<IList<IBatchContainer>>(messages),
+                    Task.FromResult<IList<IBatchContainer>>([]),
+                    Task.FromResult<IList<IBatchContainer>>([]));
+            receiver.MessagesDeliveredAsync(Arg.Any<IList<IBatchContainer>>(), Arg.Any<CancellationToken>())
+                .Returns(Task.CompletedTask);
+
+            var queueCache = new SimpleQueueCache(cacheSize: 10, NullLogger.Instance);
+            var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
+            queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
+            var options = new StreamPullingAgentOptions { BatchContainerBatchSize = 2 };
+            var agent = CreateAgent(pubSub, queueId, receiver, queueAdapterCache, options: options);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+            await testAccessor.RegisterStream(qualifiedStreamId, firstToken, DateTime.UtcNow);
+
+            var streamData = (await testAccessor.GetPubSubCache()).Single().Value;
+            var firstConsumer = new RecordingConsumer();
+            var firstConsumerData = streamData.AddConsumer(
+                GuidId.GetGuidId(Guid.NewGuid()),
+                qualifiedStreamId,
+                firstConsumer,
+                filterData: null,
+                now: DateTime.UtcNow);
+            firstConsumerData.IsRegistered = true;
+            firstConsumerData.Cursor = queueCache.GetCacheCursor(streamId, firstToken);
+            var secondConsumer = new RecordingConsumer();
+            var secondConsumerData = streamData.AddConsumer(
+                GuidId.GetGuidId(Guid.NewGuid()),
+                qualifiedStreamId,
+                secondConsumer,
+                filterData: null,
+                now: DateTime.UtcNow);
+            secondConsumerData.IsRegistered = true;
+            secondConsumerData.Cursor = queueCache.GetCacheCursor(streamId, firstToken);
+
+            Assert.True(await testAccessor.ReadFromQueue(queueId, receiver, 10));
+            await Task.WhenAll(firstConsumer.Delivered.Task, secondConsumer.Delivered.Task).WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.False(await testAccessor.ReadFromQueue(queueId, receiver, 10));
+            await receiver.DidNotReceive().MessagesDeliveredAsync(
+                Arg.Any<IList<IBatchContainer>>(),
+                Arg.Any<CancellationToken>());
+
+            firstConsumer.ReleaseDelivery();
+            await WaitForInactive(firstConsumerData);
+            Assert.False(await testAccessor.ReadFromQueue(queueId, receiver, 10));
+            await receiver.DidNotReceive().MessagesDeliveredAsync(
+                Arg.Any<IList<IBatchContainer>>(),
+                Arg.Any<CancellationToken>());
+
+            secondConsumer.ReleaseDelivery();
+            await WaitForInactive(secondConsumerData);
+            Assert.False(await testAccessor.ReadFromQueue(queueId, receiver, 10));
+            await receiver.Received(1).MessagesDeliveredAsync(
+                Arg.Is<IList<IBatchContainer>>(items => items.Count == messages.Count),
+                Arg.Any<CancellationToken>());
+
+            static async Task WaitForInactive(StreamConsumerData consumerData)
+            {
+                var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+                while (consumerData.State != StreamConsumerDataState.Inactive && DateTime.UtcNow < timeout)
+                {
+                    await Task.Delay(10);
+                }
+
+                Assert.Equal(StreamConsumerDataState.Inactive, consumerData.State);
+            }
+        }
+
+        private static PersistentStreamPullingAgent CreateAgent(
+            IStreamPubSub? pubSub,
+            QueueId queueId,
+            IQueueAdapterReceiver? receiver = null,
+            IQueueAdapterCache? queueAdapterCache = null,
+            TimeProvider? timeProvider = null,
+            StreamPullingAgentOptions? options = null)
         {
             var siloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1);
             var localSiloDetails = Substitute.For<ILocalSiloDetails>();
@@ -262,7 +361,7 @@ namespace UnitTests.StreamingTests
                 pubSub!,
                 new NoOpStreamFilter(),
                 queueId,
-                new StreamPullingAgentOptions(),
+                options ?? new StreamPullingAgentOptions(),
                 queueAdapter,
                 queueAdapterCache!,
                 new NoOpStreamDeliveryFailureHandler(),
