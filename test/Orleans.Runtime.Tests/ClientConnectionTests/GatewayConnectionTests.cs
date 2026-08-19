@@ -121,9 +121,8 @@ namespace Tester
             var connectionCount = 0;
             var timeoutCount = 0;
 
-            // Fake Gateway
-            var gateways = await this.HostedCluster.Client!.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways(); // The fixture deploys the client.
-            var port = gateways.First().Port + 2;
+            // The cluster-owned allocator reserves the port for the lifetime of the fixture.
+            var (_, port) = this.HostedCluster.PortAllocator.AllocateConsecutivePortPairs(1);
             var endpoint = new IPEndPoint(IPAddress.Loopback, port);
             var evt = new SocketAsyncEventArgs();
             var gatewayManager = this.runtimeClient.ServiceProvider.GetService<TestGatewayManager>()!;
@@ -133,16 +132,15 @@ namespace Tester
                 gatewayManager.Gateways.Remove(endpoint.ToGatewayUri());
             };
 
-            // Add the fake gateway and wait the refresh from the client
-            gatewayManager.Gateways.Add(endpoint.ToGatewayUri());
-            await Task.Delay(200);
-
             using (var socket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp))
             {
-                // Start the fake gw
                 socket.Bind(endpoint);
                 socket.Listen(1);
                 socket.AcceptAsync(evt);
+
+                // Add the fake gateway and wait for the client to refresh its gateway list.
+                gatewayManager.Gateways.Add(endpoint.ToGatewayUri());
+                await Task.Delay(200);
 
                 // Make a bunch of calls
                 for (var i = 0; i < 100; i++)
