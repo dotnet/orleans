@@ -32,4 +32,4 @@ Templates reference the current stable Orleans release. Pass `--orleans-version`
 dotnet new orleans-web --name MyOrleansWebApp --orleans-version 10.2.2
 ```
 
-The `orleans` template uses the Aspire Orleans integration to orchestrate the silo, client, and Azurite-backed Azure Table clustering and Azure Blob grain storage. The `orleans-web` template uses localhost clustering for a one-node local development host. See the [Orleans hosting documentation](https://dotnet.github.io/orleans/docs/host/configuration-guide/) for production configuration guidance.
+The `orleans` template uses the Aspire Orleans integration to orchestrate the silo, client, and Azurite-backed Azure Table clustering and Azure Blob grain storage. Run the generated AppHost with a container runtime available so that Aspire can start Azurite. The `orleans-web` template uses localhost clustering for a one-node local development host. See the [Orleans hosting documentation](https://dotnet.github.io/orleans/docs/host/configuration-guide/) for production configuration guidance.

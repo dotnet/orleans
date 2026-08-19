@@ -18,7 +18,7 @@ You learn how to:
 - Obtain a grain reference and call it.
 - Structure project references so that clients depend on contracts, not implementations.
 
-The example uses localhost clustering and omits production concerns such as durable storage, authentication, observability, and application-level retry policies.
+The manual walkthrough uses localhost clustering and transient in-memory state so that the silo and client can run directly from two terminals.
 
 ## Prerequisites
 
@@ -35,7 +35,7 @@ Create a solution with four Orleans projects:
 - **Silo** hosts the Orleans runtime and grain activations.
 - **Client** is an external process that connects to the silo and calls grains.
 
-The `Microsoft.Orleans.Templates` package creates this layout and adds an Aspire AppHost that orchestrates the silo, client, and Azurite-backed Azure Storage resources:
+The `Microsoft.Orleans.Templates` package creates the same Orleans project boundaries and adds an Aspire AppHost. The generated application uses Azurite-backed Azure Table clustering and Azure Blob grain storage instead of the manual walkthrough's localhost configuration. A running container runtime lets the AppHost start Azurite:
 
 ```dotnetcli
 dotnet new install Microsoft.Orleans.Templates
