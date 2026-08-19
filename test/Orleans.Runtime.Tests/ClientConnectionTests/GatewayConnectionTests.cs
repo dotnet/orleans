@@ -12,6 +12,7 @@ using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Microsoft.Extensions.Hosting;
 using Orleans.Runtime.Messaging;
+using Orleans.TestingHost.Utils;
 
 namespace Tester
 {
@@ -121,28 +122,31 @@ namespace Tester
             var connectionCount = 0;
             var timeoutCount = 0;
 
-            // Fake Gateway
-            var gateways = await this.HostedCluster.Client!.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways(); // The fixture deploys the client.
-            var port = gateways.First().Port + 2;
-            var endpoint = new IPEndPoint(IPAddress.Loopback, port);
+            // The cluster-owned allocator reserves the port for the lifetime of the fixture.
+            var (_, gatewayPort) = this.HostedCluster.PortAllocator.AllocateConsecutivePortPairs(1);
+            var endpoint = new IPEndPoint(IPAddress.Loopback, gatewayPort);
             var evt = new SocketAsyncEventArgs();
             var gatewayManager = this.runtimeClient.ServiceProvider.GetService<TestGatewayManager>()!;
+            var clientGatewayManager = this.runtimeClient.ServiceProvider.GetRequiredService<GatewayManager>();
             evt.Completed += (sender, args) =>
             {
                 connectionCount++;
                 gatewayManager.Gateways.Remove(endpoint.ToGatewayUri());
             };
 
-            // Add the fake gateway and wait the refresh from the client
-            gatewayManager.Gateways.Add(endpoint.ToGatewayUri());
-            await Task.Delay(200);
-
             using (var socket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp))
             {
-                // Start the fake gw
                 socket.Bind(endpoint);
                 socket.Listen(1);
                 socket.AcceptAsync(evt);
+
+                // Add the fake gateway and wait for the client to refresh its gateway list.
+                gatewayManager.Gateways.Add(endpoint.ToGatewayUri());
+                var gatewayAddress = endpoint.ToGatewayUri().ToGatewayAddress()!;
+                await TestingUtils.WaitUntilAsync(
+                    (_, _) => Task.FromResult(clientGatewayManager.IsGatewayAvailable(gatewayAddress)),
+                    TimeSpan.FromSeconds(3),
+                    TimeSpan.FromMilliseconds(20));
 
                 // Make a bunch of calls
                 for (var i = 0; i < 100; i++)
