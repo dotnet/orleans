@@ -61,7 +61,7 @@ For Event Hubs, derive from <xref:Orleans.Streaming.EventHubs.EventHubDataAdapte
 - <xref:Orleans.Streaming.EventHubs.EventHubDataAdapter.ToQueueMessage*> to encode events published through Orleans; and
 - <xref:Orleans.Streaming.EventHubs.EventHubDataAdapter.GetPartitionKey*> to select the physical Event Hubs partition key.
 
-The adapter also participates in cache conversion and sequence positioning through <xref:Orleans.Streaming.EventHubs.IEventHubDataAdapter>. Preserve the Event Hubs offset and sequence number when constructing batch tokens so checkpoint and rewind behavior remains aligned with the partition log.
+The adapter also participates in cache conversion and sequence positioning through <xref:Orleans.Streaming.EventHubs.IEventHubDataAdapter>. Preserve the Event Hubs offset and sequence number when constructing batch tokens so checkpoint and rewind behavior remains aligned with the stream partition.
 
 Register the adapter and Event Hubs connection under the same provider name on silos and publishing clients. The silo registration also configures durable Azure Table checkpoints:
 
