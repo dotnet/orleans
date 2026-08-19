@@ -62,19 +62,6 @@ namespace UnitTests.Grains
 
             this.streamHandle = await handleFactory.Create<byte[]>().ResumeAsync(OnNext, OnError, OnCompleted, this.State.Token);
 
-            async Task OnNext(byte[] value, StreamSequenceToken? token)
-            {
-                this.logger.LogInformation("Received: [{Value} {Token}]", value, token);
-                this.State.EventCounter++;
-                this.State.FirstToken ??= token;
-                this.State.Token = token;
-                await this.WriteStateAsync();
-                if (this.deactivateOnEvent)
-                {
-                    this.DeactivateOnIdle();
-                }
-            }
-
             async Task OnError(Exception ex)
             {
                 this.logger.LogError("Error: {Exception}", ex);
@@ -85,6 +72,19 @@ namespace UnitTests.Grains
             Task OnCompleted() => Task.CompletedTask;
         }
 
+        private async Task OnNext(byte[] value, StreamSequenceToken? token)
+        {
+            this.logger.LogInformation("Received: [{Value} {Token}]", value, token);
+            this.State.EventCounter++;
+            this.State.FirstToken ??= token;
+            this.State.Token = token;
+            await this.WriteStateAsync();
+            if (this.deactivateOnEvent)
+            {
+                this.DeactivateOnIdle();
+            }
+        }
+
         public Task DeactivateOnEvent(bool deactivate)
         {
             this.deactivateOnEvent = deactivate;
@@ -93,14 +93,12 @@ namespace UnitTests.Grains
 
         public async Task RewindToFirstToken()
         {
-            this.streamHandle = await this.streamHandle!.ResumeAsync(
-                async (value, token) =>
-                {
-                    this.State.EventCounter++;
-                    this.State.Token = token;
-                    await this.WriteStateAsync();
-                },
-                this.State.FirstToken);
+            if (this.streamHandle is null || this.State.FirstToken is null)
+            {
+                throw new InvalidOperationException("The stream must deliver an event before it can rewind.");
+            }
+
+            this.streamHandle = await this.streamHandle.ResumeAsync(OnNext, this.State.FirstToken);
         }
     }
 
