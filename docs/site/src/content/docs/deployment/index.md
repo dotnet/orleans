@@ -1,7 +1,7 @@
 ---
 title: Deploy and operate Orleans
 description: Plan, deploy, and operate an Orleans application in production.
-ms.date: 08/15/2026
+ms.date: 08/19/2026
 ms.topic: overview
 ---
 
@@ -23,6 +23,18 @@ Configure a silo on the [.NET Generic Host](https://learn.microsoft.com/dotnet/c
 
 See [Server configuration](../host/configuration-guide/server-configuration.md) and [Client configuration](../host/configuration-guide/client-configuration.md) for compiled examples.
 
+## Follow the deployment walkthrough
+
+[Deploy an Orleans application to Azure Container Apps](../tutorials-and-samples/production-application.md) takes you from an empty directory to a running multi-process cluster, then through code-based production configuration, deployment, observability, and verification. The sample's application code, infrastructure, and deployment workflow are validated together.
+
+For an existing application, use the walkthrough as a sequence:
+
+1. Host silos and external clients on the .NET Generic Host.
+1. Configure cluster identity, providers, credentials, and endpoints in code from deployment-supplied configuration.
+1. Choose a platform which gives every silo a unique, directly reachable endpoint.
+1. Deploy multiple silos with health probes, telemetry, resource policies, and a graceful termination deadline.
+1. Verify membership, TCP reachability, grain calls, provider state, failure behavior, and rolling replacement before admitting production traffic.
+
 <a id="production-configurations"></a>
 
 ## Operations track
@@ -40,6 +52,7 @@ Use these articles together:
 
 ## Choose a platform
 
+- [Azure Container Apps deployment walkthrough and sample](../tutorials-and-samples/production-application.md)
 - [Containers across multiple hosts](containers.md)
 - [Kubernetes](kubernetes.md)
 - [Service Fabric](service-fabric.md)
