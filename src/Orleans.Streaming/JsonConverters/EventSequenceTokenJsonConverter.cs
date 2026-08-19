@@ -47,6 +47,11 @@ namespace Orleans.Streaming.JsonConverters
 
             if (reader.TokenType != JsonTokenType.EndArray)
             {
+                if (reader.TokenType != JsonTokenType.Number)
+                {
+                    throw new JsonException($"Could not deserialize {nameof(StreamSequenceToken)}.");
+                }
+
                 eventIndex = reader.GetInt32();
                 if (!reader.Read() || reader.TokenType != JsonTokenType.EndArray)
                 {

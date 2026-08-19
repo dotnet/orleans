@@ -135,6 +135,11 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public override MembershipVersion ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
+            if (reader.ValueIsEscaped)
+            {
+                return new MembershipVersion(long.Parse(reader.GetString()!, CultureInfo.InvariantCulture));
+            }
+
             if (reader.HasValueSequence)
             {
                 var valueLength = checked((int)reader.ValueSequence.Length);

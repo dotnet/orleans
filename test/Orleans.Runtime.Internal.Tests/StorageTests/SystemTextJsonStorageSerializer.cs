@@ -53,7 +53,6 @@ namespace UnitTests.StorageTests
 
             _testCluster.DeployAsync().GetAwaiter().GetResult();
             _systemTextJson = (SystemTextJsonGrainStorageSerializer)_testCluster.Silos.First().ServiceProvider.GetRequiredService<IGrainStorageSerializer>();
-            _systemTextJson = (SystemTextJsonGrainStorageSerializer)_testCluster.Silos.First().ServiceProvider.GetRequiredService<IGrainStorageSerializer>();
         }
 
         public void Dispose() => _testCluster.Dispose();
@@ -179,6 +178,10 @@ namespace UnitTests.StorageTests
 
             AssertJson("-9223372036854775808", MembershipVersion.MinValue);
             AssertDictionaryKey("-9223372036854775808", MembershipVersion.MinValue);
+
+            var escapedKey = _systemTextJson.Deserialize<Dictionary<MembershipVersion, int>>(
+                BinaryData.FromString("""{"\u0031":42}"""));
+            Assert.Equal(42, escapedKey![new MembershipVersion(1)]);
         }
 
         [Fact]
@@ -216,6 +219,11 @@ namespace UnitTests.StorageTests
         [Fact]
         public void EventSequenceTokenConverterOmitsDefaultIndex()
             => AssertJson("""[1,2424]""", new EventSequenceToken(2424));
+
+        [Fact]
+        public void EventSequenceTokenConverterRejectsNonNumericEventIndex()
+            => Assert.Throws<JsonException>(() => _systemTextJson.Deserialize<StreamSequenceToken>(
+                BinaryData.FromString("""[1,2424,"invalid"]""")));
 
         [Fact]
         public void EventSequenceTokenBaseTypeConverter()
