@@ -19,7 +19,6 @@ namespace Orleans.Persistence.TestKit
         public int MaxSequenceLength { get { throw null; } set { } }
 
         public string ProviderName { get { throw null; } set { } }
-
     }
 
     public sealed partial class GrainStorageModelBasedTestRunner
@@ -28,11 +27,10 @@ namespace Orleans.Persistence.TestKit
 
         public GrainStorageModelBasedTestRunner(Storage.IGrainStorage storage, string providerName, System.Action<string>? output = null) { }
 
-        [System.Diagnostics.DebuggerStepThrough]
         public System.Threading.Tasks.Task RunGeneratedConformanceTests() { throw null; }
     }
 
-    public abstract partial class GrainStorageTestFixture : Xunit.IAsyncLifetime
+    public abstract partial class GrainStorageTestFixture
     {
         protected TestingHost.InProcessTestCluster Cluster { get { throw null; } }
 
