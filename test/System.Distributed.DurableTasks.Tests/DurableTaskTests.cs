@@ -811,6 +811,43 @@ public class SchedulingTests
     }
 
     [Fact]
+    public async Task ScheduledWhenAnyDrainsStartedWaitWhenLaterWaitThrowsSynchronously()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var firstCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstDefinition = host.CreateRootDefinition<object?>(async _ =>
+        {
+            await firstCompletion.Task;
+            return DurableTaskResponse.Completed;
+        });
+        var secondDefinition = host.CreateRootDefinition<object?>(async _ =>
+        {
+            await secondCompletion.Task;
+            return DurableTaskResponse.Completed;
+        });
+        ScheduledTask first = await firstDefinition.ScheduleAsync("started-before-failure");
+        ScheduledTask second = await secondDefinition.ScheduleAsync("synchronous-wait-failure");
+        var expected = new InvalidOperationException("synchronous host wait failure");
+        host.GetEntry(second.Id).WaitException = expected;
+        host.GetEntry(second.Id).WaitExceptionIsSynchronous = true;
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await ScheduledTask.WhenAny([first, second]));
+
+        Assert.Same(expected, exception);
+        Assert.True(host.GetEntry(first.Id).WaitStarted.Task.IsCompletedSuccessfully);
+        Assert.Equal(0, host.ActiveWaitCount);
+        Assert.False(host.IsCancellationRequested(first.Id));
+        Assert.False(host.IsCancellationRequested(second.Id));
+        Assert.False(firstCompletion.Task.IsCompleted);
+        Assert.False(secondCompletion.Task.IsCompleted);
+
+        firstCompletion.SetResult();
+        secondCompletion.SetResult();
+    }
+
+    [Fact]
     public async Task GenericAndNonGenericWaitsObserveTheSameSuccessfulResponse()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
@@ -982,6 +1019,7 @@ internal sealed class TestHost(DateTimeOffset utcNow)
         public TaskId TaskId => id;
         public bool CancellationRequested { get; private set; }
         public Exception? WaitException { get; set; }
+        public bool WaitExceptionIsSynchronous { get; set; }
         public TaskCompletionSource WaitStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public void StartOnce(Func<Task<DurableTaskResponse>> start)
@@ -992,7 +1030,17 @@ internal sealed class TestHost(DateTimeOffset utcNow)
             }
         }
 
-        public async ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)
+        public ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)
+        {
+            if (WaitExceptionIsSynchronous && WaitException is { } exception)
+            {
+                throw exception;
+            }
+
+            return WaitAsyncCore(cancellationToken);
+        }
+
+        private async ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken)
         {
             Interlocked.Increment(ref host._activeWaitCount);
             WaitStarted.TrySetResult();
