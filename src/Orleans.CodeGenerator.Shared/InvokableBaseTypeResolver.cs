@@ -225,13 +225,17 @@ internal sealed class InvokableBaseTypeResolver
     {
         mappings.Sort(MappingComparer.Instance);
         result = mappings[0];
-        var distinct = mappings
-            .Select(static mapping => mapping.InvokableBaseType)
-            .GroupBy(Display, StringComparer.Ordinal)
-            .Select(static group => group.First())
-            .OrderBy(Display, StringComparer.Ordinal)
-            .ToArray();
-        if (distinct.Length == 1)
+        var distinct = new List<INamedTypeSymbol>();
+        foreach (var mapping in mappings)
+        {
+            if (!distinct.Any(candidate => SymbolEqualityComparer.Default.Equals(candidate, mapping.InvokableBaseType)))
+            {
+                distinct.Add(mapping.InvokableBaseType);
+            }
+        }
+
+        distinct.Sort(static (left, right) => StringComparer.Ordinal.Compare(DisplayWithAssembly(left), DisplayWithAssembly(right)));
+        if (distinct.Count == 1)
         {
             diagnostic = null;
             return true;
@@ -239,7 +243,7 @@ internal sealed class InvokableBaseTypeResolver
 
         diagnostic = CreateDiagnostic(
             result,
-            $"Conflicting invokable base type registrations for return type '{Display(result.ReturnType)}' and proxy base '{Display(result.ProxyBaseType)}': {string.Join(", ", distinct.Select(Display))}.");
+            $"Conflicting invokable base type registrations for return type '{Display(result.ReturnType)}' and proxy base '{Display(result.ProxyBaseType)}': {string.Join(", ", distinct.Select(DisplayWithAssembly))}.");
         return false;
     }
 
@@ -270,6 +274,15 @@ internal sealed class InvokableBaseTypeResolver
         var isOpenMapping = mapping.ReturnType.IsUnboundGenericType
             || mapping.ReturnType.IsGenericType && SymbolEqualityComparer.Default.Equals(mapping.ReturnType, mapping.ReturnType.OriginalDefinition);
         var requiresConstruction = baseType.IsUnboundGenericType;
+
+        if (isOpenMapping && !baseType.IsUnboundGenericType)
+        {
+            result = null;
+            diagnostic = CreateDiagnostic(
+                mapping,
+                $"Open generic return type mapping '{Display(mapping.ReturnType)}' requires an unbound generic invokable base type, but '{Display(baseType)}' is closed.");
+            return false;
+        }
 
         if ((isOpenMapping || requiresConstruction) && returnArity != baseArity)
         {
@@ -322,19 +335,13 @@ internal sealed class InvokableBaseTypeResolver
         {
             var parameter = baseType.TypeParameters[i];
             var argument = typeArguments[i];
-            if (parameter.HasReferenceTypeConstraint && !argument.IsReferenceType
-                || parameter.HasValueTypeConstraint && !argument.IsValueType
-                || parameter.HasUnmanagedTypeConstraint && !argument.IsUnmanagedType)
+            if (!SatisfiesSpecialConstraints(parameter, argument))
             {
                 reason = $"Type argument '{Display(argument)}' does not satisfy the constraints for '{parameter.Name}' on invokable base type '{Display(baseType)}'.";
                 return false;
             }
 
-            if (parameter.HasConstructorConstraint
-                && argument is INamedTypeSymbol namedArgument
-                && !argument.IsValueType
-                && !namedArgument.InstanceConstructors.Any(static constructor =>
-                    constructor.Parameters.Length == 0 && constructor.DeclaredAccessibility == Accessibility.Public))
+            if (parameter.HasConstructorConstraint && !SatisfiesConstructorConstraint(argument))
             {
                 reason = $"Type argument '{Display(argument)}' does not satisfy the constructor constraint for '{parameter.Name}' on invokable base type '{Display(baseType)}'.";
                 return false;
@@ -353,6 +360,83 @@ internal sealed class InvokableBaseTypeResolver
 
         reason = string.Empty;
         return true;
+
+        static bool SatisfiesSpecialConstraints(ITypeParameterSymbol parameter, ITypeSymbol argument)
+        {
+            var argumentParameter = argument as ITypeParameterSymbol;
+            var isNullableValueType = IsNullableValueType(argument);
+
+            if (parameter.HasReferenceTypeConstraint)
+            {
+                var isKnownReferenceType = argument.IsReferenceType
+                    || argumentParameter?.HasReferenceTypeConstraint == true;
+                if (!isKnownReferenceType)
+                {
+                    return false;
+                }
+
+                if (parameter.ReferenceTypeConstraintNullableAnnotation == NullableAnnotation.NotAnnotated
+                    && (argument.NullableAnnotation == NullableAnnotation.Annotated
+                        || argumentParameter?.ReferenceTypeConstraintNullableAnnotation == NullableAnnotation.Annotated))
+                {
+                    return false;
+                }
+            }
+
+            if (parameter.HasValueTypeConstraint
+                && (!argument.IsValueType && argumentParameter?.HasValueTypeConstraint != true
+                    || isNullableValueType))
+            {
+                return false;
+            }
+
+            if (parameter.HasUnmanagedTypeConstraint
+                && (!argument.IsUnmanagedType && argumentParameter?.HasUnmanagedTypeConstraint != true))
+            {
+                return false;
+            }
+
+            if (parameter.HasNotNullConstraint
+                && (isNullableValueType
+                    || argument.NullableAnnotation == NullableAnnotation.Annotated
+                    || argumentParameter is not null && !HasNotNullConstraint(argumentParameter)))
+            {
+                return false;
+            }
+
+            return !argument.IsRefLikeType;
+
+            static bool HasNotNullConstraint(ITypeParameterSymbol typeParameter)
+                => typeParameter.HasNotNullConstraint
+                    || typeParameter.HasValueTypeConstraint
+                    || typeParameter.HasUnmanagedTypeConstraint
+                    || typeParameter.HasReferenceTypeConstraint
+                        && typeParameter.ReferenceTypeConstraintNullableAnnotation == NullableAnnotation.NotAnnotated;
+        }
+
+        static bool SatisfiesConstructorConstraint(ITypeSymbol argument)
+        {
+            if (argument is ITypeParameterSymbol typeParameter)
+            {
+                return typeParameter.HasConstructorConstraint
+                    || typeParameter.HasValueTypeConstraint
+                    || typeParameter.HasUnmanagedTypeConstraint;
+            }
+
+            if (argument.IsValueType)
+            {
+                return true;
+            }
+
+            return argument is INamedTypeSymbol { IsAbstract: false } namedArgument
+                && namedArgument.InstanceConstructors.Any(static constructor =>
+                    constructor.Parameters.Length == 0
+                    && constructor.DeclaredAccessibility == Accessibility.Public);
+        }
+
+        static bool IsNullableValueType(ITypeSymbol argument)
+            => argument is INamedTypeSymbol namedArgument
+                && namedArgument.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T;
 
         static ITypeSymbol SubstituteConstraint(
             ITypeSymbol constraint,
@@ -407,7 +491,8 @@ internal sealed class InvokableBaseTypeResolver
         {
             foreach (var member in current.GetMembers(methodName).OfType<IMethodSymbol>())
             {
-                if (member.IsStatic || member.Parameters.Length != 1
+                if (member.IsStatic || member.IsAbstract || member.Arity != 0
+                    || member.Parameters.Length != 1 || member.Parameters[0].RefKind != RefKind.None
                     || !_compilation.IsSymbolAccessibleWithin(member, _compilation.Assembly))
                 {
                     continue;
@@ -425,12 +510,14 @@ internal sealed class InvokableBaseTypeResolver
 
         diagnostic = CreateDiagnostic(
             mapping,
-            $"Return-value proxy initializer '{Display(baseType)}.{methodName}' must be an accessible instance method with one parameter accepting '{Display(proxyBaseType)}' and a return type assignable to '{Display(returnType)}'.");
+            $"Return-value proxy initializer '{Display(baseType)}.{methodName}' must be an accessible, concrete, non-generic instance method with one by-value parameter accepting '{Display(proxyBaseType)}' and a return type assignable to '{Display(returnType)}'.");
         return false;
     }
 
     private static ResolverDiagnostic CreateDiagnostic(Mapping mapping, string message) => new(message, mapping.Location);
     private static string Display(ISymbol symbol) => symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+    private static string DisplayWithAssembly(INamedTypeSymbol type)
+        => $"{Display(type)} [{type.ContainingAssembly.Identity}]";
     private static Location? GetLocation(AttributeData attribute) => attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation();
     private static string GetOrigin(AttributeData attribute, IAssemblySymbol? assembly)
         => $"{assembly?.Identity}|{attribute.ApplicationSyntaxReference?.SyntaxTree.FilePath}|{attribute.ApplicationSyntaxReference?.Span.Start ?? -1}";

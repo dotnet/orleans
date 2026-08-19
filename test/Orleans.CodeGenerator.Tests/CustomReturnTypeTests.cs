@@ -149,6 +149,98 @@ public class CustomReturnTypeTests
     }
 
     [Fact]
+    public async Task OpenReturnMapping_RejectsClosedInvokableBase()
+    {
+        var result = await RunGenerator(CommonTypes + """
+            [InvokableBaseType(
+                typeof(GrainReference),
+                typeof(CustomCall<>),
+                typeof(CustomRequest<string>))]
+            public class CustomCall<T> { }
+
+            public abstract class CustomRequest<T> { }
+
+            public interface ICustomGrain : IGrainWithStringKey
+            {
+                CustomCall<int> Call();
+            }
+            """);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticRuleId.InvalidInvokableBaseTypeMapping, diagnostic.Id);
+        Assert.Contains("requires an unbound generic invokable base type", diagnostic.GetMessage());
+        Assert.Contains("CustomRequest<string>", diagnostic.GetMessage());
+    }
+
+    [Theory]
+    [InlineData("int?", "where T : struct")]
+    [InlineData("AbstractValue", "where T : new()")]
+    [InlineData("string", "where T : unmanaged")]
+    [InlineData("string?", "where T : notnull")]
+    [InlineData("string?", "where T : class")]
+    [InlineData("PlainValue", "where T : IMarker")]
+    public async Task InvalidTypeArgumentConstraints_ProduceDiagnostic(string typeArgument, string constraints)
+    {
+        var result = await RunGenerator("#nullable enable\n" + CommonTypes + $$"""
+            [InvokableBaseType(
+                typeof(GrainReference),
+                typeof(CustomCall<>),
+                typeof(ConstrainedRequest<>))]
+            public class CustomCall<T> { }
+
+            public interface IMarker { }
+            public class PlainValue { }
+            public abstract class AbstractValue
+            {
+                public AbstractValue() { }
+            }
+
+            public abstract class ConstrainedRequest<T> {{constraints}} { }
+
+            public interface ICustomGrain : IGrainWithStringKey
+            {
+                CustomCall<{{typeArgument}}> Call();
+            }
+            """);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticRuleId.InvalidInvokableBaseTypeMapping, diagnostic.Id);
+        Assert.Contains("does not satisfy", diagnostic.GetMessage());
+    }
+
+    [Theory]
+    [InlineData("string?", "where T : class?")]
+    [InlineData("int", "where T : struct")]
+    [InlineData("int", "where T : unmanaged")]
+    [InlineData("GoodValue", "where T : class, IMarker, new()")]
+    public async Task ValidTypeArgumentConstraints_AreAccepted(string typeArgument, string constraints)
+    {
+        var result = await RunGenerator("#nullable enable\n" + CommonTypes + $$"""
+            [InvokableBaseType(
+                typeof(GrainReference),
+                typeof(CustomCall<>),
+                typeof(ConstrainedRequest<>))]
+            public class CustomCall<T> { }
+
+            public interface IMarker { }
+            public class GoodValue : IMarker
+            {
+                public GoodValue() { }
+            }
+
+            public abstract class ConstrainedRequest<T> {{constraints}} { }
+
+            public interface ICustomGrain : IGrainWithStringKey
+            {
+                CustomCall<{{typeArgument}}> Call();
+            }
+            """);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Contains("ConstrainedRequest", GetGeneratedSource(result));
+    }
+
+    [Fact]
     public async Task InaccessibleBase_ProducesDiagnosticAtRegistration()
     {
         var result = await RunGenerator(CommonTypes + """
@@ -192,7 +284,35 @@ public class CustomReturnTypeTests
 
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(DiagnosticRuleId.InvalidInvokableBaseTypeMapping, diagnostic.Id);
-        Assert.Contains("must be an accessible instance method", diagnostic.GetMessage());
+        Assert.Contains("must be an accessible, concrete", diagnostic.GetMessage());
+    }
+
+    [Theory]
+    [InlineData("public abstract CustomCall InitializeRequest(GrainReference proxy);")]
+    [InlineData("public CustomCall InitializeRequest<T>(GrainReference proxy) => new();")]
+    [InlineData("public CustomCall InitializeRequest(ref GrainReference proxy) => new();")]
+    public async Task InvalidInitializerShape_ProducesDiagnostic(string initializer)
+    {
+        var result = await RunGenerator(CommonTypes + $$"""
+            [InvokableBaseType(typeof(GrainReference), typeof(CustomCall), typeof(CustomRequest))]
+            public class CustomCall { }
+
+            [ReturnValueProxy(nameof(InitializeRequest))]
+            public abstract class CustomRequest
+            {
+                {{initializer}}
+            }
+
+            public interface ICustomGrain : IGrainWithStringKey
+            {
+                CustomCall Call();
+            }
+            """);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticRuleId.InvalidInvokableBaseTypeMapping, diagnostic.Id);
+        Assert.Contains("concrete, non-generic", diagnostic.GetMessage());
+        Assert.Contains("one by-value parameter", diagnostic.GetMessage());
     }
 
     [Fact]
@@ -317,6 +437,53 @@ public class CustomReturnTypeTests
 
         Assert.Empty(result.Diagnostics);
         Assert.Contains(": global::Owner.CustomRequest", GetGeneratedSource(result));
+    }
+
+    [Fact]
+    public async Task SameNamedTypesFromDifferentAssemblies_ConflictIndependentOfReferenceOrder()
+    {
+        var owner = await CompileReference("""
+            namespace Owner;
+            public class CustomCall { }
+            """, "ReturnTypeOwner");
+        var baseSource = CommonTypes + """
+            namespace Shared
+            {
+                [ReturnValueProxy(nameof(InitializeRequest))]
+                public abstract class CustomRequest
+                {
+                    public Owner.CustomCall InitializeRequest(GrainReference proxy) => new();
+                }
+            }
+            """;
+        var baseA = await CompileReference(baseSource, "SameNameBaseA", owner);
+        var baseB = await CompileReference(baseSource, "SameNameBaseB", owner);
+        const string registration = """
+            using Orleans;
+            using Orleans.Runtime;
+            [assembly: InvokableBaseType(
+                typeof(GrainReference),
+                typeof(Owner.CustomCall),
+                typeof(Shared.CustomRequest))]
+            """;
+        var adapterA = await CompileReference(registration, "SameNameAdapterA", owner, baseA);
+        var adapterB = await CompileReference(registration, "SameNameAdapterB", owner, baseB);
+        var source = CommonTypes + """
+            public interface ICustomGrain : IGrainWithStringKey
+            {
+                Owner.CustomCall Call();
+            }
+            """;
+
+        var forward = await RunGenerator(source, owner, baseA, baseB, adapterA, adapterB);
+        var reverse = await RunGenerator(source, owner, baseB, baseA, adapterB, adapterA);
+
+        var forwardDiagnostic = Assert.Single(forward.Diagnostics);
+        var reverseDiagnostic = Assert.Single(reverse.Diagnostics);
+        Assert.Equal(DiagnosticRuleId.InvalidInvokableBaseTypeMapping, forwardDiagnostic.Id);
+        Assert.Equal(forwardDiagnostic.GetMessage(), reverseDiagnostic.GetMessage());
+        Assert.Contains("Shared.CustomRequest [SameNameBaseA", forwardDiagnostic.GetMessage());
+        Assert.Contains("Shared.CustomRequest [SameNameBaseB", forwardDiagnostic.GetMessage());
     }
 
     [Fact]
