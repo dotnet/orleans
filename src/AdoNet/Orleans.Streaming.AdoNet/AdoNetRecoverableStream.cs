@@ -16,15 +16,16 @@ internal sealed partial class AdoNetRecoverableStream(
 
     public async ValueTask<StreamCheckpointStoreState> Load(CancellationToken cancellationToken)
     {
-        _partition = await queries.AcquireStreamPartitionAsync(
+        var partition = await queries.AcquireStreamPartitionAsync(
             serviceId,
             providerId,
             queueId,
             options.StartFromNow).WaitAsync(cancellationToken);
-        _readOffset = _partition.Checkpoint ?? 0;
-        ThrowIfRetentionGap(_partition);
-        var checkpoint = _partition.Checkpoint?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
-        return new(checkpoint, _partition.OwnerEpoch.ToString(CultureInfo.InvariantCulture));
+        _partition = partition;
+        _readOffset = partition.Checkpoint ?? 0;
+        ThrowIfRetentionGap(partition);
+        var checkpoint = partition.Checkpoint?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+        return new(checkpoint, partition.OwnerEpoch.ToString(CultureInfo.InvariantCulture));
     }
 
     public async ValueTask<StreamCheckpointStoreState> Update(
