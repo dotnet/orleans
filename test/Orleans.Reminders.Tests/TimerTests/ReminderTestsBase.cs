@@ -192,8 +192,8 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         {
             if (additionalSilo is not null)
             {
-                await StopSiloAsync(additionalSilo);
-                await WaitForLivenessToStabilizeAsync();
+                await StopSiloAsync(additionalSilo).WaitAsync(cts.Token);
+                await WaitForLivenessToStabilizeAsync().WaitAsync(cts.Token);
             }
         }
     }
