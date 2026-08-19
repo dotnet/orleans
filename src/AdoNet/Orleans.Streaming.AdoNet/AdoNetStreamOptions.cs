@@ -28,10 +28,10 @@ public class AdoNetStreamOptions
     public DbDataSource? DataSource { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether a new partition checkpoint starts at the retained log tail.
+    /// Gets or sets a value indicating whether a new partition checkpoint starts at the current partition history tail.
     /// </summary>
     /// <remarks>
-    /// When <see langword="false"/>, a new checkpoint starts immediately before the earliest retained message.
+    /// When <see langword="false"/>, a new checkpoint starts immediately before the earliest retained record.
     /// This setting is only used while initializing a partition which does not have a checkpoint.
     /// </remarks>
     public bool StartFromNow { get; set; }
@@ -42,7 +42,7 @@ public class AdoNetStreamOptions
     public bool FaultOnDeliveryFailure { get; set; }
 
     /// <summary>
-    /// Gets or sets the maximum number of messages returned by a partition read.
+    /// Gets or sets the maximum number of stream records returned by a partition read.
     /// </summary>
     public int MaxMessagesPerRead { get; set; } = 1_000;
 
@@ -52,7 +52,7 @@ public class AdoNetStreamOptions
     public TimeSpan CheckpointPersistInterval { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
-    /// Gets or sets the minimum amount of time that a message is retained after it is checkpointed.
+    /// Gets or sets the minimum amount of time that a stream record is retained after it is checkpointed.
     /// </summary>
     public TimeSpan RetentionPeriod { get; set; } = TimeSpan.FromDays(1);
 
@@ -60,7 +60,7 @@ public class AdoNetStreamOptions
     /// Gets or sets an optional hard retention ceiling.
     /// </summary>
     /// <remarks>
-    /// Messages older than this value can be deleted even when they are newer than the checkpoint.
+    /// Stream records older than this value can be deleted even when they are newer than the checkpoint.
     /// Such deletions are reported by storage so that the receiver can emit gap diagnostics.
     /// </remarks>
     public TimeSpan? MaximumRetentionPeriod { get; set; }
@@ -71,7 +71,7 @@ public class AdoNetStreamOptions
     public TimeSpan CleanupInterval { get; set; } = TimeSpan.FromMinutes(1);
 
     /// <summary>
-    /// Gets or sets the maximum number of messages deleted by one cleanup operation.
+    /// Gets or sets the maximum number of stream records deleted by one cleanup operation.
     /// </summary>
     public int CleanupBatchSize { get; set; } = 1_000;
 

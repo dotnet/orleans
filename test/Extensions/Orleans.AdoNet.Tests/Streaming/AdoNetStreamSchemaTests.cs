@@ -10,7 +10,7 @@ public sealed class AdoNetStreamSchemaTests
     [InlineData("SQLServer")]
     [InlineData("PostgreSQL")]
     [InlineData("MySQL")]
-    public void SchemaDefinesVersionedImmutablePartitionLog(string provider)
+    public void SchemaDefinesVersionedStreamPartitions(string provider)
     {
         var script = ReadScript(provider);
 
