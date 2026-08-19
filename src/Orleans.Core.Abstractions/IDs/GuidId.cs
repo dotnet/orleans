@@ -135,7 +135,7 @@ namespace Orleans.Runtime
 
             Span<char> buffer = !reader.HasValueSequence || reader.ValueSequence.Length <= 32
                                 ? stackalloc char[32]
-                                : new char[reader.ValueSequence.Length];
+                                : new char[checked((int)reader.ValueSequence.Length)];
 
             var read = reader.CopyString(buffer);
             if (!Guid.TryParseExact(buffer[..read], "N", out var value))
