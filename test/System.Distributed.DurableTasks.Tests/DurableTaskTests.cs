@@ -202,98 +202,153 @@ public class DurableTaskTests
     }
 
     [Fact]
-    public async Task TokenCallbackToDurableCallbackCancellationCycleCompletes()
+    public async Task DurableCallbackCancellationCycleFlowsThroughTaskRun()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
-        var first = host.CreateContext(TaskId.CreateRoot("token-durable-first"));
-        var second = host.CreateContext(TaskId.CreateRoot("token-durable-second"));
-        using var tokenRegistration = first.CancellationToken.Register(() =>
+        var first = host.CreateContext(TaskId.CreateRoot("task-run-first"));
+        var second = host.CreateContext(TaskId.CreateRoot("task-run-second"));
+        await first.RegisterCancellationCallbackAsync(
+            async _ => await Task.Run(
+                async () => await DurableTaskRuntimeHelper.RequestCancellationAsync(second)));
+        await second.RegisterCancellationCallbackAsync(_ =>
         {
-            Assert.Null(DurableExecutionContext.Current);
-            DurableTaskRuntimeHelper.RequestCancellationAsync(second).GetAwaiter().GetResult();
+            var cycleClosingRequest = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
+            Assert.True(cycleClosingRequest.IsCompletedSuccessfully);
+            return new(cycleClosingRequest);
+        });
+
+        await DurableTaskRuntimeHelper.RequestCancellationAsync(first).WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.True(first.IsCancellationRequested);
+        Assert.True(second.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task SuppressedTaskRunDetachesCancellationDependency()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var first = host.CreateContext(TaskId.CreateRoot("suppressed-first"));
+        var second = host.CreateContext(TaskId.CreateRoot("suppressed-second"));
+        var reverseRequestCompletedSynchronously = true;
+        await first.RegisterCancellationCallbackAsync(async _ =>
+        {
+            Task detachedRequest;
+            using (ExecutionContext.SuppressFlow())
+            {
+                detachedRequest = Task.Run(
+                    () => DurableTaskRuntimeHelper.RequestCancellationAsync(second));
+            }
+
+            await detachedRequest;
         });
         await second.RegisterCancellationCallbackAsync(_ =>
         {
-            var request = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
-            Assert.True(request.IsCompletedSuccessfully);
-            return new(request);
+            var reverseRequest = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
+            reverseRequestCompletedSynchronously = reverseRequest.IsCompletedSuccessfully;
+            return ValueTask.CompletedTask;
         });
 
-        var cancellation = Task.Run(() => DurableTaskRuntimeHelper.RequestCancellationAsync(first));
-        await cancellation.WaitAsync(TimeSpan.FromSeconds(10));
+        await DurableTaskRuntimeHelper.RequestCancellationAsync(first).WaitAsync(TimeSpan.FromSeconds(10));
 
+        Assert.False(reverseRequestCompletedSynchronously);
         Assert.True(first.IsCancellationRequested);
         Assert.True(second.IsCancellationRequested);
     }
 
     [Fact]
-    public async Task MultiContextMixedTokenCancellationCycleCompletes()
+    public async Task OrdinaryTokenCallbackInitiatesCancellationWithoutWaiting()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
-        var first = host.CreateContext(TaskId.CreateRoot("mixed-first"));
-        var second = host.CreateContext(TaskId.CreateRoot("mixed-second"));
-        var third = host.CreateContext(TaskId.CreateRoot("mixed-third"));
-        using var firstTokenRegistration = first.CancellationToken.Register(
-            () => DurableTaskRuntimeHelper.RequestCancellationAsync(second).GetAwaiter().GetResult());
-        await second.RegisterCancellationCallbackAsync(
-            async _ => await DurableTaskRuntimeHelper.RequestCancellationAsync(third));
-        using var thirdTokenRegistration = third.CancellationToken.Register(() =>
+        var first = host.CreateContext(TaskId.CreateRoot("observer-first"));
+        var second = host.CreateContext(TaskId.CreateRoot("observer-second"));
+        var secondCallbackStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSecondCallback = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task? secondRequest = null;
+        await second.RegisterCancellationCallbackAsync(async _ =>
         {
-            var request = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
-            Assert.True(request.IsCompletedSuccessfully);
-            request.GetAwaiter().GetResult();
+            secondCallbackStarted.SetResult();
+            await releaseSecondCallback.Task;
         });
-
-        var cancellation = Task.Run(() => DurableTaskRuntimeHelper.RequestCancellationAsync(first));
-        await cancellation.WaitAsync(TimeSpan.FromSeconds(10));
-
-        Assert.True(first.IsCancellationRequested);
-        Assert.True(second.IsCancellationRequested);
-        Assert.True(third.IsCancellationRequested);
-    }
-
-    [Fact]
-    public async Task NestedTokenCancellationCycleCompletes()
-    {
-        var host = new TestHost(DateTimeOffset.UnixEpoch);
-        var first = host.CreateContext(TaskId.CreateRoot("nested-token-first"));
-        var second = host.CreateContext(TaskId.CreateRoot("nested-token-second"));
-        using var firstTokenRegistration = first.CancellationToken.Register(
-            () => DurableTaskRuntimeHelper.RequestCancellationAsync(second).GetAwaiter().GetResult());
-        using var secondTokenRegistration = second.CancellationToken.Register(() =>
+        using var tokenRegistration = first.CancellationToken.Register(() =>
         {
-            var request = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
-            Assert.True(request.IsCompletedSuccessfully);
-            request.GetAwaiter().GetResult();
+            Assert.Null(DurableExecutionContext.Current);
+            secondRequest = DurableTaskRuntimeHelper.RequestCancellationAsync(second);
         });
 
-        var cancellation = Task.Run(() => DurableTaskRuntimeHelper.RequestCancellationAsync(first));
-        await cancellation.WaitAsync(TimeSpan.FromSeconds(10));
+        var firstRequest = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
+        await secondCallbackStarted.Task;
 
+        Assert.True(firstRequest.IsCompletedSuccessfully);
+        Assert.NotNull(secondRequest);
+        Assert.False(secondRequest.IsCompleted);
+        releaseSecondCallback.SetResult();
+        await secondRequest;
         Assert.True(first.IsCancellationRequested);
         Assert.True(second.IsCancellationRequested);
     }
 
     [Fact]
-    public async Task TokenCallbackFailureDoesNotHideMixedCancellationCycle()
+    public async Task UnsafeTokenCallbackIsAnExternalObserver()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
-        var first = host.CreateContext(TaskId.CreateRoot("token-failure-first"));
-        var second = host.CreateContext(TaskId.CreateRoot("token-failure-second"));
-        var expected = new InvalidOperationException("token callback failed");
-        using var cycleRegistration = first.CancellationToken.Register(
-            () => DurableTaskRuntimeHelper.RequestCancellationAsync(second).GetAwaiter().GetResult());
-        using var failureRegistration = first.CancellationToken.Register(() => throw expected);
-        await second.RegisterCancellationCallbackAsync(
-            async _ => await DurableTaskRuntimeHelper.RequestCancellationAsync(first));
+        var first = host.CreateContext(TaskId.CreateRoot("unsafe-observer-first"));
+        var second = host.CreateContext(TaskId.CreateRoot("unsafe-observer-second"));
+        var reverseRequestCompletedSynchronously = true;
+        await second.RegisterCancellationCallbackAsync(_ =>
+        {
+            var reverseRequest = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
+            reverseRequestCompletedSynchronously = reverseRequest.IsCompletedSuccessfully;
+            return ValueTask.CompletedTask;
+        });
+        using var tokenRegistration = first.CancellationToken.UnsafeRegister(
+            _ => _ = DurableTaskRuntimeHelper.RequestCancellationAsync(second),
+            null);
 
-        var cancellation = Task.Run(() => DurableTaskRuntimeHelper.RequestCancellationAsync(first));
+        await DurableTaskRuntimeHelper.RequestCancellationAsync(first).WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.False(reverseRequestCompletedSynchronously);
+        Assert.True(first.IsCancellationRequested);
+        Assert.True(second.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task UnrelatedExternalRequestDuringActiveCancellationAwaitsItsOwnCompletion()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var active = host.CreateContext(TaskId.CreateRoot("active"));
+        var unrelated = host.CreateContext(TaskId.CreateRoot("unrelated"));
+        var activeCallbackStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseActiveCallback = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var unrelatedCallbackStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseUnrelatedCallback = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var expected = new InvalidOperationException("unrelated failure");
+        await active.RegisterCancellationCallbackAsync(async _ =>
+        {
+            activeCallbackStarted.SetResult();
+            await releaseActiveCallback.Task;
+        });
+        await unrelated.RegisterCancellationCallbackAsync(async _ =>
+        {
+            unrelatedCallbackStarted.SetResult();
+            await releaseUnrelatedCallback.Task;
+            throw expected;
+        });
+
+        var activeRequest = DurableTaskRuntimeHelper.RequestCancellationAsync(active);
+        await activeCallbackStarted.Task;
+        var unrelatedRequest = Task.Run(
+            () => DurableTaskRuntimeHelper.RequestCancellationAsync(unrelated));
+        await unrelatedCallbackStarted.Task;
+
+        Assert.False(unrelatedRequest.IsCompleted);
+        releaseUnrelatedCallback.SetResult();
         var exception = await Assert.ThrowsAsync<AggregateException>(
-            async () => await cancellation.WaitAsync(TimeSpan.FromSeconds(10)));
+            async () => await unrelatedRequest.WaitAsync(TimeSpan.FromSeconds(10)));
 
         Assert.Same(expected, Assert.Single(exception.InnerExceptions));
-        Assert.True(first.IsCancellationRequested);
-        Assert.True(second.IsCancellationRequested);
+        Assert.False(activeRequest.IsCompleted);
+        releaseActiveCallback.SetResult();
+        await activeRequest;
     }
 
     [Fact]
@@ -564,13 +619,17 @@ public class DurableTaskTests
         var host = new TestHost(DateTimeOffset.UnixEpoch);
         var context = host.CreateContext(TaskId.CreateRoot("all-callbacks"));
         var calls = new ConcurrentBag<string>();
-        using var tokenRegistration = context.CancellationToken.Register(static state =>
+        var registrationContext = new AsyncLocal<string>();
+        registrationContext.Value = "registration";
+        using var tokenRegistration = context.CancellationToken.Register(state =>
         {
             var observedCalls = (ConcurrentBag<string>)state!;
             Assert.Null(DurableExecutionContext.Current);
+            Assert.Equal("registration", registrationContext.Value);
             observedCalls.Add("token");
             throw new InvalidOperationException("token failure");
         }, calls);
+        registrationContext.Value = "request";
         await context.RegisterCancellationCallbackAsync(_ =>
         {
             Assert.Same(context, DurableExecutionContext.Current);
@@ -596,36 +655,29 @@ public class DurableTaskTests
     }
 
     [Fact]
-    public async Task ConcurrentLateRegistrationNeverObservesAnUncanceledDurableToken()
+    public async Task TokenObserverCanPromptlyRegisterDurableCallback()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
         var context = host.CreateContext(TaskId.CreateRoot("late-race"));
-        var tokenCallbackStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var releaseTokenCallback = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var durableCallbackCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        IAsyncDisposable? durableRegistration = null;
         using var tokenRegistration = context.CancellationToken.Register(() =>
         {
-            tokenCallbackStarted.SetResult();
-            releaseTokenCallback.Task.GetAwaiter().GetResult();
+            Assert.True(context.CancellationToken.IsCancellationRequested);
+            Assert.False(context.IsCancellationRequested);
+            var pendingRegistration = context.RegisterCancellationCallbackAsync(token =>
+            {
+                Assert.True(token.IsCancellationRequested);
+                durableCallbackCompleted.SetResult();
+                return ValueTask.CompletedTask;
+            });
+            Assert.True(pendingRegistration.IsCompletedSuccessfully);
+            durableRegistration = pendingRegistration.Result;
         });
 
-        var cancellation = Task.Run(
-            async () => await DurableTaskRuntimeHelper.RequestCancellationAsync(context));
-        await tokenCallbackStarted.Task;
-
-        Assert.True(context.CancellationToken.IsCancellationRequested);
-        Assert.False(context.IsCancellationRequested);
-        await context.RegisterCancellationCallbackAsync(token =>
-        {
-            Assert.True(token.IsCancellationRequested);
-            durableCallbackCompleted.SetResult();
-            return ValueTask.CompletedTask;
-        });
-        Assert.False(durableCallbackCompleted.Task.IsCompleted);
-
-        releaseTokenCallback.SetResult();
-        await cancellation;
+        await DurableTaskRuntimeHelper.RequestCancellationAsync(context);
         await durableCallbackCompleted.Task;
+        await durableRegistration!.DisposeAsync();
 
         Assert.True(context.IsCancellationRequested);
     }
