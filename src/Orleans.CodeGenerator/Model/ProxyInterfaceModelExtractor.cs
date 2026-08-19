@@ -25,11 +25,7 @@ internal static class ProxyInterfaceModelExtractor
             return null;
         }
 
-        return ExtractProxyInterfaceModel(
-            typeSymbol,
-            context.SemanticModel.Compilation,
-            context.Attributes,
-            cancellationToken);
+        return ExtractProxyInterfaceModel(typeSymbol, context.SemanticModel.Compilation, context.Attributes, cancellationToken);
     }
 
     internal static ProxyInterfaceModel? ExtractProxyInterfaceModel(
@@ -130,6 +126,7 @@ internal static class ProxyInterfaceModelExtractor
 
         return name;
     }
+
 
     private static bool TryGetGenerateMethodSerializersAttribute(
         INamedTypeSymbol typeSymbol,
@@ -512,3 +509,4 @@ internal static class ProxyInterfaceModelExtractor
         return false;
     }
 }
+

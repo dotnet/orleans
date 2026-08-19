@@ -1,8 +1,9 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Orleans.CodeGenerator;
 
@@ -17,7 +18,7 @@ namespace Orleans.Analyzers
         public const string Category = "Usage";
         public const string InvalidMappingDiagnosticId = "ORLEANS0026";
 
-        private static readonly DiagnosticDescriptor Rule = new(DiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
+        private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(DiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
         private static readonly DiagnosticDescriptor InvalidMappingRule = new(
             InvalidMappingDiagnosticId,
             "Invalid invokable base type mapping",
@@ -39,109 +40,71 @@ namespace Orleans.Analyzers
                     return;
                 }
 
-                var generateMethodSerializersAttribute = context.Compilation.GetTypeByMetadataName("Orleans.GenerateMethodSerializersAttribute");
-                var proxyContexts = GetProxyContexts(
-                    context.Compilation.Assembly.GlobalNamespace,
-                    baseInterface,
-                    generateMethodSerializersAttribute);
                 var resolver = new InvokableBaseTypeResolver(context.Compilation);
+                var generateMethodSerializersAttribute = context.Compilation.GetTypeByMetadataName("Orleans.GenerateMethodSerializersAttribute");
                 context.RegisterSymbolAction(
-                    context => AnalyzeMethod(context, proxyContexts, resolver),
+                    context => AnalyzeMethod(context, baseInterface, generateMethodSerializersAttribute, resolver),
                     SymbolKind.Method);
             });
         }
 
         private static void AnalyzeMethod(
             SymbolAnalysisContext context,
-            ImmutableArray<ProxyContext> proxyContexts,
+            INamedTypeSymbol baseInterface,
+            INamedTypeSymbol? generateMethodSerializersAttribute,
             InvokableBaseTypeResolver resolver)
         {
             var symbol = (IMethodSymbol)context.Symbol;
-            if (symbol.ContainingType.TypeKind != TypeKind.Interface || symbol.IsStatic)
-            {
+
+            if (symbol.ContainingType.TypeKind != TypeKind.Interface) return;
+
+            // allow static interface methods to return any type
+            if (symbol.IsStatic)
                 return;
+
+            var isIAddressableInterface = false;
+            foreach (var implementedInterface in symbol.ContainingType.AllInterfaces)
+            {
+                if (implementedInterface.Equals(baseInterface, SymbolEqualityComparer.Default))
+                {
+                    isIAddressableInterface = true;
+                    break;
+                }
             }
 
-            ResolverDiagnostic? diagnostic = null;
-            foreach (var proxyContext in proxyContexts)
+            if (!isIAddressableInterface)
+                return;
+
+            var proxyBaseTypes = GetProxyBaseTypes(symbol.ContainingType, generateMethodSerializersAttribute);
+            ResolverDiagnostic? mappingDiagnostic = null;
+            foreach (var proxyBaseType in proxyBaseTypes)
             {
-                if (!TryGetContextMethod(proxyContext.InterfaceType, symbol, out var contextMethod))
+                if (resolver.TryResolve(proxyBaseType, symbol, out _, out var diagnostic))
                 {
-                    continue;
+                    return;
                 }
 
-                if (resolver.TryResolve(
-                    proxyContext.ProxyBaseType,
-                    contextMethod,
-                    proxyContext.InterfaceType,
-                    out _,
-                    out diagnostic))
+                if (diagnostic is { Kind: ResolverDiagnosticKind.InvalidMapping })
                 {
-                    continue;
+                    mappingDiagnostic ??= diagnostic;
                 }
-
-                break;
             }
 
-            if (diagnostic is null)
-            {
-                return;
-            }
-
-            var syntaxReference = symbol.DeclaringSyntaxReferences[0];
-            if (diagnostic.Kind == ResolverDiagnosticKind.InvalidMapping)
+            var syntaxReference = symbol.DeclaringSyntaxReferences;
+            if (mappingDiagnostic is not null)
             {
                 context.ReportDiagnostic(Diagnostic.Create(
                     InvalidMappingRule,
-                    diagnostic.Location ?? Location.Create(syntaxReference.SyntaxTree, syntaxReference.Span),
-                    diagnostic.Message));
+                    mappingDiagnostic.Location ?? Location.Create(syntaxReference[0].SyntaxTree, syntaxReference[0].Span),
+                    mappingDiagnostic.Message));
                 return;
             }
 
-            context.ReportDiagnostic(Diagnostic.Create(
-                Rule,
-                Location.Create(syntaxReference.SyntaxTree, syntaxReference.Span)));
+            context.ReportDiagnostic(Diagnostic.Create(Rule, Location.Create(syntaxReference[0].SyntaxTree, syntaxReference[0].Span)));
         }
 
-        private static bool TryGetContextMethod(
-            INamedTypeSymbol proxyInterface,
-            IMethodSymbol method,
-            out IMethodSymbol contextMethod)
-        {
-            if (SymbolEqualityComparer.Default.Equals(
-                proxyInterface.OriginalDefinition,
-                method.ContainingType.OriginalDefinition))
-            {
-                contextMethod = method;
-                return true;
-            }
-
-            foreach (var inheritedInterface in proxyInterface.AllInterfaces)
-            {
-                if (!SymbolEqualityComparer.Default.Equals(
-                    inheritedInterface.OriginalDefinition,
-                    method.ContainingType.OriginalDefinition))
-                {
-                    continue;
-                }
-
-                foreach (var candidate in inheritedInterface.GetMembers(method.Name).OfType<IMethodSymbol>())
-                {
-                    if (SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, method.OriginalDefinition))
-                    {
-                        contextMethod = candidate;
-                        return true;
-                    }
-                }
-            }
-
-            contextMethod = null!;
-            return false;
-        }
-
-        private static ImmutableArray<ProxyContext> GetProxyContexts(
-            INamespaceSymbol globalNamespace,
-            INamedTypeSymbol baseInterface,
+        private static ImmutableArray<INamedTypeSymbol> GetProxyBaseTypes(
+            INamedTypeSymbol interfaceType,
             INamedTypeSymbol? generateMethodSerializersAttribute)
         {
             if (generateMethodSerializersAttribute is null)
@@ -149,63 +112,24 @@ namespace Orleans.Analyzers
                 return [];
             }
 
-            var result = new List<ProxyContext>();
-            AddNamespace(globalNamespace);
-            return [.. result
-                .OrderBy(static entry => entry.SourceOrderGroup)
-                .ThenBy(static entry => entry.FilePath, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.Position)
-                .ThenBy(
-                    static entry => entry.InterfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-                    StringComparer.Ordinal)];
-
-            void AddNamespace(INamespaceSymbol @namespace)
+            var result = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
+            foreach (var candidate in interfaceType.AllInterfaces.Add(interfaceType))
             {
-                foreach (var member in @namespace.GetMembers())
+                foreach (var attribute in candidate.GetAttributes())
                 {
-                    if (member is INamespaceSymbol childNamespace)
+                    if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, generateMethodSerializersAttribute)
+                        && attribute.ConstructorArguments.Length > 0
+                        && attribute.ConstructorArguments[0].Value is INamedTypeSymbol proxyBaseType
+                        && !result.Any(existing => SymbolEqualityComparer.Default.Equals(existing, proxyBaseType)))
                     {
-                        AddNamespace(childNamespace);
-                    }
-                    else if (member is INamedTypeSymbol type)
-                    {
-                        AddType(type);
+                        result.Add(proxyBaseType.OriginalDefinition);
                     }
                 }
             }
 
-            void AddType(INamedTypeSymbol type)
-            {
-                if (type.TypeKind == TypeKind.Interface
-                    && type.AllInterfaces.Any(implemented =>
-                        SymbolEqualityComparer.Default.Equals(implemented, baseInterface))
-                    && InvokableBaseTypeResolver.TryGetProxyBaseType(
-                        type,
-                        generateMethodSerializersAttribute,
-                        out var proxyBaseType,
-                        out _))
-                {
-                    var location = type.Locations.FirstOrDefault(static candidate => candidate.IsInSource);
-                    result.Add(new ProxyContext(
-                        type,
-                        proxyBaseType,
-                        location is null ? 1 : 0,
-                        location?.SourceTree?.FilePath ?? string.Empty,
-                        location?.SourceSpan.Start ?? int.MaxValue));
-                }
-
-                foreach (var nestedType in type.GetTypeMembers())
-                {
-                    AddType(nestedType);
-                }
-            }
+            return [.. result.OrderBy(
+                static type => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                StringComparer.Ordinal)];
         }
-
-        private sealed record ProxyContext(
-            INamedTypeSymbol InterfaceType,
-            INamedTypeSymbol ProxyBaseType,
-            int SourceOrderGroup,
-            string FilePath,
-            int Position);
     }
 }

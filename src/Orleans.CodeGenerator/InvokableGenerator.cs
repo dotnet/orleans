@@ -245,7 +245,7 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
 
     private INamedTypeSymbol GetBaseClassType(InvokableMethodDescription method)
     {
-        if (_generationContext.InvokableBaseTypeResolver.TryResolveBaseType(
+        if (_generationContext.InvokableBaseTypeResolver.TryResolve(
             method.ProxyBase.ProxyBaseType,
             method.Method,
             out var baseClassType,

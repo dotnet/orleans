@@ -72,12 +72,6 @@ internal static class SyntaxFactoryUtility
     public static List<(string Name, List<TypeParameterConstraintSyntax> Constraints)> GetTypeParameterConstraints(List<(string Name, ITypeParameterSymbol Parameter)> typeParameter)
     {
         var allConstraints = new List<(string, List<TypeParameterConstraintSyntax>)>();
-        var substitutions = new Dictionary<ITypeParameterSymbol, string>(SymbolEqualityComparer.Default);
-        foreach (var (name, parameter) in typeParameter)
-        {
-            substitutions[parameter] = name;
-        }
-
         foreach (var (name, tp) in typeParameter)
         {
             var constraints = new List<TypeParameterConstraintSyntax>();
@@ -101,7 +95,7 @@ internal static class SyntaxFactoryUtility
 
             foreach (var c in tp.ConstraintTypes)
             {
-                constraints.Add(TypeConstraint(c.ToTypeSyntax(substitutions)));
+                constraints.Add(TypeConstraint(c.ToTypeSyntax()));
             }
 
             if (tp.HasConstructorConstraint)

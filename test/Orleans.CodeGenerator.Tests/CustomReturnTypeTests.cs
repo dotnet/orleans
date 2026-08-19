@@ -34,31 +34,6 @@ public class CustomReturnTypeTests
     }
 
     [Fact]
-    public async Task ShadowedGenericParameterNames_AreAlphaRenamedAcrossAllScopes()
-    {
-        var result = await RunGenerator(CommonTypes + """
-            [InvokableBaseType(typeof(GrainReference), typeof(CustomCall<>), typeof(CustomRequest<>))]
-            public readonly struct CustomCall<T> { }
-
-            public abstract class CustomRequest<T> { }
-
-            public class Scope<T> where T : class
-            {
-                public interface ICustomGrain<T> : IGrainWithStringKey where T : class
-                {
-                    CustomCall<U> Call<T, U>() where T : class where U : T;
-                }
-            }
-            """);
-
-        Assert.Empty(result.Diagnostics);
-        var generated = GetGeneratedSource(result);
-        Assert.Contains("<T, T_1, T_2, U>", generated);
-        Assert.Contains(": global::CustomRequest<U>", generated);
-        Assert.Contains("where U : T_2", generated);
-    }
-
-    [Fact]
     public async Task NonGenericReturnType_UsesRegisteredBase()
     {
         var result = await RunGenerator(CommonTypes + """
@@ -111,42 +86,6 @@ public class CustomReturnTypeTests
         var generated = GetGeneratedSource(result);
         Assert.Contains(": global::IntRequest", generated);
         Assert.DoesNotContain(": global::CustomRequest<int>", generated);
-    }
-
-    [Fact]
-    public async Task LowerPrecedenceExactRegistration_PrecedesHigherPrecedenceOpenRegistration()
-    {
-        var result = await RunGenerator(CommonTypes + """
-            [InvokableBaseType(typeof(GrainReference), typeof(CustomCall<int>), typeof(IntRequest))]
-            public class CustomCall<T> { }
-
-            [ReturnValueProxy(nameof(InitializeRequest))]
-            public abstract class OpenRequest<T>
-            {
-                public CustomCall<T> InitializeRequest(GrainReference proxy) => new();
-            }
-
-            [ReturnValueProxy(nameof(InitializeRequest))]
-            public abstract class IntRequest
-            {
-                public CustomCall<int> InitializeRequest(GrainReference proxy) => new();
-            }
-
-            [AttributeUsage(AttributeTargets.Method)]
-            [InvokableBaseType(typeof(GrainReference), typeof(CustomCall<>), typeof(OpenRequest<>))]
-            public sealed class UseOpenMappingAttribute : Attribute { }
-
-            public interface ICustomGrain : IGrainWithStringKey
-            {
-                [UseOpenMapping]
-                CustomCall<int> Call();
-            }
-            """);
-
-        Assert.Empty(result.Diagnostics);
-        var generated = GetGeneratedSource(result);
-        Assert.Contains(": global::IntRequest", generated);
-        Assert.DoesNotContain(": global::OpenRequest<int>", generated);
     }
 
     [Fact]
@@ -580,33 +519,6 @@ public class CustomReturnTypeTests
     }
 
     [Fact]
-    public async Task InheritedMethodInitializer_IsValidatedForEachDerivedProxyReceiver()
-    {
-        var result = await RunGenerator(CommonTypes + """
-            [InvokableBaseType(typeof(GrainReference), typeof(CustomCall), typeof(CustomRequest))]
-            public class CustomCall { }
-
-            [ReturnValueProxy(nameof(InitializeRequest))]
-            public abstract class CustomRequest
-            {
-                public CustomCall InitializeRequest(IBase proxy) => new();
-                public object InitializeRequest(IDerived proxy) => new();
-            }
-
-            public interface IBase : IGrainWithStringKey
-            {
-                CustomCall Call();
-            }
-
-            public interface IDerived : IBase { }
-            """);
-
-        var diagnostic = Assert.Single(result.Diagnostics);
-        Assert.Equal(DiagnosticRuleId.InvalidInvokableBaseTypeMapping, diagnostic.Id);
-        Assert.Contains("Return-value proxy initializer", diagnostic.GetMessage());
-    }
-
-    [Fact]
     public async Task ReferencedInitializerOverloadResolution_IsIndependentOfReferenceOrder()
     {
         var owner = await CompileReference(CommonTypes + """
@@ -668,118 +580,6 @@ public class CustomReturnTypeTests
 
         Assert.Empty(result.Diagnostics);
         Assert.Contains("GetInvokable<", GetGeneratedSource(result));
-    }
-
-    [Fact]
-    public async Task GeneratedActivatorConstructor_RejectsAmbiguousGeneratedBaseInitializer()
-    {
-        var result = await RunGenerator(CommonTypes + """
-            [InvokableBaseType(typeof(GrainReference), typeof(CustomCall), typeof(CustomRequest))]
-            public class CustomCall { }
-            public interface ILeft { }
-            public interface IRight { }
-            public sealed class Both : ILeft, IRight { }
-
-            public abstract class ActivatorSource
-            {
-                [GeneratedActivatorConstructor]
-                protected ActivatorSource(Both value) { }
-            }
-
-            public abstract class CustomRequest : ActivatorSource
-            {
-                protected CustomRequest(ILeft value) : base(null) { }
-                protected CustomRequest(IRight value) : base(null) { }
-            }
-
-            public interface ICustomGrain : IGrainWithStringKey
-            {
-                CustomCall Call();
-            }
-            """);
-
-        var diagnostic = Assert.Single(result.Diagnostics);
-        Assert.Equal(DiagnosticRuleId.InvalidInvokableBaseTypeMapping, diagnostic.Id);
-        Assert.Contains("accessible parameterless constructor", diagnostic.GetMessage());
-    }
-
-    [Theory]
-    [InlineData("string[]", "params string[] values")]
-    [InlineData("string", "params string[] values")]
-    [InlineData("string", "object value, int optional = 0")]
-    public async Task GeneratedActivatorConstructor_BindsExactParamsAndOptionalBaseInitializer(
-        string activatorParameterType,
-        string baseParameters)
-    {
-        var result = await RunGenerator(CommonTypes + $$"""
-            [InvokableBaseType(typeof(GrainReference), typeof(CustomCall), typeof(CustomRequest))]
-            public class CustomCall { }
-
-            public abstract class ActivatorSource
-            {
-                [GeneratedActivatorConstructor]
-                protected ActivatorSource({{activatorParameterType}} value) { }
-            }
-
-            public abstract class CustomRequest : ActivatorSource
-            {
-                protected CustomRequest({{baseParameters}}) : base(null) { }
-            }
-
-            public interface ICustomGrain : IGrainWithStringKey
-            {
-                CustomCall Call();
-            }
-            """);
-
-        Assert.Empty(result.Diagnostics);
-        Assert.Contains(": global::CustomRequest", GetGeneratedSource(result));
-    }
-
-    [Fact]
-    public async Task ReferencedGeneratedActivatorConstructorBinding_IsIndependentOfReferenceOrder()
-    {
-        var owner = await CompileReference(CommonTypes + """
-            namespace Owner
-            {
-                public class CustomCall { }
-                public interface ILeft { }
-                public interface IRight { }
-                public sealed class Both : ILeft, IRight { }
-
-                public abstract class ActivatorSource
-                {
-                    [GeneratedActivatorConstructor]
-                    protected ActivatorSource(Both value) { }
-                }
-
-                public abstract class CustomRequest : ActivatorSource
-                {
-                    protected CustomRequest(ILeft value) : base(null) { }
-                    protected CustomRequest(IRight value) : base(null) { }
-                }
-            }
-            """, "ConstructorOwner");
-        var adapter = await CompileReference(CommonTypes + """
-            [assembly: InvokableBaseType(
-                typeof(GrainReference),
-                typeof(Owner.CustomCall),
-                typeof(Owner.CustomRequest))]
-            """, "ConstructorAdapter", owner);
-        var source = CommonTypes + """
-            public interface ICustomGrain : IGrainWithStringKey
-            {
-                Owner.CustomCall Call();
-            }
-            """;
-
-        var forward = await RunGenerator(source, owner, adapter);
-        var reverse = await RunGenerator(source, adapter, owner);
-
-        var forwardDiagnostic = Assert.Single(forward.Diagnostics);
-        var reverseDiagnostic = Assert.Single(reverse.Diagnostics);
-        Assert.Equal(DiagnosticRuleId.InvalidInvokableBaseTypeMapping, forwardDiagnostic.Id);
-        Assert.Equal(forwardDiagnostic.GetMessage(), reverseDiagnostic.GetMessage());
     }
 
     [Theory]
@@ -1095,84 +895,6 @@ public class CustomReturnTypeTests
         Assert.Equal("RequestA", requestA!.Name);
         Assert.Equal("RequestB", requestB!.Name);
 
-    }
-
-    [Theory]
-    [InlineData("ProxyA", "ProxyB", false)]
-    [InlineData("ProxyB", "ProxyA", true)]
-    public async Task DirectSerializerAttributes_UseGeneratorSelectedProxyBase(
-        string firstProxy,
-        string secondProxy,
-        bool expectDiagnostic)
-    {
-        var result = await RunGenerator(CommonTypes + $$"""
-            [assembly: InvokableBaseType(typeof(ProxyA), typeof(CustomCall), typeof(CustomRequest))]
-
-            public abstract class ProxyA
-            {
-                protected System.Threading.Tasks.ValueTask InvokeAsync(Orleans.Serialization.Invocation.IInvokable request) => default;
-                protected System.Threading.Tasks.ValueTask<T> InvokeAsync<T>(Orleans.Serialization.Invocation.IInvokable request) => default;
-            }
-            public abstract class ProxyB
-            {
-                protected System.Threading.Tasks.ValueTask InvokeAsync(Orleans.Serialization.Invocation.IInvokable request) => default;
-                protected System.Threading.Tasks.ValueTask<T> InvokeAsync<T>(Orleans.Serialization.Invocation.IInvokable request) => default;
-            }
-            public class CustomCall { }
-            public abstract class CustomRequest { }
-
-            [GenerateMethodSerializers(typeof({{firstProxy}}))]
-            [GenerateMethodSerializers(typeof({{secondProxy}}))]
-            public interface ICustomGrain : IGrainWithStringKey
-            {
-                CustomCall Call();
-            }
-            """);
-
-        Assert.True(
-            expectDiagnostic == result.Diagnostics.Length > 0,
-            string.Join(Environment.NewLine, result.Diagnostics.Select(static diagnostic => diagnostic.ToString())));
-    }
-
-    [Theory]
-    [InlineData("IProxyA", "IProxyB", false)]
-    [InlineData("IProxyB", "IProxyA", true)]
-    public async Task InheritedSerializerAttributes_UseGeneratorSelectedProxyBase(
-        string firstInterface,
-        string secondInterface,
-        bool expectDiagnostic)
-    {
-        var result = await RunGenerator(CommonTypes + $$"""
-            [assembly: InvokableBaseType(typeof(ProxyA), typeof(CustomCall), typeof(CustomRequest))]
-
-            public abstract class ProxyA
-            {
-                protected System.Threading.Tasks.ValueTask InvokeAsync(Orleans.Serialization.Invocation.IInvokable request) => default;
-                protected System.Threading.Tasks.ValueTask<T> InvokeAsync<T>(Orleans.Serialization.Invocation.IInvokable request) => default;
-            }
-            public abstract class ProxyB
-            {
-                protected System.Threading.Tasks.ValueTask InvokeAsync(Orleans.Serialization.Invocation.IInvokable request) => default;
-                protected System.Threading.Tasks.ValueTask<T> InvokeAsync<T>(Orleans.Serialization.Invocation.IInvokable request) => default;
-            }
-            public class CustomCall { }
-            public abstract class CustomRequest { }
-
-            [GenerateMethodSerializers(typeof(ProxyA))]
-            public interface IProxyA : IGrainWithStringKey { }
-
-            [GenerateMethodSerializers(typeof(ProxyB))]
-            public interface IProxyB : IGrainWithStringKey { }
-
-            public interface ICustomGrain : {{firstInterface}}, {{secondInterface}}
-            {
-                CustomCall Call();
-            }
-            """);
-
-        Assert.True(
-            expectDiagnostic == result.Diagnostics.Length > 0,
-            string.Join(Environment.NewLine, result.Diagnostics.Select(static diagnostic => diagnostic.ToString())));
     }
 
     private const string CommonTypes = """
