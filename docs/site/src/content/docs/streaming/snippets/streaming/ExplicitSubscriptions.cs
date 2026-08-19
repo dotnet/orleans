@@ -50,6 +50,8 @@ public sealed class ExplicitTelemetryGrain :
         {
             await handle.UnsubscribeAsync();
         }
+
+        DeactivateOnIdle();
     }
 
     public Task OnNextAsync(
