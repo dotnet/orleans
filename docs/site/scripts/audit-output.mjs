@@ -58,10 +58,10 @@ if (files.includes(llmsEntryPoint)) {
   if (!llmsText.includes('## Documentation Overview')) {
     fail(llmsEntryPoint, 'missing conceptual documentation overview');
   }
-  if (/\/orleans\/docs\/api\//.test(llmsText)) {
+  const overview = llmsText.split('## Documentation Overview\n\n')[1] ?? '';
+  if (/\/orleans\/docs\/api\//.test(overview)) {
     fail(llmsEntryPoint, 'documentation overview includes API reference pages');
   }
-  const overview = llmsText.split('## Documentation Overview\n\n')[1] ?? '';
   const overviewUrls = [
     ...overview.matchAll(/\/orleans\/docs\/([^)\s]+)\.md/g),
   ].map((match) => match[1]);
