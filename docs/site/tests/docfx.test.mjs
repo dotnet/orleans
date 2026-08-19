@@ -8,6 +8,7 @@ import {
   convertDocfxMarkdown,
   convertHubYaml,
   createSidebar,
+  escapeMdxAngles,
   isSnippetSupportMarkdown,
 } from '../scripts/lib/docfx.mjs';
 
@@ -306,6 +307,27 @@ describe('DocFX conversion', () => {
       'Use ``Map<`key`, TValue>`` and `Dictionary<string, List<int>>`.',
     );
     expect(converted).not.toContain('GetGrain&lt;TGrainInterface>');
+  });
+
+  test('preserves code angle brackets without the Markdown AST parser', () => {
+    const converted = escapeMdxAngles(
+      [
+        'Use `GetGrain<TGrainInterface>(key)` with <TGrainInterface>.',
+        'Use ``Map<`key`, TValue>``.',
+        'A literal \\`name<T>\\` remains prose.',
+        '```csharp',
+        'List<T> values;',
+        '```',
+      ].join('\n'),
+      { dependencyFree: true },
+    );
+
+    expect(converted).toContain(
+      'Use `GetGrain<TGrainInterface>(key)` with &lt;TGrainInterface>.',
+    );
+    expect(converted).toContain('Use ``Map<`key`, TValue>``.');
+    expect(converted).toContain('A literal \\`name&lt;T>\\` remains prose.');
+    expect(converted).toContain('```csharp\nList<T> values;\n```');
   });
 
   test.each([

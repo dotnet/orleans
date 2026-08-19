@@ -1360,7 +1360,55 @@ function convertHtmlCommentsForMdx(source) {
   );
 }
 
-function escapeMdxAngles(source) {
+function transformOutsideInlineCode(source, transform) {
+  const chunks = [];
+  let offset = 0;
+  let opening = 0;
+  while (opening < source.length) {
+    opening = source.indexOf('`', opening);
+    if (opening < 0) {
+      break;
+    }
+    let openingEnd = opening + 1;
+    while (source[openingEnd] === '`') {
+      openingEnd += 1;
+    }
+    let precedingBackslashes = 0;
+    for (let index = opening - 1; source[index] === '\\'; index -= 1) {
+      precedingBackslashes += 1;
+    }
+    if (precedingBackslashes % 2 === 1) {
+      opening = openingEnd;
+      continue;
+    }
+    const delimiterLength = openingEnd - opening;
+    let closing = openingEnd;
+    while (closing < source.length) {
+      closing = source.indexOf('`', closing);
+      if (closing < 0) {
+        break;
+      }
+      let closingEnd = closing + 1;
+      while (source[closingEnd] === '`') {
+        closingEnd += 1;
+      }
+      if (closingEnd - closing === delimiterLength) {
+        chunks.push(transform(source.slice(offset, opening)), source.slice(opening, closingEnd));
+        offset = closingEnd;
+        opening = closingEnd;
+        break;
+      }
+      closing = closingEnd;
+    }
+    if (closing < 0) {
+      opening = openingEnd;
+    }
+  }
+  chunks.push(transform(source.slice(offset)));
+  return chunks.join('');
+}
+
+export function escapeMdxAngles(source, options = {}) {
   const htmlTags =
     'a|abbr|b|blockquote|br|code|dd|details|div|dl|dt|em|hr|i|iframe|img|input|kbd|li|ol|p|pre|source|span|strong|sub|summary|sup|tabitem|table|tabs|tbody|td|th|thead|tr|ul';
   const pattern = new RegExp(
@@ -1374,7 +1422,12 @@ function escapeMdxAngles(source) {
       .replace(pattern, '&lt;')
       .replace(/<(br|hr)\s*>/gi, '<$1 />')
       .replace(/<(img|input|source)(\b[^>]*?)(?<!\/)>/gi, '<$1$2 />');
-  const ranges = markdownCodeOffsetRanges(source);
+  const ranges = markdownCodeOffsetRanges(source, options);
+  if (!ranges) {
+    return transformOutsideCodeBlocks(source, (segment) =>
+      transformOutsideInlineCode(segment, transform),
+    );
+  }
   const chunks = [];
   let offset = 0;
   for (const [start, end] of ranges) {
