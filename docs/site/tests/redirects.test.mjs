@@ -13,6 +13,11 @@ describe('legacy redirects', () => {
     expect(
       redirects['/orleans/Tutorials/Running-in-a-Stand-alone-Silo.html'],
     ).toBe('/orleans/docs/quickstarts/build-your-first-orleans-app/');
+    expect(
+      redirects[
+        '/orleans/Documentation/Getting-Started-With-Orleans/Running-the-Application.html'
+      ],
+    ).toBe('/orleans/docs/quickstarts/build-your-first-orleans-app/');
   });
 
   test('routes the Azure Web Apps legacy page to the restored App Service guide', async () => {
