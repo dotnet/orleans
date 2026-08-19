@@ -56,6 +56,22 @@ jobs:
         retention-days: 1
         path: |
           **/*.binlog
+  package-persistence-test-kit:
+    name: Persistence test kit package
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Setup Node.js
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      with:
+         node-version: '24.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+      with:
+         global-json-file: global.json
+    - name: Pack and test consumer
+      shell: pwsh
+      run: ./test/Orleans.Persistence.TestKit.Package.Tests/Validate-Package.ps1 -PackageVersion 10.3.0-rc.1 -SkipExternalAssets
   test-redis:
     name: Redis provider tests
     runs-on: ubuntu-latest
@@ -1224,6 +1240,7 @@ jobs:
     if: always()
     needs:
       - build
+      - package-persistence-test-kit
       - test-redis
       - test-cassandra
       - test-postgres

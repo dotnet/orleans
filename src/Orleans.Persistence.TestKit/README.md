@@ -12,6 +12,8 @@ A comprehensive testing kit for Orleans `IGrainStorage` providers. This package 
 
 ## Installation
 
+Add the test kit to an xUnit test project and use the same version as the other Microsoft Orleans packages in the project:
+
 ```bash
 dotnet add package Microsoft.Orleans.Persistence.TestKit
 ```
