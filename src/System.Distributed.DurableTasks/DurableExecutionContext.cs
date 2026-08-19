@@ -136,6 +136,11 @@ public abstract class DurableExecutionContext
 
     internal Task RequestCancellationAsync(CancellationToken cancellationToken)
     {
+        if (CancellationRegistration.IsInvokingCallbackFor(this))
+        {
+            return Task.CompletedTask;
+        }
+
         Task cancellationTask;
         TaskCompletionSource? completion = null;
         lock (_lock)
@@ -245,6 +250,7 @@ public abstract class DurableExecutionContext
         private readonly DurableExecutionContext? _context;
         private readonly Func<CancellationToken, ValueTask>? _callback;
         private TaskCompletionSource? _completion;
+        private CancellationRegistration? _previous;
         private int _state;
 
         private CancellationRegistration(bool disposed) => _state = disposed ? DisposedState : Pending;
@@ -267,6 +273,7 @@ public abstract class DurableExecutionContext
             }
 
             var previous = Current.Value;
+            _previous = previous;
             Current.Value = this;
             try
             {
@@ -275,6 +282,7 @@ public abstract class DurableExecutionContext
             finally
             {
                 Current.Value = previous;
+                _previous = null;
                 Volatile.Write(ref _state, Completed);
                 Volatile.Read(ref _completion)?.TrySetResult();
             }
@@ -295,7 +303,7 @@ public abstract class DurableExecutionContext
 
                         break;
                     case Invoking:
-                        if (ReferenceEquals(Current.Value, this))
+                        if (IsCurrentCallback(this))
                         {
                             return ValueTask.CompletedTask;
                         }
@@ -323,6 +331,33 @@ public abstract class DurableExecutionContext
             }
 
             return completion.Task;
+        }
+
+        public static bool IsInvokingCallbackFor(DurableExecutionContext context)
+        {
+            for (var current = Current.Value; current is not null; current = current._previous)
+            {
+                if (ReferenceEquals(current._context, context)
+                    && Volatile.Read(ref current._state) == Invoking)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsCurrentCallback(CancellationRegistration registration)
+        {
+            for (var current = Current.Value; current is not null; current = current._previous)
+            {
+                if (ReferenceEquals(current, registration))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }
