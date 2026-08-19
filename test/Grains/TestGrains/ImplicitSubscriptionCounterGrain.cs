@@ -61,15 +61,6 @@ namespace UnitTests.Grains
             this.logger.LogInformation($"OnSubscribed: {handleFactory.ProviderName}/{handleFactory.StreamId}");
 
             this.streamHandle = await handleFactory.Create<byte[]>().ResumeAsync(OnNext, OnError, OnCompleted, this.State.Token);
-
-            async Task OnError(Exception ex)
-            {
-                this.logger.LogError("Error: {Exception}", ex);
-                this.State.ErrorCounter++;
-                await this.WriteStateAsync();
-            }
-
-            Task OnCompleted() => Task.CompletedTask;
         }
 
         private async Task OnNext(byte[] value, StreamSequenceToken? token)
@@ -85,6 +76,15 @@ namespace UnitTests.Grains
             }
         }
 
+        private async Task OnError(Exception ex)
+        {
+            this.logger.LogError("Error: {Exception}", ex);
+            this.State.ErrorCounter++;
+            await this.WriteStateAsync();
+        }
+
+        private static Task OnCompleted() => Task.CompletedTask;
+
         public Task DeactivateOnEvent(bool deactivate)
         {
             this.deactivateOnEvent = deactivate;
@@ -98,7 +98,7 @@ namespace UnitTests.Grains
                 throw new InvalidOperationException("The stream must deliver an event before it can rewind.");
             }
 
-            this.streamHandle = await this.streamHandle.ResumeAsync(OnNext, this.State.FirstToken);
+            this.streamHandle = await this.streamHandle.ResumeAsync(OnNext, OnError, OnCompleted, this.State.FirstToken);
         }
     }
 
