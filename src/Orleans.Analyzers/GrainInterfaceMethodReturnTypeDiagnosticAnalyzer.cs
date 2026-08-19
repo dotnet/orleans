@@ -13,7 +13,7 @@ namespace Orleans.Analyzers
     public class GrainInterfaceMethodReturnTypeDiagnosticAnalyzer : DiagnosticAnalyzer
     {
         public const string DiagnosticId = "ORLEANS0009";
-        public const string Title = "Grain interfaces methods must return a compatible type";
+        public const string Title = "Grain interface methods must return a registered grain-call return type";
         public const string MessageFormat = "Grain interface methods must return a registered grain-call return type";
         public const string Category = "Usage";
         public const string InvalidMappingDiagnosticId = "ORLEANS0026";
@@ -84,8 +84,7 @@ namespace Orleans.Analyzers
                     return;
                 }
 
-                if (diagnostic is not null
-                    && !diagnostic.Message.StartsWith("No invokable base type is registered", StringComparison.Ordinal))
+                if (diagnostic is { Kind: ResolverDiagnosticKind.InvalidMapping })
                 {
                     mappingDiagnostic ??= diagnostic;
                 }

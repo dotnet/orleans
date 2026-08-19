@@ -67,6 +67,7 @@ internal sealed class InvokableBaseTypeResolver
 
         invokableBaseType = null;
         diagnostic = new ResolverDiagnostic(
+            ResolverDiagnosticKind.MissingMapping,
             $"No invokable base type is registered for return type '{Display(returnType)}' and proxy base '{Display(proxyBaseType)}'.",
             method.Locations.FirstOrDefault());
         return false;
@@ -869,7 +870,8 @@ internal sealed class InvokableBaseTypeResolver
                 ? $"@{identifier}"
                 : identifier;
 
-    private static ResolverDiagnostic CreateDiagnostic(Mapping mapping, string message) => new(message, mapping.Location);
+    private static ResolverDiagnostic CreateDiagnostic(Mapping mapping, string message)
+        => new(ResolverDiagnosticKind.InvalidMapping, message, mapping.Location);
     private static string Display(ISymbol symbol) => symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
     private static string DisplayWithAssembly(INamedTypeSymbol type)
         => $"{Display(type)} [{type.ContainingAssembly.Identity}]";
@@ -963,7 +965,13 @@ internal sealed class InvokableBaseTypeResolver
     }
 }
 
-internal sealed record ResolverDiagnostic(string Message, Location? Location);
+internal enum ResolverDiagnosticKind
+{
+    MissingMapping,
+    InvalidMapping,
+}
+
+internal sealed record ResolverDiagnostic(ResolverDiagnosticKind Kind, string Message, Location? Location);
 
 internal readonly record struct ResolvedMapping(
     INamedTypeSymbol ReturnType,

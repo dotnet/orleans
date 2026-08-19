@@ -254,8 +254,7 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
             return baseClassType!;
         }
 
-        if (resolverDiagnostic is not null
-            && !resolverDiagnostic.Message.StartsWith("No invokable base type is registered", StringComparison.Ordinal))
+        if (resolverDiagnostic is { Kind: ResolverDiagnosticKind.InvalidMapping })
         {
             throw new OrleansGeneratorDiagnosticAnalysisException(
                 InvokableBaseTypeMappingDiagnostic.CreateDiagnostic(resolverDiagnostic));

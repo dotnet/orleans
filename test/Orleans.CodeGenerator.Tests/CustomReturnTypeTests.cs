@@ -2,6 +2,7 @@ using System.IO;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Orleans.CodeGenerator.Diagnostics;
+using Xunit;
 
 namespace Orleans.CodeGenerator.Tests;
 
