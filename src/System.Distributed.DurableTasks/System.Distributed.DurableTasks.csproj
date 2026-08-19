@@ -1,16 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageId>System.Distributed.DurableTasks</PackageId>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <IsPackable>false</IsPackable>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <OrleansBuildTimeCodeGen>false</OrleansBuildTimeCodeGen>
     <EnableOrleansContractsAnalyzer>false</EnableOrleansContractsAnalyzer>
-    <PackageDescription>Experimental runtime-independent primitives for defining and scheduling durable tasks.</PackageDescription>
-    <PackageTags>durable-tasks workflows distributed-systems experimental</PackageTags>
+    <GenAPITargetDirectory>$(SourceRoot)src\api\System.Distributed.DurableTasks\</GenAPITargetDirectory>
+    <GenAPITargetPath>$(GenAPITargetDirectory)$(AssemblyName).cs</GenAPITargetPath>
   </PropertyGroup>
 
   <ItemGroup>
     <AssemblyAttribute Remove="Orleans.Metadata.FrameworkPartAttribute" />
-    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>
