@@ -52,7 +52,7 @@
       "type": "parameter",
       "datatype": "text",
       "description": "The Aspire package and AppHost SDK version.",
-      "defaultValue": "13.4.6",
+      "defaultValue": "13.5.0",
       "replaces": "__ASPIRE_VERSION__"
     },
     "skipRestore": {
