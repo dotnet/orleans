@@ -1,14 +1,14 @@
 # System.Distributed.DurableTasks
 
 > [!IMPORTANT]
-> This package is an experimental, unpublished API. The `System.Distributed.DurableTasks`
-> package ID and namespace are retained for evaluation while formal .NET/BCL ownership is
-> reviewed. Their presence in this repository does not indicate approved platform ownership
-> or a commitment to publish this API.
+> This assembly contains incubating API under evaluation while formal .NET/BCL ownership of
+> the `System.Distributed.DurableTasks` namespace is reviewed. It is deliberately non-packable
+> and cannot ship from this repository's release pipeline. Its presence does not indicate
+> approved platform ownership or a commitment to publish this API.
 
-This package defines a runtime-independent programming model for durable asynchronous
+This assembly defines a runtime-independent programming model for durable asynchronous
 operations. A host supplies scheduling, persistence, deterministic time, and durable
-cancellation. Task definitions and application code depend only on this package.
+cancellation. Task definitions and application code depend only on this assembly.
 
 ## Execution model
 
