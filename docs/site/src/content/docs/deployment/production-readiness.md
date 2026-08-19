@@ -58,7 +58,7 @@ Complete this checklist for each production environment. Record owners, expected
 - [ ] Dashboards show ready silo count, membership changes, request latency and failures, rejected or dropped messages, activation count, CPU, memory, and dependency health.
 - [ ] Alerts are based on user impact and sustained symptoms, not individual transient membership events.
 - [ ] Operators can correlate a deployment version, silo name, cluster ID, service ID, and host instance across logs and telemetry.
-- [ ] Runbooks cover failed rollout, partial network partition, provider outage, overload, data restore, and credential expiry.
+- [ ] Named owners and runbooks follow the [production operations guide](production-operations.md) for failed rollout, partial network partition, provider outage, overload, data restore, and credential expiry.
 
 ## Capacity and recovery
 
