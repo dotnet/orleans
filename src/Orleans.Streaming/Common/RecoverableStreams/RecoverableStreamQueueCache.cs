@@ -146,6 +146,10 @@ namespace Orleans.Providers.Streams.Common
             if (!IsUnderPressure())
             {
                 _evictionStrategy.PerformPurge(DateTime.UtcNow);
+                if (_cache.IsEmpty)
+                {
+                    _currentBuffer = null;
+                }
             }
 
             return false;
