@@ -349,7 +349,7 @@ namespace Orleans.Streams
                 try
                 {
                     requestedHandshakeToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
-                         i => consumerData.StreamConsumer.GetSequenceToken(consumerData.SubscriptionId),
+                         i => GetSequenceToken(consumerData),
                          AsyncExecutorWithRetries.INFINITE_RETRIES,
                          // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
                          (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
@@ -406,6 +406,19 @@ namespace Orleans.Streams
                 }
             }
             return true;
+
+            async Task<StreamHandshakeToken?> GetSequenceToken(StreamConsumerData consumer)
+            {
+                RequestContext.Set(StreamRequestContextKeys.StreamProducer, GrainId);
+                try
+                {
+                    return await consumer.StreamConsumer.GetSequenceToken(consumer.SubscriptionId);
+                }
+                finally
+                {
+                    RequestContext.Remove(StreamRequestContextKeys.StreamProducer);
+                }
+            }
         }
 
         public Task RemoveSubscriber(GuidId subscriptionId, QualifiedStreamId streamId)

@@ -36,6 +36,8 @@ namespace Orleans.Streams
         private readonly ConcurrentDictionary<GuidId, IStreamSubscriptionHandle> allStreamObservers = new(); // map to different ObserversCollection<T> of different Ts.
         [Id(2)]
         private readonly ILogger logger;
+        [Id(3)]
+        private readonly ConcurrentDictionary<GuidId, GrainId> streamProducers = new();
         private const int MAXIMUM_ITEM_STRING_LOG_LENGTH = 128;
         // if this extension is attached to a cosnumer grain which implements IOnSubscriptionActioner,
         // then this will be not null, otherwise, it will be null
@@ -77,7 +79,28 @@ namespace Orleans.Streams
 
         public bool RemoveObserver(GuidId subscriptionId)
         {
+            streamProducers.TryRemove(subscriptionId, out _);
             return allStreamObservers.TryRemove(subscriptionId, out _);
+        }
+
+        internal void RestoreObserver(GuidId subscriptionId, IStreamSubscriptionHandle observer)
+        {
+            allStreamObservers[subscriptionId] = observer;
+        }
+
+        internal Task RefreshStreamConsumer(
+            GuidId subscriptionId,
+            QualifiedStreamId streamId,
+            GrainId streamConsumer,
+            string? filterData)
+        {
+            if (!streamProducers.TryGetValue(subscriptionId, out var streamProducer))
+            {
+                return Task.CompletedTask;
+            }
+
+            var producer = providerRuntime.GrainFactory.GetGrain(streamProducer).AsReference<IStreamProducerExtension>();
+            return producer.AddSubscriber(subscriptionId, streamId, streamConsumer, filterData);
         }
 
         public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken)
@@ -183,6 +206,11 @@ namespace Orleans.Streams
 
         public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId)
         {
+            if (RequestContext.Get(StreamRequestContextKeys.StreamProducer) is GrainId streamProducer)
+            {
+                streamProducers[subscriptionId] = streamProducer;
+            }
+
             return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out var observer) ? observer.GetSequenceToken() : null);
         }
 

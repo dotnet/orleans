@@ -10,6 +10,7 @@ namespace UnitTests.Grains
     {
         private readonly ILogger logger;
         private bool deactivateOnEvent;
+        private StreamSubscriptionHandle<byte[]>? streamHandle;
 
         [GenerateSerializer]
         public class MyState
@@ -20,6 +21,8 @@ namespace UnitTests.Grains
             public int ErrorCounter { get; set; }
             [Id(2)]
             public StreamSequenceToken? Token { get; set; }
+            [Id(3)]
+            public StreamSequenceToken? FirstToken { get; set; }
         }
 
         public ImplicitSubscriptionCounterGrain(ILoggerFactory loggerFactory)
@@ -57,12 +60,13 @@ namespace UnitTests.Grains
         {
             this.logger.LogInformation($"OnSubscribed: {handleFactory.ProviderName}/{handleFactory.StreamId}");
 
-            await handleFactory.Create<byte[]>().ResumeAsync(OnNext, OnError, OnCompleted, this.State.Token);
+            this.streamHandle = await handleFactory.Create<byte[]>().ResumeAsync(OnNext, OnError, OnCompleted, this.State.Token);
 
             async Task OnNext(byte[] value, StreamSequenceToken? token)
             {
                 this.logger.LogInformation("Received: [{Value} {Token}]", value, token);
                 this.State.EventCounter++;
+                this.State.FirstToken ??= token;
                 this.State.Token = token;
                 await this.WriteStateAsync();
                 if (this.deactivateOnEvent)
@@ -85,6 +89,18 @@ namespace UnitTests.Grains
         {
             this.deactivateOnEvent = deactivate;
             return Task.CompletedTask;
+        }
+
+        public async Task RewindToFirstToken()
+        {
+            this.streamHandle = await this.streamHandle!.ResumeAsync(
+                async (value, token) =>
+                {
+                    this.State.EventCounter++;
+                    this.State.Token = token;
+                    await this.WriteStateAsync();
+                },
+                this.State.FirstToken);
         }
     }
 

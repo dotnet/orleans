@@ -5,6 +5,11 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
+    internal static class StreamRequestContextKeys
+    {
+        public const string StreamProducer = "#StreamProducer";
+    }
+
     // This is the extension interface for stream consumers
     internal interface IStreamConsumerExtension : IGrainExtension
     {
