@@ -65,32 +65,41 @@ namespace UnitTests.MembershipTests
         [Fact, TestCategory("Functional"), TestCategory("Liveness")]
         public async Task SiloUngracefulShutdown_GatewayForwardedRequestBreaks()
         {
-            Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>().SetResponseTimeout(TimeSpan.FromMinutes(1));
-            var target = await GetGrainOnTargetSilo(HostedCluster.SecondarySilos[0]);
-            Assert.NotNull(target);
-
-            var observer = new LongRunningTaskObserver();
-            var observerReference = GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
+            var runtimeClient = Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
+            var previousResponseTimeout = runtimeClient.GetResponseTimeout();
+            runtimeClient.SetResponseTimeout(TimeSpan.FromMinutes(1));
             try
             {
-                var callId = Guid.NewGuid();
-                var promise = target.LongWaitWithStartNotification(
-                    TimeSpan.FromMinutes(1),
-                    callId,
-                    observerReference,
-                    CancellationToken.None);
+                var target = await GetGrainOnTargetSilo(HostedCluster.SecondarySilos[0]);
+                Assert.NotNull(target);
 
-                await observer.WaitForCallToStart(callId);
-                Assert.False(promise.IsCompleted);
+                var observer = new LongRunningTaskObserver();
+                var observerReference = GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
+                try
+                {
+                    var callId = Guid.NewGuid();
+                    var promise = target.LongWaitWithStartNotification(
+                        TimeSpan.FromMinutes(1),
+                        callId,
+                        observerReference,
+                        CancellationToken.None);
 
-                await HostedCluster.KillSiloAsync(HostedCluster.SecondarySilos[0]);
+                    await observer.WaitForCallToStart(callId);
+                    Assert.False(promise.IsCompleted);
 
-                await Assert.ThrowsAsync<SiloUnavailableException>(
-                    () => promise.WaitAsync(TimeSpan.FromSeconds(20)));
+                    await HostedCluster.KillSiloAsync(HostedCluster.SecondarySilos[0]);
+
+                    await Assert.ThrowsAsync<SiloUnavailableException>(
+                        () => promise.WaitAsync(TimeSpan.FromSeconds(20)));
+                }
+                finally
+                {
+                    GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+                }
             }
             finally
             {
-                GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+                runtimeClient.SetResponseTimeout(previousResponseTimeout);
             }
         }
 
