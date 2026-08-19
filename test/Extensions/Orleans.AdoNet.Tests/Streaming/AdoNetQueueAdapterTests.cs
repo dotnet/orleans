@@ -143,8 +143,12 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
         var afterEnqueued = DateTime.UtcNow.AddSeconds(1);
 
         // assert - stored messages are as expected
-        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>(
-            "SELECT * FROM OrleansStreamMessage",
+        var stored = (await _queries.ReadStreamMessagesAsync(
+            serviceId,
+            providerId,
+            adoNetQueueId,
+            afterMessageId: 0,
+            maxCount: 100,
             TestContext.Current.CancellationToken))
             .OrderBy(static message => message.MessageId)
             .ToList();
