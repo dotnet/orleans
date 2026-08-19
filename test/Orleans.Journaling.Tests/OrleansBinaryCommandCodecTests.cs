@@ -39,6 +39,26 @@ public sealed class OrleansBinaryCommandCodecTests : JournalingTestBase
     }
 
     [Fact]
+    public void DictionaryCodec_PreChangeSnapshotPayload_ReplaysIndependentReferenceScopes()
+    {
+        var codec = new OrleansBinaryDurableDictionaryCommandCodec<string, SnapshotReferenceRecord>(
+            ValueCodec<string>(),
+            ValueCodec<SnapshotReferenceRecord>(),
+            SessionPool);
+        var items = CreateReferenceItems();
+        var payload = CodecTestHelpers.WriteEntry(
+            writer => codec.WriteSnapshot([new("first", items[0]), new("second", items[1])], writer));
+
+        Assert.Equal(
+            "0705400B6669727374204007010203C105E0400D7365636F6E64204007040506C105E0",
+            Convert.ToHexString(payload));
+
+        var consumer = new RecordingDictionaryCommandHandler<string, SnapshotReferenceRecord>();
+        codec.Apply(CodecTestHelpers.ReadBuffer(payload), consumer);
+        AssertAliases(consumer.SnapshotItems.Select(static item => item.Value));
+    }
+
+    [Fact]
     public void ListCodec_AllCommands_RoundTrip()
     {
         var codec = new OrleansBinaryDurableListCommandCodec<string>(ValueCodec<string>(), SessionPool);
@@ -68,6 +88,21 @@ public sealed class OrleansBinaryCommandCodecTests : JournalingTestBase
     }
 
     [Fact]
+    public void ListCodec_PreChangeSnapshotPayload_ReplaysIndependentReferenceScopes()
+    {
+        var codec = new OrleansBinaryDurableListCommandCodec<SnapshotReferenceRecord>(
+            ValueCodec<SnapshotReferenceRecord>(),
+            SessionPool);
+        var payload = CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(CreateReferenceItems(), writer));
+
+        Assert.Equal("0B05204007010203C105E0204007040506C105E0", Convert.ToHexString(payload));
+
+        var consumer = new SnapshotCollectionConsumer();
+        codec.Apply(CodecTestHelpers.ReadBuffer(payload), consumer);
+        AssertAliases(consumer.Items);
+    }
+
+    [Fact]
     public void QueueCodec_AllCommands_RoundTrip()
     {
         var codec = new OrleansBinaryDurableQueueCommandCodec<int>(ValueCodec<int>(), SessionPool);
@@ -93,6 +128,21 @@ public sealed class OrleansBinaryCommandCodecTests : JournalingTestBase
     }
 
     [Fact]
+    public void QueueCodec_PreChangeSnapshotPayload_ReplaysIndependentReferenceScopes()
+    {
+        var codec = new OrleansBinaryDurableQueueCommandCodec<SnapshotReferenceRecord>(
+            ValueCodec<SnapshotReferenceRecord>(),
+            SessionPool);
+        var payload = CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(CreateReferenceItems(), writer));
+
+        Assert.Equal("0705204007010203C105E0204007040506C105E0", Convert.ToHexString(payload));
+
+        var consumer = new SnapshotCollectionConsumer();
+        codec.Apply(CodecTestHelpers.ReadBuffer(payload), consumer);
+        AssertAliases(consumer.Items);
+    }
+
+    [Fact]
     public void SetCodec_AllCommands_RoundTrip()
     {
         var codec = new OrleansBinaryDurableSetCommandCodec<string>(ValueCodec<string>(), SessionPool);
@@ -115,6 +165,21 @@ public sealed class OrleansBinaryCommandCodecTests : JournalingTestBase
                 "reset:0"
             ],
             consumer.Commands);
+    }
+
+    [Fact]
+    public void SetCodec_PreChangeSnapshotPayload_ReplaysIndependentReferenceScopes()
+    {
+        var codec = new OrleansBinaryDurableSetCommandCodec<SnapshotReferenceRecord>(
+            ValueCodec<SnapshotReferenceRecord>(),
+            SessionPool);
+        var payload = CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(CreateReferenceItems(), writer));
+
+        Assert.Equal("0705204007010203C105E0204007040506C105E0", Convert.ToHexString(payload));
+
+        var consumer = new SnapshotCollectionConsumer();
+        codec.Apply(CodecTestHelpers.ReadBuffer(payload), consumer);
+        AssertAliases(consumer.Items);
     }
 
     [Fact]
@@ -492,4 +557,67 @@ public sealed class OrleansBinaryCommandCodecTests : JournalingTestBase
         var exception = Assert.Throws<InvalidOperationException>(action);
         Assert.Contains("trailing data", exception.Message);
     }
+
+    private static SnapshotReferenceRecord[] CreateReferenceItems()
+    {
+        var first = new byte[] { 1, 2, 3 };
+        var second = new byte[] { 4, 5, 6 };
+        return
+        [
+            new() { Payload = first, Alias = first },
+            new() { Payload = second, Alias = second }
+        ];
+    }
+
+    private static void AssertAliases(IEnumerable<SnapshotReferenceRecord> items)
+    {
+        Assert.Collection(
+            items,
+            item =>
+            {
+                Assert.Equal([1, 2, 3], item.Payload);
+                Assert.Same(item.Payload, item.Alias);
+            },
+            item =>
+            {
+                Assert.Equal([4, 5, 6], item.Payload);
+                Assert.Same(item.Payload, item.Alias);
+            });
+    }
+}
+
+[GenerateSerializer]
+internal sealed class SnapshotReferenceRecord
+{
+    [Id(0)]
+    public required byte[] Payload { get; init; }
+
+    [Id(1)]
+    public required byte[] Alias { get; init; }
+}
+
+internal sealed class SnapshotCollectionConsumer :
+    IDurableListCommandHandler<SnapshotReferenceRecord>,
+    IDurableQueueCommandHandler<SnapshotReferenceRecord>,
+    IDurableSetCommandHandler<SnapshotReferenceRecord>
+{
+    public List<SnapshotReferenceRecord> Items { get; } = [];
+
+    public void ApplyAdd(SnapshotReferenceRecord item) => Items.Add(item);
+
+    public void ApplySet(int index, SnapshotReferenceRecord item) => throw new NotSupportedException();
+
+    public void ApplyInsert(int index, SnapshotReferenceRecord item) => throw new NotSupportedException();
+
+    public void ApplyRemoveAt(int index) => throw new NotSupportedException();
+
+    public void ApplyClear() => Items.Clear();
+
+    public void Reset(int capacityHint) => Items.Clear();
+
+    public void ApplyEnqueue(SnapshotReferenceRecord item) => Items.Add(item);
+
+    public void ApplyDequeue() => throw new NotSupportedException();
+
+    public void ApplyRemove(SnapshotReferenceRecord item) => throw new NotSupportedException();
 }

@@ -39,6 +39,13 @@ public interface IJournaledStateManager : IAsyncDisposable
     ValueTask WriteStateAsync(CancellationToken cancellationToken);
 
     /// <summary>
+    /// Discards uncommitted mutations and reloads the last durable state.
+    /// </summary>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
+    ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken);
+
+    /// <summary>
     /// Resets this instance, removing any persistent state.
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>
