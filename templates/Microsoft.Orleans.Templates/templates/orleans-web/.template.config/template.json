@@ -40,7 +40,7 @@
       "type": "parameter",
       "datatype": "text",
       "description": "The Microsoft Orleans package version.",
-      "defaultValue": "10.2.2"
+      "defaultValue": "10.0.0-dev"
     },
     "orleansVersionXml": {
       "type": "derived",
