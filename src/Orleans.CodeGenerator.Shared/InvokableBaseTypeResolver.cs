@@ -1,8 +1,12 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -17,13 +21,87 @@ internal sealed class InvokableBaseTypeResolver
     internal const string GeneratedActivatorConstructorAttributeMetadataName = "Orleans.GeneratedActivatorConstructorAttribute";
 
     private static readonly ConditionalWeakTable<Compilation, Discovery> Discoveries = new();
+    private static readonly ConditionalWeakTable<Compilation, Lazy<BindingCache>> BindingCaches = new();
+    private static readonly ImmutableArray<MappingMatchKind> MappingMatchKinds =
+        [MappingMatchKind.Exact, MappingMatchKind.OpenGeneric];
     private readonly Compilation _compilation;
     private readonly Discovery _discovery;
+    private readonly BindingCache _bindingCache;
+    private readonly Func<INamedTypeSymbol, Lazy<bool>> _constructorBindingFactory;
+    private readonly Func<InitializerBindingKey, Lazy<bool>> _initializerBindingFactory;
 
     public InvokableBaseTypeResolver(Compilation compilation)
     {
         _compilation = compilation;
         _discovery = Discoveries.GetValue(compilation, static value => Discovery.Create(value));
+        _bindingCache = BindingCaches.GetValue(
+            compilation,
+            static value => new Lazy<BindingCache>(
+                () => new BindingCache(value),
+                LazyThreadSafetyMode.ExecutionAndPublication)).Value;
+        _constructorBindingFactory = type => new Lazy<bool>(
+            () => HasUsableConstructorCore(type),
+            LazyThreadSafetyMode.ExecutionAndPublication);
+        _initializerBindingFactory = key => new Lazy<bool>(
+            () => TryBindInitializer(
+                key.ProxyBaseType,
+                key.ProxyInterface,
+                key.ReturnType,
+                key.BaseType,
+                key.MethodName,
+                out var isValid)
+                && isValid,
+            LazyThreadSafetyMode.ExecutionAndPublication);
+    }
+
+    public static bool TryGetProxyBaseType(
+        INamedTypeSymbol interfaceType,
+        INamedTypeSymbol generateMethodSerializersAttribute,
+        [NotNullWhen(true)] out INamedTypeSymbol? proxyBaseType,
+        out bool isExtension)
+    {
+        if (TryGetProxyBaseType(interfaceType.GetAttributes(), generateMethodSerializersAttribute, out proxyBaseType, out isExtension))
+        {
+            return true;
+        }
+
+        foreach (var inheritedInterface in interfaceType.AllInterfaces)
+        {
+            if (TryGetProxyBaseType(inheritedInterface.GetAttributes(), generateMethodSerializersAttribute, out proxyBaseType, out isExtension))
+            {
+                return true;
+            }
+        }
+
+        proxyBaseType = null;
+        isExtension = false;
+        return false;
+
+        static bool TryGetProxyBaseType(
+            ImmutableArray<AttributeData> attributes,
+            INamedTypeSymbol generateMethodSerializersAttribute,
+            [NotNullWhen(true)] out INamedTypeSymbol? proxyBaseType,
+            out bool isExtension)
+        {
+            foreach (var attribute in attributes)
+            {
+                if (!SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, generateMethodSerializersAttribute)
+                    || attribute.ConstructorArguments.Length == 0
+                    || attribute.ConstructorArguments[0].Value is not INamedTypeSymbol candidate)
+                {
+                    continue;
+                }
+
+                proxyBaseType = candidate.OriginalDefinition;
+                isExtension = attribute.ConstructorArguments.Length > 1
+                    && attribute.ConstructorArguments[1].Value is true;
+                return true;
+            }
+
+            proxyBaseType = null;
+            isExtension = false;
+            return false;
+        }
     }
 
     public bool TryResolve(
@@ -31,38 +109,65 @@ internal sealed class InvokableBaseTypeResolver
         IMethodSymbol method,
         out INamedTypeSymbol? invokableBaseType,
         out ResolverDiagnostic? diagnostic)
+        => TryResolve(proxyBaseType, method, method.ContainingType, out invokableBaseType, out diagnostic);
+
+    public bool TryResolve(
+        INamedTypeSymbol proxyBaseType,
+        IMethodSymbol method,
+        INamedTypeSymbol proxyInterface,
+        out INamedTypeSymbol? invokableBaseType,
+        out ResolverDiagnostic? diagnostic)
+        => TryResolveCore(proxyBaseType, method, proxyInterface, out invokableBaseType, out diagnostic);
+
+    public bool TryResolveBaseType(
+        INamedTypeSymbol proxyBaseType,
+        IMethodSymbol method,
+        out INamedTypeSymbol? invokableBaseType,
+        out ResolverDiagnostic? diagnostic)
+        => TryResolveCore(proxyBaseType, method, proxyInterface: null, out invokableBaseType, out diagnostic);
+
+    private bool TryResolveCore(
+        INamedTypeSymbol proxyBaseType,
+        IMethodSymbol method,
+        INamedTypeSymbol? proxyInterface,
+        out INamedTypeSymbol? invokableBaseType,
+        out ResolverDiagnostic? diagnostic)
     {
         var returnType = method.ReturnType;
-        foreach (var source in GetCandidateGroups(proxyBaseType, method, returnType))
+        var candidateGroups = GetCandidateGroups(proxyBaseType, method, returnType).ToArray();
+        foreach (var matchKind in MappingMatchKinds)
         {
-            var matching = GetBestMatches(source.Mappings, proxyBaseType, returnType);
-            if (matching.Count == 0)
+            foreach (var source in candidateGroups)
             {
-                continue;
-            }
+                var matching = GetMatches(source.Mappings, proxyBaseType, returnType, matchKind);
+                if (matching.Count == 0)
+                {
+                    continue;
+                }
 
-            if (!TryCoalesce(matching, out var mapping, out diagnostic))
-            {
-                invokableBaseType = null;
-                return false;
-            }
+                if (!TryCoalesce(matching, out var mapping, out diagnostic))
+                {
+                    invokableBaseType = null;
+                    return false;
+                }
 
-            if (source.Kind == MappingKind.Assembly
-                && IsBuiltInReplacement(proxyBaseType, returnType, mapping!, out var defaultMapping))
-            {
-                invokableBaseType = null;
-                diagnostic = CreateDiagnostic(
-                    mapping!,
-                    $"Assembly registration for return type '{Display(returnType)}' cannot replace proxy default '{Display(defaultMapping!.InvokableBaseType)}' with '{Display(mapping!.InvokableBaseType)}'.");
-                return false;
-            }
+                if (source.Kind == MappingKind.Assembly
+                    && IsBuiltInReplacement(proxyBaseType, returnType, mapping!, out var defaultMapping))
+                {
+                    invokableBaseType = null;
+                    diagnostic = CreateDiagnostic(
+                        mapping!,
+                        $"Assembly registration for return type '{Display(returnType)}' cannot replace proxy default '{Display(defaultMapping!.InvokableBaseType)}' with '{Display(mapping!.InvokableBaseType)}'.");
+                    return false;
+                }
 
-            if (!TryConstructAndValidate(proxyBaseType, method, returnType, mapping!, out invokableBaseType, out diagnostic))
-            {
-                return false;
-            }
+                if (!TryConstructAndValidate(proxyBaseType, proxyInterface, method, returnType, mapping!, out invokableBaseType, out diagnostic))
+                {
+                    return false;
+                }
 
-            return true;
+                return true;
+            }
         }
 
         invokableBaseType = null;
@@ -201,8 +306,19 @@ internal sealed class InvokableBaseTypeResolver
 
     private static List<Mapping> GetBestMatches(ImmutableArray<Mapping> mappings, INamedTypeSymbol proxyBaseType, ITypeSymbol returnType)
     {
-        var exact = new List<Mapping>();
-        var open = new List<Mapping>();
+        var exact = GetMatches(mappings, proxyBaseType, returnType, MappingMatchKind.Exact);
+        return exact.Count > 0
+            ? exact
+            : GetMatches(mappings, proxyBaseType, returnType, MappingMatchKind.OpenGeneric);
+    }
+
+    private static List<Mapping> GetMatches(
+        ImmutableArray<Mapping> mappings,
+        INamedTypeSymbol proxyBaseType,
+        ITypeSymbol returnType,
+        MappingMatchKind matchKind)
+    {
+        var result = new List<Mapping>();
         foreach (var mapping in mappings)
         {
             if (!SymbolEqualityComparer.Default.Equals(mapping.ProxyBaseType.OriginalDefinition, proxyBaseType.OriginalDefinition))
@@ -210,20 +326,22 @@ internal sealed class InvokableBaseTypeResolver
                 continue;
             }
 
-            if (SymbolEqualityComparer.Default.Equals(mapping.ReturnType, returnType))
+            if (matchKind == MappingMatchKind.Exact
+                && SymbolEqualityComparer.Default.Equals(mapping.ReturnType, returnType))
             {
-                exact.Add(mapping);
+                result.Add(mapping);
             }
-            else if (returnType is INamedTypeSymbol namedReturnType
+            else if (matchKind == MappingMatchKind.OpenGeneric
+                && returnType is INamedTypeSymbol namedReturnType
                 && namedReturnType.IsGenericType
                 && mapping.ReturnType.IsUnboundGenericType
                 && SymbolEqualityComparer.Default.Equals(mapping.ReturnType.OriginalDefinition, namedReturnType.OriginalDefinition))
             {
-                open.Add(mapping);
+                result.Add(mapping);
             }
         }
 
-        return exact.Count > 0 ? exact : open;
+        return result;
     }
 
     private static bool TryCoalesce(List<Mapping> mappings, out Mapping? result, out ResolverDiagnostic? diagnostic)
@@ -268,6 +386,7 @@ internal sealed class InvokableBaseTypeResolver
 
     private bool TryConstructAndValidate(
         INamedTypeSymbol proxyBaseType,
+        INamedTypeSymbol? proxyInterface,
         IMethodSymbol method,
         ITypeSymbol returnType,
         Mapping mapping,
@@ -334,12 +453,14 @@ internal sealed class InvokableBaseTypeResolver
             return false;
         }
 
-        if (!ValidateInitializer(proxyBaseType, method.ContainingType, returnType, result, mapping, out diagnostic))
+        if (proxyInterface is not null
+            && !ValidateInitializer(proxyBaseType, proxyInterface, returnType, result, mapping, out diagnostic))
         {
             result = null;
             return false;
         }
 
+        diagnostic = null;
         return true;
     }
 
@@ -520,6 +641,9 @@ internal sealed class InvokableBaseTypeResolver
     }
 
     private bool HasUsableConstructor(INamedTypeSymbol baseType)
+        => _bindingCache.ConstructorBindings.GetOrAdd(baseType, _constructorBindingFactory).Value;
+
+    private bool HasUsableConstructorCore(INamedTypeSymbol baseType)
     {
         var generatedActivatorConstructorAttribute = _compilation.GetTypeByMetadataName(GeneratedActivatorConstructorAttributeMetadataName);
         var generatedActivatorConstructor = generatedActivatorConstructorAttribute is null
@@ -534,20 +658,12 @@ internal sealed class InvokableBaseTypeResolver
         {
             return IsAccessibleFromGeneratedDerivedType(generatedActivatorConstructor)
                 && generatedActivatorConstructor.Parameters.All(static parameter => parameter.RefKind == RefKind.None)
-                && baseType.InstanceConstructors.Any(candidate => CanInvokeBaseConstructor(
-                    generatedActivatorConstructor.Parameters,
-                    candidate));
+                && TryBindBaseConstructor(baseType, generatedActivatorConstructor.Parameters, out var canInvoke)
+                && canInvoke;
         }
 
-        if (TryBindParameterlessBaseConstructor(baseType, out var canInvoke))
-        {
-            return canInvoke;
-        }
-
-        var applicable = baseType.InstanceConstructors.Where(constructor =>
-            IsAccessibleFromGeneratedDerivedType(constructor)
-            && constructor.Parameters.All(static parameter => parameter.IsOptional || parameter.IsParams));
-        return applicable.Take(2).Count() == 1;
+        return TryBindParameterlessBaseConstructor(baseType, out var canInvokeParameterless)
+            && canInvokeParameterless;
 
         IEnumerable<IMethodSymbol> GetConstructorsInGeneratorOrder(INamedTypeSymbol type)
         {
@@ -566,34 +682,6 @@ internal sealed class InvokableBaseTypeResolver
             }
         }
 
-        bool CanInvokeBaseConstructor(
-            ImmutableArray<IParameterSymbol> arguments,
-            IMethodSymbol constructor)
-        {
-            var hasParamsParameter = constructor.Parameters.Length > 0
-                && constructor.Parameters[constructor.Parameters.Length - 1].IsParams;
-            if (!IsAccessibleFromGeneratedDerivedType(constructor)
-                || constructor.Parameters.Any(static parameter => parameter.RefKind != RefKind.None)
-                || !hasParamsParameter && arguments.Length > constructor.Parameters.Length
-                || arguments.Length < constructor.Parameters.Count(static parameter => !parameter.IsOptional && !parameter.IsParams))
-            {
-                return false;
-            }
-
-            for (var i = 0; i < arguments.Length; i++)
-            {
-                var parameter = constructor.Parameters[Math.Min(i, constructor.Parameters.Length - 1)];
-                var parameterType = parameter.IsParams
-                    ? ((IArrayTypeSymbol)parameter.Type).ElementType
-                    : parameter.Type;
-                if (!_compilation.ClassifyCommonConversion(arguments[i].Type, parameterType).IsImplicit)
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
     }
 
     private bool IsAccessibleFromGeneratedDerivedType(IMethodSymbol constructor)
@@ -634,22 +722,23 @@ internal sealed class InvokableBaseTypeResolver
             return false;
         }
 
-        if (TryBindInitializer(proxyBaseType, proxyInterface, returnType, baseType, methodName, out var isValid))
-        {
-            diagnostic = isValid
-                ? null
-                : CreateInvalidInitializerDiagnostic(mapping, baseType, proxyBaseType, returnType, methodName);
-            return isValid;
-        }
-
-        diagnostic = CreateInvalidInitializerDiagnostic(mapping, baseType, proxyBaseType, returnType, methodName);
-        return false;
+        var key = new InitializerBindingKey(proxyBaseType, proxyInterface, returnType, baseType, methodName);
+        var isValid = _bindingCache.InitializerBindings.GetOrAdd(key, _initializerBindingFactory).Value;
+        diagnostic = isValid
+            ? null
+            : CreateInvalidInitializerDiagnostic(mapping, baseType, proxyBaseType, returnType, methodName);
+        return isValid;
     }
 
     private bool TryBindParameterlessBaseConstructor(INamedTypeSymbol baseType, out bool canInvoke)
     {
         canInvoke = false;
-        if (!TryCreateBindingContext([baseType], out var compilation, out var typeParameters, out var constraints))
+        if (!TryCreateBindingContext(
+            [baseType],
+            out var compilation,
+            out var typeParameters,
+            out var constraints,
+            out var substitutions))
         {
             return false;
         }
@@ -657,10 +746,49 @@ internal sealed class InvokableBaseTypeResolver
         var source = $$"""
             namespace __OrleansCodeGenSemanticBinding
             {
-                internal abstract class __Request{{typeParameters}} : {{DisplayFullyQualified(baseType)}}
+                internal abstract class __Request{{typeParameters}} : {{DisplayFullyQualified(baseType, substitutions)}}
                     {{constraints}}
                 {
                     protected __Request() : base() { }
+                }
+            }
+            """;
+        var tree = ParseBindingTree(compilation, source);
+        compilation = compilation.AddSyntaxTrees(tree);
+        var model = compilation.GetSemanticModel(tree);
+        var initializer = tree.GetRoot().DescendantNodes().OfType<ConstructorInitializerSyntax>().Single();
+        canInvoke = model.GetSymbolInfo(initializer).Symbol is IMethodSymbol;
+        return true;
+    }
+
+    private bool TryBindBaseConstructor(
+        INamedTypeSymbol baseType,
+        ImmutableArray<IParameterSymbol> parameters,
+        out bool canInvoke)
+    {
+        canInvoke = false;
+        if (!TryCreateBindingContext(
+            parameters.Select(static parameter => parameter.Type).Prepend(baseType),
+            out var compilation,
+            out var typeParameters,
+            out var constraints,
+            out var substitutions))
+        {
+            return false;
+        }
+
+        var parameterList = string.Join(
+            ", ",
+            parameters.Select((parameter, index) =>
+                $"{DisplayFullyQualified(parameter.Type, substitutions)} arg{index}"));
+        var argumentList = string.Join(", ", parameters.Select(static (_, index) => $"arg{index}"));
+        var source = $$"""
+            namespace __OrleansCodeGenSemanticBinding
+            {
+                internal abstract class __Request{{typeParameters}} : {{DisplayFullyQualified(baseType, substitutions)}}
+                    {{constraints}}
+                {
+                    protected __Request({{parameterList}}) : base({{argumentList}}) { }
                 }
             }
             """;
@@ -685,7 +813,8 @@ internal sealed class InvokableBaseTypeResolver
             [proxyBaseType, proxyInterface, returnType, baseType],
             out var compilation,
             out var typeParameters,
-            out var constraints))
+            out var constraints,
+            out var substitutions))
         {
             return false;
         }
@@ -694,15 +823,15 @@ internal sealed class InvokableBaseTypeResolver
             namespace __OrleansCodeGenSemanticBinding
             {
                 internal abstract class __Proxy{{typeParameters}} :
-                    {{DisplayFullyQualified(proxyBaseType)}},
-                    {{DisplayFullyQualified(proxyInterface)}}
+                    {{DisplayFullyQualified(proxyBaseType, substitutions)}},
+                    {{DisplayFullyQualified(proxyInterface, substitutions)}}
                     {{constraints}}
                 {
-                    private {{DisplayFullyQualified(returnType)}} __Bind(
+                    private {{DisplayFullyQualified(returnType, substitutions)}} __Bind(
                         __Request{{typeParameters}} request) => request.{{EscapeIdentifier(methodName)}}(this);
                 }
 
-                internal abstract class __Request{{typeParameters}} : {{DisplayFullyQualified(baseType)}}
+                internal abstract class __Request{{typeParameters}} : {{DisplayFullyQualified(baseType, substitutions)}}
                     {{constraints}}
                 {
                 }
@@ -733,13 +862,15 @@ internal sealed class InvokableBaseTypeResolver
         IEnumerable<ITypeSymbol> types,
         out CSharpCompilation compilation,
         out string typeParameters,
-        out string constraints)
+        out string constraints,
+        out Dictionary<ITypeParameterSymbol, string> substitutions)
     {
         if (_compilation is not CSharpCompilation csharpCompilation)
         {
             compilation = null!;
             typeParameters = string.Empty;
             constraints = string.Empty;
+            substitutions = null!;
             return false;
         }
 
@@ -758,19 +889,27 @@ internal sealed class InvokableBaseTypeResolver
             }
         }
 
-        if (parameters.Select(static parameter => parameter.Name).Distinct(StringComparer.Ordinal).Count() != parameters.Count)
+        substitutions = new(SymbolEqualityComparer.Default);
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var parameter in parameters)
         {
-            typeParameters = string.Empty;
-            constraints = string.Empty;
-            return false;
+            var count = 0;
+            var name = parameter.Name;
+            while (!names.Add(name))
+            {
+                name = $"{parameter.Name}_{++count}";
+            }
+
+            substitutions.Add(parameter, EscapeIdentifier(name));
         }
 
+        var typeParameterSubstitutions = substitutions;
         typeParameters = parameters.Count == 0
             ? string.Empty
-            : $"<{string.Join(", ", parameters.Select(static parameter => EscapeIdentifier(parameter.Name)))}>";
+            : $"<{string.Join(", ", parameters.Select(parameter => typeParameterSubstitutions[parameter]))}>";
         constraints = string.Join(
             "\n",
-            parameters.Select(GetConstraintClause).Where(static clause => clause.Length > 0));
+            parameters.Select(parameter => GetConstraintClause(parameter, typeParameterSubstitutions)).Where(static clause => clause.Length > 0));
         return true;
     }
 
@@ -814,7 +953,9 @@ internal sealed class InvokableBaseTypeResolver
         }
     }
 
-    private static string GetConstraintClause(ITypeParameterSymbol parameter)
+    private static string GetConstraintClause(
+        ITypeParameterSymbol parameter,
+        Dictionary<ITypeParameterSymbol, string> substitutions)
     {
         var constraints = new List<string>();
         if (parameter.HasUnmanagedTypeConstraint)
@@ -834,7 +975,7 @@ internal sealed class InvokableBaseTypeResolver
             constraints.Add("notnull");
         }
 
-        constraints.AddRange(parameter.ConstraintTypes.Select(DisplayFullyQualified));
+        constraints.AddRange(parameter.ConstraintTypes.Select(constraint => DisplayFullyQualified(constraint, substitutions)));
         if (parameter.HasConstructorConstraint)
         {
             constraints.Add("new()");
@@ -842,13 +983,13 @@ internal sealed class InvokableBaseTypeResolver
 
         return constraints.Count == 0
             ? string.Empty
-            : $"where {EscapeIdentifier(parameter.Name)} : {string.Join(", ", constraints)}";
+            : $"where {substitutions[parameter]} : {string.Join(", ", constraints)}";
     }
 
-    private static SyntaxTree ParseBindingTree(CSharpCompilation compilation, string source)
+    private SyntaxTree ParseBindingTree(CSharpCompilation compilation, string source)
         => CSharpSyntaxTree.ParseText(
             source,
-            compilation.SyntaxTrees.Select(static tree => tree.Options).OfType<CSharpParseOptions>().FirstOrDefault(),
+            _bindingCache.ParseOptions,
             "__OrleansCodeGenSemanticBinding.g.cs");
 
     private static ResolverDiagnostic CreateInvalidInitializerDiagnostic(
@@ -861,8 +1002,26 @@ internal sealed class InvokableBaseTypeResolver
             mapping,
             $"Return-value proxy initializer '{Display(baseType)}.{methodName}' must be an accessible, concrete, non-generic instance method selected by overload resolution, with one by-value parameter accepting '{Display(proxyBaseType)}' and a return type assignable to '{Display(returnType)}'.");
 
-    private static string DisplayFullyQualified(ITypeSymbol symbol)
-        => symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+    private static string DisplayFullyQualified(
+        ITypeSymbol symbol,
+        Dictionary<ITypeParameterSymbol, string> substitutions)
+    {
+        var result = new StringBuilder();
+        foreach (var part in symbol.ToDisplayParts(SymbolDisplayFormat.FullyQualifiedFormat))
+        {
+            if (part.Symbol is ITypeParameterSymbol parameter
+                && substitutions.TryGetValue(parameter, out var replacement))
+            {
+                result.Append(replacement);
+            }
+            else
+            {
+                result.Append(part.ToString());
+            }
+        }
+
+        return result.ToString();
+    }
 
     private static string EscapeIdentifier(string identifier)
         => SyntaxFacts.GetKeywordKind(identifier) != SyntaxKind.None
@@ -884,6 +1043,13 @@ internal sealed class InvokableBaseTypeResolver
 
     private readonly record struct CandidateGroup(MappingKind Kind, ImmutableArray<Mapping> Mappings);
 
+    private readonly record struct InitializerBindingKey(
+        INamedTypeSymbol ProxyBaseType,
+        INamedTypeSymbol ProxyInterface,
+        ITypeSymbol ReturnType,
+        INamedTypeSymbol BaseType,
+        string MethodName);
+
     private sealed record Mapping(
         INamedTypeSymbol ProxyBaseType,
         INamedTypeSymbol ReturnType,
@@ -898,6 +1064,56 @@ internal sealed class InvokableBaseTypeResolver
         ReturnType,
         Assembly,
         Default,
+    }
+
+    private enum MappingMatchKind
+    {
+        Exact,
+        OpenGeneric,
+    }
+
+    private sealed class BindingCache
+    {
+        public BindingCache(Compilation compilation)
+        {
+            ParseOptions = compilation.SyntaxTrees
+                .Select(static tree => tree.Options)
+                .OfType<CSharpParseOptions>()
+                .FirstOrDefault();
+        }
+
+        public ConcurrentDictionary<INamedTypeSymbol, Lazy<bool>> ConstructorBindings { get; } =
+            new(SymbolEqualityComparer.Default);
+
+        public ConcurrentDictionary<InitializerBindingKey, Lazy<bool>> InitializerBindings { get; } =
+            new(InitializerBindingKeyComparer.Instance);
+
+        public CSharpParseOptions? ParseOptions { get; }
+    }
+
+    private sealed class InitializerBindingKeyComparer : IEqualityComparer<InitializerBindingKey>
+    {
+        public static InitializerBindingKeyComparer Instance { get; } = new();
+
+        public bool Equals(InitializerBindingKey x, InitializerBindingKey y)
+            => SymbolEqualityComparer.Default.Equals(x.ProxyBaseType, y.ProxyBaseType)
+                && SymbolEqualityComparer.Default.Equals(x.ProxyInterface, y.ProxyInterface)
+                && SymbolEqualityComparer.Default.Equals(x.ReturnType, y.ReturnType)
+                && SymbolEqualityComparer.Default.Equals(x.BaseType, y.BaseType)
+                && string.Equals(x.MethodName, y.MethodName, StringComparison.Ordinal);
+
+        public int GetHashCode(InitializerBindingKey obj)
+        {
+            unchecked
+            {
+                var hash = SymbolEqualityComparer.Default.GetHashCode(obj.ProxyBaseType);
+                hash = (hash * 397) ^ SymbolEqualityComparer.Default.GetHashCode(obj.ProxyInterface);
+                hash = (hash * 397) ^ SymbolEqualityComparer.Default.GetHashCode(obj.ReturnType);
+                hash = (hash * 397) ^ SymbolEqualityComparer.Default.GetHashCode(obj.BaseType);
+                hash = (hash * 397) ^ StringComparer.Ordinal.GetHashCode(obj.MethodName);
+                return hash;
+            }
+        }
     }
 
     private sealed class MappingComparer : IComparer<Mapping>
