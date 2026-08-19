@@ -1738,17 +1738,6 @@ namespace Orleans.Serialization
         public override void WriteJson(Newtonsoft.Json.JsonWriter writer, object? value, Newtonsoft.Json.JsonSerializer serializer) { }
     }
 
-    public sealed partial class GrainIdJsonConverter : System.Text.Json.Serialization.JsonConverter<Runtime.GrainId>
-    {
-        public override Runtime.GrainId Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
-
-        public override Runtime.GrainId ReadAsPropertyName(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
-
-        public override void Write(System.Text.Json.Utf8JsonWriter writer, Runtime.GrainId value, System.Text.Json.JsonSerializerOptions options) { }
-
-        public override void WriteAsPropertyName(System.Text.Json.Utf8JsonWriter writer, Runtime.GrainId value, System.Text.Json.JsonSerializerOptions options) { }
-    }
-
     public sealed partial class GrainReferenceConverter : System.Text.Json.Serialization.JsonConverter<Runtime.IAddressable>
     {
         public GrainReferenceConverter(GrainReferences.GrainReferenceActivator referenceActivator) { }
@@ -1802,8 +1791,6 @@ namespace Orleans.Serialization
 
     public sealed partial class IPEndPointJsonConverter : System.Text.Json.Serialization.JsonConverter<System.Net.IPEndPoint>
     {
-        public IPEndPointJsonConverter(System.Text.Json.Serialization.JsonConverter<System.Net.IPAddress> addressConverter) { }
-
         public override System.Net.IPEndPoint? Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
 
         public override System.Net.IPEndPoint ReadAsPropertyName(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }

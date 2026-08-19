@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Serialization;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -62,48 +61,28 @@ namespace Orleans.Runtime
 
     public sealed class QualifiedStreamIdJsonConverter : JsonConverter<QualifiedStreamId>
     {
-        private readonly string? _qualifiedStreamIdType = typeof(QualifiedStreamId).AssemblyQualifiedName;
-        // The versioned form preserves provider and stream delimiters. Legacy property names always contain '/'.
-        private const string PropertyNamePrefix = "$qualifiedstreamid:v1:";
-
         public override QualifiedStreamId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            if (reader.TokenType != JsonTokenType.StartObject)
+            if (reader.TokenType != JsonTokenType.StartArray
+                || !reader.Read()
+                || reader.TokenType != JsonTokenType.String)
             {
-                return default;
+                throw new JsonException($"Could not deserialize {nameof(QualifiedStreamId)}.");
             }
 
-            string? providerName = null;
-            StreamId streamId = default;
-
-            while (reader.Read())
+            var providerName = reader.GetString();
+            if (!reader.Read())
             {
-                if (reader.TokenType == JsonTokenType.EndObject)
-                {
-                    break;
-                }
-
-                if (reader.TokenType == JsonTokenType.PropertyName)
-                {
-                    var propertyName = reader.GetString();
-
-                    reader.Read();
-
-                    switch (propertyName)
-                    {
-                        case "pvn":
-                            providerName = reader.GetString();
-                            break;
-                        case "sid":
-                            streamId = JsonSerializer.Deserialize<StreamId>(ref reader, options);
-                            break;
-                    }
-                }
+                throw new JsonException($"Could not deserialize {nameof(QualifiedStreamId)}.");
             }
 
-            if (providerName is null || streamId == default)
+            var streamId = JsonSerializer.Deserialize<StreamId>(ref reader, options);
+            if (!reader.Read()
+                || reader.TokenType != JsonTokenType.EndArray
+                || string.IsNullOrWhiteSpace(providerName)
+                || streamId == default)
             {
-                return default;
+                throw new JsonException($"Could not deserialize {nameof(QualifiedStreamId)}.");
             }
 
             return new QualifiedStreamId(providerName, streamId);
@@ -111,58 +90,60 @@ namespace Orleans.Runtime
 
         public override void Write(Utf8JsonWriter writer, QualifiedStreamId value, JsonSerializerOptions options)
         {
-            writer.WriteStartObject();
-            writer.WriteString("$type", _qualifiedStreamIdType);
-            writer.WriteString("pvn", value.ProviderName);
-            writer.WritePropertyName("sid");
+            if (string.IsNullOrWhiteSpace(value.ProviderName) || value.StreamId == default)
+            {
+                throw new JsonException($"Could not serialize {nameof(QualifiedStreamId)}.");
+            }
+
+            writer.WriteStartArray();
+            writer.WriteStringValue(value.ProviderName);
             JsonSerializer.Serialize(writer, value.StreamId, options);
-            writer.WriteEndObject();
+            writer.WriteEndArray();
         }
 
         public override QualifiedStreamId ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var value = reader.GetString() ?? throw new JsonException("Failed to parse QualifiedStreamId from property name.");
-            if (value.StartsWith(PropertyNamePrefix, StringComparison.Ordinal)
-                && !value.AsSpan(PropertyNamePrefix.Length).Contains('/'))
-            {
-                var encoded = value.AsSpan(PropertyNamePrefix.Length);
-                var separator = encoded.IndexOf(':');
-                if (separator < 0)
-                {
-                    throw new JsonException("Failed to parse QualifiedStreamId from property name.");
-                }
-
-                string encodedProviderName;
-                try
-                {
-                    encodedProviderName = Encoding.UTF8.GetString(Convert.FromHexString(encoded[..separator]));
-                }
-                catch (FormatException exception)
-                {
-                    throw new JsonException("Failed to parse QualifiedStreamId from property name.", exception);
-                }
-
-                var encodedStreamId = StreamIdJsonConverter.ParsePropertyName(encoded[(separator + 1)..].ToString());
-                return new QualifiedStreamId(encodedProviderName, encodedStreamId);
-            }
-
-            var i = value.IndexOf(':');
-
-            if (i < 0)
+            var encoded = value.AsSpan();
+            var separator = encoded.IndexOf(':');
+            if (separator <= 0
+                || !int.TryParse(
+                    encoded[..separator],
+                    System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var providerNameLength))
             {
                 throw new JsonException("Failed to parse QualifiedStreamId from property name.");
             }
 
-            var providerName = value[..i];
-            var streamId = StreamId.Parse(Encoding.UTF8.GetBytes(value[(i + 1)..]));
+            var components = encoded[(separator + 1)..];
+            if (providerNameLength <= 0 || providerNameLength > components.Length)
+            {
+                throw new JsonException("Failed to parse QualifiedStreamId from property name.");
+            }
+
+            var providerName = components[..providerNameLength].ToString();
+            if (string.IsNullOrWhiteSpace(providerName))
+            {
+                throw new JsonException("Failed to parse QualifiedStreamId from property name.");
+            }
+
+            var streamId = StreamIdJsonConverter.ParsePropertyName(components[providerNameLength..].ToString());
             return new QualifiedStreamId(providerName, streamId);
         }
 
         public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] QualifiedStreamId value, JsonSerializerOptions options)
-            => writer.WritePropertyName(string.Concat(
-                PropertyNamePrefix,
-                Convert.ToHexString(Encoding.UTF8.GetBytes(value.ProviderName)),
+        {
+            if (string.IsNullOrWhiteSpace(value.ProviderName) || value.StreamId == default)
+            {
+                throw new JsonException($"Could not serialize {nameof(QualifiedStreamId)}.");
+            }
+
+            writer.WritePropertyName(string.Concat(
+                value.ProviderName.Length.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 ":",
+                value.ProviderName,
                 StreamIdJsonConverter.FormatPropertyName(value.StreamId)));
+        }
     }
 }

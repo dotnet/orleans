@@ -496,7 +496,6 @@ namespace Orleans.Hosting
 
     public static partial class SystemTextJsonSerializerExtensions
     {
-        [System.Diagnostics.CodeAnalysis.Experimental("ORLEANSEXP006")]
         public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder) { throw null; }
     }
 }

@@ -8,59 +8,27 @@ using System.Text.Json.Serialization;
 
 namespace Orleans.Serialization
 {
-    public sealed class IPEndPointJsonConverter(JsonConverter<IPAddress> addressConverter) : JsonConverter<IPEndPoint>
+    public sealed class IPEndPointJsonConverter : JsonConverter<IPEndPoint>
     {
         private const int MaxAddressSize = 71;
 
         /// <inheritdoc />
         public override IPEndPoint? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            IPAddress? address = null;
-            var port = 0;
-
-            while (reader.Read())
-            {
-                if (reader.TokenType == JsonTokenType.EndObject)
-                    break;
-
-                if (reader.TokenType == JsonTokenType.PropertyName)
-                {
-                    if (reader.ValueTextEquals("Address"u8))
-                    {
-                        reader.Read();
-                        address = addressConverter.Read(ref reader, typeof(IPAddress), options);
-                    }
-                    else if (reader.ValueTextEquals("Port"u8))
-                    {
-                        reader.Read();
-                        _ = reader.TryGetInt32(out port); // Port is optional
-                    }
-                    else
-                    {
-                        reader.Read();
-                    }
-                }
-            }
-
-            return address is null ? null : new IPEndPoint(address, port);
-        }
+            => Parse(ref reader);
 
         /// <inheritdoc />
         public override void Write(Utf8JsonWriter writer, IPEndPoint value, JsonSerializerOptions options)
-        {
-            writer.WriteStartObject();
-            writer.WritePropertyName("Address");
-            addressConverter.Write(writer, value.Address, options);
-            writer.WriteNumber("Port", value.Port);
-            writer.WriteEndObject();
-        }
+            => writer.WriteStringValue(value.ToString());
 
         /// <inheritdoc />
         public override IPEndPoint ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            => Parse(ref reader);
+
+        private static IPEndPoint Parse(ref Utf8JsonReader reader)
         {
             var valueLength = reader.HasValueSequence
-            ? checked((int)reader.ValueSequence.Length)
-            : reader.ValueSpan.Length;
+                ? checked((int)reader.ValueSequence.Length)
+                : reader.ValueSpan.Length;
 
             if (valueLength <= MaxAddressSize)
             {
@@ -70,8 +38,7 @@ namespace Orleans.Serialization
             }
             else
             {
-                var endpoint = reader.GetString();
-                return IPEndPoint.Parse(endpoint!);
+                return IPEndPoint.Parse(reader.GetString() ?? throw new JsonException($"Could not deserialize {nameof(IPEndPoint)}."));
             }
         }
 

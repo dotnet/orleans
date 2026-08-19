@@ -21,49 +21,27 @@ namespace Orleans.Serialization
         /// <inheritdoc />
         public override IAddressable? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            string? type = null, key = null, iface = null;
-
-            while (reader.Read())
+            if (reader.TokenType != JsonTokenType.StartArray || !reader.Read())
             {
-                if (reader.TokenType == JsonTokenType.EndObject)
-                    break;
-
-                if (reader.TokenType == JsonTokenType.PropertyName)
-                {
-                    var propertyName = reader.GetString();
-                    reader.Read();
-
-                    if (propertyName == "Id")
-                    {
-                        while (reader.Read())
-                        {
-                            if (reader.TokenType == JsonTokenType.EndObject)
-                                break;
-
-                            if (reader.TokenType == JsonTokenType.PropertyName)
-                            {
-                                var idProperty = reader.GetString();
-                                reader.Read();
-
-                                if (idProperty == "Type") type = reader.GetString();
-                                if (idProperty == "Key") key = reader.GetString();
-                            }
-                        }
-                    }
-                    else if (propertyName == "Interface")
-                    {
-                        iface = reader.GetString();
-                    }
-                }
+                throw new JsonException($"Could not deserialize {nameof(IAddressable)}.");
             }
 
-            if (string.IsNullOrWhiteSpace(type) || string.IsNullOrWhiteSpace(key))
+            var grainId = JsonSerializer.Deserialize<GrainId>(ref reader, options);
+            if (!reader.Read() || reader.TokenType != JsonTokenType.String)
             {
-                return null;
+                throw new JsonException($"Could not deserialize {nameof(IAddressable)}.");
             }
 
-            var grainId = GrainId.Create(type, key);
-            var grainInterface = string.IsNullOrWhiteSpace(iface) ? default : GrainInterfaceType.Create(iface);
+            var interfaceType = reader.GetString();
+            if (!reader.Read()
+                || reader.TokenType != JsonTokenType.EndArray
+                || grainId.IsDefault
+                || interfaceType is null)
+            {
+                throw new JsonException($"Could not deserialize {nameof(IAddressable)}.");
+            }
+
+            var grainInterface = string.IsNullOrEmpty(interfaceType) ? default : GrainInterfaceType.Create(interfaceType);
             return referenceActivator.CreateReference(grainId, grainInterface);
         }
 
@@ -71,13 +49,10 @@ namespace Orleans.Serialization
         public override void Write(Utf8JsonWriter writer, IAddressable value, JsonSerializerOptions options)
         {
             var val = value.AsReference();
-            writer.WriteStartObject();
-            writer.WriteStartObject("Id");
-            writer.WriteString("Type", val.GrainId.Type.AsSpan());
-            writer.WriteString("Key", val.GrainId.Key.AsSpan());
-            writer.WriteEndObject();
-            writer.WriteString("Interface", val.InterfaceType.ToString());
-            writer.WriteEndObject();
+            writer.WriteStartArray();
+            JsonSerializer.Serialize(writer, val.GrainId, options);
+            writer.WriteStringValue(val.InterfaceType.ToString());
+            writer.WriteEndArray();
         }
     }
 }

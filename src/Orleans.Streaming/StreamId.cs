@@ -7,7 +7,6 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text.Unicode;
 using Orleans.Streams;
 
 namespace Orleans.Runtime
@@ -188,10 +187,11 @@ namespace Orleans.Runtime
             var len = Encoding.UTF8.GetCharCount(fullKey);
             if (keyIndex == 0)
             {
-                if (destination.Length >= len + 1)
+                // QualifiedStreamId.ToString() is used as the pub/sub rendezvous grain key, so preserve its historical format.
+                if (destination.Length >= len + 5)
                 {
-                    destination[0] = '/';
-                    charsWritten = Encoding.UTF8.GetChars(fullKey, destination[1..]) + 1;
+                    "null/".CopyTo(destination);
+                    charsWritten = Encoding.UTF8.GetChars(fullKey, destination[5..]) + 5;
                     return true;
                 }
             }
@@ -211,11 +211,11 @@ namespace Orleans.Runtime
         {
             if (keyIndex == 0)
             {
-                if (utf8Destination.Length >= fullKey.Length + 1)
+                if (utf8Destination.Length >= fullKey.Length + 5)
                 {
-                    utf8Destination[0] = (byte)'/';
-                    fullKey.CopyTo(utf8Destination[1..]);
-                    bytesWritten = fullKey.Length + 1;
+                    "null/"u8.CopyTo(utf8Destination);
+                    fullKey.CopyTo(utf8Destination[5..]);
+                    bytesWritten = fullKey.Length + 5;
                     return true;
                 }
             }
@@ -272,101 +272,57 @@ namespace Orleans.Runtime
 
     public sealed class StreamIdJsonConverter : JsonConverter<StreamId>
     {
-        // The versioned form preserves the raw key and namespace boundary. Legacy property names always contain '/'.
-        private const string PropertyNamePrefix = "$streamid:v1:";
-
-        // This is backward compatible with Newtonsoft.JsonSerializer
-        // which didn't have a JsonConverter for StreamId.
-        // StreamId used the default serialization that Newtonsoft provided.
-
-        // Ideally this STJ Converter would write Namespace/Key as a value
-
-        // This implementation emulates Newtonsoft by both reading and writing
-        // the same structure.
-        //
-        // The alternatives were to
-        // 1. break backward compatibility which would have prevented switching from Newtonsoft to STJ if streamIds were stored in persistence.
-        // 2. To support reading the Newtonsoft format and the new format, but write using the preferred Key and Namespace format, which would allow a one-way migration, but prevent reverting to Newtonsoft.
-        // 3. Add a Newtonsoft.JsonConverter for StreamId which supported the previous default Newtonsoft structure and also the preferred STJ Key and Namespace approach. This would make reverting Orleans a breaking change.
-
-        private readonly string? _byteArrayType = typeof(byte[]).AssemblyQualifiedName;
-        private readonly string? _streamIdType = typeof(StreamId).AssemblyQualifiedName;
+        private static readonly Encoding StrictUtf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
         public override StreamId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            if (reader.TokenType != JsonTokenType.StartObject)
+            if (reader.TokenType != JsonTokenType.StartArray || !reader.Read())
             {
-                return default;
+                throw new JsonException($"Could not deserialize {nameof(StreamId)}.");
             }
 
-            // This is backward compatible with the way Newtonsoft writes StreamId
-
-            uint? ki = null;
-            byte[]? value = null;
-            while (reader.Read())
+            var streamNamespace = reader.TokenType switch
             {
-                if (reader.TokenType == JsonTokenType.EndObject)
-                    break;
+                JsonTokenType.Null => null,
+                JsonTokenType.String => reader.GetString(),
+                _ => throw new JsonException($"Could not deserialize {nameof(StreamId)}."),
+            };
 
-                if (reader.TokenType == JsonTokenType.PropertyName)
-                {
-                    var propertyName = reader.GetString();
-                    reader.Read();
-
-                    switch (propertyName)
-                    {
-                        case "$ref":
-                            throw new JsonException("Reference-preserving JSON is not supported by the System.Text.Json grain storage serializer.");
-                        case "ki":
-                            ki = reader.GetUInt32();
-                            break;
-                        case "fk":
-                            while (reader.Read())
-                            {
-                                if (reader.TokenType == JsonTokenType.EndObject)
-                                    break;
-
-                                if (reader.TokenType == JsonTokenType.PropertyName)
-                                {
-                                    propertyName = reader.GetString();
-                                    reader.Read();
-
-                                    if (propertyName == "$ref")
-                                    {
-                                        throw new JsonException("Reference-preserving JSON is not supported by the System.Text.Json grain storage serializer.");
-                                    }
-                                    else if (propertyName == "$value")
-                                    {
-                                        value = reader.GetBytesFromBase64();
-                                    }
-                                }
-                            }
-                            break;
-                    }
-                }
+            if (!reader.Read() || reader.TokenType != JsonTokenType.String)
+            {
+                throw new JsonException($"Could not deserialize {nameof(StreamId)}.");
             }
 
-            return value is not { Length: > 0 }
-                || !ki.HasValue
-                ? default
-                : new StreamId(value, (ushort)ki);
+            var key = reader.GetString();
+            if (!reader.Read() || reader.TokenType != JsonTokenType.EndArray)
+            {
+                throw new JsonException($"Could not deserialize {nameof(StreamId)}.");
+            }
+
+            return Create(hasNamespace: true, streamNamespace, key);
         }
 
         public override void Write(Utf8JsonWriter writer, StreamId value, JsonSerializerOptions options)
         {
-            writer.WriteStartObject();
-            if (value != default)
+            if (value == default || value.Key.IsEmpty)
             {
-                writer.WriteString("$type", _streamIdType);
-                writer.WriteStartObject("fk");
-                writer.WriteString("$type", _byteArrayType);
-                writer.WriteBase64String("$value", value.FullKey.Span);
-                writer.WriteEndObject();
-                writer.WriteNumber("ki", value.GetKeyIndex());
-                writer.WriteNumber("fh", (int)value.GetUniformHashCode());
+                throw new JsonException($"Could not serialize {nameof(StreamId)}.");
             }
-            writer.WriteEndObject();
+
+            writer.WriteStartArray();
+            if (!value.Namespace.IsEmpty)
+            {
+                writer.WriteStringValue(Decode(value.Namespace.Span));
+            }
+            else
+            {
+                writer.WriteNullValue();
+            }
+
+            writer.WriteStringValue(Decode(value.Key.Span));
+            writer.WriteEndArray();
         }
+
         public override StreamId ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var value = reader.GetString() ?? throw new JsonException("Failed to parse StreamId from property name.");
@@ -378,44 +334,74 @@ namespace Orleans.Runtime
             => writer.WritePropertyName(FormatPropertyName(value));
 
         internal static string FormatPropertyName(StreamId value)
-            => string.Concat(
-                PropertyNamePrefix,
-                value.GetKeyIndex().ToString(CultureInfo.InvariantCulture),
+        {
+            if (value == default || value.Key.IsEmpty)
+            {
+                throw new JsonException($"Could not serialize {nameof(StreamId)}.");
+            }
+
+            var streamNamespace = value.Namespace.IsEmpty ? string.Empty : Decode(value.Namespace.Span);
+            return string.Concat(
+                streamNamespace.Length.ToString(CultureInfo.InvariantCulture),
                 ":",
-                Convert.ToHexString(value.FullKey.Span));
+                streamNamespace,
+                Decode(value.Key.Span));
+        }
 
         internal static StreamId ParsePropertyName(string value)
         {
-            if (!value.StartsWith(PropertyNamePrefix, StringComparison.Ordinal)
-                || value.AsSpan(PropertyNamePrefix.Length).Contains('/'))
-            {
-                return StreamId.Parse(Encoding.UTF8.GetBytes(value));
-            }
-
-            var encoded = value.AsSpan(PropertyNamePrefix.Length);
+            var encoded = value.AsSpan();
             var separator = encoded.IndexOf(':');
             if (separator <= 0
-                || !ushort.TryParse(encoded[..separator], NumberStyles.None, CultureInfo.InvariantCulture, out var keyIndex))
+                || !int.TryParse(encoded[..separator], NumberStyles.None, CultureInfo.InvariantCulture, out var namespaceLength))
             {
                 throw new JsonException("Failed to parse StreamId from property name.");
             }
 
-            byte[] fullKey;
+            var components = encoded[(separator + 1)..];
+            if (namespaceLength < 0 || namespaceLength > components.Length)
+            {
+                throw new JsonException("Failed to parse StreamId from property name.");
+            }
+
+            var streamNamespace = namespaceLength == 0 ? null : components[..namespaceLength].ToString();
+            var key = components[namespaceLength..].ToString();
+            return Create(hasNamespace: true, streamNamespace, key);
+        }
+
+        private static StreamId Create(bool hasNamespace, string? streamNamespace, string? key)
+        {
+            if (!hasNamespace || string.IsNullOrEmpty(key))
+            {
+                throw new JsonException($"Could not deserialize {nameof(StreamId)}.");
+            }
+
             try
             {
-                fullKey = Convert.FromHexString(encoded[(separator + 1)..]);
-            }
-            catch (FormatException exception)
-            {
-                throw new JsonException("Failed to parse StreamId from property name.", exception);
-            }
+                var namespaceBytes = streamNamespace is null ? Array.Empty<byte>() : StrictUtf8.GetBytes(streamNamespace);
+                if (namespaceBytes.Length > ushort.MaxValue)
+                {
+                    throw new JsonException($"{nameof(StreamId)} namespaces cannot exceed {ushort.MaxValue} UTF-8 bytes.");
+                }
 
-            if (fullKey.Length == 0 || keyIndex > fullKey.Length)
-            {
-                throw new JsonException("Failed to parse StreamId from property name.");
+                return StreamId.Create(namespaceBytes, StrictUtf8.GetBytes(key));
             }
+            catch (EncoderFallbackException exception)
+            {
+                throw new JsonException($"{nameof(StreamId)} components must contain valid UTF-8.", exception);
+            }
+        }
 
-            return new StreamId(fullKey, keyIndex);
+        private static string Decode(ReadOnlySpan<byte> value)
+        {
+            try
+            {
+                return StrictUtf8.GetString(value);
+            }
+            catch (DecoderFallbackException exception)
+            {
+                throw new JsonException($"{nameof(StreamId)} components must contain valid UTF-8.", exception);
+            }
         }
     }
 }

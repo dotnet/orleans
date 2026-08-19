@@ -13,6 +13,8 @@ namespace Orleans.Streaming.JsonConverters
     /// </summary>
     public sealed class EventSequenceTokenJsonConverter : JsonConverter<StreamSequenceToken>
     {
+        private const int EventSequenceTokenDiscriminator = 1;
+        private const int EventSequenceTokenV2Discriminator = 2;
         private readonly Type _eventSequenceTokenType = typeof(EventSequenceToken);
         private readonly Type _eventSequenceTokenTypeV2 = typeof(EventSequenceTokenV2);
         private readonly Type _streamSequenceTokenType = typeof(StreamSequenceToken);
@@ -23,66 +25,56 @@ namespace Orleans.Streaming.JsonConverters
 
         public override StreamSequenceToken? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            if (reader.TokenType != JsonTokenType.StartObject)
+            if (reader.TokenType != JsonTokenType.StartArray
+                || !reader.Read()
+                || reader.TokenType != JsonTokenType.Number)
             {
-                return null;
+                throw new JsonException($"Could not deserialize {nameof(StreamSequenceToken)}.");
             }
 
-            long? sequenceNumber = null;
-            int? eventIndex = null;
-            string? serializedType = null;
-
-            while (reader.Read())
+            var tokenType = reader.GetInt32();
+            if (!reader.Read() || reader.TokenType != JsonTokenType.Number)
             {
-                if (reader.TokenType == JsonTokenType.EndObject)
-                    break;
+                throw new JsonException($"Could not deserialize {nameof(StreamSequenceToken)}.");
+            }
 
-                if (reader.TokenType == JsonTokenType.PropertyName)
+            var sequenceNumber = reader.GetInt64();
+            var eventIndex = 0;
+            if (!reader.Read())
+            {
+                throw new JsonException($"Could not deserialize {nameof(StreamSequenceToken)}.");
+            }
+
+            if (reader.TokenType != JsonTokenType.EndArray)
+            {
+                eventIndex = reader.GetInt32();
+                if (!reader.Read() || reader.TokenType != JsonTokenType.EndArray)
                 {
-                    var propertyName = reader.GetString();
-                    reader.Read();
-
-                    switch (propertyName)
-                    {
-                        case "$ref":
-                            throw new JsonException("Reference-preserving JSON is not supported by the System.Text.Json grain storage serializer.");
-                        case "EventIndex":
-                            eventIndex = reader.GetInt32();
-                            break;
-                        case "SequenceNumber":
-                            sequenceNumber = reader.GetInt64();
-                            break;
-                        case "$type":
-                            serializedType = reader.GetString();
-                            break;
-                    }
+                    throw new JsonException($"Could not deserialize {nameof(StreamSequenceToken)}.");
                 }
             }
 
-            return sequenceNumber is null
-                || eventIndex is null
-                ? null
-                : CreateToken(typeToConvert, serializedType, sequenceNumber.Value, eventIndex.Value);
+            return CreateToken(typeToConvert, tokenType, sequenceNumber, eventIndex);
         }
 
-        private StreamSequenceToken CreateToken(Type typeToConvert, string? serializedType, long sequenceNumber, int eventIndex)
+        private StreamSequenceToken CreateToken(Type typeToConvert, int tokenType, long sequenceNumber, int eventIndex)
         {
-            if (typeToConvert == _eventSequenceTokenType)
-                return new EventSequenceToken(sequenceNumber, eventIndex);
-            if (typeToConvert == _eventSequenceTokenTypeV2)
-                return new EventSequenceTokenV2(sequenceNumber, eventIndex);
+            var runtimeType = tokenType switch
+            {
+                EventSequenceTokenDiscriminator => _eventSequenceTokenType,
+                EventSequenceTokenV2Discriminator => _eventSequenceTokenTypeV2,
+                _ => throw new JsonException($"Unsupported {nameof(StreamSequenceToken)} type: {tokenType}"),
+            };
 
-            if (IsSerializedType(serializedType, _eventSequenceTokenType))
-                return new EventSequenceToken(sequenceNumber, eventIndex);
-            if (IsSerializedType(serializedType, _eventSequenceTokenTypeV2))
-                return new EventSequenceTokenV2(sequenceNumber, eventIndex);
+            if (typeToConvert != _streamSequenceTokenType && typeToConvert != runtimeType)
+            {
+                throw new JsonException($"Cannot deserialize {runtimeType} as {typeToConvert}.");
+            }
 
-            throw new NotSupportedException($"Unsupported {nameof(StreamSequenceToken)} type: {typeToConvert}");
+            return runtimeType == _eventSequenceTokenType
+                ? new EventSequenceToken(sequenceNumber, eventIndex)
+                : new EventSequenceTokenV2(sequenceNumber, eventIndex);
         }
-
-        private static bool IsSerializedType(string? serializedType, Type expectedType)
-            => serializedType is not null
-               && serializedType.StartsWith($"{expectedType.FullName},", StringComparison.Ordinal);
 
         public override void Write(Utf8JsonWriter writer, StreamSequenceToken value, JsonSerializerOptions options)
         {
@@ -92,11 +84,15 @@ namespace Orleans.Streaming.JsonConverters
                 throw new NotSupportedException($"Unsupported {nameof(StreamSequenceToken)} type: {runtimeType}");
             }
 
-            writer.WriteStartObject();
-            writer.WriteString("$type", runtimeType.AssemblyQualifiedName); // For backward compatibility with Newtonsoft
-            writer.WriteNumber("SequenceNumber", value.SequenceNumber);
-            writer.WriteNumber("EventIndex", value.EventIndex);
-            writer.WriteEndObject();
+            writer.WriteStartArray();
+            writer.WriteNumberValue(runtimeType == _eventSequenceTokenType ? EventSequenceTokenDiscriminator : EventSequenceTokenV2Discriminator);
+            writer.WriteNumberValue(value.SequenceNumber);
+            if (value.EventIndex != 0)
+            {
+                writer.WriteNumberValue(value.EventIndex);
+            }
+
+            writer.WriteEndArray();
         }
     }
 }

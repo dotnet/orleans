@@ -7,7 +7,7 @@ namespace Orleans.Streams
     [Serializable]
     [JsonObject(MemberSerialization.OptIn)]
     [GenerateSerializer]
-    public sealed class PubSubSubscriptionState : IEquatable<PubSubSubscriptionState?>
+    public sealed class PubSubSubscriptionState : IEquatable<PubSubSubscriptionState?>, System.Text.Json.Serialization.IJsonOnDeserialized
     {
         public enum SubscriptionStates
         {
@@ -20,26 +20,32 @@ namespace Orleans.Streams
         // Implement ISerializable if changing any of them to readonly
         [JsonProperty]
         [System.Text.Json.Serialization.JsonInclude]
+        [System.Text.Json.Serialization.JsonPropertyName("subscriptionId")]
         [Id(0)]
         public GuidId SubscriptionId;
 
         [JsonProperty]
         [System.Text.Json.Serialization.JsonInclude]
+        [System.Text.Json.Serialization.JsonPropertyName("stream")]
         [Id(1)]
         public QualifiedStreamId Stream;
 
         [JsonProperty]
         [System.Text.Json.Serialization.JsonInclude]
+        [System.Text.Json.Serialization.JsonPropertyName("consumer")]
         [Id(2)]
         public GrainId Consumer; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
 
         [JsonProperty]
         [System.Text.Json.Serialization.JsonInclude]
+        [System.Text.Json.Serialization.JsonPropertyName("filterData")]
         [Id(3)]
         public string? FilterData; // Serialized func info
 
         [JsonProperty]
         [System.Text.Json.Serialization.JsonInclude]
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+        [System.Text.Json.Serialization.JsonPropertyName("state")]
         [Id(4)]
         public SubscriptionStates state;
 
@@ -130,6 +136,18 @@ namespace Orleans.Streams
         public void Fault()
         {
             state = SubscriptionStates.Faulted;
+        }
+
+        void System.Text.Json.Serialization.IJsonOnDeserialized.OnDeserialized()
+        {
+            if (SubscriptionId is null
+                || string.IsNullOrWhiteSpace(Stream.ProviderName)
+                || Stream.StreamId == default
+                || Consumer.IsDefault
+                || !Enum.IsDefined(state))
+            {
+                throw new System.Text.Json.JsonException($"Could not deserialize {nameof(PubSubSubscriptionState)}.");
+            }
         }
     }
 }

@@ -108,7 +108,8 @@ namespace Orleans.Runtime
     public sealed class ActivationIdConverter : JsonConverter<ActivationId>
     {
         /// <inheritdoc />
-        public override ActivationId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => reader.GetString() is { } str ? ActivationId.FromParsableString(str) : default;
+        public override ActivationId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            => ActivationId.FromParsableString(reader.GetString() ?? throw new JsonException($"Could not deserialize {nameof(ActivationId)}."));
 
         private void WriteCore(Utf8JsonWriter writer, ActivationId value, JsonSerializerOptions options, bool writeAsPropertyName)
         {

@@ -20,76 +20,53 @@ namespace Orleans.Streaming.JsonConverters
 
         public override IAsyncStream? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            if (reader.TokenType != JsonTokenType.StartObject)
+            if (reader.TokenType != JsonTokenType.StartArray
+                || !reader.Read()
+                || reader.TokenType != JsonTokenType.String)
             {
-                return null;
+                throw new JsonException($"Could not deserialize {nameof(IAsyncStream)}.");
             }
 
-            StreamId? streamId = null;
-            string? providerName = null;
-            bool? isRewindable = null;
-
-            while (reader.Read())
+            var providerName = reader.GetString();
+            if (!reader.Read())
             {
-                if (reader.TokenType == JsonTokenType.EndObject)
-                {
-                    break;
-                }
-
-                if (reader.TokenType == JsonTokenType.PropertyName)
-                {
-                    var propertyName = reader.GetString()!;
-                    reader.Read();
-                    switch (propertyName)
-                    {
-                        case "streamId":
-                            streamId = JsonSerializer.Deserialize<StreamId>(ref reader, options);
-                            break;
-                        case "providerName":
-                            providerName = reader.GetString();
-                            break;
-                        case "isRewindable":
-                            isRewindable = reader.GetBoolean();
-                            break;
-                    }
-                }
+                throw new JsonException($"Could not deserialize {nameof(IAsyncStream)}.");
             }
 
-            if (streamId.HasValue && isRewindable.HasValue && !string.IsNullOrWhiteSpace(providerName))
+            var streamId = JsonSerializer.Deserialize<StreamId>(ref reader, options);
+            if (!reader.Read()
+                || reader.TokenType != JsonTokenType.EndArray
+                || streamId == default
+                || string.IsNullOrWhiteSpace(providerName))
             {
-                if (typeToConvert.GetGenericArguments() is not [var itemType])
-                {
-                    throw new JsonException($"Cannot deserialize a stream reference as non-generic type {typeToConvert}.");
-                }
-
-                if (runtimeClient.ServiceProvider.GetRequiredKeyedService<IStreamProvider>(providerName) is not IInternalStreamProvider provider)
-                {
-                    throw new JsonException($"Stream provider '{providerName}' does not support internal stream references.");
-                }
-
-                return (IAsyncStream)Activator.CreateInstance(
-                    typeof(StreamImpl<>).MakeGenericType(itemType),
-                    new QualifiedStreamId(providerName, streamId.Value),
-                    provider,
-                    isRewindable.Value,
-                    runtimeClient)!;
+                throw new JsonException($"Could not deserialize {nameof(IAsyncStream)}.");
             }
-            else
+
+            if (typeToConvert.GetGenericArguments() is not [var itemType])
             {
-                return null;
+                throw new JsonException($"Cannot deserialize a stream reference as non-generic type {typeToConvert}.");
             }
+
+            var streamProvider = runtimeClient.ServiceProvider.GetRequiredKeyedService<IStreamProvider>(providerName);
+            if (streamProvider is not IInternalStreamProvider provider)
+            {
+                throw new JsonException($"Stream provider '{providerName}' does not support internal stream references.");
+            }
+
+            return (IAsyncStream)Activator.CreateInstance(
+                typeof(StreamImpl<>).MakeGenericType(itemType),
+                new QualifiedStreamId(providerName, streamId),
+                provider,
+                streamProvider.IsRewindable,
+                runtimeClient)!;
         }
 
         public override void Write(Utf8JsonWriter writer, IAsyncStream value, JsonSerializerOptions options)
         {
-            writer.WriteStartObject();
-            writer.WritePropertyName("streamId");
-            JsonSerializer.Serialize(writer, value.StreamId, options);
-            writer.WritePropertyName("providerName");
+            writer.WriteStartArray();
             writer.WriteStringValue(value.ProviderName);
-            writer.WritePropertyName("isRewindable");
-            writer.WriteBooleanValue(value.IsRewindable);
-            writer.WriteEndObject();
+            JsonSerializer.Serialize(writer, value.StreamId, options);
+            writer.WriteEndArray();
         }
     }
 }

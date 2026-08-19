@@ -43,10 +43,13 @@ namespace Orleans.Serialization
         }
 
         public override IPAddress? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            => Parse(ref reader);
+
+        private static IPAddress Parse(ref Utf8JsonReader reader)
         {
             var valueLength = reader.HasValueSequence
-            ? checked((int)reader.ValueSequence.Length)
-            : reader.ValueSpan.Length;
+                ? checked((int)reader.ValueSequence.Length)
+                : reader.ValueSpan.Length;
 
             if (valueLength <= MaxAddressSize)
             {
@@ -56,18 +59,12 @@ namespace Orleans.Serialization
             }
             else
             {
-                var address = reader.GetString();
-                if (string.IsNullOrWhiteSpace(address))
-                {
-                    return null;
-                }
-
-                return IPAddress.Parse(address);
+                return IPAddress.Parse(reader.GetString() ?? throw new JsonException($"Could not deserialize {nameof(IPAddress)}."));
             }
         }
 
         public override IPAddress ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-            => Read(ref reader, typeToConvert, options)!;
+            => Parse(ref reader);
 
         public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] IPAddress value, JsonSerializerOptions options)
             => WriteCore(writer, value, options, true);

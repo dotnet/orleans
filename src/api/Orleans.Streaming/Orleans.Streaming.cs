@@ -1823,26 +1823,32 @@ namespace Orleans.Streams
 
     [Newtonsoft.Json.JsonObject(Newtonsoft.Json.MemberSerialization.OptIn)]
     [GenerateSerializer]
-    public sealed partial class PubSubSubscriptionState : System.IEquatable<PubSubSubscriptionState?>
+    public sealed partial class PubSubSubscriptionState : System.IEquatable<PubSubSubscriptionState?>, System.Text.Json.Serialization.IJsonOnDeserialized
     {
         [Newtonsoft.Json.JsonProperty]
         [System.Text.Json.Serialization.JsonInclude]
+        [System.Text.Json.Serialization.JsonPropertyName("consumer")]
         [Id(2)]
         public Runtime.GrainId Consumer;
         [Newtonsoft.Json.JsonProperty]
         [System.Text.Json.Serialization.JsonInclude]
+        [System.Text.Json.Serialization.JsonPropertyName("filterData")]
         [Id(3)]
         public string? FilterData;
         [Newtonsoft.Json.JsonProperty]
         [System.Text.Json.Serialization.JsonInclude]
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+        [System.Text.Json.Serialization.JsonPropertyName("state")]
         [Id(4)]
         public SubscriptionStates state;
         [Newtonsoft.Json.JsonProperty]
         [System.Text.Json.Serialization.JsonInclude]
+        [System.Text.Json.Serialization.JsonPropertyName("stream")]
         [Id(1)]
         public Runtime.QualifiedStreamId Stream;
         [Newtonsoft.Json.JsonProperty]
         [System.Text.Json.Serialization.JsonInclude]
+        [System.Text.Json.Serialization.JsonPropertyName("subscriptionId")]
         [Id(0)]
         public Runtime.GuidId SubscriptionId;
         [Newtonsoft.Json.JsonConstructor]
@@ -1870,6 +1876,8 @@ namespace Orleans.Streams
         public static bool operator ==(PubSubSubscriptionState? left, PubSubSubscriptionState? right) { throw null; }
 
         public static bool operator !=(PubSubSubscriptionState? left, PubSubSubscriptionState? right) { throw null; }
+
+        void System.Text.Json.Serialization.IJsonOnDeserialized.OnDeserialized() { }
 
         public override string ToString() { throw null; }
 

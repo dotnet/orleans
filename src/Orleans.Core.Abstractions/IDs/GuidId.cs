@@ -110,66 +110,47 @@ namespace Orleans.Runtime
     public sealed class GuidIdConverter : JsonConverter<GuidId>
     {
         public override GuidId? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            Guid value = default;
-            var hasValue = false;
-
-            if (reader.TokenType == JsonTokenType.StartObject)
-            {
-                while (reader.Read())
-                {
-                    if (reader.TokenType == JsonTokenType.EndObject)
-                    {
-                        break;
-                    }
-                    switch (reader.TokenType)
-                    {
-                        case JsonTokenType.PropertyName:
-                            if (reader.ValueTextEquals("Guid") && reader.Read())
-                            {
-                                value = reader.GetGuid();
-                                hasValue = true;
-                            }
-                            else if (reader.ValueTextEquals("$ref"))
-                            {
-                                throw new JsonException("Reference-preserving JSON is not supported by the System.Text.Json grain storage serializer.");
-                            }
-                            break;
-                    }
-                }
-            }
-
-            return hasValue ? GuidId.GetGuidId(value) : throw new JsonException($"Could not deserialize {nameof(GuidId)}.");
-        }
+            => ReadCore(ref reader);
 
         public override void Write(Utf8JsonWriter writer, GuidId value, JsonSerializerOptions options)
         {
-            writer.WriteStartObject();
-            writer.WriteString("Guid", value.Guid);
-            writer.WriteEndObject();
+            Span<byte> buffer = stackalloc byte[32];
+            if (!value.Guid.TryFormat(buffer, out var written, "N"))
+            {
+                throw new JsonException($"Could not serialize {nameof(GuidId)}.");
+            }
+
+            writer.WriteStringValue(buffer[..written]);
         }
 
         public override GuidId ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            => ReadCore(ref reader);
+
+        private static GuidId ReadCore(ref Utf8JsonReader reader)
         {
-            Span<char> buffer = !reader.HasValueSequence || reader.ValueSequence.Length <= 36
-                                ? stackalloc char[36]
+            Span<char> buffer = !reader.HasValueSequence || reader.ValueSequence.Length <= 32
+                                ? stackalloc char[32]
                                 : new char[reader.ValueSequence.Length];
 
             var read = reader.CopyString(buffer);
+            if (!Guid.TryParseExact(buffer[..read], "N", out var value))
+            {
+                throw new JsonException($"Could not deserialize {nameof(GuidId)}.");
+            }
 
-            return GuidId.GetGuidId(Guid.Parse(buffer[..read]));
+            return GuidId.GetGuidId(value);
         }
 
         public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] GuidId value, JsonSerializerOptions options)
         {
-            Span<byte> buffer = stackalloc byte[36];
-            if (value.Guid.TryFormat(buffer, out var written))
+            Span<byte> buffer = stackalloc byte[32];
+            if (value.Guid.TryFormat(buffer, out var written, "N"))
             {
-                writer.WritePropertyName(buffer);
+                writer.WritePropertyName(buffer[..written]);
             }
             else
             {
-                writer.WritePropertyName(value.Guid.ToString());
+                throw new JsonException($"Could not serialize {nameof(GuidId)}.");
             }
         }
     }

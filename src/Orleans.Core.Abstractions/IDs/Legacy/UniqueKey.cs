@@ -60,10 +60,18 @@ namespace Orleans.Runtime
 
         internal static readonly UniqueKey Empty = new UniqueKey();
 
-        internal static UniqueKey Parse(ReadOnlySpan<char> input)
+        internal static UniqueKey Parse(ReadOnlySpan<char> input) => ParseCore(input, trim: true);
+
+        internal static UniqueKey ParseCanonical(ReadOnlySpan<char> input) => ParseCore(input, trim: false);
+
+        private static UniqueKey ParseCore(ReadOnlySpan<char> input, bool trim)
         {
             const int minimumValidKeyLength = 48;
-            input = input.Trim();
+            if (trim)
+            {
+                input = input.Trim();
+            }
+
             if (input.Length >= minimumValidKeyLength)
             {
                 var n0 = ulong.Parse(input[..16].ToString(), NumberStyles.AllowHexSpecifier);
@@ -354,37 +362,8 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public override UniqueKey? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            if (reader.TokenType != JsonTokenType.StartObject)
-            {
-                return null;
-            }
-            UniqueKey? result = null;
-            while (reader.Read())
-            {
-                if (reader.TokenType == JsonTokenType.EndObject)
-                    break;
-
-                if (reader.TokenType == JsonTokenType.PropertyName)
-                {
-                    var isUniqueKey = reader.ValueTextEquals("UniqueKey");
-                    if (!reader.Read())
-                    {
-                        throw new JsonException($"Could not deserialize {nameof(UniqueKey)}.");
-                    }
-
-                    if (isUniqueKey)
-                    {
-                        Span<char> buffer = stackalloc char[MaxBufferSize];
-                        result = GetUniqueKey(ref reader, buffer);
-                    }
-                    else
-                    {
-                        reader.Skip();
-                    }
-                }
-            }
-
-            return result;
+            Span<char> buffer = stackalloc char[MaxBufferSize];
+            return GetUniqueKey(ref reader, buffer) ?? throw new JsonException($"Could not deserialize {nameof(UniqueKey)}.");
         }
 
         private static UniqueKey? GetUniqueKey(ref Utf8JsonReader reader, scoped Span<char> buffer)
@@ -395,7 +374,7 @@ namespace Orleans.Runtime
                 if (valueLength < buffer.Length)
                 {
                     var written = reader.CopyString(buffer);
-                    return UniqueKey.Parse(buffer[..written]);
+                    return UniqueKey.ParseCanonical(buffer[..written]);
                 }
             }
             else
@@ -403,21 +382,17 @@ namespace Orleans.Runtime
                 if (reader.ValueSpan.Length < buffer.Length)
                 {
                     var written = reader.CopyString(buffer);
-                    return UniqueKey.Parse(buffer[..written]);
+                    return UniqueKey.ParseCanonical(buffer[..written]);
                 }
             }
 
             var str = reader.GetString();
-            return str is null ? null : UniqueKey.Parse(str);
+            return str is null ? null : UniqueKey.ParseCanonical(str);
         }
 
         /// <inheritdoc />
         public override void Write(Utf8JsonWriter writer, UniqueKey value, JsonSerializerOptions options)
-        {
-            writer.WriteStartObject();
-            writer.WriteString("UniqueKey", value.ToHexString());
-            writer.WriteEndObject();
-        }
+            => writer.WriteStringValue(value.ToHexString());
 
         /// <inheritdoc />
         public override UniqueKey ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
