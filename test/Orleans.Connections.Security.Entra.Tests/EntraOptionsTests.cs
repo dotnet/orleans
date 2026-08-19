@@ -3,6 +3,10 @@ using Orleans.Configuration;
 
 namespace Orleans.Connections.Security.Entra.Tests;
 
+[TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Security")]
 public sealed class EntraOptionsTests
 {
     [Fact]
