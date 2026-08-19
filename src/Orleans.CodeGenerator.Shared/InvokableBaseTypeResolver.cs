@@ -12,6 +12,7 @@ internal sealed class InvokableBaseTypeResolver
     internal const string InvokableBaseTypeAttributeMetadataName = "Orleans.InvokableBaseTypeAttribute";
     internal const string DefaultInvokableBaseTypeAttributeMetadataName = "Orleans.DefaultInvokableBaseTypeAttribute";
     internal const string ReturnValueProxyAttributeMetadataName = "Orleans.Invocation.ReturnValueProxyAttribute";
+    internal const string GeneratedActivatorConstructorAttributeMetadataName = "Orleans.GeneratedActivatorConstructorAttribute";
 
     private static readonly ConditionalWeakTable<Compilation, Discovery> Discoveries = new();
     private readonly Compilation _compilation;
@@ -212,6 +213,7 @@ internal sealed class InvokableBaseTypeResolver
             }
             else if (returnType is INamedTypeSymbol namedReturnType
                 && namedReturnType.IsGenericType
+                && mapping.ReturnType.IsUnboundGenericType
                 && SymbolEqualityComparer.Default.Equals(mapping.ReturnType.OriginalDefinition, namedReturnType.OriginalDefinition))
             {
                 open.Add(mapping);
@@ -271,8 +273,7 @@ internal sealed class InvokableBaseTypeResolver
         var baseType = mapping.InvokableBaseType;
         var returnArity = returnType is INamedTypeSymbol { IsGenericType: true } namedReturn ? namedReturn.Arity : 0;
         var baseArity = baseType.Arity;
-        var isOpenMapping = mapping.ReturnType.IsUnboundGenericType
-            || mapping.ReturnType.IsGenericType && SymbolEqualityComparer.Default.Equals(mapping.ReturnType, mapping.ReturnType.OriginalDefinition);
+        var isOpenMapping = mapping.ReturnType.IsUnboundGenericType;
         var requiresConstruction = baseType.IsUnboundGenericType;
 
         if (isOpenMapping && !baseType.IsUnboundGenericType)
@@ -318,6 +319,15 @@ internal sealed class InvokableBaseTypeResolver
             }
 
             result = baseType.OriginalDefinition.Construct([.. constructedReturn.TypeArguments]);
+        }
+
+        if (!HasUsableConstructor(result))
+        {
+            result = null;
+            diagnostic = CreateDiagnostic(
+                mapping,
+                $"Invokable base type '{Display(baseType)}' must declare an accessible parameterless constructor or an accessible constructor annotated with [GeneratedActivatorConstructor].");
+            return false;
         }
 
         if (!ValidateInitializer(proxyBaseType, returnType, result, mapping, out diagnostic))
@@ -411,7 +421,12 @@ internal sealed class InvokableBaseTypeResolver
                     || typeParameter.HasValueTypeConstraint
                     || typeParameter.HasUnmanagedTypeConstraint
                     || typeParameter.HasReferenceTypeConstraint
-                        && typeParameter.ReferenceTypeConstraintNullableAnnotation == NullableAnnotation.NotAnnotated;
+                        && typeParameter.ReferenceTypeConstraintNullableAnnotation == NullableAnnotation.NotAnnotated
+                    || typeParameter.ConstraintTypes.Any(static constraint =>
+                        constraint.NullableAnnotation == NullableAnnotation.NotAnnotated
+                        && (constraint.IsReferenceType
+                            || constraint is ITypeParameterSymbol constrainedParameter
+                                && HasNotNullConstraint(constrainedParameter)));
         }
 
         static bool SatisfiesConstructorConstraint(ITypeSymbol argument)
@@ -438,7 +453,7 @@ internal sealed class InvokableBaseTypeResolver
             => argument is INamedTypeSymbol namedArgument
                 && namedArgument.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T;
 
-        static ITypeSymbol SubstituteConstraint(
+        ITypeSymbol SubstituteConstraint(
             ITypeSymbol constraint,
             ImmutableArray<ITypeParameterSymbol> parameters,
             ImmutableArray<ITypeSymbol> arguments)
@@ -449,17 +464,138 @@ internal sealed class InvokableBaseTypeResolver
                 return arguments[typeParameter.Ordinal];
             }
 
-            if (constraint is INamedTypeSymbol { IsGenericType: true } namedConstraint)
+            if (constraint is IArrayTypeSymbol arrayConstraint)
             {
-                var substitutedArguments = namedConstraint.TypeArguments
-                    .Select(argument => SubstituteConstraint(argument, parameters, arguments))
-                    .ToArray();
-                return namedConstraint.OriginalDefinition.Construct(substitutedArguments);
+                return _compilation.CreateArrayTypeSymbol(
+                    SubstituteConstraint(arrayConstraint.ElementType, parameters, arguments),
+                    arrayConstraint.Rank,
+                    arrayConstraint.NullableAnnotation);
+            }
+
+            if (constraint is IPointerTypeSymbol pointerConstraint)
+            {
+                return _compilation.CreatePointerTypeSymbol(
+                    SubstituteConstraint(pointerConstraint.PointedAtType, parameters, arguments));
+            }
+
+            if (constraint is IFunctionPointerTypeSymbol functionPointerConstraint)
+            {
+                var signature = functionPointerConstraint.Signature;
+                return _compilation.CreateFunctionPointerTypeSymbol(
+                    SubstituteConstraint(signature.ReturnType, parameters, arguments),
+                    signature.RefKind,
+                    [.. signature.Parameters.Select(parameter => SubstituteConstraint(parameter.Type, parameters, arguments))],
+                    [.. signature.Parameters.Select(static parameter => parameter.RefKind)],
+                    signature.CallingConvention,
+                    signature.UnmanagedCallingConventionTypes);
+            }
+
+            if (constraint is INamedTypeSymbol namedConstraint)
+            {
+                var definition = namedConstraint.OriginalDefinition;
+                if (namedConstraint.ContainingType is { } containingType)
+                {
+                    var substitutedContainingType = (INamedTypeSymbol)SubstituteConstraint(containingType, parameters, arguments);
+                    definition = substitutedContainingType.GetTypeMembers(namedConstraint.Name, namedConstraint.Arity)
+                        .First(candidate => SymbolEqualityComparer.Default.Equals(
+                            candidate.OriginalDefinition,
+                            namedConstraint.OriginalDefinition));
+                }
+
+                if (namedConstraint.Arity > 0)
+                {
+                    definition = definition.Construct(
+                        [.. namedConstraint.TypeArguments.Select(argument => SubstituteConstraint(argument, parameters, arguments))]);
+                }
+
+                return definition.WithNullableAnnotation(namedConstraint.NullableAnnotation);
             }
 
             return constraint;
         }
     }
+
+    private bool HasUsableConstructor(INamedTypeSymbol baseType)
+    {
+        var generatedActivatorConstructorAttribute = _compilation.GetTypeByMetadataName(GeneratedActivatorConstructorAttributeMetadataName);
+        var generatedActivatorConstructor = generatedActivatorConstructorAttribute is null
+            ? null
+            : GetConstructorsInGeneratorOrder(baseType).FirstOrDefault(constructor =>
+                !constructor.IsImplicitlyDeclared
+                && constructor.DeclaredAccessibility != Accessibility.Private
+                && constructor.GetAttributes().Any(attribute =>
+                    SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, generatedActivatorConstructorAttribute)));
+
+        if (generatedActivatorConstructor is not null)
+        {
+            return IsAccessibleFromGeneratedDerivedType(generatedActivatorConstructor)
+                && generatedActivatorConstructor.Parameters.All(static parameter => parameter.RefKind == RefKind.None)
+                && baseType.InstanceConstructors.Any(candidate => CanInvokeBaseConstructor(
+                    generatedActivatorConstructor.Parameters,
+                    candidate));
+        }
+
+        return baseType.InstanceConstructors.Any(constructor =>
+            constructor.Parameters.Length == 0
+            && IsAccessibleFromGeneratedDerivedType(constructor));
+
+        IEnumerable<IMethodSymbol> GetConstructorsInGeneratorOrder(INamedTypeSymbol type)
+        {
+            var baseTypes = new Stack<INamedTypeSymbol>();
+            for (var current = type.BaseType; current is not null; current = current.BaseType)
+            {
+                baseTypes.Push(current);
+            }
+
+            foreach (var current in baseTypes.Append(type))
+            {
+                foreach (var constructor in current.InstanceConstructors)
+                {
+                    yield return constructor;
+                }
+            }
+        }
+
+        bool CanInvokeBaseConstructor(
+            ImmutableArray<IParameterSymbol> arguments,
+            IMethodSymbol constructor)
+        {
+            var hasParamsParameter = constructor.Parameters.Length > 0
+                && constructor.Parameters[constructor.Parameters.Length - 1].IsParams;
+            if (!IsAccessibleFromGeneratedDerivedType(constructor)
+                || constructor.Parameters.Any(static parameter => parameter.RefKind != RefKind.None)
+                || !hasParamsParameter && arguments.Length > constructor.Parameters.Length
+                || arguments.Length < constructor.Parameters.Count(static parameter => !parameter.IsOptional && !parameter.IsParams))
+            {
+                return false;
+            }
+
+            for (var i = 0; i < arguments.Length; i++)
+            {
+                var parameter = constructor.Parameters[Math.Min(i, constructor.Parameters.Length - 1)];
+                var parameterType = parameter.IsParams
+                    ? ((IArrayTypeSymbol)parameter.Type).ElementType
+                    : parameter.Type;
+                if (!_compilation.ClassifyCommonConversion(arguments[i].Type, parameterType).IsImplicit)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+    }
+
+    private bool IsAccessibleFromGeneratedDerivedType(IMethodSymbol constructor)
+        => constructor.DeclaredAccessibility switch
+        {
+            Accessibility.Public or Accessibility.Protected or Accessibility.ProtectedOrInternal => true,
+            Accessibility.Internal => _compilation.IsSymbolAccessibleWithin(constructor, _compilation.Assembly),
+            Accessibility.ProtectedAndInternal => SymbolEqualityComparer.Default.Equals(
+                constructor.ContainingAssembly,
+                _compilation.Assembly),
+            _ => false,
+        };
 
     private bool ValidateInitializer(
         INamedTypeSymbol proxyBaseType,

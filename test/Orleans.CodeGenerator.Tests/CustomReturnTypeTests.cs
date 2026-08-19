@@ -88,6 +88,51 @@ public class CustomReturnTypeTests
     }
 
     [Fact]
+    public async Task ClosedRegistration_DoesNotMatchDifferentGenericConstructionRegardlessOfReferenceOrder()
+    {
+        var owner = await CompileReference("""
+            namespace Owner;
+            public class CustomCall<T> { }
+            """, "ReturnTypeOwner");
+        var closedAdapter = await CompileReference(CommonTypes + """
+            [assembly: InvokableBaseType(
+                typeof(GrainReference),
+                typeof(Owner.CustomCall<string>),
+                typeof(ClosedAdapter.StringRequest))]
+
+            namespace ClosedAdapter
+            {
+                public abstract class StringRequest { }
+            }
+            """, "ClosedAdapter", owner);
+        var openAdapter = await CompileReference(CommonTypes + """
+            [assembly: InvokableBaseType(
+                typeof(GrainReference),
+                typeof(Owner.CustomCall<>),
+                typeof(OpenAdapter.CustomRequest<>))]
+
+            namespace OpenAdapter
+            {
+                public abstract class CustomRequest<T> { }
+            }
+            """, "OpenAdapter", owner);
+        var source = CommonTypes + """
+            public interface ICustomGrain : IGrainWithStringKey
+            {
+                Owner.CustomCall<int> Call();
+            }
+            """;
+
+        var forward = await RunGenerator(source, owner, closedAdapter, openAdapter);
+        var reverse = await RunGenerator(source, owner, openAdapter, closedAdapter);
+
+        Assert.Empty(forward.Diagnostics);
+        Assert.Empty(reverse.Diagnostics);
+        Assert.Contains(": global::OpenAdapter.CustomRequest<int>", GetGeneratedSource(forward));
+        Assert.Contains(": global::OpenAdapter.CustomRequest<int>", GetGeneratedSource(reverse));
+    }
+
+    [Fact]
     public async Task MethodRegistration_PrecedesReturnTypeRegistration()
     {
         var result = await RunGenerator(CommonTypes + """
@@ -241,6 +286,78 @@ public class CustomReturnTypeTests
     }
 
     [Fact]
+    public async Task NonNullableBaseClassConstraint_SatisfiesNotNullConstraint()
+    {
+        var result = await RunGenerator("#nullable enable\n" + CommonTypes + """
+            [InvokableBaseType(
+                typeof(GrainReference),
+                typeof(CustomCall<>),
+                typeof(ConstrainedRequest<>))]
+            public class CustomCall<T> { }
+
+            public class BaseValue { }
+            public abstract class ConstrainedRequest<T> where T : notnull { }
+
+            public interface ICustomGrain<T> : IGrainWithStringKey where T : BaseValue
+            {
+                CustomCall<T> Call();
+            }
+            """);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Contains(": global::ConstrainedRequest<T>", GetGeneratedSource(result));
+    }
+
+    [Fact]
+    public async Task RecursiveArrayConstraint_IsSubstituted()
+    {
+        var result = await RunGenerator(CommonTypes + """
+            using System.Collections.Generic;
+
+            [InvokableBaseType(
+                typeof(GrainReference),
+                typeof(CustomCall<>),
+                typeof(ConstrainedRequest<>))]
+            public class CustomCall<T> { }
+
+            public sealed class Recursive : List<Recursive[]> { }
+            public abstract class ConstrainedRequest<T> where T : IEnumerable<T[]> { }
+
+            public interface ICustomGrain : IGrainWithStringKey
+            {
+                CustomCall<Recursive> Call();
+            }
+            """);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Contains(": global::ConstrainedRequest<global::Recursive>", GetGeneratedSource(result));
+    }
+
+    [Fact]
+    public async Task RecursiveTupleConstraint_IsSubstituted()
+    {
+        var result = await RunGenerator(CommonTypes + """
+            [InvokableBaseType(
+                typeof(GrainReference),
+                typeof(CustomCall<>),
+                typeof(ConstrainedRequest<>))]
+            public class CustomCall<T> { }
+
+            public interface IRecursive<T> { }
+            public sealed class Recursive : IRecursive<(Recursive, Recursive[])> { }
+            public abstract class ConstrainedRequest<T> where T : IRecursive<(T, T[])> { }
+
+            public interface ICustomGrain : IGrainWithStringKey
+            {
+                CustomCall<Recursive> Call();
+            }
+            """);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Contains(": global::ConstrainedRequest<global::Recursive>", GetGeneratedSource(result));
+    }
+
+    [Fact]
     public async Task InaccessibleBase_ProducesDiagnosticAtRegistration()
     {
         var result = await RunGenerator(CommonTypes + """
@@ -339,6 +456,70 @@ public class CustomReturnTypeTests
 
         Assert.Empty(result.Diagnostics);
         Assert.Contains("GetInvokable<", GetGeneratedSource(result));
+    }
+
+    [Theory]
+    [InlineData("private CustomRequest() { }")]
+    [InlineData("protected CustomRequest(string value) { }")]
+    public async Task UnusableBaseConstructor_ProducesDiagnosticAtRegistration(string constructor)
+    {
+        var result = await RunGenerator(CommonTypes + $$"""
+            [InvokableBaseType(typeof(GrainReference), typeof(CustomCall), typeof(CustomRequest))]
+            public class CustomCall { }
+
+            public abstract class CustomRequest
+            {
+                {{constructor}}
+            }
+
+            public interface ICustomGrain : IGrainWithStringKey
+            {
+                CustomCall Call();
+            }
+            """);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticRuleId.InvalidInvokableBaseTypeMapping, diagnostic.Id);
+        Assert.Contains("accessible parameterless constructor", diagnostic.GetMessage());
+        Assert.Equal("InvokableBaseType", diagnostic.Location.SourceTree!.GetText()
+            .ToString(diagnostic.Location.SourceSpan)
+            .Split('(')[0]
+            .TrimStart('['));
+    }
+
+    [Fact]
+    public async Task InaccessibleGeneratedActivatorConstructor_ProducesDiagnosticAtRegistration()
+    {
+        var owner = await CompileReference(CommonTypes + """
+            namespace Owner
+            {
+                public class CustomCall { }
+                public interface IService { }
+
+                public abstract class CustomRequest
+                {
+                    [GeneratedActivatorConstructor]
+                    internal CustomRequest(IService service) { }
+                }
+            }
+            """, "ReturnTypeOwner");
+        var result = await RunGenerator(CommonTypes + """
+            [assembly: InvokableBaseType(
+                typeof(GrainReference),
+                typeof(Owner.CustomCall),
+                typeof(Owner.CustomRequest))]
+
+            public interface ICustomGrain : IGrainWithStringKey
+            {
+                Owner.CustomCall Call();
+            }
+            """, owner);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticRuleId.InvalidInvokableBaseTypeMapping, diagnostic.Id);
+        Assert.Contains("accessible parameterless constructor", diagnostic.GetMessage());
+        Assert.NotEqual(Location.None, diagnostic.Location);
+        Assert.NotNull(diagnostic.Location.SourceTree);
     }
 
     [Fact]
