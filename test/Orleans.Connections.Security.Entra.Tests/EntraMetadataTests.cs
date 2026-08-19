@@ -6,6 +6,10 @@ using Orleans.Connections.Security.Entra;
 
 namespace Orleans.Connections.Security.Entra.Tests;
 
+[TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Security")]
 public sealed class EntraMetadataTests
 {
     [Fact]
