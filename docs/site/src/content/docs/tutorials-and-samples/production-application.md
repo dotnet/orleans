@@ -97,7 +97,7 @@ Use the platform guide whose network and lifecycle guarantees match the target e
 | Kubernetes | Advertise each pod IP, allow direct pod-to-pod TCP, and use a production clustering provider. |
 | Managed container platform | Give each silo a documented per-instance address or a unique private address and port pair. |
 | Virtual machines or bare metal | Advertise stable private addresses and supervise the .NET host as a long-running service. |
-| Azure App Service | Use the maintained multi-instance sample and its private per-instance port mapping. |
+| Azure App Service | Use the multi-instance sample and its private per-instance port mapping. |
 
 See [Platform requirements](../deployment/platform-guides.md) before adapting the sample to another host. The invariant is that every membership entry names one silo endpoint which all other silos can reach directly.
 
