@@ -80,7 +80,7 @@ See [Grain lifecycle](grain-lifecycle.md) for collection, lifecycle participatio
 
 ## Test grain behavior
 
-Use ordinary unit tests for application logic, [OrleansTestKit](https://github.com/OrleansContrib/OrleansTestKit) for a single grain's decisions and interactions in a simulated activation context, and <xref:Orleans.TestingHost.InProcessTestCluster> when assertions depend on Orleans runtime behavior. [Test Orleans applications](testing.md) explains these boundaries and provides maintained, executable examples.
+Use ordinary unit tests for application logic, [OrleansTestKit](https://github.com/OrleansContrib/OrleansTestKit) for a single grain's decisions and interactions in a simulated activation context, and <xref:Orleans.TestingHost.InProcessTestCluster> when assertions depend on Orleans runtime behavior. [Test Orleans applications](testing.md) explains these boundaries and provides maintained, executable examples. Follow [Test an Orleans application end to end](../tutorials-and-samples/testing-walkthrough.md) for a complete cluster-testing walkthrough.
 
 ## Choose basic or advanced features
 
