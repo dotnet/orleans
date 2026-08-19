@@ -15,13 +15,19 @@ cancellation. Task definitions and application code depend only on this package.
 - An `async DurableTask` call creates a deferred definition. Its compiler-generated state
   machine begins when a host runs the definition.
 - Every root execution has an explicit `TaskId`. Child IDs append either a caller-provided
-  segment or a replay-stable ordinal to the parent ID.
+  segment or a replay-stable generated segment to the parent ID. Generated segments begin
+  with `$`; that prefix is reserved and rejected for explicit child names.
 - Scheduling the same definition under an existing ID reattaches to the response recorded
   for that ID. Hosts preserve the first definition associated with an ID.
 - A wait cancellation token abandons that scheduling, polling, or wait operation. It does
   not request durable task cancellation.
 - `CancelAsync` requests durable cancellation. The request is monotonic and idempotent, and
   hosts retain it with task state.
+- Callbacks registered through `RegisterCancellationCallbackAsync` execute with their durable
+  context ambient. Callbacks registered directly on `CancellationToken` follow standard .NET
+  registration `ExecutionContext` capture semantics instead.
+- Disposing a durable cancellation registration prevents a snapshotted callback which has not
+  started, or waits for an active callback to finish, including when that callback fails.
 - Delays use `DurableExecutionContext.UtcNow`, supplied by the host, so replay observes the
   same logical time.
 
