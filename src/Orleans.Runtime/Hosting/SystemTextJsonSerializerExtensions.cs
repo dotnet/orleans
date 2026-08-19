@@ -8,7 +8,7 @@ namespace Orleans.Hosting
     public static class SystemTextJsonSerializerExtensions
     {
         /// <summary>
-        /// Replaces <see cref="Newtonsoft.Json.JsonSerializer" /> with <see cref="System.Text.Json.JsonSerializer" /> as the default grain storage serializer.
+        /// Configures System.Text.Json as the default grain storage serializer.
         /// </summary>
         /// <param name="siloBuilder">The silo builder to configure with System.Text.Json grain storage support.</param>
         /// <returns>The silo builder.</returns>
