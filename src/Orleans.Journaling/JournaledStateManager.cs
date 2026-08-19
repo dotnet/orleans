@@ -177,9 +177,42 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                 {
                     if (needsRecovery)
                     {
-                        await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
-                        needsRecovery = false;
-                        CompleteRecoveryTrigger();
+                        bool fenceOnFailure;
+                        lock (_lock)
+                        {
+                            fenceOnFailure = _state is not ManagerState.Unknown;
+                            if (fenceOnFailure)
+                            {
+                                _state = ManagerState.Recovering;
+                            }
+                        }
+
+                        try
+                        {
+                            await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                            lock (_lock)
+                            {
+                                if (fenceOnFailure)
+                                {
+                                    _state = ManagerState.Ready;
+                                }
+                            }
+
+                            needsRecovery = false;
+                            CompleteRecoveryTrigger();
+                        }
+                        catch
+                        {
+                            lock (_lock)
+                            {
+                                if (fenceOnFailure)
+                                {
+                                    _state = ManagerState.Fenced;
+                                }
+                            }
+                            throw;
+                        }
+                        }
                     }
 
                     WorkItem workItem;
@@ -367,22 +400,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                         var writeCompleted = false;
                                         try
                                         {
-                                            if (isSnapshot && hasBufferToConsume)
-                                            {
-                                                await AppendStorageAsync(bufferToConsume.AsReadOnlySequence(), _shutdownCancellation.Token).ConfigureAwait(true);
-                                                lock (_lock)
-                                                {
-                                                    _journalWriter.Consume(bufferToConsume);
-                                                    foreach (var state in _states.Values)
-                                                    {
-                                                        state.OnWriteCompleted();
-                                                    }
-                                                }
-
-                                                bufferToConsume.Dispose();
-                                                hasBufferToConsume = false;
-                                            }
-
                                             if (isSnapshot)
                                             {
                                                 await ReplaceStorageAsync(writeSequence, _shutdownCancellation.Token).ConfigureAwait(true);
@@ -461,6 +478,17 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                     break;
                                 }
 
+                            case RevertPendingChangesWorkItem:
+                                {
+                                    await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                                    lock (_lock)
+                                    {
+                                        _state = ManagerState.Ready;
+                                    }
+
+                                    break;
+                                }
+
                             case InitializeWorkItem:
                                 {
                                     lock (_lock)
@@ -525,6 +553,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
                         if (IsRecoverySignal(exception))
                         {
+                            lock (_lock)
+                            {
+                                _state = ManagerState.Fenced;
+                            }
+
                             Debug.Assert(recoveryTrigger is null);
                             recoveryTrigger = workItem;
                             recoveryTriggerException = exception;
@@ -532,6 +565,14 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                         }
                         else
                         {
+                            if (workItem is RevertPendingChangesWorkItem)
+                            {
+                                lock (_lock)
+                                {
+                                    _state = ManagerState.Fenced;
+                                }
+                            }
+
                             workItem.SetException(exception);
                         }
                     }
@@ -664,10 +705,12 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     public async ValueTask DeleteStateAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         Task task;
         bool didEnqueue;
         lock (_lock)
         {
+            ThrowIfWritesFenced();
             task = EnqueueOrGetPendingWorkItem<DeleteStateWorkItem>(out didEnqueue);
         }
 
@@ -842,6 +885,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         string operation;
         lock (_lock)
         {
+            ThrowIfWritesFenced();
             var isSnapshot = _migrationSnapshotRequired || _storage.IsCompactionRequested;
             operation = isSnapshot ? JournalingInstruments.OperationSnapshot : JournalingInstruments.OperationAppend;
             pendingWrite = isSnapshot
@@ -864,6 +908,40 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         {
             _shared.Instruments.OnStateWriteRequest(operation, _shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: false);
             throw;
+        }
+    }
+
+    public async ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _shutdownCancellation.Token.ThrowIfCancellationRequested();
+        Task pendingRecovery;
+        bool didEnqueue;
+        lock (_lock)
+        {
+            if (_state is ManagerState.Unknown)
+            {
+                throw new InvalidOperationException("The journaled state manager has not been initialized.");
+            }
+
+            pendingRecovery = EnqueueOrGetPendingWorkItem<RevertPendingChangesWorkItem>(out didEnqueue);
+            _state = ManagerState.Recovering;
+        }
+
+        if (didEnqueue)
+        {
+            _workSignal.Signal();
+        }
+
+        await pendingRecovery.WaitAsync(cancellationToken);
+    }
+
+    private void ThrowIfWritesFenced()
+    {
+        if (_state is ManagerState.Recovering or ManagerState.Fenced)
+        {
+            throw new InvalidOperationException(
+                "Journaled state writes are fenced until recovery completes successfully. Call RevertPendingChangesAsync to retry recovery.");
         }
     }
 
@@ -1103,6 +1181,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     private sealed class DeleteStateWorkItem : WorkItem;
 
+    private sealed class RevertPendingChangesWorkItem : WorkItem;
+
     private sealed class RegisterStateWorkItem(string name) : WorkItem(name)
     {
         public string Name => (string)Task.AsyncState!;
@@ -1111,7 +1191,9 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private enum ManagerState : byte
     {
         Unknown,
-        Ready
+        Ready,
+        Recovering,
+        Fenced
     }
 
     private sealed class StateDirectory(
