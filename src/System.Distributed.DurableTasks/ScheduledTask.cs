@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 
 namespace System.Distributed.DurableTasks;
 
@@ -67,9 +68,27 @@ public abstract class ScheduledTask
     {
         ArgumentOutOfRangeException.ThrowIfZero(tasks.Count);
         using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var waits = tasks.Select(task => task.WaitAsyncCore(waitCancellation.Token).AsTask()).ToArray();
+        var waits = new List<Task<DurableTaskResponse>>(tasks.Count);
+        try
+        {
+            foreach (var task in tasks)
+            {
+                waits.Add(task.WaitAsyncCore(waitCancellation.Token).AsTask());
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            await CancelAndDrainWaitsPreservingFailureAsync(waitCancellation, waits);
+            throw new OperationCanceledException(cancellationToken);
+        }
+        catch
+        {
+            await CancelAndDrainWaitsPreservingFailureAsync(waitCancellation, waits);
+            throw;
+        }
+
         var completed = await Task.WhenAny(waits);
-        var winnerIndex = Array.IndexOf(waits, completed);
+        var winnerIndex = waits.IndexOf(completed);
         try
         {
             _ = await completed;
@@ -81,8 +100,43 @@ public abstract class ScheduledTask
         }
         finally
         {
+            await CancelAndDrainWaitsAsync(waitCancellation, waits, winnerIndex);
+        }
+    }
+
+    private static async Task CancelAndDrainWaitsPreservingFailureAsync(
+        CancellationTokenSource waitCancellation,
+        IReadOnlyList<Task<DurableTaskResponse>> waits)
+    {
+        try
+        {
+            await CancelAndDrainWaitsAsync(waitCancellation, waits, winnerIndex: -1);
+        }
+        catch
+        {
+            // The failure which interrupted wait construction takes precedence over cleanup failures.
+        }
+    }
+
+    private static async Task CancelAndDrainWaitsAsync(
+        CancellationTokenSource waitCancellation,
+        IReadOnlyList<Task<DurableTaskResponse>> waits,
+        int winnerIndex)
+    {
+        Exception? cancellationException = null;
+        try
+        {
             waitCancellation.Cancel();
-            await DrainLosingWaitsAsync(waits, winnerIndex);
+        }
+        catch (Exception exception)
+        {
+            cancellationException = exception;
+        }
+
+        await DrainLosingWaitsAsync(waits, winnerIndex);
+        if (cancellationException is not null)
+        {
+            ExceptionDispatchInfo.Capture(cancellationException).Throw();
         }
     }
 
