@@ -761,9 +761,12 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
 
     private async Task RefreshReminderServicesAsync(CancellationToken cancellationToken)
     {
-        var refreshTasks = HostedCluster.GetActiveSilos().Select(silo =>
-            silo.ServiceProvider.GetRequiredService<LocalReminderService>().TestOnlyRefresh());
-        await Task.WhenAll(refreshTasks).WaitAsync(cancellationToken);
+        // Each refresh scans the backing reminder table. Serialize this test-only barrier so that
+        // constrained provider emulators observe the same completed-refresh invariant without an artificial query burst.
+        foreach (var silo in HostedCluster.GetActiveSilos())
+        {
+            await silo.ServiceProvider.GetRequiredService<LocalReminderService>().TestOnlyRefresh().WaitAsync(cancellationToken);
+        }
     }
 
     private async Task SynchronizeReminderSchedulesAsync(
