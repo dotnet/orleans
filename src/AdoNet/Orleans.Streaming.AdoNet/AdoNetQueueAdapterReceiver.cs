@@ -3,7 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace Orleans.Streaming.AdoNet;
 
 /// <summary>
-/// Receives message batches from an individual retained-log partition.
+/// Receives records from one stream partition through the recoverable stream partition pipeline.
 /// </summary>
 internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueueCache
 {

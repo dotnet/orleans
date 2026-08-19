@@ -9,7 +9,7 @@ using Orleans.Streams;
 namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
-    /// Coordinates a recoverable partition source, pooled cache, and durable checkpoint.
+    /// Coordinates a recoverable stream partition pipeline comprising a partition source, pooled cache, and durable checkpoint.
     /// </summary>
     /// <typeparam name="TQueueMessage">The source record type.</typeparam>
     public sealed class RecoverableStreamReceiver<TQueueMessage> : IQueueAdapterReceiver, IQueueCache
