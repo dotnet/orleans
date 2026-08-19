@@ -817,7 +817,8 @@ public abstract class AdoNetStreamPartitionLogTests(string invariant) : IAsyncLi
             secondCommand.Parameters.AddWithValue("Payload", payload);
 
             var exception = await Assert.ThrowsAsync<SqlException>(() => secondCommand.ExecuteReaderAsync());
-            Assert.Equal(1222, exception.Number); // "Lock request time out period exceeded."
+            Assert.Equal(51000, exception.Number);
+            Assert.Contains("initialization lock", exception.Message, StringComparison.Ordinal);
         }
 
         // Rolling back must not burn the allocated identifier: it is reused by the next append,
@@ -827,7 +828,7 @@ public abstract class AdoNetStreamPartitionLogTests(string invariant) : IAsyncLi
         var afterRollback = await _queries.AppendStreamMessageAsync(serviceId, providerId, queueId, streamIdBytes, nsLength, payload);
         Assert.Equal(1, afterRollback.MessageId);
 
-        var rows = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage");
+        var rows = await _queries.ReadStreamMessagesAsync(serviceId, providerId, queueId, afterMessageId: 0, maxCount: 100);
         var stored = Assert.Single(rows);
         Assert.Equal(1, stored.MessageId);
     }
