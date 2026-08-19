@@ -160,6 +160,94 @@ public class DurableTaskTests
     }
 
     [Fact]
+    public async Task CancellationCallbackCanRequestCancellationWithoutBlocking()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot("reentrant-cancel"));
+        Task? reentrantRequest = null;
+        await context.RegisterCancellationCallbackAsync(_ =>
+        {
+            reentrantRequest = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+            Assert.True(reentrantRequest.IsCompletedSuccessfully);
+            return new(reentrantRequest);
+        });
+
+        await DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+
+        Assert.NotNull(reentrantRequest);
+        Assert.True(reentrantRequest.IsCompletedSuccessfully);
+    }
+
+    [Fact]
+    public async Task NestedCancellationCallbackCanRequestOuterCancellationWithoutBlocking()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var outer = host.CreateContext(TaskId.CreateRoot("outer-cancel"));
+        var inner = host.CreateContext(TaskId.CreateRoot("inner-cancel"));
+        Task? nestedRequest = null;
+        await outer.RegisterCancellationCallbackAsync(
+            async _ => await DurableTaskRuntimeHelper.RequestCancellationAsync(inner));
+        await inner.RegisterCancellationCallbackAsync(_ =>
+        {
+            nestedRequest = DurableTaskRuntimeHelper.RequestCancellationAsync(outer);
+            Assert.True(nestedRequest.IsCompletedSuccessfully);
+            return new(nestedRequest);
+        });
+
+        await DurableTaskRuntimeHelper.RequestCancellationAsync(outer);
+
+        Assert.True(inner.IsCancellationRequested);
+        Assert.NotNull(nestedRequest);
+        Assert.True(nestedRequest.IsCompletedSuccessfully);
+    }
+
+    [Fact]
+    public async Task ReentrantCancellationDoesNotHideSiblingCallbackFailure()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot("reentrant-failure"));
+        var expected = new InvalidOperationException("sibling failure");
+        await context.RegisterCancellationCallbackAsync(_ =>
+        {
+            var request = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+            Assert.True(request.IsCompletedSuccessfully);
+            return new(request);
+        });
+        await context.RegisterCancellationCallbackAsync(_ => throw expected);
+
+        var exception = await Assert.ThrowsAsync<AggregateException>(
+            () => DurableTaskRuntimeHelper.RequestCancellationAsync(context));
+
+        Assert.Same(expected, Assert.Single(exception.InnerExceptions));
+    }
+
+    [Fact]
+    public async Task OutsideCancellationCallerWaitsForActiveCallbackAndSharesCompletion()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot("outside-cancel"));
+        var callbackStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCallback = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await context.RegisterCancellationCallbackAsync(async _ =>
+        {
+            var request = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+            Assert.True(request.IsCompletedSuccessfully);
+            callbackStarted.SetResult();
+            await releaseCallback.Task;
+        });
+
+        var first = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+        await callbackStarted.Task;
+        var second = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+
+        Assert.Same(first, second);
+        Assert.False(second.IsCompleted);
+        releaseCallback.SetResult();
+        await Task.WhenAll(first, second);
+        Assert.True(second.IsCompletedSuccessfully);
+    }
+
+    [Fact]
     public async Task CancellationAttemptsTokenAndDurableCallbacksUsingTheirDocumentedContexts()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
