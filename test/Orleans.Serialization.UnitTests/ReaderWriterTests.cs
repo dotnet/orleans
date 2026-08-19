@@ -346,6 +346,139 @@ namespace Orleans.Serialization.UnitTests
 
         [Fact]
         protected override void ByteRoundTrip() => ByteRoundTripTest();
+
+        [Fact]
+        public void BufferGrowthIsGeometric()
+        {
+            using var stream = new MemoryStream();
+            var output = new MemoryStreamBufferWriter(stream);
+
+            var initialBuffer = output.GetSpan();
+            var initialCapacity = stream.Capacity;
+            output.Advance(initialBuffer.Length);
+            var expandedBuffer = output.GetSpan();
+
+            Assert.Equal(initialBuffer.Length, stream.Length);
+            Assert.True(expandedBuffer.Length >= initialBuffer.Length);
+            Assert.True(stream.Capacity >= initialCapacity * 2);
+        }
+
+        [Fact]
+        public void BufferAllocationDoesNotChangeStreamLength()
+        {
+            using var stream = new MemoryStream();
+            stream.Write([1, 2, 3, 4]);
+            stream.Position = 1;
+            var output = new MemoryStreamBufferWriter(stream);
+
+            var buffer = output.GetSpan();
+            buffer[0] = 42;
+
+            Assert.Equal(4, stream.Length);
+            output.Advance(1);
+            Assert.Equal(4, stream.Length);
+            Assert.Equal([1, 42, 3, 4], stream.ToArray());
+
+            stream.Position = stream.Length;
+            output.GetSpan()[0] = 5;
+            output.Advance(1);
+            Assert.Equal(5, stream.Length);
+            Assert.Equal([1, 42, 3, 4, 5], stream.ToArray());
+        }
+
+        [Fact]
+        public void BufferRespectsStreamOrigin()
+        {
+            var underlyingBuffer = new byte[302];
+            using var stream = new MemoryStream(underlyingBuffer, 2, 300, writable: true, publiclyVisible: true);
+            var output = new MemoryStreamBufferWriter(stream);
+
+            var buffer = output.GetSpan();
+            Assert.Equal(300, buffer.Length);
+            buffer[0] = 42;
+            output.Advance(1);
+
+            Assert.Equal(0, underlyingBuffer[0]);
+            Assert.Equal(42, underlyingBuffer[2]);
+            Assert.Equal(1, stream.Position);
+        }
+
+        [Fact]
+        public void ExistingLengthCanBeAdvancedOnReadOnlyExposedStream()
+        {
+            var underlyingBuffer = new byte[300];
+            using var stream = new MemoryStream(underlyingBuffer, 0, underlyingBuffer.Length, writable: false, publiclyVisible: true);
+            var output = new MemoryStreamBufferWriter(stream);
+
+            output.GetSpan()[0] = 42;
+            output.Advance(1);
+
+            Assert.Equal(42, underlyingBuffer[0]);
+            Assert.Equal(1, stream.Position);
+            Assert.Equal(underlyingBuffer.Length, stream.Length);
+        }
+
+        [Fact]
+        public void EmptySizeHintUsesRemainingFixedCapacity()
+        {
+            var underlyingBuffer = new byte[300];
+            using var stream = new MemoryStream(underlyingBuffer, 0, underlyingBuffer.Length, writable: true, publiclyVisible: true);
+            stream.Position = underlyingBuffer.Length - 1;
+            var output = new MemoryStreamBufferWriter(stream);
+
+            var buffer = output.GetSpan();
+
+            Assert.Equal(1, buffer.Length);
+        }
+
+        [Fact]
+        public void EmptyAdvanceDoesNotChangeStreamLength()
+        {
+            using var stream = new MemoryStream();
+            stream.Position = 5;
+            var output = new MemoryStreamBufferWriter(stream);
+
+            _ = output.GetMemory();
+            output.Advance(0);
+
+            Assert.Equal(0, stream.Length);
+            Assert.Equal(5, stream.Position);
+        }
+
+        [Fact]
+        public void AdvanceExtendsStreamAcrossGap()
+        {
+            using var stream = new MemoryStream();
+            stream.Position = 5;
+            var output = new MemoryStreamBufferWriter(stream);
+
+            output.GetSpan()[0] = 42;
+            output.Advance(1);
+
+            Assert.Equal(6, stream.Length);
+            Assert.Equal([0, 0, 0, 0, 0, 42], stream.ToArray());
+        }
+
+        [Fact]
+        public void InvalidAdvanceIsRejected()
+        {
+            using var stream = new MemoryStream();
+            var output = new MemoryStreamBufferWriter(stream);
+            var bufferLength = output.GetSpan().Length;
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => output.Advance(-1));
+            Assert.Throws<ArgumentOutOfRangeException>(() => output.Advance(bufferLength + 1));
+        }
+
+        [Fact]
+        public void NegativeSizeHintIsRejected()
+        {
+            using var stream = new MemoryStream();
+            var output = new MemoryStreamBufferWriter(stream);
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => output.GetMemory(-1));
+            Assert.Throws<ArgumentOutOfRangeException>(() => output.GetSpan(-1));
+        }
     }
 
     [Trait("Category", "BVT")]
