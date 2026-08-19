@@ -128,6 +128,11 @@ namespace Orleans.Runtime
 
         private static GuidId ReadCore(ref Utf8JsonReader reader)
         {
+            if (reader.TokenType is not JsonTokenType.String and not JsonTokenType.PropertyName)
+            {
+                throw new JsonException($"Could not deserialize {nameof(GuidId)}.");
+            }
+
             Span<char> buffer = !reader.HasValueSequence || reader.ValueSequence.Length <= 32
                                 ? stackalloc char[32]
                                 : new char[reader.ValueSequence.Length];

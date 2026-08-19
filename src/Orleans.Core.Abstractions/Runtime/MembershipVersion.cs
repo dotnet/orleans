@@ -127,7 +127,15 @@ namespace Orleans.Runtime
     {
         const int MaxStackallocLength = 64;
         /// <inheritdoc />
-        public override MembershipVersion Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => new(reader.GetInt64());
+        public override MembershipVersion Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType != JsonTokenType.Number)
+            {
+                throw new JsonException($"Could not deserialize {nameof(MembershipVersion)}.");
+            }
+
+            return new(reader.GetInt64());
+        }
 
         /// <inheritdoc />
         public override void Write(Utf8JsonWriter writer, MembershipVersion value, JsonSerializerOptions options) => writer.WriteNumberValue(value.Value);

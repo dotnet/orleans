@@ -192,6 +192,8 @@ namespace UnitTests.StorageTests
             var escapedKey = _systemTextJson.Deserialize<Dictionary<MembershipVersion, int>>(
                 BinaryData.FromString("""{"\u0031":42}"""));
             Assert.Equal(42, escapedKey![new MembershipVersion(1)]);
+
+            Assert.Throws<JsonException>(() => _systemTextJson.Deserialize<MembershipVersion>(BinaryData.FromString(@"""1""")));
         }
 
         [Fact]
@@ -212,6 +214,7 @@ namespace UnitTests.StorageTests
             Assert.Throws<JsonException>(() => _systemTextJson.Deserialize<IPAddress>(BinaryData.FromString("42")));
             Assert.Throws<JsonException>(() => _systemTextJson.Deserialize<IPEndPoint>(BinaryData.FromString("42")));
             Assert.Throws<JsonException>(() => _systemTextJson.Deserialize<UniqueKey>(BinaryData.FromString("42")));
+            Assert.Throws<JsonException>(() => _systemTextJson.Deserialize<GuidId>(BinaryData.FromString("42")));
         }
 
         [Theory]
