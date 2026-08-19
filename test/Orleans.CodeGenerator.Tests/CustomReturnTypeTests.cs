@@ -406,8 +406,11 @@ public class CustomReturnTypeTests
 
     [Theory]
     [InlineData("public abstract CustomCall InitializeRequest(GrainReference proxy);")]
-    [InlineData("public CustomCall InitializeRequest<T>(GrainReference proxy) => new();")]
+    [InlineData("public CustomCall InitializeRequest<T>(T proxy) => new();")]
     [InlineData("public CustomCall InitializeRequest(ref GrainReference proxy) => new();")]
+    [InlineData("public CustomCall InitializeRequest(in GrainReference proxy) => new();")]
+    [InlineData("private CustomCall InitializeRequest(GrainReference proxy) => new();")]
+    [InlineData("public static CustomCall InitializeRequest(GrainReference proxy) => new();")]
     public async Task InvalidInitializerShape_ProducesDiagnostic(string initializer)
     {
         var result = await RunGenerator(CommonTypes + $$"""
@@ -430,6 +433,126 @@ public class CustomReturnTypeTests
         Assert.Equal(DiagnosticRuleId.InvalidInvokableBaseTypeMapping, diagnostic.Id);
         Assert.Contains("concrete, non-generic", diagnostic.GetMessage());
         Assert.Contains("one by-value parameter", diagnostic.GetMessage());
+    }
+
+    [Theory]
+    [InlineData(
+        "public object InitializeRequest(GrainReference proxy) => new();",
+        "public CustomCall InitializeRequest(object proxy) => new();")]
+    [InlineData(
+        "public CustomCall InitializeRequest(object proxy) => new();",
+        "public object InitializeRequest(GrainReference proxy) => new();")]
+    public async Task InitializerOverloadResolution_RejectsSelectedIncompatibleReturnRegardlessOfDeclarationOrder(
+        string first,
+        string second)
+    {
+        var result = await RunGenerator(CommonTypes + $$"""
+            [InvokableBaseType(typeof(GrainReference), typeof(CustomCall), typeof(CustomRequest))]
+            public class CustomCall { }
+
+            [ReturnValueProxy(nameof(InitializeRequest))]
+            public abstract class CustomRequest
+            {
+                {{first}}
+                {{second}}
+            }
+
+            public interface ICustomGrain : IGrainWithStringKey
+            {
+                CustomCall Call();
+            }
+            """);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticRuleId.InvalidInvokableBaseTypeMapping, diagnostic.Id);
+        Assert.Contains("must be an accessible", diagnostic.GetMessage());
+    }
+
+    [Fact]
+    public async Task InitializerOverloadResolution_AcceptsSelectedCompatibleOverload()
+    {
+        var result = await RunGenerator(CommonTypes + """
+            [InvokableBaseType(typeof(GrainReference), typeof(CustomCall), typeof(CustomRequest))]
+            public class CustomCall { }
+
+            [ReturnValueProxy(nameof(InitializeRequest))]
+            public abstract class CustomRequest
+            {
+                public object InitializeRequest(object proxy) => new();
+                public CustomCall InitializeRequest(GrainReference proxy) => new();
+            }
+
+            public interface ICustomGrain : IGrainWithStringKey
+            {
+                CustomCall Call();
+            }
+            """);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Contains("return request.InitializeRequest(this);", GetGeneratedSource(result));
+    }
+
+    [Fact]
+    public async Task InitializerOverloadResolution_RejectsAmbiguousGeneratedProxyConversions()
+    {
+        var result = await RunGenerator(CommonTypes + """
+            [InvokableBaseType(typeof(GrainReference), typeof(CustomCall), typeof(CustomRequest))]
+            public class CustomCall { }
+
+            [ReturnValueProxy(nameof(InitializeRequest))]
+            public abstract class CustomRequest
+            {
+                public CustomCall InitializeRequest(GrainReference proxy) => new();
+                public CustomCall InitializeRequest(IGrain proxy) => new();
+            }
+
+            public interface ICustomGrain : IGrainWithStringKey
+            {
+                CustomCall Call();
+            }
+            """);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticRuleId.InvalidInvokableBaseTypeMapping, diagnostic.Id);
+        Assert.Contains("must be an accessible", diagnostic.GetMessage());
+    }
+
+    [Fact]
+    public async Task ReferencedInitializerOverloadResolution_IsIndependentOfReferenceOrder()
+    {
+        var owner = await CompileReference(CommonTypes + """
+            namespace Owner
+            {
+                public class CustomCall { }
+
+                [ReturnValueProxy(nameof(InitializeRequest))]
+                public abstract class CustomRequest
+                {
+                    public CustomCall InitializeRequest(object proxy) => new();
+                    public object InitializeRequest(GrainReference proxy) => new();
+                }
+            }
+            """, "ReturnTypeOwner");
+        var adapter = await CompileReference(CommonTypes + """
+            [assembly: InvokableBaseType(
+                typeof(GrainReference),
+                typeof(Owner.CustomCall),
+                typeof(Owner.CustomRequest))]
+            """, "ReturnTypeAdapter", owner);
+        var source = CommonTypes + """
+            public interface ICustomGrain : IGrainWithStringKey
+            {
+                Owner.CustomCall Call();
+            }
+            """;
+
+        var forward = await RunGenerator(source, owner, adapter);
+        var reverse = await RunGenerator(source, adapter, owner);
+
+        var forwardDiagnostic = Assert.Single(forward.Diagnostics);
+        var reverseDiagnostic = Assert.Single(reverse.Diagnostics);
+        Assert.Equal(DiagnosticRuleId.InvalidInvokableBaseTypeMapping, forwardDiagnostic.Id);
+        Assert.Equal(forwardDiagnostic.GetMessage(), reverseDiagnostic.GetMessage());
     }
 
     [Fact]
@@ -459,8 +582,36 @@ public class CustomReturnTypeTests
     }
 
     [Theory]
+    [InlineData("protected CustomRequest(string value = \"\") { }")]
+    [InlineData("protected CustomRequest(params string[] values) { }")]
+    [InlineData("protected CustomRequest(string required) { } protected CustomRequest(int optional = 0) { }")]
+    [InlineData("protected CustomRequest(int optional = 0) { } protected CustomRequest(params string[] values) { }")]
+    public async Task BaseConstructorInvocableWithNoArguments_IsAccepted(string constructors)
+    {
+        var result = await RunGenerator(CommonTypes + $$"""
+            [InvokableBaseType(typeof(GrainReference), typeof(CustomCall), typeof(CustomRequest))]
+            public class CustomCall { }
+
+            public abstract class CustomRequest
+            {
+                {{constructors}}
+            }
+
+            public interface ICustomGrain : IGrainWithStringKey
+            {
+                CustomCall Call();
+            }
+            """);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Contains(": global::CustomRequest", GetGeneratedSource(result));
+    }
+
+    [Theory]
     [InlineData("private CustomRequest() { }")]
     [InlineData("protected CustomRequest(string value) { }")]
+    [InlineData("protected CustomRequest(string required) { } private CustomRequest(int optional = 0) { }")]
+    [InlineData("protected CustomRequest(string value = \"\") { } protected CustomRequest(int value = 0) { }")]
     public async Task UnusableBaseConstructor_ProducesDiagnosticAtRegistration(string constructor)
     {
         var result = await RunGenerator(CommonTypes + $$"""

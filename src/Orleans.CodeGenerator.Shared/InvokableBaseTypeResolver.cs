@@ -4,6 +4,8 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Orleans.CodeGenerator;
 
@@ -55,7 +57,7 @@ internal sealed class InvokableBaseTypeResolver
                 return false;
             }
 
-            if (!TryConstructAndValidate(proxyBaseType, returnType, mapping!, out invokableBaseType, out diagnostic))
+            if (!TryConstructAndValidate(proxyBaseType, method, returnType, mapping!, out invokableBaseType, out diagnostic))
             {
                 return false;
             }
@@ -265,6 +267,7 @@ internal sealed class InvokableBaseTypeResolver
 
     private bool TryConstructAndValidate(
         INamedTypeSymbol proxyBaseType,
+        IMethodSymbol method,
         ITypeSymbol returnType,
         Mapping mapping,
         out INamedTypeSymbol? result,
@@ -330,7 +333,7 @@ internal sealed class InvokableBaseTypeResolver
             return false;
         }
 
-        if (!ValidateInitializer(proxyBaseType, returnType, result, mapping, out diagnostic))
+        if (!ValidateInitializer(proxyBaseType, method.ContainingType, returnType, result, mapping, out diagnostic))
         {
             result = null;
             return false;
@@ -535,9 +538,15 @@ internal sealed class InvokableBaseTypeResolver
                     candidate));
         }
 
-        return baseType.InstanceConstructors.Any(constructor =>
-            constructor.Parameters.Length == 0
-            && IsAccessibleFromGeneratedDerivedType(constructor));
+        if (TryBindParameterlessBaseConstructor(baseType, out var canInvoke))
+        {
+            return canInvoke;
+        }
+
+        var applicable = baseType.InstanceConstructors.Where(constructor =>
+            IsAccessibleFromGeneratedDerivedType(constructor)
+            && constructor.Parameters.All(static parameter => parameter.IsOptional || parameter.IsParams));
+        return applicable.Take(2).Count() == 1;
 
         IEnumerable<IMethodSymbol> GetConstructorsInGeneratorOrder(INamedTypeSymbol type)
         {
@@ -599,6 +608,7 @@ internal sealed class InvokableBaseTypeResolver
 
     private bool ValidateInitializer(
         INamedTypeSymbol proxyBaseType,
+        INamedTypeSymbol proxyInterface,
         ITypeSymbol returnType,
         INamedTypeSymbol baseType,
         Mapping mapping,
@@ -623,32 +633,241 @@ internal sealed class InvokableBaseTypeResolver
             return false;
         }
 
-        for (var current = baseType; current is not null; current = current.BaseType)
+        if (TryBindInitializer(proxyBaseType, proxyInterface, returnType, baseType, methodName, out var isValid))
         {
-            foreach (var member in current.GetMembers(methodName).OfType<IMethodSymbol>())
+            diagnostic = isValid
+                ? null
+                : CreateInvalidInitializerDiagnostic(mapping, baseType, proxyBaseType, returnType, methodName);
+            return isValid;
+        }
+
+        diagnostic = CreateInvalidInitializerDiagnostic(mapping, baseType, proxyBaseType, returnType, methodName);
+        return false;
+    }
+
+    private bool TryBindParameterlessBaseConstructor(INamedTypeSymbol baseType, out bool canInvoke)
+    {
+        canInvoke = false;
+        if (!TryCreateBindingContext([baseType], out var compilation, out var typeParameters, out var constraints))
+        {
+            return false;
+        }
+
+        var source = $$"""
+            namespace __OrleansCodeGenSemanticBinding
             {
-                if (member.IsStatic || member.IsAbstract || member.Arity != 0
-                    || member.Parameters.Length != 1 || member.Parameters[0].RefKind != RefKind.None
-                    || !_compilation.IsSymbolAccessibleWithin(member, _compilation.Assembly))
+                internal abstract class __Request{{typeParameters}} : {{DisplayFullyQualified(baseType)}}
+                    {{constraints}}
                 {
-                    continue;
+                    protected __Request() : base() { }
+                }
+            }
+            """;
+        var tree = ParseBindingTree(compilation, source);
+        compilation = compilation.AddSyntaxTrees(tree);
+        var model = compilation.GetSemanticModel(tree);
+        var initializer = tree.GetRoot().DescendantNodes().OfType<ConstructorInitializerSyntax>().Single();
+        canInvoke = model.GetSymbolInfo(initializer).Symbol is IMethodSymbol;
+        return true;
+    }
+
+    private bool TryBindInitializer(
+        INamedTypeSymbol proxyBaseType,
+        INamedTypeSymbol proxyInterface,
+        ITypeSymbol returnType,
+        INamedTypeSymbol baseType,
+        string methodName,
+        out bool isValid)
+    {
+        isValid = false;
+        if (!TryCreateBindingContext(
+            [proxyBaseType, proxyInterface, returnType, baseType],
+            out var compilation,
+            out var typeParameters,
+            out var constraints))
+        {
+            return false;
+        }
+
+        var source = $$"""
+            namespace __OrleansCodeGenSemanticBinding
+            {
+                internal abstract class __Proxy{{typeParameters}} :
+                    {{DisplayFullyQualified(proxyBaseType)}},
+                    {{DisplayFullyQualified(proxyInterface)}}
+                    {{constraints}}
+                {
+                    private {{DisplayFullyQualified(returnType)}} __Bind(
+                        __Request{{typeParameters}} request) => request.{{EscapeIdentifier(methodName)}}(this);
                 }
 
-                var proxyConversion = _compilation.ClassifyCommonConversion(proxyBaseType, member.Parameters[0].Type);
-                var returnConversion = _compilation.ClassifyCommonConversion(member.ReturnType, returnType);
-                if (proxyConversion.IsImplicit && returnConversion.IsImplicit)
+                internal abstract class __Request{{typeParameters}} : {{DisplayFullyQualified(baseType)}}
+                    {{constraints}}
                 {
-                    diagnostic = null;
-                    return true;
                 }
+            }
+            """;
+        var tree = ParseBindingTree(compilation, source);
+        compilation = compilation.AddSyntaxTrees(tree);
+        var model = compilation.GetSemanticModel(tree);
+        var root = tree.GetRoot();
+        var invocation = root.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
+        var bindMethod = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var selected = model.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
+        var boundReturnType = model.GetTypeInfo(bindMethod.ReturnType).Type;
+        isValid = selected is
+        {
+            IsStatic: false,
+            IsAbstract: false,
+            Arity: 0,
+            Parameters.Length: 1,
+        }
+            && selected.Parameters[0].RefKind == RefKind.None
+            && boundReturnType is not null
+            && compilation.ClassifyConversion(selected.ReturnType, boundReturnType).IsImplicit;
+        return true;
+    }
+
+    private bool TryCreateBindingContext(
+        IEnumerable<ITypeSymbol> types,
+        out CSharpCompilation compilation,
+        out string typeParameters,
+        out string constraints)
+    {
+        if (_compilation is not CSharpCompilation csharpCompilation)
+        {
+            compilation = null!;
+            typeParameters = string.Empty;
+            constraints = string.Empty;
+            return false;
+        }
+
+        compilation = csharpCompilation;
+        var parameters = new List<ITypeParameterSymbol>();
+        foreach (var type in types)
+        {
+            CollectTypeParameters(type, parameters);
+        }
+
+        for (var i = 0; i < parameters.Count; i++)
+        {
+            foreach (var constraintType in parameters[i].ConstraintTypes)
+            {
+                CollectTypeParameters(constraintType, parameters);
             }
         }
 
-        diagnostic = CreateDiagnostic(
-            mapping,
-            $"Return-value proxy initializer '{Display(baseType)}.{methodName}' must be an accessible, concrete, non-generic instance method with one by-value parameter accepting '{Display(proxyBaseType)}' and a return type assignable to '{Display(returnType)}'.");
-        return false;
+        if (parameters.Select(static parameter => parameter.Name).Distinct(StringComparer.Ordinal).Count() != parameters.Count)
+        {
+            typeParameters = string.Empty;
+            constraints = string.Empty;
+            return false;
+        }
+
+        typeParameters = parameters.Count == 0
+            ? string.Empty
+            : $"<{string.Join(", ", parameters.Select(static parameter => EscapeIdentifier(parameter.Name)))}>";
+        constraints = string.Join(
+            "\n",
+            parameters.Select(GetConstraintClause).Where(static clause => clause.Length > 0));
+        return true;
     }
+
+    private static void CollectTypeParameters(ITypeSymbol type, List<ITypeParameterSymbol> result)
+    {
+        switch (type)
+        {
+            case ITypeParameterSymbol parameter:
+                if (!result.Any(candidate => SymbolEqualityComparer.Default.Equals(candidate, parameter)))
+                {
+                    result.Add(parameter);
+                }
+
+                break;
+            case IArrayTypeSymbol array:
+                CollectTypeParameters(array.ElementType, result);
+                break;
+            case IPointerTypeSymbol pointer:
+                CollectTypeParameters(pointer.PointedAtType, result);
+                break;
+            case IFunctionPointerTypeSymbol functionPointer:
+                CollectTypeParameters(functionPointer.Signature.ReturnType, result);
+                foreach (var parameter in functionPointer.Signature.Parameters)
+                {
+                    CollectTypeParameters(parameter.Type, result);
+                }
+
+                break;
+            case INamedTypeSymbol named:
+                if (named.ContainingType is { } containingType)
+                {
+                    CollectTypeParameters(containingType, result);
+                }
+
+                foreach (var argument in named.TypeArguments)
+                {
+                    CollectTypeParameters(argument, result);
+                }
+
+                break;
+        }
+    }
+
+    private static string GetConstraintClause(ITypeParameterSymbol parameter)
+    {
+        var constraints = new List<string>();
+        if (parameter.HasUnmanagedTypeConstraint)
+        {
+            constraints.Add("unmanaged");
+        }
+        else if (parameter.HasValueTypeConstraint)
+        {
+            constraints.Add("struct");
+        }
+        else if (parameter.HasReferenceTypeConstraint)
+        {
+            constraints.Add(parameter.ReferenceTypeConstraintNullableAnnotation == NullableAnnotation.Annotated ? "class?" : "class");
+        }
+        else if (parameter.HasNotNullConstraint)
+        {
+            constraints.Add("notnull");
+        }
+
+        constraints.AddRange(parameter.ConstraintTypes.Select(DisplayFullyQualified));
+        if (parameter.HasConstructorConstraint)
+        {
+            constraints.Add("new()");
+        }
+
+        return constraints.Count == 0
+            ? string.Empty
+            : $"where {EscapeIdentifier(parameter.Name)} : {string.Join(", ", constraints)}";
+    }
+
+    private static SyntaxTree ParseBindingTree(CSharpCompilation compilation, string source)
+        => CSharpSyntaxTree.ParseText(
+            source,
+            compilation.SyntaxTrees.Select(static tree => tree.Options).OfType<CSharpParseOptions>().FirstOrDefault(),
+            "__OrleansCodeGenSemanticBinding.g.cs");
+
+    private static ResolverDiagnostic CreateInvalidInitializerDiagnostic(
+        Mapping mapping,
+        INamedTypeSymbol baseType,
+        INamedTypeSymbol proxyBaseType,
+        ITypeSymbol returnType,
+        string methodName)
+        => CreateDiagnostic(
+            mapping,
+            $"Return-value proxy initializer '{Display(baseType)}.{methodName}' must be an accessible, concrete, non-generic instance method selected by overload resolution, with one by-value parameter accepting '{Display(proxyBaseType)}' and a return type assignable to '{Display(returnType)}'.");
+
+    private static string DisplayFullyQualified(ITypeSymbol symbol)
+        => symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
+    private static string EscapeIdentifier(string identifier)
+        => SyntaxFacts.GetKeywordKind(identifier) != SyntaxKind.None
+            || SyntaxFacts.GetContextualKeywordKind(identifier) != SyntaxKind.None
+                ? $"@{identifier}"
+                : identifier;
 
     private static ResolverDiagnostic CreateDiagnostic(Mapping mapping, string message) => new(message, mapping.Location);
     private static string Display(ISymbol symbol) => symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
