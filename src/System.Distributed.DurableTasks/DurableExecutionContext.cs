@@ -105,6 +105,7 @@ public abstract class DurableExecutionContext
     /// Registers a callback which observes the durable cancellation request and executes with this
     /// durable context as <see cref="Current"/>. Disposing the returned registration prevents an
     /// invocation which has not started, or asynchronously waits for an active invocation to finish.
+    /// A callback can dispose its own registration without blocking.
     /// </summary>
     public async ValueTask<IAsyncDisposable> RegisterCancellationCallbackAsync(
         Func<CancellationToken, ValueTask> callback,
@@ -136,15 +137,11 @@ public abstract class DurableExecutionContext
     internal Task RequestCancellationAsync(CancellationToken cancellationToken)
     {
         Task cancellationTask;
-        List<CancellationRegistration>? callbacks = null;
         TaskCompletionSource? completion = null;
         lock (_lock)
         {
             if (_cancellationTask is null)
             {
-                _cancellationRequested = true;
-                callbacks = _registrations ?? [];
-                _registrations = null;
                 completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
                 cancellationTask = _cancellationTask = completion.Task;
             }
@@ -156,7 +153,7 @@ public abstract class DurableExecutionContext
 
         if (completion is not null)
         {
-            _ = CompleteCancellationAsync(callbacks!, completion);
+            _ = CompleteCancellationAsync(completion);
         }
 
         return cancellationToken.CanBeCanceled
@@ -164,9 +161,7 @@ public abstract class DurableExecutionContext
             : cancellationTask;
     }
 
-    private async Task CompleteCancellationAsync(
-        List<CancellationRegistration> callbacks,
-        TaskCompletionSource completion)
+    private async Task CompleteCancellationAsync(TaskCompletionSource completion)
     {
         List<Exception>? exceptions = null;
         using (Enter(this))
@@ -183,6 +178,14 @@ public abstract class DurableExecutionContext
             {
                 (exceptions ??= []).Add(exception);
             }
+        }
+
+        List<CancellationRegistration> callbacks;
+        lock (_lock)
+        {
+            _cancellationRequested = true;
+            callbacks = _registrations ?? [];
+            _registrations = null;
         }
 
         foreach (var callback in callbacks)
@@ -234,6 +237,7 @@ public abstract class DurableExecutionContext
 
     private sealed class CancellationRegistration : IAsyncDisposable
     {
+        private static readonly AsyncLocal<CancellationRegistration?> Current = new();
         private const int Pending = 0;
         private const int Invoking = 1;
         private const int Completed = 2;
@@ -262,12 +266,15 @@ public abstract class DurableExecutionContext
                 return;
             }
 
+            var previous = Current.Value;
+            Current.Value = this;
             try
             {
                 await _callback!(cancellationToken);
             }
             finally
             {
+                Current.Value = previous;
                 Volatile.Write(ref _state, Completed);
                 Volatile.Read(ref _completion)?.TrySetResult();
             }
@@ -288,6 +295,11 @@ public abstract class DurableExecutionContext
 
                         break;
                     case Invoking:
+                        if (ReferenceEquals(Current.Value, this))
+                        {
+                            return ValueTask.CompletedTask;
+                        }
+
                         return new(GetInvocationCompletionTask());
                     case Completed:
                     case DisposedState:
