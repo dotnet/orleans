@@ -202,6 +202,136 @@ public class DurableTaskTests
     }
 
     [Fact]
+    public async Task TokenCallbackToDurableCallbackCancellationCycleCompletes()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var first = host.CreateContext(TaskId.CreateRoot("token-durable-first"));
+        var second = host.CreateContext(TaskId.CreateRoot("token-durable-second"));
+        using var tokenRegistration = first.CancellationToken.Register(() =>
+        {
+            Assert.Null(DurableExecutionContext.Current);
+            DurableTaskRuntimeHelper.RequestCancellationAsync(second).GetAwaiter().GetResult();
+        });
+        await second.RegisterCancellationCallbackAsync(_ =>
+        {
+            var request = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
+            Assert.True(request.IsCompletedSuccessfully);
+            return new(request);
+        });
+
+        var cancellation = Task.Run(() => DurableTaskRuntimeHelper.RequestCancellationAsync(first));
+        await cancellation.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.True(first.IsCancellationRequested);
+        Assert.True(second.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task MultiContextMixedTokenCancellationCycleCompletes()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var first = host.CreateContext(TaskId.CreateRoot("mixed-first"));
+        var second = host.CreateContext(TaskId.CreateRoot("mixed-second"));
+        var third = host.CreateContext(TaskId.CreateRoot("mixed-third"));
+        using var firstTokenRegistration = first.CancellationToken.Register(
+            () => DurableTaskRuntimeHelper.RequestCancellationAsync(second).GetAwaiter().GetResult());
+        await second.RegisterCancellationCallbackAsync(
+            async _ => await DurableTaskRuntimeHelper.RequestCancellationAsync(third));
+        using var thirdTokenRegistration = third.CancellationToken.Register(() =>
+        {
+            var request = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
+            Assert.True(request.IsCompletedSuccessfully);
+            request.GetAwaiter().GetResult();
+        });
+
+        var cancellation = Task.Run(() => DurableTaskRuntimeHelper.RequestCancellationAsync(first));
+        await cancellation.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.True(first.IsCancellationRequested);
+        Assert.True(second.IsCancellationRequested);
+        Assert.True(third.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task NestedTokenCancellationCycleCompletes()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var first = host.CreateContext(TaskId.CreateRoot("nested-token-first"));
+        var second = host.CreateContext(TaskId.CreateRoot("nested-token-second"));
+        using var firstTokenRegistration = first.CancellationToken.Register(
+            () => DurableTaskRuntimeHelper.RequestCancellationAsync(second).GetAwaiter().GetResult());
+        using var secondTokenRegistration = second.CancellationToken.Register(() =>
+        {
+            var request = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
+            Assert.True(request.IsCompletedSuccessfully);
+            request.GetAwaiter().GetResult();
+        });
+
+        var cancellation = Task.Run(() => DurableTaskRuntimeHelper.RequestCancellationAsync(first));
+        await cancellation.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.True(first.IsCancellationRequested);
+        Assert.True(second.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task TokenCallbackFailureDoesNotHideMixedCancellationCycle()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var first = host.CreateContext(TaskId.CreateRoot("token-failure-first"));
+        var second = host.CreateContext(TaskId.CreateRoot("token-failure-second"));
+        var expected = new InvalidOperationException("token callback failed");
+        using var cycleRegistration = first.CancellationToken.Register(
+            () => DurableTaskRuntimeHelper.RequestCancellationAsync(second).GetAwaiter().GetResult());
+        using var failureRegistration = first.CancellationToken.Register(() => throw expected);
+        await second.RegisterCancellationCallbackAsync(
+            async _ => await DurableTaskRuntimeHelper.RequestCancellationAsync(first));
+
+        var cancellation = Task.Run(() => DurableTaskRuntimeHelper.RequestCancellationAsync(first));
+        var exception = await Assert.ThrowsAsync<AggregateException>(
+            async () => await cancellation.WaitAsync(TimeSpan.FromSeconds(10)));
+
+        Assert.Same(expected, Assert.Single(exception.InnerExceptions));
+        Assert.True(first.IsCancellationRequested);
+        Assert.True(second.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task ExternalRequestAfterTokenCancellationStillAwaitsAndPropagatesErrors()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot("after-token-cancel"));
+        var callbackStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCallback = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var expected = new InvalidOperationException("durable callback failed");
+        var tokenCallbackInvoked = false;
+        using var tokenRegistration = context.CancellationToken.Register(
+            () => tokenCallbackInvoked = true);
+        await context.RegisterCancellationCallbackAsync(async _ =>
+        {
+            callbackStarted.SetResult();
+            await releaseCallback.Task;
+            throw expected;
+        });
+
+        var first = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+        await callbackStarted.Task;
+        Assert.True(tokenCallbackInvoked);
+        Assert.Null(DurableExecutionContext.Current);
+
+        var second = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+        Assert.Same(first, second);
+        Assert.False(second.IsCompleted);
+
+        releaseCallback.SetResult();
+        foreach (var request in new[] { first, second })
+        {
+            var exception = await Assert.ThrowsAsync<AggregateException>(async () => await request);
+            Assert.Same(expected, Assert.Single(exception.InnerExceptions));
+        }
+    }
+
+    [Fact]
     public async Task ConcurrentMutualCancellationCycleCompletes()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
