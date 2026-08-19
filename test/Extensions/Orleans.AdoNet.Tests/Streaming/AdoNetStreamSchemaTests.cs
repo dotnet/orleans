@@ -70,6 +70,16 @@ public sealed class AdoNetStreamSchemaTests
         Assert.DoesNotContain("@@session.in_transaction", script, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void MySqlScriptDoesNotProduceWhitespaceOnlyBatches()
+    {
+        var batches = ReadScript("MySQL")
+            .Replace("END$$", "END;", StringComparison.Ordinal)
+            .Split(["DELIMITER $$", "DELIMITER ;"], StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.DoesNotContain(batches, string.IsNullOrWhiteSpace);
+    }
+
     private static string ReadScript(string provider) =>
         File.ReadAllText(Path.Combine(AppContext.BaseDirectory, $"{provider}-Streaming.sql"));
 }
