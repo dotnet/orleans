@@ -185,10 +185,6 @@ BEGIN
         _MessageId AS MessageId;
 END$$
 
-DELIMITER ;
-
-DELIMITER $$
-
 CREATE PROCEDURE AcquireStreamPartition
 (
     IN _ServiceId VARCHAR(150),
@@ -295,10 +291,6 @@ BEGIN
         _TailMessageId AS TailMessageId;
 END$$
 
-DELIMITER ;
-
-DELIMITER $$
-
 CREATE PROCEDURE AdvanceStreamCheckpoint
 (
     IN _ServiceId VARCHAR(150),
@@ -360,10 +352,6 @@ BEGIN
     FROM DUAL
     WHERE _CurrentOwnerEpoch IS NOT NULL;
 END$$
-
-DELIMITER ;
-
-DELIMITER $$
 
 CREATE PROCEDURE CleanupStreamMessages
 (

@@ -155,6 +155,9 @@ public sealed class KinesisBatchContainerTests
         Assert.True(adapter.Compare(
             ref cached,
             new KinesisSequenceToken("123456789012345678901234567889", 1000, 0)) > 0);
+        Assert.Equal(0, adapter.Compare(
+            ref cached,
+            new KinesisSequenceToken("000123456789012345678901234567890", 1000, 0)));
 
         var batch = Assert.IsType<KinesisBatchContainer>(adapter.GetBatchContainer(ref cached));
         Assert.Equal(streamId, batch.StreamId);
