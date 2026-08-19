@@ -11,6 +11,11 @@ public abstract class DurableGrain : Grain, IGrainBase
         {
             participant.Participate(((IGrainBase)this).GrainContext.ObservableLifecycle);
         }
+
+        foreach (var feature in ServiceProvider.GetServices<IJournaledGrainParticipant>())
+        {
+            feature.Initialize();
+        }
     }
 
     protected IJournaledStateManager StateManager { get; }
@@ -31,5 +36,11 @@ public abstract class DurableGrain : Grain, IGrainBase
         return result;
     }
 
-    protected ValueTask WriteStateAsync(CancellationToken cancellationToken = default) => StateManager.WriteStateAsync(cancellationToken);
+    /// <summary>
+    /// Writes pending journaled state.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task which completes when the state is written.</returns>
+    protected ValueTask WriteStateAsync(CancellationToken cancellationToken = default) =>
+        StateManager.WriteStateAsync(cancellationToken);
 }
