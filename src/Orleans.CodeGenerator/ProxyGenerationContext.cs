@@ -25,6 +25,7 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
         Compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
         Options = options ?? throw new ArgumentNullException(nameof(options));
         LibraryTypes = libraryTypes ?? throw new ArgumentNullException(nameof(libraryTypes));
+        InvokableBaseTypeResolver = new InvokableBaseTypeResolver(compilation);
         MetadataModel = new MetadataModel();
         ProxyGenerator = new ProxyGenerator(this, new CopierGenerator(this));
         InvokableGenerator = new InvokableGenerator(this);
@@ -33,6 +34,7 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
     public Compilation Compilation { get; }
     public CodeGeneratorOptions Options { get; }
     internal LibraryTypes LibraryTypes { get; }
+    internal InvokableBaseTypeResolver InvokableBaseTypeResolver { get; }
     LibraryTypes IGeneratorServices.LibraryTypes => LibraryTypes;
     internal MetadataModel MetadataModel { get; }
     internal ProxyGenerator ProxyGenerator { get; }
@@ -150,15 +152,9 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
             if (!MetadataModel.ProxyBaseTypeInvokableBaseTypes.TryGetValue(baseClass, out var invokableBaseTypes))
             {
                 invokableBaseTypes = new Dictionary<INamedTypeSymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
-                if (baseClass.GetAttributes(LibraryTypes.DefaultInvokableBaseTypeAttribute, out var invokableBaseTypeAttributes))
+                foreach (var mapping in InvokableBaseTypeResolver.GetMappingsForProxy(baseClass))
                 {
-                    foreach (var attr in invokableBaseTypeAttributes)
-                    {
-                        var ctorArgs = attr.ConstructorArguments;
-                        var returnType = (INamedTypeSymbol)ctorArgs[0].Value!;
-                        var invokableBaseType = (INamedTypeSymbol)ctorArgs[1].Value!;
-                        invokableBaseTypes[returnType] = invokableBaseType;
-                    }
+                    invokableBaseTypes[mapping.ReturnType] = mapping.InvokableBaseType;
                 }
 
                 MetadataModel.ProxyBaseTypeInvokableBaseTypes[baseClass] = invokableBaseTypes;

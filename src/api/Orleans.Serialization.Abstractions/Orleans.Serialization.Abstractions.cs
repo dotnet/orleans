@@ -119,7 +119,7 @@ namespace Orleans
     {
     }
 
-    [System.AttributeUsage(System.AttributeTargets.Class | System.AttributeTargets.Interface, AllowMultiple = true)]
+    [System.AttributeUsage(System.AttributeTargets.Assembly | System.AttributeTargets.Class | System.AttributeTargets.Interface | System.AttributeTargets.Struct, AllowMultiple = true)]
     public sealed partial class InvokableBaseTypeAttribute : System.Attribute
     {
         public InvokableBaseTypeAttribute(System.Type proxyBaseClass, System.Type returnType, System.Type invokableBaseType) { }

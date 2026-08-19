@@ -105,4 +105,30 @@ public class GrainInterfaceMethodReturnTypeDiagnosticAnalyzerTest : DiagnosticAn
         var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
         Assert.Empty(diagnostics);
     }
+
+    [Fact]
+    public async Task RegisteredCustomReturnTypeIsAllowed()
+    {
+        var code = """
+                    [Orleans.InvokableBaseType(
+                        typeof(Orleans.Runtime.GrainReference),
+                        typeof(CustomCall<>),
+                        typeof(CustomRequest<>))]
+                    public class CustomCall<T> { }
+
+                    [Orleans.Invocation.ReturnValueProxy(nameof(InitializeRequest))]
+                    public abstract class CustomRequest<T>
+                    {
+                        public CustomCall<T> InitializeRequest(Orleans.Runtime.GrainReference proxy) => new();
+                    }
+
+                    public interface I : Orleans.IGrain
+                    {
+                        CustomCall<int> MyMethod();
+                    }
+                    """;
+
+        var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
+        Assert.Empty(diagnostics);
+    }
 }

@@ -86,7 +86,7 @@ internal static class ProxyInterfaceModelExtractor
         }
 
         var proxyBaseType = proxyBaseTypeSymbol.OriginalDefinition;
-        var invokableBaseTypes = ExtractInvokableBaseTypeMappings(proxyBaseType, libraryTypes, cancellationToken);
+        var invokableBaseTypes = ExtractInvokableBaseTypeMappings(proxyBaseType, compilation, cancellationToken);
         var generatedClassNameComponent = isExtension ? $"{proxyBaseType.Name}_Ext" : proxyBaseType.Name;
         var proxyBase = new ProxyBaseModel(
             new TypeRef(proxyBaseType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)),
@@ -186,29 +186,16 @@ internal static class ProxyInterfaceModelExtractor
 
     private static ImmutableArray<InvokableBaseTypeMapping> ExtractInvokableBaseTypeMappings(
         INamedTypeSymbol proxyBaseType,
-        LibraryTypes libraryTypes,
+        Compilation compilation,
         CancellationToken cancellationToken)
     {
-        if (!proxyBaseType.GetAttributes(libraryTypes.DefaultInvokableBaseTypeAttribute, out var invokableBaseTypeAttributes))
-        {
-            return [];
-        }
-
+        var resolver = new InvokableBaseTypeResolver(compilation);
         var mappings = new Dictionary<string, InvokableBaseTypeMapping>(StringComparer.Ordinal);
-        foreach (var attr in invokableBaseTypeAttributes)
+        foreach (var mapping in resolver.GetMappingsForProxy(proxyBaseType))
         {
             cancellationToken.ThrowIfCancellationRequested();
-
-            var ctorArgs = attr.ConstructorArguments;
-            if (ctorArgs.Length < 2
-                || ctorArgs[0].Value is not INamedTypeSymbol returnType
-                || ctorArgs[1].Value is not INamedTypeSymbol invokableBaseType)
-            {
-                continue;
-            }
-
-            var returnTypeRef = new TypeRef(returnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
-            var invokableBaseTypeRef = new TypeRef(invokableBaseType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+            var returnTypeRef = new TypeRef(mapping.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+            var invokableBaseTypeRef = new TypeRef(mapping.InvokableBaseType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
             mappings[returnTypeRef.SyntaxString] = new InvokableBaseTypeMapping(returnTypeRef, invokableBaseTypeRef);
         }
 
@@ -522,5 +509,4 @@ internal static class ProxyInterfaceModelExtractor
         return false;
     }
 }
-
 
