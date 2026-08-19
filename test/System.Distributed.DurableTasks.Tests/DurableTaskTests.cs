@@ -160,18 +160,18 @@ public class DurableTaskTests
     }
 
     [Fact]
-    public async Task CancellationAttemptsTokenAndDurableCallbacksInContextAndCompletesStableTask()
+    public async Task CancellationAttemptsTokenAndDurableCallbacksUsingTheirDocumentedContexts()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
         var context = host.CreateContext(TaskId.CreateRoot("all-callbacks"));
         var calls = new ConcurrentBag<string>();
-        using var tokenRegistration = context.CancellationToken.UnsafeRegister(static state =>
+        using var tokenRegistration = context.CancellationToken.Register(static state =>
         {
-            var (expectedContext, observedCalls) = ((TestContext, ConcurrentBag<string>))state!;
-            Assert.Same(expectedContext, DurableExecutionContext.Current);
+            var observedCalls = (ConcurrentBag<string>)state!;
+            Assert.Null(DurableExecutionContext.Current);
             observedCalls.Add("token");
             throw new InvalidOperationException("token failure");
-        }, (context, calls));
+        }, calls);
         await context.RegisterCancellationCallbackAsync(_ =>
         {
             Assert.Same(context, DurableExecutionContext.Current);
@@ -194,6 +194,62 @@ public class DurableTaskTests
         Assert.Equal(2, exception.InnerExceptions.Count);
         Assert.Equal(["durable-1", "durable-2", "token"], calls.Order());
         Assert.Null(DurableExecutionContext.Current);
+    }
+
+    [Fact]
+    public async Task DisposingSnapshottedCancellationRegistrationPreventsPendingInvocation()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot("dispose-pending"));
+        var activeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseActive = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pendingInvoked = false;
+        await context.RegisterCancellationCallbackAsync(async _ =>
+        {
+            activeStarted.SetResult();
+            await releaseActive.Task;
+        });
+        var pending = await context.RegisterCancellationCallbackAsync(_ =>
+        {
+            pendingInvoked = true;
+            return ValueTask.CompletedTask;
+        });
+
+        var cancellation = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+        await activeStarted.Task;
+        await pending.DisposeAsync();
+        releaseActive.SetResult();
+        await cancellation;
+
+        Assert.False(pendingInvoked);
+    }
+
+    [Fact]
+    public async Task DisposingActiveThrowingCancellationRegistrationWaitsForInvocation()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot("dispose-active"));
+        var callbackStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCallback = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var registration = await context.RegisterCancellationCallbackAsync(async _ =>
+        {
+            callbackStarted.SetResult();
+            await releaseCallback.Task;
+            throw new InvalidOperationException("callback failure");
+        });
+
+        var cancellation = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+        await callbackStarted.Task;
+        var disposal = registration.DisposeAsync().AsTask();
+        Assert.False(disposal.IsCompleted);
+
+        releaseCallback.SetResult();
+        var exception = await Assert.ThrowsAsync<AggregateException>(async () => await cancellation);
+        await disposal;
+
+        Assert.Single(exception.InnerExceptions);
+        Assert.IsType<InvalidOperationException>(exception.InnerExceptions[0]);
+        Assert.True(disposal.IsCompletedSuccessfully);
     }
 
     [Fact]
@@ -353,6 +409,63 @@ public class SchedulingTests
         await Assert.ThrowsAsync<InvalidOperationException>(AwaitWithoutIdAsync);
 
         async Task AwaitWithoutIdAsync() => _ = await definition;
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task GeneratedChildIdsAreDisjointFromNumericNamesAndStableAcrossReplay(bool explicitFirst)
+    {
+        var first = await ExecuteAsync(new TestHost(DateTimeOffset.UnixEpoch), explicitFirst);
+        var replay = await ExecuteAsync(new TestHost(DateTimeOffset.UnixEpoch), explicitFirst);
+
+        Assert.Equal(
+        [
+            TaskId.Parse("root/$child-1"),
+            TaskId.Parse("root/1"),
+        ],
+            first);
+        Assert.Equal(first, replay);
+
+        static async Task<IReadOnlyList<TaskId>> ExecuteAsync(TestHost host, bool explicitFirst)
+        {
+            var root = host.CreateRootDefinition<object?>(async _ =>
+            {
+                if (explicitFirst)
+                {
+                    await DurableTask.Run(static _ => { }).WithId("1");
+                    await DurableTask.Run(static _ => { });
+                }
+                else
+                {
+                    await DurableTask.Run(static _ => { });
+                    await DurableTask.Run(static _ => { }).WithId("1");
+                }
+
+                return DurableTaskResponse.Completed;
+            });
+
+            var scheduled = await root.ScheduleAsync("root");
+            await ((ScheduledTask)scheduled).WaitAsync();
+            return host.EntryIds.Where(id => id != TaskId.CreateRoot("root")).ToArray();
+        }
+    }
+
+    [Theory]
+    [InlineData("$child-1")]
+    [InlineData("$when-all-1")]
+    public async Task ExplicitChildNamesRejectGeneratedNamespace(string name)
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot("root"));
+
+        var response = await DurableTaskRuntimeHelper.RunAsync(Definition(), context);
+
+        var exception = Assert.IsType<ArgumentException>(response.Exception);
+        Assert.StartsWith("Explicit child names", exception.Message);
+
+        async DurableTask Definition()
+            => await DurableTask.Run(static _ => { }).WithId(name);
     }
 
     [Fact]
