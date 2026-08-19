@@ -24,7 +24,7 @@ For a more typical project structure, [Build your first Orleans app](../quicksta
 
 | Tutorial | What it teaches |
 | --- | --- |
-| [Build and deploy a production-shaped application](production-application.md) | Run, deploy, observe, and verify a multi-process Orleans application. |
+| [Deploy an Orleans application to Azure Container Apps](production-application.md) | Run, deploy, observe, and verify a multi-process Orleans application. |
 | [Test an Orleans application end to end](testing-walkthrough.md) | Progress from a first cluster test to reusable fixtures and topology changes. |
 | [Build and recover a streaming application](streaming-walkthrough.md) | Follow events through a real provider and verify recovery from checkpoints. |
 | [Custom grain storage](custom-grain-storage.md) | Implement and register an <xref:Orleans.Storage.IGrainStorage> provider. |

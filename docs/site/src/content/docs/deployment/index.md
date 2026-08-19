@@ -25,7 +25,7 @@ See [Server configuration](../host/configuration-guide/server-configuration.md) 
 
 ## Follow the deployment walkthrough
 
-[Build and deploy a production-shaped Orleans application](../tutorials-and-samples/production-application.md) takes you from an empty directory to a running multi-process cluster, then through code-based production configuration, deployment, observability, and verification. It uses a maintained sample whose application code, infrastructure, and deployment workflow are validated together.
+[Deploy an Orleans application to Azure Container Apps](../tutorials-and-samples/production-application.md) takes you from an empty directory to a running multi-process cluster, then through code-based production configuration, deployment, observability, and verification. The sample's application code, infrastructure, and deployment workflow are validated together.
 
 For an existing application, use the walkthrough as a sequence:
 
@@ -52,7 +52,7 @@ Use these articles together:
 
 ## Choose a platform
 
-- [Production-shaped walkthrough and Azure Container Apps sample](../tutorials-and-samples/production-application.md)
+- [Azure Container Apps deployment walkthrough and sample](../tutorials-and-samples/production-application.md)
 - [Containers across multiple hosts](containers.md)
 - [Kubernetes](kubernetes.md)
 - [Service Fabric](service-fabric.md)

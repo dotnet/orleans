@@ -24,7 +24,7 @@ items:
         href: tutorials-and-samples/adventure.md
       - name: Build custom grain storage
         href: tutorials-and-samples/custom-grain-storage.md
-      - name: Build and deploy a production-shaped application
+      - name: Deploy an Orleans application to Azure Container Apps
         href: tutorials-and-samples/production-application.md
       - name: Test an Orleans application end to end
         href: tutorials-and-samples/testing-walkthrough.md

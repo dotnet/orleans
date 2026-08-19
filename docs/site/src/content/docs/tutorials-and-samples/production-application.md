@@ -1,13 +1,13 @@
 ---
-title: Build and deploy a production-shaped Orleans application
+title: Deploy an Orleans application to Azure Container Apps
 description: Run, inspect, deploy, and verify a multi-process Orleans application on Azure Container Apps.
 ms.date: 08/19/2026
 ms.topic: tutorial
 ---
 
-# Build and deploy a production-shaped Orleans application
+# Deploy an Orleans application to Azure Container Apps
 
-This walkthrough takes you from an empty directory to a deployed, observable Orleans cluster. You use the maintained [Azure Container Apps sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureContainerApps) so that the application, infrastructure, and deployment workflow stay buildable together.
+This walkthrough takes you from an empty directory to a deployed, observable Orleans cluster using the [Azure Container Apps sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureContainerApps). The application, infrastructure, and deployment workflow are versioned and validated together.
 
 The finished system has dedicated silos, an HTTP API and worker client, Azure Table Storage clustering, managed identity, health probes, Application Insights, and an Orleans Dashboard. This sample demonstrates clustering and deployment; add a grain-storage provider to persist application state.
 
