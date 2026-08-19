@@ -1,7 +1,7 @@
 ---
 title: Orleans streaming APIs
 description: Work with stream identities, producers, consumers, and explicit or implicit subscriptions in Orleans.
-ms.date: 08/18/2026
+ms.date: 08/19/2026
 ms.topic: concept-article
 ---
 
@@ -79,6 +79,10 @@ Use an explicit subscription when application behavior decides whether and when 
 The subscription belongs to the grain identity, not one activation. After deactivation, a later activation calls <xref:Orleans.Streams.IAsyncStream`1.GetAllSubscriptionHandles*> and <xref:Orleans.Streams.StreamSubscriptionHandle`1.ResumeAsync*> to attach its new observer instance. Call <xref:Orleans.Streams.StreamSubscriptionHandle`1.UnsubscribeAsync*> to remove a subscription.
 
 This lifecycle is durable across cluster restarts only when the configured [`PubSubStore` is durable](pubsub-storage.md). A memory `PubSubStore` preserves records only while that cluster state remains available.
+
+#### End an explicit subscription
+
+End a subscription by awaiting <xref:Orleans.Streams.StreamSubscriptionHandle`1.UnsubscribeAsync*> for every handle. The streaming runtime removes each subscription from pub/sub storage and notifies active producers before the operation completes. The example's `UnsubscribeAsync` method follows this sequence.
 
 ### Implicit subscriptions
 
