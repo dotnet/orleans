@@ -1,4 +1,5 @@
 using System.Threading;
+using System.Threading.Tasks;
 using Orleans.Runtime;
 using TestExtensions;
 using Xunit;
@@ -12,6 +13,31 @@ public class DefaultExecutionContextTests
 
     [Fact, TestCategory("BVT")]
     public void FallbackDoesNotContainAmbientState() => AssertDoesNotContainAmbientState(DefaultExecutionContext.CaptureDefault());
+
+    [Fact, TestCategory("BVT")]
+    public async Task InstanceSupportsConcurrentExecution()
+    {
+        var tasks = new Task[Math.Max(4, Environment.ProcessorCount)];
+        for (var i = 0; i < tasks.Length; i++)
+        {
+            var expected = new object();
+            tasks[i] = Task.Run(() =>
+            {
+                var ambientState = new AsyncLocal<object?> { Value = expected };
+                object? observed = expected;
+
+                ExecutionContext.Run(
+                    DefaultExecutionContext.Instance,
+                    _ => observed = ambientState.Value,
+                    null);
+
+                Assert.Null(observed);
+                Assert.Same(expected, ambientState.Value);
+            });
+        }
+
+        await Task.WhenAll(tasks);
+    }
 
     private static void AssertDoesNotContainAmbientState(ExecutionContext executionContext)
     {
