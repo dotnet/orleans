@@ -4,8 +4,8 @@ namespace Orleans.Streaming.AdoNet;
 /// The <see cref="IBatchContainer"/> implementation for the ADONET provider.
 /// </summary>
 /// <remarks>
-/// 1. This class only supports binary serialization as performance and data size is the priority for database storage.
-/// 2. Though the <see cref="SequenceToken"/> is supported here, it is not yet used, as the ADO.NET provider is not rewindable.
+/// This class uses binary serialization to prioritize database storage performance and payload size.
+/// Its <see cref="SequenceToken"/> identifies a record position in the rewindable partition history.
 /// </remarks>
 [GenerateSerializer]
 [Alias("Orleans.Streaming.AdoNet.AdoNetBatchContainer")]

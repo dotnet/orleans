@@ -97,7 +97,7 @@ flowchart TB
 
 Cache capacity is not durability. The queue remains the durable boundary, subject to the adapter's acknowledgement contract.
 
-Recoverable partition providers can compose <xref:Orleans.Providers.Streams.Common.RecoverableStreamReceiver%601> with a partition source and data adapter. The coordinator admits immutable raw records into pooled storage, reconstructs batches lazily, reconciles the earliest subscription delivery watermark, and persists a checkpoint which resumes strictly after the last fully delivered record.
+Recoverable partitioned stream providers can compose a stream partition pipeline from <xref:Orleans.Providers.Streams.Common.RecoverableStreamReceiver%601>, a partition source, and a data adapter. The pipeline admits immutable stream records into pooled storage, reconstructs batches lazily, reconciles the earliest subscription delivery watermark, and persists a checkpoint which resumes strictly after the last fully delivered record.
 
 ## Pub-sub handshake
 
