@@ -342,8 +342,11 @@ namespace Orleans.Streams
 
             if (await DoHandshakeWithConsumer(data, cacheToken))
             {
-                var startToken = data.LastToken?.Token ?? cacheToken ?? data.PendingStartToken;
-                data.LastProcessedToken = startToken;
+                if (data.LastToken is DeliveryToken deliveryToken)
+                {
+                    data.LastProcessedToken = deliveryToken.Token;
+                }
+
                 data.PendingStartToken = null;
                 data.IsRegistered = true;
                 StreamingEvents.EmitSubscriptionAttached(streamProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, Silo);
