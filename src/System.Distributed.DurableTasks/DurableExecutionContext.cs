@@ -5,6 +5,7 @@ namespace System.Distributed.DurableTasks;
 /// <summary>Supplies host services and deterministic execution state to a durable task.</summary>
 public abstract class DurableExecutionContext
 {
+    private const char GeneratedSegmentPrefix = '$';
     private static readonly AsyncLocal<DurableExecutionContext?> AmbientContext = new();
     private readonly object _lock = new();
     private readonly CancellationTokenSource _cancellationSource = new();
@@ -45,7 +46,10 @@ public abstract class DurableExecutionContext
         }
     }
 
-    /// <summary>Gets the durable cancellation token for this execution.</summary>
+    /// <summary>
+    /// Gets the durable cancellation token for this execution. Callbacks registered directly on this
+    /// token follow the standard .NET registration execution-context semantics.
+    /// </summary>
     public CancellationToken CancellationToken => _cancellationSource.Token;
 
     /// <summary>Schedules or reattaches to a child definition under an exact identifier.</summary>
@@ -72,14 +76,36 @@ public abstract class DurableExecutionContext
         IReadOnlyList<TaskId> candidates,
         CancellationToken cancellationToken);
 
-    /// <summary>Creates a replay-stable child identifier, using <paramref name="name"/> when supplied.</summary>
+    /// <summary>
+    /// Creates a replay-stable child identifier, using <paramref name="name"/> when supplied.
+    /// Explicit names beginning with <c>$</c> are reserved for generated identifiers.
+    /// </summary>
     protected internal virtual TaskId CreateChildTaskId(string? name)
-        => TaskId.Child(name ?? Interlocked.Increment(ref _nextChildId).ToString(CultureInfo.InvariantCulture));
+    {
+        if (name is not null)
+        {
+            if (name.StartsWith(GeneratedSegmentPrefix))
+            {
+                throw new ArgumentException(
+                    $"Explicit child names beginning with '{GeneratedSegmentPrefix}' are reserved for generated identifiers.",
+                    nameof(name));
+            }
+
+            return TaskId.Child(name);
+        }
+
+        return TaskId.Child(
+            $"$child-{Interlocked.Increment(ref _nextChildId).ToString(CultureInfo.InvariantCulture)}");
+    }
 
     internal TaskId CreateOperationId(string kind)
         => TaskId.Child($"${kind}-{Interlocked.Increment(ref _nextOperationId).ToString(CultureInfo.InvariantCulture)}");
 
-    /// <summary>Registers a callback which observes the durable cancellation request.</summary>
+    /// <summary>
+    /// Registers a callback which observes the durable cancellation request and executes with this
+    /// durable context as <see cref="Current"/>. Disposing the returned registration prevents an
+    /// invocation which has not started, or asynchronously waits for an active invocation to finish.
+    /// </summary>
     public async ValueTask<IAsyncDisposable> RegisterCancellationCallbackAsync(
         Func<CancellationToken, ValueTask> callback,
         CancellationToken cancellationToken = default)
@@ -206,19 +232,85 @@ public abstract class DurableExecutionContext
         public void Dispose() => AmbientContext.Value = previous;
     }
 
-    private sealed class CancellationRegistration(
-        DurableExecutionContext? context,
-        Func<CancellationToken, ValueTask>? callback) : IAsyncDisposable
+    private sealed class CancellationRegistration : IAsyncDisposable
     {
-        public static CancellationRegistration Disposed { get; } = new(null, null);
+        private const int Pending = 0;
+        private const int Invoking = 1;
+        private const int Completed = 2;
+        private const int DisposedState = 3;
+        private readonly DurableExecutionContext? _context;
+        private readonly Func<CancellationToken, ValueTask>? _callback;
+        private TaskCompletionSource? _completion;
+        private int _state;
 
-        public ValueTask InvokeAsync(CancellationToken cancellationToken)
-            => callback is null ? ValueTask.CompletedTask : callback(cancellationToken);
+        private CancellationRegistration(bool disposed) => _state = disposed ? DisposedState : Pending;
+
+        public CancellationRegistration(
+            DurableExecutionContext context,
+            Func<CancellationToken, ValueTask> callback)
+        {
+            _context = context;
+            _callback = callback;
+        }
+
+        public static CancellationRegistration Disposed { get; } = new(true);
+
+        public async ValueTask InvokeAsync(CancellationToken cancellationToken)
+        {
+            if (Interlocked.CompareExchange(ref _state, Invoking, Pending) != Pending)
+            {
+                return;
+            }
+
+            try
+            {
+                await _callback!(cancellationToken);
+            }
+            finally
+            {
+                Volatile.Write(ref _state, Completed);
+                Volatile.Read(ref _completion)?.TrySetResult();
+            }
+        }
 
         public ValueTask DisposeAsync()
         {
-            context?.Unregister(this);
-            return ValueTask.CompletedTask;
+            _context?.Unregister(this);
+            while (true)
+            {
+                switch (Volatile.Read(ref _state))
+                {
+                    case Pending:
+                        if (Interlocked.CompareExchange(ref _state, DisposedState, Pending) == Pending)
+                        {
+                            return ValueTask.CompletedTask;
+                        }
+
+                        break;
+                    case Invoking:
+                        return new(GetInvocationCompletionTask());
+                    case Completed:
+                    case DisposedState:
+                        return ValueTask.CompletedTask;
+                }
+            }
+        }
+
+        private Task GetInvocationCompletionTask()
+        {
+            var completion = Volatile.Read(ref _completion);
+            if (completion is null)
+            {
+                var candidate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                completion = Interlocked.CompareExchange(ref _completion, candidate, null) ?? candidate;
+            }
+
+            if (Volatile.Read(ref _state) == Completed)
+            {
+                completion.TrySetResult();
+            }
+
+            return completion.Task;
         }
     }
 }
