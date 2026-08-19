@@ -340,6 +340,25 @@ function markdownAstLineRanges(source, acceptedTypes) {
   return ranges;
 }
 
+function markdownAstOffsetRanges(source, acceptedTypes) {
+  const ranges = [];
+  const pending = [fromMarkdown(source)];
+  while (pending.length > 0) {
+    const node = pending.pop();
+    if (
+      acceptedTypes.has(node.type) &&
+      Number.isInteger(node.position?.start.offset) &&
+      Number.isInteger(node.position?.end.offset)
+    ) {
+      ranges.push([node.position.start.offset, node.position.end.offset]);
+    }
+    if (Array.isArray(node.children)) {
+      pending.push(...node.children);
+    }
+  }
+  return ranges.sort((left, right) => left[0] - right[0]);
+}
+
 export function markdownBlockquoteLineRanges(source) {
   return fromMarkdown
     ? markdownAstLineRanges(source, new Set(['blockquote']))
@@ -350,6 +369,12 @@ export function markdownLiteralLineRanges(source) {
   return fromMarkdown
     ? markdownAstLineRanges(source, new Set(['code', 'html', 'inlineCode']))
     : fallbackProtectedLineRanges(source);
+}
+
+export function markdownCodeOffsetRanges(source) {
+  return fromMarkdown
+    ? markdownAstOffsetRanges(source, new Set(['code', 'inlineCode']))
+    : [];
 }
 
 export function lineOverlapsRanges(line, ranges) {

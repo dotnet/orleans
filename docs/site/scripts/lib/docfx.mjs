@@ -6,6 +6,7 @@ import { collectIncludeTargets as collectIncludeTargetsWithoutYaml } from './inc
 import {
   lineOverlapsRanges,
   markdownBlockquoteLineRanges,
+  markdownCodeOffsetRanges,
   markdownDirectiveProtectedLineRanges,
   markdownLiteralLineRanges,
 } from './markdown-ranges.mjs';
@@ -1366,12 +1367,22 @@ function escapeMdxAngles(source) {
     `<(?!\\/?(?:${htmlTags})\\b|https?:\\/\\/|mailto:)(?=[A-Za-z\\d=/])`,
     'gi',
   );
-  return source
-    .replace(/<(https?:\/\/[^>]+)>/g, '[$1]($1)')
-    .replace(/<mailto:([^>]+)>/g, '[$1](mailto:$1)')
-    .replace(pattern, '&lt;')
-    .replace(/<(br|hr)\s*>/gi, '<$1 />')
-    .replace(/<(img|input|source)(\b[^>]*?)(?<!\/)>/gi, '<$1$2 />');
+  const transform = (value) =>
+    value
+      .replace(/<(https?:\/\/[^>]+)>/g, '[$1]($1)')
+      .replace(/<mailto:([^>]+)>/g, '[$1](mailto:$1)')
+      .replace(pattern, '&lt;')
+      .replace(/<(br|hr)\s*>/gi, '<$1 />')
+      .replace(/<(img|input|source)(\b[^>]*?)(?<!\/)>/gi, '<$1$2 />');
+  const ranges = markdownCodeOffsetRanges(source);
+  const chunks = [];
+  let offset = 0;
+  for (const [start, end] of ranges) {
+    chunks.push(transform(source.slice(offset, start)), source.slice(start, end));
+    offset = end;
+  }
+  chunks.push(transform(source.slice(offset)));
+  return chunks.join('');
 }
 
 function stripHtmlTags(value) {
@@ -1491,11 +1502,10 @@ export async function convertDocfxMarkdown({
   body = tabs.source;
   body = normalizeFenceLanguages(body);
   body = transformOutsideCodeFences(body, (line) => {
-    const converted = convertXrefs(convertLinks(line, sourcePath, sourceRoot), uidMap);
-    return escapeMdxAngles(converted)
-      .replace(/<([A-Z][A-Za-z\d_, ]*)>/g, '&lt;$1&gt;')
+    return convertXrefs(convertLinks(line, sourcePath, sourceRoot), uidMap)
       .replace(/<a\s+name="([^"]+)"><\/a>/gi, '<span id="$1"></span>');
   });
+  body = escapeMdxAngles(body);
   body = convertHtmlCommentsForMdx(body);
   const extractedTitle = extractPageTitle(body, metadataTitle);
   body = extractedTitle.body.trim();
