@@ -131,10 +131,7 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
             AdoNetStreamProviderName,
             StreamNamespace,
             _output,
-            async () => (await _testing.Storage.ReadAsync(
-                "SELECT COUNT(*) FROM OrleansStreamDeadLetter",
-                _ => { },
-                (record, i, ct) => Task.FromResult(record.GetInt32(0))))
-                .Single());
+            getDeliveryFailureCount: null,
+            waitForRetryTimeouts: true);
     }
 }
