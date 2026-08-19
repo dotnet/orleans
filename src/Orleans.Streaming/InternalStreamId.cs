@@ -59,6 +59,9 @@ namespace Orleans.Runtime
         internal string? GetNamespace() => StreamId.GetNamespace();
     }
 
+    /// <summary>
+    /// Functionality for converting <see cref="QualifiedStreamId"/> instances to and from their JSON representation.
+    /// </summary>
     public sealed class QualifiedStreamIdJsonConverter : JsonConverter<QualifiedStreamId>
     {
         public override QualifiedStreamId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)

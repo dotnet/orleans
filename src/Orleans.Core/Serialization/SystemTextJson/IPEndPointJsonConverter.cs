@@ -8,6 +8,9 @@ using System.Text.Json.Serialization;
 
 namespace Orleans.Serialization
 {
+    /// <summary>
+    /// Functionality for converting <see cref="IPEndPoint"/> instances to and from their JSON representation.
+    /// </summary>
     public sealed class IPEndPointJsonConverter : JsonConverter<IPEndPoint>
     {
         private const int MaxAddressSize = 71;

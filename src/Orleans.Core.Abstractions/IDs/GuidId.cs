@@ -107,6 +107,9 @@ namespace Orleans.Runtime
         }
     }
 
+    /// <summary>
+    /// Functionality for converting <see cref="GuidId"/> instances to and from their JSON representation.
+    /// </summary>
     public sealed class GuidIdConverter : JsonConverter<GuidId>
     {
         public override GuidId? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)

@@ -270,6 +270,9 @@ namespace Orleans.Runtime
         internal IdSpan GetKeyIdSpan() => keyIndex == 0 ? IdSpan.UnsafeCreate(fullKey, hash) : new(fullKey.AsSpan(keyIndex).ToArray());
     }
 
+    /// <summary>
+    /// Functionality for converting <see cref="StreamId"/> instances to and from their JSON representation.
+    /// </summary>
     public sealed class StreamIdJsonConverter : JsonConverter<StreamId>
     {
         private static readonly Encoding StrictUtf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);

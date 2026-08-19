@@ -355,6 +355,9 @@ namespace Orleans.Runtime
         private static ulong GetTypeCodeData(Category category, long typeData = 0) => ((ulong)category << 56) + ((ulong)typeData & 0x00FFFFFFFFFFFFFF);
     }
 
+    /// <summary>
+    /// Functionality for converting <see cref="UniqueKey"/> instances to and from their JSON representation.
+    /// </summary>
     public sealed class UniqueKeyJsonConverter : JsonConverter<UniqueKey>
     {
         private const int MaxBufferSize = 256;
