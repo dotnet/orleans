@@ -42,24 +42,70 @@ public abstract class ScheduledTask
     public static async Task WhenAll<TResult>(IReadOnlyList<ScheduledTask<TResult>> tasks, CancellationToken cancellationToken = default)
         => await Task.WhenAll(tasks.Select(task => WaitForSuccessAsync(task, cancellationToken)));
 
-    /// <summary>Returns the first scheduled task whose response completes.</summary>
+    /// <summary>
+    /// Returns the first scheduled task whose response completes, including failed or canceled durable
+    /// responses. Wait cancellation and transport failures are propagated, and losing waits are canceled
+    /// without canceling the durable tasks.
+    /// </summary>
     public static async Task<ScheduledTask> WhenAny(IReadOnlyList<ScheduledTask> tasks, CancellationToken cancellationToken = default)
-    {
-        ArgumentOutOfRangeException.ThrowIfZero(tasks.Count);
-        var waits = tasks.Select(task => task.GetResponseAsync(cancellationToken)).ToArray();
-        var completed = await Task.WhenAny(waits);
-        return tasks[Array.IndexOf(waits, completed)];
-    }
+        => tasks[await WaitForAnyIndexAsync(tasks, cancellationToken)];
 
-    /// <summary>Returns the first scheduled task whose response completes.</summary>
+    /// <summary>
+    /// Returns the first scheduled task whose response completes, including failed or canceled durable
+    /// responses. Wait cancellation and transport failures are propagated, and losing waits are canceled
+    /// without canceling the durable tasks.
+    /// </summary>
     public static async Task<ScheduledTask<TResult>> WhenAny<TResult>(
         IReadOnlyList<ScheduledTask<TResult>> tasks,
         CancellationToken cancellationToken = default)
+        => tasks[await WaitForAnyIndexAsync(tasks, cancellationToken)];
+
+    private static async Task<int> WaitForAnyIndexAsync<TTask>(
+        IReadOnlyList<TTask> tasks,
+        CancellationToken cancellationToken)
+        where TTask : ScheduledTask
     {
         ArgumentOutOfRangeException.ThrowIfZero(tasks.Count);
-        var waits = tasks.Select(task => task.GetResponseAsync(cancellationToken)).ToArray();
+        using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var waits = tasks.Select(task => task.WaitAsyncCore(waitCancellation.Token).AsTask()).ToArray();
         var completed = await Task.WhenAny(waits);
-        return tasks[Array.IndexOf(waits, completed)];
+        var winnerIndex = Array.IndexOf(waits, completed);
+        try
+        {
+            _ = await completed;
+            return winnerIndex;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(cancellationToken);
+        }
+        finally
+        {
+            waitCancellation.Cancel();
+            await DrainLosingWaitsAsync(waits, winnerIndex);
+        }
+    }
+
+    private static async Task DrainLosingWaitsAsync(
+        IReadOnlyList<Task<DurableTaskResponse>> waits,
+        int winnerIndex)
+    {
+        for (var index = 0; index < waits.Count; index++)
+        {
+            if (index == winnerIndex)
+            {
+                continue;
+            }
+
+            try
+            {
+                _ = await waits[index];
+            }
+            catch
+            {
+                // Losing observations are canceled and do not determine the result.
+            }
+        }
     }
 
     private static async Task WaitForSuccessAsync(ScheduledTask task, CancellationToken cancellationToken)
