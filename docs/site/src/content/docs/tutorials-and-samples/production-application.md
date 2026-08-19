@@ -1,7 +1,7 @@
 ---
 title: Build and deploy a production-shaped Orleans application
 description: Run, inspect, deploy, and verify a multi-process Orleans application on Azure Container Apps.
-ms.date: 08/11/2026
+ms.date: 08/19/2026
 ms.topic: tutorial
 ---
 
@@ -69,6 +69,37 @@ Development uses a storage emulator. Deployed processes use <xref:Azure.Identity
 Every deployed silo has a unique advertised silo and gateway endpoint. Azure Container Apps assigns the documented endpoint at the app boundary, so the sample deploys each silo as a separate one-replica Container App. Add capacity by adding silo apps with unused ports.
 
 Review the sample's [deployment README](https://github.com/dotnet/orleans/blob/main/samples/Deployment/AzureContainerApps/README.md) and `Azure/bootstrap.bicep` before assigning roles. The privileged bootstrap and routine deployment are deliberately separate.
+
+### Configure the host in code
+
+Orleans production configuration is composed on the .NET Generic Host. The [sample silo host](https://github.com/dotnet/orleans/blob/main/samples/Deployment/AzureContainerApps/Silo/Program.cs) reads deployment values through <xref:Microsoft.Extensions.Configuration.IConfiguration>, calls <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*>, and configures cluster identity, endpoints, and Azure Table Storage clustering on the resulting <xref:Orleans.Hosting.ISiloBuilder>.
+
+The same pattern can register durable grain storage in an application which persists grain state:
+
+:::code language="csharp" source="../snippets/compiled/Deployment/DeploymentSnippets.cs" id="container_apps_storage_usings":::
+:::code language="csharp" source="../snippets/compiled/Deployment/DeploymentSnippets.cs" id="configure_container_apps_storage":::
+
+`ServiceId` remains stable for the application. `ClusterId` identifies the deployment environment or blue-green cluster. Every silo and external client uses the same values and the same clustering backend. The host reads provider endpoints and cluster identity from deployment configuration and fails startup when required values are absent.
+
+Listening endpoints describe where the process accepts connections. Advertised endpoints identify the unique address and ports which other silos and clients use to reach that process:
+
+:::code language="csharp" source="../snippets/compiled/Deployment/DeploymentSnippets.cs" id="container_endpoint_usings":::
+:::code language="csharp" source="../snippets/compiled/Deployment/DeploymentSnippets.cs" id="configure_container_endpoints":::
+
+The deployment platform supplies these values for each silo. The sample's [endpoint configuration](https://github.com/dotnet/orleans/blob/main/samples/Deployment/AzureContainerApps/Infrastructure/OrleansEndpointConfigurationExtensions.cs) applies the same model to the private address and unique port pair allocated to each one-replica Container App.
+
+### Choose a deployment model
+
+Use the platform guide whose network and lifecycle guarantees match the target environment:
+
+| Target | Recommended model |
+| --- | --- |
+| Kubernetes | Advertise each pod IP, allow direct pod-to-pod TCP, and use a production clustering provider. |
+| Managed container platform | Give each silo a documented per-instance address or a unique private address and port pair. |
+| Virtual machines or bare metal | Advertise stable private addresses and supervise the .NET host as a long-running service. |
+| Azure App Service | Use the maintained multi-instance sample and its private per-instance port mapping. |
+
+See [Platform requirements](../deployment/platform-guides.md) before adapting the sample to another host. The invariant is that every membership entry names one silo endpoint which all other silos can reach directly.
 
 ## Deploy
 
