@@ -165,7 +165,10 @@ public abstract class DurableExecutionContext
             {
                 try
                 {
-                    _cancellationSource.Cancel();
+                    using (operation.EnterCancellationCallbacks())
+                    {
+                        _cancellationSource.Cancel();
+                    }
                 }
                 catch (AggregateException exception)
                 {
@@ -237,13 +240,17 @@ public abstract class DurableExecutionContext
     {
         private static readonly object GraphLock = new();
         private static readonly AsyncLocal<CancellationOperation?> AmbientOperation = new();
+        // CTS callbacks run synchronously but under their captured execution context, which can hide AmbientOperation.
+        [ThreadStatic]
+        private static CancellationOperation? _cancellationCallbackOperation;
         private readonly TaskCompletionSource _completion =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
         private HashSet<CancellationOperation>? _dependencies;
         private bool _graphCompleted;
         private int _started;
 
-        public static CancellationOperation? Current => AmbientOperation.Value;
+        public static CancellationOperation? Current
+            => _cancellationCallbackOperation ?? AmbientOperation.Value;
 
         public Task Task => _completion.Task;
 
@@ -285,6 +292,13 @@ public abstract class DurableExecutionContext
         {
             var previous = AmbientOperation.Value;
             AmbientOperation.Value = this;
+            return new(previous);
+        }
+
+        public CancellationCallbackScope EnterCancellationCallbacks()
+        {
+            var previous = _cancellationCallbackOperation;
+            _cancellationCallbackOperation = this;
             return new(previous);
         }
 
@@ -343,6 +357,11 @@ public abstract class DurableExecutionContext
         public readonly struct OperationScope(CancellationOperation? previous) : IDisposable
         {
             public void Dispose() => AmbientOperation.Value = previous;
+        }
+
+        public readonly struct CancellationCallbackScope(CancellationOperation? previous) : IDisposable
+        {
+            public void Dispose() => _cancellationCallbackOperation = previous;
         }
     }
 
