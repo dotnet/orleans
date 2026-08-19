@@ -202,6 +202,187 @@ public class DurableTaskTests
     }
 
     [Fact]
+    public async Task ConcurrentMutualCancellationCycleCompletes()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var first = host.CreateContext(TaskId.CreateRoot("mutual-first"));
+        var second = host.CreateContext(TaskId.CreateRoot("mutual-second"));
+        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var beginDependencies = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstDependencyAdded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await first.RegisterCancellationCallbackAsync(async _ =>
+        {
+            firstStarted.SetResult();
+            await beginDependencies.Task;
+            var request = DurableTaskRuntimeHelper.RequestCancellationAsync(second);
+            firstDependencyAdded.SetResult();
+            await request;
+        });
+        await second.RegisterCancellationCallbackAsync(async _ =>
+        {
+            secondStarted.SetResult();
+            await beginDependencies.Task;
+            await firstDependencyAdded.Task;
+            var request = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
+            Assert.True(request.IsCompletedSuccessfully);
+            await request;
+        });
+
+        var firstCancellation = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
+        var secondCancellation = DurableTaskRuntimeHelper.RequestCancellationAsync(second);
+        await Task.WhenAll(firstStarted.Task, secondStarted.Task);
+        beginDependencies.SetResult();
+        await Task.WhenAll(firstCancellation, secondCancellation).WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.True(firstCancellation.IsCompletedSuccessfully);
+        Assert.True(secondCancellation.IsCompletedSuccessfully);
+    }
+
+    [Fact]
+    public async Task ThreeContextCancellationCycleCompletes()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var first = host.CreateContext(TaskId.CreateRoot("cycle-first"));
+        var second = host.CreateContext(TaskId.CreateRoot("cycle-second"));
+        var third = host.CreateContext(TaskId.CreateRoot("cycle-third"));
+        var beginDependencies = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstDependencyAdded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondDependencyAdded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await first.RegisterCancellationCallbackAsync(async _ =>
+        {
+            await beginDependencies.Task;
+            var request = DurableTaskRuntimeHelper.RequestCancellationAsync(second);
+            firstDependencyAdded.SetResult();
+            await request;
+        });
+        await second.RegisterCancellationCallbackAsync(async _ =>
+        {
+            await beginDependencies.Task;
+            await firstDependencyAdded.Task;
+            var request = DurableTaskRuntimeHelper.RequestCancellationAsync(third);
+            secondDependencyAdded.SetResult();
+            await request;
+        });
+        await third.RegisterCancellationCallbackAsync(async _ =>
+        {
+            await beginDependencies.Task;
+            await secondDependencyAdded.Task;
+            var request = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
+            Assert.True(request.IsCompletedSuccessfully);
+            await request;
+        });
+
+        var cancellations = new[]
+        {
+            DurableTaskRuntimeHelper.RequestCancellationAsync(first),
+            DurableTaskRuntimeHelper.RequestCancellationAsync(second),
+            DurableTaskRuntimeHelper.RequestCancellationAsync(third),
+        };
+        beginDependencies.SetResult();
+        await Task.WhenAll(cancellations).WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.All(cancellations, cancellation => Assert.True(cancellation.IsCompletedSuccessfully));
+    }
+
+    [Fact]
+    public async Task AcyclicCrossContextCancellationWaitsAndPropagatesErrors()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var first = host.CreateContext(TaskId.CreateRoot("acyclic-first"));
+        var second = host.CreateContext(TaskId.CreateRoot("acyclic-second"));
+        var secondStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSecond = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var expected = new InvalidOperationException("second failed");
+        await first.RegisterCancellationCallbackAsync(
+            async _ => await DurableTaskRuntimeHelper.RequestCancellationAsync(second));
+        await second.RegisterCancellationCallbackAsync(async _ =>
+        {
+            secondStarted.SetResult();
+            await releaseSecond.Task;
+            throw expected;
+        });
+
+        var cancellation = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
+        await secondStarted.Task;
+
+        Assert.False(cancellation.IsCompleted);
+        releaseSecond.SetResult();
+        var exception = await Assert.ThrowsAsync<AggregateException>(async () => await cancellation);
+        Assert.Contains(expected, exception.Flatten().InnerExceptions);
+    }
+
+    [Fact]
+    public async Task ConcurrentExternalCancellationObserversShareCompletionAndErrors()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot("concurrent-observers"));
+        var callbackStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCallback = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var expected = new InvalidOperationException("observer failure");
+        await context.RegisterCancellationCallbackAsync(async _ =>
+        {
+            callbackStarted.SetResult();
+            await releaseCallback.Task;
+            throw expected;
+        });
+
+        var first = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+        await callbackStarted.Task;
+        var second = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+        var third = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+
+        Assert.Same(first, second);
+        Assert.Same(first, third);
+        Assert.False(first.IsCompleted);
+        releaseCallback.SetResult();
+        foreach (var observer in new[] { first, second, third })
+        {
+            var exception = await Assert.ThrowsAsync<AggregateException>(async () => await observer);
+            Assert.Same(expected, Assert.Single(exception.InnerExceptions));
+        }
+    }
+
+    [Fact]
+    public async Task CancellationCycleDoesNotHideSiblingCallbackErrors()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var first = host.CreateContext(TaskId.CreateRoot("failure-cycle-first"));
+        var second = host.CreateContext(TaskId.CreateRoot("failure-cycle-second"));
+        var beginDependencies = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstDependencyAdded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstFailure = new InvalidOperationException("first sibling failed");
+        var secondFailure = new ArgumentException("second sibling failed");
+        await first.RegisterCancellationCallbackAsync(async _ =>
+        {
+            await beginDependencies.Task;
+            var request = DurableTaskRuntimeHelper.RequestCancellationAsync(second);
+            firstDependencyAdded.SetResult();
+            await request;
+        });
+        await first.RegisterCancellationCallbackAsync(_ => throw firstFailure);
+        await second.RegisterCancellationCallbackAsync(async _ =>
+        {
+            await beginDependencies.Task;
+            await firstDependencyAdded.Task;
+            await DurableTaskRuntimeHelper.RequestCancellationAsync(first);
+        });
+        await second.RegisterCancellationCallbackAsync(_ => throw secondFailure);
+
+        var firstCancellation = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
+        var secondCancellation = DurableTaskRuntimeHelper.RequestCancellationAsync(second);
+        beginDependencies.SetResult();
+        var firstException = await Assert.ThrowsAsync<AggregateException>(
+            async () => await firstCancellation.WaitAsync(TimeSpan.FromSeconds(10)));
+        var secondException = await Assert.ThrowsAsync<AggregateException>(
+            async () => await secondCancellation.WaitAsync(TimeSpan.FromSeconds(10)));
+
+        Assert.Contains(firstFailure, firstException.Flatten().InnerExceptions);
+        Assert.Contains(secondFailure, firstException.Flatten().InnerExceptions);
+        Assert.Contains(secondFailure, secondException.Flatten().InnerExceptions);
+    }
+
+    [Fact]
     public async Task ReentrantCancellationDoesNotHideSiblingCallbackFailure()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
