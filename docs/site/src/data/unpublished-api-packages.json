@@ -1,6 +1,7 @@
 {
   "description": "Generated API assemblies which are not currently published as standalone NuGet packages.",
   "packages": {
-    "Microsoft.Orleans.Journaling.S3": "The new provider is awaiting its first NuGet publication."
+    "Microsoft.Orleans.Journaling.S3": "The new provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.Connections.Security.Entra": "The new connection authentication provider is awaiting its first NuGet publication."
   }
 }

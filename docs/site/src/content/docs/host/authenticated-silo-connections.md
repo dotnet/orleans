@@ -164,7 +164,7 @@ Prefer an explicit <xref:Azure.Core.TokenCredential> appropriate to the hosting
 environment. The maintained sample supplies a `WorkloadIdentityCredential`; it
 doesn't silently use a developer or unrelated cached identity:
 
-:::code language="csharp" source="../../../../../../samples/AuthenticatedSiloConnections/Program.cs" id="ExplicitCredential":::
+:::code language="csharp" source="snippets/authenticated-silo-connections/csharp/ConnectionAuthenticationExamples.cs" id="ExplicitCredential":::
 
 Create the credential once and reuse it. The credential implementation owns its
 token cache.
@@ -178,7 +178,7 @@ public or private roots in the platform trust store and overlap old and new
 roots there during CA rotation. Each silo certificate therefore needs both the
 Server Authentication and Client Authentication EKUs.
 
-:::code language="csharp" source="../../../../../../samples/AuthenticatedSiloConnections/SiloAuthentication.cs" id="AuthenticatedSiloConnections":::
+:::code language="csharp" source="snippets/authenticated-silo-connections/csharp/ConnectionAuthenticationExamples.cs" id="AuthenticatedSiloConnections":::
 
 The configured `TargetHost` must match a DNS SAN and the chain must be valid
 and trusted. Never replace this policy with
@@ -203,11 +203,11 @@ token for outbound silo connections, so it needs both a provider and validator.
 Configure the gateway side on every silo. It validates client tokens before the
 gateway reads the Orleans connection preamble:
 
-:::code language="csharp" source="../../../../../../samples/AuthenticatedSiloConnections/SiloAuthentication.cs" id="AuthenticatedClientGateway":::
+:::code language="csharp" source="snippets/authenticated-silo-connections/csharp/ConnectionAuthenticationExamples.cs" id="AuthenticatedClientGateway":::
 
 Configure each external Orleans client with the corresponding outbound policy:
 
-:::code language="csharp" source="../../../../../../samples/AuthenticatedSiloConnections/ClientAuthentication.cs" id="AuthenticatedClient":::
+:::code language="csharp" source="snippets/authenticated-silo-connections/csharp/ConnectionAuthenticationExamples.cs" id="AuthenticatedClient":::
 
 The client and gateway must use compatible enforcement modes and the same Entra
 audience, tenant, cluster binding, client role, and caller authorization. Keep
@@ -330,7 +330,7 @@ hide a broken credential until token-expiry recycling or a process restart.
 Export the `Microsoft.Orleans.Connections.Security` meter. The maintained
 sample enables an OTLP exporter when `OTEL_EXPORTER_OTLP_ENDPOINT` is set:
 
-:::code language="csharp" source="../../../../../../samples/AuthenticatedSiloConnections/Program.cs" id="FixedDiagnostics":::
+:::code language="csharp" source="snippets/authenticated-silo-connections/csharp/ConnectionAuthenticationExamples.cs" id="FixedDiagnostics":::
 
 Alert on rates and latency for these instruments:
 
