@@ -11,7 +11,6 @@ namespace Orleans.Serialization.Buffers.Adaptors
     {
         private readonly MemoryStream _stream;
         private const int MinRequestSize = 256;
-        private const int MaxArrayLength = 0x7FFFFFC7;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MemoryStreamBufferWriter"/> struct.
@@ -83,7 +82,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
             if (_stream.Capacity < requiredCapacity)
             {
                 requiredCapacity = checked(position + Math.Max(sizeHint, MinRequestSize));
-                var doubledCapacity = Math.Min((long)_stream.Capacity * 2, MaxArrayLength);
+                var doubledCapacity = Math.Min((long)_stream.Capacity * 2, Array.MaxLength);
                 _stream.Capacity = Math.Max(requiredCapacity, (int)doubledCapacity);
             }
 
