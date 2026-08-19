@@ -232,7 +232,7 @@ namespace Orleans.Providers.Streams.Common
             // If nothing in cache, unset token and wait for more data.
             if (IsEmpty)
             {
-                cursor.State = CursorStates.Unset;
+                cursor.State = sequenceToken is null ? CursorStates.Idle : CursorStates.Unset;
                 cursor.SequenceToken = sequenceToken;
                 return;
             }
@@ -242,10 +242,22 @@ namespace Orleans.Providers.Streams.Common
             // if sequenceToken is null, iterate from newest message in cache
             if (sequenceToken == null)
             {
-                cursor.State = CursorStates.Idle;
-                cursor.CurrentBlock = newestBlock;
-                cursor.Index = newestBlock.Value.NewestMessageIndex;
-                cursor.SequenceToken = newestBlock.Value.GetNewestSequenceToken(cacheDataAdapter);
+                if (cursor.State == CursorStates.Idle)
+                {
+                    var waitingOldestBlock = messageBlocks.Last!;
+                    cursor.State = CursorStates.Set;
+                    cursor.CurrentBlock = waitingOldestBlock;
+                    cursor.Index = waitingOldestBlock.Value.OldestMessageIndex;
+                    cursor.SequenceToken = waitingOldestBlock.Value.GetOldestSequenceToken(cacheDataAdapter);
+                }
+                else
+                {
+                    cursor.State = CursorStates.Idle;
+                    cursor.CurrentBlock = newestBlock;
+                    cursor.Index = newestBlock.Value.NewestMessageIndex;
+                    cursor.SequenceToken = newestBlock.Value.GetNewestSequenceToken(cacheDataAdapter);
+                }
+
                 return;
             }
 
@@ -581,7 +593,7 @@ namespace Orleans.Providers.Streams.Common
 
             public CursorStates State;
 
-            // current sequence token; null while Unset (no sequence token has been established yet)
+            // current sequence token; null while waiting for the first message to arrive
             public StreamSequenceToken? SequenceToken;
             public long BlockGeneration;
 
