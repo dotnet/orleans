@@ -17,26 +17,33 @@ public sealed class JournaledGrainParticipantTests(JournaledGrainParticipantFixt
     public async Task DurableGrain_InitializesComposedParticipantsExactlyOnceBeforeRecovery()
     {
         var grain = fixture.Client.GetGrain<IComposedParticipantGrain>(Guid.NewGuid());
+        var beforeFirstActivation = fixture.GetCounts(ComposedParticipantGrain.GrainTypeName);
 
-        Assert.Equal(new[] { 1, 1, 1, 1 }, await grain.GetCounts());
+        var activationId = await grain.GetActivationId();
+        var afterFirstActivation = fixture.GetCounts(ComposedParticipantGrain.GrainTypeName);
+        AssertActivationDelta(beforeFirstActivation, afterFirstActivation);
         await grain.SetValues("one", "two");
         Assert.Equal(new[] { "one", "two" }, await grain.GetValues());
 
-        var activationId = await grain.GetActivationId();
         await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
 
         Assert.NotEqual(activationId, await grain.GetActivationId());
         Assert.Equal(new[] { "one", "two" }, await grain.GetValues());
-        Assert.Equal(new[] { 1, 1, 1, 1 }, await grain.GetCounts());
-        var counts = fixture.GetCounts(ComposedParticipantGrain.GrainTypeName);
-        Assert.Equal(
-            new ParticipantCounts(
-                FirstConstructions: 2,
-                SecondConstructions: 2,
-                FailureConstructions: 2,
-                FirstInitializations: 2,
-                SecondInitializations: 2),
-            counts);
+        AssertActivationDelta(
+            afterFirstActivation,
+            fixture.GetCounts(ComposedParticipantGrain.GrainTypeName));
+
+        static void AssertActivationDelta(ParticipantCounts beforeActivation, ParticipantCounts afterActivation)
+        {
+            Assert.Equal(
+                new ParticipantCounts(
+                    FirstConstructions: 1,
+                    SecondConstructions: 1,
+                    FailureConstructions: 1,
+                    FirstInitializations: 1,
+                    SecondInitializations: 1),
+                afterActivation - beforeActivation);
+        }
     }
 
     [Fact]
@@ -210,12 +217,18 @@ public readonly record struct ParticipantCounts(
             left.FailureConstructions + right.FailureConstructions,
             left.FirstInitializations + right.FirstInitializations,
             left.SecondInitializations + right.SecondInitializations);
+
+    public static ParticipantCounts operator -(ParticipantCounts left, ParticipantCounts right) =>
+        new(
+            left.FirstConstructions - right.FirstConstructions,
+            left.SecondConstructions - right.SecondConstructions,
+            left.FailureConstructions - right.FailureConstructions,
+            left.FirstInitializations - right.FirstInitializations,
+            left.SecondInitializations - right.SecondInitializations);
 }
 
 [GrainType(GrainTypeName)]
-public sealed class ComposedParticipantGrain(
-    IGrainContext grainContext,
-    ParticipantRecorder recorder) : DurableGrain, IComposedParticipantGrain
+public sealed class ComposedParticipantGrain : DurableGrain, IComposedParticipantGrain
 {
     public const string GrainTypeName = "journaling-composed-participant";
     private readonly Guid _activationId = Guid.NewGuid();
@@ -231,18 +244,6 @@ public sealed class ComposedParticipantGrain(
         Task.FromResult(new[] { GetValue("participant-one").Value!, GetValue("participant-two").Value! });
 
     public Task<Guid> GetActivationId() => Task.FromResult(_activationId);
-
-    public Task<int[]> GetCounts()
-    {
-        var counts = recorder.GetCounts(grainContext.GrainId.Type.ToString());
-        return Task.FromResult(new[]
-        {
-            counts.FirstConstructions,
-            counts.SecondConstructions,
-            counts.FirstInitializations,
-            counts.SecondInitializations
-        });
-    }
 
     private IDurableValue<string> GetValue(string name)
     {
@@ -291,7 +292,6 @@ public interface IComposedParticipantGrain : IGrainWithGuidKey
 {
     Task SetValues(string first, string second);
     Task<string[]> GetValues();
-    Task<int[]> GetCounts();
     Task<Guid> GetActivationId();
 }
 
