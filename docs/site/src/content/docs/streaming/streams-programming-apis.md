@@ -82,7 +82,7 @@ This lifecycle is durable across cluster restarts only when the configured [`Pub
 
 #### End an explicit subscription
 
-End a subscription in a regular grain method. Await <xref:Orleans.Streams.StreamSubscriptionHandle`1.UnsubscribeAsync*> for every handle so that the streaming runtime removes the subscription from pub/sub storage and notifies active producers before the method returns. The example's `UnsubscribeAsync` method follows this sequence.
+End a subscription in a regular grain method while the activation is active, before deactivation starts. Await <xref:Orleans.Streams.StreamSubscriptionHandle`1.UnsubscribeAsync*> for every handle so that the streaming runtime removes the subscription from pub/sub storage and notifies active producers before the method returns. Use <xref:Orleans.Grain.OnDeactivateAsync*> for activation-local cleanup after deactivation begins. After the unsubscribe method returns, the activation follows its normal lifecycle and Orleans cleans it up as usual. The example's `UnsubscribeAsync` method follows this sequence.
 
 ### Implicit subscriptions
 
