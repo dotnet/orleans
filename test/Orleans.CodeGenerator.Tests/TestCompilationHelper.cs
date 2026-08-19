@@ -14,6 +14,9 @@ namespace Orleans.CodeGenerator.Tests;
 /// </summary>
 internal static class TestCompilationHelper
 {
+    private static readonly StringComparer PathComparer = OperatingSystem.IsWindows()
+        ? StringComparer.OrdinalIgnoreCase
+        : StringComparer.Ordinal;
     private static readonly ImmutableArray<MetadataReference> FrameworkReferences = CreateFrameworkReferences();
 
     /// <summary>
@@ -49,12 +52,39 @@ internal static class TestCompilationHelper
     {
         var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")
             ?? throw new InvalidOperationException("The test host must provide trusted platform assemblies.");
-        var frameworkDirectory = Path.GetDirectoryName(typeof(object).Assembly.Location);
 
-        return trustedPlatformAssemblies
-            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
-            .Where(path => Path.GetDirectoryName(path) == frameworkDirectory)
+        return GetFrameworkAssemblyPaths(trustedPlatformAssemblies, typeof(object).Assembly.Location)
             .Select(static path => (MetadataReference)MetadataReference.CreateFromFile(path))
             .ToImmutableArray();
+    }
+
+    internal static ImmutableArray<string> GetFrameworkAssemblyPaths(
+        string trustedPlatformAssemblies,
+        string frameworkAssemblyPath)
+    {
+        if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
+        {
+            throw new InvalidOperationException("The test host must provide trusted platform assemblies.");
+        }
+
+        var frameworkDirectory = Path.GetDirectoryName(frameworkAssemblyPath);
+        if (string.IsNullOrWhiteSpace(frameworkDirectory))
+        {
+            throw new InvalidOperationException("The test host framework directory must be available.");
+        }
+
+        frameworkDirectory = Path.GetFullPath(frameworkDirectory);
+        var frameworkAssemblyPaths = trustedPlatformAssemblies
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+            .Where(path => PathComparer.Equals(Path.GetDirectoryName(Path.GetFullPath(path)), frameworkDirectory))
+            .ToImmutableArray();
+
+        if (frameworkAssemblyPaths.IsEmpty)
+        {
+            throw new InvalidOperationException(
+                $"The trusted platform assemblies must include references from '{frameworkDirectory}'.");
+        }
+
+        return frameworkAssemblyPaths;
     }
 }
