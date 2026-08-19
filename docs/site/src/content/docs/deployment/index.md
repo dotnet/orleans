@@ -42,6 +42,7 @@ For an existing application, use the walkthrough as a sequence:
 Use these articles together:
 
 1. [Production-readiness checklist](production-readiness.md) - Review the decisions required before launch.
+1. [Operate a production cluster](production-operations.md) - Control configuration, perform maintenance, exercise recovery, and maintain runbooks.
 1. [Topology and networking](networking.md) - Configure listening and advertised endpoints, firewalls, and clustering.
 1. [Health and observability](health-and-observability.md) - Design startup, readiness, liveness, dependency health, telemetry, and alerts.
 1. [Graceful shutdown and upgrades](upgrades.md) - Drain instances, scale in, and perform rolling or blue-green releases.

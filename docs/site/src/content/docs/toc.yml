@@ -263,6 +263,8 @@ items:
         href: deployment/index.md
       - name: Production-readiness checklist
         href: deployment/production-readiness.md
+      - name: Operate a production cluster
+        href: deployment/production-operations.md
       - name: Topology, networking, and clustering
         href: deployment/networking.md
       - name: Run containers across multiple hosts
