@@ -436,6 +436,13 @@ namespace UnitTests.StorageTests
             await CheckResult(x => x.GetAlt(), grainReference);
         }
 
+        [Fact]
+        public void GrainReferenceJsonConverterRejectsMismatchedInterface()
+        {
+            var grainReference = _testCluster.Client.GetGrain<IReferenceTesterGrain>(Guid.NewGuid()).AsReference<IAdditionalInterface>();
+            Assert.Throws<JsonException>(() => _systemTextJson.Deserialize<IReferenceTesterGrain>(_systemTextJson.Serialize(grainReference)));
+        }
+
         private void AssertGrainReferenceJson(IAddressable grainReference)
         {
             var reference = grainReference.AsReference();

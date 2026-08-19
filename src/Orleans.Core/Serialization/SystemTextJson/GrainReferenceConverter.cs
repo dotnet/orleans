@@ -42,7 +42,13 @@ namespace Orleans.Serialization
             }
 
             var grainInterface = string.IsNullOrEmpty(interfaceType) ? default : GrainInterfaceType.Create(interfaceType);
-            return referenceActivator.CreateReference(grainId, grainInterface);
+            var reference = referenceActivator.CreateReference(grainId, grainInterface);
+            if (!typeToConvert.IsInstanceOfType(reference))
+            {
+                throw new JsonException($"Cannot deserialize a grain reference with interface type '{grainInterface}' as {typeToConvert}.");
+            }
+
+            return reference;
         }
 
         /// <inheritdoc />
