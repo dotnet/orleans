@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Azure.Data.Tables" />
+    <PackageReference Include="Aspire.Azure.Storage.Blobs" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" />
+    <PackageReference Include="Microsoft.Orleans.Server" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OrleansApp.Grains\OrleansApp.Grains.csproj" />
+  </ItemGroup>
+</Project>

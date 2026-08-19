@@ -1,7 +1,7 @@
 ---
 title: 'Tutorial: Build your first Orleans app'
 description: Build a multi-project Orleans application with a silo and external client.
-ms.date: 08/08/2026
+ms.date: 08/18/2026
 ms.topic: tutorial
 ms.devlang: csharp
 ---
@@ -18,7 +18,7 @@ You learn how to:
 - Obtain a grain reference and call it.
 - Structure project references so that clients depend on contracts, not implementations.
 
-The example uses localhost clustering and omits production concerns such as durable storage, authentication, observability, and application-level retry policies.
+The manual walkthrough uses localhost clustering and transient in-memory state so that the silo and client can run directly from two terminals.
 
 ## Prerequisites
 
@@ -28,12 +28,21 @@ The example uses localhost clustering and omits production concerns such as dura
 
 ## Create the solution
 
-Create a solution with four projects:
+Create a solution with four Orleans projects:
 
 - **GrainInterfaces** contains grain contracts shared by callers and implementations.
 - **Grains** contains the grain implementations.
 - **Silo** hosts the Orleans runtime and grain activations.
 - **Client** is an external process that connects to the silo and calls grains.
+
+The `Microsoft.Orleans.Templates` package creates the same Orleans project boundaries and adds an Aspire AppHost. The generated application uses Azurite-backed Azure Table clustering and Azure Blob grain storage instead of the manual walkthrough's localhost configuration. A running container runtime lets the AppHost start Azurite:
+
+```dotnetcli
+dotnet new install Microsoft.Orleans.Templates
+dotnet new orleans --name OrleansHelloWorld --output OrleansHelloWorld
+```
+
+Continue with the manual steps below to learn how the projects and references fit together.
 
 Run the following commands in an empty directory:
 

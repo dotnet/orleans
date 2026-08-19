@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>Microsoft.Orleans.Templates</PackageId>
+    <Title>Microsoft Orleans project templates</Title>
+    <Description>Official project and solution templates for building Microsoft Orleans applications.</Description>
+    <PackageTags>$(PackageTags) dotnet-new templates</PackageTags>
+    <PackageType>Template</PackageType>
+    <IsPackable>true</IsPackable>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeSymbols>false</IncludeSymbols>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <ContentTargetFolders>content</ContentTargetFolders>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="templates\**\*" />
+    <Content Include="templates\**\*" Exclude="templates\**\bin\**;templates\**\obj\**" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

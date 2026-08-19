@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Microsoft",
+  "classifications": [
+    "Cloud",
+    "Distributed Systems",
+    "Orleans",
+    "Web"
+  ],
+  "identity": "Microsoft.Orleans.Templates.Web.CSharp",
+  "groupIdentity": "Microsoft.Orleans.Templates.Web",
+  "name": "Orleans ASP.NET Core application",
+  "shortName": "orleans-web",
+  "defaultName": "OrleansWebApp",
+  "sourceName": "OrleansWebApp",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "symbols": {
+    "framework": {
+      "type": "parameter",
+      "datatype": "choice",
+      "description": "The target framework for the generated project.",
+      "defaultValue": "net10.0",
+      "replaces": "net10.0",
+      "choices": [
+        {
+          "choice": "net10.0",
+          "description": "Target .NET 10."
+        },
+        {
+          "choice": "net8.0",
+          "description": "Target .NET 8."
+        }
+      ]
+    },
+    "orleansVersion": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "The Microsoft Orleans package version.",
+      "defaultValue": "10.2.2"
+    },
+    "orleansVersionXml": {
+      "type": "derived",
+      "valueSource": "orleansVersion",
+      "valueTransform": "xmlEncode",
+      "replaces": "__ORLEANS_VERSION__"
+    },
+    "skipRestore": {
+      "type": "parameter",
+      "datatype": "bool",
+      "description": "Skip automatic package restore.",
+      "defaultValue": "false"
+    }
+  },
+  "primaryOutputs": [
+    {
+      "path": "OrleansWebApp.csproj"
+    }
+  ],
+  "postActions": [
+    {
+      "id": "restore",
+      "condition": "(!skipRestore)",
+      "description": "Restore NuGet packages required by this project.",
+      "manualInstructions": [
+        {
+          "text": "Run 'dotnet restore'."
+        }
+      ],
+      "actionId": "210D431B-A78B-4D2F-B762-4ED3E3EA9025",
+      "args": {
+        "files": "OrleansWebApp.csproj"
+      },
+      "continueOnError": true
+    }
+  ]
+}

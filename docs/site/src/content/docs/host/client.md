@@ -1,7 +1,7 @@
 ---
 title: Orleans clients
 description: Choose and host an Orleans client.
-ms.date: 08/02/2026
+ms.date: 08/18/2026
 ms.topic: concept-article
 ---
 
@@ -27,6 +27,26 @@ Start with a co-hosted client unless isolation is a requirement.
 :::code language="csharp" source="snippets/hosting/HostingExamples.cs" id="local_silo_and_client":::
 
 Calls from a co-hosted client use the silo's cluster knowledge and don't require a gateway. If the target activation is local, Orleans can also avoid a network hop.
+
+### Call grains from ASP.NET Core
+
+The `orleans-web` template creates an ASP.NET Core app which co-hosts a silo and exposes a grain through an HTTP endpoint:
+
+```dotnetcli
+dotnet new install Microsoft.Orleans.Templates
+dotnet new orleans-web --name HelloOrleans --output HelloOrleans
+dotnet run --project HelloOrleans/HelloOrleans.csproj
+```
+
+Call the endpoint from another terminal:
+
+```console
+curl http://localhost:5000/hello/Ada
+```
+
+The endpoint returns `Hello, Ada!`. ASP.NET Core resolves <xref:Orleans.IGrainFactory> from dependency injection, the endpoint obtains the grain reference keyed by `Ada`, and Orleans activates the grain when the request invokes it.
+
+The generated app uses localhost clustering for a one-node development cluster. For a multi-silo deployment, configure [shared clustering and storage providers](configuration-guide/typical-configurations.md) and apply the [production-readiness checklist](../deployment/production-readiness.md).
 
 ## External clients
 

@@ -1,0 +1,22 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <AspireVersion>__ASPIRE_VERSION__</AspireVersion>
+    <OrleansVersion>__ORLEANS_VERSION__</OrleansVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageVersion Include="Aspire.Azure.Data.Tables" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Hosting.Orleans" Version="$(AspireVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Orleans.Client" Version="$(OrleansVersion)" />
+    <PackageVersion Include="Microsoft.Orleans.Clustering.AzureStorage" Version="$(OrleansVersion)" />
+    <PackageVersion Include="Microsoft.Orleans.Persistence.AzureStorage" Version="$(OrleansVersion)" />
+    <PackageVersion Include="Microsoft.Orleans.Runtime" Version="$(OrleansVersion)" />
+    <PackageVersion Include="Microsoft.Orleans.Sdk" Version="$(OrleansVersion)" />
+    <PackageVersion Include="Microsoft.Orleans.Server" Version="$(OrleansVersion)" />
+  </ItemGroup>
+</Project>
