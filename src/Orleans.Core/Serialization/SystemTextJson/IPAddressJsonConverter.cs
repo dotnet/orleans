@@ -47,6 +47,11 @@ namespace Orleans.Serialization
 
         private static IPAddress Parse(ref Utf8JsonReader reader)
         {
+            if (reader.TokenType is not JsonTokenType.String and not JsonTokenType.PropertyName)
+            {
+                throw new JsonException($"Could not deserialize {nameof(IPAddress)}.");
+            }
+
             var valueLength = reader.HasValueSequence
                 ? checked((int)reader.ValueSequence.Length)
                 : reader.ValueSpan.Length;

@@ -206,6 +206,14 @@ namespace UnitTests.StorageTests
             AssertDictionaryKey(extendedKey.ToHexString(), extendedKey);
         }
 
+        [Fact]
+        public void ScalarStringConvertersRejectNonStringTokens()
+        {
+            Assert.Throws<JsonException>(() => _systemTextJson.Deserialize<IPAddress>(BinaryData.FromString("42")));
+            Assert.Throws<JsonException>(() => _systemTextJson.Deserialize<IPEndPoint>(BinaryData.FromString("42")));
+            Assert.Throws<JsonException>(() => _systemTextJson.Deserialize<UniqueKey>(BinaryData.FromString("42")));
+        }
+
         [Theory]
         [InlineData("192.168.100.228:443")]
         [InlineData("192.168.100.228:0")]

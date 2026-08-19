@@ -26,6 +26,11 @@ namespace Orleans.Serialization
 
         private static IPEndPoint Parse(ref Utf8JsonReader reader)
         {
+            if (reader.TokenType is not JsonTokenType.String and not JsonTokenType.PropertyName)
+            {
+                throw new JsonException($"Could not deserialize {nameof(IPEndPoint)}.");
+            }
+
             var valueLength = reader.HasValueSequence
                 ? checked((int)reader.ValueSequence.Length)
                 : reader.ValueSpan.Length;

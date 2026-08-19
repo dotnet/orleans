@@ -368,6 +368,11 @@ namespace Orleans.Runtime
 
         private static UniqueKey? GetUniqueKey(ref Utf8JsonReader reader, scoped Span<char> buffer)
         {
+            if (reader.TokenType is not JsonTokenType.String and not JsonTokenType.PropertyName)
+            {
+                throw new JsonException($"Could not deserialize {nameof(UniqueKey)}.");
+            }
+
             if (reader.HasValueSequence)
             {
                 var valueLength = checked((int)reader.ValueSequence.Length);
