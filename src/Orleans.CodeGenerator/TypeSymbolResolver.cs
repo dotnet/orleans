@@ -78,6 +78,15 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
         return false;
     }
 
+    public bool TryResolveType(
+        TypeRef type,
+        CancellationToken cancellationToken,
+        [NotNullWhen(true)] out INamedTypeSymbol? symbol)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return TryResolveTypeSyntax(type.SyntaxString, cancellationToken, out symbol);
+    }
+
     private bool TryResolveMetadataIdentity(
         TypeMetadataIdentity metadataIdentity,
         CancellationToken cancellationToken,
