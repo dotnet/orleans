@@ -44,6 +44,53 @@ for (const requiredFile of ['llms.txt', 'llms-small.txt', 'llms-full.txt']) {
   }
 }
 
+const llmsEntryPoint = path.join(distRoot, 'llms.txt');
+if (files.includes(llmsEntryPoint)) {
+  const llmsText = await readFile(llmsEntryPoint, 'utf8');
+  const markdownPageExample =
+    'https://dotnet.github.io/orleans/docs/implementation/streams-implementation.md';
+  if (!llmsText.includes('Replace the trailing `/` in a page URL with `.md`')) {
+    fail(llmsEntryPoint, 'missing per-page Markdown URL guidance');
+  }
+  if (!llmsText.includes(markdownPageExample)) {
+    fail(llmsEntryPoint, 'missing per-page Markdown URL example');
+  }
+  if (!llmsText.includes('## Documentation Overview')) {
+    fail(llmsEntryPoint, 'missing conceptual documentation overview');
+  }
+  const overview = llmsText.split('## Documentation Overview\n\n')[1] ?? '';
+  if (/\/orleans\/docs\/api\//.test(overview)) {
+    fail(llmsEntryPoint, 'documentation overview includes API reference pages');
+  }
+  const overviewUrls = [
+    ...overview.matchAll(/\/orleans\/docs\/([^)\s]+)\.md/g),
+  ].map((match) => match[1]);
+  if (overviewUrls.some((url) => url.split('/').length > 3)) {
+    fail(llmsEntryPoint, 'documentation overview includes pages below the third level');
+  }
+  const overviewUrlSet = new Set(overviewUrls);
+  for (const url of overviewUrls) {
+    const segments = url.split('/');
+    if (segments.length === 3) {
+      const parentUrl = segments.slice(0, -1).join('/');
+      if (!overviewUrlSet.has(parentUrl)) {
+        fail(llmsEntryPoint, `third-level overview entry '${url}' has no parent hub`);
+      }
+      continue;
+    }
+
+    const overviewDirectory = path.join(distRoot, 'docs', ...url.split('/'));
+    try {
+      const children = await readdir(overviewDirectory, { withFileTypes: true });
+      if (!children.some((entry) => entry.isFile() && entry.name.endsWith('.md'))) {
+        fail(llmsEntryPoint, `documentation overview entry '${url}' is not a hub page`);
+      }
+    } catch {
+      fail(llmsEntryPoint, `documentation overview entry '${url}' is not a hub page`);
+    }
+  }
+}
+
 if (totalBytes > maxPublishedBytes) {
   failures.push(`Published site is ${(totalBytes / 1024 / 1024).toFixed(1)} MiB; limit is 1024 MiB.`);
 }
@@ -123,6 +170,13 @@ for (const file of renderedMarkdown) {
     if (pattern.test(markdown)) {
       fail(file, description);
     }
+  }
+  if (
+    /\]\((?:https:\/\/dotnet\.github\.io)?\/orleans\/docs\/[^)\s]*\/(?:[?#][^)]*)?\)/.test(
+      markdown,
+    )
+  ) {
+    fail(file, 'documentation link points to HTML instead of Markdown');
   }
 }
 

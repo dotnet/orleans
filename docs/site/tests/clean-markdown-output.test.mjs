@@ -6,6 +6,7 @@ import { afterEach, describe, test } from 'vitest';
 import {
   cleanMarkdownOutputDirectory,
   cleanPublishedMarkdown,
+  publishMarkdownOverview,
 } from '../src/plugins/clean-markdown-output.mjs';
 
 const temporaryDirectories = [];
@@ -23,6 +24,10 @@ title: Orleans clients
 description: Choose and host an Orleans client.
 ---
 
+[Client configuration](/orleans/docs/host/configuration-guide/client-configuration/)
+[Streams](https://dotnet.github.io/orleans/docs/streaming/#providers)
+[External](https://learn.microsoft.com/dotnet/)
+
 {/* Source: snippets/HostingExamples.cs; region: local_silo_and_client */}
 \`\`\`csharp
 builder.UseOrleans();
@@ -33,6 +38,15 @@ builder.UseOrleans();
 
     assert.match(markdown, /^# Orleans clients/m);
     assert.match(markdown, /builder\.UseOrleans\(\);/);
+    assert.match(
+      markdown,
+      /\[Client configuration\]\(\/orleans\/docs\/host\/configuration-guide\/client-configuration\.md\)/,
+    );
+    assert.match(
+      markdown,
+      /\[Streams\]\(https:\/\/dotnet\.github\.io\/orleans\/docs\/streaming\.md#providers\)/,
+    );
+    assert.match(markdown, /\[External\]\(https:\/\/learn\.microsoft\.com\/dotnet\/\)/);
     assert.doesNotMatch(markdown, /^---$/m);
     assert.doesNotMatch(markdown, /\{\/\*/);
   });
@@ -50,5 +64,51 @@ builder.UseOrleans();
     assert.equal(await cleanMarkdownOutputDirectory(outputRoot), 1);
     assert.equal(await readFile(conceptual, 'utf8'), '# Orleans clients\n\nContent');
     assert.equal(await readFile(api, 'utf8'), '# API\n');
+  });
+
+  test('adds a three-level conceptual overview to llms.txt', async () => {
+    const outputRoot = await mkdtemp(path.join(os.tmpdir(), 'orleans-docs-overview-'));
+    temporaryDirectories.push(outputRoot);
+    const docsIndex = path.join(outputRoot, 'docs.md');
+    const grains = path.join(outputRoot, 'docs', 'grains.md');
+    const eventSourcing = path.join(outputRoot, 'docs', 'grains', 'event-sourcing.md');
+    const details = path.join(outputRoot, 'docs', 'grains', 'event-sourcing', 'details.md');
+    const grainIdentity = path.join(outputRoot, 'docs', 'grains', 'grain-identity.md');
+    const api = path.join(outputRoot, 'docs', 'api', 'csharp.md');
+    await mkdir(path.dirname(grains), { recursive: true });
+    await mkdir(path.dirname(eventSourcing), { recursive: true });
+    await mkdir(path.dirname(details), { recursive: true });
+    await mkdir(path.dirname(api), { recursive: true });
+    await writeFile(docsIndex, '# Orleans documentation\n');
+    await writeFile(grains, '# Grains\n');
+    await writeFile(eventSourcing, '# Event sourcing\n');
+    await writeFile(details, '# Event sourcing details\n');
+    await writeFile(grainIdentity, '# Grain identity\n');
+    await writeFile(api, '# API\n');
+    await writeFile(path.join(outputRoot, 'llms.txt'), '# Microsoft Orleans\n');
+
+    assert.equal(
+      await publishMarkdownOverview(outputRoot, new URL('https://dotnet.github.io/orleans/')),
+      4,
+    );
+    const llmsText = await readFile(path.join(outputRoot, 'llms.txt'), 'utf8');
+    assert.match(llmsText, /## Documentation Overview/);
+    assert.match(
+      llmsText,
+      /- \[Orleans documentation\]\(\/orleans\/docs\.md\)/,
+    );
+    assert.match(
+      llmsText,
+      /  - \[Grains\]\(\/orleans\/docs\/grains\.md\)/,
+    );
+    assert.match(
+      llmsText,
+      /    - \[Event sourcing\]\(\/orleans\/docs\/grains\/event-sourcing\.md\)/,
+    );
+    assert.match(
+      llmsText,
+      /      - \[Event sourcing details\]\(\/orleans\/docs\/grains\/event-sourcing\/details\.md\)/,
+    );
+    assert.doesNotMatch(llmsText, /Grain identity|\[API\]/);
   });
 });
