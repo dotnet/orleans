@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using Orleans.DurableTasks;
 using Xunit;
 
@@ -34,6 +35,30 @@ public class DurableTaskTests
             Assert.Same(context, DurableExecutionContext.Current);
             return 42;
         }
+    }
+
+    [Fact]
+    public void DefaultNonGenericBuilderOperationsRequireStart()
+    {
+        var builder = default(DurableTaskMethodBuilder);
+
+        AssertBuilderNotStarted(() => _ = builder.Task);
+        AssertBuilderNotStarted(() => builder.SetException(new InvalidOperationException()));
+        AssertBuilderNotStarted(() => builder.SetResult());
+        AssertBuilderNotStarted(() => AwaitOnCompleted(builder));
+        AssertBuilderNotStarted(() => AwaitUnsafeOnCompleted(builder));
+    }
+
+    [Fact]
+    public void DefaultGenericBuilderOperationsRequireStart()
+    {
+        var builder = default(DurableTaskMethodBuilder<int>);
+
+        AssertBuilderNotStarted(() => _ = builder.Task);
+        AssertBuilderNotStarted(() => builder.SetException(new InvalidOperationException()));
+        AssertBuilderNotStarted(() => builder.SetResult(42));
+        AssertBuilderNotStarted(() => AwaitOnCompleted(builder));
+        AssertBuilderNotStarted(() => AwaitUnsafeOnCompleted(builder));
     }
 
     [Fact]
@@ -1088,6 +1113,46 @@ public class DurableTaskTests
         Assert.Equal(kind, response.ResponseKind);
         Assert.Equal(status, response.Status);
         Assert.Equal(completed, response.IsCompleted);
+    }
+
+    private static void AssertBuilderNotStarted(Action action)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(action);
+        Assert.Equal("The durable task builder has not started.", exception.Message);
+    }
+
+    private static void AwaitOnCompleted(DurableTaskMethodBuilder builder)
+    {
+        var awaiter = Task.CompletedTask.GetAwaiter();
+        var stateMachine = default(NoopStateMachine);
+        builder.AwaitOnCompleted(ref awaiter, ref stateMachine);
+    }
+
+    private static void AwaitUnsafeOnCompleted(DurableTaskMethodBuilder builder)
+    {
+        var awaiter = Task.CompletedTask.GetAwaiter();
+        var stateMachine = default(NoopStateMachine);
+        builder.AwaitUnsafeOnCompleted(ref awaiter, ref stateMachine);
+    }
+
+    private static void AwaitOnCompleted(DurableTaskMethodBuilder<int> builder)
+    {
+        var awaiter = Task.CompletedTask.GetAwaiter();
+        var stateMachine = default(NoopStateMachine);
+        builder.AwaitOnCompleted(ref awaiter, ref stateMachine);
+    }
+
+    private static void AwaitUnsafeOnCompleted(DurableTaskMethodBuilder<int> builder)
+    {
+        var awaiter = Task.CompletedTask.GetAwaiter();
+        var stateMachine = default(NoopStateMachine);
+        builder.AwaitUnsafeOnCompleted(ref awaiter, ref stateMachine);
+    }
+
+    private struct NoopStateMachine : IAsyncStateMachine
+    {
+        public void MoveNext() { }
+        public void SetStateMachine(IAsyncStateMachine stateMachine) { }
     }
 
     private sealed class RecordingSynchronizationContext : SynchronizationContext
