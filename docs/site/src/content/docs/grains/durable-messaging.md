@@ -39,7 +39,8 @@ Durable Messaging has the following boundaries:
 - The receiver deduplicates by `(SenderId, MessageId)`. Duplicate deliveries converge
   on one set of handler effects while that deduplication record is retained. After
   <xref:Orleans.DurableMessaging.Configuration.DurableInboxOptions.DeduplicationWindow>
-  expires and compaction runs, the same envelope can be processed again.
+  expires, the same envelope can be accepted and processed again. The expired record and
+  replay acceptance are committed atomically.
 - Delivery is **unordered**. Inbox and outbox storage are dictionaries, and retries can
   reorder envelopes. Applications which require ordering must carry sequence numbers
   and make their handlers converge on application-defined order.

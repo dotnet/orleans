@@ -131,9 +131,11 @@ internal sealed class DurableInbox : IDurableInbox
         ArgumentException.ThrowIfNullOrWhiteSpace(routeKey);
         ArgumentNullException.ThrowIfNull(handler);
 
-        _exactRouteHandlers[routeKey] = handler;
+        if (!_exactRouteHandlers.TryAdd(routeKey, handler))
+        {
+            throw new InvalidOperationException($"A handler is already registered for exact route '{routeKey}'.");
+        }
 
-        // Wrap in a RouteKeyHandler and add to new handlers list
         var wrappedHandler = new ExactRouteKeyHandlerWrapper(routeKey, handler);
         _handlers.Add(wrappedHandler);
 
