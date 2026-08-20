@@ -1195,70 +1195,6 @@ namespace Orleans
         protected virtual System.Threading.Tasks.Task WriteStateAsync() { throw null; }
     }
 
-    [GenerateSerializer]
-    [Immutable]
-    public sealed partial class HierarchicalKey : System.ISpanFormattable, System.IFormattable, System.IEquatable<HierarchicalKey>, System.IParsable<HierarchicalKey>, System.ISpanParsable<HierarchicalKey>
-    {
-        internal HierarchicalKey() { }
-
-        public const char EscapeCharacter = '\\';
-        public const char SegmentSeparator = '/';
-        public int Length { get { throw null; } }
-
-        public static HierarchicalKey Create(HierarchicalKey? parent, string value) { throw null; }
-
-        public static HierarchicalKey Create(string value) { throw null; }
-
-        public HierarchicalKey CreateChildKey(string value) { throw null; }
-
-        public static HierarchicalKey CreateEscaped(HierarchicalKey? parent, System.ReadOnlyMemory<char> value) { throw null; }
-
-        public static HierarchicalKey CreateEscaped(string value) { throw null; }
-
-        public HierarchicalKey CreateEscapedChildKey(string value) { throw null; }
-
-        public bool Equals(HierarchicalKey? other) { throw null; }
-
-        public override bool Equals(object? obj) { throw null; }
-
-        public SegmentEnumerator GetEnumerator() { throw null; }
-
-        public override int GetHashCode() { throw null; }
-
-        public HierarchicalKey? GetParent() { throw null; }
-
-        public bool IsAncestorOf(HierarchicalKey? other) { throw null; }
-
-        public bool IsChildOf(HierarchicalKey? other) { throw null; }
-
-        public bool IsParentOf(HierarchicalKey? other) { throw null; }
-
-        static HierarchicalKey System.ISpanParsable<HierarchicalKey>.Parse(System.ReadOnlySpan<char> s, System.IFormatProvider? provider) { throw null; }
-
-        static HierarchicalKey System.IParsable<HierarchicalKey>.Parse(string s, System.IFormatProvider? provider) { throw null; }
-
-        public override string ToString() { throw null; }
-
-        public string ToString(string? format, System.IFormatProvider? formatProvider) { throw null; }
-
-        public bool TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
-
-        static bool System.ISpanParsable<HierarchicalKey>.TryParse(System.ReadOnlySpan<char> s, System.IFormatProvider? provider, out HierarchicalKey result) { throw null; }
-
-        static bool System.IParsable<HierarchicalKey>.TryParse(string? s, System.IFormatProvider? provider, out HierarchicalKey result) { throw null; }
-
-        public ref partial struct SegmentEnumerator
-        {
-            private object _dummy;
-            private int _dummyPrimitive;
-            public SegmentEnumerator(HierarchicalKey id) { }
-
-            public System.ReadOnlySpan<char> Current { get { throw null; } }
-
-            public bool MoveNext() { throw null; }
-        }
-    }
-
     public partial interface IConfigurationValidator
     {
         void ValidateConfiguration();
@@ -3530,24 +3466,6 @@ namespace OrleansCodeGen.Orleans
         public global::Orleans.DeactivationReasonCode ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
 
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.DeactivationReasonCode value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_HierarchicalKey : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.HierarchicalKey>, global::Orleans.Serialization.Codecs.IFieldCodec
-    {
-        public Codec_HierarchicalKey(global::Orleans.Serialization.Activators.IActivator<global::Orleans.HierarchicalKey> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.HierarchicalKey instance) { }
-
-        public global::Orleans.HierarchicalKey ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.HierarchicalKey instance)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.HierarchicalKey value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 }
