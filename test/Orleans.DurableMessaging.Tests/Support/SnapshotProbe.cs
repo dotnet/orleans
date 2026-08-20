@@ -8,6 +8,8 @@ public sealed class SnapshotProbe
     private readonly ConcurrentDictionary<GrainId, DurableEndpointSnapshot> _latest = new();
     private readonly ConcurrentDictionary<GrainId, List<Waiter>> _waiters = new();
 
+    internal int WaiterListCount => _waiters.Count;
+
     public async Task<DurableEndpointSnapshot> WaitAsync(
         GrainId grainId,
         Func<DurableEndpointSnapshot, bool> predicate,
@@ -19,15 +21,27 @@ public sealed class SnapshotProbe
         }
 
         var waiter = new Waiter(predicate);
-        var waiters = _waiters.GetOrAdd(grainId, static _ => []);
-        lock (waiters)
+        List<Waiter> waiters;
+        while (true)
         {
-            if (_latest.TryGetValue(grainId, out current) && predicate(current))
+            waiters = _waiters.GetOrAdd(grainId, static _ => []);
+            lock (waiters)
             {
-                return current;
-            }
+                if (!_waiters.TryGetValue(grainId, out var currentWaiters)
+                    || !ReferenceEquals(waiters, currentWaiters))
+                {
+                    continue;
+                }
 
-            waiters.Add(waiter);
+                if (_latest.TryGetValue(grainId, out current) && predicate(current))
+                {
+                    RemoveWaiterListIfEmpty(grainId, waiters);
+                    return current;
+                }
+
+                waiters.Add(waiter);
+                break;
+            }
         }
 
         try
@@ -39,6 +53,7 @@ public sealed class SnapshotProbe
             lock (waiters)
             {
                 waiters.Remove(waiter);
+                RemoveWaiterListIfEmpty(grainId, waiters);
             }
         }
     }
@@ -61,6 +76,14 @@ public sealed class SnapshotProbe
                     waiter.Completion.TrySetResult(snapshot);
                 }
             }
+        }
+    }
+
+    private void RemoveWaiterListIfEmpty(GrainId grainId, List<Waiter> waiters)
+    {
+        if (waiters.Count == 0)
+        {
+            _waiters.TryRemove(new KeyValuePair<GrainId, List<Waiter>>(grainId, waiters));
         }
     }
 
