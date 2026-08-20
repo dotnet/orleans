@@ -50,19 +50,18 @@ public abstract class DurableExecutionContext
     /// Gets the durable cancellation token for this execution.
     /// </summary>
     /// <remarks>
-    /// Registrations on this token are ordinary synchronous .NET cancellation observers and follow
-    /// standard registration-time <see cref="ExecutionContext"/> and <see cref="SynchronizationContext"/>
-    /// behavior. A callback registered outside a durable cancellation callback is an external observer.
-    /// A callback registered inside an active durable cancellation callback inherits that callback's
-    /// cancellation-operation causality unless execution-context flow is suppressed or an unsafe
-    /// registration API is used.
+    /// Registrations on this token are ordinary synchronous .NET cleanup observers only. They follow
+    /// standard <see cref="CancellationToken"/> behavior, including registration-time
+    /// <see cref="ExecutionContext"/> capture, optional <see cref="SynchronizationContext"/> dispatch,
+    /// and current execution-context behavior for unsafe registrations.
     ///
     /// <para>
-    /// Regardless of inherited causality, these observers must return promptly and must not
-    /// synchronously wait for <see cref="DurableTaskRuntimeHelper.RequestCancellationAsync"/> or
-    /// another durable cancellation operation. Use <see cref="RegisterCancellationCallbackAsync"/>
-    /// for asynchronous work, awaited cross-context cancellation dependencies, failure aggregation,
-    /// and explicit cycle semantics.
+    /// These observers must return promptly. They must not call, block on, await, or otherwise
+    /// orchestrate <see cref="DurableTaskRuntimeHelper.RequestCancellationAsync"/> or durable
+    /// cancellation of any context. Doing so is outside this contract and has the usual synchronous
+    /// reentrancy and sync-over-async risks. Use <see cref="RegisterCancellationCallbackAsync"/> for
+    /// all cancellation work which requests another durable context, awaits asynchronous work, needs
+    /// cycle handling, or participates in durable failure aggregation.
     /// </para>
     /// </remarks>
     public CancellationToken CancellationToken => _cancellationSource.Token;
@@ -120,15 +119,14 @@ public abstract class DurableExecutionContext
     /// Registers an asynchronous callback which observes the durable cancellation request.
     /// </summary>
     /// <remarks>
-    /// The callback executes with this durable context as <see cref="Current"/> and participates in
-    /// durable cancellation dependency tracking and failure aggregation. Its cancellation operation
-    /// flows with <see cref="ExecutionContext"/> across ordinary awaits and safe thread-pool dispatch,
-    /// including <see cref="Task.Run(Action)"/>. Suppressing execution-context flow or using an unsafe
-    /// dispatch API detaches that work, so cancellation requests made by it are external observers
-    /// rather than durable dependencies. An ordinary cancellation-token callback registered while
-    /// this callback is active also captures that operation under standard .NET execution-context
-    /// rules. Dependency edges are based only on the explicitly flowed operation; no thread or global
-    /// activity is inferred.
+    /// This API establishes cancellation-operation causality. The callback executes with this durable
+    /// context as <see cref="Current"/> and participates in durable cancellation dependency tracking
+    /// and failure aggregation. Its cancellation operation flows with <see cref="ExecutionContext"/>
+    /// across ordinary awaits and safe thread-pool dispatch, including <see cref="Task.Run(Action)"/>.
+    /// Suppressing execution-context flow or using unsafe dispatch detaches subsequent asynchronous
+    /// work according to standard .NET behavior, so cancellation requests made by that work are
+    /// external rather than durable dependencies. Dependency edges are based only on this explicitly
+    /// flowed operation; no thread or global activity is inferred.
     ///
     /// <para>
     /// Disposing the returned registration prevents an invocation which has not started, or
@@ -233,7 +231,7 @@ public abstract class DurableExecutionContext
         if (exceptions is not null)
         {
             operation.SetException(new AggregateException(
-                "One or more durable cancellation callbacks failed.",
+                "One or more cancellation observers failed.",
                 exceptions));
         }
         else
