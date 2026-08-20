@@ -132,6 +132,8 @@ public class StateManagerTests : JournalingTestBase
             () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask());
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask());
         Assert.ThrowsAny<OperationCanceledException>(
             () => sut.Manager.RegisterObserver(new RecordingStateObserver()));
     }
