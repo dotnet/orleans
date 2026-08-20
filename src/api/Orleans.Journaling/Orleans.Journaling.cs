@@ -246,6 +246,7 @@ namespace Orleans.Journaling
     public partial interface IJournaledStateObserver
     {
         void OnRecoveryCompleted();
+        void OnRecoveryStarted() { }
         void OnWriteCompleted();
         System.Threading.Tasks.ValueTask OnWritePreparingAsync(System.Threading.CancellationToken cancellationToken);
         void OnWriteStarted();
