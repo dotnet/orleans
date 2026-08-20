@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Accordant" />
+    <PackageReference Include="System.Text.Json" VersionOverride="10.0.5" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

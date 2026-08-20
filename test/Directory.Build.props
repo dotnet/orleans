@@ -26,6 +26,8 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="System.IO.Pipelines" VersionOverride="10.0.5" PrivateAssets="all" Condition="'$(TargetFramework)' == 'net8.0'" />
+    <PackageReference Include="System.Text.Json" VersionOverride="10.0.5" PrivateAssets="all" Condition="'$(TargetFramework)' == 'net8.0'" />
   </ItemGroup>
 
 </Project>

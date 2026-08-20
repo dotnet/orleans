@@ -1,3 +1,4 @@
+using System.Reflection;
 using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -43,7 +44,10 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("Functional")]
         public async Task SiloRoleBasedPlacementDirector_CanFindSilo()
         {
-            var grain = this.GrainFactory.GetGrain<ISiloRoleBasedPlacementGrain>("testhost");
+            var siloRole = Assembly.GetEntryAssembly()?.GetName().Name;
+            Assert.NotNull(siloRole);
+
+            var grain = this.GrainFactory.GetGrain<ISiloRoleBasedPlacementGrain>(siloRole);
             bool result = await grain.Ping();
             Assert.True(result);
         }
