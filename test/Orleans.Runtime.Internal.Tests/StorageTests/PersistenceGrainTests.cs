@@ -14,7 +14,6 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
-using Xunit.Abstractions;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -69,12 +68,12 @@ namespace UnitTests.StorageTests
             ResetMockStorageProvidersHistory();
         }
 
-        public async Task InitializeAsync()
+        public async ValueTask InitializeAsync()
         {
             await SetErrorInjection(ErrorInjectorProviderName, ErrorInjectionPoint.None);
         }
 
-        public async Task DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             await SetErrorInjection(ErrorInjectorProviderName, ErrorInjectionPoint.None);
         }

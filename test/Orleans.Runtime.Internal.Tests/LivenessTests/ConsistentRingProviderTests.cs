@@ -6,7 +6,6 @@ using Orleans.Runtime.ConsistentRing;
 using Orleans.Streams;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.LivenessTests
 {

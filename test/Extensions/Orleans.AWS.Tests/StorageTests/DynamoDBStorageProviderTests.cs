@@ -11,7 +11,6 @@ using TestExtensions;
 using UnitTests.Persistence;
 using Orleans.Persistence.TestKit;
 using Xunit;
-using Xunit.Abstractions;
 using static Orleans.Storage.DynamoDBGrainStorage;
 
 namespace AWSUtils.Tests.StorageTests
@@ -42,7 +41,7 @@ namespace AWSUtils.Tests.StorageTests
                 fixture.Services.GetRequiredService<ClientGrainContext>());
         }
 
-        [SkippableTheory, TestCategory("Functional")]
+        [Theory, TestCategory("Functional")]
         [InlineData(null, false)]
         [InlineData(null, true)]
         [InlineData(400_000, false)]
@@ -62,7 +61,7 @@ namespace AWSUtils.Tests.StorageTests
             await Test_PersistenceProvider_WriteRead(testName, store, grainState);
         }
 
-        [SkippableTheory, TestCategory("Functional")]
+        [Theory, TestCategory("Functional")]
         [InlineData(null, false, false)]
         [InlineData(null, true, false)]
         [InlineData(400_000, false, false)]
@@ -83,7 +82,7 @@ namespace AWSUtils.Tests.StorageTests
             await Test_PersistenceProvider_WriteClearRead(testName, store, grainState);
         }
 
-        [SkippableTheory, TestCategory("Functional")]
+        [Theory, TestCategory("Functional")]
         [InlineData(null, true, false)]
         [InlineData(null, false, true)]
         [InlineData(400_000, true, false)]
@@ -110,7 +109,7 @@ namespace AWSUtils.Tests.StorageTests
             await Test_PersistenceProvider_Read(testName, store, grainState, grainId);
         }
 
-        [SkippableTheory, TestCategory("Functional")]
+        [Theory, TestCategory("Functional")]
         [InlineData(null, true, false)]
         [InlineData(null, false, true)]
         [InlineData(100_000, true, false)]
@@ -140,7 +139,7 @@ namespace AWSUtils.Tests.StorageTests
             await Test_PersistenceProvider_WriteRead(testName, store, grainState, grainId);
         }
 
-        [SkippableTheory, TestCategory("Functional")]
+        [Theory, TestCategory("Functional")]
         [InlineData(null, false)]
         [InlineData(null, true)]
         [InlineData(400_000, false)]
@@ -170,12 +169,12 @@ namespace AWSUtils.Tests.StorageTests
             Assert.Equal(initialState.C, convertedState.C);
         }
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("ModelBased")]
+        [Fact, TestCategory("Functional"), TestCategory("ModelBased")]
         public async Task DynamoDBStorage_ModelBasedGeneratedConformance()
         {
             if (!AWSTestConstants.IsDynamoDbAvailable)
             {
-                throw new SkipException("Unable to connect to AWS DynamoDB simulator");
+                throw Xunit.Sdk.SkipException.ForSkip("Unable to connect to AWS DynamoDB simulator");
             }
 
             var storage = await InitDynamoDBGrainStorage();
@@ -184,12 +183,12 @@ namespace AWSUtils.Tests.StorageTests
             await runner.RunGeneratedConformanceTests();
         }
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("ModelBased")]
+        [Fact, TestCategory("Functional"), TestCategory("ModelBased")]
         public async Task DynamoDBStorage_DeleteStateOnClear_ModelBasedGeneratedConformance()
         {
             if (!AWSTestConstants.IsDynamoDbAvailable)
             {
-                throw new SkipException("Unable to connect to AWS DynamoDB simulator");
+                throw Xunit.Sdk.SkipException.ForSkip("Unable to connect to AWS DynamoDB simulator");
             }
 
             var storage = await InitDynamoDBGrainStorage(deleteStateOnClear: true);
@@ -246,7 +245,7 @@ namespace AWSUtils.Tests.StorageTests
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
 
             TimeSpan readTime = sw.Elapsed;
-            this.output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
+            this.output.WriteLine("{0} - Read time = {1}", store.GetType().FullName!, readTime);
 
             var storedState = storedGrainState.State;
             Assert.NotNull(grainState.State);
@@ -280,7 +279,7 @@ namespace AWSUtils.Tests.StorageTests
             };
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
             TimeSpan readTime = sw.Elapsed;
-            this.output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+            this.output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName!, writeTime, readTime);
             Assert.NotNull(grainState.State);
             Assert.NotNull(storedGrainState.State);
             Assert.Equal(grainState.State.A, storedGrainState.State.A);
@@ -316,7 +315,7 @@ namespace AWSUtils.Tests.StorageTests
             };
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
             TimeSpan readTime = sw.Elapsed;
-            this.output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+            this.output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName!, writeTime, readTime);
             Assert.NotNull(storedGrainState.State);
             Assert.Equal(default, storedGrainState.State.A);
             Assert.Equal(default, storedGrainState.State.B);
@@ -328,7 +327,7 @@ namespace AWSUtils.Tests.StorageTests
         private static void EnsureEnvironmentSupportsState(GrainState<TestStoreGrainState> grainState)
         {
             if (!AWSTestConstants.IsDynamoDbAvailable)
-                throw new SkipException("Unable to connect to DynamoDB simulator");
+                throw Xunit.Sdk.SkipException.ForSkip("Unable to connect to DynamoDB simulator");
         }
     }
 }

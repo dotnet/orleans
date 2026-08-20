@@ -464,7 +464,7 @@ public sealed class DynamoDBStreamQueueCheckpointerIntegrationTests
 {
     private static readonly DateTime TestTimeUtc = new(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc);
 
-    [SkippableFact]
+    [Fact]
     public async Task CheckpointsAreDurableAndIsolatedByProviderAndPartition()
     {
         KinesisTestConstants.CheckDynamoDbPreconditionsOrThrow();
@@ -504,7 +504,7 @@ public sealed class DynamoDBStreamQueueCheckpointerIntegrationTests
         }
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task StaleWriterCannotMoveCheckpointBackward()
     {
         KinesisTestConstants.CheckDynamoDbPreconditionsOrThrow();
@@ -541,7 +541,7 @@ public sealed class DynamoDBStreamQueueCheckpointerIntegrationTests
         }
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task MissingTableFailsWhenCreationIsDisabled()
     {
         KinesisTestConstants.CheckDynamoDbPreconditionsOrThrow();

@@ -4,7 +4,6 @@ using AwesomeAssertions;
 using Orleans.Caching;
 using Orleans.Caching.Internal;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace NonSilo.Tests.Caching;
 
@@ -373,7 +372,7 @@ public sealed class ConcurrentLruCacheSoakTests
         }
     }
 
-    private sealed class RepeatAttribute : Xunit.Sdk.DataAttribute
+    private sealed class RepeatAttribute : Xunit.v3.DataAttribute
     {
         private readonly int _count;
 
@@ -390,13 +389,15 @@ public sealed class ConcurrentLruCacheSoakTests
             _count = count;
         }
 
-        public override IEnumerable<object[]> GetData(System.Reflection.MethodInfo testMethod)
+        public override ValueTask<IReadOnlyCollection<ITheoryDataRow>> GetData(MethodInfo testMethod, Xunit.Sdk.DisposalTracker disposalTracker)
         {
-            foreach (var iterationNumber in Enumerable.Range(start: 1, count: _count))
-            {
-                yield return new object[] { iterationNumber };
-            }
+            IReadOnlyCollection<ITheoryDataRow> rows = Enumerable.Range(start: 1, count: _count)
+                .Select(iterationNumber => (ITheoryDataRow)new TheoryDataRow(iterationNumber))
+                .ToArray();
+            return new(rows);
         }
+
+        public override bool SupportsDiscoveryEnumeration() => true;
     }
 
     private class Threaded

@@ -1,6 +1,5 @@
 using System.Threading.Tasks;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Transactions.TestKit.xUnit
 {
@@ -9,7 +8,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         protected TocFaultTransactionTestRunnerxUnit(IGrainFactory grainFactory, ITestOutputHelper output)
         : base(grainFactory, output.WriteLine) { }
 
-        [SkippableTheory(Skip = "https://github.com/dotnet/orleans/issues/9556")]
+        [Theory(Skip = "https://github.com/dotnet/orleans/issues/9556")]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions / 2)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain, 1)]
@@ -18,7 +17,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.MultiGrainWriteTransactionWithCommitFailure(grainStates, grainCount);
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions / 2)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain, 1)]

@@ -31,9 +31,9 @@ namespace Tester.AzureUtils
             this.loggerFactory = loggerFactory;
         }
 
-        public Task InitializeAsync() => Task.CompletedTask;
+        public ValueTask InitializeAsync() => ValueTask.CompletedTask;
 
-        public async Task DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             AzureQueueDataManager manager = await GetTableManager(queueName);
             await manager.DeleteQueue();
@@ -46,7 +46,7 @@ namespace Tester.AzureUtils
             return manager;
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AQ_Standalone_1()
         {
             queueName = "Test-1-".ToLower() + Guid.NewGuid();
@@ -83,7 +83,7 @@ namespace Tester.AzureUtils
             Assert.Equal(0, await manager.GetApproximateMessageCount());
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AQ_Standalone_2()
         {
             queueName = "Test-2-".ToLower() + Guid.NewGuid();
@@ -98,7 +98,7 @@ namespace Tester.AzureUtils
             {
                 promises.Add(manager.AddQueueMessage(i.ToString()));
             }
-            Task.WaitAll(promises.ToArray());
+            await Task.WhenAll(promises);
             Assert.Equal(numMsgs, await manager.GetApproximateMessageCount());
 
             var receivedMessages = await manager.GetQueueMessages(numMsgs);
@@ -112,11 +112,11 @@ namespace Tester.AzureUtils
             {
                 promises.Add(manager.DeleteQueueMessage(msg));
             }
-            Task.WaitAll(promises.ToArray());
+            await Task.WhenAll(promises);
             Assert.Equal(0, await manager.GetApproximateMessageCount());
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AQ_Standalone_3_Init_MultipleThreads()
         {
             queueName = "Test-4-".ToLower() + Guid.NewGuid();
@@ -135,7 +135,7 @@ namespace Tester.AzureUtils
             await Task.WhenAll(promises);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AQ_Standalone_4()
         {
             var visibilityTimeout = TimeSpan.FromSeconds(2);

@@ -11,7 +11,7 @@ namespace Tester.ZooKeeperUtils
         public static void EnsureZooKeeper()
         {
             if (!EnsureZooKeeperLazy.Value)
-                throw new SkipException("ZooKeeper isn't running");
+                throw Xunit.Sdk.SkipException.ForSkip("ZooKeeper isn't running");
         }
 
         public static async Task<bool> EnsureZooKeeperAsync()

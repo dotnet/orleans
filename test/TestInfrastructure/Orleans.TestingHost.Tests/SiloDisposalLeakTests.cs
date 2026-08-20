@@ -148,7 +148,7 @@ namespace Orleans.TestingHost.Tests
             // Kill the launcher's silo (ungraceful) and dispose its host. Prior to the fix this can hang
             // if cancellation interrupts callback timer shutdown before the callbacks are faulted.
             var killAndDispose = cluster.KillSiloAsync(launcherHandle);
-            var completed = await Task.WhenAny(killAndDispose, Task.Delay(TimeSpan.FromSeconds(60)));
+            var completed = await Task.WhenAny(killAndDispose, Task.Delay(TimeSpan.FromSeconds(60), TestContext.Current.CancellationToken));
             Assert.True(completed == killAndDispose, "Killing a silo with an in-flight outbound call should not hang host disposal.");
             await killAndDispose;
 

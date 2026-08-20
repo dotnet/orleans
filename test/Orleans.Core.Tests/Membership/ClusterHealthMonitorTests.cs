@@ -18,7 +18,6 @@ using Orleans.Runtime.Messaging;
 using Orleans.TestingHost.Diagnostics;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace NonSilo.Tests.Membership
 {

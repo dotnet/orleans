@@ -58,14 +58,14 @@ public abstract class AdoNetSubscriptionObserverWithImplicitSubscribingTests(Ado
     private static RelationalStorageForTesting _testing = null!;
     private readonly Fixture _fixture = fixture;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _fixture.InitializeAsync();
 
         _fixture.EnsurePreconditionsMet();
     }
 
-    public Task DisposeAsync() => _fixture.DisposeAsync();
+    public ValueTask DisposeAsync() => _fixture.DisposeAsync();
 
     public class Fixture : BaseTestClusterFixture
     {
@@ -76,14 +76,22 @@ public abstract class AdoNetSubscriptionObserverWithImplicitSubscribingTests(Ado
             _invariant = invariant;
         }
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             // set up the adonet environment before the base initializes
             _testing = await RelationalStorageForTesting.SetupInstance(_invariant, TestDatabaseName);
 
-            Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
+            Assert.SkipWhen(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
             await base.InitializeAsync();
+
+            if (!PreconditionsMet)
+
+            {
+
+                return;
+
+            }
         }
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)

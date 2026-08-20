@@ -12,7 +12,6 @@ using Orleans.Transactions.TestKit.xUnit;
 using Tester.AzureUtils;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Azure.Tests
 {
@@ -54,7 +53,7 @@ namespace Orleans.Transactions.Azure.Tests
             return CreateStorage(table, $"{partition}{DateTime.UtcNow.Ticks}", jsonSettings);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task NoChangeStoreUsesStrictETag()
         {
             var (writer, staleWriter, writerLoad, staleLoad) = await CreateInitializedWriters();
@@ -66,7 +65,7 @@ namespace Orleans.Transactions.Azure.Tests
                 () => staleWriter.Store(staleLoad.ETag, staleLoad.Metadata, [], null, null));
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task StaleWriterConvergesAfterLoad()
         {
             var (writer, staleWriter, writerLoad, staleLoad) = await CreateInitializedWriters();
@@ -100,7 +99,7 @@ namespace Orleans.Transactions.Azure.Tests
             Assert.Equal(staleWriterTimestamp, converged.Metadata.TimeStamp);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task FailedStoreRequiresSuccessfulLoadBeforeReuse()
         {
             var (writer, staleWriter, writerLoad, staleLoad) = await CreateInitializedWriters();
@@ -117,7 +116,7 @@ namespace Orleans.Transactions.Azure.Tests
             await staleWriter.Store(refreshed.ETag, refreshed.Metadata, [], null, null);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task ConflictDiagnosticsExcludePayloads()
         {
             var table = await InitTableAsync(NullLogger.Instance);

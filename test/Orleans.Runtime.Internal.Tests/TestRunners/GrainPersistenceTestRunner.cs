@@ -5,7 +5,6 @@ using Orleans.TestingHost;
 using Tester;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace TestExtensions.Runners;
 
@@ -41,7 +40,7 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
 
     public IGrainFactory GrainFactory => fixture.GrainFactory;
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task ClearStateAsync_Before_WriteStateAsync()
     {
         var grain = GrainFactory.GetGrain<IGrainStorageTestGrain>(Guid.NewGuid(), grainNamespace);
@@ -53,7 +52,7 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
         Assert.NotNull(state.State);
     }
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Grain_GrainStorage_Delete()
     {
         var grain = GrainFactory.GetGrain<IGrainStorageTestGrain>(Guid.NewGuid(), grainNamespace);
@@ -84,7 +83,7 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
         Assert.Equal(2, val);  // "Value after Delete + New Write"
     }
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Grain_GrainStorage_Read()
     {
         var id = Guid.NewGuid();
@@ -99,7 +98,7 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
         Assert.NotNull(state.State);
     }
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Grain_GuidKey_GrainStorage_Read_Write()
     {
         var id = Guid.NewGuid();
@@ -122,7 +121,7 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
         Assert.Equal(2, val);  // "Value after Re-Read"
     }
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Grain_LongKey_GrainStorage_Read_Write()
     {
         long id = Random.Shared.Next();
@@ -145,7 +144,7 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
         Assert.Equal(2, val);  // "Value after Re-Read"
     }
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Grain_LongKeyExtended_GrainStorage_Read_Write()
     {
         long id = Random.Shared.Next();
@@ -176,7 +175,7 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
         Assert.Equal(extKey, extKeyValue);  // "Extended Key"
     }
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Grain_GuidKeyExtended_GrainStorage_Read_Write()
     {
         var id = Guid.NewGuid();
@@ -207,7 +206,7 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
         Assert.Equal(extKey, extKeyValue);  // "Extended Key"
     }
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Grain_Generic_GrainStorage_Read_Write()
     {
         long id = Random.Shared.Next();
@@ -231,7 +230,7 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
         Assert.Equal(2, val);  // "Value after Re-Read"
     }
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Grain_NestedGeneric_GrainStorage_Read_Write()
     {
         long id = Random.Shared.Next();
@@ -255,12 +254,12 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
         Assert.Equal(new List<int> { 1, 2 }, val);  // "Value after Re-Read"
     }
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Grain_Generic_GrainStorage_DiffTypes()
     {
         if (!DistinguishesGenericGrainTypeParameters)
         {
-            throw new SkipException("This provider does not support distinguishing grains in storage by their generic type parameters.");
+            throw Xunit.Sdk.SkipException.ForSkip("This provider does not support distinguishing grains in storage by their generic type parameters.");
         }
 
         long id1 = Random.Shared.Next();
@@ -325,12 +324,12 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
         Assert.Equal(expected3, val3);  // "Value after Re-Read - 3"
     }
     
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Grain_GrainStorage_SiloRestart()
     {
         if (!IsDurableStorage) 
         {
-            throw new SkipException("This provider does not persist state, so cannot survive a silo restart.");
+            throw Xunit.Sdk.SkipException.ForSkip("This provider does not persist state, so cannot survive a silo restart.");
         }
 
         var initialServiceId = fixture.GetClientServiceId();
@@ -390,7 +389,7 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
         Assert.Equal(2, val);  // "Value after Re-Read"
     }
 
-    [SkippableFact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]
+    [Fact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]
     public async Task Persistence_Perf_Activate()
     {
         const string testName = "Persistence_Perf_Activate";
@@ -405,7 +404,7 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
             grainAzureStore => grainAzureStore.GetValue());
     }
 
-    [SkippableFact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]
+    [Fact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]
     public async Task Persistence_Perf_Write()
     {
         const string testName = "Persistence_Perf_Write";
@@ -420,7 +419,7 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
             grainAzureStore => grainAzureStore.DoWrite(n));
     }
 
-    [SkippableFact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]
+    [Fact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]
     public async Task Persistence_Perf_Write_Reread()
     {
         const string testName = "Persistence_Perf_Write_Read";
@@ -498,7 +497,7 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
             }
             else
             {
-                throw new SkipException(msg);
+                throw Xunit.Sdk.SkipException.ForSkip(msg);
             }
         }
     }

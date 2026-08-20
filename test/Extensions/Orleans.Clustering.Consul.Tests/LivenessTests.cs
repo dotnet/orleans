@@ -2,7 +2,6 @@ using Orleans.TestingHost;
 using Microsoft.Extensions.Configuration;
 using UnitTests.MembershipTests;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Consul.Tests
 {
@@ -51,31 +50,31 @@ namespace Consul.Tests
             }
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Liveness_Consul_1()
         {
             await Do_Liveness_OracleTest_1();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Liveness_Consul_2_Restart_Primary()
         {
             await Do_Liveness_OracleTest_2(0);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Liveness_Consul_3_Restart_GW()
         {
             await Do_Liveness_OracleTest_2(1);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Liveness_Consul_4_Restart_Silo_1()
         {
             await Do_Liveness_OracleTest_2(2);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Liveness_Consul_5_Kill_Silo_1_With_Timers()
         {
             await Do_Liveness_OracleTest_2(2, false, true);

@@ -22,7 +22,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
             base.CheckPreconditionsOrThrow();
             if (!AWSTestConstants.IsDynamoDbAvailable)
             {
-                throw new SkipException("DynamoDB is not configured");
+                throw Xunit.Sdk.SkipException.ForSkip("DynamoDB is not configured");
             }
         }
 
@@ -68,7 +68,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
             base.CheckPreconditionsOrThrow();
             if (!AWSTestConstants.IsDynamoDbAvailable)
             {
-                throw new SkipException("DynamoDB is not configured");
+                throw Xunit.Sdk.SkipException.ForSkip("DynamoDB is not configured");
             }
         }
 

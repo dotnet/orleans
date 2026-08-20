@@ -58,10 +58,10 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     private IRelationalStorage _storage = null!;
     private RelationalOrleansQueries _queries = null!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var testing = await RelationalStorageForTesting.SetupInstance(invariant, TestDatabaseName);
-        Skip.If(IsNullOrEmpty(testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
+        Assert.SkipWhen(IsNullOrEmpty(testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
         _storage = RelationalStorage.CreateInstance(invariant, testing.CurrentConnectionString);
 
@@ -78,12 +78,12 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
 
     private static string RandomActivationId(int max = 10) => $"ActivationId{Random.Shared.Next(max)}";
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     /// <summary>
     /// Tests that a grain activation is registered.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task RelationalOrleansQueries_RegistersActivation()
     {
         // arrange
@@ -118,7 +118,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// <summary>
     /// Tests that a grain activation is unregistered.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task RelationalOrleansQueries_UnregistersActivation()
     {
         // arrange
@@ -145,7 +145,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// <summary>
     /// Tests that a grain activation can be looked up.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task RelationalOrleansQueries_LooksUpActivation()
     {
         // arrange
@@ -174,7 +174,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// <summary>
     /// Tests that grain activations for a set of silos are unregistered.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task RelationalOrleansQueries_UnregistersActivationsForSilos()
     {
         // arrange
@@ -213,7 +213,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// </remarks>
     [TestSuite("Stress")]
     [TestCategory("Stress")]
-    [SkippableFact]
+    [Fact]
     public async Task RelationalOrleansQueries_ChaosTest()
     {
         var clusterId = RandomClusterId();

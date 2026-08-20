@@ -7,7 +7,7 @@ public sealed class TopologyTests : IAsyncLifetime
 {
     private InProcessTestCluster _cluster = null!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _cluster = ClusterConfiguration.Create(new SharedTestState());
         await _cluster.DeployAsync();
@@ -24,6 +24,6 @@ public sealed class TopologyTests : IAsyncLifetime
         Assert.Equal("Hello, World!", greeting);
     }
 
-    public async Task DisposeAsync() => await _cluster.DisposeAsync();
+    public async ValueTask DisposeAsync() => await _cluster.DisposeAsync();
 }
 // </topology_change_test>

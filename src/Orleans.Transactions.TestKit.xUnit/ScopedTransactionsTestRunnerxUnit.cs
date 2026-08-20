@@ -1,7 +1,6 @@
 using System.Threading.Tasks;
 
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Transactions.TestKit.xUnit
 {
@@ -10,7 +9,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         protected ScopedTransactionsTestRunnerxUnit(IGrainFactory grainFactory, ITransactionClient transactionFrame, ITestOutputHelper output)
         : base(grainFactory, transactionFrame, output.WriteLine) { }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
@@ -19,7 +18,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.CreateTransactionScopeAndSetValue(grainStates);
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
@@ -28,7 +27,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.CreateTransactionScopeAndSetValueWithFailure(grainStates);
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
@@ -37,7 +36,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.CreateTransactionScopeAndSetValueAndAssert(grainStates);
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]

@@ -5,7 +5,6 @@ using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Tester.StreamingTests
 {
@@ -57,7 +56,7 @@ namespace Tester.StreamingTests
         /// 3. Send another event
         /// Verifies that both events are delivered despite cache eviction.
         /// </summary>
-        [SkippableFact]
+        [Fact]
         public virtual async Task PreviousEventEvictedFromCacheTest()
         {
             using var observer = StreamingDiagnosticObserver.Create();
@@ -104,7 +103,7 @@ namespace Tester.StreamingTests
         /// - Non-filtered events are still delivered after cache eviction
         /// - Filter state doesn't interfere with cache management
         /// </summary>
-        [SkippableFact]
+        [Fact]
         public virtual async Task PreviousEventEvictedFromCacheWithFilterTest()
         {
             using var observer = StreamingDiagnosticObserver.Create();

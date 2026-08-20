@@ -6,7 +6,6 @@ using Orleans.Runtime;
 using Orleans.TestingHost.Tests.Grains;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.TestingHost.Tests
 {
@@ -59,7 +58,7 @@ namespace Orleans.TestingHost.Tests
 
             primary.ServiceProvider.GetRequiredService<IFatalErrorHandler>().OnFatalException(context: "Test");
 
-            await stopped.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            await stopped.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         }
     }
 
@@ -363,12 +362,12 @@ namespace Orleans.TestingHost.Tests
             }
         }
         
-        public Task InitializeAsync()
+        public ValueTask InitializeAsync()
         {
-            return Task.CompletedTask;
+            return ValueTask.CompletedTask;
         }
 
-        public async Task DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             if (_testCluster is not null)
             {

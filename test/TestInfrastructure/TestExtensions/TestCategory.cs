@@ -1,5 +1,4 @@
-using Xunit.Abstractions;
-using Xunit.Sdk;
+using Xunit.v3;
 
 /// <summary>
 /// Provides a compatibility bridge for the legacy xUnit <c>Category</c> trait while the test suite
@@ -15,7 +14,6 @@ using Xunit.Sdk;
 /// [TestCategory("BVT")]
 /// </code>
 /// </example>
-[TraitDiscoverer(TestTraitDiscoverers.CategoryDiscovererTypeName, TestTraitDiscoverers.AssemblyName)]
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
 public class TestCategoryAttribute : Attribute, ITraitAttribute
 {
@@ -25,17 +23,7 @@ public class TestCategoryAttribute : Attribute, ITraitAttribute
     }
 
     public string Category { get; }
-}
 
-/// <summary>
-/// Discovers <see cref="TestCategoryAttribute"/> traits.
-/// </summary>
-public sealed class CategoryDiscoverer : SingleValueTraitDiscoverer
-{
-    public CategoryDiscoverer(IMessageSink diagnosticMessageSink)
-        : base(diagnosticMessageSink)
-    {
-    }
-
-    protected override string TraitName => TestTraitNames.Category;
+    public IReadOnlyCollection<KeyValuePair<string, string>> GetTraits() =>
+        [new(TestTraitNames.Category, Category)];
 }

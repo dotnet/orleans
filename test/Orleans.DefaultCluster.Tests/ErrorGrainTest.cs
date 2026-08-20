@@ -5,7 +5,6 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace DefaultCluster.Tests
 {

@@ -10,7 +10,6 @@ using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
@@ -25,10 +24,11 @@ namespace UnitTests.General
     public class GrainCallTraceContextPropagationTests : OrleansTestingBase, IClassFixture<ActivationTracingTests.Fixture>
     {
         private static readonly ConcurrentBag<Activity> Started = new();
+        private static readonly ActivityListener Listener;
 
         static GrainCallTraceContextPropagationTests()
         {
-            var listener = new ActivityListener
+            Listener = new ActivityListener
             {
                 ShouldListenTo = src => src.Name == ActivitySources.ApplicationGrainActivitySourceName
                                         || src.Name == ActivitySources.LifecycleActivitySourceName
@@ -37,7 +37,7 @@ namespace UnitTests.General
                 SampleUsingParentId = (ref _) => ActivitySamplingResult.AllData,
                 ActivityStarted = activity => Started.Add(activity),
             };
-            ActivitySource.AddActivityListener(listener);
+            ActivitySource.AddActivityListener(Listener);
         }
 
         private readonly ActivationTracingTests.Fixture _fixture;

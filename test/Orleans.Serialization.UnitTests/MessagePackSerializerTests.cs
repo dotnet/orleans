@@ -6,7 +6,6 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TestKit;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Serialization.UnitTests;
 

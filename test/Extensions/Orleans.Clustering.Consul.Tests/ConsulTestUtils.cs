@@ -41,7 +41,7 @@ namespace Consul.Tests
         {
             var skipReason = EnsureConsulSkipReasonLazy.Value;
             if (skipReason is not null)
-                throw new SkipException(skipReason);
+                throw Xunit.Sdk.SkipException.ForSkip(skipReason);
         }
 
         public static Task<bool> EnsureConsulAsync()

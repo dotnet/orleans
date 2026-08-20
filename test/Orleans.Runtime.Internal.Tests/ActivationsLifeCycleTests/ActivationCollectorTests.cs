@@ -70,7 +70,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         }
 
 
-        Task IAsyncLifetime.InitializeAsync() => Task.CompletedTask;
+        ValueTask IAsyncLifetime.InitializeAsync() => ValueTask.CompletedTask;
 
         private async Task Initialize(TimeSpan collectionAgeLimit)
         {
@@ -89,7 +89,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
         }
 
-        public async Task DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             if (testCluster is null) return;
 

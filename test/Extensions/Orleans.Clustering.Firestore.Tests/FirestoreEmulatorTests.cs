@@ -8,7 +8,7 @@ namespace Orleans.Clustering.Firestore.Tests;
 [TestCategory("GoogleCloud"), TestCategory("Functional")]
 public class FirestoreEmulatorTests
 {
-    [SkippableFact]
+    [Fact]
     public async Task EnsureFirestoreTest()
     {
         Assert.NotNull(GoogleEmulatorHost.FirestoreEndpoint);

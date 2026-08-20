@@ -1,5 +1,4 @@
-using Xunit.Abstractions;
-using Xunit.Sdk;
+using Xunit.v3;
 
 internal static class TestTraitNames
 {
@@ -7,35 +6,6 @@ internal static class TestTraitNames
     public const string Category = "Category";
     public const string Provider = "Provider";
     public const string Suite = "Suite";
-}
-
-internal static class TestTraitDiscoverers
-{
-    public const string AreaDiscovererTypeName = nameof(AreaDiscoverer);
-    public const string AssemblyName = "TestExtensions";
-    public const string CategoryDiscovererTypeName = nameof(CategoryDiscoverer);
-    public const string ProviderDiscovererTypeName = nameof(ProviderDiscoverer);
-    public const string SuiteDiscovererTypeName = nameof(SuiteDiscoverer);
-}
-
-/// <summary>
-/// Base implementation for discoverers which emit a single xUnit trait value from the attribute constructor.
-/// </summary>
-public abstract class SingleValueTraitDiscoverer : ITraitDiscoverer
-{
-    protected SingleValueTraitDiscoverer(IMessageSink diagnosticMessageSink)
-    {
-    }
-
-    protected abstract string TraitName { get; }
-
-    public IEnumerable<KeyValuePair<string, string>> GetTraits(IAttributeInfo traitAttribute)
-    {
-        if (traitAttribute.GetConstructorArguments().FirstOrDefault() is string value)
-        {
-            yield return new KeyValuePair<string, string>(TraitName, value);
-        }
-    }
 }
 
 /// <summary>
@@ -50,7 +20,6 @@ public abstract class SingleValueTraitDiscoverer : ITraitDiscoverer
 /// [TestSuite("BVT")]
 /// </code>
 /// </example>
-[TraitDiscoverer(TestTraitDiscoverers.SuiteDiscovererTypeName, TestTraitDiscoverers.AssemblyName)]
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
 public sealed class TestSuiteAttribute : Attribute, ITraitAttribute
 {
@@ -60,19 +29,9 @@ public sealed class TestSuiteAttribute : Attribute, ITraitAttribute
     }
 
     public string Suite { get; }
-}
 
-/// <summary>
-/// Discovers suite traits.
-/// </summary>
-public sealed class SuiteDiscoverer : SingleValueTraitDiscoverer
-{
-    public SuiteDiscoverer(IMessageSink diagnosticMessageSink)
-        : base(diagnosticMessageSink)
-    {
-    }
-
-    protected override string TraitName => TestTraitNames.Suite;
+    public IReadOnlyCollection<KeyValuePair<string, string>> GetTraits() =>
+        [new(TestTraitNames.Suite, Suite)];
 }
 
 /// <summary>
@@ -86,7 +45,6 @@ public sealed class SuiteDiscoverer : SingleValueTraitDiscoverer
 /// [TestProvider("None")]
 /// </code>
 /// </example>
-[TraitDiscoverer(TestTraitDiscoverers.ProviderDiscovererTypeName, TestTraitDiscoverers.AssemblyName)]
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
 public sealed class TestProviderAttribute : Attribute, ITraitAttribute
 {
@@ -96,19 +54,9 @@ public sealed class TestProviderAttribute : Attribute, ITraitAttribute
     }
 
     public string Provider { get; }
-}
 
-/// <summary>
-/// Discovers provider traits.
-/// </summary>
-public sealed class ProviderDiscoverer : SingleValueTraitDiscoverer
-{
-    public ProviderDiscoverer(IMessageSink diagnosticMessageSink)
-        : base(diagnosticMessageSink)
-    {
-    }
-
-    protected override string TraitName => TestTraitNames.Provider;
+    public IReadOnlyCollection<KeyValuePair<string, string>> GetTraits() =>
+        [new(TestTraitNames.Provider, Provider)];
 }
 
 /// <summary>
@@ -119,7 +67,6 @@ public sealed class ProviderDiscoverer : SingleValueTraitDiscoverer
 /// [TestArea("Streaming")]
 /// </code>
 /// </example>
-[TraitDiscoverer(TestTraitDiscoverers.AreaDiscovererTypeName, TestTraitDiscoverers.AssemblyName)]
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
 public sealed class TestAreaAttribute : Attribute, ITraitAttribute
 {
@@ -129,17 +76,7 @@ public sealed class TestAreaAttribute : Attribute, ITraitAttribute
     }
 
     public string Area { get; }
-}
 
-/// <summary>
-/// Discovers area traits.
-/// </summary>
-public sealed class AreaDiscoverer : SingleValueTraitDiscoverer
-{
-    public AreaDiscoverer(IMessageSink diagnosticMessageSink)
-        : base(diagnosticMessageSink)
-    {
-    }
-
-    protected override string TraitName => TestTraitNames.Area;
+    public IReadOnlyCollection<KeyValuePair<string, string>> GetTraits() =>
+        [new(TestTraitNames.Area, Area)];
 }

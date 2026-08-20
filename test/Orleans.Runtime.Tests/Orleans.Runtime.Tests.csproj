@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <OutputType>Exe</OutputType>
     <GenerateProgramFile>false</GenerateProgramFile>
+    <StartupObject>Tester.Program</StartupObject>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 

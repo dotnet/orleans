@@ -69,7 +69,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
             TimeProvider.System,
             _serviceProvider);
 
-    public virtual async Task InitializeAsync()
+    public virtual async ValueTask InitializeAsync()
     {
         var services = new ServiceCollection();
         services.AddSerializer();
@@ -89,7 +89,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
         await _siloLifecycle.OnStart(cts.Token);
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_siloLifecycle is not null)
         {
@@ -128,7 +128,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
     /// <summary>
     /// Tests basic Add, Update (by index), and RemoveAt operations.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task DurableList_BasicOperations_Test()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -162,7 +162,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
     /// <summary>
     /// Tests that list state is correctly persisted and can be recovered by a new instance.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task DurableList_Persistence_Test()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -191,7 +191,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
     /// <summary>
     /// Tests storing and retrieving complex objects, including updates to mutable properties.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task DurableList_ComplexValues_Test()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -223,7 +223,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
     /// <summary>
     /// Tests the Clear operation and its persistence.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task DurableList_Clear_Test()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -251,7 +251,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
     /// <summary>
     /// Tests the Contains method and Remove (by value) operation.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task DurableList_Contains_Test()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -276,7 +276,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
     /// <summary>
     /// Tests Insert and Remove (by value) operations.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task DurableList_InsertAndRemove_Test()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -308,7 +308,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
     /// <summary>
     /// Tests list enumeration using ToList() (which relies on GetEnumerator).
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task DurableList_Enumeration_Test()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -334,7 +334,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
     /// Tests behavior with a larger number of operations (add, update) and multiple writes,
     /// potentially triggering snapshotting behavior in the storage provider. Also tests recovery.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task DurableList_LargeNumberOfOperations_And_Snapshot_Test()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60)); // Increased timeout

@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 #nullable enable
 

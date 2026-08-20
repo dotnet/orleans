@@ -75,18 +75,18 @@ namespace UnitTests.MembershipTests
             return isReachable ? TestDefaultConfiguration.ZooKeeperConnectionString! : null!;
         }
 
-        [SkippableFact]
+        [Fact]
         public void MembershipTable_ZooKeeper_Init()
         {
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_ZooKeeper_GetGateways()
         {
             await MembershipTable_GetGateways();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_ZooKeeper_ReadAll_EmptyTable()
         {
             await MembershipTable_ReadAll_EmptyTable();
@@ -97,25 +97,25 @@ namespace UnitTests.MembershipTests
         /// Verifies that the membership data is correctly serialized
         /// and stored in ZooKeeper's hierarchical structure.
         /// </summary>
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_ZooKeeper_InsertRow()
         {
             await MembershipTable_InsertRow();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_ZooKeeper_ReadRow_Insert_Read()
         {
             await MembershipTable_ReadRow_Insert_Read();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_ZooKeeper_ReadAll_Insert_ReadAll()
         {
             await MembershipTable_ReadAll_Insert_ReadAll();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_ZooKeeper_UpdateRow()
         {
             await MembershipTable_UpdateRow();
@@ -126,7 +126,7 @@ namespace UnitTests.MembershipTests
         /// Verifies that ZooKeeper's optimistic concurrency control
         /// correctly handles simultaneous updates from multiple silos.
         /// </summary>
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_ZooKeeper_UpdateRowInParallel()
         {
             await MembershipTable_UpdateRowInParallel();
@@ -137,7 +137,7 @@ namespace UnitTests.MembershipTests
         /// Verifies that ephemeral nodes and session timeouts
         /// work correctly for detecting failed silos.
         /// </summary>
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_ZooKeeper_UpdateIAmAlive()
         {
             await MembershipTable_UpdateIAmAlive();

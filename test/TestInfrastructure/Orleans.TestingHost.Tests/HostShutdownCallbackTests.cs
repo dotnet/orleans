@@ -40,11 +40,11 @@ namespace Orleans.TestingHost.Tests
             await cluster.StopClusterClientAsync();
 
             // The pending call must fault promptly instead of hanging.
-            var faulted = await Task.WhenAny(pending, Task.Delay(TimeSpan.FromSeconds(30)));
+            var faulted = await Task.WhenAny(pending, Task.Delay(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
             Assert.True(faulted == pending, "Stopping the client should fault in-flight calls instead of hanging.");
             await Assert.ThrowsAnyAsync<Exception>(async () => await pending);
 
-            var followUpFaulted = await Task.WhenAny(followUp, Task.Delay(TimeSpan.FromSeconds(30)));
+            var followUpFaulted = await Task.WhenAny(followUp, Task.Delay(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
             Assert.True(followUpFaulted == followUp, "Calls issued after client shutdown begins should fault instead of hanging.");
             await Assert.ThrowsAnyAsync<Exception>(async () => await followUp);
 

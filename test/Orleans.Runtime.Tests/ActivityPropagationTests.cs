@@ -24,7 +24,7 @@ namespace UnitTests.General
     [TestSuite("BVT")]
     [TestProvider("None")]
     [TestArea("Runtime")]
-    public class ActivityPropagationTests : OrleansTestingBase, IClassFixture<ActivityPropagationTests.Fixture>
+    public class ActivityPropagationTests : OrleansTestingBase, IClassFixture<ActivityPropagationTests.Fixture>, IDisposable
     {
         private static readonly ActivityListener Listener;
 
@@ -98,6 +98,8 @@ namespace UnitTests.General
             this._fixture = fixture;
             ActivitySource.AddActivityListener(Listener);
         }
+
+        public void Dispose() => Activity.DefaultIdFormat = _defaultIdFormat;
 
         /// <summary>
         /// Tests that grain calls create new activities when no parent activity exists.

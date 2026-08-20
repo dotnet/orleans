@@ -65,21 +65,21 @@ public abstract class AdoNetGrainDirectoryTests(string invariant, int concurrenc
 
     private const string TestDatabaseName = "OrleansGrainDirectoryTest";
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _testing = await RelationalStorageForTesting.SetupInstance(invariant, TestDatabaseName);
 
-        Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
+        Assert.SkipWhen(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
         _storage = _testing.Storage;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     /// <summary>
     /// Tests that a grain activation is registered.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task AdoNetGrainDirectory_RegistersActivation()
     {
         // arrange
@@ -125,7 +125,7 @@ public abstract class AdoNetGrainDirectoryTests(string invariant, int concurrenc
     /// <summary>
     /// Tests that a grain activation is unregistered.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task AdoNetGrainDirectory_UnregistersActivation()
     {
         // arrange
@@ -163,7 +163,7 @@ public abstract class AdoNetGrainDirectoryTests(string invariant, int concurrenc
     /// <summary>
     /// Tests that a grain activation can be looked up.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task AdoNetGrainDirectory_LooksUpActivation()
     {
         // arrange
@@ -206,7 +206,7 @@ public abstract class AdoNetGrainDirectoryTests(string invariant, int concurrenc
     /// <summary>
     /// Tests that grain activations can be unregistered for a set of silos.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task AdoNetGrainDirectory_UnregistersActivationsForSilos()
     {
         // arrange
@@ -254,7 +254,7 @@ public abstract class AdoNetGrainDirectoryTests(string invariant, int concurrenc
     /// </summary>
     [TestSuite("Stress")]
     [TestCategory("Stress")]
-    [SkippableFact]
+    [Fact]
     public async Task AdoNetGrainDirectory_ChaosTest()
     {
         // arrange

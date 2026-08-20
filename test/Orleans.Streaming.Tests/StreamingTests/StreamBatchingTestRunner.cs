@@ -3,7 +3,6 @@ using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.StreamingTests
 {
@@ -21,7 +20,7 @@ namespace UnitTests.StreamingTests
             this.output = output;
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5649"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact(Skip = "https://github.com/dotnet/orleans/issues/5649"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SingleSendBatchConsume()
         {
             const int ExpectedConsumed = 30;
@@ -40,7 +39,7 @@ namespace UnitTests.StreamingTests
             await AssertCountersAsync(consumer, ExpectedConsumed, 2);
         }
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task BatchSendSingleConsume()
         {
             const int BatchesSent = 3;
@@ -61,7 +60,7 @@ namespace UnitTests.StreamingTests
             await AssertCountersAsync(consumer, ExpectedConsumed, 1);
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5632"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact(Skip = "https://github.com/dotnet/orleans/issues/5632"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task BatchSendBatchConsume()
         {
             const int BatchesSent = 3;

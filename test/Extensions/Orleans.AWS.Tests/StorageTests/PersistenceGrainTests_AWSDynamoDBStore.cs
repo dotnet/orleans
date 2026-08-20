@@ -7,7 +7,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using TesterInternal;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Xunit.Abstractions;
 using static Orleans.Storage.DynamoDBGrainStorage;
 using TestExtensions.Runners;
 
@@ -49,11 +48,11 @@ namespace AWSUtils.Tests.StorageTests
             if (!AWSTestConstants.IsDynamoDbAvailable)
             {
                 output.WriteLine("Unable to connect to AWS DynamoDB simulator");
-                throw new SkipException("Unable to connect to AWS DynamoDB simulator");
+                throw Xunit.Sdk.SkipException.ForSkip("Unable to connect to AWS DynamoDB simulator");
             }
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AWSDynamoDBStore_ConvertToFromStorageFormat_GrainReference()
         {
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
@@ -70,7 +69,7 @@ namespace AWSUtils.Tests.StorageTests
             Assert.Equal(initialState.Grain, convertedState.Grain);  // "Grain"
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AWSDynamoDBStore_ConvertToFromStorageFormat_GrainReference_List()
         {
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.

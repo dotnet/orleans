@@ -1,6 +1,5 @@
 using System.Threading.Tasks;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Transactions.TestKit.xUnit
 {
@@ -9,7 +8,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         protected GoldenPathTransactionTestRunnerxUnit(IGrainFactory grainFactory, ITestOutputHelper output)
         : base(grainFactory, output.WriteLine) { }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
@@ -18,7 +17,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.SingleGrainReadTransaction(grainStates);
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
@@ -27,7 +26,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.SingleGrainWriteTransaction(grainStates);
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions / 2)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain, 1)]
@@ -36,7 +35,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.MultiGrainWriteTransaction(grainStates, grainCount);
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions / 2)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain, 1)]
@@ -45,7 +44,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.MultiGrainReadWriteTransaction(grainStates, grainCount);
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions / 2)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain, 1)]
@@ -54,7 +53,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.RepeatGrainReadWriteTransaction(grainStates, grainCount);
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
@@ -63,7 +62,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.MultiWriteToSingleGrainTransaction(grainStates);
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions / 2)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain, 1)]
@@ -72,7 +71,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.RWRWTest(grainStates, grainCount);
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions / 2)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain, 1)]

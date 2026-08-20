@@ -58,13 +58,17 @@ namespace Tester.AzureUtils.Streaming
             }
         }
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             await base.InitializeAsync();
+            if (!PreconditionsMet)
+            {
+                return;
+            }
             runner = new SubscriptionMultiplicityTestRunner(AQStreamProviderName, this.HostedCluster);
         }
 
-        public override async Task DisposeAsync()
+        public override async ValueTask DisposeAsync()
         {
             await base.DisposeAsync();
             try
@@ -75,59 +79,59 @@ namespace Tester.AzureUtils.Streaming
                     AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
                     new AzureQueueOptions().ConfigureTestDefaults());
             }
-            catch (SkipException) { }
+            catch (Xunit.Sdk.SkipException) { }
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AQMultipleParallelSubscriptionTest()
         {
             logger.LogInformation("************************ AQMultipleParallelSubscriptionTest *********************************");
             await runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AQMultipleLinearSubscriptionTest()
         {
             logger.LogInformation("************************ AQMultipleLinearSubscriptionTest *********************************");
             await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AQMultipleSubscriptionTest_AddRemove()
         {
             logger.LogInformation("************************ AQMultipleSubscriptionTest_AddRemove *********************************");
             await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AQResubscriptionTest()
         {
             logger.LogInformation("************************ AQResubscriptionTest *********************************");
             await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AQResubscriptionAfterDeactivationTest()
         {
             logger.LogInformation("************************ ResubscriptionAfterDeactivationTest *********************************");
             await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AQActiveSubscriptionTest()
         {
             logger.LogInformation("************************ AQActiveSubscriptionTest *********************************");
             await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AQTwoIntermittentStreamTest()
         {
             logger.LogInformation("************************ AQTwoIntermittentStreamTest *********************************");
             await runner.TwoIntermittentStreamTest(Guid.NewGuid());
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AQSubscribeFromClientTest()
         {
             logger.LogInformation("************************ AQSubscribeFromClientTest *********************************");

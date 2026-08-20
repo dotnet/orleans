@@ -65,15 +65,19 @@ public abstract class AdoNetGrainDirectoryClusterTests : MultipleGrainDirectorie
         _invariant = invariant;
     }
 
-    public override async Task InitializeAsync()
+    public override async ValueTask InitializeAsync()
     {
         // set up the adonet environment before the base initializes
         _testing = await RelationalStorageForTesting.SetupInstance(_invariant, TestDatabaseName);
 
-        Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
+        Assert.SkipWhen(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
         // base initialization must only happen after the above
         await base.InitializeAsync();
+        if (!PreconditionsMet)
+        {
+            return;
+        }
     }
 
     public class SiloConfigurator : ISiloConfigurator

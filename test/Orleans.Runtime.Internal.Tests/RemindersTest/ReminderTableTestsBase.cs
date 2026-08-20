@@ -40,13 +40,13 @@ namespace UnitTests.RemindersTest
             this.remindersTable = this.CreateRemindersTable();
         }
 
-        public virtual async Task InitializeAsync()
+        public virtual async ValueTask InitializeAsync()
         {
             using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
             await this.remindersTable.StartAsync(cancellation.Token);
         }
 
-        public virtual async Task DisposeAsync()
+        public virtual async ValueTask DisposeAsync()
         {
             if (remindersTable != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
             {

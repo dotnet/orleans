@@ -26,8 +26,13 @@ public sealed class RedisStreamFilteringTests : StreamFilteringTestsBase, IClass
             builder.AddSiloBuilderConfigurator<TestClusterConfigurator>();
         }
 
-        public override async Task DisposeAsync()
+        public override async ValueTask DisposeAsync()
         {
+            if (!PreconditionsMet)
+            {
+                return;
+            }
+
             var serviceId = HostedCluster?.Options.ServiceId;
             await base.DisposeAsync();
             await RedisStreamTestUtils.DeleteServiceKeysAsync(serviceId);

@@ -120,8 +120,8 @@ namespace Tester
             var lifecycle = new TestLifecycleSubject();
             var multiStageObserver = new MultiStageObserver();
             multiStageObserver.Participate(lifecycle);
-            await lifecycle.OnStart();
-            await lifecycle.OnStop();
+            await lifecycle.OnStart(TestContext.Current.CancellationToken);
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
             Assert.Equal(4, multiStageObserver.Started.Count);
             Assert.Equal(4, multiStageObserver.Stopped.Count);
             Assert.True(multiStageObserver.Started.Values.All(o => o));
@@ -146,13 +146,13 @@ namespace Tester
             // run lifecycle
             if (failOnStart.HasValue)
             {
-                await Assert.ThrowsAsync<Exception>(() => lifecycle.OnStart());
+                await Assert.ThrowsAsync<Exception>(() => lifecycle.OnStart(TestContext.Current.CancellationToken));
             }
             else
             {
-                await lifecycle.OnStart();
+                await lifecycle.OnStart(TestContext.Current.CancellationToken);
             }
-            await lifecycle.OnStop();
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
 
             // return results
             return observersByStage;

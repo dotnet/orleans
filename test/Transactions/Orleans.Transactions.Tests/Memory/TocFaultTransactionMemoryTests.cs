@@ -1,6 +1,5 @@
-﻿
+
 using Orleans.Transactions.TestKit.xUnit;
-using Xunit.Abstractions;
 using Xunit;
 
 namespace Orleans.Transactions.Tests

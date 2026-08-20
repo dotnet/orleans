@@ -37,25 +37,25 @@ public class FirestoreRemindersTests : ReminderTableTestsBase, IClassFixture<Tes
 
     protected override Task<string> GetConnectionString() => Task.FromResult(GoogleEmulatorHost.FirestoreEndpoint);
 
-    [SkippableFact]
+    [Fact]
     public async Task ReadsReminderRanges()
     {
         await RemindersRange(50);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task SupportsParallelUpserts()
     {
         await RemindersParallelUpsert();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task SupportsReminderLifecycle()
     {
         await ReminderSimple();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task ReminderIdsDoNotCollide()
     {
         var startAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -82,7 +82,7 @@ public class FirestoreRemindersTests : ReminderTableTestsBase, IClassFixture<Tes
         Assert.Equal(second.ReminderName, (await RemindersTable.ReadRow(second.GrainId, second.ReminderName))?.ReminderName);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task StaleETagDoesNotOverwriteReminder()
     {
         var reminder = new ReminderEntry
@@ -109,7 +109,7 @@ public class FirestoreRemindersTests : ReminderTableTestsBase, IClassFixture<Tes
         Assert.Equal(new DateTime(2026, 1, 1, 0, 1, 0, DateTimeKind.Utc), stored.StartAt);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UnspecifiedStartTimePreservesTicks()
     {
         var startAt = new DateTime(2026, 1, 1, 12, 34, 56, DateTimeKind.Unspecified);

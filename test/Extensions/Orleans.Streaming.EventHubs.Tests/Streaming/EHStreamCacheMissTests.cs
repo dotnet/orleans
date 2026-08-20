@@ -1,11 +1,11 @@
 using Microsoft.Extensions.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;
-using Xunit.Abstractions;
 using Orleans.Streaming.EventHubs;
 using Tester;
 using Microsoft.Extensions.DependencyInjection;
 using Tester.StreamingTests;
+using Xunit;
 
 namespace ServiceBus.Tests.StreamingTests
 {

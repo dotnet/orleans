@@ -14,7 +14,6 @@ using Orleans.Transactions.DynamoDB;
 using Orleans.Transactions.DynamoDB.TransactionalState;
 using Orleans.Transactions.TestKit.xUnit;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Transactions.DynamoDB.Tests
 {
@@ -48,10 +47,10 @@ namespace Orleans.Transactions.DynamoDB.Tests
         {
         }
 
-        [SkippableFact]
+        [Fact]
         public override Task StoreWithoutChanges() => base.StoreWithoutChanges();
 
-        [SkippableFact]
+        [Fact]
         public override async Task WrongEtags()
         {
             var storage = await this.stateStorageFactory();
@@ -90,7 +89,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
             return stateStorage;
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Store_NewRowConflict_ReportsOperationsAndRequiresLoadBeforeReuse()
         {
             var partitionKey = $"{partition}-{Guid.NewGuid():N}";
@@ -144,7 +143,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
             Assert.Equal(202, recovered.CommittedState.State);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Store_ExistingRowETagConflict_MapsCancellationReasonsInOperationOrder()
         {
             var partitionKey = $"{partition}-{Guid.NewGuid():N}";
@@ -204,7 +203,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
             Assert.Equal(40, recovered.CommittedState.State);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Store_StaleDeleteConflict_ReportsDeleteOperation()
         {
             var partitionKey = $"{partition}-{Guid.NewGuid():N}";
@@ -249,7 +248,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
             Assert.Equal(21, durableWinner.CommittedState.State);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Store_DuplicateSequenceInSingleBatch_IsRejectedAndRequiresLoad()
         {
             var partitionKey = $"{partition}-{Guid.NewGuid():N}";
@@ -285,7 +284,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
             Assert.Equal(40, recovered.CommittedState.State);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task TransactWriteItems_ExplicitClientRequestToken_ReplaysIdenticalRequest()
         {
             _ = await InitTableAsync(NullLogger.Instance);
@@ -330,7 +329,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
             Assert.Equal("1", response.Item["Value"].N);
         }
 
-        [SkippableFact]
+        [Fact]
         public void TransactionConflictCancellation_IsNotClassifiedAsStorageConflict()
         {
             var batchOperation = typeof(DynamoDBTransactionalStateStorage<TestState>).GetNestedType(

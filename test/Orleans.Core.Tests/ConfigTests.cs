@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Sockets;
 using Orleans.Runtime.Configuration;
 using Xunit;
-using Xunit.Abstractions;
 
 // ReSharper disable RedundantTypeArgumentsOfMethod
 // ReSharper disable CheckNamespace

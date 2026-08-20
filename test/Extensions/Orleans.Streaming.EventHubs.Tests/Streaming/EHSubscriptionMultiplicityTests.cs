@@ -63,49 +63,49 @@ namespace ServiceBus.Tests.StreamingTests
             runner = new SubscriptionMultiplicityTestRunner(StreamProviderName, fixture.HostedCluster);            
         }
 
-        [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHMultipleParallelSubscriptionTest()
         {
             this.fixture.Logger.LogInformation("************************ EHMultipleParallelSubscriptionTest *********************************");
             await runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHMultipleLinearSubscriptionTest()
         {
             this.fixture.Logger.LogInformation("************************ EHMultipleLinearSubscriptionTest *********************************");
             await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHMultipleSubscriptionTest_AddRemove()
         {
             this.fixture.Logger.LogInformation("************************ EHMultipleSubscriptionTest_AddRemove *********************************");
             await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHResubscriptionTest()
         {
             this.fixture.Logger.LogInformation("************************ EHResubscriptionTest *********************************");
             await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHResubscriptionAfterDeactivationTest()
         {
             this.fixture.Logger.LogInformation("************************ EHResubscriptionAfterDeactivationTest *********************************");
             await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHActiveSubscriptionTest()
         {
             this.fixture.Logger.LogInformation("************************ EHActiveSubscriptionTest *********************************");
             await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHTwoIntermittentStreamTest()
         {
             this.fixture.Logger.LogInformation("************************ EHTwoIntermittentStreamTest *********************************");

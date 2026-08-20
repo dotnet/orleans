@@ -9,7 +9,6 @@ using Orleans.TestingHost;
 using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Tester.AzureUtils.Streaming
 {
@@ -32,9 +31,13 @@ namespace Tester.AzureUtils.Streaming
             this.output = output;
         }
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             await base.InitializeAsync();
+            if (!PreconditionsMet)
+            {
+                return;
+            }
             runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 
@@ -73,8 +76,13 @@ namespace Tester.AzureUtils.Streaming
             }
         }
 
-        public override async Task DisposeAsync()
+        public override async ValueTask DisposeAsync()
         {
+            if (!PreconditionsMet)
+            {
+                return;
+            }
+
             await base.DisposeAsync();
             try
             {
@@ -84,20 +92,20 @@ namespace Tester.AzureUtils.Streaming
                     new AzureQueueOptions().ConfigureTestDefaults());
                 await TestAzureTableStorageStreamFailureHandler.DeleteAll();
             }
-            catch (SkipException)
+            catch (Xunit.Sdk.SkipException)
             {
                 // Ignore
             }
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5639"), TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("Streaming")]
+        [Fact(Skip = "https://github.com/dotnet/orleans/issues/5639"), TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("Streaming")]
         public async Task AQStreamProducerOnDroppedClientTest()
         {
             logger.LogInformation("************************ AQStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(AQStreamProviderName, StreamNamespace);
         }
 
-        [SkippableFact(Skip = "AzureQueue has unpredictable event delivery counts - re-enable when we figure out how to handle this."), TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("Streaming")]
+        [Fact(Skip = "AzureQueue has unpredictable event delivery counts - re-enable when we figure out how to handle this."), TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("Streaming")]
         public async Task AQStreamConsumerOnDroppedClientTest()
         {
             logger.LogInformation("************************ AQStreamConsumerOnDroppedClientTest *********************************");

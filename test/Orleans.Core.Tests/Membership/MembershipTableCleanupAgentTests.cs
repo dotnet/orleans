@@ -11,7 +11,6 @@ using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace NonSilo.Tests.Membership
 {

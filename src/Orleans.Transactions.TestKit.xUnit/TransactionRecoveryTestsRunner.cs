@@ -1,7 +1,6 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Orleans.TestingHost;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Transactions.TestKit.xUnit
 {
@@ -12,7 +11,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         {
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, 30)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, 20)]
         public override Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent)
@@ -20,7 +19,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.TransactionWillRecoverAfterRandomSiloGracefulShutdown(transactionTestGrainClassName, concurrent);
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, 30)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, 20)]
         public override Task TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(string transactionTestGrainClassName, int concurrent)

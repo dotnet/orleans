@@ -413,7 +413,8 @@ public class TransactionDiagnosticEventsTests
 
         var transition = await observer.WaitForNextTransitionAsync(
             afterSequence: 0,
-            GetDeadline(RecoveryObservationTimeout));
+            GetDeadline(RecoveryObservationTimeout),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(TransactionRecoveryEventObserver.RecoveryTransitionKind.StorageWriteCompleted, transition.Kind);
         Assert.Equal(committedTransactionIds, transition.TransactionIds);
@@ -442,7 +443,8 @@ public class TransactionDiagnosticEventsTests
         var confirmation = observer.WaitForCommitConfirmationAsync(
             afterSequence: 0,
             participantCount: 3,
-            GetDeadline(RecoveryObservationTimeout));
+            GetDeadline(RecoveryObservationTimeout),
+            TestContext.Current.CancellationToken);
 
         TransactionDiagnosticEvents.EmitStorageWriteCompleted(
             manager,
@@ -517,7 +519,8 @@ public class TransactionDiagnosticEventsTests
             transactionId,
             resource.Reference.GrainId,
             afterSequence: 0,
-            GetDeadline(RecoveryObservationTimeout));
+            GetDeadline(RecoveryObservationTimeout),
+            TestContext.Current.CancellationToken);
 
         TransactionDiagnosticEvents.EmitStorageConflictDetected(
             resource,
@@ -558,7 +561,8 @@ public class TransactionDiagnosticEventsTests
 
         var transition = await observer.WaitForNextTransitionAsync(
             afterSequence: 0,
-            GetDeadline(RecoveryObservationTimeout));
+            GetDeadline(RecoveryObservationTimeout),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(TransactionRecoveryEventObserver.RecoveryTransitionKind.LockExpired, transition.Kind);
         Assert.Equal(transactionId, transition.TransactionId);
@@ -637,7 +641,10 @@ public class TransactionDiagnosticEventsTests
             DateTime.UtcNow,
             manager);
 
-        var transition = await observer.WaitForNextTransitionAsync(0, GetDeadline(RecoveryObservationTimeout));
+        var transition = await observer.WaitForNextTransitionAsync(
+            0,
+            GetDeadline(RecoveryObservationTimeout),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(TransactionRecoveryEventObserver.RecoveryTransitionKind.RemotePreparePersisted, transition.Kind);
         Assert.Equal(transactionId, transition.TransactionId);
@@ -662,7 +669,8 @@ public class TransactionDiagnosticEventsTests
 
         var transition = await observer.WaitForNextTransitionAsync(
             afterSequence,
-            GetDeadline(RecoveryObservationTimeout));
+            GetDeadline(RecoveryObservationTimeout),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(TransactionRecoveryEventObserver.RecoveryTransitionKind.RemotePreparedSent, transition.Kind);
     }
@@ -754,7 +762,8 @@ public class TransactionDiagnosticEventsTests
         var timeout = await Assert.ThrowsAsync<TimeoutException>(
             () => observer.WaitForNextTransitionAsync(
                 observer.LatestRelevantSequence,
-                GetDeadline(TimeSpan.FromMilliseconds(20))));
+                GetDeadline(TimeSpan.FromMilliseconds(20)),
+                TestContext.Current.CancellationToken));
         Assert.Contains("Transaction recovery timeline: <no relevant events>", timeout.Message);
     }
 

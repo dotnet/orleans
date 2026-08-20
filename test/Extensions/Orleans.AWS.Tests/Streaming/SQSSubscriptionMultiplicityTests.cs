@@ -28,7 +28,7 @@ namespace AWSUtils.Tests.Streaming
         {
             if (!AWSTestConstants.IsSqsAvailable)
             {
-                throw new SkipException("Empty connection string");
+                throw Xunit.Sdk.SkipException.ForSkip("Empty connection string");
             }
 
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
@@ -60,14 +60,23 @@ namespace AWSUtils.Tests.Streaming
             }
         }
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             await base.InitializeAsync();
+            if (!PreconditionsMet)
+            {
+                return;
+            }
             runner = new SubscriptionMultiplicityTestRunner(SQSStreamProviderName, this.HostedCluster);
         }
 
-        public override async Task DisposeAsync()
+        public override async ValueTask DisposeAsync()
         {
+            if (!PreconditionsMet)
+            {
+                return;
+            }
+
             var clusterId = HostedCluster.Options.ClusterId;
             await base.DisposeAsync();
             if (!string.IsNullOrWhiteSpace(StreamConnectionString))
@@ -76,56 +85,56 @@ namespace AWSUtils.Tests.Streaming
             }
         }
 
-        [SkippableFact, TestCategory("AWS")]
+        [Fact, TestCategory("AWS")]
         public async Task SQSMultipleParallelSubscriptionTest()
         {
             logger.LogInformation("************************ SQSMultipleParallelSubscriptionTest *********************************");
             await runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("AWS")]
+        [Fact, TestCategory("AWS")]
         public async Task SQSMultipleLinearSubscriptionTest()
         {
             logger.LogInformation("************************ SQSMultipleLinearSubscriptionTest *********************************");
             await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("AWS")]
+        [Fact, TestCategory("AWS")]
         public async Task SQSMultipleSubscriptionTest_AddRemove()
         {
             logger.LogInformation("************************ SQSMultipleSubscriptionTest_AddRemove *********************************");
             await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("AWS")]
+        [Fact, TestCategory("AWS")]
         public async Task SQSResubscriptionTest()
         {
             logger.LogInformation("************************ SQSResubscriptionTest *********************************");
             await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("AWS")]
+        [Fact, TestCategory("AWS")]
         public async Task SQSResubscriptionAfterDeactivationTest()
         {
             logger.LogInformation("************************ ResubscriptionAfterDeactivationTest *********************************");
             await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("AWS")]
+        [Fact, TestCategory("AWS")]
         public async Task SQSActiveSubscriptionTest()
         {
             logger.LogInformation("************************ SQSActiveSubscriptionTest *********************************");
             await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("AWS")]
+        [Fact, TestCategory("AWS")]
         public async Task SQSTwoIntermittentStreamTest()
         {
             logger.LogInformation("************************ SQSTwoIntermittentStreamTest *********************************");
             await runner.TwoIntermittentStreamTest(Guid.NewGuid());
         }
 
-        [SkippableFact, TestCategory("AWS")]
+        [Fact, TestCategory("AWS")]
         public async Task SQSSubscribeFromClientTest()
         {
             logger.LogInformation("************************ SQSSubscribeFromClientTest *********************************");

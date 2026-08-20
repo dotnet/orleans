@@ -32,7 +32,7 @@ namespace UnitTests.RemindersTest
             return filters;
         }
 
-        public override Task DisposeAsync()
+        public override ValueTask DisposeAsync()
         {
             // Reset init timeout after tests
             return base.DisposeAsync();
@@ -52,24 +52,24 @@ namespace UnitTests.RemindersTest
             return Task.FromResult("not used");
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public void RemindersTable_Azure_Init()
         {
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task RemindersTable_Azure_RemindersRange()
         {
             await RemindersRange(50);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task RemindersTable_Azure_RemindersParallelUpsert()
         {
             await RemindersParallelUpsert();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task RemindersTable_Azure_ReminderSimple()
         {
             await ReminderSimple();

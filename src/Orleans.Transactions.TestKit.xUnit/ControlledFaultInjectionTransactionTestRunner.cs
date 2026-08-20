@@ -1,6 +1,5 @@
 using System.Threading.Tasks;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Transactions.TestKit.xUnit
 {
@@ -10,19 +9,19 @@ namespace Orleans.Transactions.TestKit.xUnit
          : base(grainFactory, output.WriteLine)
         { }
 
-        [SkippableFact]
+        [Fact]
         public override Task SingleGrainReadTransaction()
         {
             return base.SingleGrainReadTransaction();
         }
 
-        [SkippableFact]
+        [Fact]
         public override Task SingleGrainWriteTransaction()
         {
             return base.SingleGrainWriteTransaction();
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionFaultInjectPhase.AfterPrepare, FaultInjectionType.Deactivation)]
         [InlineData(TransactionFaultInjectPhase.AfterConfirm, FaultInjectionType.Deactivation)]
         [InlineData(TransactionFaultInjectPhase.AfterPrepared, FaultInjectionType.Deactivation)]

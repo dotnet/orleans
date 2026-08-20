@@ -8,7 +8,6 @@ using Orleans.Configuration;
 using Orleans.Runtime.MembershipService;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 using static Orleans.Runtime.MembershipService.SiloHealthMonitor;
 
 namespace NonSilo.Tests.Membership

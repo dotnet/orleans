@@ -16,7 +16,7 @@ public class SiloMetadataPlacementFilterTests(SiloMetadataPlacementFilterTests.F
     public class Fixture : IAsyncLifetime
     {
         public InProcessTestCluster Cluster { get; private set; } = null!;
-        public async Task DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             if (Cluster is { } cluster)
             {
@@ -24,7 +24,7 @@ public class SiloMetadataPlacementFilterTests(SiloMetadataPlacementFilterTests.F
             }
         }
 
-        public async Task InitializeAsync()
+        public async ValueTask InitializeAsync()
         {
             var builder = new InProcessTestClusterBuilder(3);
             builder.ConfigureSilo((options, siloBuilder) => siloBuilder.UseSiloMetadata(new Dictionary<string, string>

@@ -1,6 +1,6 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
-using Xunit.Abstractions;
+using Xunit;
 
 namespace Orleans.Serialization.TestKit
 {

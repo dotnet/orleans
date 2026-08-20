@@ -94,7 +94,10 @@ public class ArraySerializeBenchmark
     [Benchmark(Baseline = true), BenchmarkCategory("BufferWriter")]
     public void MessagePackBufferWriter()
     {
-        MessagePackSerializer.Serialize(_arrayBufferWriter, _value);
+        MessagePackSerializer.Serialize(
+            _arrayBufferWriter,
+            _value,
+            cancellationToken: TestContext.Current.CancellationToken);
         _arrayBufferWriter.Clear();
     }
 

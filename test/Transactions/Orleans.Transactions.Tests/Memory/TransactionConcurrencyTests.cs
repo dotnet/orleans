@@ -1,5 +1,4 @@
-﻿using Orleans.Transactions.TestKit.xUnit;
-using Xunit.Abstractions;
+using Orleans.Transactions.TestKit.xUnit;
 using Xunit;
 
 namespace Orleans.Transactions.Tests

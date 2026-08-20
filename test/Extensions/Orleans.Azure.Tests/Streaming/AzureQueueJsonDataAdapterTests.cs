@@ -15,7 +15,6 @@ using Orleans.Streaming.AzureStorage.Providers.Streams.AzureQueue.Json;
 using Orleans.Streams;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Tester.AzureUtils.Streaming
 {

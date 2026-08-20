@@ -1,5 +1,4 @@
-﻿using Xunit;
-using Xunit.Abstractions;
+using Xunit;
 using Orleans.LeaseProviders;
 
 namespace TestExtensions.Runners
@@ -17,7 +16,7 @@ namespace TestExtensions.Runners
             this.output = output;
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task ProviderCanAcquireLeases()
         {
             var leaseRequests = new List<LeaseRequest>() {
@@ -34,7 +33,7 @@ namespace TestExtensions.Runners
             };
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task ProviderCanReleaseLeases()
         {
             var leaseRequests = new List<LeaseRequest>() {
@@ -46,7 +45,7 @@ namespace TestExtensions.Runners
             await this.leaseProvider.Release(LeaseCategory, results.Select(result => result.AcquiredLease!).ToArray()); // This golden path expects every acquisition to succeed.
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task ProviderCanRenewLeases()
         {
             var leaseRequests = new List<LeaseRequest>() {
@@ -65,7 +64,7 @@ namespace TestExtensions.Runners
             };
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Provider_TryAcquireLeaseWhichBelongToOtherEntity_Return_LeaseNotAvailable()
         {
             var resourceId = Guid.NewGuid().ToString();
@@ -79,7 +78,7 @@ namespace TestExtensions.Runners
             Assert.Contains(results, result => result.StatusCode == ResponseCode.LeaseNotAvailable);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Provider_TryRenewLeaseWithWrongToken_Return_InvalidToken()
         {
             var leaseRequests = new List<LeaseRequest>() {
@@ -99,7 +98,7 @@ namespace TestExtensions.Runners
             }
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Provider_LifeCycle_Acqurie_Renew_Release_ShouldBeAbleToAcquireLeaseOnTheSameResourceAfterRelease()
         {
             var resourceId = Guid.NewGuid().ToString();

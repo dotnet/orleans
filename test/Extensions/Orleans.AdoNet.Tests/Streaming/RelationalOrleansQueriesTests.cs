@@ -19,7 +19,7 @@ namespace Tester.AdoNet.Streaming;
 [TestSuite("Functional")]
 public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueriesTests(AdoNetInvariants.InvariantNameSqlServer, 90)
 {
-    [SkippableFact]
+    [Fact]
     public Task RelationalOrleansQueries_SerializesQueueMessageCommits() => VerifySqlServerQueueMessageCommitsAreSerialized();
 }
 
@@ -36,7 +36,7 @@ public class MySqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
         MySqlConnection.ClearAllPools();
     }
 
-    [SkippableFact]
+    [Fact]
     public Task RelationalOrleansQueries_OrdersProviderResults() => VerifyProviderResultsAreOrdered();
 }
 
@@ -67,10 +67,10 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     private IRelationalStorage _storage = null!;
     private RelationalOrleansQueries _queries = null!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var testing = await RelationalStorageForTesting.SetupInstance(invariant, TestDatabaseName);
-        Skip.If(IsNullOrEmpty(testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
+        Assert.SkipWhen(IsNullOrEmpty(testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
         _storage = RelationalStorage.CreateInstance(invariant, testing.CurrentConnectionString);
 
@@ -115,7 +115,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         }));
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     protected async Task VerifyProviderResultsAreOrdered()
     {
@@ -214,7 +214,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// <summary>
     /// Tests that a single message is queued.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task RelationalOrleansQueries_QueuesMessage()
     {
         // arrange
@@ -258,7 +258,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// </summary>
     [TestSuite("Stress")]
     [TestCategory("Stress")]
-    [SkippableFact]
+    [Fact]
     public async Task RelationalOrleansQueries_QueuesManyMessagesInParallel()
     {
         // arrange
@@ -336,7 +336,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// </summary>
     [TestSuite("Stress")]
     [TestCategory("Stress")]
-    [SkippableFact]
+    [Fact]
     public async Task RelationalOrleansQueries_QueuesManyMessagesInParallelOnManyQueues()
     {
         // arrange - create up to 27 random partition keys with around 1000 random messages per partition in random order
@@ -414,7 +414,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// <summary>
     /// Tests that a single message is dequeued correctly.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task RelationalOrleansQueries_DequeuesSingleMessage()
     {
         // arrange
@@ -483,7 +483,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// <summary>
     /// Tests that messages are dequeued in a batch.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task RelationalOrleansQueries_DequeuesMessageBatches()
     {
         // arrange
@@ -566,7 +566,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// <summary>
     /// Tests that a single message is re-dequeued after visibility timeout until max attempts.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task RelationalOrleansQueries_DequeuesSingleMessageAgainAfterVisibilityTimeout()
     {
         // arrange
@@ -638,7 +638,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// <summary>
     /// Tests that a single message is not dequeued again before the visibility timeout.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task RelationalOrleansQueries_DoesNotDequeueSingleMessageBeforeVisibilityTimeout()
     {
         // arrange
@@ -687,7 +687,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// <summary>
     /// Tests that a message can be released for immediate redelivery using its dequeue receipt.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task RelationalOrleansQueries_ReleasesMessageUsingDequeueReceipt()
     {
         var serviceId = $"Service-{Guid.NewGuid()}";
@@ -724,7 +724,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// <summary>
     /// Tests that a single message is not dequeued again after expiry
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task RelationalOrleansQueries_DoesNotDequeueSingleMessageAfterExpiry()
     {
         // arrange
@@ -772,7 +772,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// <summary>
     /// Tests that messages can be confirmed.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task RelationalOrleansQueries_ConfirmsMessages()
     {
         // arrange
@@ -820,7 +820,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// <summary>
     /// Tests that messages are not confirmed if the receipt is incorrect.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task RelationalOrleansQueries_DoesNotConfirmMessagesWithWrongReceipt()
     {
         // arrange
@@ -862,7 +862,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// <summary>
     /// Chaos tests that some messages can be confirmed while others are not.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task RelationalOrleansQueries_ConfirmsSomeMessagesAndNotOthers()
     {
         // arrange
@@ -925,7 +925,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// </remarks>
     [TestSuite("Stress")]
     [TestCategory("Stress")]
-    [SkippableFact]
+    [Fact]
     public async Task RelationalOrleansQueries_ChaosTest()
     {
         // arrange - generate test data
@@ -1068,7 +1068,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// <summary>
     /// Tests that a poisoned message can be moved to dead letters.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task RelationalOrleansQueries_MovesPoisonedMessageToDeadLetters()
     {
         // arrange
@@ -1109,7 +1109,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     /// <summary>
     /// Tests that a healthy message is not moved to dead letters.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task RelationalOrleansQueries_DoesNotMoveHealthyMessageToDeadLetters()
     {
         // arrange

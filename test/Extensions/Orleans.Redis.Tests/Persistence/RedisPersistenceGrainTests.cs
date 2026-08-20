@@ -9,7 +9,6 @@ using TestExtensions;
 using TestExtensions.Runners;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Tester.Redis.Persistence
 {
@@ -93,7 +92,7 @@ namespace Tester.Redis.Persistence
         private readonly GrainState state;
         private readonly IDatabase database;
 
-        [SkippableFact]
+        [Fact]
         public async Task Redis_InitializeWithNoStateTest()
         {
             var grain = fixture.GrainFactory.GetGrain<IGrainStorageGenericGrain<GrainState>>(0);
@@ -108,7 +107,7 @@ namespace Tester.Redis.Persistence
             //Assert.Equal(default(ITestGrain), result.GrainValue);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Redis_TestStaticIdentifierGrains()
         {
             var grain = fixture.GrainFactory.GetGrain<IGrainStorageGenericGrain<GrainState>>(12345);
@@ -123,7 +122,7 @@ namespace Tester.Redis.Persistence
             Assert.Equal(result.GrainValue, state.GrainValue);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Redis_TestRedisScriptCacheClearBeforeGrainWriteState()
         {
             var grain = fixture.GrainFactory.GetGrain<IGrainStorageGenericGrain<GrainState>>(1111);
@@ -150,7 +149,7 @@ namespace Tester.Redis.Persistence
             Assert.Equal(result.GrainValue, state.GrainValue);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Redis_DoubleActivationETagConflictSimulation()
         {
             var grain = fixture.GrainFactory.GetGrain<IGrainStorageGenericGrain<GrainState>>(54321);

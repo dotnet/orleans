@@ -1,6 +1,6 @@
 using Orleans.TestingHost;
 using TestExtensions.Runners;
-using Xunit.Abstractions;
+using Xunit;
 
 
 namespace Orleans.Persistence.Firestore.Tests;

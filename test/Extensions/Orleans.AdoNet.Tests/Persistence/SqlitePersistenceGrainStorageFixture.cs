@@ -39,13 +39,13 @@ namespace Tester.AdoNet.Persistence
 
         public AdoNetGrainStorage Storage { get; private set; } = null!;
 
-        public async Task InitializeAsync()
+        public async ValueTask InitializeAsync()
         {
             await this.InitializeSchemaAsync();
             this.Storage = await this.CreateGrainStorageAsync();
         }
 
-        public Task DisposeAsync() => Task.CompletedTask;
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
         public async Task InitializeSchemaAsync()
         {

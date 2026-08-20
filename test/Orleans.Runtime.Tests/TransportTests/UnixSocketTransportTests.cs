@@ -27,7 +27,7 @@ public class UnixSocketTransportTests : TransportTestsBase, IClassFixture<UnixSo
             }
             catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AddressFamilyNotSupported)
             {
-                throw new SkipException("Unix socket not supported", ex);
+                throw Xunit.Sdk.SkipException.ForSkip($"Unix socket not supported: {ex.Message}");
             }
         }
 

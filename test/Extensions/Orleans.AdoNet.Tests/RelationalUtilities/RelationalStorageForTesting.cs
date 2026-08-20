@@ -95,10 +95,10 @@ namespace UnitTests.General
         {
             if (string.IsNullOrWhiteSpace(connectionString))
             {
-                Skip.IfNot(ConnectionStringsByInvariant.TryGetValue(invariantName, out connectionString), $"Unknown ADO.NET invariant, '{invariantName}'");
+                Assert.SkipUnless(ConnectionStringsByInvariant.TryGetValue(invariantName, out connectionString), $"Unknown ADO.NET invariant, '{invariantName}'");
             }
 
-            Skip.If(string.IsNullOrEmpty(connectionString), "Connection string not provided.");
+            Assert.SkipWhen(string.IsNullOrEmpty(connectionString), "Connection string not provided.");
         }
 
         public static async Task<RelationalStorageForTesting> SetupInstance(string invariantName, string testDatabaseName, string? connectionString = null)
@@ -177,7 +177,7 @@ namespace UnitTests.General
             }
             else
             {
-                throw new SkipException("ConnectionString not provided.");
+                throw Xunit.Sdk.SkipException.ForSkip("ConnectionString not provided.");
             }
         }
 

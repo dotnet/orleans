@@ -16,7 +16,7 @@ namespace Tester
             if ((UseAadAuthentication && (TableEndpoint == null)) ||
                 (!UseAadAuthentication && string.IsNullOrWhiteSpace(DataConnectionString)))
             {
-                throw new SkipException("No connection string found. Skipping");
+                throw Xunit.Sdk.SkipException.ForSkip("No connection string found. Skipping");
             }
 
             bool usingLocalWAS = string.Equals(DataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
@@ -32,7 +32,7 @@ namespace Tester
             {
                 string errorMsg = "Azure Storage Emulator could not be started.";
                 Console.WriteLine(errorMsg);
-                throw new SkipException(errorMsg);
+                throw Xunit.Sdk.SkipException.ForSkip(errorMsg);
             }
         }
 
@@ -41,7 +41,7 @@ namespace Tester
             if ((UseAadAuthentication && (EventHubFullyQualifiedNamespace == null)) ||
                 (!UseAadAuthentication && string.IsNullOrWhiteSpace(EventHubConnectionString)))
             {
-                throw new SkipException("No connection string found. Skipping");
+                throw Xunit.Sdk.SkipException.ForSkip("No connection string found. Skipping");
             }
         }
 
@@ -49,7 +49,7 @@ namespace Tester
         {
             if (string.IsNullOrWhiteSpace(RedisConnectionString))
             {
-                throw new SkipException("No connection string found. Skipping");
+                throw Xunit.Sdk.SkipException.ForSkip("No connection string found. Skipping");
             }
         }
 

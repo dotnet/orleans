@@ -28,16 +28,16 @@ public abstract class RepartitioningTestBase<TFixture> : IAsyncLifetime where TF
         Silo2Repartitioner = IActivationRepartitionerSystemTarget.GetReference(GrainFactory, Silo2);
     }
 
-    public virtual async Task InitializeAsync()
+    public virtual async ValueTask InitializeAsync()
     {
         await GrainFactory.GetGrain<IManagementGrain>(0).ForceActivationCollection(TimeSpan.FromSeconds(0));
         await ResetCounters();
         await AdjustActivationCountOffsets();
     }
 
-    public virtual Task DisposeAsync()
+    public virtual ValueTask DisposeAsync()
     {
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     public async ValueTask ResetCounters()

@@ -8,6 +8,8 @@ namespace TestExtensions
     public abstract class TestClusterPerTest : OrleansTestingBase, Xunit.IAsyncLifetime
     {
         private readonly ExceptionDispatchInfo? preconditionsException;
+
+        protected bool PreconditionsMet => this.preconditionsException is null;
         static TestClusterPerTest()
         {
             TestDefaultConfiguration.InitializeDefaults();
@@ -17,7 +19,14 @@ namespace TestExtensions
 
         internal IInternalClusterClient InternalClient => (IInternalClusterClient)this.Client;
 
-        public IClusterClient Client => this.HostedCluster.Client;
+        public IClusterClient Client
+        {
+            get
+            {
+                this.EnsurePreconditionsMet();
+                return this.HostedCluster.Client;
+            }
+        }
 
         protected IGrainFactory GrainFactory => this.Client;
 
@@ -48,9 +57,10 @@ namespace TestExtensions
         {
         }
 
-        public virtual async Task InitializeAsync()
+        public virtual async ValueTask InitializeAsync()
         {
-            EnsurePreconditionsMet();
+            this.EnsurePreconditionsMet();
+
             var builder = new TestClusterBuilder();
             TestDefaultConfiguration.ConfigureTestCluster(builder);
             this.ConfigureTestCluster(builder);
@@ -65,7 +75,7 @@ namespace TestExtensions
             this.logger = this.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
         }
 
-        public virtual async Task DisposeAsync()
+        public virtual async ValueTask DisposeAsync()
         {
             var cluster = this.HostedCluster;
             if (cluster is null) return;

@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using System.IO.Pipelines;
 using Xunit;
 using Orleans.Serialization.Serializers;
-using Xunit.Abstractions;
 
 namespace Orleans.Serialization.TestKit
 {

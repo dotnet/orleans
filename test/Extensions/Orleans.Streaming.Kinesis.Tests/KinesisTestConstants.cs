@@ -18,7 +18,7 @@ internal static class KinesisTestConstants
     {
         if (!IsAvailable)
         {
-            throw new SkipException("Empty connection string");
+            throw Xunit.Sdk.SkipException.ForSkip("Empty connection string");
         }
     }
 
@@ -26,7 +26,7 @@ internal static class KinesisTestConstants
     {
         if (!IsDynamoDbAvailable)
         {
-            throw new SkipException("DynamoDB service is not configured");
+            throw Xunit.Sdk.SkipException.ForSkip("DynamoDB service is not configured");
         }
     }
 }

@@ -49,7 +49,7 @@ namespace UnitTests.CancellationTests
             using var cts = new GrainCancellationTokenSource();
             var callId = Guid.NewGuid();
             var grainTask = grain.LongWaitGrainCancellation(cts.Token, TimeSpan.FromSeconds(10), callId);
-            await Task.Delay(TimeSpan.FromMilliseconds(delay));
+            await Task.Delay(TimeSpan.FromMilliseconds(delay), TestContext.Current.CancellationToken);
             await cts.Cancel();
             await Assert.ThrowsAsync<TaskCanceledException>(() => grainTask);
             await WaitForCallCancellation(grain, callId);
@@ -67,7 +67,7 @@ namespace UnitTests.CancellationTests
             var grainTasks = grains
                 .Select(grain => Assert.ThrowsAsync<TaskCanceledException>(() => grain
                             .LongWaitGrainCancellationInterleaving(cts.Token, TimeSpan.FromSeconds(10), callId))).ToList();
-            await Task.Delay(TimeSpan.FromMilliseconds(delay));
+            await Task.Delay(TimeSpan.FromMilliseconds(delay), TestContext.Current.CancellationToken);
             await cts.Cancel();
             await Task.WhenAll(grainTasks);
             if (delay > 0)
@@ -92,7 +92,7 @@ namespace UnitTests.CancellationTests
                 {
                     using var cts = new GrainCancellationTokenSource();
                     var task = grain.LongWaitGrainCancellationInterleaving(cts.Token, TimeSpan.FromSeconds(10), callId);
-                    await Task.WhenAny(task, Task.Delay(TimeSpan.FromMilliseconds(delay)));
+                    await Task.WhenAny(task, Task.Delay(TimeSpan.FromMilliseconds(delay), TestContext.Current.CancellationToken));
                     await cts.Cancel();
                     try
                     {
@@ -143,7 +143,7 @@ namespace UnitTests.CancellationTests
             using var cts = new GrainCancellationTokenSource();
             var callId = Guid.NewGuid();
             var grainTask = grain.GrainCancellationTokenCallbackResolve(cts.Token, callId);
-            await Task.Delay(TimeSpan.FromMilliseconds(100));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
             await cts.Cancel();
             var result = await grainTask;
             Assert.True(result);
@@ -231,7 +231,7 @@ namespace UnitTests.CancellationTests
             var cts = new GrainCancellationTokenSource();
             var callId = Guid.NewGuid();
             var grainTask = grain.CallOtherLongRunningTaskGrainCancellation(target, cts.Token, TimeSpan.FromSeconds(10), callId);
-            await Task.Delay(TimeSpan.FromMilliseconds(delay));
+            await Task.Delay(TimeSpan.FromMilliseconds(delay), TestContext.Current.CancellationToken);
             await cts.Cancel();
             await Assert.ThrowsAsync<TaskCanceledException>(() => grainTask);
             if (delay > 0)

@@ -16,7 +16,7 @@ namespace Tester.Redis.Streaming;
 [TestCategory("Redis"), TestCategory("Streaming")]
 public sealed class RedisStreamingProviderBuilderTests
 {
-    [SkippableFact]
+    [Fact]
     public async Task SiloProviderBuilder_ServiceKey_ConfiguresSharedMultiplexer()
     {
         TestUtils.CheckForRedis();

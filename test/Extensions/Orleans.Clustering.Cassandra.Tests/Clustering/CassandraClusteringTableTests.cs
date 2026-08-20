@@ -7,7 +7,6 @@ using Orleans.Configuration;
 using Orleans.Messaging;
 using Tester.Cassandra.Utility;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Tester.Cassandra.Clustering;
 

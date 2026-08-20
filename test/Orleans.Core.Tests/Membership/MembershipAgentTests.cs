@@ -10,7 +10,6 @@ using Orleans.Runtime.MembershipService;
 using Orleans.Runtime.Messaging;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace NonSilo.Tests.Membership
 {

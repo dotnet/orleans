@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using AwesomeAssertions;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Tests;
 

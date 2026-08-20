@@ -45,11 +45,11 @@ namespace Orleans.Persistence.TestKit
         protected abstract void ConfigureSilo(Hosting.ISiloBuilder siloBuilder);
         protected virtual void ConfigureTestCluster(TestingHost.InProcessTestClusterBuilder builder) { }
 
-        public virtual System.Threading.Tasks.Task DisposeAsync() { throw null; }
+        public virtual System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
 
         public void EnsurePreconditionsMet() { }
 
-        public virtual System.Threading.Tasks.Task InitializeAsync() { throw null; }
+        public virtual System.Threading.Tasks.ValueTask InitializeAsync() { throw null; }
     }
 
     public abstract partial class GrainStorageTestRunner

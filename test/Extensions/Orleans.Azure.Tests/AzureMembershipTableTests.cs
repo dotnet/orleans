@@ -75,18 +75,18 @@ namespace Tester.AzureUtils
             return Task.FromResult("not used");
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public void MembershipTable_Azure_Init()
         {
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Azure_GetGateways()
         {
             await MembershipTable_GetGateways();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Azure_ReadAll_EmptyTable()
         {
             await MembershipTable_ReadAll_EmptyTable();
@@ -97,25 +97,25 @@ namespace Tester.AzureUtils
         /// Verifies that the entry is correctly stored with all required
         /// properties and can handle Azure's entity size limitations.
         /// </summary>
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Azure_InsertRow()
         {
             await MembershipTable_InsertRow();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Azure_ReadRow_Insert_Read()
         {
             await MembershipTable_ReadRow_Insert_Read();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Azure_ReadAll_Insert_ReadAll()
         {
             await MembershipTable_ReadAll_Insert_ReadAll();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Azure_UpdateRow()
         {
             await MembershipTable_UpdateRow();
@@ -126,7 +126,7 @@ namespace Tester.AzureUtils
         /// Verifies that Azure Table Storage's optimistic concurrency control
         /// correctly handles simultaneous updates from multiple silos.
         /// </summary>
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Azure_UpdateRowInParallel()
         {
             await MembershipTable_UpdateRowInParallel();
@@ -137,7 +137,7 @@ namespace Tester.AzureUtils
         /// Verifies that silos can efficiently update their liveness
         /// timestamps without conflicts or excessive storage operations.
         /// </summary>
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Azure_UpdateIAmAlive()
         {
             await MembershipTable_UpdateIAmAlive();

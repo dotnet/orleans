@@ -57,55 +57,55 @@ namespace Tester.Redis.Clustering
 
         protected override Task<string> GetConnectionString() => Task.FromResult(TestDefaultConfiguration.RedisConnectionString!);
 
-        [SkippableFact]
+        [Fact]
         public async Task GetGateways()
         {
             await MembershipTable_GetGateways();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task ReadAll_EmptyTable()
         {
             await MembershipTable_ReadAll_EmptyTable();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task InsertRow()
         {
             await MembershipTable_InsertRow();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task ReadRow_Insert_Read()
         {
             await MembershipTable_ReadRow_Insert_Read();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task ReadAll_Insert_ReadAll()
         {
             await MembershipTable_ReadAll_Insert_ReadAll();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task UpdateRow()
         {
             await MembershipTable_UpdateRow();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task UpdateRowInParallel()
         {
             await MembershipTable_UpdateRowInParallel(false);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task UpdateIAmAlive()
         {
             await MembershipTable_UpdateIAmAlive();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task CleanupDefunctSiloEntries()
         {
             await MembershipTable_CleanupDefunctSiloEntries(false);

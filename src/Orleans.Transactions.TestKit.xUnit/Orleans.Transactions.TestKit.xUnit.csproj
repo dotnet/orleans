@@ -20,6 +20,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Orleans.Transactions.TestKit.Base\Orleans.Transactions.TestKit.Base.csproj" />
   </ItemGroup>
 

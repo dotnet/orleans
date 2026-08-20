@@ -6,8 +6,8 @@ using Orleans.TestingHost;
 using Tester.StreamingTests;
 using TestExtensions;
 using UnitTests.General;
-using Xunit.Abstractions;
 using static System.String;
+using Xunit;
 
 namespace Tester.AdoNet.Streaming;
 
@@ -69,15 +69,19 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
     private static RelationalStorageForTesting _testing = null!;
     private ClientStreamTestRunner _runner = null!;
 
-    public override async Task InitializeAsync()
+    public override async ValueTask InitializeAsync()
     {
         // set up the adonet environment before the base initializes
         _testing = await RelationalStorageForTesting.SetupInstance(_invariant, TestDatabaseName);
 
-        Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
+        Assert.SkipWhen(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
         // base initialization must only happen after the above
         await base.InitializeAsync();
+        if (!PreconditionsMet)
+        {
+            return;
+        }
 
         _runner = new ClientStreamTestRunner(HostedCluster);
     }
@@ -117,10 +121,10 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
         }
     }
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public Task AdoNetStreamProducerOnDroppedClientTest() => _runner.StreamProducerOnDroppedClientTest(AdoNetStreamProviderName, StreamNamespace);
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public virtual Task AdoNetStreamConsumerOnDroppedClientTest()
     {
         return _runner.StreamConsumerOnDroppedClientTest(

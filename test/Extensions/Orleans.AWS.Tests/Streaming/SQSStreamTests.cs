@@ -27,7 +27,7 @@ namespace AWSUtils.Tests.Streaming
         {
             if (!AWSTestConstants.IsSqsAvailable)
             {
-                throw new SkipException("Empty connection string");
+                throw Xunit.Sdk.SkipException.ForSkip("Empty connection string");
             }
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
@@ -75,14 +75,23 @@ namespace AWSUtils.Tests.Streaming
             }
         }
         
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             await base.InitializeAsync();
+            if (!PreconditionsMet)
+            {
+                return;
+            }
             runner = new SingleStreamTestRunner(this.InternalClient, SQS_STREAM_PROVIDER_NAME);
         }
 
-        public override async Task DisposeAsync()
+        public override async ValueTask DisposeAsync()
         {
+            if (!PreconditionsMet)
+            {
+                return;
+            }
+
             var clusterId = HostedCluster.Options.ClusterId;
             await base.DisposeAsync();
             if (!string.IsNullOrWhiteSpace(AWSTestConstants.SqsConnectionString))
@@ -93,25 +102,25 @@ namespace AWSUtils.Tests.Streaming
 
         ////------------------------ One to One ----------------------//
 
-        [SkippableFact]
+        [Fact]
         public async Task SQS_01_OneProducerGrainOneConsumerGrain()
         {
             await runner.StreamTest_01_OneProducerGrainOneConsumerGrain();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task SQS_02_OneProducerGrainOneConsumerClient()
         {
             await runner.StreamTest_02_OneProducerGrainOneConsumerClient();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task SQS_03_OneProducerClientOneConsumerGrain()
         {
             await runner.StreamTest_03_OneProducerClientOneConsumerGrain();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task SQS_04_OneProducerClientOneConsumerClient()
         {
             await runner.StreamTest_04_OneProducerClientOneConsumerClient();
@@ -119,50 +128,50 @@ namespace AWSUtils.Tests.Streaming
 
         //------------------------ MANY to Many different grains ----------------------//
 
-        [SkippableFact]
+        [Fact]
         public async Task SQS_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
         {
             await runner.StreamTest_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task SQS_06_ManyDifferent_ManyProducerGrainManyConsumerClients()
         {
             await runner.StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task SQS_07_ManyDifferent_ManyProducerClientsManyConsumerGrains()
         {
             await runner.StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task SQS_08_ManyDifferent_ManyProducerClientsManyConsumerClients()
         {
             await runner.StreamTest_08_ManyDifferent_ManyProducerClientsManyConsumerClients();
         }
 
         //------------------------ MANY to Many Same grains ----------------------//
-        [SkippableFact]
+        [Fact]
         public async Task SQS_09_ManySame_ManyProducerGrainsManyConsumerGrains()
         {
             await runner.StreamTest_09_ManySame_ManyProducerGrainsManyConsumerGrains();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task SQS_10_ManySame_ManyConsumerGrainsManyProducerGrains()
         {
             await runner.StreamTest_10_ManySame_ManyConsumerGrainsManyProducerGrains();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task SQS_11_ManySame_ManyProducerGrainsManyConsumerClients()
         {
             await runner.StreamTest_11_ManySame_ManyProducerGrainsManyConsumerClients();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task SQS_12_ManySame_ManyProducerClientsManyConsumerGrains()
         {
             await runner.StreamTest_12_ManySame_ManyProducerClientsManyConsumerGrains();
@@ -170,13 +179,13 @@ namespace AWSUtils.Tests.Streaming
 
         //------------------------ MANY to Many producer consumer same grain ----------------------//
 
-        [SkippableFact]
+        [Fact]
         public async Task SQS_13_SameGrain_ConsumerFirstProducerLater()
         {
             await runner.StreamTest_13_SameGrain_ConsumerFirstProducerLater(false);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task SQS_14_SameGrain_ProducerFirstConsumerLater()
         {
             await runner.StreamTest_14_SameGrain_ProducerFirstConsumerLater(false);
@@ -184,20 +193,20 @@ namespace AWSUtils.Tests.Streaming
 
         //----------------------------------------------//
 
-        [SkippableFact]
+        [Fact]
         public async Task SQS_15_ConsumeAtProducersRequest()
         {
             await runner.StreamTest_15_ConsumeAtProducersRequest();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task SQS_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
         {
             var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, SQS_STREAM_PROVIDER_NAME, 16, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task SQS_17_MultipleStreams_1J_ManyProducerGrainsManyConsumerGrains()
         {
             var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, SQS_STREAM_PROVIDER_NAME, 17, false);

@@ -42,7 +42,7 @@ namespace DefaultCluster.Tests.General
                 portAllocator = new TestClusterPortAllocator();
             }
 
-            public async Task InitializeAsync()
+            public async ValueTask InitializeAsync()
             {
                 var (siloPort, gatewayPort) = portAllocator.AllocateConsecutivePortPairs(1);
                 Host = Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder()
@@ -63,7 +63,7 @@ namespace DefaultCluster.Tests.General
                 await Host.StartAsync();
             }
 
-            public async Task DisposeAsync()
+            public async ValueTask DisposeAsync()
             {
                 try
                 {

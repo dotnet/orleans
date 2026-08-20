@@ -9,7 +9,6 @@ using Orleans.Streaming.NATS;
 using Orleans.Providers.Streams.Common;
 using Xunit;
 using NATS.Client.Core;
-using Xunit.Abstractions;
 using NATS.Client.JetStream;
 
 namespace NATS.Tests;
@@ -34,7 +33,7 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
     {
         if (!NatsTestConstants.IsNatsAvailable)
         {
-            throw new SkipException("Nats Server is not available");
+            throw Xunit.Sdk.SkipException.ForSkip("Nats Server is not available");
         }
 
         this.output = output;
@@ -46,7 +45,7 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
         this.testStreamName = $"test-stream-{Guid.NewGuid()}";
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await natsConnection.ConnectAsync();
 
@@ -62,7 +61,7 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
         }
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (NatsTestConstants.IsNatsAvailable)
         {
@@ -74,7 +73,7 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
         }
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task SendAndReceiveFromNats()
     {
         var options = new NatsOptions { StreamName = testStreamName, NatsClientOptions = NatsTestConstants.NatsClientOptions };

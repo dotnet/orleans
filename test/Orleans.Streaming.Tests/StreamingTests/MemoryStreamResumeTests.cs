@@ -24,9 +24,13 @@ namespace Tester.StreamingTests
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             await base.InitializeAsync();
+            if (!PreconditionsMet)
+            {
+                return;
+            }
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             var managementGrain = this.Client.GetGrain<IManagementGrain>(0);

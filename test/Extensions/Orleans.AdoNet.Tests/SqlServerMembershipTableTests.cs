@@ -60,60 +60,60 @@ namespace UnitTests.MembershipTests
             return instance.CurrentConnectionString;
         }
 
-        [SkippableFact]
+        [Fact]
         public void MembershipTable_SqlServer_Init()
         {
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_SqlServer_GetGateways()
         {
             await MembershipTable_GetGateways();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_SqlServer_ReadAll_EmptyTable()
         {
             await MembershipTable_ReadAll_EmptyTable();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_SqlServer_InsertRow()
         {
             await MembershipTable_InsertRow();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_SqlServer_ReadRow_Insert_Read()
         {
             await MembershipTable_ReadRow_Insert_Read();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_SqlServer_ReadAll_Insert_ReadAll()
         {
             await MembershipTable_ReadAll_Insert_ReadAll();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_SqlServer_UpdateRow()
         {
             await MembershipTable_UpdateRow();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_SqlServer_UpdateRowInParallel()
         {
             await MembershipTable_UpdateRowInParallel();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_SqlServer_UpdateIAmAlive()
         {
             await MembershipTable_UpdateIAmAlive();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTableSqlServerSql_CleanupDefunctSiloEntries()
         {
             await MembershipTable_CleanupDefunctSiloEntries();

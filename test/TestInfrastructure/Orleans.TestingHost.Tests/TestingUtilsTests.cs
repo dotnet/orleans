@@ -12,7 +12,11 @@ public class TestingUtilsTests
     [Fact]
     public async Task WaitUntilAsync_UntypedSingleParameterLambdaBindsLegacyOverload()
     {
-        await TestingUtils.WaitUntilAsync(_ => Task.FromResult(true), TimeSpan.FromSeconds(1));
+#pragma warning disable xUnit1051 // This test verifies binding to the legacy overload without cancellation.
+        await TestingUtils.WaitUntilAsync(
+            _ => Task.FromResult(true),
+            TimeSpan.FromSeconds(1));
+#pragma warning restore xUnit1051
     }
 
     [Fact]
@@ -26,7 +30,8 @@ public class TestingUtilsTests
                 calls++;
                 return Task.FromResult(true);
             },
-            TimeSpan.FromSeconds(1));
+            TimeSpan.FromSeconds(1),
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(result);
         Assert.Equal(1, calls);
@@ -40,7 +45,8 @@ public class TestingUtilsTests
         var result = await TestingUtils.WaitUntilSucceededAsync(
             _ => Task.FromResult(++calls == 3),
             TimeSpan.FromSeconds(1),
-            TimeSpan.Zero);
+            TimeSpan.Zero,
+            TestContext.Current.CancellationToken);
 
         Assert.True(result);
         Assert.Equal(3, calls);
@@ -52,7 +58,8 @@ public class TestingUtilsTests
         var result = await TestingUtils.WaitUntilSucceededAsync(
             _ => Task.FromResult(false),
             TimeSpan.FromMilliseconds(50),
-            TimeSpan.FromSeconds(1));
+            TimeSpan.FromSeconds(1),
+            TestContext.Current.CancellationToken);
 
         Assert.False(result);
     }
@@ -69,7 +76,8 @@ public class TestingUtilsTests
                 predicateSettled = true;
                 return true;
             },
-            TimeSpan.FromMilliseconds(25));
+            TimeSpan.FromMilliseconds(25),
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.False(result);
         Assert.True(predicateSettled);
@@ -80,6 +88,7 @@ public class TestingUtilsTests
     {
         var calls = 0;
 
+#pragma warning disable xUnit1051 // This test verifies the legacy overload's deadline behavior.
         var exception = await Assert.ThrowsAsync<TimeoutException>(() => TestingUtils.WaitUntilAsync(
             async (bool _) =>
             {
@@ -89,6 +98,7 @@ public class TestingUtilsTests
             },
             TimeSpan.FromMilliseconds(25),
             TimeSpan.FromSeconds(1)));
+#pragma warning restore xUnit1051
 
         Assert.Equal(1, calls);
         Assert.Contains(nameof(TestingUtilsTests), exception.Message);
@@ -100,6 +110,7 @@ public class TestingUtilsTests
     {
         var calls = 0;
 
+#pragma warning disable xUnit1051 // This test verifies the legacy overload's final-attempt behavior.
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => TestingUtils.WaitUntilAsync(
             (bool lastTry) =>
             {
@@ -113,6 +124,7 @@ public class TestingUtilsTests
             },
             TimeSpan.FromSeconds(1),
             TimeSpan.FromSeconds(1)));
+#pragma warning restore xUnit1051
 
         Assert.Equal("Expected legacy detailed failure", exception.Message);
         Assert.Equal(2, calls);
@@ -130,7 +142,8 @@ public class TestingUtilsTests
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
                 return false;
             },
-            TimeSpan.FromMilliseconds(25)));
+            TimeSpan.FromMilliseconds(25),
+            cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Equal(1, calls);
         Assert.Contains("async (_, cancellationToken) =>", exception.Message);
@@ -153,7 +166,8 @@ public class TestingUtilsTests
                 return Task.FromResult(false);
             },
             TimeSpan.FromSeconds(1),
-            TimeSpan.FromSeconds(1)));
+            TimeSpan.FromSeconds(1),
+            TestContext.Current.CancellationToken));
 
         Assert.Equal("Expected detailed failure", exception.Message);
         Assert.Equal(2, calls);
@@ -181,7 +195,8 @@ public class TestingUtilsTests
 
         var actual = await Assert.ThrowsAsync<InvalidOperationException>(() => TestingUtils.WaitUntilSucceededAsync(
             _ => Task.FromException<bool>(exception),
-            TimeSpan.FromSeconds(1)));
+            TimeSpan.FromSeconds(1),
+            cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Same(exception, actual);
     }

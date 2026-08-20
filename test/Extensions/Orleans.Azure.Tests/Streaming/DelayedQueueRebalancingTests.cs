@@ -25,12 +25,16 @@ namespace Tester.AzureUtils.Streaming
         private const int queueCount = 8;
         private StreamQueueDiagnosticObserver diagnosticObserver = null!;
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             diagnosticObserver = StreamQueueDiagnosticObserver.Create(adapterName);
             try
             {
                 await base.InitializeAsync();
+                if (!PreconditionsMet)
+                {
+                    return;
+                }
             }
             catch
             {
@@ -77,8 +81,13 @@ namespace Tester.AzureUtils.Streaming
             }
         }
 
-        public override async Task DisposeAsync()
+        public override async ValueTask DisposeAsync()
         {
+            if (!PreconditionsMet)
+            {
+                return;
+            }
+
             var cluster = this.HostedCluster;
             try
             {
@@ -96,12 +105,12 @@ namespace Tester.AzureUtils.Streaming
                             AzureQueueUtilities.GenerateQueueNames(cluster.Options.ClusterId, queueCount),
                             new AzureQueueOptions().ConfigureTestDefaults());
                     }
-                    catch (SkipException) { }
+                    catch (Xunit.Sdk.SkipException) { }
                 }
             }
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task DelayedQueueRebalancingTests_1()
         {
             await WaitForAgentsState(2, "1", includeHistory: true);
@@ -109,7 +118,7 @@ namespace Tester.AzureUtils.Streaming
             await WaitForAgentsState(4, "2");
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task DelayedQueueRebalancingTests_2()
         {
             await WaitForAgentsState(2, "1", includeHistory: true);

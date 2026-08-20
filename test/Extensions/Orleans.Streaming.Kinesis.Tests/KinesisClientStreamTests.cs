@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 using Orleans.Streaming.Kinesis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -32,12 +31,16 @@ namespace Orleans.Streaming.Kinesis.Tests
             this.output = output;
         }
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             EnsurePreconditionsMet();
             await KinesisStreamTestResource.Create(KinesisStreamName);
             streamCreated = true;
             await base.InitializeAsync();
+            if (!PreconditionsMet)
+            {
+                return;
+            }
             runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 
@@ -78,7 +81,7 @@ namespace Orleans.Streaming.Kinesis.Tests
             }
         }
 
-        public override async Task DisposeAsync()
+        public override async ValueTask DisposeAsync()
         {
             try
             {
@@ -93,7 +96,7 @@ namespace Orleans.Streaming.Kinesis.Tests
             }
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task KinesisStreamProducerOnDroppedClientTest()
         {
             await runner.StreamProducerOnDroppedClientTest(KinesisStreamProviderName, StreamNamespace);

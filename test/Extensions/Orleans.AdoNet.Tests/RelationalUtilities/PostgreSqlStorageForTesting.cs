@@ -18,7 +18,7 @@ namespace Tester.RelationalUtilities
         {
             if (string.IsNullOrEmpty(connectionString))
             {
-                throw new SkipException("ConnectionString not provided.");
+                throw Xunit.Sdk.SkipException.ForSkip("ConnectionString not provided.");
             }
 
             var builder = new NpgsqlConnectionStringBuilder(connectionString)

@@ -1,14 +1,14 @@
 using TestGrainInterfaces;
 using Xunit;
-using Xunit.Abstractions;
 using Xunit.Sdk;
+using Xunit.v3;
 
 namespace Tester.EventSourcingTests
 {
     /// <summary>
     /// Performance tests for event-sourced counters grain comparing different synchronization and reentrancy strategies.
     /// </summary>
-    [TestCaseOrderer("Tester.EventSourcingTests.SimplePriorityOrderer", "Tester")]
+    [TestCaseOrderer(typeof(SimplePriorityOrderer))]
     public partial class CountersGrainTests
     {
 
@@ -110,20 +110,19 @@ namespace Tester.EventSourcingTests
     {
         private readonly string attrname = typeof(RunThisFirstAttribute).AssemblyQualifiedName!;
 
-        private bool HasRunThisFirstAttribute(ITestCase testcase)
+        private static bool HasRunThisFirstAttribute(ITestCase testCase)
         {
-            return testcase.TestMethod.Method.GetCustomAttributes(attrname).Any();
+            return testCase is IXunitTestCase xunitTestCase
+                && xunitTestCase.TestMethod.Method.GetCustomAttributes(typeof(RunThisFirstAttribute), inherit: true).Any();
         }
 
-        public IEnumerable<TTestCase> OrderTestCases<TTestCase>(IEnumerable<TTestCase> testCases) where TTestCase : ITestCase
+        public IReadOnlyCollection<TTestCase> OrderTestCases<TTestCase>(IReadOnlyCollection<TTestCase> testCases) where TTestCase : ITestCase
         {
-            // return all tests with RunThisFirst attribute
-            foreach (var tc in testCases.Where(tc => HasRunThisFirstAttribute(tc)))
-                yield return tc;
-
-            // return all other tests
-            foreach (var tc in testCases.Where(tc => !HasRunThisFirstAttribute(tc)))
-                yield return tc;
+            return
+            [
+                .. testCases.Where(testCase => HasRunThisFirstAttribute(testCase)),
+                .. testCases.Where(testCase => !HasRunThisFirstAttribute(testCase)),
+            ];
         }
     }
 

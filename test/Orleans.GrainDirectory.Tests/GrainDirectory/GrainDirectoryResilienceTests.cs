@@ -11,7 +11,6 @@ using Orleans.Storage;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Diagnostics;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.GrainDirectory;
 

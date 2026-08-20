@@ -11,7 +11,6 @@ using TestGrainInterfaces;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
-using Xunit.Abstractions;
 
 // ReSharper disable NotAccessedVariable
 

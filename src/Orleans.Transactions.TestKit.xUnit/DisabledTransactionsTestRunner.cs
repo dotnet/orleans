@@ -1,5 +1,4 @@
-﻿using Xunit;
-using Xunit.Abstractions;
+using Xunit;
 
 namespace Orleans.Transactions.TestKit.xUnit
 {
@@ -8,14 +7,14 @@ namespace Orleans.Transactions.TestKit.xUnit
         protected DisabledTransactionsTestRunnerxUnit(IGrainFactory grainFactory, ITestOutputHelper output)
         : base(grainFactory, output.WriteLine) { }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.NoStateTransactionalGrain)]
         public override void TransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
         {
              base.TransactionGrainsThrowWhenTransactions(transactionTestGrainClassName);
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.NoStateTransactionalGrain)]
         public override void MultiTransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
         {

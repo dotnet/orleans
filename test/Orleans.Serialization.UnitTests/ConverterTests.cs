@@ -1,9 +1,8 @@
-﻿using System;
+using System;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.TestKit;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Serialization.UnitTests;
 

@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Orleans.Providers;
 using Orleans.TestingHost;
-using Xunit.Abstractions;
+using Xunit;
 
 namespace Tester.StreamingTests
 {

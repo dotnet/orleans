@@ -20,13 +20,13 @@ public abstract class StreamingResumeTests : TestClusterPerTest
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(100);
     private static readonly TimeSpan WaitTimeout = TimeSpan.FromSeconds(30);
 
-    [SkippableFact]
+    [Fact]
     public virtual async Task ResumeAfterInactivity()
     {
         await ResumeAfterInactivityImpl(false);
     }
 
-    [SkippableFact]
+    [Fact]
     public virtual async Task ResumeAfterInactivityNotInCache()
     {
         await ResumeAfterInactivityImpl(true);
@@ -75,7 +75,7 @@ public abstract class StreamingResumeTests : TestClusterPerTest
         Assert.Equal(0, await grain.GetErrorCounter());
     }
 
-    [SkippableFact]
+    [Fact]
     public virtual async Task ResumeAfterDeactivation()
     {
         using var observer = StreamingDiagnosticObserver.Create();
@@ -99,7 +99,7 @@ public abstract class StreamingResumeTests : TestClusterPerTest
         Assert.Equal(0, await grain.GetErrorCounter());
     }
 
-    [SkippableFact]
+    [Fact]
     public virtual async Task ResumeAfterDeactivationActiveStream()
     {
         using var observer = StreamingDiagnosticObserver.Create();
@@ -129,7 +129,7 @@ public abstract class StreamingResumeTests : TestClusterPerTest
         Assert.Equal(0, await grain.GetErrorCounter());
     }
 
-    [SkippableFact]
+    [Fact]
     public virtual async Task ResumeAfterSlowSubscriber()
     {
         var key = Guid.NewGuid();

@@ -5,7 +5,6 @@ using Orleans.Storage;
 using TestExtensions;
 using UnitTests.Persistence;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.StorageTests
 {
@@ -53,7 +52,7 @@ namespace UnitTests.StorageTests
             sw.Start();
             var data = store.ReadRow(keys);
             TimeSpan readTime = sw.Elapsed;
-            output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
+            output.WriteLine("{0} - Read time = {1}", store.GetType().FullName!, readTime);
             Assert.Equal(state.A,  data["A"]);  // "A"
             Assert.Equal(state.B,  data["B"]);  // "B"
             Assert.Equal(state.C,  data["C"]);  // "C"
@@ -78,7 +77,7 @@ namespace UnitTests.StorageTests
             sw.Restart();
             var data = store.ReadRow(keys);
             TimeSpan readTime = sw.Elapsed;
-            output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+            output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName!, writeTime, readTime);
             Assert.Equal(state.State.A,  data["A"]);  // "A"
             Assert.Equal(state.State.B,  data["B"]);  // "B"
             Assert.Equal(state.State.C,  data["C"]);  // "C"
@@ -95,7 +94,7 @@ namespace UnitTests.StorageTests
             var data = TestStoreGrainState.NewRandomState();
             Assert.NotNull(data.State);
 
-            output.WriteLine("Using store = {0}", store.GetType().FullName);
+            output.WriteLine("Using store = {0}", store.GetType().FullName!);
             Stopwatch sw = new Stopwatch();
 
             var keys = GetKeys(name, reference);
@@ -115,7 +114,7 @@ namespace UnitTests.StorageTests
 
             sw.Restart();
             storedData = store.ReadRow(keys); // Try to re-read after delete
-            output.WriteLine("Re-Read took {0} and returned {1}", sw.Elapsed, StorageProviderUtils.PrintData(storedData));
+            output.WriteLine("Re-Read took {0} and returned {1}", sw.Elapsed, StorageProviderUtils.PrintData(storedData)!);
             Assert.NotNull(data); // Should not get null data from Re-Read
             Assert.True(storedData.Count == 0, $"Should get no data from Re-Read but got: {StorageProviderUtils.PrintData(storedData)}");
 
@@ -123,7 +122,7 @@ namespace UnitTests.StorageTests
             const string? oldEtag = null;
             eTag = store.WriteRow(keys, storedData, oldEtag);
             output.WriteLine("Write for Keys={0} Etag={1} Data={2} returned New Etag={3} after {4}",
-                StorageProviderUtils.PrintKeys(keys), oldEtag, StorageProviderUtils.PrintData(storedData),
+                StorageProviderUtils.PrintKeys(keys), oldEtag!, StorageProviderUtils.PrintData(storedData)!,
                 eTag, sw.Elapsed);
 
             sw.Restart();
@@ -196,7 +195,7 @@ namespace UnitTests.StorageTests
             sw.Restart();
             var data = store.ReadRow(keys);
             TimeSpan readTime = sw.Elapsed;
-            output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+            output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName!, writeTime, readTime);
             Assert.Equal(state.A,  data["A"]);  // "A"
             Assert.Equal(state.B,  data["B"]);  // "B"
             Assert.Equal(state.C,  data["C"]);  // "C"

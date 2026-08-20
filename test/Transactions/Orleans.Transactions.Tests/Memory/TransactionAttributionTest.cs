@@ -1,4 +1,3 @@
-﻿using Xunit.Abstractions;
 using Xunit;
 
 namespace Orleans.Transactions.Tests

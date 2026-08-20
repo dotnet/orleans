@@ -2,7 +2,6 @@ using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Xunit.Abstractions;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -13,6 +12,7 @@ using UnitTests.Persistence;
 using Orleans.Persistence.TestKit;
 using Orleans.Persistence.Firestore;
 using UnitTests.StorageTests.Relational;
+using Xunit;
 
 namespace Orleans.Persistence.Firestore.Tests;
 
@@ -38,7 +38,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
     }
 
     [TestSuite("Functional")]
-    [SkippableTheory, TestCategory("Functional")]
+    [Theory, TestCategory("Functional")]
     [InlineData(null, false)]
     [InlineData(null, true)]
     [InlineData(400_000, false)]
@@ -57,7 +57,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
     }
 
     [TestSuite("Functional")]
-    [SkippableTheory, TestCategory("Functional")]
+    [Theory, TestCategory("Functional")]
     [InlineData(null, false)]
     [InlineData(null, true)]
     [InlineData(400_000, false)]
@@ -75,7 +75,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         await Test_PersistenceProvider_WriteClearRead(testName, storage, grainState);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task StateNamesUseIndependentRecords()
     {
         var storage = await CreateStorage();
@@ -103,7 +103,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         Assert.Equal(secondState.C, secondReadState.C);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task MissingReadResetsState()
     {
         var storage = await CreateStorage();
@@ -124,7 +124,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         Assert.Equal(default, state.C);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task ClearBeforeWriteSucceeds()
     {
         var storage = await CreateStorage();
@@ -143,7 +143,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         Assert.Equal(default, state.C);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task ClearedDocumentCanBeRewritten()
     {
         var storage = await CreateStorage(deleteStateOnClear: false);
@@ -171,7 +171,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         Assert.Equal(expected.C, actual.C);
     }
 
-    [SkippableTheory]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task SerializedNullIsReadAsMissingState(bool useJson)
@@ -196,7 +196,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         Assert.Equal(default, state.C);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task WildcardETagOverwritesExistingState()
     {
         var storage = await CreateStorage();
@@ -222,7 +222,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         Assert.Equal(expected.C, actual.C);
     }
 
-    [SkippableTheory]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task WildcardETagClearsExistingState(bool deleteStateOnClear)
@@ -243,7 +243,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         Assert.False(readState.RecordExists);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DuplicateWriteThrowsInconsistentStateException()
     {
         var tests = new CommonStorageTests(await CreateStorage());
@@ -253,7 +253,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         Assert.Equal("Unknown", exception.StoredEtag);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task WriteWithUnknownETagThrowsInconsistentStateException()
     {
         var tests = new CommonStorageTests(await CreateStorage());
@@ -263,7 +263,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         Assert.Equal("Unknown", exception.StoredEtag);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task ClearWithStaleETagThrowsInconsistentStateException()
     {
         var storage = await CreateStorage();
@@ -283,7 +283,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         Assert.Equal("Unknown", exception.StoredEtag);
     }
 
-    [SkippableFact, TestCategory("Functional"), TestCategory("ModelBased")]
+    [Fact, TestCategory("Functional"), TestCategory("ModelBased")]
     public async Task FirestoreStorage_ModelBasedGeneratedConformance()
     {
         var storage = await CreateStorage(deleteStateOnClear: true);
@@ -292,7 +292,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         await runner.RunGeneratedConformanceTests();
     }
 
-    [SkippableFact, TestCategory("Functional"), TestCategory("ModelBased")]
+    [Fact, TestCategory("Functional"), TestCategory("ModelBased")]
     public async Task FirestoreStorage_ClearWritesTombstone_ModelBasedGeneratedConformance()
     {
         var storage = await CreateStorage(deleteStateOnClear: false);
@@ -301,7 +301,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
     }
 
     [TestSuite("Functional")]
-    [SkippableTheory, TestCategory("Functional")]
+    [Theory, TestCategory("Functional")]
     [InlineData(null, true, false)]
     [InlineData(null, false, true)]
     [InlineData(400_000, true, false)]
@@ -339,7 +339,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
 
         var readTime = sw.Elapsed;
-        this._output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
+        this._output.WriteLine("{0} - Read time = {1}", store.GetType().FullName!, readTime);
 
         var storedState = storedGrainState.State;
         Assert.NotNull(grainState.State);
@@ -370,7 +370,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         };
         await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
         var readTime = sw.Elapsed;
-        this._output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+        this._output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName!, writeTime, readTime);
         Assert.NotNull(grainState.State);
         Assert.NotNull(storedGrainState.State);
         Assert.Equal(grainState.State.A, storedGrainState.State.A);
@@ -403,7 +403,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         };
         await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
         var readTime = sw.Elapsed;
-        this._output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+        this._output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName!, writeTime, readTime);
         Assert.NotNull(storedGrainState.State);
         Assert.Equal(default, storedGrainState.State.A);
         Assert.Equal(default, storedGrainState.State.B);
@@ -444,14 +444,14 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         return store;
     }
 
-    public Task InitializeAsync()
+    public ValueTask InitializeAsync()
     {
         _rootCollectionName = $"orleans-test-{Guid.NewGuid():N}";
         _ = GoogleEmulatorHost.FirestoreEndpoint;
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         foreach (var lifecycle in Enumerable.Reverse(_lifecycles))
         {

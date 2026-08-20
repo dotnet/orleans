@@ -8,7 +8,6 @@ using Orleans.Serialization;
 using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace DefaultCluster.Tests
 {
@@ -259,7 +258,7 @@ namespace DefaultCluster.Tests
                     JsonNode node = JsonValue.Create(value);
                     var result = (await grain.ProcessJsonNode(node))!;
                     Assert.Equal(value, result.GetValue<int>());
-                });
+                }, TestContext.Current.CancellationToken);
             }
 
             await Task.WhenAll(tasks);

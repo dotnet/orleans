@@ -9,7 +9,7 @@ namespace Orleans.DurableJobs.Tests;
 [TestCategory("BVT")]
 public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fixture)
 {
-    [SkippableFact]
+    [Fact]
     public async Task ShardCreationAndAssignmentUsesDistinctShardIdsForSameWindow()
     {
         await using var scope = await fixture.CreateScopeAsync();
@@ -27,7 +27,7 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
         Assert.Contains(assigned, shard => shard.Id == shard2.Id && shard.Metadata!["index"] == "2");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DeadOwnerShardIsReassignedAndPreservesQueuedJobOrderAndMetadata()
     {
         await using var scope = await fixture.CreateScopeAsync();
@@ -51,7 +51,7 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
         Assert.Equal("later", runs[1].Job.Metadata!["kind"]);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task OpenAndClosedShardsAreReassignedAfterFailover()
     {
         await using var scope = await fixture.CreateScopeAsync();
@@ -74,7 +74,7 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
         Assert.True(assigned.All(static shard => shard.IsAddingCompleted));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task LiveShardSchedulesAndConsumesJobsInDueTimeOrder()
     {
         await using var scope = await fixture.CreateScopeAsync();
@@ -90,7 +90,7 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
         Assert.Equal([earlier!.Id, later!.Id], runs.Select(run => run.Job.Id).ToArray());
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task ConcurrentOwnershipConflictAllowsOnlyOneManagerToClaimShard()
     {
         await using var scope = await fixture.CreateScopeAsync();
@@ -109,7 +109,7 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
         Assert.Single(claims.SelectMany(static claim => claim));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task MetadataIsPreservedAcrossGracefulReassignmentIncludingSpecialCharacters()
     {
         await using var scope = await fixture.CreateScopeAsync();
@@ -131,7 +131,7 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
         Assert.Equal(metadata, reassigned.Metadata);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UnregisterWithJobsRemainingPreservesShardForLaterReassignment()
     {
         await using var scope = await fixture.CreateScopeAsync();
@@ -151,7 +151,7 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
         Assert.Null(await reassigned.TryScheduleJobAsync(CreateRequest(now.AddMinutes(1), "rejected"), CancellationToken.None));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task RetryLaterPersistsThroughShardReassignment()
     {
         await using var scope = await fixture.CreateScopeAsync();
@@ -172,7 +172,7 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
         Assert.Equal(run.DequeueCount + 1, retried.DequeueCount);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task SuccessfulReschedulePersistsResetAttemptThroughShardReassignment()
     {
         await using var scope = await fixture.CreateScopeAsync();
@@ -195,7 +195,7 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
         Assert.Equal(run.Job.ExecutionGeneration + 1, rescheduled.Job.ExecutionGeneration);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task CancellationsBeforeAndDuringProcessingPersistAfterReassignment()
     {
         await using var scope = await fixture.CreateScopeAsync();
@@ -220,7 +220,7 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
         Assert.Equal(1, await reassigned.GetJobCountAsync());
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task SlowStartRespectsZeroLimitedUnlimitedAndRepeatedBudgets()
     {
         await using var scope = await fixture.CreateScopeAsync();

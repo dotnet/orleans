@@ -22,12 +22,12 @@ namespace UnitTests.StorageTests.AdoNet
         {
             public RelationalStorageForTesting Storage { get; private set; } = null!;
 
-            public async Task InitializeAsync()
+            public async ValueTask InitializeAsync()
             {
                 Storage = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
             }
 
-            public Task DisposeAsync() => Task.CompletedTask;
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
         }
 
         public PostgreSqlRelationalStoreTests(Fixture fixture) : base(AdoNetInvariantName)
@@ -35,7 +35,7 @@ namespace UnitTests.StorageTests.AdoNet
             _storage = fixture.Storage;
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Streaming_PostgreSql_Test()
         {
             using(var tokenSource = new CancellationTokenSource(StreamCancellationTimeoutLimit))
@@ -45,16 +45,16 @@ namespace UnitTests.StorageTests.AdoNet
             }
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task CancellationToken_PostgreSql_Test()
         {
             await CancellationTokenTest(_storage, CancellationTestTimeoutLimit);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task NativeDataSource_PostgreSql_Test()
         {
-            Skip.If(string.IsNullOrWhiteSpace(_storage.CurrentConnectionString), "Connection string not provided.");
+            Assert.SkipWhen(string.IsNullOrWhiteSpace(_storage.CurrentConnectionString), "Connection string not provided.");
             await using var dataSource = Npgsql.NpgsqlDataSource.Create(_storage.CurrentConnectionString);
             var storage = RelationalStorage.CreateInstance(AdoNetInvariantName, dataSource);
 

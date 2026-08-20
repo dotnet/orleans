@@ -3,7 +3,6 @@ using Microsoft.Extensions.Configuration;
 using Orleans.TestingHost;
 using UnitTests.MembershipTests;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace AWSUtils.Tests.Liveness
 {
@@ -28,7 +27,7 @@ namespace AWSUtils.Tests.Liveness
         public LivenessTests_DynamoDB(ITestOutputHelper output) : base(output)
         {
             if (!AWSTestConstants.IsDynamoDbAvailable)
-                throw new SkipException("Unable to connect to DynamoDB simulator");
+                throw Xunit.Sdk.SkipException.ForSkip("Unable to connect to DynamoDB simulator");
         }
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -70,7 +69,7 @@ namespace AWSUtils.Tests.Liveness
         /// Tests that silos can join the cluster, be discovered by other silos,
         /// and maintain accurate membership information in DynamoDB.
         /// </summary>
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Liveness_AWS_DynamoDB_1()
         {
             await Do_Liveness_OracleTest_1();
@@ -81,7 +80,7 @@ namespace AWSUtils.Tests.Liveness
         /// Verifies that the cluster can handle the loss and recovery of
         /// the primary silo without losing membership consistency.
         /// </summary>
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Liveness_AWS_DynamoDB_2_Restart_Primary()
         {
             await Do_Liveness_OracleTest_2(0);
@@ -92,7 +91,7 @@ namespace AWSUtils.Tests.Liveness
         /// Verifies that client connections can recover and find alternative
         /// gateways when their connected gateway fails.
         /// </summary>
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Liveness_AWS_DynamoDB_3_Restart_GW()
         {
             await Do_Liveness_OracleTest_2(1);
@@ -103,7 +102,7 @@ namespace AWSUtils.Tests.Liveness
         /// Verifies that grain activations are properly migrated and
         /// the cluster maintains operation during silo failures.
         /// </summary>
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Liveness_AWS_DynamoDB_4_Restart_Silo_1()
         {
             await Do_Liveness_OracleTest_2(2);
@@ -114,7 +113,7 @@ namespace AWSUtils.Tests.Liveness
         /// Verifies that timer registrations are properly recovered when
         /// grains are reactivated on other silos after failure.
         /// </summary>
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Liveness_AWS_DynamoDB_5_Kill_Silo_1_With_Timers()
         {
             await Do_Liveness_OracleTest_2(2, false, true);

@@ -2,7 +2,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Placement.Rebalancing;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.ActivationRebalancingTests;
 

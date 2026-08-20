@@ -23,7 +23,7 @@ public class FirestoreClusteringTests : IAsyncLifetime
     private int _generation = default!;
     private SiloAddress _siloAddress = default!;
 
-    [SkippableFact]
+    [Fact]
     public async Task CleanDeadSiloInstance()
     {
         this._generation = 0;
@@ -44,7 +44,7 @@ public class FirestoreClusteringTests : IAsyncLifetime
         Assert.All(membership.Members, member => Assert.NotEqual(SiloStatus.Dead, member.Item1.Status));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task CleanDefunctSilosSupportsMoreThanOneWriteBatch()
     {
         const int count = FirestoreDataManager.MaxBatchSize + 1;
@@ -73,7 +73,7 @@ public class FirestoreClusteringTests : IAsyncLifetime
         Assert.Empty(membership.Members);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task FindAllGatewayProxyEndpoints()
     {
         await WriteSiloInstance(SiloStatus.Created);
@@ -92,7 +92,7 @@ public class FirestoreClusteringTests : IAsyncLifetime
         Assert.Equal(this._entity.ProxyPort, myGateway.Port);  // "Gateway port"
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UpdateIAmAliveDoesNotOverwriteNewerHeartbeat()
     {
         var current = TestStartTime.AddMinutes(2);
@@ -112,7 +112,7 @@ public class FirestoreClusteringTests : IAsyncLifetime
         Assert.Equal(entry.IAmAliveTime, Assert.Single(row.Members).Item1.IAmAliveTime);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task ReadRowReturnsVersionWhenSiloDoesNotExist()
     {
         var expected = await this._membershipTable.ReadAll();
@@ -124,7 +124,7 @@ public class FirestoreClusteringTests : IAsyncLifetime
         Assert.Equal(expected.Version.VersionEtag, actual.Version.VersionEtag);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UpdateRowRefreshesEtagForIdenticalMembership()
     {
         var entry = new MembershipEntry
@@ -172,7 +172,7 @@ public class FirestoreClusteringTests : IAsyncLifetime
         this._entity.ETag = Clustering.Firestore.Utils.ParseTimestamp(etag);
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var id = $"orleans-test-{Guid.NewGuid():N}";
         var options = new FirestoreOptions
@@ -208,5 +208,5 @@ public class FirestoreClusteringTests : IAsyncLifetime
             NullLogger<FirestoreDataManager>.Instance);
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

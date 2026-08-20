@@ -19,10 +19,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- due to Verify.Xunit requiring newer versions of these libraries -->
+    <!-- due to Verify.XunitV3 requiring newer versions of these libraries -->
     <PackageReference Include="System.IO.Hashing" />
     <PackageReference Include="System.CodeDom" />
-    <PackageReference Include="Verify.Xunit" />
+    <PackageReference Include="Verify.XunitV3" />
     <Compile Remove="snapshots\**\*" />
     <None Include="snapshots\**\*" />
   </ItemGroup>

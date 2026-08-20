@@ -7,7 +7,6 @@ using Orleans.TestingHost;
 using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Tester.AzureUtils.Streaming
 {
@@ -54,7 +53,7 @@ namespace Tester.AzureUtils.Streaming
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.AddStreaming();
             }
 
-            public override async Task DisposeAsync()
+            public override async ValueTask DisposeAsync()
             {
                 await base.DisposeAsync();
 
@@ -67,7 +66,7 @@ namespace Tester.AzureUtils.Streaming
                     await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                         AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount), new AzureQueueOptions().ConfigureTestDefaults());
                 }
-                catch (SkipException)
+                catch (Xunit.Sdk.SkipException)
                 {
                     // ignore
                 }

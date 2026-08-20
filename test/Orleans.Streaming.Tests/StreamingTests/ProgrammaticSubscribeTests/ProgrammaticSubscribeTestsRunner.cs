@@ -23,14 +23,14 @@ public abstract class ProgrammaticSubscribeTestsRunner
         this.fixture = fixture;
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Programmatic_Subscribe_Provider_WithExplicitPubsub_TryGetStreamSubscrptionManager()
     {
         var subGrain = this.fixture.HostedCluster.GrainFactory!.GetGrain<ISubscribeGrain>(Guid.NewGuid());
         Assert.True(await subGrain.CanGetSubscriptionManager(StreamProviderName));
     }
     
-    [SkippableFact]
+    [Fact]
     public async Task Programmatic_Subscribe_CanUseNullNamespace()
     {
         var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
@@ -41,7 +41,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
         await subscriptionManager.RemoveSubscription(streamId, subscriptions.First().SubscriptionId);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task StreamingTests_Consumer_Producer_Subscribe()
     {
         using var observer = StreamingDiagnosticObserver.Create();
@@ -64,7 +64,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
         await Task.WhenAll(consumers.Select(consumer => consumer.StopConsuming()));
     }
 
-    [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5635")]
+    [Fact(Skip = "https://github.com/dotnet/orleans/issues/5635")]
     public async Task StreamingTests_Consumer_Producer_UnSubscribe()
     {
         using var cts = new CancellationTokenSource(_timeout);
@@ -116,7 +116,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
         await consumerUnSub.StopConsuming();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task StreamingTests_Consumer_Producer_GetSubscriptions()
     {
         var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
@@ -143,7 +143,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
         // clean up tests
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task StreamingTests_Consumer_Producer_ConsumerUnsubscribeOnAdd()
     {
         var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
@@ -170,7 +170,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
     }
 
 
-    [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5650")]
+    [Fact(Skip = "https://github.com/dotnet/orleans/issues/5650")]
     public async Task StreamingTests_Consumer_Producer_SubscribeToTwoStream_MessageWithPolymorphism()
     {
         using var observer = StreamingDiagnosticObserver.Create();
@@ -212,7 +212,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
         await Task.WhenAll(consumers.Select(consumer => consumer.StopConsuming()));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task StreamingTests_Consumer_Producer_SubscribeToStreamsHandledByDifferentStreamProvider()
     {
         using var observer = StreamingDiagnosticObserver.Create();

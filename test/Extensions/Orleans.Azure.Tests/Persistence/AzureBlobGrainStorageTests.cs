@@ -17,7 +17,6 @@ using Tester.AzureUtils;
 using TestExtensions;
 using Orleans.Persistence.TestKit;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Tester.AzureUtils.Persistence;
 
@@ -55,19 +54,19 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
         _services.Dispose();
     }
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task AzureBlobStorage_ReadState_StreamDeserializationFailure_DoesNotMutateGrainState()
     {
         await AssertFailedReadDoesNotMutateStateAsync(new ThrowingStreamDeserializeSerializer(CreateSetupSerializer()));
     }
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task AzureBlobStorage_ReadState_PooledBinaryDeserializationFailure_DoesNotMutateGrainState()
     {
         await AssertFailedReadDoesNotMutateStateAsync(new ThrowingBinaryDeserializeSerializer(CreateSetupSerializer()));
     }
 
-    [SkippableFact, TestCategory("Functional"), TestCategory("ModelBased")]
+    [Fact, TestCategory("Functional"), TestCategory("ModelBased")]
     public async Task AzureBlobStorage_ModelBasedGeneratedConformance()
     {
         var storage = await CreateStorageAsync(CreateSetupSerializer());
@@ -76,7 +75,7 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
         await runner.RunGeneratedConformanceTests();
     }
 
-    [SkippableFact, TestCategory("Functional"), TestCategory("ModelBased")]
+    [Fact, TestCategory("Functional"), TestCategory("ModelBased")]
     public async Task AzureBlobStorage_ClearWritesTombstone_ModelBasedGeneratedConformance()
     {
         var storage = await CreateStorageAsync(CreateSetupSerializer(), deleteStateOnClear: false);

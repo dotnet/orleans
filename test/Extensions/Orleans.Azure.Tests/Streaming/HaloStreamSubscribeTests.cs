@@ -68,7 +68,7 @@ namespace UnitTests.HaloTests.Streaming
                 }
             }
 
-            public override async Task DisposeAsync()
+            public override async ValueTask DisposeAsync()
             {
                 await base.DisposeAsync();
                 try
@@ -81,7 +81,7 @@ namespace UnitTests.HaloTests.Streaming
                         AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount),
                         new AzureQueueOptions().ConfigureTestDefaults());
                 }
-                catch (SkipException) { }
+                catch (Xunit.Sdk.SkipException) { }
             }
         }
 
@@ -102,7 +102,7 @@ namespace UnitTests.HaloTests.Streaming
             this.loggerFactory = fixture.HostedCluster.ServiceProvider.GetService<ILoggerFactory>()!;
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Halo_AzureQueue_ResubscribeTest_ConsumerProducer()
         {
             this.fixture.Logger.LogInformation("\n\n************************ Halo_AzureQueue_ResubscribeTest_ConsumerProducer ********************************* \n\n");
@@ -114,7 +114,7 @@ namespace UnitTests.HaloTests.Streaming
             await ConsumerProducerTest(consumerGuid, producerGuid);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Halo_AzureQueue_ResubscribeTest_ProducerConsumer()
         {
             this.fixture.Logger.LogInformation("\n\n************************ Halo_AzureQueue_ResubscribeTest_ProducerConsumer ********************************* \n\n");

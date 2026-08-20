@@ -78,18 +78,18 @@ namespace Tester.AzureUtils.Streaming
 
         protected override TimeSpan WaitTime => TimeSpan.FromSeconds(2);
 
-        [SkippableFact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Filters")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Filters")]
         public async override Task IgnoreBadFilter() => await base.IgnoreBadFilter();
 
-        [SkippableFact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Filters")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Filters")]
         public async override Task OnlyEvenItems() => await base.OnlyEvenItems();
 
-        [SkippableFact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Filters")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Filters")]
         public async override Task MultipleSubscriptionsDifferentFilterData() => await base.MultipleSubscriptionsDifferentFilterData();
 
-        public Task InitializeAsync() => Task.CompletedTask;
+        public ValueTask InitializeAsync() => ValueTask.CompletedTask;
 
-        public async Task DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             try
             {
@@ -99,7 +99,7 @@ namespace Tester.AzureUtils.Streaming
                   AzureQueueUtilities.GenerateQueueNames(this.fixture.HostedCluster.Options.ClusterId, queueCount),
                   new AzureQueueOptions().ConfigureTestDefaults());
             }
-            catch (SkipException)
+            catch (Xunit.Sdk.SkipException)
             {
                 // Ignore
             }

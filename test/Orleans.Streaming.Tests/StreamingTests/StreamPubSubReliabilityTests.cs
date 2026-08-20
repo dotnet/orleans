@@ -71,12 +71,12 @@ namespace UnitTests.StreamingTests
             _fixture = fixture;
         }
 
-        public async Task InitializeAsync()
+        public async ValueTask InitializeAsync()
         {
             await SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.None);
         }
 
-        public Task DisposeAsync() => Task.CompletedTask;
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task PubSub_Store_Baseline()

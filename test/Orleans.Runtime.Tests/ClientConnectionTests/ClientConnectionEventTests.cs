@@ -35,7 +35,7 @@ public class ClientConnectionEventTests
         }
 
         await cluster.StopAllSilosAsync();
-        await tcs.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await tcs.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("SlowBVT")]
@@ -65,7 +65,7 @@ public class ClientConnectionEventTests
         var silo = cluster.Silos[0];
         await silo.StopSiloAsync(true);
 
-        await lostGatewayTcs.Task.WaitAsync(TimeSpan.FromSeconds(20));
+        await lostGatewayTcs.Task.WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken);
 
         await cluster.RestartStoppedSecondarySiloAsync(silo.Name);
 
@@ -75,7 +75,7 @@ public class ClientConnectionEventTests
         do
         {
             cluster.Client!.GetGrain<ITestGrain>(Guid.NewGuid().GetHashCode()).SetLabel("test").Ignore(); // DeployAsync initializes the client.
-            await regainedGatewayTcs.Task.WaitAsync(TimeSpan.FromSeconds(1)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+            await regainedGatewayTcs.Task.WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
             reconnected = regainedGatewayTcs.Task.IsCompleted;
         } while (!reconnected && --remainingAttempts > 0);
 

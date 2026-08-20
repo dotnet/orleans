@@ -10,6 +10,9 @@ namespace TestExtensions
     public abstract class BaseTestClusterFixture : Xunit.IAsyncLifetime
     {
         private readonly ExceptionDispatchInfo? preconditionsException;
+        private TestCluster? hostedCluster;
+
+        protected bool PreconditionsMet => this.preconditionsException is null;
 
         static BaseTestClusterFixture()
         {
@@ -40,19 +43,45 @@ namespace TestExtensions
         {
         }
 
-        public TestCluster HostedCluster { get; private set; } = null!;
+        public TestCluster HostedCluster
+        {
+            get
+            {
+                this.EnsurePreconditionsMet();
+                return this.hostedCluster ?? throw new InvalidOperationException("The test cluster has not been initialized.");
+            }
+            private set => this.hostedCluster = value;
+        }
 
-        public IGrainFactory GrainFactory => this.HostedCluster.GrainFactory;
+        public IGrainFactory GrainFactory
+        {
+            get
+            {
+                this.EnsurePreconditionsMet();
+                return this.HostedCluster.GrainFactory;
+            }
+        }
 
-        public IClusterClient Client => this.HostedCluster.Client;
+        public IClusterClient Client
+        {
+            get
+            {
+                this.EnsurePreconditionsMet();
+                return this.HostedCluster.Client;
+            }
+        }
 
         public ILogger Logger { get; private set; } = null!;
         
         public string GetClientServiceId() => Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
 
-        public virtual async Task InitializeAsync()
+        public virtual async ValueTask InitializeAsync()
         {
-            this.EnsurePreconditionsMet();
+            if (!this.PreconditionsMet)
+            {
+                return;
+            }
+
             var builder = new TestClusterBuilder();
             TestDefaultConfiguration.ConfigureTestCluster(builder);
             this.ConfigureTestCluster(builder);
@@ -67,9 +96,9 @@ namespace TestExtensions
             this.Logger = this.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
         }
 
-        public virtual async Task DisposeAsync()
+        public virtual async ValueTask DisposeAsync()
         {
-            var cluster = this.HostedCluster;
+            var cluster = this.hostedCluster;
             if (cluster is null) return;
 
             try

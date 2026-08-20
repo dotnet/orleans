@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 using Orleans.Serialization.Cloning;
@@ -6,7 +6,6 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TestKit;
 using Xunit;
-using Xunit.Abstractions;
 
 // TestKit's legacy TestValues contract cannot express intentionally nullable test values.
 namespace Orleans.Serialization.UnitTests

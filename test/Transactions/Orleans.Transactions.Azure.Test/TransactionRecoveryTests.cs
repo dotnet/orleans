@@ -6,7 +6,6 @@ using Tester;
 using Tester.AzureUtils;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
@@ -28,9 +27,13 @@ namespace Orleans.Transactions.AzureStorage.Tests
             this.helper = helper;
         }
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             await base.InitializeAsync();
+            if (!PreconditionsMet)
+            {
+                return;
+            }
             this.testRunner = new TransactionRecoveryTestsRunnerxUnit(this.HostedCluster, helper);
         }
 
@@ -48,7 +51,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
             builder.AddClientBuilderConfigurator<ClientBuilderConfiguratorUsingAzureClustering>();
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, 30)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, 20)]
         public Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent)
@@ -56,7 +59,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
             return this.testRunner.TransactionWillRecoverAfterRandomSiloGracefulShutdown(transactionTestGrainClassName, concurrent);
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, 30)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, 20)]
         public Task TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(string transactionTestGrainClassName, int concurrent)
@@ -64,21 +67,21 @@ namespace Orleans.Transactions.AzureStorage.Tests
             return this.testRunner.TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(transactionTestGrainClassName, concurrent);
         }
 
-        [SkippableFact]
+        [Fact]
         public Task TransactionWillRecoverAfterManagerWait()
         {
             return this.testRunner.TransactionWillRecoverAfterManagerWait(
                 TransactionTestConstants.SingleStateTransactionalGrain);
         }
 
-        [SkippableFact]
+        [Fact]
         public Task TransactionWillRecoverAfterRemotePreparePersisted()
         {
             return this.testRunner.TransactionWillRecoverAfterRemotePreparePersisted(
                 TransactionTestConstants.SingleStateTransactionalGrain);
         }
 
-        [SkippableFact]
+        [Fact]
         public Task TransactionWillRecoverAfterLocalCommitStored()
         {
             return this.testRunner.TransactionWillRecoverAfterLocalCommitStored(
