@@ -726,7 +726,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                     _retirementTracker.ApplyRemove(name);
                 }
             }
-
         }
     }
 
@@ -791,8 +790,10 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private async Task RecoverAsync(CancellationToken cancellationToken)
     {
         var startTimestamp = _shared.TimeProvider.GetTimestamp();
+        IJournaledStateObserver[] observers;
         lock (_lock)
         {
+            observers = [.. _observers];
             ResetForRecovery();
         }
 
@@ -807,7 +808,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             throw;
         }
 
-        IJournaledStateObserver[] observers;
         lock (_lock)
         {
             foreach ((var name, var state) in _states)
@@ -824,7 +824,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                 }
             }
 
-            observers = [.. _observers];
         }
 
         foreach (var observer in observers)
