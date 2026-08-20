@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableMessaging.Tests.Support;
+using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization.Session;
 using Xunit;
@@ -17,7 +18,7 @@ public sealed class DedupeExpiryClusterCollection : ICollectionFixture<DedupeExp
 public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture)
 {
     [Fact]
-    public async Task DedupeExpiry_AfterCompaction_AllowsASecondTerminalEffect()
+    public async Task IdleReplay_AtDeduplicationBoundary_IsAcceptedWithoutCompactionTrigger()
     {
         var receiver = fixture.Client.GetGrain<IDurableMessagingTestGrain>(Guid.NewGuid());
         var original = new DurableTestMessage(Guid.NewGuid(), 15, "expires");
@@ -25,21 +26,56 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
 
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, first.Value)).Status);
         await fixture.WaitForEffectCountAsync(receiver, 1);
-        fixture.Clock.Advance(TimeSpan.FromMinutes(11));
+        await WaitForIdleInboxAsync(receiver);
+        fixture.Clock.Advance(TimeSpan.FromMinutes(10) - TimeSpan.FromTicks(1));
 
-        using var compactionTrigger = CreateEnvelope(
-            receiver,
-            new DurableTestMessage(Guid.NewGuid(), 16, "compact"));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, compactionTrigger.Value)).Status);
-        await fixture.WaitForEffectCountAsync(receiver, 2);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, first.Value)).Status);
+        Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
 
-        using var expiredDuplicate = CreateEnvelope(receiver, original, first.Value.MessageId);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, expiredDuplicate.Value)).Status);
-        var state = await fixture.WaitForEffectCountAsync(receiver, 3);
+        fixture.Clock.Advance(TimeSpan.FromTicks(1));
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, first.Value)).Status);
+        var state = await fixture.WaitForEffectCountAsync(receiver, 2);
 
         Assert.Equal(2, state.Effects.Single(effect => effect.LogicalId == original.LogicalId).Count);
-        Assert.Equal(1, state.Effects.Single(effect => effect.Sequence == 16).Count);
     }
+
+    [Fact]
+    public async Task ExpiryReplacement_WhenJournalWriteFails_RetainsDedupeRecord()
+    {
+        var receiver = fixture.Client.GetGrain<IDurableMessagingTestGrain>(Guid.NewGuid());
+        using var envelope = CreateEnvelope(
+            receiver,
+            new DurableTestMessage(Guid.NewGuid(), 16, "failed-expiry-replacement"));
+
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        await fixture.WaitForEffectCountAsync(receiver, 1);
+        await WaitForIdleInboxAsync(receiver);
+        fixture.Clock.Advance(TimeSpan.FromMinutes(10));
+        fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()));
+
+        await Assert.ThrowsAnyAsync<Exception>(() => DeliverAsync(receiver, envelope.Value));
+
+        var failed = await receiver.GetSnapshotAsync();
+        Assert.Equal(0, failed.InboxCount);
+        Assert.Equal(1, Assert.Single(failed.Effects).Count);
+        Assert.Equal(1, failed.ProcessedMessageCount);
+
+        await receiver.RequestDeactivationAsync();
+        var recovered = await receiver.GetSnapshotAsync();
+        Assert.NotEqual(failed.ActivationId, recovered.ActivationId);
+        Assert.Equal(0, recovered.InboxCount);
+        Assert.Equal(1, recovered.ProcessedMessageCount);
+        Assert.Equal(1, Assert.Single(recovered.Effects).Count);
+
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        var retried = await fixture.WaitForEffectCountAsync(receiver, 2);
+        Assert.Equal(2, Assert.Single(retried.Effects).Count);
+    }
+
+    private Task<DurableEndpointSnapshot> WaitForIdleInboxAsync(IDurableMessagingTestGrain receiver) =>
+        fixture.SnapshotProbe.WaitAsync(
+            receiver.GetGrainId(),
+            static snapshot => snapshot.InboxCount == 0 && string.IsNullOrEmpty(snapshot.InboxJobId));
 
     private static async Task<DeliveryResult> DeliverAsync(
         IDurableMessagingTestGrain receiver,
