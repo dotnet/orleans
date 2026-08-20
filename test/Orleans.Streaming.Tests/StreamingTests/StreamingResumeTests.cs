@@ -169,7 +169,7 @@ public abstract class StreamingResumeTests : TestClusterPerTest
 
                 return actual == expected;
             },
-            TimeSpan.FromSeconds(30),
+            WaitTimeout,
             delayOnFail: PollInterval);
     }
 
