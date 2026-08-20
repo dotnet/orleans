@@ -133,6 +133,30 @@ public class GrainInterfaceMethodReturnTypeDiagnosticAnalyzerTest : DiagnosticAn
     }
 
     [Fact]
+    public async Task AssemblyRegistrationCannotReplaceProxyDefault()
+    {
+        var code = """
+                    [assembly: Orleans.InvokableBaseType(
+                        typeof(Orleans.Runtime.GrainReference),
+                        typeof(Task),
+                        typeof(CustomRequest))]
+
+                    public abstract class CustomRequest { }
+
+                    public interface I : Orleans.IGrain
+                    {
+                        Task MyMethod();
+                    }
+                    """;
+
+        var (diagnostics, _) = await this.GetDiagnosticsAsync(code, []);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(GrainInterfaceMethodReturnTypeDiagnosticAnalyzer.InvalidMappingDiagnosticId, diagnostic.Id);
+        Assert.Contains("cannot replace proxy default", diagnostic.GetMessage());
+    }
+
+    [Fact]
     public async Task InheritedMethodInitializerIsValidatedForDerivedProxyReceiver()
     {
         var code = """

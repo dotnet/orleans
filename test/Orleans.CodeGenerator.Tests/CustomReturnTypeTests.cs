@@ -228,6 +228,64 @@ public class CustomReturnTypeTests
         Assert.Contains(": global::OverrideRequest<int>", GetGeneratedSource(result));
     }
 
+    [Fact]
+    public async Task AssemblyFiltering_PreservesExactOpenAndSourcePrecedence()
+    {
+        var result = await RunGenerator(CommonTypes + """
+            [assembly: InvokableBaseType(typeof(GrainReference), typeof(CustomCall<>), typeof(AssemblyRequest<>))]
+            [assembly: InvokableBaseType(typeof(GrainReference), typeof(CustomCall<int>), typeof(IntRequest))]
+
+            [InvokableBaseType(typeof(GrainReference), typeof(CustomCall<>), typeof(ReturnTypeRequest<>))]
+            public class CustomCall<T> { }
+
+            [ReturnValueProxy(nameof(InitializeRequest))]
+            public abstract class AssemblyRequest<T>
+            {
+                public CustomCall<T> InitializeRequest(GrainReference proxy) => new();
+            }
+
+            [ReturnValueProxy(nameof(InitializeRequest))]
+            public abstract class IntRequest
+            {
+                public CustomCall<int> InitializeRequest(GrainReference proxy) => new();
+            }
+
+            [ReturnValueProxy(nameof(InitializeRequest))]
+            public abstract class ReturnTypeRequest<T>
+            {
+                public CustomCall<T> InitializeRequest(GrainReference proxy) => new();
+            }
+
+            [ReturnValueProxy(nameof(InitializeRequest))]
+            public abstract class MethodRequest<T>
+            {
+                public CustomCall<T> InitializeRequest(GrainReference proxy) => new();
+            }
+
+            [AttributeUsage(AttributeTargets.Method)]
+            [InvokableBaseType(typeof(GrainReference), typeof(CustomCall<>), typeof(MethodRequest<>))]
+            public sealed class UseMethodMappingAttribute : Attribute { }
+
+            public interface ICustomGrain : IGrainWithStringKey
+            {
+                [UseMethodMapping]
+                CustomCall<int> ExactAssemblyMappingWins();
+
+                [UseMethodMapping]
+                CustomCall<string> MethodMappingWins();
+
+                CustomCall<long> ReturnTypeMappingWins();
+            }
+            """);
+
+        Assert.Empty(result.Diagnostics);
+        var generated = GetGeneratedSource(result);
+        Assert.Contains(": global::IntRequest", generated);
+        Assert.Contains(": global::MethodRequest<string>", generated);
+        Assert.Contains(": global::ReturnTypeRequest<long>", generated);
+        Assert.DoesNotContain(": global::AssemblyRequest<", generated);
+    }
+
     [Theory]
     [InlineData(
         "typeof(CustomCall<>), typeof(BadRequest<,>)",
@@ -1020,27 +1078,141 @@ public class CustomReturnTypeTests
     }
 
     [Fact]
-    public async Task AssemblyRegistration_CannotReplaceProxyDefault()
+    public async Task AssemblyRegistration_CannotReplaceProxyDefaultOrContaminateEffectiveMappings()
     {
-        var result = await RunGenerator(CommonTypes + """
+        const string registration = """
+            [assembly: Orleans.InvokableBaseType(
+                typeof(Orleans.Runtime.GrainReference),
+                typeof(System.Threading.Tasks.Task),
+                typeof(CustomRequest))]
+            """;
+        var source = CommonTypes + """
+            using System.Threading.Tasks;
+
+            public abstract class CustomRequest { }
+
+            [GenerateMethodSerializers(typeof(GrainReference))]
+            public interface ICustomGrain : IGrainWithStringKey
+            {
+                Task Call();
+            }
+            """;
+        var validCompilation = await TestCompilationHelper.CreateCompilation(source, "CustomReturnTypes");
+        var invalidCompilation = validCompilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(registration));
+        var invalidInterface = invalidCompilation.GetTypeByMetadataName("ICustomGrain")!;
+        var taskType = invalidCompilation.GetTypeByMetadataName("System.Threading.Tasks.Task")!;
+        var customRequest = invalidCompilation.GetTypeByMetadataName("CustomRequest")!;
+        var resolver = new InvokableBaseTypeResolver(invalidCompilation);
+
+        var mappings = resolver.GetMappingsForProxy(invalidCompilation.GetTypeByMetadataName("Orleans.Runtime.GrainReference")!);
+        var taskMapping = Assert.Single(mappings, mapping => SymbolEqualityComparer.Default.Equals(mapping.ReturnType, taskType));
+        Assert.Equal("Orleans.Runtime.TaskRequest", taskMapping.InvokableBaseType.ToDisplayString());
+        Assert.DoesNotContain(mappings, mapping => SymbolEqualityComparer.Default.Equals(mapping.InvokableBaseType, customRequest));
+
+        var generationContext = new ProxyGenerationContext(invalidCompilation, new CodeGeneratorOptions());
+        Assert.True(generationContext.TryGetProxyBaseDescription(invalidInterface, out var proxyBase));
+        Assert.Equal(
+            "Orleans.Runtime.TaskRequest",
+            Assert.Single(proxyBase.InvokableBaseTypes, pair => SymbolEqualityComparer.Default.Equals(pair.Key, taskType))
+                .Value.ToDisplayString());
+
+        var validModel = ProxyInterfaceModelExtractor.ExtractProxyInterfaceModel(
+            validCompilation.GetTypeByMetadataName("ICustomGrain")!,
+            validCompilation,
+            CancellationToken.None);
+        var invalidModel = ProxyInterfaceModelExtractor.ExtractProxyInterfaceModel(
+            invalidInterface,
+            invalidCompilation,
+            CancellationToken.None);
+        Assert.Equal(validModel, invalidModel);
+
+        var result = RunGenerator(invalidCompilation);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticRuleId.InvalidInvokableBaseTypeMapping, diagnostic.Id);
+        Assert.Contains("cannot replace proxy default", diagnostic.GetMessage());
+    }
+
+    [Fact]
+    public async Task AssemblyReplacementFiltering_IsDeterministicAndPreservesValidAdapters()
+    {
+        var owner = await CompileReference("""
+            namespace Owner;
+            public class CustomCall { }
+            """, "ReturnTypeOwner");
+        var invalidAdapter = await CompileReference(CommonTypes + """
             using System.Threading.Tasks;
 
             [assembly: InvokableBaseType(
                 typeof(GrainReference),
                 typeof(Task),
-                typeof(CustomRequest))]
+                typeof(InvalidAdapter.CustomTaskRequest))]
 
-            public abstract class CustomRequest { }
+            namespace InvalidAdapter
+            {
+                public abstract class CustomTaskRequest { }
+            }
+            """, "InvalidAdapter", owner);
+        var validAdapter = await CompileReference(CommonTypes + """
+            [assembly: InvokableBaseType(
+                typeof(GrainReference),
+                typeof(Owner.CustomCall),
+                typeof(ValidAdapter.CustomRequest))]
+
+            namespace ValidAdapter
+            {
+                public abstract class CustomRequest { }
+            }
+            """, "ValidAdapter", owner);
+        var source = CommonTypes + """
+            using System.Threading.Tasks;
 
             public interface ICustomGrain : IGrainWithStringKey
             {
                 Task Call();
+                Owner.CustomCall CustomCall();
             }
-            """);
+            """;
+        var forwardCompilation = await TestCompilationHelper.CreateCompilation(
+            source,
+            "CustomReturnTypes",
+            owner,
+            invalidAdapter,
+            validAdapter);
+        var reverseCompilation = await TestCompilationHelper.CreateCompilation(
+            source,
+            "CustomReturnTypes",
+            owner,
+            validAdapter,
+            invalidAdapter);
 
-        var diagnostic = Assert.Single(result.Diagnostics);
-        Assert.Equal(DiagnosticRuleId.InvalidInvokableBaseTypeMapping, diagnostic.Id);
-        Assert.Contains("cannot replace proxy default", diagnostic.GetMessage());
+        var forwardDiagnostic = Assert.Single(RunGenerator(forwardCompilation).Diagnostics);
+        var reverseDiagnostic = Assert.Single(RunGenerator(reverseCompilation).Diagnostics);
+        Assert.Equal(DiagnosticRuleId.InvalidInvokableBaseTypeMapping, forwardDiagnostic.Id);
+        Assert.Equal(forwardDiagnostic.GetMessage(), reverseDiagnostic.GetMessage());
+        Assert.Contains("cannot replace proxy default", forwardDiagnostic.GetMessage());
+
+        var forwardMappings = GetEffectiveMappings(forwardCompilation);
+        var reverseMappings = GetEffectiveMappings(reverseCompilation);
+        Assert.Equal(forwardMappings, reverseMappings);
+        Assert.Contains(
+            forwardMappings,
+            static mapping => mapping == "Owner.CustomCall [ReturnTypeOwner] -> ValidAdapter.CustomRequest [ValidAdapter]");
+        Assert.Contains(
+            forwardMappings,
+            static mapping => mapping == "System.Threading.Tasks.Task [System.Runtime] -> Orleans.Runtime.TaskRequest [Orleans.Core.Abstractions]");
+        Assert.DoesNotContain(forwardMappings, static mapping => mapping.Contains("InvalidAdapter.CustomTaskRequest", StringComparison.Ordinal));
+
+        static string[] GetEffectiveMappings(Compilation compilation)
+        {
+            var proxyBaseType = compilation.GetTypeByMetadataName("Orleans.Runtime.GrainReference")!;
+            return new InvokableBaseTypeResolver(compilation)
+                .GetMappingsForProxy(proxyBaseType)
+                .Select(static mapping =>
+                    $"{mapping.ReturnTypeName} [{mapping.ReturnType.ContainingAssembly.Name}] -> "
+                    + $"{mapping.InvokableBaseTypeName} [{mapping.InvokableBaseType.ContainingAssembly.Name}]")
+                .ToArray();
+        }
     }
 
     [Fact]
@@ -1186,6 +1358,11 @@ public class CustomReturnTypeTests
     private static async Task<GeneratorRunResult> RunGenerator(string code, params MetadataReference[] references)
     {
         var compilation = await TestCompilationHelper.CreateCompilation(code, "CustomReturnTypes", references);
+        return RunGenerator(compilation);
+    }
+
+    private static GeneratorRunResult RunGenerator(Compilation compilation)
+    {
         var generator = new OrleansSerializationSourceGenerator().AsSourceGenerator();
         GeneratorDriver driver = CSharpGeneratorDriver.Create(generator);
         driver = driver.RunGenerators(compilation);

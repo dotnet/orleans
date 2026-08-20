@@ -233,15 +233,50 @@ internal sealed class InvokableBaseTypeResolver
     private ImmutableArray<ResolvedMapping> GetMappingsForProxyCore(INamedTypeSymbol proxyBaseType)
     {
         var result = new Dictionary<INamedTypeSymbol, ResolvedMapping>(SymbolEqualityComparer.Default);
-        Add(_discovery.AssemblyMappings);
-        Add(GetDefaultMappings(proxyBaseType));
+        var assemblyMappings = new Dictionary<INamedTypeSymbol, List<Mapping>>(SymbolEqualityComparer.Default);
+        foreach (var mapping in _discovery.AssemblyMappings)
+        {
+            if (!SymbolEqualityComparer.Default.Equals(mapping.ProxyBaseType.OriginalDefinition, proxyBaseType.OriginalDefinition))
+            {
+                continue;
+            }
+
+            if (!assemblyMappings.TryGetValue(mapping.ReturnType, out var mappings))
+            {
+                assemblyMappings.Add(mapping.ReturnType, mappings = []);
+            }
+
+            mappings.Add(mapping);
+        }
+
+        foreach (var entry in assemblyMappings)
+        {
+            if (TrySelectAssemblyMapping(proxyBaseType, entry.Key, entry.Value, out var mapping, out _))
+            {
+                AddMapping(mapping!);
+            }
+        }
+
+        AddMappings(GetDefaultMappings(proxyBaseType));
         return [.. result.Values
             .OrderBy(static value => value.ReturnTypeName, StringComparer.Ordinal)
             .ThenBy(static value => value.ReturnType.ContainingAssembly.Identity.GetDisplayName(), StringComparer.Ordinal)
             .ThenBy(static value => value.InvokableBaseTypeName, StringComparer.Ordinal)
             .ThenBy(static value => value.InvokableBaseType.ContainingAssembly.Identity.GetDisplayName(), StringComparer.Ordinal)];
 
-        void Add(ImmutableArray<Mapping> mappings)
+        void AddMapping(Mapping mapping)
+        {
+            if (!result.ContainsKey(mapping.ReturnType))
+            {
+                result.Add(mapping.ReturnType, new ResolvedMapping(
+                    mapping.ReturnType,
+                    mapping.InvokableBaseType,
+                    Display(mapping.ReturnType),
+                    Display(mapping.InvokableBaseType)));
+            }
+        }
+
+        void AddMappings(ImmutableArray<Mapping> mappings)
         {
             foreach (var mapping in mappings)
             {
@@ -250,14 +285,7 @@ internal sealed class InvokableBaseTypeResolver
                     continue;
                 }
 
-                if (!result.ContainsKey(mapping.ReturnType))
-                {
-                    result.Add(mapping.ReturnType, new ResolvedMapping(
-                        mapping.ReturnType,
-                        mapping.InvokableBaseType,
-                        Display(mapping.ReturnType),
-                        Display(mapping.InvokableBaseType)));
-                }
+                AddMapping(mapping);
             }
         }
     }
@@ -281,19 +309,18 @@ internal sealed class InvokableBaseTypeResolver
             return CandidateResolutionStatus.NoMatch;
         }
 
-        if (!TryCoalesce(matching, out var mapping, out diagnostic))
+        Mapping? mapping;
+        if (kind == MappingKind.Assembly)
         {
-            invokableBaseType = null;
-            return CandidateResolutionStatus.Failure;
+            if (!TrySelectAssemblyMapping(proxyBaseType, returnType, matching, out mapping, out diagnostic))
+            {
+                invokableBaseType = null;
+                return CandidateResolutionStatus.Failure;
+            }
         }
-
-        if (kind == MappingKind.Assembly
-            && IsBuiltInReplacement(proxyBaseType, returnType, mapping!, out var defaultMapping))
+        else if (!TryCoalesce(matching, out mapping, out diagnostic))
         {
             invokableBaseType = null;
-            diagnostic = CreateDiagnostic(
-                mapping!,
-                $"Assembly registration for return type '{Display(returnType)}' cannot replace proxy default '{Display(defaultMapping!.InvokableBaseType)}' with '{Display(mapping!.InvokableBaseType)}'.");
             return CandidateResolutionStatus.Failure;
         }
 
@@ -307,6 +334,29 @@ internal sealed class InvokableBaseTypeResolver
             out diagnostic)
             ? CandidateResolutionStatus.Success
             : CandidateResolutionStatus.Failure;
+    }
+
+    private bool TrySelectAssemblyMapping(
+        INamedTypeSymbol proxyBaseType,
+        ITypeSymbol returnType,
+        List<Mapping> mappings,
+        out Mapping? mapping,
+        out ResolverDiagnostic? diagnostic)
+    {
+        if (!TryCoalesce(mappings, out mapping, out diagnostic))
+        {
+            return false;
+        }
+
+        if (IsBuiltInReplacement(proxyBaseType, returnType, mapping!, out var defaultMapping))
+        {
+            diagnostic = CreateDiagnostic(
+                mapping!,
+                $"Assembly registration for return type '{Display(returnType)}' cannot replace proxy default '{Display(defaultMapping!.InvokableBaseType)}' with '{Display(mapping!.InvokableBaseType)}'.");
+            return false;
+        }
+
+        return true;
     }
 
     private ImmutableArray<Mapping> GetMethodMappings(IMethodSymbol method)
