@@ -22,7 +22,7 @@ namespace OrleansCodeGen.TestProject
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IComplexGrain), "ProcessData", null, new[] { typeof(int), typeof(string), typeof(global::TestProject.ComplexData), typeof(global::System.Threading.CancellationToken) });
         global::System.Threading.CancellationTokenSource _cts;
         private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IComplexGrain_GrainReference_67FE5808> _pool;
-        public Invokable_IComplexGrain_GrainReference_67FE5808()
+        public Invokable_IComplexGrain_GrainReference_67FE5808() : this(null !)
         {
         }
 

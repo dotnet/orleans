@@ -18,7 +18,7 @@ namespace OrleansCodeGen.TestProject
         global::TestProject.IBasicGrain _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IBasicGrain), "SayHello", null, new[] { typeof(string) });
         private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IBasicGrain_GrainReference_6B0E24A1> _pool;
-        public Invokable_IBasicGrain_GrainReference_6B0E24A1()
+        public Invokable_IBasicGrain_GrainReference_6B0E24A1() : this(null !)
         {
         }
 

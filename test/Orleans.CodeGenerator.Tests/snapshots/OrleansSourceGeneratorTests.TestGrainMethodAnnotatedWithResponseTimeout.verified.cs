@@ -18,7 +18,7 @@ namespace OrleansCodeGen.TestProject
         global::TestProject.IResponseTimeoutGrain _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IResponseTimeoutGrain), "LongRunningMethod", null, new[] { typeof(string) });
         private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8> _pool;
-        public Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8()
+        public Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8() : this(null !)
         {
         }
 

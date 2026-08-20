@@ -18,7 +18,7 @@ namespace OrleansCodeGen
         global::IMyGrain _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::IMyGrain), "SayHello", null, new[] { typeof(string) });
         private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IMyGrain_GrainReference_6D39E404> _pool;
-        public Invokable_IMyGrain_GrainReference_6D39E404()
+        public Invokable_IMyGrain_GrainReference_6D39E404() : this(null !)
         {
         }
 

@@ -17,7 +17,7 @@ namespace OrleansCodeGen.TestProject
         global::TestProject.IMyGrainWithGuidKey _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IMyGrainWithGuidKey), "GetGuidValue", null, null);
         private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E> _pool;
-        public Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E()
+        public Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E() : this(null !)
         {
         }
 
@@ -64,7 +64,7 @@ namespace OrleansCodeGen.TestProject
         global::TestProject.IMyGrainWithStringKey _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IMyGrainWithStringKey), "GetStringKey", null, null);
         private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IMyGrainWithStringKey_GrainReference_43570316> _pool;
-        public Invokable_IMyGrainWithStringKey_GrainReference_43570316()
+        public Invokable_IMyGrainWithStringKey_GrainReference_43570316() : this(null !)
         {
         }
 
@@ -111,7 +111,7 @@ namespace OrleansCodeGen.TestProject
         global::TestProject.IMyGrainWithGuidCompoundKey _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IMyGrainWithGuidCompoundKey), "GetGuidAndStringKey", null, null);
         private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF> _pool;
-        public Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF()
+        public Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF() : this(null !)
         {
         }
 
@@ -158,7 +158,7 @@ namespace OrleansCodeGen.TestProject
         global::TestProject.IMyGrainWithIntegerCompoundKey _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IMyGrainWithIntegerCompoundKey), "GetIntegerAndStringKey", null, null);
         private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A> _pool;
-        public Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A()
+        public Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A() : this(null !)
         {
         }
 

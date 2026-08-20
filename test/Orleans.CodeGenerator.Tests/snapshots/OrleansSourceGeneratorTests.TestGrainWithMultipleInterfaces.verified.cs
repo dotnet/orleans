@@ -18,7 +18,7 @@ namespace OrleansCodeGen.TestProject
         global::TestProject.IGrainA _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IGrainA), "MethodA", null, new[] { typeof(string) });
         private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IGrainA_GrainReference_11405B98> _pool;
-        public Invokable_IGrainA_GrainReference_11405B98()
+        public Invokable_IGrainA_GrainReference_11405B98() : this(null !)
         {
         }
 
@@ -93,7 +93,7 @@ namespace OrleansCodeGen.TestProject
         global::TestProject.IGrainB _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IGrainB), "MethodB", null, new[] { typeof(string) });
         private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IGrainB_GrainReference_6B5D7809> _pool;
-        public Invokable_IGrainB_GrainReference_6B5D7809()
+        public Invokable_IGrainB_GrainReference_6B5D7809() : this(null !)
         {
         }
 

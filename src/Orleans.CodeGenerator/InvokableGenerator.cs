@@ -29,6 +29,15 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         var compatibilityCtor = fieldDescriptions.OfType<PoolFieldDescription>().Any()
                 ? ConstructorDeclaration(generatedClassName)
                     .AddModifiers(Token(SyntaxKind.PublicKeyword))
+                    .WithInitializer(
+                        ConstructorInitializer(
+                            SyntaxKind.ThisConstructorInitializer,
+                            ArgumentList(
+                                SingletonSeparatedList(
+                                    Argument(
+                                        PostfixUnaryExpression(
+                                            SyntaxKind.SuppressNullableWarningExpression,
+                                            LiteralExpression(SyntaxKind.NullLiteralExpression)))))))
                     .WithBody(Block())
                 : null;
         var accessibility = GetAccessibility(method);
