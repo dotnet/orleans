@@ -1,7 +1,7 @@
 ---
 title: Durable messaging
 description: Understand the durable inbox and outbox guarantees, recovery model, and operating limits.
-ms.date: 08/19/2026
+ms.date: 08/20/2026
 ms.topic: conceptual
 ---
 
@@ -59,14 +59,14 @@ doesn't stop another grain's outbox. Monotonic ownership generations fence job
 callbacks; if an ambiguous scheduling response creates more than one job, callbacks
 with that generation poll the same durable queue safely. Completed-generation
 tombstones let delayed duplicates terminate. A job which wakes before its ownership
-commit is visible retries instead of completing and requests a fresh activation only
-when no journal writes are pending, so it neither strands a later-visible commit nor
-discards staged application state. Ownership-clear write failures restore the preceding
-generation and return `Retry`, so the current job remains responsible.
-Activation recovery replaces legacy or stale ownership when work is accepted into an
-empty queue. Pump callbacks execute as non-interleaving grain timer turns so that
-infrastructure writes can't commit provisional state from a concurrently running
-handler.
+commit or activation recovery is visible polls the same attempt instead of completing.
+After recovery, a scheduled generation with no committed owner and no work is a
+confirmed orphan and completes, so Durable Jobs removes it. If recovered work has no
+matching owner, recovery schedules and commits a new generation before the old
+generation terminates. Ownership-clear write failures restore the preceding generation,
+so the current job remains responsible. Pump callbacks execute as non-interleaving grain
+timer turns so that infrastructure writes can't commit provisional state from a
+concurrently running handler.
 
 ## Backpressure, retries, and dead letters
 
@@ -94,4 +94,5 @@ only for development and tests.
 Capacity and retention settings bound storage growth and define the effectively-once
 window. Monitor inbox depth, outbox depth, retry failures, dead letters, and oldest
 pending-message age. Keep deduplication retention longer than the maximum expected
-outbox retry age.
+outbox retry age. The `orleans-durable-messaging-orphaned-jobs-reclaimed` counter
+identifies terminal cleanup of schedule-before-commit crash remnants.

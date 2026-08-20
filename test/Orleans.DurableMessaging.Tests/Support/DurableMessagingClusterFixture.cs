@@ -21,6 +21,7 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
     {
         Clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
         Storage = new ControlledJournalStorageProvider();
+        Metrics = new DurableMessagingMetricProbe();
         JobManagerProbe = new DurableJobManagerProbe();
         HandlerProbe = new HandlerProbe();
         SnapshotProbe = new SnapshotProbe();
@@ -62,6 +63,7 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
     public IClusterClient Client => Cluster.Client!;
     public FakeTimeProvider Clock { get; }
     public ControlledJournalStorageProvider Storage { get; }
+    public DurableMessagingMetricProbe Metrics { get; }
     public DurableJobManagerProbe JobManagerProbe { get; }
     public HandlerProbe HandlerProbe { get; }
     public SnapshotProbe SnapshotProbe { get; }
@@ -95,7 +97,11 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
     }
 
     public Task InitializeAsync() => Cluster.DeployAsync();
-    public Task DisposeAsync() => Cluster.DisposeAsync().AsTask();
+    public async Task DisposeAsync()
+    {
+        await Cluster.DisposeAsync();
+        Metrics.Dispose();
+    }
 }
 
 public sealed class MultiSiloDurableMessagingClusterFixture : DurableMessagingClusterFixture
