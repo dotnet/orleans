@@ -1,6 +1,7 @@
-using System.Distributed.DurableTasks;
-using Orleans.Journaling.DurableTasks;
-using Orleans.Runtime.DurableTasks;
+using Orleans.DurableTasks.Protocol;
+using Orleans.DurableTasks.Runtime;
+using Orleans.DurableTasks.Storage;
+using Orleans.DurableTasks;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;

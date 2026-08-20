@@ -41,7 +41,7 @@
     <Project Path="src/Orleans.Core.Abstractions/Orleans.Core.Abstractions.csproj" />
     <Project Path="src/Orleans.Core/Orleans.Core.csproj" />
     <Project Path="src/Orleans.DurableMessaging/Orleans.DurableMessaging.csproj" />
-    <Project Path="src/Orleans.DurableTasks/Orleans.DurableTasks.csproj" />
+    <Project Path="src/Microsoft.Orleans.DurableTasks/Microsoft.Orleans.DurableTasks.csproj" />
     <Project Path="src/Orleans.EventSourcing/Orleans.EventSourcing.csproj" />
     <Project Path="src/Orleans.Journaling/Orleans.Journaling.csproj" />
     <Project Path="src/Orleans.Persistence.Memory/Orleans.Persistence.Memory.csproj" />
@@ -148,7 +148,7 @@
     <Project Path="test/Orleans.Streaming.Tests/Orleans.Streaming.Tests.csproj" />
     <Project Path="test/Orleans.BroadcastChannel.Tests/Orleans.BroadcastChannel.Tests.csproj" />
     <Project Path="test/Orleans.DurableMessaging.Tests/Orleans.DurableMessaging.Tests.csproj" />
-    <Project Path="test/Orleans.DurableTasks.Tests/Orleans.DurableTasks.Tests.csproj" />
+    <Project Path="test/Microsoft.Orleans.DurableTasks.Tests/Microsoft.Orleans.DurableTasks.Tests.csproj" />
     <Project Path="test/Orleans.EventSourcing.Tests/Orleans.EventSourcing.Tests.csproj" />
     <Project Path="test/Orleans.DurableJobs.Tests/Orleans.DurableJobs.Tests.csproj" />
     <Project Path="test/Orleans.DurableTasks.Abstractions.Tests/Orleans.DurableTasks.Abstractions.Tests.csproj" />
