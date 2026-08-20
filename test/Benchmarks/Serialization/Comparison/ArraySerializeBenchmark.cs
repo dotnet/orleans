@@ -97,7 +97,7 @@ public class ArraySerializeBenchmark
         MessagePackSerializer.Serialize(
             _arrayBufferWriter,
             _value,
-            cancellationToken: TestContext.Current.CancellationToken);
+            cancellationToken: CancellationToken.None);
         _arrayBufferWriter.Clear();
     }
 
