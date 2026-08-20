@@ -2,6 +2,7 @@
 using System;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
+using Orleans.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
 
