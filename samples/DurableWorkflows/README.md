@@ -34,6 +34,8 @@ curl -X POST "$service/workflows/orders/order-1?failShipping=true"
 ```
 
 Approval and cancellation commands return `202 Accepted`. Their `Location` header names the corresponding GET status resource. A status response always includes the stable durable task ID and one of `pending`, `running`, `succeeded`, `canceled`, or `failed`. Successful responses include the workflow result. Canceled and failed responses include only a safe summary, not internal exception details.
+After submitting a command, clients should poll that status resource instead of repeating
+the mutation solely to discover completion.
 
 ```json
 {
