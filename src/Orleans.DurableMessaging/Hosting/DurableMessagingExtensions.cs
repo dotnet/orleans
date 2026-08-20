@@ -109,7 +109,6 @@ public static class DurableMessagingExtensions
             _ = sp.GetRequiredService<IDurableOutbox>();
             return new DurableInbox(
                 sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("inbox"),
-                sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DateTimeOffset>>("inbox-processed"),
                 sp.GetServices<IInboxHandler>(),
                 options.MaxCapacity);
         });
