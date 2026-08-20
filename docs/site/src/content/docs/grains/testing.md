@@ -46,7 +46,7 @@ Each host has its own dependency-injection container. Registering a type creates
 
 ## Reuse a cluster across tests
 
-Cluster startup is more expensive than an isolated unit test. Reuse a cluster across tests that need the same configuration by using the lifecycle support from the test framework.
+Cluster startup is more expensive than an isolated unit test. Test framework lifecycle support lets tests with the same configuration reuse a cluster.
 
 ### xUnit
 
