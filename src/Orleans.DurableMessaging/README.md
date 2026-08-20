@@ -13,7 +13,9 @@ siloBuilder
 Inject `IDurableInbox` to register handlers and `IDurableOutbox` to enqueue envelopes.
 An outbox enqueue allocates stable job ownership and durably schedules that job before
 the grain journal captures the envelope and ownership in one commit. The job safely
-polls while the envelope is provisional, and dispatch starts only after the commit.
+polls while the envelope is provisional, and dispatch starts only after the commit. If
+the journal write fails, the scheduled job observes no committed envelope and completes
+without sending it; a later enqueue establishes a new ownership generation.
 The receiver uses the same schedule-before-commit ordering and returns `Accepted` only
 after the inbox envelope and its durable drain-job ownership are stable.
 
