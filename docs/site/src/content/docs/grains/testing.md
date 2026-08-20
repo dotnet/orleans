@@ -16,7 +16,7 @@ Orleans applications benefit from tests at more than one level:
 | [OrleansTestKit](https://github.com/OrleansContrib/OrleansTestKit) | Basic arrange-act-assert tests of one grain activation whose correctness is independent of Orleans scheduling and concurrency |
 | Test cluster with production providers | Storage, clustering, reminders, and streams whose external-system contract matters |
 
-Default to <xref:Orleans.TestingHost.InProcessTestCluster> for grain code. It provides the highest-fidelity test boundary for Orleans runtime behavior while remaining fast enough to share across a test collection. Test extracted calculations and application services directly. Use OrleansTestKit only for deliberately basic, single-activation tests where the test author controls all sequencing and synchronization.
+Default to <xref:Orleans.TestingHost.InProcessTestCluster> for grain code. It provides the highest-fidelity test boundary for Orleans runtime behavior. Test extracted calculations and application services directly. Use OrleansTestKit when the test author controls sequencing and synchronization.
 
 ## Create an in-process test cluster
 

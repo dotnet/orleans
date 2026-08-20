@@ -80,7 +80,7 @@ See [Grain lifecycle](grain-lifecycle.md) for collection, lifecycle participatio
 
 ## Test grain behavior
 
-Use <xref:Orleans.TestingHost.InProcessTestCluster> for most grain tests so activation, scheduling, serialization, dependency injection, and messaging execute through the Orleans runtime. Use ordinary unit tests for extracted application logic. [Test Orleans applications](testing.md) explains these boundaries, including the narrow single-activation scenarios suited to [OrleansTestKit](https://github.com/OrleansContrib/OrleansTestKit), and provides maintained, executable examples. Follow [Test an Orleans application end to end](../tutorials-and-samples/testing-walkthrough.md) for a complete cluster-testing walkthrough.
+Use <xref:Orleans.TestingHost.InProcessTestCluster> for most grain tests so activation, scheduling, serialization, dependency injection, and messaging execute through the Orleans runtime. Use ordinary unit tests for extracted application logic. [Test Orleans applications](testing.md) explains these boundaries, including basic scenarios suited to [OrleansTestKit](https://github.com/OrleansContrib/OrleansTestKit), and provides maintained, executable examples. Follow [Test an Orleans application end to end](../tutorials-and-samples/testing-walkthrough.md) for a complete cluster-testing walkthrough.
 
 ## Choose basic or advanced features
 
