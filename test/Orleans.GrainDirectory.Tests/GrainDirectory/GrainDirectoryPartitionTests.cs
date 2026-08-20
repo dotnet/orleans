@@ -202,6 +202,12 @@ public sealed class GrainDirectoryPartitionTests
 
         Assert.Equal(newRegistration, oldThenNew[grainId]);
         Assert.Equal(newRegistration, newThenOld[grainId]);
+        Assert.Equal(
+            [oldRegistration],
+            GrainDirectoryPartition.GetDuplicateActivations(oldThenNew, [oldRegistration, newRegistration]));
+        Assert.Equal(
+            [oldRegistration],
+            GrainDirectoryPartition.GetDuplicateActivations(newThenOld, [newRegistration, oldRegistration]));
     }
 
     private static void AssertRanges(RingRange previousOwnerRange, RingRange addedRange, params RingRange[] expected)
