@@ -82,6 +82,19 @@ preceding generation, so the current job remains responsible. Pump callbacks exe
 non-interleaving grain timer turns so that infrastructure writes can't commit
 provisional state from a concurrently running handler.
 
+## Durable RPC incubation
+
+The `Orleans.DurableTasks` and `System.Distributed.DurableTasks` assemblies
+are source-only, incubating components. Neither is published as a NuGet package.
+Documentation and samples must not present them as externally consumable until their
+ownership and publication model is decided.
+
+During activation shutdown, the Orleans adapter rejects new durable RPC work and
+cancels adapter-controlled scheduling and waits without converting activation shutdown
+into durable cancellation. It discards user results and failures produced after
+shutdown begins, then drains all executing user code before replacement replay starts.
+User code which ignores cancellation can therefore delay activation shutdown.
+
 ## Backpressure, retries, and dead letters
 
 The inbox rejects new, nonduplicate envelopes with `Backpressured` when it reaches

@@ -1,11 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.DurableTasks</PackageId>
-    <Title>Microsoft Orleans Durable Tasks</Title>
-    <Description>Experimental durable grain RPC integration for Microsoft Orleans.</Description>
-    <PackageTags>$(PackageTags) Durable RPC Workflow</PackageTags>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IsPackable>false</IsPackable>
+    <GenAPITargetDirectory>$(SourceRoot)src\api\Orleans.DurableTasks\</GenAPITargetDirectory>
+    <GenAPITargetPath>$(GenAPITargetDirectory)$(AssemblyName).cs</GenAPITargetPath>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -33,9 +31,4 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />
     <ProjectReference Include="$(SourceRoot)src\System.Distributed.DurableTasks\System.Distributed.DurableTasks.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <None Include="README.md" Pack="true" PackagePath="\" />
-  </ItemGroup>
-
 </Project>

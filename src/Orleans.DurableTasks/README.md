@@ -1,10 +1,11 @@
 # Microsoft Orleans Durable Tasks
 
 > [!WARNING]
-> This package is experimental. Its APIs and persisted formats can change before
-> the first stable release.
+> This source assembly is incubating and is not published as a NuGet package.
+> It and `System.Distributed.DurableTasks` remain source-only until ownership
+> and publication are decided. Their APIs and persisted formats can change.
 
-`Microsoft.Orleans.DurableTasks` executes grain interface methods which return
+The `Orleans.DurableTasks` assembly executes grain interface methods which return
 `System.Distributed.DurableTasks.DurableTask` over Orleans Durable Messaging.
 It is the Orleans-specific adapter for the portable durable-task model and owns
 the request protocol, runtime, storage adapter, code-generation mapping,
@@ -12,8 +13,8 @@ diagnostics, cancellation, completion acknowledgement, and delayed resume jobs.
 
 ## Configuration
 
-Reference this package from every project which declares or calls a durable
-grain interface. Registration is opt-in:
+Projects in this repository can reference the source project when declaring or
+calling a durable grain interface. Registration is opt-in:
 
 ```csharp
 clientBuilder.AddDurableTasks();
@@ -50,8 +51,10 @@ available only for tests through `AddVolatileDurableTaskStorage`.
 - Recovery occurs before new request execution. Child identifiers and
   `WhenAny` decisions are replay-stable, and outbound effects use durable,
   idempotent messaging records.
-- Activation shutdown stops new execution, signals running execution contexts,
-  and drains them before a replacement activation can replay pending requests.
+- Activation shutdown stops new execution and cancels adapter-controlled waits.
+  Results and failures produced after shutdown begins are discarded. Arbitrary
+  user code can delay shutdown when it does not cooperate; the activation drains
+  every execution before a replacement activation can replay pending requests.
 
 ## Limits
 
@@ -62,7 +65,7 @@ outside the guarantee and can repeat after recovery. Durable Messaging remains
 at-least-once transport; this adapter supplies task-level deduplication while
 identity and completion records are retained.
 
-The package currently depends on the experimental
+The assembly currently depends on the experimental
 `Microsoft.Orleans.DurableMessaging`, `Microsoft.Orleans.Journaling`,
 `Microsoft.Orleans.DurableJobs`, and `System.Distributed.DurableTasks`
 components.
