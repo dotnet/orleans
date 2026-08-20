@@ -1,14 +1,12 @@
-# System.Distributed.DurableTasks
+# Orleans.DurableTasks
 
 > [!IMPORTANT]
-> This assembly contains incubating API under evaluation while formal .NET/BCL ownership of
-> the `System.Distributed.DurableTasks` namespace is reviewed. It is deliberately non-packable
-> and cannot ship from this repository's release pipeline. Its presence does not indicate
-> approved platform ownership or a commitment to publish this API.
+> This assembly contains incubating Orleans API under evaluation. Release packaging remains
+> disabled until incubation concludes.
 
-This assembly defines a runtime-independent programming model for durable asynchronous
-operations. A host supplies scheduling, persistence, deterministic time, and durable
-cancellation. Task definitions and application code depend only on this assembly.
+This assembly defines the Orleans programming model for durable asynchronous operations.
+An Orleans host supplies scheduling, persistence, deterministic time, and durable cancellation.
+Task definitions and application code depend only on this assembly.
 
 ## Execution model
 

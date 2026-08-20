@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace System.Distributed.DurableTasks;
+namespace Orleans.DurableTasks;
 
 /// <summary>Defines a deferred, host-scheduled durable asynchronous operation.</summary>
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
@@ -292,10 +292,14 @@ internal sealed class InlineAsyncDelegateDurableTask<TState, TResult>(
 internal struct ConfiguredDurableTaskCore<TTask> where TTask : DurableTask
 {
     private TaskId _taskId;
-    internal ConfiguredDurableTaskCore(TTask task)
+    internal ConfiguredDurableTaskCore(TTask task) : this(task, DurableExecutionContext.Current)
+    {
+    }
+
+    internal ConfiguredDurableTaskCore(TTask task, DurableExecutionContext? parentContext)
     {
         Task = task ?? throw new ArgumentNullException(nameof(task));
-        ParentContext = DurableExecutionContext.Current;
+        ParentContext = parentContext;
     }
 
     internal TTask Task { get; }
@@ -389,6 +393,11 @@ public struct ConfiguredDurableTask
 {
     private ConfiguredDurableTaskCore<DurableTask> _core;
     internal ConfiguredDurableTask(DurableTask task) => _core = new(task);
+    internal ConfiguredDurableTask(DurableTask task, string rootId)
+    {
+        _core = new(task, parentContext: null);
+        _core.SetId(TaskId.CreateRoot(rootId));
+    }
     internal ConfiguredDurableTask(DurableTask task, TaskId taskId)
     {
         _core = new(task);
@@ -428,6 +437,11 @@ public struct ConfiguredDurableTask<TResult>
 {
     private ConfiguredDurableTaskCore<DurableTask<TResult>> _core;
     internal ConfiguredDurableTask(DurableTask<TResult> task) => _core = new(task);
+    internal ConfiguredDurableTask(DurableTask<TResult> task, string rootId)
+    {
+        _core = new(task, parentContext: null);
+        _core.SetId(TaskId.CreateRoot(rootId));
+    }
     internal ConfiguredDurableTask(DurableTask<TResult> task, TaskId taskId)
     {
         _core = new(task);
