@@ -86,6 +86,33 @@ namespace Orleans.CodeGenerator {
                 return ResourceManager.GetString("InaccessibleSetterTitle", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Invokable base type registrations must identify a valid base type for the grain-call return type and proxy base..
+        /// </summary>
+        internal static string InvalidInvokableBaseTypeMappingDescription {
+            get {
+                return ResourceManager.GetString("InvalidInvokableBaseTypeMappingDescription", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to {0}.
+        /// </summary>
+        internal static string InvalidInvokableBaseTypeMappingMessageFormat {
+            get {
+                return ResourceManager.GetString("InvalidInvokableBaseTypeMappingMessageFormat", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Invalid invokable base type mapping.
+        /// </summary>
+        internal static string InvalidInvokableBaseTypeMappingTitle {
+            get {
+                return ResourceManager.GetString("InvalidInvokableBaseTypeMappingTitle", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to The return type of an RPC method must conform to the list of supported types, such as Task, Task&lt;T&gt;, ValueTask, and ValueTask&lt;T&gt;..

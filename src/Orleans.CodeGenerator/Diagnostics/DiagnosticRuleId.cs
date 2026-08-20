@@ -13,4 +13,5 @@ internal static class DiagnosticRuleId
     public const string GenerateCodeForDeclaringAssemblyAttribute_NoDeclaringAssembly = "ORLEANS0108";
     public const string MultipleCancellationTokenParameters = "ORLEANS0109";
     public const string ReferenceAssemblyWithGenerateSerializer = "ORLEANS0110";
+    public const string InvalidInvokableBaseTypeMapping = "ORLEANS0111";
 }

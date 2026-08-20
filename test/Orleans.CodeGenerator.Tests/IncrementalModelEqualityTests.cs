@@ -237,7 +237,10 @@ public class IncrementalModelEqualityTests
             new TypeRef("global::Orleans.Runtime.GrainReference"),
             IsExtension: false,
             GeneratedClassNameComponent: "GrainReference",
-            ImmutableArray<InvokableBaseTypeMapping>.Empty),
+            MetadataIdentity: new TypeMetadataIdentity(
+                "Orleans.Runtime.GrainReference",
+                "Orleans.Core.Abstractions",
+                "Orleans.Core.Abstractions")),
         ImmutableArray<MethodModel>.Empty,
         MetadataIdentity: new TypeMetadataIdentity($"MyNamespace.{name}", "TestAssembly", "TestAssembly"));
 

@@ -188,9 +188,11 @@ namespace Orleans
     }
 
     /// <summary>
-    /// Applied to attribute types used on invokable interface methods to specify the base type for the invokable object which represents a method call.
+    /// Applied to return types, attribute types used on invokable interface methods, or assemblies to specify the base type for the
+    /// invokable object which represents a method call. Assembly-level registrations can be used when the return type and proxy base
+    /// type are owned by independent libraries.
     /// </summary>
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface, AllowMultiple = true)]
+    [AttributeUsage(AttributeTargets.Assembly | AttributeTargets.Class | AttributeTargets.Interface | AttributeTargets.Struct, AllowMultiple = true)]
     public sealed class InvokableBaseTypeAttribute : Attribute
     {
         /// <summary>

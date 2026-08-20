@@ -375,7 +375,13 @@ internal static class ProxySourceOutputGenerator
         CancellationToken cancellationToken)
     {
         var processed = new HashSet<string>(StringComparer.Ordinal);
-        var resolvedInterfaces = new List<(ProxyInterfaceModel Model, INamedTypeSymbol Symbol, int SourceOrderGroup, string FilePath, int Position)>();
+        var resolvedInterfaces = new List<(
+            ProxyInterfaceModel Model,
+            INamedTypeSymbol Symbol,
+            INamedTypeSymbol ProxyBaseType,
+            int SourceOrderGroup,
+            string FilePath,
+            int Position)>();
         foreach (var model in models)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -391,10 +397,20 @@ internal static class ProxySourceOutputGenerator
                 throw new InvalidOperationException($"Unable to resolve proxy interface '{model.InterfaceType.SyntaxString}'.");
             }
 
+            if (!resolver.TryResolveType(
+                model.ProxyBase.ProxyBaseType,
+                model.ProxyBase.MetadataIdentity,
+                cancellationToken,
+                out var proxyBaseType))
+            {
+                throw new InvalidOperationException($"Unable to resolve proxy base type '{model.ProxyBase.ProxyBaseType.SyntaxString}'.");
+            }
+
             var sourceLocation = interfaceType.Locations.FirstOrDefault(static location => location.IsInSource);
             resolvedInterfaces.Add((
                 model,
                 interfaceType,
+                proxyBaseType,
                 SourceOrderGroup: sourceLocation is null ? 1 : 0,
                 FilePath: sourceLocation?.SourceTree?.FilePath ?? string.Empty,
                 Position: sourceLocation?.SourceSpan.Start ?? int.MaxValue));
@@ -407,7 +423,10 @@ internal static class ProxySourceOutputGenerator
             .ThenBy(static entry => entry.Model.InterfaceType.SyntaxString, StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            proxyContext.VisitInterface(entry.Symbol.OriginalDefinition);
+            proxyContext.VisitInterface(
+                entry.Symbol.OriginalDefinition,
+                entry.ProxyBaseType.OriginalDefinition,
+                entry.Model.ProxyBase.IsExtension);
         }
     }
 
@@ -448,4 +467,3 @@ internal static class ProxySourceOutputGenerator
         return arity == 0 ? name : $"{name}`{arity}";
     }
 }
-

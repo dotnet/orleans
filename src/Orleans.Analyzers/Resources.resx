@@ -165,6 +165,24 @@
   <data name="AliasClashDetectedTitle" xml:space="preserve">
     <value>Rename duplicated [Alias]</value>
   </data>
+  <data name="GrainInterfaceMethodReturnTypeDescription" xml:space="preserve">
+    <value>Grain interface methods must use a return type registered for the selected proxy base.</value>
+  </data>
+  <data name="GrainInterfaceMethodReturnTypeMessageFormat" xml:space="preserve">
+    <value>Grain interface methods must return a registered grain-call return type</value>
+  </data>
+  <data name="GrainInterfaceMethodReturnTypeTitle" xml:space="preserve">
+    <value>Grain interface methods must return a registered grain-call return type</value>
+  </data>
+  <data name="InvalidInvokableBaseTypeMappingDescription" xml:space="preserve">
+    <value>Invokable base type registrations must identify a valid base type for the grain-call return type and proxy base.</value>
+  </data>
+  <data name="InvalidInvokableBaseTypeMappingMessageFormat" xml:space="preserve">
+    <value>{0}</value>
+  </data>
+  <data name="InvalidInvokableBaseTypeMappingTitle" xml:space="preserve">
+    <value>Invalid invokable base type mapping</value>
+  </data>
   <data name="IdClashDetectedDescription" xml:space="preserve">
     <value>The [Id] attribute must be unique to each members of the declaring type.</value>
   </data>

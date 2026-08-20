@@ -374,6 +374,131 @@ public class IncrementalCachingTests
     }
 
     [Fact]
+    public async Task CustomReturnTypeMapping_UnrelatedChangePreservesProxyPipeline()
+    {
+        const string code = """
+            using Orleans;
+
+            public class CustomCall { }
+            public abstract class CustomRequest { }
+
+            [GenerateMethodSerializers(typeof(Orleans.Runtime.GrainReference))]
+            public interface IMyGrain : IGrainWithIntegerKey
+            {
+                CustomCall Call();
+            }
+            """;
+        const string registration = """
+            [assembly: Orleans.InvokableBaseType(
+                typeof(Orleans.Runtime.GrainReference),
+                typeof(CustomCall),
+                typeof(CustomRequest))]
+            """;
+        const string unrelated = """
+            public sealed class UnrelatedClass
+            {
+                public int Value { get; set; }
+            }
+            """;
+
+        var compilation = (await CreateCompilation(code)).AddSyntaxTrees(CSharpSyntaxTree.ParseText(registration));
+        var updatedCompilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(unrelated));
+        var (result1, result2) = await RunTwice(compilation, updatedCompilation);
+
+        AssertTrackedStepsCachedOrUnchanged(
+            result2,
+            OrleansSerializationSourceGenerator.DirectProxyInterfacesTrackingName,
+            OrleansSerializationSourceGenerator.InheritedProxyInterfacesTrackingName,
+            OrleansSerializationSourceGenerator.CollectedProxyInterfacesTrackingName,
+            OrleansSerializationSourceGenerator.PreparedProxyOutputsTrackingName,
+            OrleansSerializationSourceGenerator.ProxyOutputsTrackingName);
+        AssertGeneratedSourcesIdentical(result1, result2);
+    }
+
+    [Fact]
+    public async Task ChangedCustomReturnTypeMappingInvalidatesProxyPipeline()
+    {
+        const string code = """
+            using Orleans;
+
+            public class CustomCall { }
+            public abstract class RequestA { }
+            public abstract class RequestB { }
+
+            [GenerateMethodSerializers(typeof(Orleans.Runtime.GrainReference))]
+            public interface IMyGrain : IGrainWithIntegerKey
+            {
+                CustomCall Call();
+            }
+            """;
+        const string registrationA = """
+            [assembly: Orleans.InvokableBaseType(
+                typeof(Orleans.Runtime.GrainReference),
+                typeof(CustomCall),
+                typeof(RequestA))]
+            """;
+        const string registrationB = """
+            [assembly: Orleans.InvokableBaseType(
+                typeof(Orleans.Runtime.GrainReference),
+                typeof(CustomCall),
+                typeof(RequestB))]
+            """;
+
+        var compilation = await CreateCompilation(code);
+        var registrationTree = CSharpSyntaxTree.ParseText(registrationA);
+        compilation = compilation.AddSyntaxTrees(registrationTree);
+        var updatedCompilation = compilation.ReplaceSyntaxTree(registrationTree, CSharpSyntaxTree.ParseText(registrationB));
+        var (result1, result2) = await RunTwice(compilation, updatedCompilation);
+
+        AssertTrackedStepsCachedOrUnchanged(
+            result2,
+            OrleansSerializationSourceGenerator.DirectProxyInterfacesTrackingName,
+            OrleansSerializationSourceGenerator.CollectedProxyInterfacesTrackingName);
+        AssertTrackedStepModifiedOrNew(result2, OrleansSerializationSourceGenerator.PreparedProxyOutputsTrackingName);
+        AssertTrackedStepModifiedOrNew(result2, OrleansSerializationSourceGenerator.ProxyOutputsTrackingName);
+        AssertSourcesChanged(result1, result2, static hint => hint.Contains(".orleans.proxy.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AddedInvalidDefaultReplacement_PreservesProxyModelCacheAndReportsDiagnostic()
+    {
+        const string code = """
+            using Orleans;
+            using Orleans.Runtime;
+            using System.Threading.Tasks;
+
+            public abstract class CustomRequest { }
+
+            [GenerateMethodSerializers(typeof(GrainReference))]
+            public interface IMyGrain : IGrainWithIntegerKey
+            {
+                Task Call();
+            }
+            """;
+        const string invalidRegistration = """
+            [assembly: Orleans.InvokableBaseType(
+                typeof(Orleans.Runtime.GrainReference),
+                typeof(System.Threading.Tasks.Task),
+                typeof(CustomRequest))]
+            """;
+
+        var compilation = await CreateCompilation(code);
+        var updatedCompilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(invalidRegistration));
+        var (result1, result2) = await RunTwice(compilation, updatedCompilation);
+
+        Assert.Empty(result1.Diagnostics);
+        var diagnostic = Assert.Single(result2.Diagnostics);
+        Assert.Equal(DiagnosticRuleId.InvalidInvokableBaseTypeMapping, diagnostic.Id);
+        Assert.Contains("cannot replace proxy default", diagnostic.GetMessage());
+        AssertTrackedStepsCachedOrUnchanged(
+            result2,
+            OrleansSerializationSourceGenerator.DirectProxyInterfacesTrackingName,
+            OrleansSerializationSourceGenerator.CollectedProxyInterfacesTrackingName);
+        AssertTrackedStepModifiedOrNew(result2, OrleansSerializationSourceGenerator.PreparedProxyOutputsTrackingName);
+        AssertTrackedStepInvalidated(result2, OrleansSerializationSourceGenerator.ProxyOutputsTrackingName);
+    }
+
+    [Fact]
     public async Task AddedSyntaxTreeWithoutSerializableTypes_ProducesIdenticalOutput()
     {
         const string code = """
@@ -950,6 +1075,23 @@ public class IncrementalCachingTests
             .Select(static output => output.Reason)
             .ToArray();
         Assert.Contains(reasons, static reason => reason is IncrementalStepRunReason.Modified or IncrementalStepRunReason.New);
+    }
+
+    private static void AssertTrackedStepInvalidated(GeneratorRunResult result, string stepName)
+    {
+        var trackedSteps = result.TrackedSteps;
+        Assert.NotEmpty(trackedSteps);
+        Assert.True(trackedSteps.TryGetValue(stepName, out var steps), $"Missing tracked step '{stepName}'.");
+
+        var reasons = steps
+            .SelectMany(static step => step.Outputs)
+            .Select(static output => output.Reason)
+            .ToArray();
+        Assert.Contains(
+            reasons,
+            static reason => reason is IncrementalStepRunReason.Modified
+                or IncrementalStepRunReason.New
+                or IncrementalStepRunReason.Removed);
     }
 
     private static void AssertGeneratedSourcesIdentical(GeneratorRunResult result1, GeneratorRunResult result2)

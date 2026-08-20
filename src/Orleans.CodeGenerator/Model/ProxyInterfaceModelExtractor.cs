@@ -25,7 +25,11 @@ internal static class ProxyInterfaceModelExtractor
             return null;
         }
 
-        return ExtractProxyInterfaceModel(typeSymbol, context.SemanticModel.Compilation, context.Attributes, cancellationToken);
+        return ExtractProxyInterfaceModel(
+            typeSymbol,
+            context.SemanticModel.Compilation,
+            context.Attributes,
+            cancellationToken);
     }
 
     internal static ProxyInterfaceModel? ExtractProxyInterfaceModel(
@@ -86,13 +90,12 @@ internal static class ProxyInterfaceModelExtractor
         }
 
         var proxyBaseType = proxyBaseTypeSymbol.OriginalDefinition;
-        var invokableBaseTypes = ExtractInvokableBaseTypeMappings(proxyBaseType, libraryTypes, cancellationToken);
         var generatedClassNameComponent = isExtension ? $"{proxyBaseType.Name}_Ext" : proxyBaseType.Name;
         var proxyBase = new ProxyBaseModel(
             new TypeRef(proxyBaseType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)),
             isExtension,
             generatedClassNameComponent,
-            invokableBaseTypes);
+            TypeMetadataIdentity.Create(proxyBaseType));
 
         var name = GetProxyInterfaceName(typeSymbol, libraryTypes);
         var typeParameters = ExtractInterfaceTypeParameters(typeSymbol);
@@ -126,7 +129,6 @@ internal static class ProxyInterfaceModelExtractor
 
         return name;
     }
-
 
     private static bool TryGetGenerateMethodSerializersAttribute(
         INamedTypeSymbol typeSymbol,
@@ -182,48 +184,6 @@ internal static class ProxyInterfaceModelExtractor
         }
 
         return true;
-    }
-
-    private static ImmutableArray<InvokableBaseTypeMapping> ExtractInvokableBaseTypeMappings(
-        INamedTypeSymbol proxyBaseType,
-        LibraryTypes libraryTypes,
-        CancellationToken cancellationToken)
-    {
-        if (!proxyBaseType.GetAttributes(libraryTypes.DefaultInvokableBaseTypeAttribute, out var invokableBaseTypeAttributes))
-        {
-            return [];
-        }
-
-        var mappings = new Dictionary<string, InvokableBaseTypeMapping>(StringComparer.Ordinal);
-        foreach (var attr in invokableBaseTypeAttributes)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var ctorArgs = attr.ConstructorArguments;
-            if (ctorArgs.Length < 2
-                || ctorArgs[0].Value is not INamedTypeSymbol returnType
-                || ctorArgs[1].Value is not INamedTypeSymbol invokableBaseType)
-            {
-                continue;
-            }
-
-            var returnTypeRef = new TypeRef(returnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
-            var invokableBaseTypeRef = new TypeRef(invokableBaseType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
-            mappings[returnTypeRef.SyntaxString] = new InvokableBaseTypeMapping(returnTypeRef, invokableBaseTypeRef);
-        }
-
-        if (mappings.Count == 0)
-        {
-            return [];
-        }
-
-        var builder = ImmutableArray.CreateBuilder<InvokableBaseTypeMapping>(mappings.Count);
-        foreach (var mapping in mappings.OrderBy(static m => m.Key, StringComparer.Ordinal))
-        {
-            builder.Add(mapping.Value);
-        }
-
-        return builder.MoveToImmutable();
     }
 
     private static ImmutableArray<TypeParameterModel> ExtractInterfaceTypeParameters(INamedTypeSymbol typeSymbol)
@@ -522,5 +482,3 @@ internal static class ProxyInterfaceModelExtractor
         return false;
     }
 }
-
-

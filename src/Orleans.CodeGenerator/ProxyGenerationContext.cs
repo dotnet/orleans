@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Orleans.CodeGenerator.Diagnostics;
 using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
 
@@ -14,6 +15,7 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
     private readonly Dictionary<INamedTypeSymbol, List<CompoundTypeAliasModel>> _compatibilityInvokableAliases = new(SymbolEqualityComparer.Default);
     private readonly HashSet<string> _generatedCompatibilityInvokableMetadataNames = new(StringComparer.Ordinal);
     private readonly HashSet<INamedTypeSymbol> _visitedInterfaces = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<INamedTypeSymbol, InvokableMethodProxyBase> _interfaceProxyBases = new(SymbolEqualityComparer.Default);
 
     internal ProxyGenerationContext(Compilation compilation, CodeGeneratorOptions options)
         : this(compilation, options, LibraryTypes.FromCompilation(compilation, options))
@@ -25,6 +27,7 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
         Compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
         Options = options ?? throw new ArgumentNullException(nameof(options));
         LibraryTypes = libraryTypes ?? throw new ArgumentNullException(nameof(libraryTypes));
+        InvokableBaseTypeResolver = new InvokableBaseTypeResolver(compilation);
         MetadataModel = new MetadataModel();
         ProxyGenerator = new ProxyGenerator(this, new CopierGenerator(this));
         InvokableGenerator = new InvokableGenerator(this);
@@ -33,6 +36,7 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
     public Compilation Compilation { get; }
     public CodeGeneratorOptions Options { get; }
     internal LibraryTypes LibraryTypes { get; }
+    internal InvokableBaseTypeResolver InvokableBaseTypeResolver { get; }
     LibraryTypes IGeneratorServices.LibraryTypes => LibraryTypes;
     internal MetadataModel MetadataModel { get; }
     internal ProxyGenerator ProxyGenerator { get; }
@@ -66,7 +70,7 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
 
     internal string? GetAlias(ISymbol symbol) => GeneratedCodeUtilities.GetAlias(LibraryTypes, symbol);
 
-    internal void VisitInterface(INamedTypeSymbol interfaceType)
+    internal void VisitInterface(INamedTypeSymbol interfaceType, INamedTypeSymbol proxyBaseType, bool isExtension)
     {
         // Get or generate an invokable for the original method definition.
         if (!SymbolEqualityComparer.Default.Equals(interfaceType, interfaceType.OriginalDefinition))
@@ -79,10 +83,9 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
             return;
         }
 
-        foreach (var proxyBase in GetProxyBases(interfaceType))
-        {
-            _ = GetInvokableInterfaceDescription(proxyBase.ProxyBaseType, interfaceType);
-        }
+        var proxyBase = GetProxyBaseDescription(proxyBaseType, isExtension);
+        _interfaceProxyBases[interfaceType] = proxyBase;
+        _ = GetInvokableInterfaceDescription(proxyBase.ProxyBaseType, interfaceType);
     }
 
     internal bool TryGetInvokableInterfaceDescription(INamedTypeSymbol interfaceType, [NotNullWhen(true)] out ProxyInterfaceDescription? result)
@@ -97,48 +100,30 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
         return true;
     }
 
-    private readonly Dictionary<INamedTypeSymbol, List<InvokableMethodProxyBase>> _interfaceProxyBases = new(SymbolEqualityComparer.Default);
-    internal List<InvokableMethodProxyBase> GetProxyBases(INamedTypeSymbol interfaceType)
-    {
-        if (_interfaceProxyBases.TryGetValue(interfaceType, out var result))
-        {
-            return result;
-        }
-
-        result = new List<InvokableMethodProxyBase>();
-        if (interfaceType.GetAttributes(LibraryTypes.GenerateMethodSerializersAttribute, out var attributes, inherited: true))
-        {
-            foreach (var attribute in attributes)
-            {
-                var proxyBase = GetProxyBaseDescription(attribute);
-                if (!result.Contains(proxyBase))
-                {
-                    result.Add(proxyBase);
-                }
-            }
-        }
-
-        _interfaceProxyBases[interfaceType] = result;
-        return result;
-    }
-
     internal bool TryGetProxyBaseDescription(INamedTypeSymbol interfaceType, [NotNullWhen(true)] out InvokableMethodProxyBase? result)
     {
-        var attribute = interfaceType.GetAttribute(LibraryTypes.GenerateMethodSerializersAttribute, inherited: true);
-        if (attribute == null)
+        if (_interfaceProxyBases.TryGetValue(interfaceType.OriginalDefinition, out result))
+        {
+            return true;
+        }
+
+        if (!InvokableBaseTypeResolver.TryGetProxyBaseType(
+            interfaceType,
+            LibraryTypes.GenerateMethodSerializersAttribute,
+            out var proxyBaseType,
+            out var isExtension))
         {
             result = null;
             return false;
         }
 
-        result = GetProxyBaseDescription(attribute);
+        result = GetProxyBaseDescription(proxyBaseType, isExtension);
         return true;
     }
 
-    private InvokableMethodProxyBase GetProxyBaseDescription(AttributeData attribute)
+    private InvokableMethodProxyBase GetProxyBaseDescription(INamedTypeSymbol proxyBaseType, bool isExtension)
     {
-        var proxyBaseType = ((INamedTypeSymbol)attribute.ConstructorArguments[0].Value!).OriginalDefinition;
-        var isExtension = (bool)attribute.ConstructorArguments[1].Value!;
+        proxyBaseType = proxyBaseType.OriginalDefinition;
         var invokableBaseTypes = GetInvokableBaseTypes(proxyBaseType);
         var descriptor = new InvokableMethodProxyBaseId(proxyBaseType, isExtension);
         var description = new InvokableMethodProxyBase(this, descriptor, invokableBaseTypes);
@@ -150,15 +135,9 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
             if (!MetadataModel.ProxyBaseTypeInvokableBaseTypes.TryGetValue(baseClass, out var invokableBaseTypes))
             {
                 invokableBaseTypes = new Dictionary<INamedTypeSymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
-                if (baseClass.GetAttributes(LibraryTypes.DefaultInvokableBaseTypeAttribute, out var invokableBaseTypeAttributes))
+                foreach (var mapping in InvokableBaseTypeResolver.GetMappingsForProxy(baseClass))
                 {
-                    foreach (var attr in invokableBaseTypeAttributes)
-                    {
-                        var ctorArgs = attr.ConstructorArguments;
-                        var returnType = (INamedTypeSymbol)ctorArgs[0].Value!;
-                        var invokableBaseType = (INamedTypeSymbol)ctorArgs[1].Value!;
-                        invokableBaseTypes[returnType] = invokableBaseType;
-                    }
+                    invokableBaseTypes[mapping.ReturnType] = mapping.InvokableBaseType;
                 }
 
                 MetadataModel.ProxyBaseTypeInvokableBaseTypes[baseClass] = invokableBaseTypes;
@@ -205,6 +184,17 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
     {
         var originalMethod = method.OriginalDefinition;
         var proxyBaseInfo = GetProxyBase(interfaceType);
+        if (!InvokableBaseTypeResolver.TryResolve(
+            proxyBaseInfo.ProxyBaseType,
+            method,
+            interfaceType,
+            out _,
+            out var resolverDiagnostic)
+            && resolverDiagnostic is { Kind: ResolverDiagnosticKind.InvalidMapping })
+        {
+            throw new OrleansGeneratorDiagnosticAnalysisException(
+                InvokableBaseTypeMappingDiagnostic.CreateDiagnostic(resolverDiagnostic));
+        }
 
         // For extensions, we want to ensure that the containing type is always the extension.
         // This ensures that we will always know which 'component' to get in our SetTarget method.

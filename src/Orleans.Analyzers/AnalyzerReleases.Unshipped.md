@@ -4,6 +4,7 @@
 
 Rule ID | Category | Severity | Notes
 --------|----------|----------|-------
+ORLEANS0026 | Usage | Error | Invalid invokable base type mapping
 ORLEANS0014 | Usage | Warning | ConfigureAwaitAnalyzer, Grain code should not use ConfigureAwait(false) or ConfigureAwait without ContinueOnCapturedContext
 ORLEANS0016 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Grain interface not declared in OrleansContracts.txt
 ORLEANS0017 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Grain interface version mismatch between code and file

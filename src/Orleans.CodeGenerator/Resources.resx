@@ -135,4 +135,13 @@
   <data name="InvalidRpcMethodReturnTypeTitle" xml:space="preserve">
     <value>Invalid return type for RPC interface method</value>
   </data>
+  <data name="InvalidInvokableBaseTypeMappingDescription" xml:space="preserve">
+    <value>Invokable base type registrations must identify a valid base type for the grain-call return type and proxy base.</value>
+  </data>
+  <data name="InvalidInvokableBaseTypeMappingMessageFormat" xml:space="preserve">
+    <value>{0}</value>
+  </data>
+  <data name="InvalidInvokableBaseTypeMappingTitle" xml:space="preserve">
+    <value>Invalid invokable base type mapping</value>
+  </data>
 </root>

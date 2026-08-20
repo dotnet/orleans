@@ -243,26 +243,21 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         return alias;
     }
 
-    private static INamedTypeSymbol GetBaseClassType(InvokableMethodDescription method)
+    private INamedTypeSymbol GetBaseClassType(InvokableMethodDescription method)
     {
-        var methodReturnType = method.Method.ReturnType;
-        if (methodReturnType is not INamedTypeSymbol namedMethodReturnType)
+        if (_generationContext.InvokableBaseTypeResolver.TryResolveBaseType(
+            method.ProxyBase.ProxyBaseType,
+            method.Method,
+            out var baseClassType,
+            out var resolverDiagnostic))
         {
-            throw new OrleansGeneratorDiagnosticAnalysisException(InvalidRpcMethodReturnTypeDiagnostic.CreateDiagnostic(method));
+            return baseClassType!;
         }
 
-        if (method.InvokableBaseTypes.TryGetValue(namedMethodReturnType, out var baseClassType))
+        if (resolverDiagnostic is { Kind: ResolverDiagnosticKind.InvalidMapping })
         {
-            return baseClassType;
-        }
-
-        if (namedMethodReturnType.ConstructedFrom is { IsGenericType: true, IsUnboundGenericType: false } constructedFrom)
-        {
-            var unbound = constructedFrom.ConstructUnboundGenericType();
-            if (method.InvokableBaseTypes.TryGetValue(unbound, out baseClassType))
-            {
-                return baseClassType.ConstructedFrom.Construct([.. namedMethodReturnType.TypeArguments]);
-            }
+            throw new OrleansGeneratorDiagnosticAnalysisException(
+                InvokableBaseTypeMappingDiagnostic.CreateDiagnostic(resolverDiagnostic));
         }
 
         throw new OrleansGeneratorDiagnosticAnalysisException(InvalidRpcMethodReturnTypeDiagnostic.CreateDiagnostic(method));

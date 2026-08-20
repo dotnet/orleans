@@ -29,6 +29,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Orleans.CodeGenerator.Shared\InvokableBaseTypeResolver.cs" Link="InvokableBaseTypeResolver.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="buildTransitive\Microsoft.Orleans.CodeGenerator.props">
       <PackagePath>%(Identity)</PackagePath>
       <Visible>true</Visible>
