@@ -28,7 +28,10 @@ public static class DurableTaskRuntimeHelper
     /// dependencies wait for completion. If a call made from a durable callback, or asynchronous work
     /// carrying its normally flowed <see cref="ExecutionContext"/>, would close a dependency cycle,
     /// the target request is still initiated but that cycle-closing edge is not awaited. There is no
-    /// global or thread-based inference.
+    /// global or thread-based inference. Durable callbacks registered before the shared completion
+    /// closes are enlisted in that operation and contribute to its completion and failures. Callbacks
+    /// registered after that atomic boundary run in an independent callback scope and cannot change
+    /// this method's already-completed shared result.
     ///
     /// <para>
     /// The <paramref name="cancellationToken"/> only abandons this caller's wait; it does not undo the
