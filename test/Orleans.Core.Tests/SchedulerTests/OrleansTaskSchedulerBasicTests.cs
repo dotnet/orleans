@@ -117,7 +117,7 @@ namespace UnitTests.SchedulerTests
         }
 
         [Fact]
-        public async Task Sched_RunSynchronously_QueuesWhenContextIsNotCurrent()
+        public async Task Sched_RunTaskSynchronously_DefersQueuedWorkUntilExecutionIsReleased()
         {
             Task? queuedTask = null;
             var startCompleted = 0;
@@ -135,20 +135,23 @@ namespace UnitTests.SchedulerTests
                     });
                 queuedTask.Start(_rootContext.WorkItemGroup.TaskScheduler);
 
-                Assert.Contains("WorkGroupStatus=Running", _rootContext.WorkItemGroup.DumpStatus());
+                Assert.Equal(1, _rootContext.WorkItemGroup.ExternalWorkItemCount);
                 Assert.False(queuedTask.IsCompleted);
                 Volatile.Write(ref startCompleted, 1);
             });
 
-            startTask.RunSynchronously(_rootContext.WorkItemGroup.TaskScheduler);
+            _rootContext.WorkItemGroup.ReserveExecution();
+            _rootContext.WorkItemGroup.RunTaskSynchronously(startTask);
             Assert.True(startTask.IsCompletedSuccessfully, startTask.Exception?.ToString());
+            Assert.False(queuedTask!.IsCompleted);
+            _rootContext.WorkItemGroup.ReleaseExecution();
 
-            await queuedTask!.WaitAsync(TimeSpan.FromSeconds(5));
+            await queuedTask.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.Equal(1, queuedTaskObservedStartCompletion);
         }
 
         [Fact]
-        public async Task Sched_RunSynchronously_PreservesContextAcrossAsynchronousSignals()
+        public async Task Sched_RunTaskSynchronously_PreservesContextForReleasedAsynchronousWork()
         {
             const int IterationCount = 1_000;
             var signal = new SingleWaiterAutoResetEvent { RunContinuationsAsynchronously = true };
@@ -161,6 +164,12 @@ namespace UnitTests.SchedulerTests
             Task? observationLoop = null;
             var initialObservation = 0;
             var asyncInitialObservation = 0;
+            var loopStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var loopStarter = new Task(() =>
+            {
+                observationLoop = ObserveSignals();
+                loopStarted.SetResult();
+            });
             var startTask = new Task(() =>
             {
                 if (ReferenceEquals(RuntimeContext.Current, _rootContext))
@@ -173,11 +182,14 @@ namespace UnitTests.SchedulerTests
                     initialObservation |= 2;
                 }
 
-                observationLoop = ObserveSignals();
+                loopStarter.Start(_rootContext.WorkItemGroup.TaskScheduler);
             });
-            startTask.RunSynchronously(_rootContext.WorkItemGroup.TaskScheduler);
+            _rootContext.WorkItemGroup.ReserveExecution();
+            _rootContext.WorkItemGroup.RunTaskSynchronously(startTask);
             Assert.True(startTask.IsCompletedSuccessfully, startTask.Exception?.ToString());
             Assert.Equal(3, initialObservation);
+            _rootContext.WorkItemGroup.ReleaseExecution();
+            await loopStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.Equal(3, asyncInitialObservation);
 
             for (var i = 0; i < observations.Length; i++)

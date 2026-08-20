@@ -45,6 +45,7 @@ internal sealed partial class ActivationData :
     private readonly object _lock = new();
 #endif
     private readonly GrainTypeSharedContext _shared;
+    private readonly IGrainActivator _grainActivator;
     private readonly IServiceScope _serviceScope;
     private readonly WorkItemGroup _workItemGroup;
     private readonly List<(Message Message, CoarseStopwatch QueuedTime)> _waitingRequests = new();
@@ -69,6 +70,7 @@ internal sealed partial class ActivationData :
 #pragma warning disable IDE0052 // Remove unread private members
     private Task? _messageLoopTask;
 #pragma warning restore IDE0052 // Remove unread private members
+    private int _messageLoopStarted;
 
     private Activity? _activationActivity;
 
@@ -92,18 +94,29 @@ internal sealed partial class ActivationData :
         GrainAddress grainAddress,
         Func<IGrainContext, WorkItemGroup> createWorkItemGroup,
         IServiceProvider applicationServices,
-        GrainTypeSharedContext shared)
+        GrainTypeSharedContext shared,
+        IGrainActivator grainActivator)
     {
         ArgumentNullException.ThrowIfNull(grainAddress);
         ArgumentNullException.ThrowIfNull(createWorkItemGroup);
         ArgumentNullException.ThrowIfNull(applicationServices);
         ArgumentNullException.ThrowIfNull(shared);
+        ArgumentNullException.ThrowIfNull(grainActivator);
         _shared = shared;
+        _grainActivator = grainActivator;
         Address = grainAddress;
         _serviceScope = applicationServices.CreateScope();
         Debug.Assert(_serviceScope != null, "_serviceScope must not be null.");
         _workItemGroup = createWorkItemGroup(this);
         Debug.Assert(_workItemGroup != null, "_workItemGroup must not be null.");
+        _workItemGroup.ReserveExecution();
+        _workItemGroup.QueueAction(
+            static state =>
+            {
+                var context = (ActivationData)state;
+                context._messageLoopTask = context.RunMessageLoop();
+            },
+            this);
     }
 
     internal void SetActivationActivity(Activity activity)
@@ -120,14 +133,37 @@ internal sealed partial class ActivationData :
         return _activationActivity?.Context;
     }
 
-    public void Start(IGrainActivator grainActivator)
+    internal void Start()
+    {
+        ExecutionContext.Run(
+            DefaultExecutionContext.Instance,
+            static state =>
+            {
+                var context = (ActivationData)state!;
+                var task = new Task(
+                    static state => ((ActivationData)state!).StartCore(),
+                    context,
+                    CancellationToken.None,
+                    TaskCreationOptions.DenyChildAttach);
+                context._workItemGroup.RunTaskSynchronously(task);
+                task.GetAwaiter().GetResult();
+            },
+            this);
+    }
+
+    private void StartCore()
     {
         Debug.Assert(Equals(ActivationTaskScheduler, TaskScheduler.Current));
         lock (_lock)
         {
+            if (State is not ActivationState.Creating)
+            {
+                return;
+            }
+
             try
             {
-                var instance = grainActivator.CreateInstance(this);
+                var instance = _grainActivator.CreateInstance(this);
                 SetGrainInstance(instance);
                 _activationActivity?.AddEvent(new ActivityEvent("instance-created"));
 
@@ -140,8 +176,17 @@ internal sealed partial class ActivationData :
                 Deactivate(new(DeactivationReasonCode.ActivationFailed, exception, "Error constructing grain instance."), _activationActivity?.Context, CancellationToken.None);
             }
 
-            _messageLoopTask = RunMessageLoop();
         }
+    }
+
+    internal void StartMessageLoop()
+    {
+        if (Interlocked.Exchange(ref _messageLoopStarted, 1) != 0)
+        {
+            throw new InvalidOperationException("The activation message loop has already been started.");
+        }
+
+        _workItemGroup.ReleaseExecution();
     }
 
     public ActivationTaskScheduler ActivationTaskScheduler => _workItemGroup.TaskScheduler;

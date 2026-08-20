@@ -49,15 +49,13 @@ internal partial class ActivationDataActivatorProvider(
         return true;
     }
 
-    private partial class ActivationDataActivator : IGrainContextActivator
+    private partial class ActivationDataActivator : IDeferredGrainContextActivator
     {
         private readonly IOptions<SchedulingOptions> _schedulingOptions;
         private readonly IGrainActivator _grainActivator;
         private readonly IServiceProvider _serviceProvider;
         private readonly GrainTypeSharedContext _sharedComponents;
         private readonly Func<IGrainContext, WorkItemGroup> _createWorkItemGroup;
-        private readonly Action<object?> _startActivation;
-        private readonly ContextCallback _startActivationSynchronously;
 
         public ActivationDataActivator(
             IGrainActivator grainActivator,
@@ -74,33 +72,37 @@ internal partial class ActivationDataActivatorProvider(
                 context,
                 _schedulingOptions,
                 schedulerInstruments);
-            _startActivation = state => ((ActivationData)state!).Start(_grainActivator);
-            _startActivationSynchronously = state =>
-            {
-                var context = (ActivationData)state!;
-                var task = new Task(
-                    _startActivation,
-                    context,
-                    CancellationToken.None,
-                    TaskCreationOptions.DenyChildAttach);
-                task.RunSynchronously(context.ActivationTaskScheduler);
-            };
         }
 
         public IGrainContext CreateContext(GrainAddress activationAddress, IConfigureGrainContext[] configureActions)
+        {
+            var context = CreateDeferredContext(activationAddress, configureActions);
+            context.Start();
+            context.StartMessageLoop();
+            return context;
+        }
+
+        IGrainContext IDeferredGrainContextActivator.CreateDeferredContext(
+            GrainAddress activationAddress,
+            IConfigureGrainContext[] configureActions)
+            => CreateDeferredContext(activationAddress, configureActions);
+
+        private ActivationData CreateDeferredContext(
+            GrainAddress activationAddress,
+            IConfigureGrainContext[] configureActions)
         {
             var context = new ActivationData(
                 activationAddress,
                 _createWorkItemGroup,
                 _serviceProvider,
-                _sharedComponents);
+                _sharedComponents,
+                _grainActivator);
 
             foreach (var configure in configureActions)
             {
                 configure.Configure(context);
             }
 
-            ExecutionContext.Run(DefaultExecutionContext.Instance, _startActivationSynchronously, context);
             return context;
         }
     }

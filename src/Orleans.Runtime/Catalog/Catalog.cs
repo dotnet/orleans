@@ -164,7 +164,7 @@ namespace Orleans.Runtime
                         MembershipVersion = MembershipVersion.MinValue,
                     };
 
-                    result = this.grainActivator.CreateInstance(address);
+                    result = this.grainActivator.CreateInstance(address, deferActivation: true);
                     activations.RecordNewTarget(result);
                 }
             } // End lock
@@ -194,6 +194,11 @@ namespace Orleans.Runtime
                 }
             }
 
+            if (result is ActivationData activationData)
+            {
+                activationData.Start();
+            }
+
             _catalogInstruments.OnActivationCreated();
 
             // Rehydration occurs before activation.
@@ -204,6 +209,7 @@ namespace Orleans.Runtime
 
             // Initialize the new activation asynchronously.
             result.Activate(requestContextData);
+            (result as ActivationData)?.StartMessageLoop();
             return result;
 
             [MethodImpl(MethodImplOptions.NoInlining)]

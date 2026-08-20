@@ -119,6 +119,75 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
         }
     }
 
+    internal void ReserveExecution()
+    {
+        lock (_lockObj)
+        {
+            if (_state != WorkGroupStatus.Waiting)
+            {
+                throw new InvalidOperationException($"Cannot reserve execution while {this} is {_state}.");
+            }
+
+            _state = WorkGroupStatus.Running;
+        }
+    }
+
+    internal void RunTaskSynchronously(Task task)
+    {
+        long taskStart;
+        lock (_lockObj)
+        {
+            if (_state != WorkGroupStatus.Running || _currentTask is not null)
+            {
+                throw new InvalidOperationException($"Synchronous execution requires a reserved {this}.");
+            }
+
+            _currentTask = task;
+            _currentTaskStarted = taskStart = Environment.TickCount64;
+            _totalItemsEnqueued++;
+        }
+
+        RuntimeContext.SetExecutionContext(GrainContext, out var originalContext);
+        try
+        {
+#if DEBUG
+            LogTaskStart(task);
+#endif
+            TaskScheduler.RunTaskSynchronously(task);
+        }
+        finally
+        {
+            RuntimeContext.ResetExecutionContext(originalContext);
+            _totalItemsProcessed++;
+            var taskDurationMs = Environment.TickCount64 - taskStart;
+            if (taskDurationMs > (long)Math.Ceiling(_schedulingOptions.TurnWarningLengthThreshold.TotalMilliseconds))
+            {
+                _schedulerInstruments.OnLongRunningTurn();
+                LogLongRunningTurn(task, taskDurationMs);
+            }
+
+            _currentTask = null;
+        }
+    }
+
+    internal void ReleaseExecution()
+    {
+        lock (_lockObj)
+        {
+            Debug.Assert(_state == WorkGroupStatus.Running);
+            Debug.Assert(_currentTask is null);
+            if (_workItems.Count > 0)
+            {
+                _state = WorkGroupStatus.Runnable;
+                ScheduleExecution(this);
+            }
+            else
+            {
+                _state = WorkGroupStatus.Waiting;
+            }
+        }
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void LogTooManyTasksInQueue(int count, int maxPendingItemsLimit)
     {
