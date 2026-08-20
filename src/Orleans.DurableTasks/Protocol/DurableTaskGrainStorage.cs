@@ -16,6 +16,7 @@ public interface IDurableTaskGrainStorage
     IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest? request);
     void SetRequest(TaskId taskId, IDurableTaskState state, IDurableTaskRequest request);
     void SetRequestFingerprint(TaskId taskId, IDurableTaskState state, string fingerprint);
+    void SetRemoteRequest(TaskId taskId, IDurableTaskState state, GrainId target, string fingerprint);
     void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response);
     void RequestCancellation(TaskId taskId, IDurableTaskState state);
     void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, long generation);

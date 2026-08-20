@@ -20,6 +20,9 @@ public class DurableTaskRequestContext
     // TODO: Use a specialized collection type which allows for late materialization when deserialized.
     [Id(2)]
     public Dictionary<string, byte[]>? Values { get; set; }
+
+    [Id(3)]
+    public bool SupportsDurableCompletion { get; set; }
 }
 
 [RegisterConverter, RegisterCopier]

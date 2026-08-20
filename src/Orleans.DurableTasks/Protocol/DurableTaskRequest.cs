@@ -3,16 +3,18 @@ using System;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Distributed.DurableTasks;
+using System.IO;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Invocation;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
+using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.DurableTasks;
 
@@ -39,70 +41,29 @@ public interface IDurableTaskRequest : IRequest
     /// <returns>A string representation of the request.</returns>
     public string ToMethodCallString() => ToMethodCallString(this);
 
-    internal static bool AreRequestsEquivalent(IDurableTaskRequest left, IDurableTaskRequest right)
-    {
-        if (!string.Equals(left.GetInterfaceName(), right.GetInterfaceName(), StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        if (!string.Equals(left.GetMethodName(), right.GetMethodName(), StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        if (left.GetArgumentCount() != right.GetArgumentCount())
-        {
-            return false;
-        }
-
-        for (var arg = 0; arg < left.GetArgumentCount(); arg++)
-        {
-            var leftValue = left.GetArgument(arg);
-            var rightValue = right.GetArgument(arg);
-            if (!Equals(leftValue, rightValue))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    internal static string GetFingerprint(IDurableTaskRequest request)
+    internal static string GetFingerprint(IDurableTaskRequest request, Serializer serializer)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        Append(request.GetInterfaceName());
-        Append(request.GetMethodName());
-        Append(request.GetArgumentCount().ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Append(Encoding.UTF8.GetBytes(RuntimeTypeNameFormatter.Format(request.GetType())));
+
+        var arguments = new object?[request.GetArgumentCount()];
         for (var index = 0; index < request.GetArgumentCount(); index++)
         {
-            var argument = request.GetArgument(index);
-            if (argument is null)
-            {
-                Append("<null>");
-                continue;
-            }
-
-            var type = argument.GetType();
-            Append(type.AssemblyQualifiedName ?? type.FullName ?? type.Name);
-            try
-            {
-                Append(JsonSerializer.Serialize(argument, type));
-            }
-            catch (Exception exception) when (exception is NotSupportedException or JsonException)
-            {
-                Append(argument.ToString() ?? string.Empty);
-            }
+            arguments[index] = request.GetArgument(index);
         }
 
+        using var stream = new MemoryStream();
+        using var session = serializer.SessionPool.GetSession();
+        serializer.Serialize(arguments, stream, session);
+        Append(stream.GetBuffer().AsSpan(0, checked((int)stream.Length)));
         return Convert.ToHexString(hash.GetHashAndReset());
 
-        void Append(string value)
+        void Append(ReadOnlySpan<byte> value)
         {
-            var bytes = Encoding.UTF8.GetBytes(value);
-            hash.AppendData(bytes);
-            hash.AppendData([0]);
+            Span<byte> length = stackalloc byte[sizeof(int)];
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(length, value.Length);
+            hash.AppendData(length);
+            hash.AppendData(value);
         }
     }
 }
@@ -201,6 +162,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
             return await runtime.ScheduleRemoteAsync(taskId, this, cancellationToken);
         }
 
+        Context.SupportsDurableCompletion = false;
         var targetGrain = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         return await targetGrain.ScheduleAsync(taskId, this, cancellationToken);
     }
@@ -232,7 +194,8 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
                 : await runtime.GetScheduledTaskHandle(executionContext.TaskId).WaitAsync(durableCts.Token);
         }
 
-        Context.CallerId = _shared.GrainContextAccessor.GrainContext.GrainId;
+        Context.CallerId = default;
+        Context.SupportsDurableCompletion = false;
 
         var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         using var cts = new CancellationTokenSource();
@@ -379,6 +342,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
             return await runtime.ScheduleRemoteAsync(taskId, this, cancellationToken);
         }
 
+        Context.SupportsDurableCompletion = false;
         var targetGrain = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         return await targetGrain.ScheduleAsync(taskId, this, cancellationToken);
     }
@@ -410,7 +374,8 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
                 : await runtime.GetScheduledTaskHandle(executionContext.TaskId).WaitAsync(durableCts.Token);
         }
 
-        Context.CallerId = _shared.GrainContextAccessor.GrainContext.GrainId;
+        Context.CallerId = default;
+        Context.SupportsDurableCompletion = false;
 
         var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         using var cts = new CancellationTokenSource();

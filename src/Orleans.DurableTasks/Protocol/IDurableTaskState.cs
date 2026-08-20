@@ -55,4 +55,8 @@ public interface IDurableTaskState
     public string? RequestFingerprint { get; }
 
     public DateTimeOffset? TombstonedAt { get; }
+
+    public GrainId RemoteTarget { get; }
+
+    public string? RemoteRequestFingerprint { get; }
 }

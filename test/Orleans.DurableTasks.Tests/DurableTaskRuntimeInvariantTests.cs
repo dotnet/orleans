@@ -2,12 +2,17 @@ using System.Diagnostics.CodeAnalysis;
 using System.Distributed.DurableTasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
+using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.DurableJobs;
+using Orleans.Invocation;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Runtime.DurableTasks;
+using Orleans.Serialization;
+using Orleans.Serialization.Invocation;
 using Xunit;
 
 namespace Orleans.DurableTasks.Tests;
@@ -97,6 +102,183 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
+    public async Task LocalDelayRemainsPendingUntilResumeAndRecoveryReschedulesIt()
+    {
+        var (runtime, storage, _, transport) = CreateRuntime();
+        var localTaskId = TaskId.Parse("root/local");
+        var localHandle = await runtime.ScheduleChildAsync(
+            localTaskId,
+            new TestStateManager.PendingDurableTask(),
+            default);
+        Assert.Equal(DurableTaskStatus.Pending, (await localHandle.PollAsync(default, default)).Status);
+        Assert.Null(storage.Get(localTaskId).Result);
+        Assert.Null(storage.Get(localTaskId).CompletedAt);
+
+        var taskId = TaskId.Parse("root/delay");
+        Assert.Equal(
+            DurableTaskStatus.Pending,
+            (await runtime.ScheduleDelayAsync(taskId, runtime.UtcNow, default)).Status);
+        var handle = runtime.GetScheduledTaskHandle(taskId);
+
+        Assert.Equal(
+            DurableTaskStatus.Pending,
+            (await handle.PollAsync(default, default)).Status);
+        Assert.Null(storage.Get(taskId).Result);
+        Assert.Null(storage.Get(taskId).CompletedAt);
+
+        transport.ScheduledResumes.Clear();
+        await runtime.ResumePendingTasksAsync(default);
+        var resume = Assert.Single(transport.ScheduledResumes);
+        Assert.Equal(taskId, resume.TaskId);
+        Assert.Null(storage.Get(taskId).CompletedAt);
+
+        var state = storage.Get(taskId);
+        Assert.Same(DurableJobRunResult.Completed, await runtime.ExecuteJobAsync(
+            CreateRunContext(taskId, state.ResumeGeneration),
+            default));
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, (await handle.WaitAsync(default)).Status);
+        Assert.NotNull(storage.Get(taskId).CompletedAt);
+    }
+
+    [Fact]
+    public async Task RecoveredCanceledDelayTerminalizesBeforeRescheduleAndStaleResumesAreHarmless()
+    {
+        var (runtime, storage, _, transport) = CreateRuntime();
+        var taskId = TaskId.Parse("root/delay");
+        await runtime.ScheduleDelayAsync(taskId, runtime.UtcNow.AddMinutes(5), default);
+        var generation = storage.Get(taskId).ResumeGeneration;
+
+        storage.Get(taskId).CancellationRequestedAt = runtime.UtcNow;
+        transport.ScheduledResumes.Clear();
+        await runtime.ResumePendingTasksAsync(default);
+
+        var canceled = storage.Get(taskId);
+        Assert.Equal(DurableTaskStatus.Canceled, canceled.Result!.Status);
+        Assert.NotNull(canceled.CompletedAt);
+        Assert.Null(canceled.DueTime);
+        Assert.True(canceled.ResumeGeneration > generation);
+        Assert.Empty(transport.ScheduledResumes);
+
+        await runtime.ExecuteJobAsync(CreateRunContext(taskId, generation), default);
+        await runtime.ExecuteJobAsync(CreateRunContext(taskId, generation), default);
+        Assert.Equal(DurableTaskStatus.Canceled, storage.Get(taskId).Result!.Status);
+    }
+
+    [Fact]
+    public async Task PollingOnlyCallerIsNotRegisteredAsCompletionDestination()
+    {
+        var (runtime, storage, _, transport) = CreateRuntime();
+        var request = CreateRequest(1);
+        request.Context!.CallerId = GrainId.Create("client", "one");
+        request.Context.SupportsDurableCompletion = false;
+        var taskId = TaskId.Parse("client-request");
+
+        var response = await ((IDurableTaskServer)runtime).ScheduleAsync(taskId, request);
+        Assert.Equal(DurableTaskResponseKind.Pending, response.ResponseKind);
+        await WaitUntilAsync(() => storage.Get(taskId).Result is { IsCompleted: true });
+
+        Assert.Empty(storage.Get(taskId).CompletionDestinations);
+        Assert.Empty(transport.Completions);
+        Assert.Equal(
+            DurableTaskStatus.CompletedSuccessfully,
+            (await runtime.SubscribeOrPollAsync(taskId, default, default)).Status);
+    }
+
+    [Fact]
+    public async Task RecoveredRemoteChildRetainsCancellationTargetAndReplayIdentity()
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var rootId = TaskId.Parse("root");
+        var childId = TaskId.Parse("root/remote");
+        storage.GetOrCreate(rootId);
+        var request = CreateRequest(7);
+        var target = request.Context!.TargetId;
+
+        await runtime.ScheduleChildAsync(childId, new TestStateManager.TestRemoteDurableTask(request), default);
+        var child = storage.Get(childId);
+        var fingerprint = child.RemoteRequestFingerprint;
+        Assert.Equal(target, child.RemoteTarget);
+        Assert.NotNull(fingerprint);
+
+        var (recovered, _, _, recoveredTransport) = CreateRuntime(storage, manager);
+        await recovered.SignalCancellationAsync(rootId, default);
+
+        var cancellation = Assert.Single(recoveredTransport.Cancellations);
+        Assert.Equal(childId, cancellation.TaskId);
+        Assert.Equal(target, cancellation.Target);
+        Assert.Equal(fingerprint, storage.Get(childId).RemoteRequestFingerprint);
+    }
+
+    [Fact]
+    public async Task StopCancelsAndDrainsExecutionWithoutPersistingShutdownAsTerminal()
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var active = 0;
+        var maxActive = 0;
+        var request = CreateRequest(
+            1,
+            () => DurableTask.Run(async token =>
+            {
+                var count = Interlocked.Increment(ref active);
+                maxActive = Math.Max(maxActive, count);
+                started.TrySetResult();
+                try
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref active);
+                }
+            }));
+        var taskId = TaskId.Parse("root");
+
+        await ((IDurableTaskServer)runtime).ScheduleAsync(taskId, request);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var firstStop = runtime.StopAsync(default);
+        Assert.Same(firstStop, runtime.StopAsync(default));
+        await firstStop.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(0, active);
+        Assert.Null(storage.Get(taskId).Result);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => runtime.ResumePendingTasksAsync(default));
+
+        started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var (replacement, _, _, _) = CreateRuntime(storage, manager);
+        await replacement.ResumePendingTasksAsync(default);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(1, maxActive);
+        await replacement.StopAsync(default);
+        Assert.Null(storage.Get(taskId).Result);
+    }
+
+    [Fact]
+    public async Task StopDrainsAndPersistsNaturalCompletionWhichWinsShutdownRace()
+    {
+        var (runtime, storage, _, _) = CreateRuntime();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var complete = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = CreateRequest(
+            1,
+            () => DurableTask.Run(async _ =>
+            {
+                started.TrySetResult();
+                await complete.Task;
+            }));
+        var taskId = TaskId.Parse("root");
+
+        await ((IDurableTaskServer)runtime).ScheduleAsync(taskId, request);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var stopping = runtime.StopAsync(default);
+        complete.TrySetResult();
+        await stopping.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, storage.Get(taskId).Result!.Status);
+    }
+
+    [Fact]
     public async Task FirstTerminalResponseWinsAndAcknowledgementRemovesOnlyItsWaiter()
     {
         var (runtime, storage, _, transport) = CreateRuntime();
@@ -106,12 +288,14 @@ public sealed class DurableTaskRuntimeInvariantTests
         var state = storage.GetOrCreate(taskId);
         state.CompletionDestinations.Add(target);
         state.CompletionDestinations.Add(other);
+        var handle = runtime.GetScheduledTaskHandle(taskId);
 
         runtime.AcceptResponse(taskId, DurableTaskResponse.FromResult(7));
         runtime.AcceptResponse(taskId, DurableTaskResponse.FromResult(8));
         await runtime.AcknowledgeCompletionAsync(taskId, target, default);
 
         Assert.Equal(7, storage.Get(taskId).Result!.GetResult<int>());
+        Assert.Equal(7, (await handle.WaitAsync(default)).GetResult<int>());
         Assert.DoesNotContain(target, storage.Get(taskId).CompletionDestinations);
         Assert.Contains(other, storage.Get(taskId).CompletionDestinations);
         Assert.Empty(transport.Completions);
@@ -175,6 +359,7 @@ public sealed class DurableTaskRuntimeInvariantTests
             {
                 CallerId = GrainId.Create("caller", "one"),
                 TargetId = GrainId.Create("target", "one"),
+                SupportsDurableCompletion = true,
             },
         };
 
@@ -207,6 +392,18 @@ public sealed class DurableTaskRuntimeInvariantTests
     {
         var manager = new TestStateManager();
         var storage = new TestStorage(manager);
+        return CreateRuntime(storage, manager, resultRetentionPeriod);
+    }
+
+    private static (
+        DurableTaskGrainRuntime Runtime,
+        TestStorage Storage,
+        TestStateManager Manager,
+        RecordingDurableTaskMessageTransport Transport) CreateRuntime(
+            TestStorage storage,
+            TestStateManager manager,
+            TimeSpan? resultRetentionPeriod = null)
+    {
         var context = Substitute.For<IGrainContext>();
         context.GrainId.Returns(GrainId.Create("test", "one"));
         var accessor = Substitute.For<IGrainContextAccessor>();
@@ -218,11 +415,19 @@ public sealed class DurableTaskRuntimeInvariantTests
             Options.Create(new DurableTaskOptions
             {
                 ResultRetentionPeriod = resultRetentionPeriod ?? TimeSpan.FromHours(1),
-            }));
+            }),
+            CreateSerializer());
         var transport = new RecordingDurableTaskMessageTransport();
         var runtime = new DurableTaskGrainRuntime(storage, shared, [transport], manager);
         manager.RegisterObserver(runtime);
         return (runtime, storage, manager, transport);
+    }
+
+    private static Serializer CreateSerializer()
+    {
+        var services = new ServiceCollection();
+        services.AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskRuntimeInvariantTests).Assembly));
+        return services.BuildServiceProvider().GetRequiredService<Serializer>();
     }
 
     private static async Task WaitUntilAsync(Func<bool> predicate)
@@ -269,10 +474,21 @@ public sealed class DurableTaskRuntimeInvariantTests
         public void SetRequestFingerprint(TaskId taskId, IDurableTaskState state, string fingerprint) =>
             ((DurableTaskState)state).RequestFingerprint = fingerprint;
 
+        public void SetRemoteRequest(TaskId taskId, IDurableTaskState state, GrainId target, string fingerprint)
+        {
+            ((DurableTaskState)state).RemoteTarget = target;
+            ((DurableTaskState)state).RemoteRequestFingerprint = fingerprint;
+        }
+
         public void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
         {
             ((DurableTaskState)state).Result = response;
             ((DurableTaskState)state).CompletedAt = DateTimeOffset.UtcNow;
+            ((DurableTaskState)state).DueTime = null;
+            if (((DurableTaskState)state).ResumeGeneration > 0)
+            {
+                ((DurableTaskState)state).ResumeGeneration++;
+            }
         }
 
         public void RequestCancellation(TaskId taskId, IDurableTaskState state) =>
@@ -337,6 +553,37 @@ public sealed class DurableTaskRuntimeInvariantTests
             {
                 observer.OnWriteCompleted();
             }
+        }
+
+        internal sealed class PendingDurableTask : DurableTask
+        {
+            protected override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context) =>
+                new(DurableTaskResponse.Pending);
+        }
+
+        internal sealed class TestRemoteDurableTask(IDurableTaskRequest request) : DurableTask, ISchedulableTask, IDurableTaskRequest
+        {
+            public DurableTaskRequestContext? Context => request.Context;
+            public InvokeMethodOptions Options => request.Options;
+            public DurableTask CreateTask() => request.CreateTask();
+            public object GetTarget() => request.GetTarget()!;
+            public void SetTarget(ITargetHolder holder) => request.SetTarget(holder);
+            public ValueTask<Response> Invoke() => request.Invoke();
+            public int GetArgumentCount() => request.GetArgumentCount();
+            public object GetArgument(int index) => request.GetArgument(index)!;
+            public void SetArgument(int index, object value) => request.SetArgument(index, value);
+            public void Dispose() => request.Dispose();
+            public string GetMethodName() => request.GetMethodName();
+            public string GetInterfaceName() => request.GetInterfaceName();
+            public string GetActivityName() => request.GetActivityName();
+            public Type GetInterfaceType() => request.GetInterfaceType();
+            public System.Reflection.MethodInfo GetMethod() => request.GetMethod();
+            public void AddInvokeMethodOptions(InvokeMethodOptions options) => request.AddInvokeMethodOptions(options);
+            public ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken) =>
+                new(DurableTaskResponse.Pending);
+            public IScheduledTaskHandle GetHandle(TaskId taskId) => throw new NotSupportedException();
+            protected override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context) =>
+                throw new NotSupportedException();
         }
 
         public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken)
