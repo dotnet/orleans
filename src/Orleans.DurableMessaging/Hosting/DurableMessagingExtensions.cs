@@ -84,6 +84,8 @@ public static class DurableMessagingExtensions
                 sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), InboxMessageState>>("inbox-message-state"),
                 sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), InboxDeadLetter>>("inbox-dead-letters"),
                 sp.GetRequiredKeyedService<IDurableValue<string>>("inbox-job-id"),
+                sp.GetRequiredKeyedService<IDurableValue<string>>("inbox-completed-job-id"),
+                sp.GetRequiredKeyedService<IDurableValue<long>>("inbox-job-sequence"),
                 sp.GetRequiredService<IDurableOutbox>(),
                 sp.GetRequiredService<ILocalDurableJobManager>(),
                 sp.GetRequiredService<IDurableJobHandlerRegistry>(),
@@ -102,6 +104,8 @@ public static class DurableMessagingExtensions
             _ = sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), InboxMessageState>>("inbox-message-state");
             _ = sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), InboxDeadLetter>>("inbox-dead-letters");
             _ = sp.GetRequiredKeyedService<IDurableValue<string>>("inbox-job-id");
+            _ = sp.GetRequiredKeyedService<IDurableValue<string>>("inbox-completed-job-id");
+            _ = sp.GetRequiredKeyedService<IDurableValue<long>>("inbox-job-sequence");
             _ = sp.GetRequiredService<IDurableOutbox>();
             return new DurableInbox(
                 sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("inbox"),
