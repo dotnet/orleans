@@ -60,6 +60,34 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Deliver_CancellationStopsWaitingForInboxGate()
+    {
+        var receiver = NewGrain();
+        _ = await receiver.GetSnapshotAsync();
+        var barrier = fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
+        using var firstEnvelope = CreateEnvelope(receiver, NewMessage(72, "holds-gate"));
+        using var secondEnvelope = CreateEnvelope(receiver, NewMessage(73, "canceled"));
+        var firstDelivery = DeliverAsync(receiver, firstEnvelope.Value);
+        await barrier.WaitUntilEnteredAsync();
+        using var cancellation = new CancellationTokenSource();
+
+        var canceledDelivery = DeliverAsync(receiver, secondEnvelope.Value, cancellation.Token);
+        Assert.False(canceledDelivery.IsCompleted);
+        cancellation.Cancel();
+
+        try
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledDelivery);
+        }
+        finally
+        {
+            barrier.Release();
+        }
+
+        Assert.Equal(DeliveryStatus.Accepted, (await firstDelivery).Status);
+    }
+
+    [Fact]
     public async Task FailedInboxAcceptance_RevertsEnvelopeAndOrphanedJobCannotProcess()
     {
         var receiver = NewGrain();
@@ -590,8 +618,9 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
 
     private static async Task<DeliveryResult> DeliverAsync(
         IDurableMessagingTestGrain receiver,
-        DurableEnvelope envelope) =>
-        await receiver.AsReference<IDurableInboxExtension>().DeliverAsync(envelope);
+        DurableEnvelope envelope,
+        CancellationToken cancellationToken = default) =>
+        await receiver.AsReference<IDurableInboxExtension>().DeliverAsync(envelope, cancellationToken);
 
     private static async Task WaitForBarrierAsync(
         IDurableMessagingTestGrain receiver,
