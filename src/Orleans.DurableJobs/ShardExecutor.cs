@@ -254,7 +254,7 @@ internal sealed partial class ShardExecutor
                 var result = await target.HandleDurableJobAsync(jobContext, cancellationToken);
 
                 // Handle the result based on status
-                while (result.IsRunning)
+                while (result.IsInProgress)
                 {
                     // Enter polling loop
                     LogPollingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.PollAfterDelay.Value);

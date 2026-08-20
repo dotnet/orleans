@@ -14,7 +14,7 @@ public class DurableJobRunResultTests
     public void StatusValuesAndSerializedMemberIdsRemainCompatible()
     {
         Assert.Equal(0, (int)DurableJobRunStatus.Completed);
-        Assert.Equal(1, (int)DurableJobRunStatus.Running);
+        Assert.Equal(1, (int)DurableJobRunStatus.InProgress);
         Assert.Equal(2, (int)DurableJobRunStatus.Failed);
         Assert.Equal(3, (int)DurableJobRunStatus.RescheduleRequested);
 
@@ -30,7 +30,7 @@ public class DurableJobRunResultTests
         var result = DurableJobRunResult.Completed;
 
         Assert.Equal(DurableJobRunStatus.Completed, result.Status);
-        Assert.False(result.IsRunning);
+        Assert.False(result.IsInProgress);
         Assert.False(result.IsFailed);
         Assert.False(result.IsRescheduleRequested);
         Assert.Null(result.PollAfterDelay);
@@ -39,34 +39,34 @@ public class DurableJobRunResultTests
     }
 
     [Fact]
-    public void Running_RequiresPositiveDelayAndExposesPollDelay()
+    public void InProgress_RequiresPositiveDelayAndExposesPollDelay()
     {
         var delay = TimeSpan.FromSeconds(5);
 
-        var result = DurableJobRunResult.Running(delay);
+        var result = DurableJobRunResult.InProgress(delay);
 
-        Assert.Equal(DurableJobRunStatus.Running, result.Status);
-        Assert.True(result.IsRunning);
+        Assert.Equal(DurableJobRunStatus.InProgress, result.Status);
+        Assert.True(result.IsInProgress);
         Assert.Equal(delay, result.PollAfterDelay);
         Assert.False(result.IsFailed);
         Assert.False(result.IsRescheduleRequested);
         Assert.Null(result.Exception);
         Assert.Null(result.RescheduleTime);
-        Assert.Throws<ArgumentOutOfRangeException>(() => DurableJobRunResult.Running(TimeSpan.Zero));
-        Assert.Throws<ArgumentOutOfRangeException>(() => DurableJobRunResult.Running(TimeSpan.FromTicks(-1)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => DurableJobRunResult.InProgress(TimeSpan.Zero));
+        Assert.Throws<ArgumentOutOfRangeException>(() => DurableJobRunResult.InProgress(TimeSpan.FromTicks(-1)));
     }
 
     [Fact]
-    public void PollAfterCompatibilityMembers_ForwardToRunning()
+    public void PollAfterCompatibilityMembers_ForwardToInProgress()
     {
 #pragma warning disable CS0618 // Verify compatibility members remain functional.
         var delay = TimeSpan.FromSeconds(5);
         var result = DurableJobRunResult.PollAfter(delay);
 
-        Assert.Equal(DurableJobRunStatus.Running, result.Status);
-        Assert.Equal(DurableJobRunStatus.Running, DurableJobRunStatus.PollAfter);
+        Assert.Equal(DurableJobRunStatus.InProgress, result.Status);
+        Assert.Equal(DurableJobRunStatus.InProgress, DurableJobRunStatus.PollAfter);
         Assert.True(result.IsPending);
-        Assert.True(result.IsRunning);
+        Assert.True(result.IsInProgress);
         Assert.Equal(delay, result.PollAfterDelay);
 #pragma warning restore CS0618
     }
@@ -81,7 +81,7 @@ public class DurableJobRunResultTests
         Assert.Equal(DurableJobRunStatus.Failed, result.Status);
         Assert.True(result.IsFailed);
         Assert.Same(exception, result.Exception);
-        Assert.False(result.IsRunning);
+        Assert.False(result.IsInProgress);
         Assert.False(result.IsRescheduleRequested);
         Assert.Null(result.PollAfterDelay);
         Assert.Null(result.RescheduleTime);
@@ -99,7 +99,7 @@ public class DurableJobRunResultTests
         Assert.True(result.IsRescheduleRequested);
         Assert.Equal(dueTime, result.RescheduleTime);
         Assert.False(result.IsFailed);
-        Assert.False(result.IsRunning);
+        Assert.False(result.IsInProgress);
         Assert.Null(result.PollAfterDelay);
         Assert.Null(result.Exception);
     }

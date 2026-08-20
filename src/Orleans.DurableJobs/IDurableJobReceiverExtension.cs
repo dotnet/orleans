@@ -11,9 +11,9 @@ namespace Orleans.DurableJobs;
 internal interface IDurableJobReceiverExtension : IGrainExtension
 {
     /// <summary>
-    /// Handles a durable job by either starting execution or checking the status of an already running job.
+    /// Handles a durable job by either starting execution or checking the status of an execution which remains in progress.
     /// If the job attempt identified by <see cref="IJobRunContext.Job"/> and <see cref="IJobRunContext.DequeueCount"/> has not been started, it will be executed.
-    /// If it is already running, the current status is returned.
+    /// If it remains in progress, the current status is returned.
     /// </summary>
     /// <param name="context">The context containing information about the durable job.</param>
     /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
@@ -112,7 +112,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
                 return LongPollGetJobStatusAsync(key, context, state);
             }
 
-            return new(DurableJobRunResult.Running(_shared.Options.JobStatusPollInterval));
+            return new(DurableJobRunResult.InProgress(_shared.Options.JobStatusPollInterval));
         }
 
         RecordCompletedJobAttempt(key, state);
@@ -144,7 +144,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
 
                 if (!state.Task.IsCompleted)
                 {
-                    return DurableJobRunResult.Running(_shared.Options.JobStatusPollInterval);
+                    return DurableJobRunResult.InProgress(_shared.Options.JobStatusPollInterval);
                 }
             }
 

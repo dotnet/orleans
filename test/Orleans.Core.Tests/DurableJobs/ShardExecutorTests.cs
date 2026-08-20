@@ -274,7 +274,7 @@ public class ShardExecutorTests
     }
 
     [Fact]
-    public async Task RunShardAsync_WhenJobReturnsRunning_EntersPollingLoopUntilCompletion()
+    public async Task RunShardAsync_WhenJobReturnsInProgress_EntersPollingLoopUntilCompletion()
     {
         var options = CreateOptions(maxConcurrentJobs: 10);
         var overloadDetector = CreateOverloadDetector(isOverloaded: false);
@@ -295,7 +295,7 @@ public class ShardExecutorTests
     }
 
     [Fact]
-    public async Task RunShardAsync_WhenJobReturnsRunning_UsesTimeProvider()
+    public async Task RunShardAsync_WhenJobReturnsInProgress_UsesTimeProvider()
     {
         var timeProvider = new TimerTrackingFakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         var options = CreateOptions(maxConcurrentJobs: 10);
@@ -314,7 +314,7 @@ public class ShardExecutorTests
                 if (currentCall == 1)
                 {
                     firstCall.SetResult();
-                    return DurableJobRunResult.Running(TimeSpan.FromSeconds(5));
+                    return DurableJobRunResult.InProgress(TimeSpan.FromSeconds(5));
                 }
 
                 secondCall.SetResult();
@@ -368,7 +368,7 @@ public class ShardExecutorTests
     }
 
     [Fact]
-    public async Task RunShardAsync_WhenJobReturnsRunningThenFails_HandlesFailureCorrectly()
+    public async Task RunShardAsync_WhenJobReturnsInProgressThenFails_HandlesFailureCorrectly()
     {
         var options = CreateOptions(
             maxConcurrentJobs: 10,
@@ -946,7 +946,7 @@ public class ShardExecutorTests
                 var currentCall = Interlocked.Increment(ref callBox.Value);
                 if (currentCall < 4)
                 {
-                    return DurableJobRunResult.Running(TimeSpan.FromMilliseconds(10));
+                    return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
                 }
                 return DurableJobRunResult.Completed;
             });
@@ -970,7 +970,7 @@ public class ShardExecutorTests
                 var currentCall = Interlocked.Increment(ref callBox.Value);
                 if (currentCall < 4)
                 {
-                    return DurableJobRunResult.Running(TimeSpan.FromMilliseconds(10));
+                    return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
                 }
                 var exception = new InvalidOperationException("Job failed after polling");
                 return DurableJobRunResult.Failed(exception);
@@ -1005,7 +1005,7 @@ public class ShardExecutorTests
                 
                 if (currentCall < 4)
                 {
-                    return DurableJobRunResult.Running(TimeSpan.FromMilliseconds(pollDelayMs));
+                    return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(pollDelayMs));
                 }
                 return DurableJobRunResult.Completed;
             });

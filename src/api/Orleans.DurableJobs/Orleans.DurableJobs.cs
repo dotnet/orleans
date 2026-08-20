@@ -50,15 +50,15 @@ namespace Orleans.DurableJobs
         [System.Diagnostics.CodeAnalysis.MemberNotNullWhen(true, "Exception")]
         public bool IsFailed { get { throw null; } }
 
-        [System.Obsolete("Use IsRunning instead.")]
+        [System.Obsolete("Use IsInProgress instead.")]
         [System.Diagnostics.CodeAnalysis.MemberNotNullWhen(true, "PollAfterDelay")]
         public bool IsPending { get { throw null; } }
 
+        [System.Diagnostics.CodeAnalysis.MemberNotNullWhen(true, "PollAfterDelay")]
+        public bool IsInProgress { get { throw null; } }
+
         [System.Diagnostics.CodeAnalysis.MemberNotNullWhen(true, "RescheduleTime")]
         public bool IsRescheduleRequested { get { throw null; } }
-
-        [System.Diagnostics.CodeAnalysis.MemberNotNullWhen(true, "PollAfterDelay")]
-        public bool IsRunning { get { throw null; } }
 
         [Id(1)]
         public System.TimeSpan? PollAfterDelay { get { throw null; } }
@@ -71,19 +71,19 @@ namespace Orleans.DurableJobs
 
         public static DurableJobRunResult Failed(System.Exception exception) { throw null; }
 
-        [System.Obsolete("Use Running instead.")]
+        [System.Obsolete("Use InProgress instead.")]
         public static DurableJobRunResult PollAfter(System.TimeSpan delay) { throw null; }
 
-        public static DurableJobRunResult RescheduleAt(System.DateTimeOffset dueTime) { throw null; }
+        public static DurableJobRunResult InProgress(System.TimeSpan delay) { throw null; }
 
-        public static DurableJobRunResult Running(System.TimeSpan delay) { throw null; }
+        public static DurableJobRunResult RescheduleAt(System.DateTimeOffset dueTime) { throw null; }
     }
 
     public enum DurableJobRunStatus
     {
         Completed = 0,
-        Running = 1,
-        [System.Obsolete("Use Running instead.")]
+        InProgress = 1,
+        [System.Obsolete("Use InProgress instead.")]
         PollAfter = 1,
         Failed = 2,
         RescheduleRequested = 3

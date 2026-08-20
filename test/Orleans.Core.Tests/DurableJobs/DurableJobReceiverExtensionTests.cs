@@ -44,15 +44,15 @@ public class DurableJobReceiverExtensionTests
         var first = await extension.HandleDurableJobAsync(context, cts.Token);
         var second = await extension.HandleDurableJobAsync(context, cts.Token);
 
-        Assert.True(first.IsRunning);
-        Assert.True(second.IsRunning);
+        Assert.True(first.IsInProgress);
+        Assert.True(second.IsInProgress);
         await handler.Received(1).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
 
         executionTask.SetResult(true);
     }
 
     [Fact]
-    public async Task HandleDurableJobAsync_WhenExecutionIsRunning_UsesConfiguredPollInterval()
+    public async Task HandleDurableJobAsync_WhenExecutionIsInProgress_UsesConfiguredPollInterval()
     {
         var executionTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var handler = Substitute.For<IDurableJobHandler>();
@@ -65,7 +65,7 @@ public class DurableJobReceiverExtensionTests
 
         var result = await extension.HandleDurableJobAsync(context, CancellationToken.None);
 
-        Assert.True(result.IsRunning);
+        Assert.True(result.IsInProgress);
         Assert.Equal(pollInterval, result.PollAfterDelay);
 
         executionTask.SetResult(true);
@@ -87,7 +87,7 @@ public class DurableJobReceiverExtensionTests
         var second = await extension.HandleDurableJobAsync(secondNotification, CancellationToken.None);
 
         Assert.False(first.IsCompleted);
-        Assert.True(second.IsRunning);
+        Assert.True(second.IsInProgress);
         await handler.Received(1).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
 
         executionTask.SetResult(true);
