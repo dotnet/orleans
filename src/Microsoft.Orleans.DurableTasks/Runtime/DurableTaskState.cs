@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks;
+using Orleans.Runtime;
 
 namespace Orleans.DurableTasks.Runtime;
 
