@@ -24,11 +24,14 @@ namespace Orleans.DurableTasks.Tests;
 /// </summary>
 internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessageTransport
 {
+    private readonly TaskCompletionSource _scheduledResume = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     public List<(GrainId Sender, GrainId Target, TaskId TaskId, IDurableTaskRequest Request)> Invocations { get; } = [];
     public List<(GrainId Sender, GrainId Target, TaskId TaskId, DurableTaskResponse Response)> Completions { get; } = [];
     public List<(GrainId Sender, GrainId Target, TaskId TaskId)> Cancellations { get; } = [];
     public List<(GrainId Target, TaskId TaskId, DateTimeOffset DueTime)> ScheduledResumes { get; } = [];
     public int CommitCount { get; private set; }
+    public Task ScheduledResume => _scheduledResume.Task;
 
     public void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request) => Invocations.Add((sender, target, taskId, request));
 
@@ -40,6 +43,7 @@ internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessage
     public ValueTask ScheduleResumeAsync(GrainId target, TaskId taskId, long generation, DateTimeOffset dueTime, CancellationToken cancellationToken)
     {
         ScheduledResumes.Add((target, taskId, dueTime));
+        _scheduledResume.TrySetResult();
         return default;
     }
 

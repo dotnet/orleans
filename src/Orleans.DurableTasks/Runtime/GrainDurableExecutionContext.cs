@@ -44,7 +44,11 @@ internal sealed class GrainDurableExecutionContext(
         DateTimeOffset dueTime,
         CancellationToken cancellationToken)
     {
-        ThrowIfNotChildTaskId(taskId);
+        if (taskId != TaskId)
+        {
+            ThrowIfNotChildTaskId(taskId);
+        }
+
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
         return await runtime.ScheduleDelayAsync(taskId, dueTime, executionCts.Token);
     }

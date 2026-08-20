@@ -306,3 +306,84 @@ internal sealed class ExceptionDurableTaskResponseCopier : IDeepCopier<Exception
         return result;
     }
 }
+
+[RegisterSerializer]
+internal sealed class CanceledDurableTaskResponseCodec : IFieldCodec<CanceledDurableTaskResponse>
+{
+    private readonly Type _codecFieldType = typeof(CanceledDurableTaskResponse);
+    private readonly IFieldCodec<Exception> _codec;
+
+    public CanceledDurableTaskResponseCodec(ICodecProvider codecProvider)
+        => _codec = OrleansGeneratedCodeHelper.GetService<IFieldCodec<Exception>>(this, codecProvider);
+
+    public void WriteField<TBufferWriter>(
+        ref Writer<TBufferWriter> writer,
+        uint fieldIdDelta,
+        [AllowNull] Type expectedType,
+        [AllowNull] CanceledDurableTaskResponse value) where TBufferWriter : IBufferWriter<byte>
+    {
+        if (value is null)
+        {
+            ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
+            return;
+        }
+
+        ReferenceCodec.MarkValueField(writer.Session);
+        writer.WriteStartObject(fieldIdDelta, expectedType, _codecFieldType);
+        _codec.WriteField(ref writer, 0, typeof(Exception), value.Exception);
+        writer.WriteEndObject();
+    }
+
+    [return: MaybeNull]
+    public CanceledDurableTaskResponse ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+    {
+        if (field.IsReference)
+            return ReferenceCodec.ReadReference<CanceledDurableTaskResponse, TInput>(ref reader, field);
+
+        field.EnsureWireTypeTagDelimited();
+        ReferenceCodec.MarkValueField(reader.Session);
+        reader.ReadFieldHeader(ref field);
+        if (field.IsEndBaseOrEndObject || field.FieldIdDelta != 0)
+        {
+            throw new RequiredFieldMissingException(nameof(CanceledDurableTaskResponse.Exception));
+        }
+
+        var exception = _codec.ReadValue(ref reader, field);
+        if (exception is not OperationCanceledException cancellation)
+        {
+            throw new InvalidOperationException(
+                $"Expected an {nameof(OperationCanceledException)} but encountered '{exception?.GetType()}'.");
+        }
+
+        reader.ReadFieldHeader(ref field);
+        reader.ConsumeEndBaseOrEndObject(ref field);
+        return new CanceledDurableTaskResponse(cancellation);
+    }
+}
+
+[RegisterCopier]
+internal sealed class CanceledDurableTaskResponseCopier : IDeepCopier<CanceledDurableTaskResponse>
+{
+    private readonly IDeepCopier<Exception> _copier;
+
+    public CanceledDurableTaskResponseCopier(ICodecProvider codecProvider)
+        => _copier = OrleansGeneratedCodeHelper.GetService<IDeepCopier<Exception>>(this, codecProvider);
+
+    public CanceledDurableTaskResponse DeepCopy(CanceledDurableTaskResponse? input, CopyContext context)
+    {
+        if (context.TryGetCopy<CanceledDurableTaskResponse>(input, out var existing))
+            return existing!;
+
+        var original = input!;
+        var copiedException = _copier.DeepCopy(original.Exception, context);
+        if (copiedException is not OperationCanceledException cancellation)
+        {
+            throw new InvalidOperationException(
+                $"Expected an {nameof(OperationCanceledException)} but encountered '{copiedException?.GetType()}'.");
+        }
+
+        var result = new CanceledDurableTaskResponse(cancellation);
+        context.RecordCopy(original, result);
+        return result;
+    }
+}
