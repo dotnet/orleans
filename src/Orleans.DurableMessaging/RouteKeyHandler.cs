@@ -15,9 +15,8 @@ namespace Orleans.DurableMessaging;
 /// the message processing logic.
 /// </para>
 /// <para>
-/// For prefix-based routing (e.g., "orders/" matches "orders/create" and "orders/update"), implement
-/// <see cref="IInboxHandler"/> directly with custom <see cref="IInboxHandler.CanHandle"/>
-/// logic using <c>RouteKey?.StartsWith()</c>.
+/// For prefix-based routing (e.g., "orders/" matches "orders/create" and "orders/update"), derive
+/// from <see cref="RoutePrefixHandler"/>.
 /// </para>
 /// <para>
 /// <b>Handler Precedence:</b> When registering multiple handlers, more specific handlers
