@@ -8,13 +8,14 @@ public sealed class SnapshotProbe
     private readonly ConcurrentDictionary<GrainId, DurableEndpointSnapshot> _latest = new();
     private readonly ConcurrentDictionary<GrainId, List<Waiter>> _waiters = new();
 
-    public Task<DurableEndpointSnapshot> WaitAsync(
+    public async Task<DurableEndpointSnapshot> WaitAsync(
         GrainId grainId,
-        Func<DurableEndpointSnapshot, bool> predicate)
+        Func<DurableEndpointSnapshot, bool> predicate,
+        TimeSpan? timeout = null)
     {
         if (_latest.TryGetValue(grainId, out var current) && predicate(current))
         {
-            return Task.FromResult(current);
+            return current;
         }
 
         var waiter = new Waiter(predicate);
@@ -23,13 +24,23 @@ public sealed class SnapshotProbe
         {
             if (_latest.TryGetValue(grainId, out current) && predicate(current))
             {
-                return Task.FromResult(current);
+                return current;
             }
 
             waiters.Add(waiter);
         }
 
-        return waiter.Completion.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        try
+        {
+            return await waiter.Completion.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(30));
+        }
+        finally
+        {
+            lock (waiters)
+            {
+                waiters.Remove(waiter);
+            }
+        }
     }
 
     public void Publish(GrainId grainId, DurableEndpointSnapshot snapshot)
