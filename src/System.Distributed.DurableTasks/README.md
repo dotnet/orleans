@@ -24,22 +24,22 @@ cancellation. Task definitions and application code depend only on this assembly
 - `CancelAsync` requests durable cancellation. The request is monotonic and idempotent, and
   hosts retain it with task state. The durable token enters the canceled state before cancellation
   is published to durable callbacks, including callbacks registered concurrently with the request.
-- Callbacks registered through `RegisterCancellationCallbackAsync` execute with their durable
-  context ambient and participate in durable dependency and failure tracking. Their explicit
-  cancellation-operation causality flows through ordinary awaits and safe `Task.Run` dispatch.
-  Suppressed `ExecutionContext` flow and unsafe dispatch detach that causality and behave as
-  external observers.
+- `RegisterCancellationCallbackAsync` establishes cancellation-operation causality. Its callbacks
+  execute with their durable context ambient and participate in durable dependency and failure
+  tracking. Causality flows through ordinary awaits and safe `Task.Run` dispatch. Suppressing
+  `ExecutionContext` flow or using unsafe dispatch detaches subsequent asynchronous work according
+  to standard .NET behavior, so that work is external.
 - Callbacks registered directly on `CancellationToken` are ordinary synchronous .NET observers,
-  not durable cancellation callbacks. They follow standard registration-time `ExecutionContext`
-  capture and optional `SynchronizationContext` dispatch. A callback registered outside a durable
-  cancellation callback is an external observer. One registered inside an active durable callback
-  inherits its cancellation-operation causality unless execution-context flow is suppressed or an
-  unsafe registration API is used. This also applies to immediate registration on an already-canceled
-  token: the context current at registration determines its causality.
-- Regardless of inherited causality, ordinary token callbacks must return promptly and must not
-  synchronously block on `RequestCancellationAsync` or any other durable cancellation completion.
-  Use `RegisterCancellationCallbackAsync` for asynchronous work, awaited cross-context cancellation
-  dependencies, failure aggregation, and clear cycle semantics.
+  not durable cancellation callbacks. They are for cooperative checks and synchronous cleanup only.
+  They follow standard `CancellationToken` behavior: registration-time `ExecutionContext` capture,
+  optional `SynchronizationContext` dispatch, and current execution-context behavior for unsafe
+  registrations.
+- Ordinary token callbacks must return promptly. They must not call, block on, await, or otherwise
+  orchestrate `RequestCancellationAsync` or durable cancellation of any context. Violating this
+  boundary is outside the contract and has the usual synchronous reentrancy and sync-over-async risks.
+  All cancellation work which requests another durable context, awaits asynchronous work, needs cycle
+  handling, or participates in durable failure aggregation must use
+  `RegisterCancellationCallbackAsync`.
 - Disposing a durable cancellation registration prevents a snapshotted callback which has not
   started, or waits for an active callback to finish, including when that callback fails. A callback
   can dispose its own registration without blocking.
@@ -49,13 +49,16 @@ cancellation. Task definitions and application code depend only on this assembly
 ### Cancellation completion and cycles
 
 `RequestCancellationAsync` starts the durable request once and all callers observe the same
-monotonic completion. External callers and acyclic durable callback dependencies wait until all
-observers finish and receive their aggregated failures. Dependency edges are created only from
-the explicit cancellation operation flowed by `RegisterCancellationCallbackAsync`, including when
-standard `ExecutionContext` capture carries that operation into an ordinary token callback. There
-is no global or thread activity inference. If adding an edge would close a durable callback cycle,
-the target cancellation is initiated but the cycle-closing call returns without waiting on that
-edge. Completed operations release their graph edges.
+monotonic completion. Ordinary token observers run synchronously using standard
+`CancellationTokenSource` cancellation semantics. External callers and acyclic durable callback
+dependencies wait until durable observers finish and receive their aggregated failures. Dependency
+edges are created only from cancellation operations established by
+`RegisterCancellationCallbackAsync` and flowed into subsequent asynchronous work by standard
+`ExecutionContext` behavior; there is no global or thread activity inference. Cycle breaking applies
+only to `RequestCancellationAsync` calls made from those durable callbacks or their normally flowed
+asynchronous work. If adding such an edge would close a durable callback cycle, the target
+cancellation is initiated but the cycle-closing call returns without waiting on that edge. Completed
+operations release their graph edges.
 
 The cancellation token passed to `RequestCancellationAsync` only abandons that caller's wait.
 It cannot reverse or withdraw the durable request.
