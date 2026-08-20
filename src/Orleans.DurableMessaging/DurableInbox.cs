@@ -16,7 +16,6 @@ namespace Orleans.DurableMessaging;
 internal sealed class DurableInbox : IDurableInbox
 {
     private readonly IDurableDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> _inbox;
-    private readonly IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> _processed;
     private readonly List<IInboxHandler> _handlers;
     private readonly Dictionary<string, IInboxHandler> _exactRouteHandlers;
     private readonly int _capacity;
@@ -25,19 +24,15 @@ internal sealed class DurableInbox : IDurableInbox
     /// Creates a new DurableInbox instance.
     /// </summary>
     /// <param name="inbox">Durable dictionary for storing unprocessed messages.</param>
-    /// <param name="processed">Durable dictionary for tracking processed messages.</param>
     /// <param name="capacity">Maximum inbox capacity (default: 1000).</param>
     public DurableInbox(
         IDurableDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> inbox,
-        IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> processed,
         int capacity = 1000)
     {
         ArgumentNullException.ThrowIfNull(inbox);
-        ArgumentNullException.ThrowIfNull(processed);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(capacity);
 
         _inbox = inbox;
-        _processed = processed;
         _handlers = new List<IInboxHandler>();
         _exactRouteHandlers = new Dictionary<string, IInboxHandler>(StringComparer.Ordinal);
         _capacity = capacity;
@@ -45,10 +40,9 @@ internal sealed class DurableInbox : IDurableInbox
 
     internal DurableInbox(
         IDurableDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> inbox,
-        IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> processed,
         IEnumerable<IInboxHandler> handlers,
         int capacity)
-        : this(inbox, processed, capacity)
+        : this(inbox, capacity)
     {
         foreach (var handler in handlers)
         {
