@@ -163,9 +163,9 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     /// </summary>
     /// <param name="envelope">The envelope to send.</param>
     /// <remarks>
-    /// The message is persisted atomically with grain state when IStateMachineManager.WriteStateAsync()
-    /// is called. The background pump will deliver the message to the target grain ONLY AFTER
-    /// the message has been durably persisted.
+    /// The message is persisted atomically with grain state when
+    /// <see cref="IJournaledStateManager.WriteStateAsync"/> is called. The background pump will
+    /// deliver the message to the target grain ONLY AFTER the message has been durably persisted.
     /// </remarks>
     public void Send(DurableEnvelope envelope)
     {
