@@ -39,7 +39,7 @@ internal sealed class DurableInbox : IDurableInbox
         _inbox = inbox;
         _processed = processed;
         _handlers = new List<IInboxHandler>();
-        _exactRouteHandlers = new Dictionary<string, IInboxHandler>();
+        _exactRouteHandlers = new Dictionary<string, IInboxHandler>(StringComparer.Ordinal);
         _capacity = capacity;
     }
 
