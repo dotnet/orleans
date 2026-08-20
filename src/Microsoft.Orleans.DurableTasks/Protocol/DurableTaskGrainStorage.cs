@@ -1,0 +1,36 @@
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Threading;
+using System.Threading.Tasks;
+using Orleans.Runtime;
+using Orleans.DurableTasks;
+
+namespace Orleans.DurableTasks.Protocol;
+
+public interface IDurableTaskGrainStorage
+{
+    IEnumerable<(TaskId Id, IDurableTaskState State)> GetChildren(TaskId task);
+
+    IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks { get; }
+
+    IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest? request);
+    void SetRequest(TaskId taskId, IDurableTaskState state, IDurableTaskRequest request);
+    void SetRequestFingerprint(TaskId taskId, IDurableTaskState state, string fingerprint);
+    void SetRemoteRequest(TaskId taskId, IDurableTaskState state, GrainId target, string fingerprint);
+    void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response);
+    void RequestCancellation(TaskId taskId, IDurableTaskState state);
+    void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, long generation);
+
+    void AddCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination);
+    void RemoveCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination);
+    void CreateTombstone(TaskId taskId, IDurableTaskState state);
+
+    bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state);
+
+    // Removes a request and its state
+    bool RemoveTask(TaskId taskId);
+    void Clear();
+
+    ValueTask WriteAsync(CancellationToken cancellationToken);
+    ValueTask ReadAsync(CancellationToken cancellationToken);
+}
