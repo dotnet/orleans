@@ -13,8 +13,6 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="System.IO.Pipelines" />
     <PackageReference Include="xunit.v3.assert" />
-    <PackageReference Include="xunit.v3.core" />
-    <PackageReference Include="xunit.v3.extensibility.core" />
   </ItemGroup>
 
   <ItemGroup>
