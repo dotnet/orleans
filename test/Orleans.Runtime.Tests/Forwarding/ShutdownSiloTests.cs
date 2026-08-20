@@ -24,7 +24,7 @@ namespace Tester.Forwarding
         public const int NumberOfSilos = 2;
 
         public static readonly TimeSpan DeactivationTimeout = TimeSpan.FromSeconds(3);
-        private static readonly TimeSpan ShutdownTimeout = TimeSpan.FromMinutes(2);
+        private static readonly TimeSpan ShutdownTimeout = TimeSpan.FromSeconds(7);
         private static readonly TimeSpan PendingRequestTimerDueTime = TimeSpan.FromSeconds(2);
         private static readonly TimeSpan StuckActivationTimerDueTime = TimeSpan.FromMinutes(5);
         private static readonly TimeSpan TimerReadinessTimeout = TimeSpan.FromMinutes(1);
