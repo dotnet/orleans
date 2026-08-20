@@ -131,34 +131,38 @@ public abstract class DurableExecutionContext
     /// <para>
     /// Disposing the returned registration prevents an invocation which has not started, or
     /// asynchronously waits for an active invocation to finish. A callback can dispose its own
-    /// registration without blocking.
+    /// registration without blocking. A registration accepted before cancellation completion is
+    /// enlisted in that cancellation operation: its callback, completion, and failure contribute to
+    /// the shared cancellation result. Once cancellation completion has closed registration, the
+    /// callback starts immediately in a new callback causality scope. It cannot change the completed
+    /// shared cancellation result; disposing its returned registration waits for that invocation and
+    /// propagates its failure.
     /// </para>
     /// </remarks>
-    public async ValueTask<IAsyncDisposable> RegisterCancellationCallbackAsync(
+    public ValueTask<IAsyncDisposable> RegisterCancellationCallbackAsync(
         Func<CancellationToken, ValueTask> callback,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(callback);
-        CancellationRegistration? registration;
+        cancellationToken.ThrowIfCancellationRequested();
+
+        CancellationRegistration registration;
+        CancellationOperation? callbackOperation = null;
         lock (_lock)
         {
-            if (!_cancellationRequested)
+            if (!_cancellationRequested || !_cancellationOperation!.Task.IsCompleted)
             {
                 registration = new(this, callback);
                 (_registrations ??= []).Add(registration);
-                return registration;
+                return new(registration);
             }
 
-            registration = null;
+            registration = new(this, callback, propagateInvocationExceptionOnDispose: true);
+            callbackOperation = new(this);
         }
 
-        cancellationToken.ThrowIfCancellationRequested();
-        using (Enter(this))
-        {
-            await callback(CancellationToken);
-        }
-
-        return CancellationRegistration.Disposed;
+        _ = InvokePostCompletionCallbackAsync(callbackOperation!, registration);
+        return new(registration);
     }
 
     internal Task RequestCancellationAsync(CancellationToken cancellationToken)
@@ -204,30 +208,48 @@ public abstract class DurableExecutionContext
                 (exceptions ??= []).Add(exception);
             }
 
-            List<CancellationRegistration> callbacks;
             lock (_lock)
             {
                 _cancellationRequested = true;
-                callbacks = _registrations ?? [];
-                _registrations = null;
             }
 
-            foreach (var callback in callbacks)
+            while (true)
             {
-                try
+                List<CancellationRegistration> callbacks;
+                lock (_lock)
                 {
-                    using (Enter(this))
+                    if (_registrations is not { Count: > 0 })
                     {
-                        await callback.InvokeAsync(CancellationToken);
+                        CompleteCancellation(operation, exceptions);
+                        return;
                     }
+
+                    callbacks = _registrations;
+                    _registrations = null;
                 }
-                catch (Exception exception)
+
+                foreach (var callback in callbacks)
                 {
-                    (exceptions ??= []).Add(exception);
+                    try
+                    {
+                        using (Enter(this))
+                        {
+                            await callback.InvokeAsync(CancellationToken);
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        (exceptions ??= []).Add(exception);
+                    }
                 }
             }
         }
+    }
 
+    private static void CompleteCancellation(
+        CancellationOperation operation,
+        List<Exception>? exceptions)
+    {
         if (exceptions is not null)
         {
             operation.SetException(new AggregateException(
@@ -237,6 +259,28 @@ public abstract class DurableExecutionContext
         else
         {
             operation.SetResult();
+        }
+    }
+
+    private async Task InvokePostCompletionCallbackAsync(
+        CancellationOperation operation,
+        CancellationRegistration registration)
+    {
+        using (operation.Enter())
+        using (Enter(this))
+        {
+            try
+            {
+                await registration.InvokeAsync(CancellationToken);
+            }
+            catch
+            {
+                // The registration owns post-completion callback observation.
+            }
+            finally
+            {
+                operation.CompleteGraph();
+            }
         }
     }
 
@@ -365,7 +409,7 @@ public abstract class DurableExecutionContext
             return false;
         }
 
-        private void CompleteGraph()
+        public void CompleteGraph()
         {
             lock (GraphLock)
             {
@@ -389,21 +433,21 @@ public abstract class DurableExecutionContext
         private const int DisposedState = 3;
         private readonly DurableExecutionContext? _context;
         private readonly Func<CancellationToken, ValueTask>? _callback;
+        private readonly bool _propagateInvocationExceptionOnDispose;
         private TaskCompletionSource? _completion;
+        private Exception? _invocationException;
         private CancellationRegistration? _previous;
         private int _state;
 
-        private CancellationRegistration(bool disposed) => _state = disposed ? DisposedState : Pending;
-
         public CancellationRegistration(
             DurableExecutionContext context,
-            Func<CancellationToken, ValueTask> callback)
+            Func<CancellationToken, ValueTask> callback,
+            bool propagateInvocationExceptionOnDispose = false)
         {
             _context = context;
             _callback = callback;
+            _propagateInvocationExceptionOnDispose = propagateInvocationExceptionOnDispose;
         }
-
-        public static CancellationRegistration Disposed { get; } = new(true);
 
         public async ValueTask InvokeAsync(CancellationToken cancellationToken)
         {
@@ -419,12 +463,17 @@ public abstract class DurableExecutionContext
             {
                 await _callback!(cancellationToken);
             }
+            catch (Exception exception)
+            {
+                _invocationException = exception;
+                throw;
+            }
             finally
             {
                 Current.Value = previous;
                 _previous = null;
                 Volatile.Write(ref _state, Completed);
-                Volatile.Read(ref _completion)?.TrySetResult();
+                CompleteInvocation(Volatile.Read(ref _completion));
             }
         }
 
@@ -449,6 +498,9 @@ public abstract class DurableExecutionContext
                         }
 
                         return new(GetInvocationCompletionTask());
+                    case Completed when _propagateInvocationExceptionOnDispose
+                        && _invocationException is not null:
+                        return new(GetInvocationCompletionTask());
                     case Completed:
                     case DisposedState:
                         return ValueTask.CompletedTask;
@@ -467,10 +519,27 @@ public abstract class DurableExecutionContext
 
             if (Volatile.Read(ref _state) == Completed)
             {
-                completion.TrySetResult();
+                CompleteInvocation(completion);
             }
 
             return completion.Task;
+        }
+
+        private void CompleteInvocation(TaskCompletionSource? completion)
+        {
+            if (completion is null)
+            {
+                return;
+            }
+
+            if (_propagateInvocationExceptionOnDispose && _invocationException is { } exception)
+            {
+                completion.TrySetException(exception);
+            }
+            else
+            {
+                completion.TrySetResult();
+            }
         }
 
         private static bool IsCurrentCallback(CancellationRegistration registration)
