@@ -17,45 +17,89 @@ public abstract class DurableTask
     }
 
     /// <summary>Creates a durable task which invokes <paramref name="action"/>.</summary>
-    public static DurableTask Run(Action<CancellationToken> action) => new DelegateDurableTask(action);
+    public static DurableTask Run(Action<CancellationToken> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        return new DelegateDurableTask(action);
+    }
     /// <summary>Creates a durable task which invokes <paramref name="function"/>.</summary>
-    public static DurableTask<TResult> Run<TResult>(Func<CancellationToken, TResult> function) => new DelegateDurableTask<TResult>(function);
+    public static DurableTask<TResult> Run<TResult>(Func<CancellationToken, TResult> function)
+    {
+        ArgumentNullException.ThrowIfNull(function);
+        return new DelegateDurableTask<TResult>(function);
+    }
     /// <summary>Creates a durable task which invokes asynchronous <paramref name="function"/>.</summary>
-    public static DurableTask Run(Func<CancellationToken, Task> function) => new AsyncDelegateDurableTask(function);
+    public static DurableTask Run(Func<CancellationToken, Task> function)
+    {
+        ArgumentNullException.ThrowIfNull(function);
+        return new AsyncDelegateDurableTask(function);
+    }
     /// <summary>Creates a durable task which invokes asynchronous <paramref name="function"/>.</summary>
-    public static DurableTask<TResult> Run<TResult>(Func<CancellationToken, Task<TResult>> function) => new AsyncDelegateDurableTask<TResult>(function);
+    public static DurableTask<TResult> Run<TResult>(Func<CancellationToken, Task<TResult>> function)
+    {
+        ArgumentNullException.ThrowIfNull(function);
+        return new AsyncDelegateDurableTask<TResult>(function);
+    }
     /// <summary>Creates a durable task which invokes <paramref name="action"/> with captured <paramref name="state"/>.</summary>
-    public static DurableTask Run<TState>(Action<TState, CancellationToken> action, TState state) => Run(ct => action(state, ct));
+    public static DurableTask Run<TState>(Action<TState, CancellationToken> action, TState state)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        return Run(ct => action(state, ct));
+    }
     /// <summary>Creates a durable task which invokes <paramref name="function"/> with captured <paramref name="state"/>.</summary>
-    public static DurableTask<TResult> Run<TState, TResult>(Func<TState, CancellationToken, TResult> function, TState state) => Run(ct => function(state, ct));
+    public static DurableTask<TResult> Run<TState, TResult>(Func<TState, CancellationToken, TResult> function, TState state)
+    {
+        ArgumentNullException.ThrowIfNull(function);
+        return Run(ct => function(state, ct));
+    }
     /// <summary>Creates a durable task which invokes asynchronous <paramref name="function"/> with captured <paramref name="state"/>.</summary>
-    public static DurableTask Run<TState>(Func<TState, CancellationToken, Task> function, TState state) => Run(ct => function(state, ct));
+    public static DurableTask Run<TState>(Func<TState, CancellationToken, Task> function, TState state)
+    {
+        ArgumentNullException.ThrowIfNull(function);
+        return Run(ct => function(state, ct));
+    }
     /// <summary>Creates a durable task which invokes asynchronous <paramref name="function"/> with captured <paramref name="state"/>.</summary>
-    public static DurableTask<TResult> Run<TState, TResult>(Func<TState, CancellationToken, Task<TResult>> function, TState state) => Run(ct => function(state, ct));
+    public static DurableTask<TResult> Run<TState, TResult>(Func<TState, CancellationToken, Task<TResult>> function, TState state)
+    {
+        ArgumentNullException.ThrowIfNull(function);
+        return Run(ct => function(state, ct));
+    }
 
     /// <summary>Creates a durable task which completes after every input task and returns their stable identifiers.</summary>
     public static DurableTask<IReadOnlyList<TaskId>> WhenAll(IReadOnlyList<DurableTask> tasks)
-        => new InlineAsyncDelegateDurableTask<IReadOnlyList<DurableTask>, IReadOnlyList<TaskId>>(
+    {
+        ArgumentNullException.ThrowIfNull(tasks);
+        return new InlineAsyncDelegateDurableTask<IReadOnlyList<DurableTask>, IReadOnlyList<TaskId>>(
             WhenAllCore,
-            tasks);
+            tasks.ToArray());
+    }
 
     /// <summary>Creates a durable task which completes after every input task and returns their stable identifiers.</summary>
     public static DurableTask<IReadOnlyList<TaskId>> WhenAll<TResult>(IReadOnlyList<DurableTask<TResult>> tasks)
-        => new InlineAsyncDelegateDurableTask<IReadOnlyList<DurableTask<TResult>>, IReadOnlyList<TaskId>>(
+    {
+        ArgumentNullException.ThrowIfNull(tasks);
+        return new InlineAsyncDelegateDurableTask<IReadOnlyList<DurableTask<TResult>>, IReadOnlyList<TaskId>>(
             WhenAllCore<TResult>,
-            tasks);
+            tasks.ToArray());
+    }
 
     /// <summary>Creates a durable task which returns the replay-stable identifier of the first completed input.</summary>
     public static DurableTask<TaskId> WhenAny(IReadOnlyList<DurableTask> tasks)
-        => new InlineAsyncDelegateDurableTask<IReadOnlyList<DurableTask>, TaskId>(
+    {
+        ValidateWhenAnyTasks(tasks);
+        return new InlineAsyncDelegateDurableTask<IReadOnlyList<DurableTask>, TaskId>(
             WhenAnyCore,
-            tasks);
+            tasks.ToArray());
+    }
 
     /// <summary>Creates a durable task which returns the replay-stable identifier of the first completed input.</summary>
     public static DurableTask<TaskId> WhenAny<TResult>(IReadOnlyList<DurableTask<TResult>> tasks)
-        => new InlineAsyncDelegateDurableTask<IReadOnlyList<DurableTask<TResult>>, TaskId>(
+    {
+        ValidateWhenAnyTasks(tasks);
+        return new InlineAsyncDelegateDurableTask<IReadOnlyList<DurableTask<TResult>>, TaskId>(
             WhenAnyCore<TResult>,
-            tasks);
+            tasks.ToArray());
+    }
 
     private static async Task<IReadOnlyList<TaskId>> WhenAllCore(
         IReadOnlyList<DurableTask> tasks,
@@ -96,7 +140,6 @@ public abstract class DurableTask
         IReadOnlyList<DurableTask> tasks,
         CancellationToken cancellationToken)
     {
-        ArgumentOutOfRangeException.ThrowIfZero(tasks.Count);
         var context = GetCurrentContext(nameof(WhenAny));
         var operationId = context.CreateOperationId("when-any");
         var scheduled = new ScheduledTask[tasks.Count];
@@ -116,7 +159,6 @@ public abstract class DurableTask
         IReadOnlyList<DurableTask<TResult>> tasks,
         CancellationToken cancellationToken)
     {
-        ArgumentOutOfRangeException.ThrowIfZero(tasks.Count);
         var context = GetCurrentContext(nameof(WhenAny));
         var operationId = context.CreateOperationId("when-any");
         var scheduled = new ScheduledTask<TResult>[tasks.Count];
@@ -139,6 +181,12 @@ public abstract class DurableTask
 
     private static TaskId CreateCombinatorChildId(TaskId operationId, int index)
         => operationId.Child(index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+    private static void ValidateWhenAnyTasks<TTask>(IReadOnlyList<TTask> tasks)
+    {
+        ArgumentNullException.ThrowIfNull(tasks);
+        ArgumentOutOfRangeException.ThrowIfZero(tasks.Count, nameof(tasks));
+    }
 
     /// <summary>Runs the definition in the supplied execution context.</summary>
     protected internal abstract ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context);
