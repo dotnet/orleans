@@ -50,6 +50,14 @@ public sealed class HandlerRoutingContractTests : IDisposable
         Assert.Equal(suffix, handler.Suffix(route));
     }
 
+    [Fact]
+    public void RoutePrefixHandler_NullPrefix_ThrowsArgumentNullException()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(() => new PrefixHandler(null!));
+
+        Assert.Equal("prefix", exception.ParamName);
+    }
+
     [Theory]
     [InlineData("workflow/order-42", true)]
     [InlineData("workflow/order-42/payment", true)]
