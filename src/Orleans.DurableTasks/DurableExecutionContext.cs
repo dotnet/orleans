@@ -267,7 +267,7 @@ public abstract class DurableExecutionContext
         {
             try
             {
-                await registration.InvokeAsync(CancellationToken);
+                await registration.InvokeAsync(CancellationToken).ConfigureAwait(false);
             }
             catch
             {
