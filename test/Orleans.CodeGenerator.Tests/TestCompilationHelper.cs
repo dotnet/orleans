@@ -3,7 +3,6 @@ using System.IO;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 
@@ -15,26 +14,20 @@ namespace Orleans.CodeGenerator.Tests;
 /// </summary>
 internal static class TestCompilationHelper
 {
+    private static readonly StringComparer PathComparer = OperatingSystem.IsWindows()
+        ? StringComparer.OrdinalIgnoreCase
+        : StringComparer.Ordinal;
+    private static readonly ImmutableArray<MetadataReference> FrameworkReferences = CreateFrameworkReferences();
+
     /// <summary>
     /// Creates a <see cref="CSharpCompilation"/> with the .NET framework and Orleans assembly references.
     /// </summary>
-    public static async Task<CSharpCompilation> CreateCompilation(
+    public static Task<CSharpCompilation> CreateCompilation(
         string sourceCode,
         string assemblyName = "TestProject",
         params MetadataReference[] additionalReferences)
     {
-#if NET10_0_OR_GREATER
-        var net10References = new ReferenceAssemblies(
-            "net10.0",
-            new PackageIdentity("Microsoft.NETCore.App.Ref", "10.0.0"),
-            Path.Combine("ref", "net10.0"));
-
-        var references = await net10References.ResolveAsync(LanguageNames.CSharp, default);
-#else
-        var references = await ReferenceAssemblies.Net.Net80.ResolveAsync(LanguageNames.CSharp, default);
-#endif
-
-        references = references.AddRange(
+        var references = FrameworkReferences.AddRange(
             MetadataReference.CreateFromFile(typeof(GrainId).Assembly.Location),
             MetadataReference.CreateFromFile(typeof(IClusterClientLifecycle).Assembly.Location),
             MetadataReference.CreateFromFile(typeof(IGrainActivator).Assembly.Location),
@@ -48,6 +41,50 @@ internal static class TestCompilationHelper
         }
 
         var syntaxTree = CSharpSyntaxTree.ParseText(sourceCode);
-        return CSharpCompilation.Create(assemblyName, [syntaxTree], references, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        return Task.FromResult(CSharpCompilation.Create(
+            assemblyName,
+            [syntaxTree],
+            references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)));
+    }
+
+    private static ImmutableArray<MetadataReference> CreateFrameworkReferences()
+    {
+        var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")
+            ?? throw new InvalidOperationException("The test host must provide trusted platform assemblies.");
+
+        return GetFrameworkAssemblyPaths(trustedPlatformAssemblies, typeof(object).Assembly.Location)
+            .Select(static path => (MetadataReference)MetadataReference.CreateFromFile(path))
+            .ToImmutableArray();
+    }
+
+    internal static ImmutableArray<string> GetFrameworkAssemblyPaths(
+        string trustedPlatformAssemblies,
+        string frameworkAssemblyPath)
+    {
+        if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
+        {
+            throw new InvalidOperationException("The test host must provide trusted platform assemblies.");
+        }
+
+        var frameworkDirectory = Path.GetDirectoryName(frameworkAssemblyPath);
+        if (string.IsNullOrWhiteSpace(frameworkDirectory))
+        {
+            throw new InvalidOperationException("The test host framework directory must be available.");
+        }
+
+        frameworkDirectory = Path.GetFullPath(frameworkDirectory);
+        var frameworkAssemblyPaths = trustedPlatformAssemblies
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+            .Where(path => PathComparer.Equals(Path.GetDirectoryName(Path.GetFullPath(path)), frameworkDirectory))
+            .ToImmutableArray();
+
+        if (frameworkAssemblyPaths.IsEmpty)
+        {
+            throw new InvalidOperationException(
+                $"The trusted platform assemblies must include references from '{frameworkDirectory}'.");
+        }
+
+        return frameworkAssemblyPaths;
     }
 }
