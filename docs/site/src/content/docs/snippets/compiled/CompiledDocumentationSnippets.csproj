@@ -12,7 +12,9 @@
     <ProjectReference Include="$(RepositoryRoot)src\Dashboard\Orleans.Dashboard\Orleans.Dashboard.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\AdoNet\Orleans.Clustering.AdoNet\Orleans.Clustering.AdoNet.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\AdoNet\Orleans.Persistence.AdoNet\Orleans.Persistence.AdoNet.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\AWS\Orleans.Clustering.DynamoDB\Orleans.Clustering.DynamoDB.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\AWS\Orleans.Persistence.DynamoDB\Orleans.Persistence.DynamoDB.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\AWS\Orleans.Reminders.DynamoDB\Orleans.Reminders.DynamoDB.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Azure\Orleans.Clustering.Cosmos\Orleans.Clustering.Cosmos.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Azure\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Azure\Orleans.Persistence.Cosmos\Orleans.Persistence.Cosmos.csproj" />

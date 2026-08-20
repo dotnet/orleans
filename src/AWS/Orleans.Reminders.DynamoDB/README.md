@@ -25,9 +25,7 @@ var builder = Host.CreateApplicationBuilder(args)
             // Configure DynamoDB as reminder storage
             .UseDynamoDBReminderService(options =>
             {
-                options.AccessKey = "YOUR_AWS_ACCESS_KEY";
-                options.SecretKey = "YOUR_AWS_SECRET_KEY";
-                options.Region = "us-east-1";
+                options.Service = "us-east-1";
                 options.TableName = "OrleansReminders";
                 options.CreateIfNotExists = true;
             });
@@ -101,7 +99,8 @@ public class ReminderGrain : Grain, IReminderGrain, IRemindable
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
-- [Reminders and Timers](https://dotnet.github.io/orleans/docs/grains/timers-and-reminders/)
+- [Configure Amazon DynamoDB reminders](https://dotnet.github.io/orleans/docs/grains/dynamodb-reminders/)
+- [Grain timers and reminders](https://dotnet.github.io/orleans/docs/grains/timers-and-reminders/)
 - [AWS SDK for .NET Documentation](https://docs.aws.amazon.com/sdk-for-net/index.html)
 
 ## Feedback & Contributing

@@ -36,6 +36,8 @@ items:
         href: grains/stateless-worker-grains.md
       - name: Timers and reminders
         href: grains/timers-and-reminders.md
+      - name: Configure DynamoDB reminders
+        href: grains/dynamodb-reminders.md
       - name: Observers
         href: grains/observers.md
       - name: Cancellation

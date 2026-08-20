@@ -1,7 +1,7 @@
 ---
 title: Grain timers and reminders
 description: Schedule activation-scoped and durable periodic work in Orleans.
-ms.date: 08/13/2026
+ms.date: 08/20/2026
 ms.topic: concept-article
 ---
 
@@ -72,7 +72,7 @@ There is no special `period` value that means "fire once and never again." To mo
 
 Every silo must configure a reminder provider. Production deployments should use a durable provider such as Azure Table, ADO.NET, Redis, or [Cosmos DB](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Cosmos). In-memory reminders are suitable only for local development and tests because definitions are lost when the cluster stops.
 
-The provider-specific configuration is covered by each reminder provider package. For a compiled in-repository configuration example, see the [reminder configuration snippets](https://github.com/dotnet/orleans/tree/main/docs/site/src/content/docs/grains/snippets/timers). When composing resources with Aspire, see [Orleans and Aspire integration](../host/aspire-integration.md).
+Configure each provider through the API supplied by its package. See [Configure Amazon DynamoDB reminders](dynamodb-reminders.md) for a compiled example which configures DynamoDB clustering and reminder storage independently. For other compiled in-repository examples, see the [reminder configuration snippets](https://github.com/dotnet/orleans/tree/main/docs/site/src/content/docs/grains/snippets/timers). When composing resources with Aspire, see [Orleans and Aspire integration](../host/aspire-integration.md).
 
 ## POCO grains
 
