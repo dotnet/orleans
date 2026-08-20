@@ -111,6 +111,6 @@ Derive the test class from `TestKitBase`. Register persistent state and grain pr
 
 The test verifies the grain's state mutation, storage write request, key-derived grain reference, and outgoing call. OrleansTestKit invokes one grain using its simulated activation context and resolves collaborating grains as probes.
 
-Use <xref:Orleans.TestingHost.InProcessTestCluster> for grains which await work, make concurrent calls, use reentrancy or interleaving, coordinate multiple activations, or depend on serialization, lifecycle, placement, timers, reminders, streams, or message routing. The runtime owns those behaviors, and the in-process cluster preserves their execution model.
+Use <xref:Orleans.TestingHost.InProcessTestCluster> for grains that await work, make concurrent calls, use reentrancy or interleaving, coordinate multiple activations, or depend on serialization, lifecycle, placement, timers, reminders, streams, or message routing. The runtime owns those behaviors, and the in-process cluster preserves their execution model.
 
 The OrleansTestKit [README](https://github.com/OrleansContrib/OrleansTestKit/blob/main/README.md) documents version compatibility and package setup. Its [test suite](https://github.com/OrleansContrib/OrleansTestKit/tree/main/test/OrleansTestKit.Tests/Tests) demonstrates the fixture APIs and available test doubles for single-activation tests.
