@@ -661,8 +661,11 @@ function repositorySourceTarget(url, repositoryRoot) {
   }
   const match =
     /^\/dotnet\/orleans\/(blob|tree)\/(?:main|[a-f\d]{40})\/(.+)$/i.exec(url.pathname);
-  const isDirectory = match?.[1].toLowerCase() === 'tree';
-  if (!match || (url.hash && (isDirectory || !/^#L\d+(?:-L\d+)?$/i.test(url.hash)))) {
+  if (!match) {
+    return undefined;
+  }
+  const isDirectory = match[1].toLowerCase() === 'tree';
+  if (url.hash && (isDirectory || !/^#L\d+(?:-L\d+)?$/i.test(url.hash))) {
     return undefined;
   }
   let relative;

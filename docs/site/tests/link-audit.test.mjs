@@ -410,6 +410,7 @@ describe('rendered internal link audit', () => {
         '<a href="https://github.com/dotnet/orleans/tree/main/samples/Example">directory</a>',
         '<a href="https://github.com/dotnet/orleans/tree/main/samples/Missing">missing directory</a>',
         '<a href="https://github.com/dotnet/orleans/tree/main/samples/NotDirectory">file as directory</a>',
+        '<a href="https://github.com/dotnet/orleans/pulls">non-source repository URL</a>',
       ].join(''),
     );
     const externalTargets = new Map();
@@ -428,7 +429,14 @@ describe('rendered internal link audit', () => {
         "/orleans/docs/a/: repository source link 'https://github.com/dotnet/orleans/tree/main/samples/NotDirectory' does not target a directory.",
       ]),
     );
-    expect(externalTargets.size).toBe(0);
+    expect(externalTargets).toEqual(
+      new Map([
+        [
+          'https://github.com/dotnet/orleans/pulls',
+          [{ relativeFile: '/orleans/docs/a/', line: 1, rendered: true }],
+        ],
+      ]),
+    );
   });
 
   test('rejects missing pages, anchors, malformed encodings, and base escapes', async () => {
