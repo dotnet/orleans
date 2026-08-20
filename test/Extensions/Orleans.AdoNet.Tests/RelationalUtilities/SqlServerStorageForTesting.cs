@@ -32,7 +32,7 @@ namespace UnitTests.General
         protected override async Task WaitForDatabaseReadyAsync()
         {
             const int maxAttempts = 3;
-            var connectionStringBuilder = new SqlConnectionStringBuilder(CurrentConnectionString)
+            var databaseConnectionStringBuilder = new SqlConnectionStringBuilder(CurrentConnectionString)
             {
                 Pooling = false,
                 ConnectTimeout = 5
@@ -42,19 +42,49 @@ namespace UnitTests.General
             {
                 try
                 {
-                    await using var connection = new SqlConnection(connectionStringBuilder.ConnectionString);
+                    await using var connection = new SqlConnection(databaseConnectionStringBuilder.ConnectionString);
                     await connection.OpenAsync();
                     await using var command = connection.CreateCommand();
                     command.CommandText = "SELECT 1";
                     command.CommandTimeout = 5;
                     _ = await command.ExecuteScalarAsync();
-                    return;
                 }
                 catch (SqlException exception) when (exception.Number == 18456 && exception.State == 1 && attempt < maxAttempts)
                 {
                     await Task.Delay(TimeSpan.FromMilliseconds(250));
+                    continue;
                 }
+
+                break;
             }
+
+            // The first schema batch enables snapshot isolation and requires exclusive database access.
+            var administrativeConnectionStringBuilder = new SqlConnectionStringBuilder(CurrentConnectionString)
+            {
+                InitialCatalog = "master",
+                Pooling = false,
+                ConnectTimeout = 5
+            };
+
+            await using var administrativeConnection = new SqlConnection(administrativeConnectionStringBuilder.ConnectionString);
+            await administrativeConnection.OpenAsync();
+            await using var readinessCommand = administrativeConnection.CreateCommand();
+            readinessCommand.CommandText = """
+                DECLARE @DatabaseId INT = DB_ID(@DatabaseName);
+                WHILE EXISTS
+                (
+                    SELECT 1
+                    FROM sys.dm_exec_sessions
+                    WHERE database_id = @DatabaseId
+                      AND session_id <> @@SPID
+                )
+                BEGIN
+                    WAITFOR DELAY '00:00:00.050';
+                END;
+                """;
+            readinessCommand.CommandTimeout = 30;
+            readinessCommand.Parameters.AddWithValue("DatabaseName", databaseConnectionStringBuilder.InitialCatalog);
+            await readinessCommand.ExecuteNonQueryAsync();
         }
 
         public override string CancellationTestQuery { get { return "WAITFOR DELAY '00:00:010'; SELECT 1; "; } }
