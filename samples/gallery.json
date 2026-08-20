@@ -88,6 +88,17 @@
     "featured": true
   },
   {
+    "slug": "custom-grain-call-return-type",
+    "title": "Custom grain-call return type",
+    "description": "An awaitable GrainCall<T> extension demonstrating generated request bases, proxy adaptation, and failure propagation.",
+    "path": "CustomGrainCallReturnType",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "image": null,
+    "languages": ["C#"],
+    "tags": ["serialization", "code-generation", "grains"],
+    "featured": false
+  },
+  {
     "slug": "fsharp-hello-world",
     "title": "F# Hello World",
     "description": "A minimal Orleans application with grains implemented in F#.",

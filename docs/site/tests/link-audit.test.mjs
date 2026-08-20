@@ -396,7 +396,9 @@ describe('rendered internal link audit', () => {
     const repositoryRoot = await temporaryDirectory();
     const distRoot = path.join(repositoryRoot, 'dist');
     await mkdir(path.join(repositoryRoot, 'src'));
+    await mkdir(path.join(repositoryRoot, 'samples', 'Example'), { recursive: true });
     await writeFile(path.join(repositoryRoot, 'src', 'Widget.cs'), 'line 1\nline 2\n');
+    await writeFile(path.join(repositoryRoot, 'samples', 'NotDirectory'), 'sample file\n');
     const commit = 'a'.repeat(40);
     await writePage(
       distRoot,
@@ -405,6 +407,10 @@ describe('rendered internal link audit', () => {
         `<a href="https://github.com/dotnet/orleans/blob/${commit}/src/Widget.cs#L2">valid</a>`,
         `<a href="https://github.com/dotnet/orleans/blob/${commit}/src/Missing.cs#L1">missing</a>`,
         `<a href="https://github.com/dotnet/orleans/blob/${commit}/src/Widget.cs#L4">line</a>`,
+        '<a href="https://github.com/dotnet/orleans/tree/main/samples/Example">directory</a>',
+        '<a href="https://github.com/dotnet/orleans/tree/main/samples/Missing">missing directory</a>',
+        '<a href="https://github.com/dotnet/orleans/tree/main/samples/NotDirectory">file as directory</a>',
+        '<a href="https://github.com/dotnet/orleans/pulls">non-source repository URL</a>',
       ].join(''),
     );
     const externalTargets = new Map();
@@ -419,9 +425,18 @@ describe('rendered internal link audit', () => {
       expect.arrayContaining([
         expect.stringContaining('targets a missing file'),
         expect.stringContaining('targets line 4'),
+        "/orleans/docs/a/: repository source link 'https://github.com/dotnet/orleans/tree/main/samples/Missing' does not target a directory.",
+        "/orleans/docs/a/: repository source link 'https://github.com/dotnet/orleans/tree/main/samples/NotDirectory' does not target a directory.",
       ]),
     );
-    expect(externalTargets.size).toBe(0);
+    expect(externalTargets).toEqual(
+      new Map([
+        [
+          'https://github.com/dotnet/orleans/pulls',
+          [{ relativeFile: '/orleans/docs/a/', line: 1, rendered: true }],
+        ],
+      ]),
+    );
   });
 
   test('rejects missing pages, anchors, malformed encodings, and base escapes', async () => {

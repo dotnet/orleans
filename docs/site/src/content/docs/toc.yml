@@ -18,6 +18,144 @@ items:
         href: quickstarts/build-your-first-orleans-app.md
       - name: Deploy and scale on Azure
         href: quickstarts/deploy-scale-orleans-on-azure.md
+  - name: Grains
+    items:
+      - name: Develop grains
+        href: grains/index.md
+      - name: Grain references
+        href: grains/grain-references.md
+      - name: Grain identity
+        href: grains/grain-identity.md
+      - name: Grain activation and lifecycle
+        href: grains/grain-lifecycle.md
+      - name: Grain extensions
+        href: grains/grain-extensions.md
+      - name: Grain services
+        href: grains/grainservices.md
+      - name: Stateless worker grains
+        href: grains/stateless-worker-grains.md
+      - name: Timers and reminders
+        href: grains/timers-and-reminders.md
+      - name: Observers
+        href: grains/observers.md
+      - name: Cancellation
+        href: grains/cancellation-tokens.md
+      - name: Response streaming
+        href: grains/response-streaming.md
+      - name: Request scheduling
+        href: grains/request-scheduling.md
+      - name: Request context
+        href: grains/request-context.md
+      - name: External tasks and grains
+        href: grains/external-tasks-and-grains.md
+      - name: Interceptors
+        href: grains/interceptors.md
+      - name: One-way requests
+        href: grains/oneway.md
+      - name: Grain persistence
+        items:
+          - name: Overview
+            href: grains/grain-persistence/index.md
+          - name: Azure Cosmos DB
+            href: grains/grain-persistence/azure-cosmos-db.md
+          - name: Relational storage (ADO.NET)
+            href: grains/grain-persistence/relational-storage.md
+          - name: Azure Storage
+            href: grains/grain-persistence/azure-storage.md
+          - name: Amazon DynamoDB
+            href: grains/grain-persistence/dynamodb-storage.md
+          - name: Google Cloud Firestore
+            href: grains/grain-persistence/google-firestore-storage.md
+          - name: Redis
+            href: grains/grain-persistence/redis-storage.md
+          - name: Memory
+            href: grains/grain-persistence/memory-storage.md
+      - name: Event Sourcing
+        items:
+          - name: Overview
+            href: grains/event-sourcing/index.md
+          - name: JournaledGrain basics
+            href: grains/event-sourcing/journaledgrain-basics.md
+          - name: JournaledGrain diagnostics
+            href: grains/event-sourcing/journaledgrain-diagnostics.md
+          - name: Immediate and delayed confirmation
+            href: grains/event-sourcing/immediate-vs-delayed-confirmation.md
+          - name: Notifications
+            href: grains/event-sourcing/notifications.md
+          - name: Configuration
+            href: grains/event-sourcing/event-sourcing-configuration.md
+          - name: Log-consistency providers
+            href: grains/event-sourcing/log-consistency-providers.md
+          - name: Replicated instances
+            href: grains/event-sourcing/replicated-instances.md
+      - name: Redis journal storage
+        href: grains/journaling/redis-journal-storage.md
+      - name: Transactions
+        href: grains/transactions.md
+  - name: Serialization and code generation
+    items:
+      - name: Serialization overview
+        href: host/configuration-guide/serialization.md
+      - name: Immutable types
+        href: host/configuration-guide/serialization-immutability.md
+      - name: Configure serialization
+        href: host/configuration-guide/serialization-configuration.md
+      - name: Customize serialization
+        href: host/configuration-guide/serialization-customization.md
+      - name: Code generation overview
+        href: grains/code-generation.md
+      - name: Advanced code-generation customization
+        href: grains/code-generation-customization.md
+  - name: Streaming
+    items:
+      - name: Overview
+        href: streaming/index.md
+      - name: Streams quickstart
+        href: streaming/streams-quick-start.md
+      - name: Why streams?
+        href: streaming/streams-why.md
+      - name: Programming APIs
+        href: streaming/streams-programming-apis.md
+      - name: Stream providers
+        href: streaming/stream-providers.md
+      - name: External producers and consumers
+        href: streaming/external-streams.md
+      - name: Customize stream data formats
+        href: streaming/data-adapters.md
+      - name: Write a custom queue adapter
+        href: streaming/custom-queue-adapter.md
+      - name: Amazon Kinesis
+        href: streaming/kinesis-streaming.md
+      - name: Delivery semantics
+        href: streaming/delivery-semantics.md
+      - name: Pub-sub storage
+        href: streaming/pubsub-storage.md
+      - name: Operate streaming applications
+        href: streaming/streaming-operations.md
+      - name: Broadcast channels
+        href: streaming/broadcast-channel.md
+  - name: Placement and versioning
+    items:
+      - name: Grain placement and migration
+        href: grains/grain-placement.md
+      - name: Placement filtering
+        href: grains/grain-placement-filtering.md
+      - name: Interface versioning
+        href: grains/grain-versioning/grain-versioning.md
+      - name: Contract compatibility analyzer
+        href: grains/grain-versioning/contract-compatibility-analyzer.md
+      - name: Backward compatibility guidelines
+        href: grains/grain-versioning/backward-compatibility-guidelines.md
+      - name: Compatible grains
+        href: grains/grain-versioning/compatible-grains.md
+      - name: Version selector strategy
+        href: grains/grain-versioning/version-selector-strategy.md
+      - name: Deploy new grain versions
+        href: grains/grain-versioning/deploying-new-versions-of-grains.md
+  - name: Testing
+    items:
+      - name: Test Orleans applications
+        href: grains/testing.md
   - name: Walkthroughs and tutorials
     items:
       - name: Model an adventure game
@@ -34,136 +172,6 @@ items:
     items:
       - name: Recipe index
         href: how-to/index.md
-  - name: Develop applications
-    items:
-      - name: Grains
-        items:
-          - name: Develop grains
-            href: grains/index.md
-          - name: Grain references
-            href: grains/grain-references.md
-          - name: Grain identity
-            href: grains/grain-identity.md
-          - name: Grain extensions
-            href: grains/grain-extensions.md
-          - name: Timers and reminders
-            href: grains/timers-and-reminders.md
-          - name: Observers
-            href: grains/observers.md
-          - name: Cancellation
-            href: grains/cancellation-tokens.md
-          - name: Response streaming
-            href: grains/response-streaming.md
-          - name: Request scheduling
-            href: grains/request-scheduling.md
-          - name: Request context
-            href: grains/request-context.md
-          - name: External tasks and grains
-            href: grains/external-tasks-and-grains.md
-          - name: Interceptors
-            href: grains/interceptors.md
-          - name: Grain services
-            href: grains/grainservices.md
-          - name: Stateless worker grains
-            href: grains/stateless-worker-grains.md
-          - name: One-way requests
-            href: grains/oneway.md
-          - name: Grain activation and lifecycle
-            href: grains/grain-lifecycle.md
-          - name: Code generation
-            href: grains/code-generation.md
-      - name: Test Orleans applications
-        href: grains/testing.md
-      - name: Placement and versioning
-        items:
-          - name: Grain placement and migration
-            href: grains/grain-placement.md
-          - name: Placement filtering
-            href: grains/grain-placement-filtering.md
-          - name: Interface versioning
-            href: grains/grain-versioning/grain-versioning.md
-          - name: Contract compatibility analyzer
-            href: grains/grain-versioning/contract-compatibility-analyzer.md
-          - name: Backward compatibility guidelines
-            href: grains/grain-versioning/backward-compatibility-guidelines.md
-          - name: Compatible grains
-            href: grains/grain-versioning/compatible-grains.md
-          - name: Version selector strategy
-            href: grains/grain-versioning/version-selector-strategy.md
-          - name: Deploy new grain versions
-            href: grains/grain-versioning/deploying-new-versions-of-grains.md
-      - name: State and durability
-        items:
-          - name: Grain persistence
-            items:
-              - name: Overview
-                href: grains/grain-persistence/index.md
-              - name: Azure Cosmos DB
-                href: grains/grain-persistence/azure-cosmos-db.md
-              - name: Relational storage (ADO.NET)
-                href: grains/grain-persistence/relational-storage.md
-              - name: Azure Storage
-                href: grains/grain-persistence/azure-storage.md
-              - name: Amazon DynamoDB
-                href: grains/grain-persistence/dynamodb-storage.md
-              - name: Google Cloud Firestore
-                href: grains/grain-persistence/google-firestore-storage.md
-              - name: Redis
-                href: grains/grain-persistence/redis-storage.md
-              - name: Memory
-                href: grains/grain-persistence/memory-storage.md
-          - name: Event Sourcing
-            items:
-              - name: Overview
-                href: grains/event-sourcing/index.md
-              - name: JournaledGrain basics
-                href: grains/event-sourcing/journaledgrain-basics.md
-              - name: JournaledGrain diagnostics
-                href: grains/event-sourcing/journaledgrain-diagnostics.md
-              - name: Immediate and delayed confirmation
-                href: grains/event-sourcing/immediate-vs-delayed-confirmation.md
-              - name: Notifications
-                href: grains/event-sourcing/notifications.md
-              - name: Configuration
-                href: grains/event-sourcing/event-sourcing-configuration.md
-              - name: Log-consistency providers
-                href: grains/event-sourcing/log-consistency-providers.md
-              - name: Replicated instances
-                href: grains/event-sourcing/replicated-instances.md
-          - name: Journaling
-            items:
-              - name: Redis journal storage
-                href: grains/journaling/redis-journal-storage.md
-          - name: Transactions
-            href: grains/transactions.md
-      - name: Streaming
-        items:
-          - name: Overview
-            href: streaming/index.md
-          - name: Streams quickstart
-            href: streaming/streams-quick-start.md
-          - name: Why streams?
-            href: streaming/streams-why.md
-          - name: Programming APIs
-            href: streaming/streams-programming-apis.md
-          - name: Stream providers
-            href: streaming/stream-providers.md
-          - name: External producers and consumers
-            href: streaming/external-streams.md
-          - name: Customize stream data formats
-            href: streaming/data-adapters.md
-          - name: Write a custom queue adapter
-            href: streaming/custom-queue-adapter.md
-          - name: Amazon Kinesis
-            href: streaming/kinesis-streaming.md
-          - name: Delivery semantics
-            href: streaming/delivery-semantics.md
-          - name: Pub-sub storage
-            href: streaming/pubsub-storage.md
-          - name: Operate streaming applications
-            href: streaming/streaming-operations.md
-          - name: Broadcast channels
-            href: streaming/broadcast-channel.md
   - name: Host and configure
     items:
       - name: Hosting
@@ -216,16 +224,6 @@ items:
             href: host/configuration-guide/startup-tasks.md
           - name: Graceful shutdown
             href: host/configuration-guide/shutting-down-orleans.md
-      - name: Serialization
-        items:
-          - name: Overview
-            href: host/configuration-guide/serialization.md
-          - name: Immutable types
-            href: host/configuration-guide/serialization-immutability.md
-          - name: Configure serialization
-            href: host/configuration-guide/serialization-configuration.md
-          - name: Customize serialization
-            href: host/configuration-guide/serialization-customization.md
       - name: Observability and diagnostics
         items:
           - name: Overview
