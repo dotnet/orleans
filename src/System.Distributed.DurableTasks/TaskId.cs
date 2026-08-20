@@ -42,11 +42,18 @@ public readonly struct TaskId : IEquatable<TaskId>, IParsable<TaskId>, ISpanPars
     public bool IsChildOf(TaskId other) => other.IsParentOf(this);
 
     /// <summary>Parses an escaped hierarchical path.</summary>
-    public static TaskId Parse(string s, IFormatProvider? provider = null)
+    public static TaskId Parse(string s) => Parse(s, provider: null);
+
+    /// <summary>Parses an escaped hierarchical path.</summary>
+    public static TaskId Parse(string s, IFormatProvider? provider)
     {
         ArgumentNullException.ThrowIfNull(s);
         return s.Length == 0 ? None : new(HierarchicalKey.Parse(s));
     }
+
+    /// <summary>Attempts to parse an escaped hierarchical path.</summary>
+    public static bool TryParse([NotNullWhen(true)] string? s, out TaskId result)
+        => TryParse(s, provider: null, out result);
 
     /// <summary>Attempts to parse an escaped hierarchical path.</summary>
     public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, out TaskId result)
@@ -74,8 +81,15 @@ public readonly struct TaskId : IEquatable<TaskId>, IParsable<TaskId>, ISpanPars
     }
 
     /// <summary>Parses an escaped hierarchical path.</summary>
+    public static TaskId Parse(ReadOnlySpan<char> s) => Parse(s, provider: null);
+
+    /// <summary>Parses an escaped hierarchical path.</summary>
     public static TaskId Parse(ReadOnlySpan<char> s, IFormatProvider? provider)
         => s.IsEmpty ? None : new(HierarchicalKey.Parse(s));
+
+    /// <summary>Attempts to parse an escaped hierarchical path.</summary>
+    public static bool TryParse(ReadOnlySpan<char> s, out TaskId result)
+        => TryParse(s, provider: null, out result);
 
     /// <summary>Attempts to parse an escaped hierarchical path.</summary>
     public static bool TryParse(ReadOnlySpan<char> s, IFormatProvider? provider, out TaskId result)
