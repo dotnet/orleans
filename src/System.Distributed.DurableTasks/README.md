@@ -29,6 +29,14 @@ cancellation. Task definitions and application code depend only on this assembly
   tracking. Causality flows through ordinary awaits and safe `Task.Run` dispatch. Suppressing
   `ExecutionContext` flow or using unsafe dispatch detaches subsequent asynchronous work according
   to standard .NET behavior, so that work is external.
+- A durable callback registered while cancellation completion is still open joins that same
+  cancellation operation, even when the durable token has already been canceled. Cancellation
+  completion closes registration atomically and waits for every callback accepted before that
+  boundary. Their failures are included in the shared cancellation result.
+- A durable callback registered after cancellation has completed starts immediately in a new
+  callback causality scope. It cannot retroactively change the already-completed shared cancellation
+  result. Its returned registration independently tracks the invocation: asynchronous disposal waits
+  for completion and propagates the callback failure.
 - Callbacks registered directly on `CancellationToken` are ordinary synchronous .NET observers,
   not durable cancellation callbacks. They are for cooperative checks and synchronous cleanup only.
   They follow standard `CancellationToken` behavior: registration-time `ExecutionContext` capture,
@@ -59,6 +67,11 @@ only to `RequestCancellationAsync` calls made from those durable callbacks or th
 asynchronous work. If adding such an edge would close a durable callback cycle, the target
 cancellation is initiated but the cycle-closing call returns without waiting on that edge. Completed
 operations release their graph edges.
+
+Cancellation completion and callback registration have one atomic boundary. Registrations accepted
+before it belong to the shared operation and delay its completion. Registrations accepted after it
+run independently and are observed by disposing their registration, so they never alter a result
+which an existing cancellation observer could already have consumed.
 
 The cancellation token passed to `RequestCancellationAsync` only abandons that caller's wait.
 It cannot reverse or withdraw the durable request.
