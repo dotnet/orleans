@@ -101,6 +101,26 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task StateManager_WriteOperations_RequireSuccessfulInitialization()
+    {
+        var storage = new CapturingStorage
+        {
+            NextReadException = new IOException("Expected recovery failure.")
+        };
+        var sut = CreateTestSystem(storage: storage);
+
+        await Assert.ThrowsAsync<IOException>(() => sut.Lifecycle.OnStart());
+
+        var writeException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        var deleteException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask());
+
+        Assert.Contains("not been initialized", writeException.Message, StringComparison.Ordinal);
+        Assert.Contains("not been initialized", deleteException.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task StateManager_WriteOperations_ObserveShutdown()
     {
         var sut = CreateTestSystem();
@@ -1017,6 +1037,7 @@ public class StateManagerTests : JournalingTestBase
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
 
+        await sut.Manager.InitializeAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
         await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
 
         Assert.Equal(42, value.Value);
@@ -1033,6 +1054,7 @@ public class StateManagerTests : JournalingTestBase
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
 
+        await sut.Manager.InitializeAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
         await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
 
         var replacement = Assert.Single(storage.Replaces);
@@ -1050,6 +1072,7 @@ public class StateManagerTests : JournalingTestBase
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
 
+        await sut.Manager.InitializeAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
         await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
 
         Assert.False(sut.Manager.TryGetState("stale", out _));

@@ -923,7 +923,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private void ThrowIfWriteOperationsUnavailable()
     {
         _shutdownCancellation.Token.ThrowIfCancellationRequested();
-        if (_workLoop is null)
+        if (_state is ManagerState.Unknown)
         {
             throw new InvalidOperationException("The journaled state manager has not been initialized.");
         }
