@@ -17,6 +17,7 @@ internal sealed class DurableMessagingInstruments(OrleansInstruments instruments
     private readonly Counter<long> _inboxMessagesProcessed = instruments.Meter.CreateCounter<long>("orleans-durable-messaging-inbox-messages-processed");
     private readonly Counter<long> _outboxMessagesSent = instruments.Meter.CreateCounter<long>("orleans-durable-messaging-outbox-messages-sent");
     private readonly Counter<long> _outboxMessagesDelivered = instruments.Meter.CreateCounter<long>("orleans-durable-messaging-outbox-messages-delivered");
+    private readonly Counter<long> _orphanedJobsReclaimed = instruments.Meter.CreateCounter<long>("orleans-durable-messaging-orphaned-jobs-reclaimed");
     private readonly Histogram<double> _inboxProcessingDuration = instruments.Meter.CreateHistogram<double>("orleans-durable-messaging-inbox-processing-duration", MillisecondsUnit);
     private readonly Histogram<double> _outboxDeliveryDuration = instruments.Meter.CreateHistogram<double>("orleans-durable-messaging-outbox-delivery-duration", MillisecondsUnit);
     private readonly DepthTracker _inboxDepth = new(instruments.Meter, "orleans-durable-messaging-inbox-depth");
@@ -50,6 +51,19 @@ internal sealed class DurableMessagingInstruments(OrleansInstruments instruments
 
     internal void OnOutboxDeliveryDuration(TimeSpan duration, string grainType, string routeKey) =>
         Record(_outboxDeliveryDuration, duration, grainType, routeKey);
+
+    internal void OnOrphanedJobReclaimed(string grainType, string jobName)
+    {
+        if (_orphanedJobsReclaimed.Enabled)
+        {
+            _orphanedJobsReclaimed.Add(
+                1,
+                [
+                    new(GrainTypeTagName, grainType),
+                    new("job_name", jobName)
+                ]);
+        }
+    }
 
     private static void Add(Counter<long> counter, string grainType, string routeKey, string status)
     {

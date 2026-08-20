@@ -15,6 +15,7 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
     Task<Guid> SendAndDeactivateAsync(GrainId target, string route, DurableTestMessage message);
     Task<Guid> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message);
     Task RetryWriteStateAsync();
+    [AlwaysInterleave] Task RevertStateAsync();
     Task SetInboxJobIdAsync(string jobId);
     [AlwaysInterleave] Task DeactivateOnNextRecoveryAsync();
     Task<DuplicateRouteRegistrationResult> RegisterDuplicateExactRouteHandlersAsync(string route);
@@ -164,6 +165,8 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     }
 
     public async Task RetryWriteStateAsync() => await WriteStateAsync();
+
+    public async Task RevertStateAsync() => await StateManager.RevertPendingChangesAsync(CancellationToken.None);
 
     public async Task SetInboxJobIdAsync(string jobId)
     {
