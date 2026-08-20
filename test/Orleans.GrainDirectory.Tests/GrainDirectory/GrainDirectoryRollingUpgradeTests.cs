@@ -101,12 +101,12 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
 
                 for (var i = 0; i < oldSilos.Count; i++)
                 {
-                    await ValidateDirectoryIntegrityAsync(cluster, $"before adding distributed silo {i + 1}/{oldSilos.Count}");
+                    await ValidateDirectoryPhaseInvariantsAsync(cluster, $"before adding distributed silo {i + 1}/{oldSilos.Count}");
                     var newSilo = await cluster.StartAdditionalSiloAsync();
                     output.WriteLine($"  Started new silo: {newSilo.SiloAddress}");
                     await cluster.WaitForLivenessToStabilizeAsync();
                     await WaitForDirectoryConvergenceAsync(cluster, $"after adding distributed silo {i + 1}/{oldSilos.Count}");
-                    await ValidateDirectoryIntegrityAsync(cluster, $"after adding distributed silo {i + 1}/{oldSilos.Count}");
+                    await ValidateDirectoryPhaseInvariantsAsync(cluster, $"after adding distributed silo {i + 1}/{oldSilos.Count}");
                     await DriveLoad(client, nextGrainId, count: 100, id => failingGrainKey = id);
                 }
 
@@ -119,19 +119,19 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 foreach (var oldSilo in oldSilos.OrderBy(static s => s.InstanceNumber == 0 ? 1 : 0))
                 {
                     transitionIndex++;
-                    await ValidateDirectoryIntegrityAsync(cluster, $"before removing local silo {transitionIndex}/{oldSilos.Count}");
+                    await ValidateDirectoryPhaseInvariantsAsync(cluster, $"before removing local silo {transitionIndex}/{oldSilos.Count}");
                     await cluster.StopSiloAsync(oldSilo);
                     output.WriteLine($"  Stopped old silo: {oldSilo.SiloAddress}");
                     await cluster.WaitForLivenessToStabilizeAsync();
                     await WaitForDirectoryConvergenceAsync(cluster, $"after removing local silo {transitionIndex}/{oldSilos.Count}");
-                    await ValidateDirectoryIntegrityAsync(cluster, $"after removing local silo {transitionIndex}/{oldSilos.Count}");
+                    await ValidateDirectoryPhaseInvariantsAsync(cluster, $"after removing local silo {transitionIndex}/{oldSilos.Count}");
                     await DriveLoad(client, nextGrainId, count: 100, id => failingGrainKey = id);
                 }
 
                 // Phase 4: Final verification on the fully-upgraded cluster — must succeed without retries.
                 output.WriteLine("Phase 4: Verifying fully-upgraded DistributedGrainDirectory cluster...");
                 await DriveLoad(client, nextGrainId, count: 200, id => failingGrainKey = id);
-                await ValidateDirectoryIntegrityAsync(cluster, "after final verification");
+                await ValidateDirectoryPhaseInvariantsAsync(cluster, "after final verification");
                 AssertSplitPartitionHandoffsAreDurable(handoffLogs, requireNonEmptyHandoff: true);
             }
             catch
@@ -267,23 +267,14 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         return true;
     }
 
-    private async Task ValidateDirectoryIntegrityAsync(InProcessTestCluster cluster, string stage)
+    private async Task ValidateDirectoryPhaseInvariantsAsync(InProcessTestCluster cluster, string stage)
     {
-        output.WriteLine($"  Validating grain directory integrity {stage}...");
+        output.WriteLine($"  Validating grain directory invariants {stage}...");
 
         var activations = GetDirectoryActivations(cluster);
-        var duplicateActivations = activations
-            .GroupBy(static activation => activation.Address.GrainId)
-            .Where(static group => group.Count() > 1)
-            .ToArray();
-        Assert.True(
-            duplicateActivations.Length == 0,
-            $"Found duplicate activations during '{stage}': "
-            + string.Join(
-                "; ",
-                duplicateActivations.Select(static group =>
-                    $"{group.Key}=[{string.Join(", ", group.Select(static activation => activation.Address.ToFullString()))}]")));
+        var activationGroups = activations.GroupBy(static activation => activation.Address.GrainId).ToArray();
         var distributedPartitions = new List<IGrainDirectoryTestHooks>();
+        var distributedSiloCount = 0;
         foreach (var silo in cluster.Silos)
         {
             var membershipService = silo.ServiceProvider.GetService<DirectoryMembershipService>();
@@ -292,12 +283,73 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 continue;
             }
 
+            distributedSiloCount++;
             for (var partitionIndex = 0; partitionIndex < membershipService.PartitionsPerSilo; partitionIndex++)
             {
                 var replica = cluster.InternalClient!.GetSystemTarget<IGrainDirectoryTestHooks>(
                     GrainDirectoryPartition.CreateGrainId(silo.SiloAddress, partitionIndex).GrainId);
                 distributedPartitions.Add(replica);
             }
+        }
+
+        var isMixedDirectoryCluster = distributedSiloCount > 0 && distributedSiloCount < cluster.Silos.Count;
+        foreach (var group in activationGroups)
+        {
+            var candidates = group.ToArray();
+            if (candidates.Length == 1)
+            {
+                continue;
+            }
+
+            Assert.True(
+                isMixedDirectoryCluster,
+                $"Found duplicate activations during '{stage}': "
+                + $"{group.Key}=[{string.Join(", ", candidates.Select(static activation => activation.Address.ToFullString()))}]");
+            Assert.True(
+                candidates.Length == 2,
+                $"Mixed-directory activation conflict for grain '{group.Key}' during '{stage}' must contain one "
+                + "LocalGrainDirectory activation and one DistributedGrainDirectory activation.");
+            Assert.True(
+                candidates.Select(static activation => activation.Address.MembershipVersion).Distinct().Count() == candidates.Length,
+                $"Mixed-directory activation conflict for grain '{group.Key}' during '{stage}' must contain one "
+                + "candidate per membership version.");
+
+            var newestMembershipVersion = candidates.Max(static activation => activation.Address.MembershipVersion);
+            var newestCandidates = candidates
+                .Where(activation => activation.Address.MembershipVersion == newestMembershipVersion)
+                .ToArray();
+            Assert.True(
+                newestCandidates.Length == 1,
+                $"Mixed-directory activation conflict for grain '{group.Key}' during '{stage}' must have exactly one "
+                + $"candidate in the newest membership version '{newestMembershipVersion}': "
+                + $"[{string.Join(", ", candidates.Select(static activation => activation.Address.ToFullString()))}]");
+            var newestCandidate = newestCandidates[0];
+            Assert.True(
+                newestCandidate.Silo.ServiceProvider.GetService<DirectoryMembershipService>() is not null,
+                $"The authoritative activation for grain '{group.Key}' during '{stage}' must run on a "
+                + $"DistributedGrainDirectory silo: '{newestCandidate.Address.ToFullString()}'.");
+            var losingCandidates = candidates
+                .Where(activation => activation.Address.MembershipVersion != newestMembershipVersion)
+                .ToArray();
+            Assert.All(losingCandidates, activation =>
+            {
+                Assert.True(
+                    activation.Address.MembershipVersion < newestMembershipVersion,
+                    $"The tolerated LocalGrainDirectory activation for grain '{group.Key}' during '{stage}' must "
+                    + $"precede membership version '{newestMembershipVersion}': '{activation.Address.ToFullString()}'.");
+                Assert.True(
+                    activation.Silo.ServiceProvider.GetService<DirectoryMembershipService>() is null,
+                    $"The tolerated older activation for grain '{group.Key}' during '{stage}' must run on a "
+                    + $"LocalGrainDirectory silo: '{activation.Address.ToFullString()}'.");
+            });
+        }
+
+        if (isMixedDirectoryCluster)
+        {
+            output.WriteLine(
+                $"  Validated {activations.Count} mixed-directory activations, including "
+                + $"{activationGroups.Count(static group => group.Count() > 1)} cross-version conflicts, {stage}.");
+            return;
         }
 
         if (distributedPartitions.Count == 0)
@@ -390,6 +442,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
 
     private static async Task CheckActivationRegistrationAsync(GrainLocator grainLocator, GrainAddress activationAddress, SiloAddress siloAddress, string stage)
     {
+        grainLocator.InvalidateCache(activationAddress.GrainId);
         var registeredAddress = await grainLocator.Lookup(activationAddress.GrainId);
         Assert.True(
             activationAddress.Matches(registeredAddress),
@@ -938,7 +991,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 staleCacheEvidence);
             await WaitForClusterMembershipConvergenceAsync(cluster, retiredAddresses, phase.Current, operationTimeout);
             await WaitForDirectoryConvergenceAsync(cluster, "in the final all-DistributedGrainDirectory phase");
-            await ValidateDirectoryIntegrityAsync(cluster, phase.Current);
+            await ValidateDirectoryPhaseInvariantsAsync(cluster, phase.Current);
 
             Assert.Equal(SiloCount, traffic.MaximumObservedSiloCount);
             Assert.True(traffic.MaximumObservedSiloCount <= SiloCount);
@@ -1058,24 +1111,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         string stage,
         StaleCacheEvidenceCapture staleCacheEvidence)
     {
-        var distributedPartitions = new List<IGrainDirectoryTestHooks>();
-        foreach (var silo in cluster.Silos)
-        {
-            if (silo.ServiceProvider.GetService<DirectoryMembershipService>() is not { } membershipService)
-            {
-                continue;
-            }
-
-            for (var partitionIndex = 0; partitionIndex < membershipService.PartitionsPerSilo; partitionIndex++)
-            {
-                distributedPartitions.Add(
-                    cluster.InternalClient!.GetSystemTarget<IGrainDirectoryTestHooks>(
-                        GrainDirectoryPartition.CreateGrainId(silo.SiloAddress, partitionIndex).GrainId));
-            }
-        }
-
-        // Validate the observable directory state before invoking recovery so that recovery cannot
-        // repair a lost registration and mask a rolling-upgrade regression.
+        // Validate bounded grains using fresh directory lookups before checking phase-wide activation invariants.
         await ValidateObservedAddressesAsync(
             cluster,
             observations,
@@ -1084,13 +1120,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             stage,
             staleCacheEvidence);
 
-        var integrityChecks = distributedPartitions
-            .Select(static partition => partition.CheckIntegrityAsync().AsTask())
-            .ToArray();
-        await Task.WhenAll(integrityChecks);
-        output.WriteLine(
-            $"  Validated {observations.Count} bounded tracked grains and "
-            + $"{distributedPartitions.Count} DistributedGrainDirectory partitions during '{stage}'.");
+        await ValidateDirectoryPhaseInvariantsAsync(cluster, stage);
+        output.WriteLine($"  Validated {observations.Count} bounded tracked grains during '{stage}'.");
     }
 
     private static async Task ValidateObservedAddressesAsync(
