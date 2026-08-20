@@ -61,7 +61,7 @@ Register the fixture as a collection and apply that collection to each test clas
 
 ### MSTest
 
-Use MSTest assembly lifecycle methods to deploy one cluster for all MSTest classes in the test assembly:
+Group MSTest classes that share cluster configuration in a dedicated test project. Use assembly lifecycle methods to deploy one cluster for that project:
 
 :::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/MSTestClusterFixture.cs" id="mstest_cluster_fixture":::
 
