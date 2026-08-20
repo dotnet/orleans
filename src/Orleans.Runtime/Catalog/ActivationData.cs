@@ -1295,7 +1295,8 @@ internal sealed partial class ActivationData :
                         case Command.DeactivateIfAddressMatches command:
                             try
                             {
-                                var matches = Address.Equals(command.Address)
+                                var matches = State == ActivationState.Valid
+                                    && Address.Equals(command.Address)
                                     && Address.MembershipVersion == command.Address.MembershipVersion;
                                 if (matches)
                                 {
