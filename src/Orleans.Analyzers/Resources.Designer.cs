@@ -185,6 +185,60 @@ namespace Orleans.Analyzers {
                 return ResourceManager.GetString("AliasClashDetectedTitle", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Grain interface methods must use a return type registered for the selected proxy base..
+        /// </summary>
+        internal static string GrainInterfaceMethodReturnTypeDescription {
+            get {
+                return ResourceManager.GetString("GrainInterfaceMethodReturnTypeDescription", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Grain interface methods must return a registered grain-call return type.
+        /// </summary>
+        internal static string GrainInterfaceMethodReturnTypeMessageFormat {
+            get {
+                return ResourceManager.GetString("GrainInterfaceMethodReturnTypeMessageFormat", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Grain interface methods must return a registered grain-call return type.
+        /// </summary>
+        internal static string GrainInterfaceMethodReturnTypeTitle {
+            get {
+                return ResourceManager.GetString("GrainInterfaceMethodReturnTypeTitle", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Invokable base type registrations must identify a valid base type for the grain-call return type and proxy base..
+        /// </summary>
+        internal static string InvalidInvokableBaseTypeMappingDescription {
+            get {
+                return ResourceManager.GetString("InvalidInvokableBaseTypeMappingDescription", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to {0}.
+        /// </summary>
+        internal static string InvalidInvokableBaseTypeMappingMessageFormat {
+            get {
+                return ResourceManager.GetString("InvalidInvokableBaseTypeMappingMessageFormat", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Invalid invokable base type mapping.
+        /// </summary>
+        internal static string InvalidInvokableBaseTypeMappingTitle {
+            get {
+                return ResourceManager.GetString("InvalidInvokableBaseTypeMappingTitle", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to A single type is not allowed to have multiple constructors annotated with the [OrleansConstructor] attribute.

@@ -17,14 +17,28 @@ namespace Orleans.Analyzers
         public const string Category = "Usage";
         public const string InvalidMappingDiagnosticId = "ORLEANS0026";
 
-        private static readonly DiagnosticDescriptor Rule = new(DiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
-        private static readonly DiagnosticDescriptor InvalidMappingRule = new(
-            InvalidMappingDiagnosticId,
-            "Invalid invokable base type mapping",
-            "{0}",
+        private static readonly DiagnosticDescriptor Rule = new(
+            DiagnosticId,
+            new LocalizableResourceString(nameof(Resources.GrainInterfaceMethodReturnTypeTitle), Resources.ResourceManager, typeof(Resources)),
+            new LocalizableResourceString(nameof(Resources.GrainInterfaceMethodReturnTypeMessageFormat), Resources.ResourceManager, typeof(Resources)),
             Category,
             DiagnosticSeverity.Error,
-            isEnabledByDefault: true);
+            isEnabledByDefault: true,
+            description: new LocalizableResourceString(
+                nameof(Resources.GrainInterfaceMethodReturnTypeDescription),
+                Resources.ResourceManager,
+                typeof(Resources)));
+        private static readonly DiagnosticDescriptor InvalidMappingRule = new(
+            InvalidMappingDiagnosticId,
+            new LocalizableResourceString(nameof(Resources.InvalidInvokableBaseTypeMappingTitle), Resources.ResourceManager, typeof(Resources)),
+            new LocalizableResourceString(nameof(Resources.InvalidInvokableBaseTypeMappingMessageFormat), Resources.ResourceManager, typeof(Resources)),
+            Category,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true,
+            description: new LocalizableResourceString(
+                nameof(Resources.InvalidInvokableBaseTypeMappingDescription),
+                Resources.ResourceManager,
+                typeof(Resources)));
 
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [Rule, InvalidMappingRule];
 
