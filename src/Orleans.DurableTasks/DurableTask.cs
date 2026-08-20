@@ -111,10 +111,10 @@ public abstract class DurableTask
         for (var index = 0; index < tasks.Count; index++)
         {
             scheduled[index] = await new ConfiguredDurableTask(tasks[index], CreateCombinatorChildId(operationId, index))
-                .ScheduleAsync(cancellationToken);
+                .ScheduleAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        await ScheduledTask.WhenAll(scheduled, cancellationToken);
+        await ScheduledTask.WhenAll(scheduled, cancellationToken).ConfigureAwait(false);
         return scheduled.Select(task => task.Id).ToArray();
     }
 
@@ -129,10 +129,10 @@ public abstract class DurableTask
         {
             scheduled[index] = await new ConfiguredDurableTask<TResult>(
                 tasks[index],
-                CreateCombinatorChildId(operationId, index)).ScheduleAsync(cancellationToken);
+                CreateCombinatorChildId(operationId, index)).ScheduleAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        await ScheduledTask.WhenAll(scheduled, cancellationToken);
+        await ScheduledTask.WhenAll(scheduled, cancellationToken).ConfigureAwait(false);
         return scheduled.Select(task => task.Id).ToArray();
     }
 
@@ -146,13 +146,13 @@ public abstract class DurableTask
         for (var index = 0; index < tasks.Count; index++)
         {
             scheduled[index] = await new ConfiguredDurableTask(tasks[index], CreateCombinatorChildId(operationId, index))
-                .ScheduleAsync(cancellationToken);
+                .ScheduleAsync(cancellationToken).ConfigureAwait(false);
         }
 
         return await context.SelectCompletionAsync(
             operationId.Child("$winner"),
             scheduled.Select(task => task.Id).ToArray(),
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<TaskId> WhenAnyCore<TResult>(
@@ -166,13 +166,13 @@ public abstract class DurableTask
         {
             scheduled[index] = await new ConfiguredDurableTask<TResult>(
                 tasks[index],
-                CreateCombinatorChildId(operationId, index)).ScheduleAsync(cancellationToken);
+                CreateCombinatorChildId(operationId, index)).ScheduleAsync(cancellationToken).ConfigureAwait(false);
         }
 
         return await context.SelectCompletionAsync(
             operationId.Child("$winner"),
             scheduled.Select(task => task.Id).ToArray(),
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
     }
 
     private static DurableExecutionContext GetCurrentContext(string operation)
@@ -219,7 +219,7 @@ internal abstract class DelegateDurableTaskBase : DurableTask
 
         try
         {
-            return await callback(context.CancellationToken);
+            return await callback(context.CancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
@@ -260,7 +260,7 @@ internal sealed class AsyncDelegateDurableTask(Func<CancellationToken, Task> fun
     protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
         => InvokeAsync(context, async token =>
         {
-            await function(token);
+            await function(token).ConfigureAwait(false);
             return DurableTaskResponse.Completed;
         });
 }
@@ -273,7 +273,7 @@ internal class AsyncDelegateDurableTask<TResult>(Func<CancellationToken, Task<TR
 
         try
         {
-            return DurableTaskResponse.FromResult(await function(context.CancellationToken));
+            return DurableTaskResponse.FromResult(await function(context.CancellationToken).ConfigureAwait(false));
         }
         catch (Exception exception)
         {
