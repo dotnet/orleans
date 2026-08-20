@@ -384,7 +384,7 @@ public class ShardExecutorTests
 
         await executor.RunShardAsync(shard, CancellationToken.None);
 
-        // Verify HandleDurableJobAsync was called 4 times (1 initial + 2 PollAfter + 1 Failed)
+        // Verify HandleDurableJobAsync was called 4 times (1 initial + 2 in-progress results + 1 failure)
         Assert.Equal(4, callBox.Value);
         
         // Verify job was scheduled for retry (not removed)
@@ -939,7 +939,7 @@ public class ShardExecutorTests
         
         var extension = Substitute.For<IDurableJobReceiverExtension>();
         
-        // First 3 calls return PollAfter, 4th returns Completed
+        // First 3 calls return InProgress, 4th returns Completed
         extension.HandleDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
@@ -963,7 +963,7 @@ public class ShardExecutorTests
         
         var extension = Substitute.For<IDurableJobReceiverExtension>();
         
-        // First 3 calls return PollAfter, 4th returns Failed
+        // First 3 calls return InProgress, 4th returns Failed
         extension.HandleDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
@@ -990,7 +990,7 @@ public class ShardExecutorTests
         
         var extension = Substitute.For<IDurableJobReceiverExtension>();
         
-        // First 3 calls return PollAfter (recording timestamps after the initial call), 4th returns Completed
+        // First 3 calls return InProgress (recording timestamps after the initial call), 4th returns Completed
         extension.HandleDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {

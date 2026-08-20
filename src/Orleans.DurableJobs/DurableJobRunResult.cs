@@ -22,13 +22,6 @@ public sealed class DurableJobRunResult
     public bool IsInProgress => Status == DurableJobRunStatus.InProgress;
 
     /// <summary>
-    /// Gets a value indicating whether the job execution remains in progress and should be polled after a delay.
-    /// </summary>
-    [Obsolete($"Use {nameof(IsInProgress)} instead.")]
-    [MemberNotNullWhen(true, nameof(PollAfterDelay))]
-    public bool IsPending => IsInProgress;
-
-    /// <summary>
     /// Gets a value indicating whether the successfully handled job requested durable rescheduling.
     /// </summary>
     [MemberNotNullWhen(true, nameof(RescheduleTime))]
@@ -94,14 +87,6 @@ public sealed class DurableJobRunResult
     }
 
     /// <summary>
-    /// Creates a result indicating the job execution remains in progress and should be polled after the specified delay.
-    /// </summary>
-    /// <param name="delay">The time to wait before polling the run again.</param>
-    /// <returns>An in-progress job result.</returns>
-    [Obsolete($"Use {nameof(InProgress)} instead.")]
-    public static DurableJobRunResult PollAfter(TimeSpan delay) => InProgress(delay);
-
-    /// <summary>
     /// Creates a result indicating that the current execution completed successfully and requested durable rescheduling.
     /// </summary>
     /// <param name="dueTime">The time at which the next execution should become due.</param>
@@ -146,12 +131,6 @@ public enum DurableJobRunStatus
     /// The job execution remains in progress and should be polled again after the specified delay.
     /// </summary>
     InProgress = 1,
-
-    /// <summary>
-    /// The job execution remains in progress and should be polled again after the specified delay.
-    /// </summary>
-    [Obsolete($"Use {nameof(InProgress)} instead.")]
-    PollAfter = InProgress,
 
     /// <summary>
     /// The job failed and should be processed through the retry policy.
