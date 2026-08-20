@@ -1,7 +1,7 @@
 ---
 title: Test Orleans applications
 description: Test Orleans applications with InProcessTestCluster, shared fixtures, dynamic silos, and isolated unit tests.
-ms.date: 08/18/2026
+ms.date: 08/20/2026
 ms.topic: how-to
 ---
 
@@ -12,11 +12,11 @@ Orleans applications benefit from tests at more than one level:
 | Test level | Best suited for |
 | --- | --- |
 | Isolated unit test | Pure application logic and constructor-injected collaborators |
-| [OrleansTestKit](https://github.com/OrleansContrib/OrleansTestKit) | A single grain's decisions and interactions using a simulated activation context |
-| <xref:Orleans.TestingHost.InProcessTestCluster> | Grain calls, activation, scheduling, serialization, dependency injection, and cluster behavior |
+| <xref:Orleans.TestingHost.InProcessTestCluster> | Most grain tests, including grain calls, activation, scheduling, serialization, dependency injection, and cluster behavior |
+| [OrleansTestKit](https://github.com/OrleansContrib/OrleansTestKit) | Basic arrange-act-assert tests of one grain activation whose correctness is independent of Orleans scheduling and concurrency |
 | Test cluster with production providers | Storage, clustering, reminders, and streams whose external-system contract matters |
 
-Use the smallest level which preserves the behavior under test. A mock can verify that code called a collaborator, but it cannot reproduce Orleans turn scheduling or message serialization. Conversely, starting a cluster for a pure calculation adds cost without increasing confidence.
+Default to <xref:Orleans.TestingHost.InProcessTestCluster> for grain code. It provides the highest-fidelity test boundary for Orleans runtime behavior. Test extracted calculations and application services directly. Use OrleansTestKit when the test author controls sequencing and synchronization.
 
 ## Create an in-process test cluster
 
@@ -44,15 +44,30 @@ The builder exposes separate configuration scopes:
 
 Each host has its own dependency-injection container. Registering a type creates one singleton per container. Registering a captured instance, as in the example, deliberately shares that instance with the client and all silos. Shared mutable test doubles must therefore be thread-safe.
 
-## Reuse a cluster with an xUnit fixture
+## Reuse a cluster across tests
 
-Cluster startup is more expensive than an isolated unit test. Reuse a cluster across tests which need the same configuration by using an xUnit collection fixture:
+Cluster startup is more expensive than an isolated unit test. Test framework lifecycle support lets tests with the same configuration reuse a cluster.
+
+### xUnit
+
+Create an xUnit collection fixture:
 
 :::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/ClusterFixture.cs" id="cluster_fixture":::
 
-:::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/ClusterCollection.cs" id="cluster_collection":::
+Register the fixture as a collection and apply that collection to each test class that shares the cluster:
 
+:::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/ClusterCollection.cs" id="cluster_collection":::
 :::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/HelloGrainTestsWithFixture.cs" id="shared_cluster_test":::
+
+### MSTest
+
+Group MSTest classes that share cluster configuration in a dedicated test project. Use assembly lifecycle methods to deploy one cluster for that project:
+
+:::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/MSTestClusterFixture.cs" id="mstest_cluster_fixture":::
+
+Tests access the deployed cluster through the fixture:
+
+:::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/MSTestClusterFixture.cs" id="mstest_shared_cluster_test":::
 
 Shared-cluster tests must not depend on execution order. Give each test distinct grain identities and reset any shared external state. Use separate fixtures when suites require incompatible silo or provider configuration.
 
@@ -76,9 +91,9 @@ Pure domain logic can be extracted into an ordinary class or service and tested 
 
 Configure the production storage or reminder provider when the test covers its external-system contract, concurrency behavior, or restart recovery.
 
-## Test a grain in isolation with OrleansTestKit
+## Use OrleansTestKit for a basic single-activation test
 
-[OrleansTestKit](https://github.com/OrleansContrib/OrleansTestKit) is a community-maintained project in the OrleansContrib organization. Its releases and issue tracking are managed in that repository. It creates a simulated grain activation context and supplies test implementations for activation identity, persistent state, grain references, timers, reminders, and streams. Match the OrleansTestKit major version to the Orleans major version used by the application.
+[OrleansTestKit](https://github.com/OrleansContrib/OrleansTestKit) is a community-maintained project in the OrleansContrib organization. It creates a fixture for one grain activation and supplies test implementations for activation identity, persistent state, grain references, timers, reminders, and streams. The test invokes grain code on its own execution context, so the test author controls sequencing and synchronization. This boundary suits basic arrange-act-assert tests of a single method whose result depends on injected values and recorded collaborator interactions. Match the OrleansTestKit major version to the Orleans major version used by the application.
 
 Install the package in the test project:
 
@@ -94,21 +109,8 @@ Derive the test class from `TestKitBase`. Register persistent state and grain pr
 
 :::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/ShoppingCartGrainTests.cs" id="testkit_grain_test":::
 
-The test verifies the grain's state mutation, storage write request, key-derived grain reference, and outgoing call. OrleansTestKit invokes one grain using its simulated activation context and resolves collaborating grains as probes. Its timer and reminder helpers invoke registered callbacks directly. Use <xref:Orleans.TestingHost.InProcessTestCluster> for assertions governed by Orleans turn scheduling, interleaving, reentrancy, serialization, activation lifecycle, placement, timer or reminder scheduling, or message routing.
+The test verifies the grain's state mutation, storage write request, key-derived grain reference, and outgoing call. OrleansTestKit invokes one grain using its simulated activation context and resolves collaborating grains as probes.
 
-### More OrleansTestKit examples
+Use <xref:Orleans.TestingHost.InProcessTestCluster> for grains that await work, make concurrent calls, use reentrancy or interleaving, coordinate multiple activations, or depend on serialization, lifecycle, placement, timers, reminders, streams, or message routing. The runtime owns those behaviors, and the in-process cluster preserves their execution model.
 
-The OrleansTestKit [README](https://github.com/OrleansContrib/OrleansTestKit/blob/main/README.md) documents version compatibility and package setup. The project's CI-run test suite provides additional recipes:
-
-| Scenario | Upstream examples |
-| --- | --- |
-| Activation, deactivation, and lifecycle callbacks | [`BasicGrainTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/BasicGrainTests.cs) and [`ActivationGrainTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/ActivationGrainTests.cs) |
-| Constructor and keyed service injection | [`DependencyGrainTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/DependencyGrainTests.cs) |
-| Grain identities and activation context | [`GrainContextTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/GrainContextTests.cs) and [`GrainIdTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/GrainIdTests.cs) |
-| `Grain<TState>` and persistent-state facets | [`StorageTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/StorageTests.cs) and [`StorageFacetTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/StorageFacetTests.cs) |
-| Timers | [`TimerTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/TimerTests.cs) |
-| Reminders | [`ReminderTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/ReminderTests.cs) |
-| Streams, batches, and persistent subscriptions | [`StreamTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/StreamTests.cs), [`StreamBatchTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/StreamBatchTests.cs), and [`PersistentStreamWithinGrainStateTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/PersistentStreamWithinGrainStateTests.cs) |
-| Strict grain and stream probes | [`StrictGrainProbeTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/StrictGrainProbeTests.cs) and [`StrictStreamTests`](https://github.com/OrleansContrib/OrleansTestKit/blob/main/test/OrleansTestKit.Tests/Tests/StrictStreamTests.cs) |
-
-See the complete [OrleansTestKit test suite](https://github.com/OrleansContrib/OrleansTestKit/tree/main/test/OrleansTestKit.Tests/Tests) for probe factories, compound keys, class prefixes, stream IDs, storage failures, and custom service probes.
+The OrleansTestKit [README](https://github.com/OrleansContrib/OrleansTestKit/blob/main/README.md) documents version compatibility and package setup. Its [test suite](https://github.com/OrleansContrib/OrleansTestKit/tree/main/test/OrleansTestKit.Tests/Tests) demonstrates the fixture APIs and available test doubles for single-activation tests.
