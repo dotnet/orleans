@@ -102,7 +102,7 @@ items:
         href: host/configuration-guide/serialization-configuration.md
       - name: Customize serialization
         href: host/configuration-guide/serialization-customization.md
-      - name: Source generation
+      - name: Code generation overview
         href: grains/code-generation.md
       - name: Advanced code-generation customization
         href: grains/code-generation-customization.md
