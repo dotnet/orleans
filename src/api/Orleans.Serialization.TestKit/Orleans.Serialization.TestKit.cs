@@ -9,6 +9,9 @@
 namespace Orleans.Serialization.TestKit
 {
     [Xunit.Trait("Category", "BVT")]
+    [Xunit.Trait("Suite", "BVT")]
+    [Xunit.Trait("Provider", "None")]
+    [Xunit.Trait("Area", "Serialization")]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public abstract partial class CopierTester<TValue, TCopier> : SerializationTester where TCopier : class, Cloning.IDeepCopier<TValue>
     {
@@ -53,6 +56,9 @@ namespace Orleans.Serialization.TestKit
     }
 
     [Xunit.Trait("Category", "BVT")]
+    [Xunit.Trait("Suite", "BVT")]
+    [Xunit.Trait("Provider", "None")]
+    [Xunit.Trait("Area", "Serialization")]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public abstract partial class FieldCodecTester<TValue, TCodec> : SerializationTester where TCodec : class, Codecs.IFieldCodec<TValue>
     {

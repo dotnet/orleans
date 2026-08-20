@@ -8,20 +8,21 @@
 //------------------------------------------------------------------------------
 namespace Orleans.GrainDirectory.Firestore
 {
-    public partial class FirestoreOptions
-    {
-        public string? EmulatorHost { get { throw null; } set { } }
-
-        public string ProjectId { get { throw null; } set { } }
-
-        public string RootCollectionName { get { throw null; } set { } }
-    }
-
     public partial class FirestoreGrainDirectory : IGrainDirectory, ILifecycleParticipant<Runtime.ISiloLifecycle>
     {
         public FirestoreGrainDirectory(Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Options.IOptions<FirestoreOptions> firestoreOptions, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
 
         public System.Threading.Tasks.Task<Runtime.GrainAddress?> Lookup(Runtime.GrainId grainId) { throw null; }
+
+        System.Threading.Tasks.Task<Runtime.GrainAddress?> IGrainDirectory.Lookup(Runtime.GrainId grainId, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        System.Threading.Tasks.Task<Runtime.GrainAddress?> IGrainDirectory.Register(Runtime.GrainAddress address, Runtime.GrainAddress? previousAddress, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        System.Threading.Tasks.Task<Runtime.GrainAddress?> IGrainDirectory.Register(Runtime.GrainAddress address, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        System.Threading.Tasks.Task IGrainDirectory.Unregister(Runtime.GrainAddress address, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        System.Threading.Tasks.Task IGrainDirectory.UnregisterSilos(System.Collections.Generic.List<Runtime.SiloAddress> siloAddresses, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public void Participate(Runtime.ISiloLifecycle lifecycle) { }
 
@@ -30,6 +31,15 @@ namespace Orleans.GrainDirectory.Firestore
         public System.Threading.Tasks.Task Unregister(Runtime.GrainAddress address) { throw null; }
 
         public System.Threading.Tasks.Task UnregisterSilos(System.Collections.Generic.List<Runtime.SiloAddress> siloAddresses) { throw null; }
+    }
+
+    public partial class FirestoreOptions
+    {
+        public string? EmulatorHost { get { throw null; } set { } }
+
+        public string ProjectId { get { throw null; } set { } }
+
+        public string RootCollectionName { get { throw null; } set { } }
     }
 }
 

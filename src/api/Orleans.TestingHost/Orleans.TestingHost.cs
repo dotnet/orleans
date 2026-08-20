@@ -824,11 +824,11 @@ namespace Orleans.TestingHost.Utils
 
         public static System.TimeSpan Multiply(System.TimeSpan time, double value) { throw null; }
 
+        public static System.Threading.Tasks.Task WaitUntilAsync(System.Func<bool, System.Threading.CancellationToken, System.Threading.Tasks.Task<bool>> predicate, System.TimeSpan timeout, System.TimeSpan? delayOnFail = null, System.Threading.CancellationToken cancellationToken = default, string? predicateExpression = null) { throw null; }
+
         public static System.Threading.Tasks.Task WaitUntilAsync(System.Func<bool, System.Threading.Tasks.Task<bool>> predicate, System.TimeSpan timeout, System.TimeSpan? delayOnFail = null) { throw null; }
 
-        public static System.Threading.Tasks.Task WaitUntilAsync(System.Func<bool, System.Threading.CancellationToken, System.Threading.Tasks.Task<bool>> predicate, System.TimeSpan timeout, System.TimeSpan? delayOnFail = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken), [System.Runtime.CompilerServices.CallerArgumentExpression("predicate")] string predicateExpression = null) { throw null; }
-
-        public static System.Threading.Tasks.Task<bool> WaitUntilSucceededAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<bool>> predicate, System.TimeSpan timeout, System.TimeSpan? delayOnFail = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) { throw null; }
+        public static System.Threading.Tasks.Task<bool> WaitUntilSucceededAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<bool>> predicate, System.TimeSpan timeout, System.TimeSpan? delayOnFail = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 }
 
