@@ -75,7 +75,9 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
     /// <param name="routeKey">The route key for handler dispatch (e.g., "transfer.debit").</param>
     /// <returns>This builder for chaining.</returns>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="routeKey"/> is null.</exception>
-    /// <exception cref="ArgumentException">Thrown if <paramref name="routeKey"/> is empty or whitespace.</exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown if <paramref name="target"/> is the default grain id or <paramref name="routeKey"/> is empty or whitespace.
+    /// </exception>
     /// <example>
     /// <code>
     /// builder.To(targetGrain, "account.debit");
@@ -86,6 +88,10 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
         ThrowIfBuilt();
         ArgumentNullException.ThrowIfNull(routeKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(routeKey);
+        if (target.IsDefault)
+        {
+            throw new ArgumentException("The target grain id must not be the default value.", nameof(target));
+        }
 
         _receiverId = target;
         _routeKey = routeKey;
@@ -171,6 +177,7 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
     /// </summary>
     /// <param name="replyTo">The grain to receive the reply.</param>
     /// <returns>This builder for chaining.</returns>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="replyTo"/> is the default grain id.</exception>
     /// <example>
     /// <code>
     /// // Request with reply-to
@@ -194,6 +201,11 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
     public DurableEnvelopeBuilder WithReplyTo(GrainId replyTo)
     {
         ThrowIfBuilt();
+        if (replyTo.IsDefault)
+        {
+            throw new ArgumentException("The reply-to grain id must not be the default value.", nameof(replyTo));
+        }
+
         _replyTo = replyTo;
         return this;
     }
