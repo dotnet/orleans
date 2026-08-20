@@ -1,4 +1,4 @@
-import { access, readFile, readdir, realpath } from 'node:fs/promises';
+import { access, readFile, readdir, realpath, stat } from 'node:fs/promises';
 import { lookup as dnsLookup } from 'node:dns/promises';
 import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
@@ -27,6 +27,15 @@ const headFallbackStatusesByHost = new Map([
 
 function toPosix(value) {
   return value.split(path.sep).join('/');
+}
+
+async function pathIsDirectory(target) {
+  try {
+    return (await stat(target)).isDirectory();
+  } catch (error) {
+    if (error?.code === 'ENOENT' || error?.code === 'ENOTDIR') return false;
+    throw error;
+  }
 }
 
 function isWithin(root, target) {
@@ -747,9 +756,9 @@ export async function auditRenderedInternalLinks({
           if (sourceTarget.error) {
             issues.push(`${route}: ${sourceTarget.error}.`);
           } else if (sourceTarget.isDirectory) {
-            if (!(await pathExists(sourceTarget.target))) {
+            if (!(await pathIsDirectory(sourceTarget.target))) {
               issues.push(
-                `${route}: repository source link '${href}' targets a missing directory.`,
+                `${route}: repository source link '${href}' does not target a directory.`,
               );
             }
           } else {
