@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics.Metrics;
+using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Serialization.Buffers;
@@ -131,6 +132,8 @@ public class StateManagerTests : JournalingTestBase
             () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask());
+        Assert.ThrowsAny<OperationCanceledException>(
+            () => sut.Manager.RegisterObserver(new RecordingStateObserver()));
     }
 
     [Fact]
@@ -2170,7 +2173,7 @@ public class StateManagerTests : JournalingTestBase
             if (NextReplaceException is { } exception)
             {
                 NextReplaceException = null;
-                throw exception;
+                ExceptionDispatchInfo.Throw(exception);
             }
 
             if (DelayReplace)
