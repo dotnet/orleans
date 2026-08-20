@@ -75,8 +75,9 @@ Memory persistence distributes records across cluster storage grains but isn't d
 | [Microsoft.Orleans.Reminders.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Redis) | Redis reminders. |
 | [Microsoft.Orleans.DurableJobs](https://www.nuget.org/packages/Microsoft.Orleans.DurableJobs) | Distributed scheduling for durable one-time jobs. |
 | [Microsoft.Orleans.DurableJobs.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.DurableJobs.AzureStorage) | Azure Blob Storage for durable jobs. |
+| [Microsoft.Orleans.DurableMessaging](https://www.nuget.org/packages/Microsoft.Orleans.DurableMessaging) | Experimental grain-scoped durable inbox and outbox messaging. |
 
-Use reminders for recurring durable callbacks and durable jobs for scheduled one-time work. Grain timers are activation-scoped and use the core runtime rather than a provider package.
+Use reminders for recurring durable callbacks and durable jobs for scheduled one-time work. Durable Messaging composes Durable Jobs with Journaling for recoverable, at-least-once grain messages. Grain timers are activation-scoped and use the core runtime rather than a provider package.
 
 ## Streams and broadcast channels
 

@@ -90,6 +90,8 @@ items:
             href: grains/event-sourcing/log-consistency-providers.md
           - name: Replicated instances
             href: grains/event-sourcing/replicated-instances.md
+      - name: Durable messaging
+        href: grains/durable-messaging.md
       - name: Redis journal storage
         href: grains/journaling/redis-journal-storage.md
       - name: Transactions
