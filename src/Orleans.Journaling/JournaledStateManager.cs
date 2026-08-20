@@ -134,6 +134,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     public void RegisterObserver(IJournaledStateObserver observer)
     {
         ArgumentNullException.ThrowIfNull(observer);
+        _shutdownCancellation.Token.ThrowIfCancellationRequested();
         lock (_lock)
         {
             if (!_observers.Add(observer))
