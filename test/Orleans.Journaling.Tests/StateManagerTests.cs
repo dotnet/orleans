@@ -666,8 +666,10 @@ public class StateManagerTests : JournalingTestBase
         var writeException = await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
         Assert.Contains("fenced", writeException.Message, StringComparison.OrdinalIgnoreCase);
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        Assert.Contains("Call RevertPendingChangesAsync", writeException.Message, StringComparison.Ordinal);
+        var deleteException = await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask());
+        Assert.Contains("Call RevertPendingChangesAsync", deleteException.Message, StringComparison.Ordinal);
 
         await sut.Manager.RevertPendingChangesAsync(CancellationToken.None);
         Assert.Equal(1, value.Value);
@@ -675,6 +677,30 @@ public class StateManagerTests : JournalingTestBase
         value.Value = 3;
         await sut.Manager.WriteStateAsync(CancellationToken.None);
         Assert.Equal(3, value.Value);
+    }
+
+    [Fact]
+    public async Task StateManager_WriteOperations_ReportRecoveryInProgress()
+    {
+        var storage = new BlockingRecoveryStorage();
+        var sut = CreateTestSystem(storage: storage);
+        await sut.Lifecycle.OnStart();
+
+        var recovery = sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask();
+        await storage.RecoveryReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var writeException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        var deleteException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask());
+
+        Assert.Contains("recovery is in progress", writeException.Message, StringComparison.Ordinal);
+        Assert.Contains("recovery is in progress", deleteException.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("RevertPendingChangesAsync", writeException.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("RevertPendingChangesAsync", deleteException.Message, StringComparison.Ordinal);
+
+        storage.AllowRecoveryRead.SetResult();
+        await recovery.WaitAsync(TimeSpan.FromSeconds(10));
     }
 
     [Fact]
@@ -1712,6 +1738,34 @@ public class StateManagerTests : JournalingTestBase
                 await AllowFirstDelete.Task.WaitAsync(cancellationToken);
             }
         }
+    }
+
+    private sealed class BlockingRecoveryStorage : IJournalStorage
+    {
+        private int _readCount;
+
+        public TaskCompletionSource RecoveryReadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowRecoveryRead { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool IsCompactionRequested => false;
+
+        public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+        {
+            if (Interlocked.Increment(ref _readCount) == 2)
+            {
+                RecoveryReadStarted.SetResult();
+                await AllowRecoveryRead.Task.WaitAsync(cancellationToken);
+            }
+
+            consumer.Complete(metadata: null);
+        }
+
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
 
     private sealed class CapturingStorage : IJournalStorage
