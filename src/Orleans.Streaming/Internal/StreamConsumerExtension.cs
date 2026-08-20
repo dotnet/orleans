@@ -37,17 +37,17 @@ namespace Orleans.Streams
         [Id(2)]
         private readonly ILogger logger;
         private const int MAXIMUM_ITEM_STRING_LOG_LENGTH = 128;
-        // if this extension is attached to a cosnumer grain which implements IOnSubscriptionActioner,
-        // then this will be not null, otherwise, it will be null
         [NonSerialized]
-        private readonly IStreamSubscriptionObserver? streamSubscriptionObserver;
-        [NonSerialized]
-        private readonly bool isStatelessWorker;
+        private readonly IGrainContext? _grainContext;
+
+        private IStreamSubscriptionObserver? StreamSubscriptionObserver =>
+            _grainContext?.GrainInstance as IStreamSubscriptionObserver;
+
+        private bool IsStatelessWorker => _grainContext is ActivationData { IsStatelessWorker: true };
 
         internal StreamConsumerExtension(IStreamProviderRuntime providerRt, IGrainContext? grainContext = null)
         {
-            streamSubscriptionObserver = grainContext?.GrainInstance as IStreamSubscriptionObserver;
-            isStatelessWorker = grainContext is ActivationData { IsStatelessWorker: true };
+            _grainContext = grainContext;
             providerRuntime = providerRt;
             logger = providerRt.ServiceProvider.GetRequiredService<ILogger<StreamConsumerExtension>>();
         }
@@ -61,7 +61,7 @@ namespace Orleans.Streams
             string? filterData)
         {
             if (null == stream) throw new ArgumentNullException(nameof(stream));
-            if (isStatelessWorker && token is not null)
+            if (IsStatelessWorker && token is not null)
             {
                 throw new InvalidOperationException("Stateless worker stream subscriptions use provider-managed live delivery and require a null sequence token.");
             }
@@ -78,7 +78,7 @@ namespace Orleans.Streams
                     stream,
                     token,
                     filterData,
-                    disableHandshake: isStatelessWorker);
+                    disableHandshake: IsStatelessWorker);
                 allStreamObservers[subscriptionId] = handle;
                 return handle;
             }
@@ -106,13 +106,13 @@ namespace Orleans.Streams
             {
                 return await observer.DeliverItem(item, currentToken, handshakeToken);
             }
-            else if(this.streamSubscriptionObserver != null)
+            else if (StreamSubscriptionObserver is { } streamSubscriptionObserver)
             {
                 var streamProvider = this.providerRuntime.ServiceProvider.GetKeyedService<IStreamProvider>(streamId.ProviderName);
-                if(streamProvider != null)
+                if (streamProvider != null)
                 {
                     var subscriptionHandlerFactory = new StreamSubscriptionHandlerFactory(streamProvider, streamId, streamId.ProviderName, subscriptionId);
-                    await this.streamSubscriptionObserver.OnSubscribed(subscriptionHandlerFactory);
+                    await streamSubscriptionObserver.OnSubscribed(subscriptionHandlerFactory);
                     //check if an observer were attached after handling the new subscription, deliver on it if attached
                     if (allStreamObservers.TryGetValue(subscriptionId, out observer))
                     {
@@ -138,13 +138,13 @@ namespace Orleans.Streams
             {
                 return await observer.DeliverBatch(batch, handshakeToken);
             }
-            else if(this.streamSubscriptionObserver != null)
+            else if (StreamSubscriptionObserver is { } streamSubscriptionObserver)
             {
                 var streamProvider = this.providerRuntime.ServiceProvider.GetKeyedService<IStreamProvider>(streamId.ProviderName);
                 if (streamProvider != null)
                 {
                     var subscriptionHandlerFactory = new StreamSubscriptionHandlerFactory(streamProvider, streamId, streamId.ProviderName, subscriptionId);
-                    await this.streamSubscriptionObserver.OnSubscribed(subscriptionHandlerFactory);
+                    await streamSubscriptionObserver.OnSubscribed(subscriptionHandlerFactory);
                     // check if an observer were attached after handling the new subscription, deliver on it if attached
                     if (allStreamObservers.TryGetValue(subscriptionId, out observer))
                     {
