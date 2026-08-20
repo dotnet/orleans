@@ -120,7 +120,7 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
     /// <remarks>
     /// <para>
     /// The envelope is added to the outbox immediately, but persistence is deferred until
-    /// <c>IStateMachineManager.WriteStateAsync()</c> is called (typically after the handler completes
+    /// <c>IJournaledStateManager.WriteStateAsync()</c> is called (typically after the handler completes
     /// successfully). This ensures that outbound messages are persisted atomically with any grain
     /// state changes made during handler execution.
     /// </para>
