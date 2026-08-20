@@ -9,7 +9,6 @@ namespace OrleansCodeGen.TestProject
 {
     using global::Orleans.Serialization.Codecs;
     using global::Orleans.Serialization.GeneratedCodeHelpers;
-    using global::Orleans.Serialization.Invocation;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     [global::Orleans.CompoundTypeAliasAttribute("inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::TestProject.IGrainA), "11405B98")]
@@ -18,8 +17,8 @@ namespace OrleansCodeGen.TestProject
         public string arg0;
         global::TestProject.IGrainA _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IGrainA), "MethodA", null, new[] { typeof(string) });
-        private readonly InvokablePool<Invokable_IGrainA_GrainReference_11405B98> _pool;
-        public Invokable_IGrainA_GrainReference_11405B98(InvokablePool<Invokable_IGrainA_GrainReference_11405B98> pool) : base()
+        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IGrainA_GrainReference_11405B98> _pool;
+        public Invokable_IGrainA_GrainReference_11405B98(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IGrainA_GrainReference_11405B98> pool) : base()
         {
             _pool = pool;
         }
@@ -89,8 +88,8 @@ namespace OrleansCodeGen.TestProject
         public string arg0;
         global::TestProject.IGrainB _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IGrainB), "MethodB", null, new[] { typeof(string) });
-        private readonly InvokablePool<Invokable_IGrainB_GrainReference_6B5D7809> _pool;
-        public Invokable_IGrainB_GrainReference_6B5D7809(InvokablePool<Invokable_IGrainB_GrainReference_6B5D7809> pool) : base()
+        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IGrainB_GrainReference_6B5D7809> _pool;
+        public Invokable_IGrainB_GrainReference_6B5D7809(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IGrainB_GrainReference_6B5D7809> pool) : base()
         {
             _pool = pool;
         }
@@ -244,8 +243,8 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Activator_Invokable_IGrainA_GrainReference_11405B98 : global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98>
     {
-        private readonly InvokablePool<Invokable_IGrainA_GrainReference_11405B98> _arg0;
-        public Activator_Invokable_IGrainA_GrainReference_11405B98(InvokablePool<Invokable_IGrainA_GrainReference_11405B98> arg0)
+        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IGrainA_GrainReference_11405B98> _arg0;
+        public Activator_Invokable_IGrainA_GrainReference_11405B98(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IGrainA_GrainReference_11405B98> arg0)
         {
             _arg0 = arg0;
         }
@@ -344,8 +343,8 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Activator_Invokable_IGrainB_GrainReference_6B5D7809 : global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809>
     {
-        private readonly InvokablePool<Invokable_IGrainB_GrainReference_6B5D7809> _arg0;
-        public Activator_Invokable_IGrainB_GrainReference_6B5D7809(InvokablePool<Invokable_IGrainB_GrainReference_6B5D7809> arg0)
+        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IGrainB_GrainReference_6B5D7809> _arg0;
+        public Activator_Invokable_IGrainB_GrainReference_6B5D7809(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IGrainB_GrainReference_6B5D7809> arg0)
         {
             _arg0 = arg0;
         }

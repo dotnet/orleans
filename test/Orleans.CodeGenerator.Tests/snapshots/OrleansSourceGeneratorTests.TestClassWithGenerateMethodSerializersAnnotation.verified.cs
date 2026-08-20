@@ -9,7 +9,6 @@ namespace OrleansCodeGen
 {
     using global::Orleans.Serialization.Codecs;
     using global::Orleans.Serialization.GeneratedCodeHelpers;
-    using global::Orleans.Serialization.Invocation;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     [global::Orleans.CompoundTypeAliasAttribute("inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::IMyGrain), "6D39E404")]
@@ -18,8 +17,8 @@ namespace OrleansCodeGen
         public string arg0;
         global::IMyGrain _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::IMyGrain), "SayHello", null, new[] { typeof(string) });
-        private readonly InvokablePool<Invokable_IMyGrain_GrainReference_6D39E404> _pool;
-        public Invokable_IMyGrain_GrainReference_6D39E404(InvokablePool<Invokable_IMyGrain_GrainReference_6D39E404> pool) : base()
+        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IMyGrain_GrainReference_6D39E404> _pool;
+        public Invokable_IMyGrain_GrainReference_6D39E404(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IMyGrain_GrainReference_6D39E404> pool) : base()
         {
             _pool = pool;
         }
@@ -173,8 +172,8 @@ namespace OrleansCodeGen
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Activator_Invokable_IMyGrain_GrainReference_6D39E404 : global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404>
     {
-        private readonly InvokablePool<Invokable_IMyGrain_GrainReference_6D39E404> _arg0;
-        public Activator_Invokable_IMyGrain_GrainReference_6D39E404(InvokablePool<Invokable_IMyGrain_GrainReference_6D39E404> arg0)
+        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IMyGrain_GrainReference_6D39E404> _arg0;
+        public Activator_Invokable_IMyGrain_GrainReference_6D39E404(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IMyGrain_GrainReference_6D39E404> arg0)
         {
             _arg0 = arg0;
         }
@@ -187,7 +186,6 @@ namespace OrleansCodeGen.TestProject
 {
     using global::Orleans.Serialization.Codecs;
     using global::Orleans.Serialization.GeneratedCodeHelpers;
-    using global::Orleans.Serialization.Invocation;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase

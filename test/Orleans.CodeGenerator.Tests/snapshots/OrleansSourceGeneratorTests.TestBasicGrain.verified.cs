@@ -9,7 +9,6 @@ namespace OrleansCodeGen.TestProject
 {
     using global::Orleans.Serialization.Codecs;
     using global::Orleans.Serialization.GeneratedCodeHelpers;
-    using global::Orleans.Serialization.Invocation;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     [global::Orleans.CompoundTypeAliasAttribute("inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::TestProject.IBasicGrain), "6B0E24A1")]
@@ -18,8 +17,8 @@ namespace OrleansCodeGen.TestProject
         public string arg0;
         global::TestProject.IBasicGrain _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IBasicGrain), "SayHello", null, new[] { typeof(string) });
-        private readonly InvokablePool<Invokable_IBasicGrain_GrainReference_6B0E24A1> _pool;
-        public Invokable_IBasicGrain_GrainReference_6B0E24A1(InvokablePool<Invokable_IBasicGrain_GrainReference_6B0E24A1> pool) : base()
+        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IBasicGrain_GrainReference_6B0E24A1> _pool;
+        public Invokable_IBasicGrain_GrainReference_6B0E24A1(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IBasicGrain_GrainReference_6B0E24A1> pool) : base()
         {
             _pool = pool;
         }
@@ -173,8 +172,8 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Activator_Invokable_IBasicGrain_GrainReference_6B0E24A1 : global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1>
     {
-        private readonly InvokablePool<Invokable_IBasicGrain_GrainReference_6B0E24A1> _arg0;
-        public Activator_Invokable_IBasicGrain_GrainReference_6B0E24A1(InvokablePool<Invokable_IBasicGrain_GrainReference_6B0E24A1> arg0)
+        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IBasicGrain_GrainReference_6B0E24A1> _arg0;
+        public Activator_Invokable_IBasicGrain_GrainReference_6B0E24A1(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IBasicGrain_GrainReference_6B0E24A1> arg0)
         {
             _arg0 = arg0;
         }

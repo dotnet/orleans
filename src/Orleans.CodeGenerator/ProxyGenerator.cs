@@ -45,7 +45,8 @@ namespace Orleans.CodeGenerator
             var activatorIndex = 0;
             foreach (var method in interfaceDescription.Methods)
             {
-                if (method.MethodTypeParameters.Count == 0 && method.GeneratedInvokable.UseActivator)
+                if (method.MethodTypeParameters.Count == 0
+                    && method.GeneratedInvokable.ActivatorConstructorParameters.Any(IsInvokablePoolType))
                 {
                     activatorIndexMap[method] = activatorIndex++;
                 }
@@ -76,6 +77,11 @@ namespace Orleans.CodeGenerator
             }
 
             return (classDeclaration, new GeneratedProxyDescription(interfaceDescription, generatedClassName));
+
+            static bool IsInvokablePoolType(TypeSyntax type)
+                => type.DescendantNodesAndSelf()
+                    .OfType<GenericNameSyntax>()
+                    .Any(name => name.Identifier.ValueText == "InvokablePool");
         }
 
         public static string GetSimpleClassName(ProxyInterfaceDescription interfaceDescription)

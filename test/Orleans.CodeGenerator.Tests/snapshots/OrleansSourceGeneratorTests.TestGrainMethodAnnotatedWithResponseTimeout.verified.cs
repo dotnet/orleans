@@ -9,7 +9,6 @@ namespace OrleansCodeGen.TestProject
 {
     using global::Orleans.Serialization.Codecs;
     using global::Orleans.Serialization.GeneratedCodeHelpers;
-    using global::Orleans.Serialization.Invocation;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     [global::Orleans.CompoundTypeAliasAttribute("inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::TestProject.IResponseTimeoutGrain), "6BE752C8")]
@@ -18,8 +17,8 @@ namespace OrleansCodeGen.TestProject
         public string arg0;
         global::TestProject.IResponseTimeoutGrain _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IResponseTimeoutGrain), "LongRunningMethod", null, new[] { typeof(string) });
-        private readonly InvokablePool<Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8> _pool;
-        public Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8(InvokablePool<Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8> pool) : base()
+        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8> _pool;
+        public Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8> pool) : base()
         {
             _pool = pool;
         }
@@ -175,8 +174,8 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Activator_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8 : global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8>
     {
-        private readonly InvokablePool<Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8> _arg0;
-        public Activator_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8(InvokablePool<Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8> arg0)
+        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8> _arg0;
+        public Activator_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8> arg0)
         {
             _arg0 = arg0;
         }

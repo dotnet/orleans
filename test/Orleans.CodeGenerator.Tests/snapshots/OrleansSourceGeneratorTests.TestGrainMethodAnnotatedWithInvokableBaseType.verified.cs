@@ -9,7 +9,6 @@ namespace OrleansCodeGen.TestProject
 {
     using global::Orleans.Serialization.Codecs;
     using global::Orleans.Serialization.GeneratedCodeHelpers;
-    using global::Orleans.Serialization.Invocation;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     [global::Orleans.CompoundTypeAliasAttribute("inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::TestProject.IHelloGrain), "5336307F")]
@@ -18,8 +17,8 @@ namespace OrleansCodeGen.TestProject
         public string arg0;
         global::TestProject.IHelloGrain _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IHelloGrain), "SayHello", null, new[] { typeof(string) });
-        private readonly InvokablePool<Invokable_IHelloGrain_GrainReference_5336307F> _pool;
-        public Invokable_IHelloGrain_GrainReference_5336307F(InvokablePool<Invokable_IHelloGrain_GrainReference_5336307F> pool) : base()
+        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IHelloGrain_GrainReference_5336307F> _pool;
+        public Invokable_IHelloGrain_GrainReference_5336307F(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IHelloGrain_GrainReference_5336307F> pool) : base()
         {
             _pool = pool;
             SetLoggingOptions("Hello");
@@ -174,8 +173,8 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Activator_Invokable_IHelloGrain_GrainReference_5336307F : global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F>
     {
-        private readonly InvokablePool<Invokable_IHelloGrain_GrainReference_5336307F> _arg0;
-        public Activator_Invokable_IHelloGrain_GrainReference_5336307F(InvokablePool<Invokable_IHelloGrain_GrainReference_5336307F> arg0)
+        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IHelloGrain_GrainReference_5336307F> _arg0;
+        public Activator_Invokable_IHelloGrain_GrainReference_5336307F(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IHelloGrain_GrainReference_5336307F> arg0)
         {
             _arg0 = arg0;
         }

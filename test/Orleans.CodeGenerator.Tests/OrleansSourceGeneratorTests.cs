@@ -1729,10 +1729,10 @@ public class DemoClass
         var emittedActivatorNames = GetGeneratedClassNames(result, ".orleans.proxy.", "Activator_Invokable_");
         var registeredActivatorNames = GetRegisteredGeneratedInvokableActivatorNames(result);
 
-        Assert.Single(emittedActivatorNames);
+        Assert.Equal(2, emittedActivatorNames.Length);
         Assert.Equal(emittedActivatorNames, registeredActivatorNames);
         Assert.Contains(emittedActivatorNames, static name => name.Contains("IActivatingGrain", StringComparison.Ordinal));
-        Assert.DoesNotContain(registeredActivatorNames, static name => name.Contains("INormalGrain", StringComparison.Ordinal));
+        Assert.Contains(emittedActivatorNames, static name => name.Contains("INormalGrain", StringComparison.Ordinal));
     }
 
     [Fact]

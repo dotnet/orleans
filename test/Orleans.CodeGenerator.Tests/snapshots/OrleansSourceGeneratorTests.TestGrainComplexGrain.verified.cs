@@ -9,7 +9,6 @@ namespace OrleansCodeGen.TestProject
 {
     using global::Orleans.Serialization.Codecs;
     using global::Orleans.Serialization.GeneratedCodeHelpers;
-    using global::Orleans.Serialization.Invocation;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     [global::Orleans.CompoundTypeAliasAttribute("inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::TestProject.IComplexGrain), "67FE5808")]
@@ -22,8 +21,8 @@ namespace OrleansCodeGen.TestProject
         global::TestProject.IComplexGrain _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IComplexGrain), "ProcessData", null, new[] { typeof(int), typeof(string), typeof(global::TestProject.ComplexData), typeof(global::System.Threading.CancellationToken) });
         global::System.Threading.CancellationTokenSource _cts;
-        private readonly InvokablePool<Invokable_IComplexGrain_GrainReference_67FE5808> _pool;
-        public Invokable_IComplexGrain_GrainReference_67FE5808(InvokablePool<Invokable_IComplexGrain_GrainReference_67FE5808> pool) : base()
+        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IComplexGrain_GrainReference_67FE5808> _pool;
+        public Invokable_IComplexGrain_GrainReference_67FE5808(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IComplexGrain_GrainReference_67FE5808> pool) : base()
         {
             _pool = pool;
         }
@@ -358,8 +357,8 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Activator_Invokable_IComplexGrain_GrainReference_67FE5808 : global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808>
     {
-        private readonly InvokablePool<Invokable_IComplexGrain_GrainReference_67FE5808> _arg0;
-        public Activator_Invokable_IComplexGrain_GrainReference_67FE5808(InvokablePool<Invokable_IComplexGrain_GrainReference_67FE5808> arg0)
+        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IComplexGrain_GrainReference_67FE5808> _arg0;
+        public Activator_Invokable_IComplexGrain_GrainReference_67FE5808(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IComplexGrain_GrainReference_67FE5808> arg0)
         {
             _arg0 = arg0;
         }
