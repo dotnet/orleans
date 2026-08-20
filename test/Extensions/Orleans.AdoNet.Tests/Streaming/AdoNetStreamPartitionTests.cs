@@ -1,10 +1,13 @@
 using System.Data;
 using System.Data.Common;
+using System.Globalization;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Data.SqlClient;
 using MySql.Data.MySqlClient;
 using Npgsql;
 using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.Streams;
 using Orleans.Streaming.AdoNet;
 using Orleans.Streaming.AdoNet.Storage;
 using UnitTests.General;
@@ -518,6 +521,64 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.NotNull(currentAttempt);
         Assert.True(currentAttempt!.Updated);
         Assert.Equal(2, currentAttempt.Checkpoint);
+    }
+
+    [SkippableFact]
+    public async Task RecoverableStreamUpdate_ReturnsPersistedStateWhenExpectedVersionConflicts()
+    {
+        var serviceId = RandomServiceId();
+        var providerId = RandomProviderId();
+        var queueId = RandomQueueId();
+
+        await AppendAsync(serviceId, providerId, queueId);
+        await AppendAsync(serviceId, providerId, queueId);
+
+        IStreamCheckpointStore store = new AdoNetRecoverableStream(
+            serviceId,
+            providerId,
+            queueId,
+            new AdoNetStreamOptions(),
+            _queries,
+            NullLogger.Instance);
+        var loaded = await store.Load(CancellationToken.None);
+        Assert.Equal("0", loaded.Checkpoint);
+        Assert.Equal("1", loaded.Version);
+
+        var conflict = await store.Update("1", expectedVersion: "2", CancellationToken.None);
+
+        Assert.Equal(loaded.Checkpoint, conflict.Checkpoint);
+        Assert.Equal(loaded.Version, conflict.Version);
+
+        var updated = await store.Update("1", conflict.Version, CancellationToken.None);
+        Assert.Equal("1", updated.Checkpoint);
+        Assert.Equal(loaded.Version, updated.Version);
+    }
+
+    [SkippableFact]
+    public async Task RecoverableStreamUpdate_ThrowsWhenPartitionOwnershipIsLost()
+    {
+        var serviceId = RandomServiceId();
+        var providerId = RandomProviderId();
+        var queueId = RandomQueueId();
+
+        await AppendAsync(serviceId, providerId, queueId);
+        await AppendAsync(serviceId, providerId, queueId);
+
+        IStreamCheckpointStore store = new AdoNetRecoverableStream(
+            serviceId,
+            providerId,
+            queueId,
+            new AdoNetStreamOptions(),
+            _queries,
+            NullLogger.Instance);
+        var loaded = await store.Load(CancellationToken.None);
+        var newOwner = await _queries.AcquireStreamPartitionAsync(serviceId, providerId, queueId, startFromNow: false);
+        Assert.NotEqual(long.Parse(loaded.Version, CultureInfo.InvariantCulture), newOwner.OwnerEpoch);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => store.Update("1", loaded.Version, CancellationToken.None).AsTask());
+
+        Assert.Contains("ownership was lost", exception.Message);
     }
 
     [SkippableFact]
