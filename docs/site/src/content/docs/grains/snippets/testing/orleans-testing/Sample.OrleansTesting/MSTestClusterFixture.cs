@@ -28,7 +28,7 @@ public sealed class MSTestClusterFixture
 public sealed class HelloGrainMSTests
 {
     [TestMethod]
-    public async Task SaysHelloCorrectly()
+    public async Task SharedClusterSaysHelloCorrectly()
     {
         var hello = MSTestClusterFixture.Cluster.Client.GetGrain<IHelloGrain>(Guid.NewGuid());
         var greeting = await hello.SayHello("World");
