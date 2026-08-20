@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
-using System.Distributed.DurableTasks;
+using Orleans.DurableTasks;
 using Xunit;
 
-namespace System.Distributed.DurableTasks.Tests;
+namespace Orleans.DurableTasks.Tests;
 
 [Trait("Category", "BVT")]
 public class DurableTaskTests
@@ -134,6 +134,20 @@ public class DurableTaskTests
         Assert.True(context.IsCancellationRequested);
         Assert.True(context.CancellationToken.IsCancellationRequested);
         Assert.Equal(2, calls);
+    }
+
+    [Fact]
+    public async Task CancellationStateIsPublishedBeforeTokenObserversRun()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot("cancel-state"));
+        bool? observedCancellationState = null;
+        using var registration = context.CancellationToken.Register(
+            () => observedCancellationState = context.IsCancellationRequested);
+
+        await DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+
+        Assert.True(observedCancellationState);
     }
 
     [Fact]
@@ -1127,6 +1141,26 @@ public class SchedulingTests
         await Assert.ThrowsAsync<InvalidOperationException>(AwaitWithoutIdAsync);
 
         async Task AwaitWithoutIdAsync() => _ = await definition;
+    }
+
+    [Fact]
+    public async Task ExplicitRootSchedulingIgnoresAmbientDurableContext()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var ambient = host.CreateContext(TaskId.CreateRoot("ambient"));
+        var definition = host.CreateRootDefinition<string>(
+            context => ValueTask.FromResult<DurableTaskResponse>(
+                DurableTaskResponse.FromResult(context.TaskId.ToString())));
+        ScheduledTask<string>? scheduled = null;
+
+        await host.RunWithAmbientAsync(
+            ambient,
+            async () => scheduled = await definition.ScheduleAsync("root"));
+
+        Assert.NotNull(scheduled);
+        Assert.Equal(TaskId.CreateRoot("root"), scheduled.Id);
+        Assert.Equal("root", await scheduled);
+        Assert.False(host.Contains(TaskId.Parse("ambient/root")));
     }
 
     [Theory]
