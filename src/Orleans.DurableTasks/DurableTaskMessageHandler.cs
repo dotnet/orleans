@@ -23,6 +23,7 @@ internal sealed class DurableTaskMessageHandler(
                 }
 
                 invocation.Request.Context!.CallerId = context.Envelope.ReplyTo ?? context.Envelope.SenderId;
+                invocation.Request.Context.SupportsDurableCompletion = true;
                 var response = await runtime.ScheduleFromInboxAsync(
                     invocation.TaskId,
                     invocation.Request,

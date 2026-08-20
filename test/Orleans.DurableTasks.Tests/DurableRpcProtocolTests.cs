@@ -11,6 +11,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.DurableTasks;
 using Orleans.Serialization;
 using Orleans.Serialization.Session;
+using Orleans.Serialization.TypeSystem;
 using Xunit;
 
 namespace Orleans.DurableTasks.Tests;
@@ -19,24 +20,47 @@ namespace Orleans.DurableTasks.Tests;
 public sealed class DurableRpcProtocolTests
 {
     [Fact]
-    public void EquivalentRequestsProduceSameFingerprintAndChangedArgumentsConflict()
+    public void OrleansSerializationFingerprintIncludesPrivateStateAndIsStableForEquivalentGraphs()
     {
+        var serializer = CreateSerializer();
+        var firstGraph = new FingerprintArgument(42);
+        firstGraph.Next = firstGraph;
+        var retryGraph = new FingerprintArgument(42);
+        retryGraph.Next = retryGraph;
+        var conflictGraph = new FingerprintArgument(43);
+        conflictGraph.Next = conflictGraph;
         var first = new RuntimeTestDurableTaskRequest(
             interfaceName: "ITestGrain",
             methodName: "Run",
-            arguments: [42, "value"]);
+            arguments: [firstGraph, firstGraph]);
         var retry = new RuntimeTestDurableTaskRequest(
             interfaceName: "ITestGrain",
             methodName: "Run",
-            arguments: [42, "value"]);
+            arguments: [retryGraph, retryGraph]);
         var conflict = new RuntimeTestDurableTaskRequest(
             interfaceName: "ITestGrain",
             methodName: "Run",
-            arguments: [43, "value"]);
+            arguments: [conflictGraph, conflictGraph]);
 
-        Assert.True(IDurableTaskRequest.AreRequestsEquivalent(first, retry));
-        Assert.Equal(IDurableTaskRequest.GetFingerprint(first), IDurableTaskRequest.GetFingerprint(retry));
-        Assert.NotEqual(IDurableTaskRequest.GetFingerprint(first), IDurableTaskRequest.GetFingerprint(conflict));
+        var firstFingerprint = IDurableTaskRequest.GetFingerprint(first, serializer);
+        Assert.Equal(64, firstFingerprint.Length);
+        Assert.Equal(firstFingerprint, IDurableTaskRequest.GetFingerprint(retry, serializer));
+        Assert.Equal(firstFingerprint, IDurableTaskRequest.GetFingerprint(first, serializer));
+        Assert.NotEqual(firstFingerprint, IDurableTaskRequest.GetFingerprint(conflict, serializer));
+    }
+
+    [Fact]
+    public void GeneratedRequestAliasesProvideStableDistinctMethodIdentity()
+    {
+        var identities = typeof(IDurableRpcCodegenGrain).Assembly
+            .GetTypes()
+            .Where(type => !type.IsAbstract && typeof(IDurableTaskRequest).IsAssignableFrom(type))
+            .Select(RuntimeTypeNameFormatter.Format)
+            .ToArray();
+
+        Assert.True(identities.Length >= 2);
+        Assert.Equal(identities.Length, identities.Distinct(StringComparer.Ordinal).Count());
+        Assert.All(identities, identity => Assert.DoesNotContain("Version=", identity, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -176,6 +200,13 @@ public sealed class DurableRpcProtocolTests
         }
     }
 
+    private static Serializer CreateSerializer()
+    {
+        var services = new ServiceCollection();
+        services.AddSerializer(builder => builder.AddAssembly(typeof(DurableRpcProtocolTests).Assembly));
+        return services.BuildServiceProvider().GetRequiredService<Serializer>();
+    }
+
     private sealed class RecordingJobManager : ILocalDurableJobManager
     {
         public List<ScheduleJobRequest> Requests { get; } = [];
@@ -209,6 +240,16 @@ public sealed class DurableRpcProtocolTests
         public IServiceCollection Services { get; } = new ServiceCollection();
         public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
     }
+}
+
+[GenerateSerializer]
+internal sealed class FingerprintArgument(int value)
+{
+    [Id(0)]
+    private readonly int _value = value;
+
+    [Id(1)]
+    public FingerprintArgument? Next { get; set; }
 }
 
 public interface IDurableRpcCodegenGrain : IGrainWithStringKey
