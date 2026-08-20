@@ -40,7 +40,13 @@ namespace Orleans.Runtime
 
         public static bool operator !=(QualifiedStreamId s1, QualifiedStreamId s2) => !s2.Equals(s1);
 
-        public int CompareTo(QualifiedStreamId other) => StreamId.CompareTo(other.StreamId);
+        public int CompareTo(QualifiedStreamId other)
+        {
+            var streamComparison = StreamId.CompareTo(other.StreamId);
+            return streamComparison != 0
+                ? streamComparison
+                : string.Compare(ProviderName, other.ProviderName, StringComparison.Ordinal);
+        }
 
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {

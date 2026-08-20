@@ -358,6 +358,19 @@ namespace UnitTests.StorageTests
         }
 
         [Fact]
+        public void QualifiedStreamIdComparisonIncludesProviderName()
+        {
+            var streamId = StreamId.Create("namespace", "key");
+            var values = new SortedSet<QualifiedStreamId>
+            {
+                new("provider-a", streamId),
+                new("provider-b", streamId),
+            };
+
+            Assert.Equal(2, values.Count);
+        }
+
+        [Fact]
         public void QualifiedStreamIdConverterDictionaryKeyWithDelimiters()
             => Roundtrip(new QualifiedStreamId("provider:n\u00e4me", StreamId.Create("namespace/segment", "key/value")));
 
