@@ -7,8 +7,11 @@ namespace Orleans.DurableTasks;
 public struct DurableTaskMethodBuilder
 {
     private VoidDurableTaskMethodInvocation? _invocation;
+    private readonly VoidDurableTaskMethodInvocation Invocation
+        => _invocation ?? throw new InvalidOperationException("The durable task builder has not started.");
+
     /// <summary>Gets the deferred durable task definition.</summary>
-    public readonly DurableTask Task => _invocation ?? throw new InvalidOperationException("The durable task builder has not started.");
+    public readonly DurableTask Task => Invocation;
     /// <summary>Creates a builder.</summary>
     public static DurableTaskMethodBuilder Create() => new();
 
@@ -28,27 +31,30 @@ public struct DurableTaskMethodBuilder
     }
 
     /// <summary>Completes the definition with an exception.</summary>
-    public readonly void SetException(Exception exception) => _invocation!.SetException(exception);
+    public readonly void SetException(Exception exception) => Invocation.SetException(exception);
     /// <summary>Completes the definition successfully.</summary>
-    public readonly void SetResult() => _invocation!.SetResult();
+    public readonly void SetResult() => Invocation.SetResult();
 
     /// <summary>Registers the next state-machine step with a safe awaiter.</summary>
     public readonly void AwaitOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
         where TAwaiter : INotifyCompletion where TStateMachine : IAsyncStateMachine
-        => awaiter.OnCompleted(_invocation!.MoveNext);
+        => awaiter.OnCompleted(Invocation.MoveNext);
 
     /// <summary>Registers the next state-machine step with a critical awaiter.</summary>
     public readonly void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
         where TAwaiter : ICriticalNotifyCompletion where TStateMachine : IAsyncStateMachine
-        => awaiter.UnsafeOnCompleted(_invocation!.MoveNext);
+        => awaiter.UnsafeOnCompleted(Invocation.MoveNext);
 }
 
 /// <summary>Builds compiler-lowered asynchronous methods which return <see cref="DurableTask{TResult}"/>.</summary>
 public struct DurableTaskMethodBuilder<TResult>
 {
     private DurableTaskMethodInvocation<TResult>? _invocation;
+    private readonly DurableTaskMethodInvocation<TResult> Invocation
+        => _invocation ?? throw new InvalidOperationException("The durable task builder has not started.");
+
     /// <summary>Gets the deferred durable task definition.</summary>
-    public readonly DurableTask<TResult> Task => _invocation ?? throw new InvalidOperationException("The durable task builder has not started.");
+    public readonly DurableTask<TResult> Task => Invocation;
     /// <summary>Creates a builder.</summary>
     public static DurableTaskMethodBuilder<TResult> Create() => new();
 
@@ -68,17 +74,17 @@ public struct DurableTaskMethodBuilder<TResult>
     }
 
     /// <summary>Completes the definition with an exception.</summary>
-    public readonly void SetException(Exception exception) => _invocation!.SetException(exception);
+    public readonly void SetException(Exception exception) => Invocation.SetException(exception);
     /// <summary>Completes the definition successfully with <paramref name="result"/>.</summary>
-    public readonly void SetResult(TResult result) => _invocation!.SetResult(result);
+    public readonly void SetResult(TResult result) => Invocation.SetResult(result);
 
     /// <summary>Registers the next state-machine step with a safe awaiter.</summary>
     public readonly void AwaitOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
         where TAwaiter : INotifyCompletion where TStateMachine : IAsyncStateMachine
-        => awaiter.OnCompleted(_invocation!.MoveNext);
+        => awaiter.OnCompleted(Invocation.MoveNext);
 
     /// <summary>Registers the next state-machine step with a critical awaiter.</summary>
     public readonly void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
         where TAwaiter : ICriticalNotifyCompletion where TStateMachine : IAsyncStateMachine
-        => awaiter.UnsafeOnCompleted(_invocation!.MoveNext);
+        => awaiter.UnsafeOnCompleted(Invocation.MoveNext);
 }
