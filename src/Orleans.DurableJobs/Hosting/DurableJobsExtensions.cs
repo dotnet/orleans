@@ -36,6 +36,12 @@ public static class DurableJobsExtensions
             return;
         }
 
+        if (services.Any(service => service.ServiceType == typeof(IDurableJobHandlerRegistry)))
+        {
+            throw new InvalidOperationException(
+                $"{nameof(IDurableJobHandlerRegistry)} is DurableJobs infrastructure and cannot be replaced or decorated.");
+        }
+
         services.TryAddSingleton<DurableJobsInstruments>();
         services.AddSingleton<IConfigurationValidator, DurableJobsOptionsValidator>();
         services.AddSingleton<IConfigurationValidator, DurableJobsJournalingConfigurationValidator>();
@@ -43,6 +49,7 @@ public static class DurableJobsExtensions
         services.AddSingleton<LocalDurableJobManager>();
         services.AddFromExisting<ILocalDurableJobManager, LocalDurableJobManager>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalDurableJobManager>();
+        services.AddScoped<IDurableJobHandlerRegistry, DurableJobHandlerRegistry>();
         services.AddSingleton(sp => new DurableJobReceiverExtensionShared(
             sp.GetRequiredService<ILogger<DurableJobReceiverExtension>>(),
             sp.GetRequiredService<IOptions<DurableJobsOptions>>(),
@@ -52,9 +59,17 @@ public static class DurableJobsExtensions
         services.AddKeyedTransient<IGrainExtension>(typeof(IDurableJobReceiverExtension), (sp, _) =>
         {
             var grainContextAccessor = sp.GetRequiredService<IGrainContextAccessor>();
+            var registry = sp.GetRequiredService<IDurableJobHandlerRegistry>();
+            if (registry is not DurableJobHandlerRegistry lookup)
+            {
+                throw new InvalidOperationException(
+                    $"{nameof(IDurableJobHandlerRegistry)} is DurableJobs infrastructure and cannot be replaced or decorated.");
+            }
+
             return new DurableJobReceiverExtension(
                 grainContextAccessor.GrainContext,
-                sp.GetRequiredService<DurableJobReceiverExtensionShared>());
+                sp.GetRequiredService<DurableJobReceiverExtensionShared>(),
+                lookup);
         });
     }
 
