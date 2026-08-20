@@ -230,7 +230,7 @@ public abstract class DurableExecutionContext
                     {
                         using (Enter(this))
                         {
-                            await callback.InvokeAsync(CancellationToken);
+                            await callback.InvokeAsync(CancellationToken).ConfigureAwait(false);
                         }
                     }
                     catch (Exception exception)
@@ -457,7 +457,7 @@ public abstract class DurableExecutionContext
             Current.Value = this;
             try
             {
-                await _callback!(cancellationToken);
+                await _callback!(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception exception)
             {
