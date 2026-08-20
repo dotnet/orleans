@@ -199,6 +199,61 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         }
     }
 
+    public async Task Test_Reminders_2J_MultiGrainMultiReminders()
+    {
+        IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g3 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        var initialSilos = HostedCluster.GetActiveSilos().ToHashSet();
+        using var cts = new CancellationTokenSource(CHURN_ENDWAIT);
+        Task<List<InProcessSiloHandle>>? startSilosTask = null;
+        try
+        {
+            await Test_Reminders_MultiGrainMultiReminders(
+                async cancellationToken =>
+                {
+                    await using (await PauseReminderTimeAsync(cancellationToken))
+                    {
+                        log.LogInformation("Starting 2 extra silos");
+                        startSilosTask = StartAdditionalSilosAsync(2, startAdditionalSiloOnNewPort: true);
+                        await WaitForAdditionalSilosAndReminderServicesAsync(startSilosTask, cancellationToken);
+                    }
+                },
+                cts.Token,
+                g1,
+                g2,
+                g3,
+                g4,
+                g5);
+        }
+        finally
+        {
+            if (startSilosTask is not null)
+            {
+                using var cleanupCts = new CancellationTokenSource(CHURN_ENDWAIT);
+                try
+                {
+                    await startSilosTask.WaitAsync(cleanupCts.Token);
+                }
+                catch (Exception exception)
+                {
+                    log.LogInformation(exception, "Additional silo startup did not complete successfully before cleanup.");
+                }
+
+                var additionalSilos = HostedCluster.GetActiveSilos()
+                    .Where(silo => !initialSilos.Contains(silo))
+                    .ToArray();
+                if (additionalSilos.Length > 0)
+                {
+                    await Task.WhenAll(additionalSilos.Select(StopSiloAsync)).WaitAsync(cleanupCts.Token);
+                    await WaitForLivenessToStabilizeAsync().WaitAsync(cleanupCts.Token);
+                }
+            }
+        }
+    }
+
     public async Task Test_Reminders_ReminderNotFound()
     {
         IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -253,7 +308,15 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         CancellationToken cancellationToken,
         bool startAdditionalSiloOnNewPort = false)
     {
-        var result = await StartAdditionalSilosAsync(silosToStart, startAdditionalSiloOnNewPort).WaitAsync(cancellationToken);
+        var startSilosTask = StartAdditionalSilosAsync(silosToStart, startAdditionalSiloOnNewPort);
+        return await WaitForAdditionalSilosAndReminderServicesAsync(startSilosTask, cancellationToken);
+    }
+
+    private async Task<List<InProcessSiloHandle>> WaitForAdditionalSilosAndReminderServicesAsync(
+        Task<List<InProcessSiloHandle>> startSilosTask,
+        CancellationToken cancellationToken)
+    {
+        var result = await startSilosTask.WaitAsync(cancellationToken);
         var reminderServicesStarted = result.Select(silo =>
             observer.WaitForReminderServiceStartedAsync(cancellationToken, silo.SiloAddress));
         await Task.WhenAll(

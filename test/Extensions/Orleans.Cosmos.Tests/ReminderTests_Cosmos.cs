@@ -150,31 +150,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     [SkippableFact, TestCategory("Functional")]
     public async Task Rem_Azure_2J_MultiGrainMultiReminders()
     {
-        IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g2 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g3 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g4 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g5 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        using var cts = new CancellationTokenSource(CHURN_ENDWAIT);
-
-        await Test_Reminders_MultiGrainMultiReminders(
-            async cancellationToken =>
-            {
-                await using (await PauseReminderTimeAsync(cancellationToken))
-                {
-                    log.LogInformation("Starting 2 extra silos");
-                    await StartAdditionalSilosAndWaitForReminderServicesAsync(
-                        2,
-                        cancellationToken,
-                        startAdditionalSiloOnNewPort: true);
-                }
-            },
-            cts.Token,
-            g1,
-            g2,
-            g3,
-            g4,
-            g5);
+        await Test_Reminders_2J_MultiGrainMultiReminders();
     }
 
     [TestSuite("Functional")]
