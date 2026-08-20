@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace System.Distributed.DurableTasks;
+namespace Orleans.DurableTasks;
 
 /// <summary>Supplies host services and deterministic execution state to a durable task.</summary>
 public abstract class DurableExecutionContext
@@ -171,6 +171,7 @@ public abstract class DurableExecutionContext
         lock (_lock)
         {
             operation = _cancellationOperation ??= new(this);
+            _cancellationRequested = true;
         }
 
         var waitForCompletion = CancellationOperation.TryAddDependency(
@@ -206,11 +207,6 @@ public abstract class DurableExecutionContext
             catch (Exception exception)
             {
                 (exceptions ??= []).Add(exception);
-            }
-
-            lock (_lock)
-            {
-                _cancellationRequested = true;
             }
 
             while (true)
