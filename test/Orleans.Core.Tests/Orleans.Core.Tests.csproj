@@ -30,6 +30,5 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
-    <Compile Include="..\NonSilo.Tests\Orleans\HierarchicalKeyTests.cs" Link="Orleans\HierarchicalKeyTests.cs" />
   </ItemGroup>
 </Project>
