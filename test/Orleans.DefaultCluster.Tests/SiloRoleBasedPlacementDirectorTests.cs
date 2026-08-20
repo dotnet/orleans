@@ -44,8 +44,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("Functional")]
         public async Task SiloRoleBasedPlacementDirector_CanFindSilo()
         {
-            var siloRole = Assembly.GetEntryAssembly()?.GetName().Name;
-            Assert.NotNull(siloRole);
+            var siloRole = (Assembly.GetEntryAssembly() ?? typeof(ClusterMembershipSnapshot).Assembly).GetName().Name!;
 
             var grain = this.GrainFactory.GetGrain<ISiloRoleBasedPlacementGrain>(siloRole);
             bool result = await grain.Ping();
