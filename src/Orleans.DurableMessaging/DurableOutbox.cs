@@ -77,6 +77,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private bool _recoveryCompleted;
 
     private int _metricsActive;
+    private int _reportedDepth;
 
     /// <summary>
     /// Creates a new DurableOutbox instance.
@@ -201,7 +202,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         {
             EnqueuedAt = _jobTimeProvider.GetUtcNow()
         };
-        _instruments.OnOutboxDepthChanged(1);
+        UpdateOutboxDepth(1);
 
         // Record metric for message sent
         var grainType = _grainContext.GrainId.Type.ToString();
@@ -320,6 +321,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         _committingMessageIds.Clear();
         _pendingJobDueTime = null;
         _jobScheduleConfirmed = false;
+        ReconcileOutboxDepth();
         if (Count > 0)
         {
             QueueEnsureJobScheduled(replaceExisting: true);
@@ -338,9 +340,9 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         _pendingMessageIds.Remove(messageId);
         _messageStates.Remove(messageId);
         var removed = _messages.Remove(messageId);
-        if (removed && Volatile.Read(ref _metricsActive) != 0)
+        if (removed)
         {
-            _instruments.OnOutboxDepthChanged(-1);
+            UpdateOutboxDepth(-1);
         }
 
         return removed;
@@ -579,7 +581,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         _shutdown.Cancel();
         if (Interlocked.Exchange(ref _metricsActive, 0) != 0)
         {
-            _instruments.OnOutboxDepthChanged(-Count);
+            _instruments.OnOutboxDepthChanged(-Interlocked.Exchange(ref _reportedDepth, 0));
         }
 
         return Task.CompletedTask;
@@ -589,7 +591,32 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     {
         if (Interlocked.Exchange(ref _metricsActive, 1) == 0)
         {
+            Volatile.Write(ref _reportedDepth, Count);
             _instruments.OnOutboxDepthChanged(Count);
+        }
+    }
+
+    private void UpdateOutboxDepth(int delta)
+    {
+        if (Volatile.Read(ref _metricsActive) != 0)
+        {
+            Interlocked.Add(ref _reportedDepth, delta);
+            _instruments.OnOutboxDepthChanged(delta);
+        }
+    }
+
+    private void ReconcileOutboxDepth()
+    {
+        if (Volatile.Read(ref _metricsActive) == 0)
+        {
+            return;
+        }
+
+        var count = Count;
+        var delta = count - Interlocked.Exchange(ref _reportedDepth, count);
+        if (delta != 0)
+        {
+            _instruments.OnOutboxDepthChanged(delta);
         }
     }
 

@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.Metrics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -126,23 +127,32 @@ public sealed class DurableOutboxDeliveryBatchTests
     [Fact]
     public async Task CancellationAfterSuccessfulDeliveryRevertsRemoval()
     {
-        using var cancellation = new CancellationTokenSource();
+        CancellationTokenSource? cancellation = null;
         var fixture = new OutboxFixture(
             _ =>
             {
-                cancellation.Cancel();
+                cancellation!.Cancel();
                 return ValueTask.FromResult(DeliveryResult.Accepted());
             });
+        fixture.ActivateMetrics();
+        Assert.Equal(1, fixture.GetOutboxDepth());
 
-        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => fixture.DeliverAsync(cancellation.Token));
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            using var currentCancellation = new CancellationTokenSource();
+            cancellation = currentCancellation;
+            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => fixture.DeliverAsync(currentCancellation.Token));
 
-        Assert.Equal(cancellation.Token, exception.CancellationToken);
-        Assert.True(fixture.Messages.ContainsKey(fixture.MessageId));
-        Assert.True(fixture.MessageStates.ContainsKey(fixture.MessageId));
-        Assert.Equal(0, fixture.DeadLetters.Count);
+            Assert.Equal(currentCancellation.Token, exception.CancellationToken);
+            Assert.True(fixture.Messages.ContainsKey(fixture.MessageId));
+            Assert.True(fixture.MessageStates.ContainsKey(fixture.MessageId));
+            Assert.Equal(0, fixture.DeadLetters.Count);
+            Assert.Equal(1, fixture.GetOutboxDepth());
+        }
+
         Assert.Equal(0, fixture.Manager.WriteCount);
-        Assert.Equal(1, fixture.Manager.RevertCount);
+        Assert.Equal(2, fixture.Manager.RevertCount);
     }
 
     [Fact]
@@ -213,6 +223,8 @@ public sealed class DurableOutboxDeliveryBatchTests
         var fixture = new OutboxFixture(
             _ => ValueTask.FromResult(DeliveryResult.Accepted()),
             writeException: writeFailure);
+        fixture.ActivateMetrics();
+        Assert.Equal(1, fixture.GetOutboxDepth());
 
         var exception = await Assert.ThrowsAsync<IOException>(
             () => fixture.DeliverAsync());
@@ -222,6 +234,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         Assert.True(fixture.MessageStates.ContainsKey(fixture.MessageId));
         Assert.Equal(0, fixture.DeadLetters.Count);
         Assert.Equal(1, fixture.Manager.RevertCount);
+        Assert.Equal(1, fixture.GetOutboxDepth());
     }
 
     [Fact]
@@ -262,6 +275,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         private static readonly Assembly DurableMessagingAssembly = typeof(IDurableOutbox).Assembly;
         private readonly IDurableOutbox _outbox;
         private readonly MethodInfo _deliverMethod;
+        private readonly Instrument _outboxDepthInstrument;
         private readonly FieldInfo _pendingMessageIdsField;
 
         public OutboxFixture(
@@ -310,6 +324,12 @@ public sealed class DurableOutboxDeliveryBatchTests
             var instruments = instrumentsType
                 .GetMethod("CreateForDirectConstruction", BindingFlags.Static | BindingFlags.NonPublic)!
                 .Invoke(null, null)!;
+            var depthTracker = instrumentsType
+                .GetField("_outboxDepth", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(instruments)!;
+            _outboxDepthInstrument = (Instrument)depthTracker.GetType()
+                .GetField("_gauge", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(depthTracker)!;
             var pumpResults = Activator.CreateInstance(
                 GetInternalType("Orleans.DurableMessaging.DurableMessagingPumpResults"),
                 nonPublic: true)!;
@@ -363,6 +383,31 @@ public sealed class DurableOutboxDeliveryBatchTests
 
         public Task DeliverAsync(CancellationToken cancellationToken = default) =>
             (Task)_deliverMethod.Invoke(_outbox, [cancellationToken])!;
+
+        public void ActivateMetrics() =>
+            _outbox.GetType()
+                .GetMethod("EnsureMetricsActive", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(_outbox, null);
+
+        public long GetOutboxDepth()
+        {
+            long? result = null;
+            using var listener = new MeterListener
+            {
+                InstrumentPublished = (instrument, meterListener) =>
+                {
+                    if (ReferenceEquals(instrument, _outboxDepthInstrument))
+                    {
+                        meterListener.EnableMeasurementEvents(instrument);
+                    }
+                }
+            };
+            listener.SetMeasurementEventCallback<long>(
+                (instrument, measurement, tags, state) => result = measurement);
+            listener.Start();
+            listener.RecordObservableInstruments();
+            return result ?? throw new InvalidOperationException("The outbox depth gauge did not report a value.");
+        }
 
         public void Send(DurableEnvelope envelope) => _outbox.Send(envelope);
 
