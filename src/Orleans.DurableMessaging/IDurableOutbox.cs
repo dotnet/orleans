@@ -71,6 +71,11 @@ public interface IDurableOutbox
     /// is called. The message remains in the outbox until the infrastructure confirms durable inbox acceptance.
     /// </para>
     /// <para>
+    /// Repeatedly sending an equivalent envelope with the same message ID is an idempotent no-op.
+    /// Sending a different envelope with an ID which is already present throws <see cref="InvalidOperationException"/>.
+    /// Envelope equivalence includes routing and correlation fields, creation time, body bytes, and request-context bytes.
+    /// </para>
+    /// <para>
     /// To create an envelope, use <c>context.CreateEnvelope()</c> in a handler, or create a
     /// <see cref="DurableEnvelopeBuilder"/> directly with the appropriate <c>SerializerSessionPool</c>
     /// and <c>SenderId</c>.
@@ -86,6 +91,9 @@ public interface IDurableOutbox
     /// outbox.Send(envelope);
     /// </code>
     /// </example>
+    /// <exception cref="InvalidOperationException">
+    /// An envelope with the same message ID but different content is already present.
+    /// </exception>
     void Send(DurableEnvelope envelope);
 
     /// <summary>
