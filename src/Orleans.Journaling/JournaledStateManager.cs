@@ -949,10 +949,14 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     private void ThrowIfWritesFenced()
     {
-        if (_state is ManagerState.Recovering or ManagerState.Fenced)
+        if (_state is ManagerState.Recovering)
         {
-            throw new InvalidOperationException(
-                "Journaled state writes are fenced until recovery completes successfully. Call RevertPendingChangesAsync to retry recovery.");
+            throw new InvalidOperationException("Journaled state writes are unavailable while recovery is in progress.");
+        }
+
+        if (_state is ManagerState.Fenced)
+        {
+            throw new InvalidOperationException("Journaled state writes are fenced because recovery failed. Call RevertPendingChangesAsync to retry recovery.");
         }
     }
 
