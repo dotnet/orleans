@@ -110,6 +110,19 @@ public sealed class DurableEnvelopeContractTests : IDisposable
     }
 
     [Fact]
+    public void EnvelopeBuilder_DefaultDestination_ThrowsAtConfiguration()
+    {
+        var targetBuilder = new DurableEnvelopeBuilder(_sessions, GrainId.Create("sender", "target"));
+        var replyBuilder = new DurableEnvelopeBuilder(_sessions, GrainId.Create("sender", "reply"));
+
+        var targetException = Assert.Throws<ArgumentException>(() => targetBuilder.To(default, "route"));
+        var replyException = Assert.Throws<ArgumentException>(() => replyBuilder.WithReplyTo(default));
+
+        Assert.Equal("target", targetException.ParamName);
+        Assert.Equal("replyTo", replyException.ParamName);
+    }
+
+    [Fact]
     public void EnvelopeData_WrongBodyOrContextType_FailsWithoutCorruptingOtherValues()
     {
         var envelope = new DurableEnvelopeBuilder(_sessions, GrainId.Create("sender", "types"))
