@@ -11,7 +11,7 @@ public static class DurableTaskRuntimeHelper
         using var scope = DurableExecutionContext.Enter(context);
         try
         {
-            return await task.RunAsync(context);
+            return await task.RunAsync(context).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
