@@ -686,50 +686,40 @@ internal sealed partial class DurableTaskGrainRuntime(
         {
             foreach (var taskId in completedTaskIds)
             {
-                // Prune all otherwise-completed children.
-                if (waitingOnParent is not null && waitingOnParent.TryGetValue(taskId, out var childTaskIds))
-                {
-                    foreach (var childTaskId in childTaskIds)
-                    {
-                        if (_shared.Logger.IsEnabled(LogLevel.Trace))
-                        {
-                            _shared.Logger.LogTrace("{Id} pruning completed child task {TaskId}", GrainId, childTaskId);
-                        }
-
-                        if (allTasks[childTaskId].RequestFingerprint is not null)
-                        {
-                            _storage.CreateTombstone(childTaskId, allTasks[childTaskId]);
-                        }
-                        else
-                        {
-                            _storage.RemoveTask(childTaskId);
-                        }
-                        _executionContexts.Remove(childTaskId);
-                        _taskHandles.Remove(childTaskId);
-                    }
-                }
-
-                // Prune the task.
-                if (_shared.Logger.IsEnabled(LogLevel.Trace))
-                {
-                    _shared.Logger.LogTrace("{Id} pruning completed task {TaskId}", GrainId, taskId);
-                }
-
-                var completedState = allTasks[taskId];
-                if (completedState.RequestFingerprint is not null)
-                {
-                    _storage.CreateTombstone(taskId, completedState);
-                }
-                else
-                {
-                    _storage.RemoveTask(taskId);
-                }
-                _executionContexts.Remove(taskId);
-                _taskHandles.Remove(taskId);
+                PruneTaskTree(taskId);
             }
         }
 
         return completedTaskIds is not null;
+
+        void PruneTaskTree(TaskId taskId)
+        {
+            if (waitingOnParent is not null && waitingOnParent.TryGetValue(taskId, out var childTaskIds))
+            {
+                foreach (var childTaskId in childTaskIds)
+                {
+                    PruneTaskTree(childTaskId);
+                }
+            }
+
+            if (_shared.Logger.IsEnabled(LogLevel.Trace))
+            {
+                _shared.Logger.LogTrace("{Id} pruning completed task {TaskId}", GrainId, taskId);
+            }
+
+            var completedState = allTasks[taskId];
+            if (completedState.RequestFingerprint is not null)
+            {
+                _storage.CreateTombstone(taskId, completedState);
+            }
+            else
+            {
+                _storage.RemoveTask(taskId);
+            }
+
+            _executionContexts.Remove(taskId);
+            _taskHandles.Remove(taskId);
+        }
     }
 
     /// <inheritdoc/>

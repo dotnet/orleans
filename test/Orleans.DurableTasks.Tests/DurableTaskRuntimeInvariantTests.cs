@@ -132,6 +132,36 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.Equal(taskId, handle.TaskId);
     }
 
+    [Fact]
+    public async Task CleanupRecursivelyPrunesDescendantsBeforeTombstoningParent()
+    {
+        var (runtime, storage, _, _) = CreateRuntime(TimeSpan.Zero);
+        var rootId = TaskId.Parse("root");
+        var childId = TaskId.Parse("root/child");
+        var grandchildId = TaskId.Parse("root/child/grandchild");
+        var waiter = GrainId.Create("caller", "one");
+        var completedAt = DateTimeOffset.UtcNow.AddMinutes(-1);
+
+        var root = storage.GetOrCreate(rootId);
+        root.Result = DurableTaskResponse.Completed;
+        root.CompletedAt = completedAt;
+        root.RequestFingerprint = "root";
+        root.CompletionDestinations.Add(waiter);
+        var child = storage.GetOrCreate(childId);
+        child.Result = DurableTaskResponse.Completed;
+        child.CompletedAt = completedAt;
+        child.RequestFingerprint = "child";
+        var grandchild = storage.GetOrCreate(grandchildId);
+        grandchild.Result = DurableTaskResponse.Completed;
+        grandchild.CompletedAt = completedAt;
+
+        await runtime.AcknowledgeCompletionAsync(rootId, waiter, default);
+
+        Assert.NotNull(storage.Get(rootId).TombstonedAt);
+        Assert.NotNull(storage.Get(childId).TombstonedAt);
+        Assert.False(storage.Contains(grandchildId));
+    }
+
     private static RuntimeTestDurableTaskRequest CreateRequest(
         int argument,
         Func<DurableTask>? createTask = null) =>
@@ -172,7 +202,8 @@ public sealed class DurableTaskRuntimeInvariantTests
         DurableTaskGrainRuntime Runtime,
         TestStorage Storage,
         TestStateManager Manager,
-        RecordingDurableTaskMessageTransport Transport) CreateRuntime()
+        RecordingDurableTaskMessageTransport Transport) CreateRuntime(
+            TimeSpan? resultRetentionPeriod = null)
     {
         var manager = new TestStateManager();
         var storage = new TestStorage(manager);
@@ -184,7 +215,10 @@ public sealed class DurableTaskRuntimeInvariantTests
             accessor,
             TimeProvider.System,
             NullLogger<DurableTaskGrainRuntime>.Instance,
-            Options.Create(new DurableTaskOptions { ResultRetentionPeriod = TimeSpan.FromHours(1) }));
+            Options.Create(new DurableTaskOptions
+            {
+                ResultRetentionPeriod = resultRetentionPeriod ?? TimeSpan.FromHours(1),
+            }));
         var transport = new RecordingDurableTaskMessageTransport();
         var runtime = new DurableTaskGrainRuntime(storage, shared, [transport], manager);
         manager.RegisterObserver(runtime);
@@ -208,6 +242,7 @@ public sealed class DurableTaskRuntimeInvariantTests
             _states.Select(entry => (entry.Key, (IDurableTaskState)entry.Value));
 
         public DurableTaskState Get(TaskId id) => _states[id];
+        public bool Contains(TaskId id) => _states.ContainsKey(id);
         public DurableTaskState GetOrCreate(TaskId id) => (DurableTaskState)GetOrCreateTask(id, null);
 
         public IEnumerable<(TaskId Id, IDurableTaskState State)> GetChildren(TaskId task) =>
