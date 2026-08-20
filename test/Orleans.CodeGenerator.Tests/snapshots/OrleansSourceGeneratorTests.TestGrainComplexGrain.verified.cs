@@ -22,6 +22,10 @@ namespace OrleansCodeGen.TestProject
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IComplexGrain), "ProcessData", null, new[] { typeof(int), typeof(string), typeof(global::TestProject.ComplexData), typeof(global::System.Threading.CancellationToken) });
         global::System.Threading.CancellationTokenSource _cts;
         private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IComplexGrain_GrainReference_67FE5808> _pool;
+        public Invokable_IComplexGrain_GrainReference_67FE5808()
+        {
+        }
+
         public Invokable_IComplexGrain_GrainReference_67FE5808(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IComplexGrain_GrainReference_67FE5808> pool) : base()
         {
             _pool = pool;
@@ -50,7 +54,7 @@ namespace OrleansCodeGen.TestProject
             _target = default;
             _cts?.Dispose();
             _cts = default;
-            _pool.Return(this);
+            _pool?.Return(this);
         }
 
         public override object GetArgument(int index)

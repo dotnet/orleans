@@ -18,6 +18,10 @@ namespace OrleansCodeGen.TestProject
         global::TestProject.IHelloGrain _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IHelloGrain), "SayHello", null, new[] { typeof(string) });
         private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IHelloGrain_GrainReference_5336307F> _pool;
+        public Invokable_IHelloGrain_GrainReference_5336307F()
+        {
+        }
+
         public Invokable_IHelloGrain_GrainReference_5336307F(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IHelloGrain_GrainReference_5336307F> pool) : base()
         {
             _pool = pool;
@@ -36,7 +40,7 @@ namespace OrleansCodeGen.TestProject
         {
             arg0 = default;
             _target = default;
-            _pool.Return(this);
+            _pool?.Return(this);
         }
 
         public override object GetArgument(int index)

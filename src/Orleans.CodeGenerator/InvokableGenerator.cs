@@ -26,6 +26,11 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         var invokableTypeSyntax = CreateInvokableTypeSyntax(generatedClassName, invokableMethodInfo);
         var fields = GetFieldDeclarations(invokableMethodInfo, fieldDescriptions, invokableTypeSyntax);
         var (ctor, ctorArgs) = GenerateConstructor(generatedClassName, invokableMethodInfo, baseClassType, fieldDescriptions, invokableTypeSyntax);
+        var compatibilityCtor = fieldDescriptions.OfType<PoolFieldDescription>().Any()
+                ? ConstructorDeclaration(generatedClassName)
+                    .AddModifiers(Token(SyntaxKind.PublicKeyword))
+                    .WithBody(Block())
+                : null;
         var accessibility = GetAccessibility(method);
         var compoundTypeAliases = GetCompoundTypeAliasAttributeArguments(invokableMethodInfo, invokableMethodInfo.Key);
 
@@ -53,6 +58,7 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
             baseClassType,
             fieldDescriptions,
             fields,
+            compatibilityCtor,
             ctor,
             compoundTypeAliases,
             targetField,
@@ -107,6 +113,7 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         INamedTypeSymbol baseClassType,
         List<InvokerFieldDescription> fieldDescriptions,
         MemberDeclarationSyntax[] fields,
+        ConstructorDeclarationSyntax? compatibilityCtor,
         ConstructorDeclarationSyntax? ctor,
         List<CompoundTypeAliasComponent[]> compoundTypeAliases,
         TargetFieldDescription targetField,
@@ -124,7 +131,12 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
                 AttributeList(SingletonSeparatedList(GetCompoundTypeAliasAttribute(alias))));
         }
 
-        if (ctor != null)
+        if (compatibilityCtor is not null)
+        {
+            classDeclaration = classDeclaration.AddMembers(compatibilityCtor);
+        }
+
+        if (ctor is not null)
         {
             classDeclaration = classDeclaration.AddMembers(ctor);
         }
@@ -613,9 +625,11 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         {
             body.Add(
                 ExpressionStatement(
-                    InvocationExpression(
-                        IdentifierName(poolField.FieldName).Member("Return"),
-                        ArgumentList(SingletonSeparatedList(Argument(ThisExpression()))))));
+                    ConditionalAccessExpression(
+                        IdentifierName(poolField.FieldName),
+                        InvocationExpression(
+                            MemberBindingExpression(IdentifierName("Return")),
+                            ArgumentList(SingletonSeparatedList(Argument(ThisExpression())))))));
         }
 
         return MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "Dispose")
