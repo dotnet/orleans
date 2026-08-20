@@ -796,6 +796,22 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         lock (_lock)
         {
             observers = [.. _observers];
+        }
+
+        foreach (var observer in observers)
+        {
+            try
+            {
+                observer.OnRecoveryStarted();
+            }
+            catch (Exception exception)
+            {
+                LogObserverError(_shared.Logger, exception, nameof(IJournaledStateObserver.OnRecoveryStarted));
+            }
+        }
+
+        lock (_lock)
+        {
             ResetForRecovery();
         }
 
@@ -825,7 +841,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                     }
                 }
             }
-
         }
 
         foreach (var observer in observers)

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.DurableJobs;
 using Orleans.DurableMessaging.Tests.Support;
 using Orleans.Journaling;
 using Orleans.Runtime;
@@ -106,6 +107,52 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         Assert.NotEqual(reverted.ActivationId, recovered.ActivationId);
         Assert.Equal(0, recovered.InboxCount);
         Assert.Empty(recovered.Effects);
+    }
+
+    [Fact]
+    public async Task Inbox_PrecommitCrash_ReclaimsScheduledOrphanAfterRecovery()
+    {
+        const string jobName = "orleans.messaging.inbox-drain";
+        var receiver = NewGrain();
+        var before = await receiver.GetSnapshotAsync();
+        await receiver.DeactivateOnNextRecoveryAsync();
+        var barrier = fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
+        var attemptBaseline = fixture.Metrics.GetCount("orleans-durablejobs-job-attempts-started");
+        var completionBaseline = fixture.Metrics.GetCount("orleans-durablejobs-jobs-completed");
+        var orphanBaseline = fixture.Metrics.GetCount(
+            "orleans-durable-messaging-orphaned-jobs-reclaimed",
+            jobName);
+        using var envelope = CreateEnvelope(receiver, NewMessage(3, "inbox-orphan"));
+
+        var delivery = DeliverAsync(receiver, envelope.Value);
+        await barrier.WaitUntilEnteredAsync();
+        await fixture.Metrics.WaitForCountAsync(
+            "orleans-durablejobs-job-attempts-started",
+            attemptBaseline + 1);
+
+        Assert.Equal(
+            orphanBaseline,
+            fixture.Metrics.GetCount("orleans-durable-messaging-orphaned-jobs-reclaimed", jobName));
+        barrier.Fail();
+        await Assert.ThrowsAnyAsync<Exception>(() => delivery);
+
+        var recovered = await fixture.SnapshotProbe.WaitAsync(
+            receiver.GetGrainId(),
+            snapshot => snapshot.ActivationId != before.ActivationId);
+        await fixture.Metrics.WaitForCountAsync(
+            "orleans-durable-messaging-orphaned-jobs-reclaimed",
+            orphanBaseline + 1,
+            jobName);
+        await fixture.Metrics.WaitForCountAsync(
+            "orleans-durablejobs-jobs-completed",
+            completionBaseline + 1);
+
+        Assert.Equal(0, recovered.InboxCount);
+        Assert.Null(recovered.InboxJobId);
+        Assert.Empty(recovered.Effects);
+        Assert.Equal(
+            orphanBaseline + 1,
+            fixture.Metrics.GetCount("orleans-durable-messaging-orphaned-jobs-reclaimed", jobName));
     }
 
     [Fact]
@@ -394,6 +441,56 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Outbox_PrecommitCrash_ReclaimsScheduledOrphanAfterRecovery()
+    {
+        const string jobName = "orleans.messaging.outbox-flush";
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        var before = await sender.GetSnapshotAsync();
+        _ = await receiver.GetSnapshotAsync();
+        await sender.DeactivateOnNextRecoveryAsync();
+        var barrier = fixture.Storage.BlockWrite(JournalId.FromGrainId(sender.GetGrainId()));
+        var attemptBaseline = fixture.Metrics.GetCount("orleans-durablejobs-job-attempts-started");
+        var completionBaseline = fixture.Metrics.GetCount("orleans-durablejobs-jobs-completed");
+        var orphanBaseline = fixture.Metrics.GetCount(
+            "orleans-durable-messaging-orphaned-jobs-reclaimed",
+            jobName);
+
+        var send = sender.SendAsync(
+            receiver.GetGrainId(),
+            "messages/outbox-orphan",
+            NewMessage(54, "outbox-orphan"));
+        await barrier.WaitUntilEnteredAsync();
+        await fixture.Metrics.WaitForCountAsync(
+            "orleans-durablejobs-job-attempts-started",
+            attemptBaseline + 1);
+
+        Assert.Equal(
+            orphanBaseline,
+            fixture.Metrics.GetCount("orleans-durable-messaging-orphaned-jobs-reclaimed", jobName));
+        barrier.Fail();
+        await Assert.ThrowsAnyAsync<Exception>(() => send);
+
+        await sender.RequestDeactivationAsync();
+        var recovered = await sender.GetSnapshotAsync();
+        Assert.NotEqual(before.ActivationId, recovered.ActivationId);
+        await fixture.Metrics.WaitForCountAsync(
+            "orleans-durable-messaging-orphaned-jobs-reclaimed",
+            orphanBaseline + 1,
+            jobName);
+        await fixture.Metrics.WaitForCountAsync(
+            "orleans-durablejobs-jobs-completed",
+            completionBaseline + 1);
+
+        Assert.Equal(0, recovered.OutboxCount);
+        Assert.Null(recovered.OutboxJobId);
+        Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
+        Assert.Equal(
+            orphanBaseline + 1,
+            fixture.Metrics.GetCount("orleans-durable-messaging-orphaned-jobs-reclaimed", jobName));
+    }
+
+    [Fact]
     public async Task OutboxJobClearWriteFailure_RevertsOwnershipAndRetryCleansUp()
     {
         var sender = NewGrain();
@@ -463,6 +560,151 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         handler.Release();
         var completed = await fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal("stale-owner", Assert.Single(completed.Effects).Value);
+    }
+
+    [Fact]
+    public async Task Inbox_StaleGenerationCompletesWithoutClearingNewerOwner()
+    {
+        var receiver = NewGrain();
+        const string route = "messages/stale-inbox-generation";
+        using var handler = fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
+        using var envelope = CreateEnvelope(receiver, NewMessage(60, "newer-inbox-owner"), route);
+
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        await handler.WaitUntilEnteredAsync();
+        var owned = await receiver.GetSnapshotAsync();
+        Assert.False(string.IsNullOrEmpty(owned.InboxJobId));
+        var completionBaseline = fixture.Metrics.GetCount("orleans-durablejobs-jobs-completed");
+        var manager = fixture.Cluster.Silos[0].ServiceProvider.GetRequiredService<ILocalDurableJobManager>();
+
+        await manager.ScheduleJobAsync(
+            new ScheduleJobRequest
+            {
+                Target = receiver.GetGrainId(),
+                JobName = "orleans.messaging.inbox-drain",
+                DueTime = DateTimeOffset.UtcNow,
+                Metadata = new Dictionary<string, string>
+                {
+                    ["orleans.messaging.ownership-id"] = "0"
+                }
+            },
+            CancellationToken.None);
+        await fixture.Metrics.WaitForCountAsync(
+            "orleans-durablejobs-jobs-completed",
+            completionBaseline + 1);
+
+        Assert.Equal(owned.InboxJobId, (await receiver.GetSnapshotAsync()).InboxJobId);
+        handler.Release();
+        Assert.Equal("newer-inbox-owner", Assert.Single((await fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Value);
+    }
+
+    [Fact]
+    public async Task Outbox_StaleGenerationCompletesWithoutClearingNewerOwner()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        _ = await sender.GetSnapshotAsync();
+        _ = await receiver.GetSnapshotAsync();
+        var receiverWrite = fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
+
+        await sender.SendAsync(
+            receiver.GetGrainId(),
+            "messages/stale-outbox-generation",
+            NewMessage(61, "newer-outbox-owner"));
+        await receiverWrite.WaitUntilEnteredAsync();
+        var owned = await sender.GetSnapshotAsync();
+        Assert.False(string.IsNullOrEmpty(owned.OutboxJobId));
+        var completionBaseline = fixture.Metrics.GetCount("orleans-durablejobs-jobs-completed");
+        var manager = fixture.Cluster.Silos[0].ServiceProvider.GetRequiredService<ILocalDurableJobManager>();
+
+        try
+        {
+            await manager.ScheduleJobAsync(
+                new ScheduleJobRequest
+                {
+                    Target = sender.GetGrainId(),
+                    JobName = "orleans.messaging.outbox-flush",
+                    DueTime = DateTimeOffset.UtcNow,
+                    Metadata = new Dictionary<string, string>
+                    {
+                        ["orleans.messaging.ownership-id"] = "0"
+                    }
+                },
+                CancellationToken.None);
+            await fixture.Metrics.WaitForCountAsync(
+                "orleans-durablejobs-jobs-completed",
+                completionBaseline + 1);
+
+            Assert.Equal(owned.OutboxJobId, (await sender.GetSnapshotAsync()).OutboxJobId);
+        }
+        finally
+        {
+            receiverWrite.Release();
+        }
+
+        Assert.Equal("newer-outbox-owner", Assert.Single((await fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Value);
+    }
+
+    [Fact]
+    public async Task Outbox_JobVisibleDuringRecovery_PollsUntilCommittedOwnerIsRestored()
+    {
+        const string jobName = "orleans.messaging.outbox-flush";
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        _ = await sender.GetSnapshotAsync();
+        _ = await receiver.GetSnapshotAsync();
+        var receiverWrite = fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
+
+        await sender.SendAsync(
+            receiver.GetGrainId(),
+            "messages/recovery-visibility",
+            NewMessage(62, "recovery-visibility"));
+        await receiverWrite.WaitUntilEnteredAsync();
+        var owned = await sender.GetSnapshotAsync();
+        var ownershipId = Assert.IsType<string>(owned.OutboxJobId);
+        var recoveryRead = fixture.Storage.BlockRead(JournalId.FromGrainId(sender.GetGrainId()));
+        var recovery = sender.RevertStateAsync();
+        await recoveryRead.WaitUntilEnteredAsync();
+        var handlerBaseline = fixture.Metrics.GetCount("orleans-durablejobs-handler-executions-started");
+        var completionBaseline = fixture.Metrics.GetCount("orleans-durablejobs-jobs-completed");
+        var orphanBaseline = fixture.Metrics.GetCount(
+            "orleans-durable-messaging-orphaned-jobs-reclaimed",
+            jobName);
+        var manager = fixture.Cluster.Silos[0].ServiceProvider.GetRequiredService<ILocalDurableJobManager>();
+
+        try
+        {
+            await manager.ScheduleJobAsync(
+                new ScheduleJobRequest
+                {
+                    Target = sender.GetGrainId(),
+                    JobName = jobName,
+                    DueTime = DateTimeOffset.UtcNow,
+                    Metadata = new Dictionary<string, string>
+                    {
+                        ["orleans.messaging.ownership-id"] = ownershipId
+                    }
+                },
+                CancellationToken.None);
+            await fixture.Metrics.WaitForCountAsync(
+                "orleans-durablejobs-handler-executions-started",
+                handlerBaseline + 1);
+
+            Assert.Equal(
+                orphanBaseline,
+                fixture.Metrics.GetCount("orleans-durable-messaging-orphaned-jobs-reclaimed", jobName));
+            Assert.Equal(completionBaseline, fixture.Metrics.GetCount("orleans-durablejobs-jobs-completed"));
+        }
+        finally
+        {
+            recoveryRead.Release();
+            await recovery;
+            receiverWrite.Release();
+        }
+
+        var delivered = await fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.Equal("recovery-visibility", Assert.Single(delivered.Effects).Value);
+        Assert.Equal(1, Assert.Single(delivered.Effects).Count);
     }
 
     [Fact]

@@ -12,6 +12,8 @@ namespace Orleans.Journaling;
 /// should queue asynchronous follow-up work instead of performing it inline.
 /// </para>
 /// <para>
+/// Before recovery resets registered state, the manager invokes <see cref="OnRecoveryStarted"/>.
+/// After recovery restores all registered state, it invokes <see cref="OnRecoveryCompleted"/>.
 /// Before each write, the manager awaits <see cref="OnWritePreparingAsync"/> and then invokes
 /// <see cref="OnWriteStarted"/> immediately before capturing registered states. Mutations remain
 /// provisional until <see cref="OnWriteCompleted"/> marks a successful commit. Restoring the last
@@ -26,6 +28,11 @@ namespace Orleans.Journaling;
 /// </remarks>
 public interface IJournaledStateObserver
 {
+    /// <summary>
+    /// Called before registered states are reset for recovery.
+    /// </summary>
+    void OnRecoveryStarted() { }
+
     /// <summary>
     /// Prepares external prerequisites for a durable write before registered states are captured.
     /// </summary>
