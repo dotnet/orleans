@@ -28,7 +28,7 @@ if ([string]::IsNullOrWhiteSpace($testFilter)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($testFilter)) {
-    $testFilter = "Category=BVT|Category=SlowBVT";
+    $testFilter = "/[(Category=BVT)|(Category=SlowBVT)]";
 }
 
 Write-Host "Test filters: `"$testFilter`"";
@@ -81,7 +81,7 @@ foreach ($d in $directories)
     if (-not $testFilter.EndsWith('"')) { $testFilter = "$testFilter`""; }
 
     $jobName = $([System.IO.Path]::GetFileName($d))
-    $cmdLine = 'test --blame-hang-timeout 10m --no-build --configuration "' + $env:BuildConfiguration + '" --filter ' + $testFilter + ' --logger "trx" -- -parallel none -noshadow'
+    $cmdLine = 'test --no-build --configuration "' + $env:BuildConfiguration + '" --filter-query ' + $testFilter + ' --minimum-expected-tests 1 --report-trx --crashdump --crashdump-type Full --hangdump --hangdump-timeout 10m --hangdump-type Full'
     Write-Host $jobName dotnet $cmdLine
     Start-Job $ExecuteCmd -ArgumentList @($cmdLine, "$d") -Name $jobName | Out-Null
     Write-Host ''

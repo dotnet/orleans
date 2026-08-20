@@ -91,13 +91,13 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        --minimum-expected-tests 1
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        --max-parallel-test-modules 1
       env:
         ORLEANSREDISCONNECTIONSTRING: "localhost:6379,ssl=False,abortConnect=False"
     - name: Clean up Redis
@@ -141,13 +141,13 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.dbversion }}_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        --minimum-expected-tests 1
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.dbversion }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        --max-parallel-test-modules 1
       env:
         CASSANDRAVERSION: ${{ matrix.dbversion }}
     - name: Archive Test Results
@@ -199,13 +199,13 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        --minimum-expected-tests 1
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        --max-parallel-test-modules 1
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
         ORLEANSPOSTGRESCONNECTIONSTRING: "Server=127.0.0.1;Port=5432;Pooling=false;User Id=postgres;Password=postgres;SSL Mode=Disable"
@@ -290,13 +290,13 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        --minimum-expected-tests 1
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        --max-parallel-test-modules 1
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
@@ -352,13 +352,13 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        --minimum-expected-tests 1
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        --max-parallel-test-modules 1
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;TrustServerCertificate=True;"
@@ -399,13 +399,13 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        --minimum-expected-tests 1
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        --max-parallel-test-modules 1
     - name: Archive Test Results
       if: always()
       continue-on-error: true
@@ -451,14 +451,14 @@ jobs:
         global-json-file: global.json
     - name: Test
       run: dotnet test
-        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
+        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        --minimum-expected-tests 1
         --framework ${{ matrix.framework }}
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        --max-parallel-test-modules 1
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
@@ -531,14 +531,14 @@ jobs:
         global-json-file: global.json
     - name: Test
       run: dotnet test
-        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
+        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        --minimum-expected-tests 1
         --framework ${{ matrix.framework }}
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        --max-parallel-test-modules 1
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
@@ -612,7 +612,7 @@ jobs:
         done
     - name: Test
       run: |
-        cosmos_filter='Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress'
+        cosmos_filter='/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]'
         for attempt in 1 2; do
           logger_name="test_results_${{ matrix.provider }}_${{ matrix.framework }}_attempt${attempt}.trx"
           extra_args=()
@@ -622,16 +622,16 @@ jobs:
           fi
 
           if dotnet test \
-            test/Extensions/Orleans.Cosmos.Tests/Orleans.Cosmos.Tests.csproj \
+            --project test/Extensions/Orleans.Cosmos.Tests/Orleans.Cosmos.Tests.csproj \
             --framework ${{ matrix.framework }} \
-            --filter "${cosmos_filter}" \
-            --blame-hang-timeout 10m \
-            --blame-crash-dump-type full \
-            --blame-hang-dump-type full \
-            --logger "trx;LogFileName=${logger_name}" \
+            --filter-query "${cosmos_filter}" \
+            --minimum-expected-tests 1 \
+            --hangdump --hangdump-timeout 10m \
+            --crashdump --crashdump-type Full \
+            --hangdump-type Full \
+            --report-trx --report-trx-filename "${logger_name}" \
             "${extra_args[@]}" \
-            -- \
-            -parallel none -noshadow; then
+            --max-parallel-test-modules 1; then
             exit 0
           fi
         done
@@ -681,13 +681,13 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        --minimum-expected-tests 1
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        --max-parallel-test-modules 1
     - name: Archive Test Results
       if: always()
       continue-on-error: true
@@ -731,13 +731,13 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        --minimum-expected-tests 1
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        --max-parallel-test-modules 1
       env:
         ORLEANSZOOKEEPERCONNECTIONSTRING: "localhost:2181"
     - name: Clean up ZooKeeper
@@ -794,13 +794,13 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        --minimum-expected-tests 1
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        --max-parallel-test-modules 1
       env:
         ORLEANSDYNAMODBSERVICE: "http://127.0.0.1:8000"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
@@ -871,15 +871,15 @@ jobs:
         global-json-file: global.json
     - name: Test
       run: dotnet test
-        test/Extensions/Orleans.AWS.Tests/Orleans.AWS.Tests.csproj
+        --project test/Extensions/Orleans.AWS.Tests/Orleans.AWS.Tests.csproj
         --framework ${{ matrix.framework }}
-        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        --minimum-expected-tests 1
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        --max-parallel-test-modules 1
       env:
         ORLEANSSQSCONNECTIONSTRING: "Service=http://127.0.0.1:9324"
         ORLEANSDYNAMODBSERVICE: "http://127.0.0.1:8000"
@@ -949,15 +949,15 @@ jobs:
         global-json-file: global.json
     - name: Test
       run: dotnet test
-        test/Extensions/Orleans.Streaming.NATS.Tests/Orleans.Streaming.NATS.Tests.csproj
+        --project test/Extensions/Orleans.Streaming.NATS.Tests/Orleans.Streaming.NATS.Tests.csproj
         --framework ${{ matrix.framework }}
-        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        --minimum-expected-tests 1
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        --max-parallel-test-modules 1
     - name: Clean up container
       if: always()
       run: docker rm -f nats || true
@@ -1023,15 +1023,15 @@ jobs:
         global-json-file: global.json
     - name: Test
       run: dotnet test
-        test/Extensions/Orleans.Streaming.Kinesis.Tests/Orleans.Streaming.Kinesis.Tests.csproj
+        --project test/Extensions/Orleans.Streaming.Kinesis.Tests/Orleans.Streaming.Kinesis.Tests.csproj
         --framework ${{ matrix.framework }}
-        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        --minimum-expected-tests 1
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        --max-parallel-test-modules 1
       env:
         ORLEANSKINESISCONNECTIONSTRING: "http://localhost:4566;test;test;us-east-1"
         ORLEANSDYNAMODBSERVICE: "http://localhost:8000"
@@ -1079,13 +1079,13 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Provider=None&Suite=${{ matrix.suite }}&Area!=CodeGen"
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_${{ matrix.suite }}_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+        --filter-query "/[(Provider=None)&(Suite=${{ matrix.suite }})&(Area!=CodeGen)]"
+        --minimum-expected-tests 1
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --report-trx --report-trx-filename "test_results_${{ matrix.suite }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        --max-parallel-test-modules 1
     - name: Archive Test Results
       if: always()
       continue-on-error: true
@@ -1112,25 +1112,25 @@ jobs:
         global-json-file: global.json
     - name: Test Code Generator
       run: dotnet test
-        test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj
+        --project test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj
         --framework ${{ matrix.framework }}
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+        --minimum-expected-tests 1
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --report-trx --report-trx-filename "test_results_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        --max-parallel-test-modules 1
         &&
         dotnet test
-        test/Orleans.DefaultCluster.Tests/Orleans.DefaultCluster.Tests.csproj
+        --project test/Orleans.DefaultCluster.Tests/Orleans.DefaultCluster.Tests.csproj
         --framework ${{ matrix.framework }}
-        --filter "Provider=None&Area=CodeGen&(Suite=BVT|Suite=SlowBVT|Suite=Functional)"
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_defaultcluster_codegen_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+        --filter-query "/[(Provider=None)&(Area=CodeGen)&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))]"
+        --minimum-expected-tests 1
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --report-trx --report-trx-filename "test_results_defaultcluster_codegen_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        --max-parallel-test-modules 1
     - name: Archive Test Results
       if: always()
       continue-on-error: true
@@ -1202,13 +1202,13 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress"
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        --minimum-expected-tests 1
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        --max-parallel-test-modules 1
     - name: Archive Test Results
       if: always()
       continue-on-error: true

@@ -22,7 +22,7 @@ Clone the repository, then run the maintained test project:
 ```powershell
 git clone https://github.com/dotnet/orleans.git
 cd orleans
-dotnet test .\docs\site\src\content\docs\grains\snippets\testing\orleans-testing\Sample.OrleansTesting\Sample.OrleansTesting.csproj
+dotnet test --project .\docs\site\src\content\docs\grains\snippets\testing\orleans-testing\Sample.OrleansTesting\Sample.OrleansTesting.csproj --minimum-expected-tests 1
 ```
 
 The first test creates a cluster, deploys it, obtains a grain reference from the client, makes a call, and disposes the cluster:

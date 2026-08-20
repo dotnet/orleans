@@ -17,7 +17,12 @@
 
   <PropertyGroup>
     <TestTargetFrameworks Condition="'$(TestTargetFrameworks)' == ''">net8.0;net10.0</TestTargetFrameworks>
-    <OutputType Condition="$(MSBuildProjectName.EndsWith('.Test')) or $(MSBuildProjectName.EndsWith('.Tests'))">Exe</OutputType>
+    <IsOrleansTestApplication Condition="$(MSBuildProjectName.EndsWith('Test')) or $(MSBuildProjectName.EndsWith('Tests')) or '$(MSBuildProjectName)' == 'Benchmarks'">true</IsOrleansTestApplication>
+    <IsTestProject Condition="'$(IsOrleansTestApplication)' == 'true'">true</IsTestProject>
+    <IsTestingPlatformApplication Condition="'$(IsOrleansTestApplication)' == 'true'">true</IsTestingPlatformApplication>
+    <OutputType Condition="'$(IsOrleansTestApplication)' == 'true'">Exe</OutputType>
+    <UseMicrosoftTestingPlatformRunner Condition="'$(IsOrleansTestApplication)' == 'true'">true</UseMicrosoftTestingPlatformRunner>
+    <TestingPlatformCommandLineArguments Condition="'$(IsOrleansTestApplication)' == 'true'">$(TestingPlatformCommandLineArguments) --ignore-exit-code 8</TestingPlatformCommandLineArguments>
     <!-- Microsoft.Accordant currently requires System.Text.Json 10: https://github.com/microsoft/accordant/issues/38 -->
     <UsesAccordantTestKit Condition="
       '$(MSBuildProjectName)' == 'Benchmarks.AdoNet' or
@@ -35,12 +40,13 @@
       '$(MSBuildProjectName)' == 'Orleans.Transactions.DynamoDB.Test'">true</UsesAccordantTestKit>
   </PropertyGroup>
 
-  <ItemGroup>
-    <None Include="$(MsBuildThisFileDirectory)xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  <ItemGroup Condition="'$(IsOrleansTestApplication)' == 'true'">
+    <PackageReference Include="Microsoft.Testing.Extensions.CrashDump" />
+    <PackageReference Include="Microsoft.Testing.Extensions.HangDump" />
+    <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="coverlet.collector" />
     <PackageReference Include="System.Collections.Immutable" VersionOverride="10.0.0" PrivateAssets="all" Condition="'$(TargetFramework)' == 'net8.0' and '$(UsesAccordantTestKit)' == 'true'" />
     <PackageReference Include="System.IO.Pipelines" VersionOverride="10.0.5" PrivateAssets="all" Condition="'$(TargetFramework)' == 'net8.0' and '$(UsesAccordantTestKit)' == 'true'" />
     <PackageReference Include="System.Text.Json" VersionOverride="10.0.5" PrivateAssets="all" Condition="'$(TargetFramework)' == 'net8.0' and '$(UsesAccordantTestKit)' == 'true'" />

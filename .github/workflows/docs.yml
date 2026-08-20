@@ -45,7 +45,7 @@ jobs:
           global-json-file: global.json
 
       - name: Test API data generator
-        run: dotnet test docs/tools/PackageJsonGenerator.Tests/PackageJsonGenerator.Tests.csproj
+        run: dotnet test --project docs/tools/PackageJsonGenerator.Tests/PackageJsonGenerator.Tests.csproj --minimum-expected-tests 1
 
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
@@ -105,7 +105,7 @@ jobs:
           ./samples/Validate-Samples.ps1 -NoBuild
 
       - name: Build and test documentation projects
-        run: dotnet test docs/Docs.slnx --configuration Release --framework net10.0 -p:BuildExternalAssets=false -bl:docs-projects.binlog --nologo -- -parallel none -noshadow
+        run: dotnet test --solution docs/Docs.slnx --configuration Release --framework net10.0 -p:BuildExternalAssets=false -bl:docs-projects.binlog --minimum-expected-tests 1 --max-parallel-test-modules 1
 
       - name: Build samples against local Orleans packages
         shell: pwsh

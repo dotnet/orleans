@@ -25,14 +25,14 @@ The `Orleans.slnx` solution includes the source projects under `src` and the tes
 Run the full test suite for the current .NET target with:
 
 ```console
-dotnet test Orleans.slnx --framework net10.0 -- -parallel none -noshadow
+dotnet test --solution Orleans.slnx --framework net10.0 --minimum-expected-tests 1 --max-parallel-test-modules 1
 ```
 
 For a faster feedback loop, run a category or a single test. For example:
 
 ```console
-dotnet test Orleans.slnx --framework net10.0 --filter "Category=BVT" -- -parallel none -noshadow
-dotnet test test/Orleans.Core.Tests/Orleans.Core.Tests.csproj --framework net10.0 --filter "FullyQualifiedName~MyTestClass.MyTestMethod" -- -parallel none -noshadow
+dotnet test --solution Orleans.slnx --framework net10.0 --filter-trait "Category=BVT" --minimum-expected-tests 1 --max-parallel-test-modules 1
+dotnet test --project test/Orleans.Core.Tests/Orleans.Core.Tests.csproj --framework net10.0 --filter-class "*MyTestClass*" --filter-method "*MyTestMethod*" --minimum-expected-tests 1
 ```
 
 ### Work on an application with local source
