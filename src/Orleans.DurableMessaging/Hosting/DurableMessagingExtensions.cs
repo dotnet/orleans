@@ -63,11 +63,7 @@ public static class DurableMessagingExtensions
         services.TryAddScoped<DurableInboxExtension>(sp =>
         {
             var stateManager = sp.GetRequiredService<IJournaledStateManager>();
-            if (!stateManager.SupportsRollback)
-            {
-                throw new InvalidOperationException(
-                    "Durable messaging requires an IJournaledStateManager implementation with rollback support.");
-            }
+            DurableMessagingStateManagerCapabilities.Validate(stateManager);
 
             var options = sp.GetRequiredService<IOptions<DurableInboxOptions>>().Value;
             return new DurableInboxExtension(
@@ -117,7 +113,18 @@ public static class DurableMessagingExtensions
         services.TryAddKeyedScoped<IDurableOutbox, DurableOutbox>("outbox");
         services.TryAddScoped<IDurableOutbox>(sp => sp.GetRequiredKeyedService<IDurableOutbox>("outbox"));
         services.TryAddScoped<IDurableMessagingDiagnostics, DurableMessagingDiagnostics>();
-        services.TryAddScoped<DurableMessagingPumpResults>();
+        services.TryAddScoped(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<DurableJobsOptions>>().Value;
+            var abandonedRetentionPeriod = options.JobStatusPollInterval <= TimeSpan.MaxValue / 4
+                ? options.JobStatusPollInterval * 4
+                : TimeSpan.MaxValue;
+            return new DurableMessagingPumpResults(
+                sp.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs),
+                options.CompletedJobAttemptRetentionPeriod,
+                TimeSpan.FromTicks(Math.Max(options.CompletedJobAttemptRetentionPeriod.Ticks, abandonedRetentionPeriod.Ticks)),
+                maxRetainedEntries: 65_536);
+        });
         services.TryAddScoped<DurableMessagingGrainParticipant>();
         services.TryAddEnumerable(
             ServiceDescriptor.Scoped<IJournaledGrainParticipant, DurableMessagingGrainParticipant>());
