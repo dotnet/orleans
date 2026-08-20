@@ -490,7 +490,7 @@ public class ShardExecutorTests
         await executor.RunShardAsync(shard, CancellationToken.None);
 
         Assert.False(retryPolicyInvoked);
-        await ((IResettableJobShard)shard).Received(1).RescheduleJobAsync(
+        await shard.Received(1).RescheduleJobAsync(
             Arg.Any<IJobRunContext>(),
             rescheduleTime,
             Arg.Any<CancellationToken>());
@@ -530,42 +530,7 @@ public class ShardExecutorTests
         Assert.IsType<InvalidOperationException>(retryException);
         Assert.Contains("unsupported status value 99", retryException.Message, StringComparison.Ordinal);
         await shard.Received(1).RetryJobLaterAsync(Arg.Any<IJobRunContext>(), retryTime, Arg.Any<CancellationToken>());
-        await ((IResettableJobShard)shard).DidNotReceive().RescheduleJobAsync(
-            Arg.Any<IJobRunContext>(),
-            Arg.Any<DateTimeOffset>(),
-            Arg.Any<CancellationToken>());
-        await shard.DidNotReceive().RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task RunShardAsync_RescheduleAtOnLegacyShardFailsExplicitlyWithoutFailureRetry()
-    {
-        var retryPolicyInvoked = false;
-        var options = CreateOptions(
-            maxConcurrentJobs: 1,
-            shouldRetry: (_, _) =>
-            {
-                retryPolicyInvoked = true;
-                return DateTimeOffset.UtcNow.AddMinutes(1);
-            });
-        var shard = CreateJobShard(CreateJobs(1), supportsResetReschedule: false);
-        var grainFactory = CreateGrainFactory();
-        var extension = Substitute.For<IDurableJobReceiverExtension>();
-        extension.HandleDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
-            .Returns(DurableJobRunResult.RescheduleAt(DateTimeOffset.UtcNow.AddMinutes(5)));
-        grainFactory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
-        var executor = new ShardExecutor(
-            grainFactory,
-            options,
-            CreateOverloadDetector(isOverloaded: false),
-            NullLogger<ShardExecutor>.Instance);
-
-        var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(
-            () => executor.RunShardAsync(shard, CancellationToken.None));
-
-        Assert.Contains("does not support successful reset-rescheduling", exception.Message, StringComparison.Ordinal);
-        Assert.False(retryPolicyInvoked);
-        await shard.DidNotReceive().RetryJobLaterAsync(
+        await shard.DidNotReceive().RescheduleJobAsync(
             Arg.Any<IJobRunContext>(),
             Arg.Any<DateTimeOffset>(),
             Arg.Any<CancellationToken>());
@@ -760,12 +725,9 @@ public class ShardExecutorTests
         List<DurableJob> jobs, 
         DateTimeOffset? startTime = null,
         DateTimeOffset? endTime = null,
-        TaskCompletionSource? firstJobRegistered = null,
-        bool supportsResetReschedule = true)
+        TaskCompletionSource? firstJobRegistered = null)
     {
-        var shard = supportsResetReschedule
-            ? Substitute.For<IJobShard, IResettableJobShard>()
-            : Substitute.For<IJobShard>();
+        var shard = Substitute.For<IJobShard>();
         shard.Id.Returns("shard-1");
         shard.StartTime.Returns(startTime ?? DateTimeOffset.UtcNow.AddMinutes(-10));
         shard.EndTime.Returns(endTime ?? DateTimeOffset.UtcNow.AddMinutes(10));

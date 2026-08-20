@@ -79,7 +79,7 @@ public class JobShardTests
         var resetShard = await CreateShardWithDueJobAsync("reset", now);
         var resetRun = await ConsumeNextAsync(resetShard);
 
-        await ((IResettableJobShard)resetShard).RescheduleJobAsync(resetRun, now.AddSeconds(-1), CancellationToken.None);
+        await resetShard.RescheduleJobAsync(resetRun, now.AddSeconds(-1), CancellationToken.None);
 
         var rescheduledRun = await ConsumeNextAsync(resetShard);
         Assert.Equal(1, rescheduledRun.DequeueCount);

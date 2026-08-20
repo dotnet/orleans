@@ -274,13 +274,8 @@ internal sealed partial class ShardExecutor
                         activity?.SetStatus(ActivityStatusCode.Ok);
                         break;
                     case DurableJobRunStatus.RescheduleRequested when result.RescheduleTime is { } rescheduleTime:
-                        if (shard is not IResettableJobShard resettableShard)
-                        {
-                            throw new ResettableJobShardNotSupportedException(shard.GetType());
-                        }
-
                         LogReschedulingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, rescheduleTime);
-                        await resettableShard.RescheduleJobAsync(jobContext, rescheduleTime, cancellationToken);
+                        await shard.RescheduleJobAsync(jobContext, rescheduleTime, cancellationToken);
                         _durableJobsInstruments.OnJobRescheduled(_timeProvider.GetElapsedTime(attemptStartTimestamp));
                         activity?.SetTag(ActivityTagKeys.DurableJobStatus, "rescheduled");
                         activity?.SetStatus(ActivityStatusCode.Ok);
@@ -306,7 +301,7 @@ internal sealed partial class ShardExecutor
                         break;
                 }
             }
-            catch (Exception ex) when (ex is not OperationCanceledException and not ResettableJobShardNotSupportedException)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 LogErrorExecutingJob(_logger, ex, jobContext.Job.Id);
                 failureException = ex;
@@ -352,8 +347,4 @@ internal sealed partial class ShardExecutor
         }
     }
 
-    private sealed class ResettableJobShardNotSupportedException(Type shardType)
-        : NotSupportedException(
-            $"Job shard implementation '{shardType}' does not support successful reset-rescheduling. "
-            + "RescheduleRequested cannot be processed without changing failure-attempt semantics.");
 }

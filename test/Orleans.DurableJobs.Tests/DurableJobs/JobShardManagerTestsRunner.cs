@@ -183,8 +183,7 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
         var job = await ScheduleJobAsync(shard, now.AddMinutes(-1), "rescheduled-job");
         var run = await TakeOneAsync(shard);
 
-        var resettableShard = Assert.IsAssignableFrom<IResettableJobShard>(shard);
-        await resettableShard.RescheduleJobAsync(run, now.AddMinutes(-1), CancellationToken.None);
+        await shard.RescheduleJobAsync(run, now.AddMinutes(-1), CancellationToken.None);
         await first.UnregisterShardAsync(shard, CancellationToken.None);
 
         var reassigned = Assert.Single(await second.AssignJobShardsAsync(now.AddMinutes(5), int.MaxValue, CancellationToken.None));

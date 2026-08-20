@@ -11,7 +11,7 @@ namespace Orleans.DurableJobs;
 /// <summary>
 /// Journaled implementation of <see cref="IJobShard"/> that stores shard state in Orleans journaling storage.
 /// </summary>
-internal sealed class JournaledJobShard : IJobShard, IResettableJobShard
+internal sealed class JournaledJobShard : IJobShard
 {
     private readonly JournaledJobShardState _state;
     private readonly IJournaledStateManager _stateManager;
@@ -161,7 +161,8 @@ internal sealed class JournaledJobShard : IJobShard, IResettableJobShard
         }
     }
 
-    async Task IResettableJobShard.RescheduleJobAsync(
+    /// <inheritdoc/>
+    public async Task RescheduleJobAsync(
         IJobRunContext jobContext,
         DateTimeOffset newDueTime,
         CancellationToken cancellationToken)
