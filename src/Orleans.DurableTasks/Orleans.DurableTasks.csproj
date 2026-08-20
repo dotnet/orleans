@@ -5,7 +5,7 @@
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <OrleansBuildTimeCodeGen>false</OrleansBuildTimeCodeGen>
     <EnableOrleansContractsAnalyzer>false</EnableOrleansContractsAnalyzer>
-    <GenAPITargetDirectory>$(SourceRoot)src\api\System.Distributed.DurableTasks\</GenAPITargetDirectory>
+    <GenAPITargetDirectory>$(SourceRoot)src\api\Orleans.DurableTasks\</GenAPITargetDirectory>
     <GenAPITargetPath>$(GenAPITargetDirectory)$(AssemblyName).cs</GenAPITargetPath>
   </PropertyGroup>
 

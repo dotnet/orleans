@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace System.Distributed.DurableTasks;
+namespace Orleans.DurableTasks;
 
 /// <summary>Identifies a durable task within a hierarchy.</summary>
 public readonly struct TaskId : IEquatable<TaskId>, IParsable<TaskId>, ISpanParsable<TaskId>, ISpanFormattable

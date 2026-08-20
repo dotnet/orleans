@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
-namespace System.Distributed.DurableTasks;
+namespace Orleans.DurableTasks;
 
 /// <summary>Builds compiler-lowered asynchronous methods which return <see cref="DurableTask"/>.</summary>
 public struct DurableTaskMethodBuilder

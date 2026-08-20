@@ -1,4 +1,4 @@
-namespace System.Distributed.DurableTasks;
+namespace Orleans.DurableTasks;
 
 /// <summary>Provides awaiting, identification, and scheduling operations for durable task definitions.</summary>
 public static class DurableTaskExtensions
@@ -19,8 +19,8 @@ public static class DurableTaskExtensions
     public static ConfiguredDurableTask<TResult> WithId<TResult>(this DurableTask<TResult> task, string segment) => new ConfiguredDurableTask<TResult>(task).WithId(segment);
     /// <summary>Schedules a root task using one explicit stable identifier segment.</summary>
     public static Task<ScheduledTask> ScheduleAsync(this DurableTask task, string rootId, CancellationToken cancellationToken = default)
-        => task.WithId(rootId).ScheduleAsync(cancellationToken);
+        => new ConfiguredDurableTask(task, rootId).ScheduleAsync(cancellationToken);
     /// <summary>Schedules a root task using one explicit stable identifier segment.</summary>
     public static Task<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> task, string rootId, CancellationToken cancellationToken = default)
-        => task.WithId(rootId).ScheduleAsync(cancellationToken);
+        => new ConfiguredDurableTask<TResult>(task, rootId).ScheduleAsync(cancellationToken);
 }

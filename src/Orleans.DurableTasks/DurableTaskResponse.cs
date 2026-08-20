@@ -1,6 +1,6 @@
 using System.Runtime.ExceptionServices;
 
-namespace System.Distributed.DurableTasks;
+namespace Orleans.DurableTasks;
 
 /// <summary>Identifies the execution status of a durable task.</summary>
 public enum DurableTaskStatus

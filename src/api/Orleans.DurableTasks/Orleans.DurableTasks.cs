@@ -6,7 +6,7 @@
 //     the code is regenerated.
 // </auto-generated>
 //------------------------------------------------------------------------------
-namespace System.Distributed.DurableTasks
+namespace Orleans.DurableTasks
 {
     public sealed partial class CanceledDurableTaskResponse : DurableTaskResponse
     {

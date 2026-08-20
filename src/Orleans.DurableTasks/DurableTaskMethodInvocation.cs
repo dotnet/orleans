@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace System.Distributed.DurableTasks;
+namespace Orleans.DurableTasks;
 
 internal abstract class DeferredMethodInvocation : DurableTask
 {

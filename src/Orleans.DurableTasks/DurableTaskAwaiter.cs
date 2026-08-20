@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace System.Distributed.DurableTasks;
+namespace Orleans.DurableTasks;
 
 /// <summary>Provides an awaiter for a durable task without a result.</summary>
 public readonly struct DurableTaskAwaiter : ICriticalNotifyCompletion
