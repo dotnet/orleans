@@ -347,11 +347,11 @@ internal struct ConfiguredDurableTaskCore<TTask> where TTask : DurableTask
     {
         if (_taskId.IsDefault && ParentContext is { } parent && Task.RunsInlineInParent)
         {
-            return await Task.RunAsync(parent);
+            return await Task.RunAsync(parent).ConfigureAwait(false);
         }
 
-        var scheduled = await ScheduleCoreAsync(cancellationToken);
-        return scheduled.Response ?? await scheduled.Handle!.WaitAsync(cancellationToken);
+        var scheduled = await ScheduleCoreAsync(cancellationToken).ConfigureAwait(false);
+        return scheduled.Response ?? await scheduled.Handle!.WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     internal async Task<(DurableTaskResponse? Response, IScheduledTaskHandle? Handle)> ScheduleCoreAsync(
@@ -360,7 +360,7 @@ internal struct ConfiguredDurableTaskCore<TTask> where TTask : DurableTask
         EnsureId();
         if (ParentContext is { } parent)
         {
-            return (null, await parent.ScheduleChildTaskAsync(_taskId, Task, cancellationToken));
+            return (null, await parent.ScheduleChildTaskAsync(_taskId, Task, cancellationToken).ConfigureAwait(false));
         }
 
         if (Task is not ISchedulableTask schedulable)
@@ -368,7 +368,7 @@ internal struct ConfiguredDurableTaskCore<TTask> where TTask : DurableTask
             throw new InvalidOperationException("The durable task definition does not support root scheduling.");
         }
 
-        var response = await schedulable.ScheduleAsync(_taskId, cancellationToken);
+        var response = await schedulable.ScheduleAsync(_taskId, cancellationToken).ConfigureAwait(false);
         return response.IsCompleted
             ? (response, null)
             : (null, schedulable.GetHandle(_taskId));
@@ -415,7 +415,7 @@ public struct ConfiguredDurableTask
     /// <summary>Schedules the configured definition and returns its handle.</summary>
     public async Task<ScheduledTask> ScheduleAsync(CancellationToken cancellationToken = default)
     {
-        var scheduled = await _core.ScheduleCoreAsync(cancellationToken);
+        var scheduled = await _core.ScheduleCoreAsync(cancellationToken).ConfigureAwait(false);
         return scheduled.Response is { } response
             ? new CompletedScheduledTask(_core.TaskId, response)
             : new ScheduledTaskHandle(scheduled.Handle!);
@@ -429,7 +429,7 @@ public struct ConfiguredDurableTask
     public async Task<DurableTaskStatus> PollAsync(
         PollingOptions options = default,
         CancellationToken cancellationToken = default)
-        => (await _core.GetHandle().PollAsync(options, cancellationToken)).Status;
+        => (await _core.GetHandle().PollAsync(options, cancellationToken).ConfigureAwait(false)).Status;
 }
 
 /// <summary>Configures and schedules a durable task with a result.</summary>
@@ -459,7 +459,7 @@ public struct ConfiguredDurableTask<TResult>
     /// <summary>Schedules the configured definition and returns its typed handle.</summary>
     public async Task<ScheduledTask<TResult>> ScheduleAsync(CancellationToken cancellationToken = default)
     {
-        var scheduled = await _core.ScheduleCoreAsync(cancellationToken);
+        var scheduled = await _core.ScheduleCoreAsync(cancellationToken).ConfigureAwait(false);
         return scheduled.Response is { } response
             ? new CompletedScheduledTask<TResult>(_core.TaskId, response)
             : new ScheduledTaskHandle<TResult>(scheduled.Handle!);
@@ -473,5 +473,5 @@ public struct ConfiguredDurableTask<TResult>
     public async Task<DurableTaskStatus> PollAsync(
         PollingOptions options = default,
         CancellationToken cancellationToken = default)
-        => (await _core.GetHandle().PollAsync(options, cancellationToken)).Status;
+        => (await _core.GetHandle().PollAsync(options, cancellationToken).ConfigureAwait(false)).Status;
 }
