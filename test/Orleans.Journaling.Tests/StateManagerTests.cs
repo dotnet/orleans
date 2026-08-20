@@ -87,6 +87,33 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task StateManager_WriteOperations_RequireInitialization()
+    {
+        var sut = CreateTestSystem();
+
+        var writeException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        var deleteException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask());
+
+        Assert.Contains("not been initialized", writeException.Message, StringComparison.Ordinal);
+        Assert.Contains("not been initialized", deleteException.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StateManager_WriteOperations_ObserveShutdown()
+    {
+        var sut = CreateTestSystem();
+        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStop(CancellationToken.None);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask());
+    }
+
+    [Fact]
     public async Task StateManager_Recovery_PreservesUnknownStateEntry()
     {
         var storage = new VolatileJournalStorage();
@@ -653,34 +680,40 @@ public class StateManagerTests : JournalingTestBase
     [Fact]
     public async Task StateManager_WriteStateAsync_CoalescesQueuedWrites()
     {
-        var storage = new CapturingStorage();
+        var storage = new BlockingAppendStorage();
         var sut = CreateTestSystem(storage: storage);
         var state = new AlwaysWritingState();
         sut.Manager.RegisterState("state", state);
+        await sut.Lifecycle.OnStart();
 
         var first = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        await storage.FirstAppendStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
         var second = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        var third = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
 
-        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
-        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(10));
+        storage.AllowFirstAppend.SetResult();
+        await Task.WhenAll(first, second, third).WaitAsync(TimeSpan.FromSeconds(10));
 
-        Assert.Equal(1, state.AppendEntriesCount);
-        Assert.Single(storage.Appends);
+        Assert.Equal(2, state.AppendEntriesCount);
+        Assert.Equal(2, storage.Appends.Count);
     }
 
     [Fact]
     public async Task StateManager_DeleteStateAsync_CoalescesQueuedDeletes()
     {
-        var storage = new CapturingStorage();
+        var storage = new BlockingDeleteStorage();
         var sut = CreateTestSystem(storage: storage);
+        await sut.Lifecycle.OnStart();
 
         var first = sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask();
+        await storage.FirstDeleteStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
         var second = sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask();
+        var third = sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask();
 
-        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
-        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(10));
+        storage.AllowFirstDelete.SetResult();
+        await Task.WhenAll(first, second, third).WaitAsync(TimeSpan.FromSeconds(10));
 
-        Assert.Equal(1, storage.DeleteCount);
+        Assert.Equal(2, storage.DeleteCount);
     }
 
     [Fact]
@@ -1647,6 +1680,38 @@ public class StateManagerTests : JournalingTestBase
         }
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
+    }
+
+    private sealed class BlockingDeleteStorage : IJournalStorage
+    {
+        public TaskCompletionSource FirstDeleteStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowFirstDelete { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int DeleteCount { get; private set; }
+
+        public bool IsCompactionRequested => false;
+
+        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+        {
+            consumer.Complete(metadata: null);
+            return default;
+        }
+
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public async ValueTask DeleteAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            DeleteCount++;
+            if (DeleteCount == 1)
+            {
+                FirstDeleteStarted.SetResult();
+                await AllowFirstDelete.Task.WaitAsync(cancellationToken);
+            }
+        }
     }
 
     private sealed class CapturingStorage : IJournalStorage
