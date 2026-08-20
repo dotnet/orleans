@@ -58,7 +58,7 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// Implementations override this member to provide rollback to the last durable state.
     /// </remarks>
     ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) =>
-        throw new NotSupportedException("This journaled state manager does not support reverting pending changes.");
+        ValueTask.FromException(new NotSupportedException("This journaled state manager does not support rollback."));
 
     /// <summary>
     /// Resets this instance, removing any persistent state.
