@@ -1,15 +1,18 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import legacyJekyllPages from '../src/data/legacy-jekyll-pages.json' with { type: 'json' };
 import legacyPaths from '../src/data/legacy-pages.json' with { type: 'json' };
 import redirects from '../src/data/redirects.json' with { type: 'json' };
 import { compatibilityOutputPath } from './lib/compatibility-paths.mjs';
+import { mergeLegacyRedirects } from './lib/legacy-routes.mjs';
 
 const siteRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const distRoot = path.join(siteRoot, 'dist');
 const maxPublishedBytes = 1024 * 1024 * 1024;
 const maxApiRootBytes = 1024 * 1024;
 const failures = [];
+const allRedirects = mergeLegacyRedirects(redirects, legacyJekyllPages);
 
 async function walk(directory) {
   const files = [];
@@ -200,7 +203,7 @@ for (const legacyPath of legacyPaths) {
   }
 }
 
-for (const [source, target] of Object.entries(redirects)) {
+for (const [source, target] of Object.entries(allRedirects)) {
   const outputPath = compatibilityOutputPath(source, distRoot);
   if (!files.includes(outputPath)) {
     failures.push(`Missing explicit compatibility redirect '${source}'.`);

@@ -150,12 +150,15 @@ Before the first deployment, set **Settings → Pages → Source** to **GitHub
 Actions**. The workflow publishes after pushes to `main`, nightly at 09:00 UTC,
 and on manual dispatch.
 
-The production build also emits compatibility redirects for every URL in the
-legacy `gh-pages` sitemap. Existing pages retain their exact URL when the new
-site owns it; retired documentation and blog URLs redirect to the nearest
-current documentation entry point. Explicit replacements in
-`src/data/redirects.json` preserve inbound anchors and override the automatic
-legacy-path matching.
+The production build also emits compatibility redirects for the two legacy
+`gh-pages` site maps. `src/data/legacy-jekyll-pages.json` maps every
+pre-DocFX documentation page to its best current successor. GitHub Pages serves
+each generated `.html` redirect through its historical extensionless alias as
+well. `src/data/legacy-pages.json` captures the final DocFX-era site. Existing
+pages retain their exact URL when the new site owns it; retired documentation
+and blog URLs redirect to the nearest current documentation entry point.
+Explicit replacements in `src/data/redirects.json` preserve inbound anchors and
+override automatic DocFX-era path matching.
 
 `npm run audit:links` validates source-authored external links and every rendered
 internal route and anchor. It runs automatically from both `npm run build` and
