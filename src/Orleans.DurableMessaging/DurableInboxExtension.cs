@@ -24,6 +24,7 @@ namespace Orleans.DurableMessaging;
 internal sealed partial class DurableInboxExtension :
     IDurableInboxExtension,
     IDurableJobFeatureHandler,
+    IJournaledStateObserver,
     ILifecycleObserver,
     IDisposable
 {
@@ -59,6 +60,7 @@ internal sealed partial class DurableInboxExtension :
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly CancellationTokenSource _shutdownCts = new();
     private int _metricsActive;
+    private bool _recoveryCompleted;
 
     /// <summary>
     /// Creates a new inbox extension instance.
@@ -145,6 +147,7 @@ internal sealed partial class DurableInboxExtension :
         _maxProcessingAttempts = options.MaxProcessingAttempts;
         _batchSize = options.InboxBatchSize;
         _retryDelay = options.BackpressureRetryDelay;
+        stateManager.RegisterObserver(this);
         jobHandlers.Register(JobName, this);
         grainContext.ObservableLifecycle.Subscribe(
             RuntimeTypeNameFormatter.Format(GetType()),
@@ -373,6 +376,18 @@ internal sealed partial class DurableInboxExtension :
         }
     }
 
+    public void OnWriteStarted()
+    {
+    }
+
+    public void OnWriteCompleted()
+    {
+    }
+
+    public void OnRecoveryStarted() => _recoveryCompleted = false;
+
+    public void OnRecoveryCompleted() => _recoveryCompleted = true;
+
     public async ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
         var hasStableOwnership = DurableMessagingJobOwnership.TryGetOwnershipId(
@@ -380,12 +395,34 @@ internal sealed partial class DurableInboxExtension :
             out var ownershipId);
         if (!string.Equals(_jobId.Value, ownershipId, StringComparison.Ordinal))
         {
-            if (!hasStableOwnership
-                || !string.IsNullOrEmpty(_jobId.Value)
-                || DurableMessagingJobOwnership.IsCompleted(_completedJobId.Value, ownershipId))
+            if (!hasStableOwnership)
             {
                 return DurableJobRunResult.Completed;
             }
+
+            var disposition = DurableMessagingJobOwnership.ResolveMismatch(
+                _recoveryCompleted,
+                !string.IsNullOrEmpty(_jobId.Value),
+                DurableMessagingJobOwnership.IsCompleted(_completedJobId.Value, ownershipId),
+                _inboxDict.Count > 0);
+            if (disposition == OwnershipMismatchDisposition.ReclaimOrphan)
+            {
+                LogOrphanedJobReclaimed(_logger, ownershipId, _grainContext.GrainId);
+                _instruments.OnOrphanedJobReclaimed(_grainContext.GrainId.Type.ToString(), JobName);
+                return DurableJobRunResult.Completed;
+            }
+
+            if (disposition == OwnershipMismatchDisposition.CompleteStale)
+            {
+                return DurableJobRunResult.Completed;
+            }
+
+            return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
+        }
+
+        if (!_recoveryCompleted)
+        {
+            return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
         }
 
         if (_localDrainJobIds.Contains(ownershipId))
@@ -461,14 +498,24 @@ internal sealed partial class DurableInboxExtension :
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
         try
         {
+            if (!_recoveryCompleted)
+            {
+                return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
+            }
+
             if (string.IsNullOrEmpty(_jobId.Value))
             {
                 if (hasStableOwnership
                     && !DurableMessagingJobOwnership.IsCompleted(_completedJobId.Value, jobId))
                 {
-                    RequestRefreshWhenSafe();
-                    return DurableJobRunResult.RetryAt(
-                        _jobTimeProvider.GetUtcNow() + _retryDelay);
+                    if (_inboxDict.Count == 0)
+                    {
+                        LogOrphanedJobReclaimed(_logger, jobId, _grainContext.GrainId);
+                        _instruments.OnOrphanedJobReclaimed(_grainContext.GrainId.Type.ToString(), JobName);
+                        return DurableJobRunResult.Completed;
+                    }
+
+                    return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
                 }
                 else if (GetDurableInboxCount() == 0)
                 {
@@ -505,7 +552,7 @@ internal sealed partial class DurableInboxExtension :
             {
                 if (_inboxDict.Count > 0)
                 {
-                    return DurableJobRunResult.RetryAt(_jobTimeProvider.GetUtcNow() + TimeSpan.FromMilliseconds(10));
+                    return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
                 }
 
                 if (!clearOwnershipWhenEmpty)
@@ -562,17 +609,6 @@ internal sealed partial class DurableInboxExtension :
             {
                 LogProcessingError(_logger, exception, envelope.MessageId, envelope.SenderId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
             }
-        }
-    }
-
-    private void RequestRefreshWhenSafe()
-    {
-        if (_stateManager.PendingWriteByteCount == 0)
-        {
-            _grainContext.Deactivate(
-                new DeactivationReason(
-                    DeactivationReasonCode.ApplicationRequested,
-                    "Refreshing durable inbox ownership after a precommit wake-up."));
         }
     }
 
@@ -852,6 +888,11 @@ internal sealed partial class DurableInboxExtension :
         Level = LogLevel.Error,
         Message = "Handler threw exception for message {MessageId} from {SenderId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
     private static partial void LogHandlerException(ILogger logger, Exception exception, Guid messageId, GrainId senderId, string routeKey, string? correlationKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Reclaimed orphaned inbox job ownership {OwnershipId} for grain {GrainId}")]
+    private static partial void LogOrphanedJobReclaimed(ILogger logger, string ownershipId, GrainId grainId);
 
     private sealed class PumpTimerState(
         DurableInboxExtension owner,

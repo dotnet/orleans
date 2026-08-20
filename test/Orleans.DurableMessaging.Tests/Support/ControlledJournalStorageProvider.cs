@@ -9,6 +9,7 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
 {
     private readonly VolatileJournalStorageProvider _inner = new(
         Options.Create(new JournaledStateManagerOptions { JournalFormatKey = "orleans-binary" }));
+    private readonly ConcurrentDictionary<JournalId, WritePlan> _readPlans = new();
     private readonly ConcurrentDictionary<JournalId, WritePlan> _writePlans = new();
     private readonly ConcurrentDictionary<JournalId, int> _successfulWrites = new();
 
@@ -27,6 +28,18 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
         if (!_writePlans.TryAdd(journalId, plan))
         {
             throw new InvalidOperationException($"A write plan is already armed for journal '{journalId}'.");
+        }
+
+        return new WriteBarrier(plan);
+    }
+
+    public WriteBarrier BlockRead(JournalId journalId, int matchingRead = 1)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(matchingRead);
+        var plan = new WritePlan(matchingRead, fail: false);
+        if (!_readPlans.TryAdd(journalId, plan))
+        {
+            throw new InvalidOperationException($"A read plan is already armed for journal '{journalId}'.");
         }
 
         return new WriteBarrier(plan);
@@ -62,6 +75,19 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
         await plan.Release.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    private async ValueTask BeforeReadAsync(JournalId journalId, CancellationToken cancellationToken)
+    {
+        if (!_readPlans.TryGetValue(journalId, out var plan)
+            || Interlocked.Increment(ref plan.Seen) != plan.Target)
+        {
+            return;
+        }
+
+        _readPlans.TryRemove(new KeyValuePair<JournalId, WritePlan>(journalId, plan));
+        plan.Entered.TrySetResult();
+        await plan.Release.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     private void OnWriteSucceeded(JournalId journalId) =>
         _successfulWrites.AddOrUpdate(journalId, 1, static (_, count) => count + 1);
 
@@ -82,6 +108,7 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
 
         public Task WaitUntilEnteredAsync() => _plan.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
         public void Release() => _plan.Release.TrySetResult();
+        public void Fail() => _plan.Release.TrySetException(new IOException("Injected blocked journal write failure."));
     }
 
     private sealed class ControlledJournalStorage(
@@ -91,8 +118,11 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
     {
         public bool IsCompactionRequested => inner.IsCompactionRequested;
 
-        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken) =>
-            inner.ReadAsync(consumer, cancellationToken);
+        public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+        {
+            await owner.BeforeReadAsync(journalId, cancellationToken).ConfigureAwait(false);
+            await inner.ReadAsync(consumer, cancellationToken).ConfigureAwait(false);
+        }
 
         public ValueTask<bool> CreateIfNotExistsAsync(
             IReadOnlyDictionary<string, string>? metadata = null,
