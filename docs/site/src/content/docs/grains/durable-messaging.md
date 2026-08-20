@@ -28,12 +28,15 @@ for a follow-up message.
 Durable Messaging has the following boundaries:
 
 - Calling <xref:Orleans.DurableMessaging.IDurableOutbox.Send*> stages an envelope in the
-  grain journal. The envelope and other journaled grain effects become durable in one
-  commit. Dispatch starts only after that commit succeeds.
+  grain journal. Before journal capture, Durable Messaging allocates a stable job ID and
+  durably schedules the outbox job. The envelope, job ownership, and other journaled
+  grain effects then become durable in one commit. The job polls safely while the
+  envelope is provisional, and dispatch starts only after that commit succeeds.
 - A failed turn restores the last durable journal version. Its staged effects and
   outgoing envelopes are discarded before the inbox records a retry or dead letter.
-- A receiver returns `Accepted` only after both the envelope and stable ownership of
-  its inbox drain job are durable.
+- A receiver allocates a stable ownership token and places it in a scheduled inbox job
+  before committing both the envelope and ownership, and returns `Accepted` only after
+  both are durable.
 - Transport is **at-least-once**. A crash after receiver acceptance but before durable
   outbox removal can send the same envelope again.
 - The receiver deduplicates by `(SenderId, MessageId)`. Duplicate deliveries converge
@@ -46,10 +49,18 @@ Durable Messaging has the following boundaries:
   and make their handlers converge on application-defined order.
 
 The inbox and outbox use independent Durable Jobs. A blocked inbox handler on one grain
-doesn't stop another grain's outbox. Activation recovery repairs missing scheduling,
-including a crash after durable envelope storage but before a local pump is started.
-Pump callbacks execute as non-interleaving grain timer turns so that infrastructure
-writes can't commit provisional state from a concurrently running handler.
+doesn't stop another grain's outbox. Monotonic ownership generations fence job
+callbacks; if an ambiguous scheduling response creates more than one job, callbacks
+with that generation poll the same durable queue safely. Completed-generation
+tombstones let delayed duplicates terminate. A job which wakes before its ownership
+commit is visible retries instead of completing and requests a fresh activation only
+when no journal writes are pending, so it neither strands a later-visible commit nor
+discards staged application state. Ownership-clear write failures restore the preceding
+generation and return `Retry`, so the current job remains responsible.
+Activation recovery replaces legacy or stale ownership when work is accepted into an
+empty queue. Pump callbacks execute as non-interleaving grain timer turns so that
+infrastructure writes can't commit provisional state from a concurrently running
+handler.
 
 ## Backpressure, retries, and dead letters
 
@@ -62,6 +73,8 @@ outbox dead-letter collection after their configured attempt or age limit. Use
 
 Malformed typed bodies are isolated during handler deserialization and follow the same
 retry and dead-letter path; they don't prevent later envelopes from being recovered.
+A successfully decoded null body is delivered as null. Typed handler parameters are
+explicitly null-capable and handlers which require a non-null body must validate it.
 
 ## Deployment requirements
 

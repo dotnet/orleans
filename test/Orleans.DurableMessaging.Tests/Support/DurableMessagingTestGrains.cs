@@ -11,7 +11,12 @@ namespace Orleans.DurableMessaging.Tests.Support;
 public interface IDurableMessagingTestGrain : IGrainWithGuidKey
 {
     Task<Guid> SendAsync(GrainId target, string route, DurableTestMessage message);
+    Task<Guid> SendDuplicateAsync(GrainId target, string route, DurableTestMessage message);
+    Task<Guid> SendAndDeactivateAsync(GrainId target, string route, DurableTestMessage message);
     Task<Guid> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message);
+    Task RetryWriteStateAsync();
+    Task SetInboxJobIdAsync(string jobId);
+    [AlwaysInterleave] Task DeactivateOnNextRecoveryAsync();
     Task<DuplicateRouteRegistrationResult> RegisterDuplicateExactRouteHandlersAsync(string route);
     [AlwaysInterleave] Task<DurableEndpointSnapshot> GetSnapshotAsync();
     Task RequestDeactivationAsync();
@@ -50,7 +55,10 @@ public sealed record DurableEndpointSnapshot(
     [property: Id(8)] string? InboxJobId,
     [property: Id(9)] int ProcessedMessageCount,
     [property: Id(10)] int FirstExactRouteHandlerCalls,
-    [property: Id(11)] int ReplacementExactRouteHandlerCalls);
+    [property: Id(11)] int ReplacementExactRouteHandlerCalls,
+    [property: Id(12)] string? OutboxJobId,
+    [property: Id(13)] int NullReferenceMessageCalls,
+    [property: Id(14)] int NullNullableValueMessageCalls);
 
 [GenerateSerializer, Immutable]
 public sealed record DurableDeadLetterSnapshot(
@@ -70,6 +78,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     private readonly IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> _processedMessages;
     private readonly SerializerSessionPool _sessions;
     private readonly IDurableValue<string> _inboxJobId;
+    private readonly IDurableValue<string> _outboxJobId;
     private readonly ILocalSiloDetails _siloDetails;
     private readonly HandlerProbe _handlerProbe;
     private readonly SnapshotProbe _snapshotProbe;
@@ -78,6 +87,9 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     private int _maxConcurrentHandlers;
     private int _firstExactRouteHandlerCalls;
     private int _replacementExactRouteHandlerCalls;
+    private int _nullReferenceMessageCalls;
+    private int _nullNullableValueMessageCalls;
+    private bool _deactivateOnNextRecovery;
 
     public DurableMessagingTestGrain(
         IDurableInbox inbox,
@@ -86,6 +98,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         [FromKeyedServices("test-effects")] IDurableDictionary<Guid, DurableEffect> effects,
         [FromKeyedServices("inbox-processed")] IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> processedMessages,
         [FromKeyedServices("inbox-job-id")] IDurableValue<string> inboxJobId,
+        [FromKeyedServices("outbox-job-id")] IDurableValue<string> outboxJobId,
         SerializerSessionPool sessions,
         ILocalSiloDetails siloDetails,
         HandlerProbe handlerProbe,
@@ -97,6 +110,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         _effects = effects;
         _processedMessages = processedMessages;
         _inboxJobId = inboxJobId;
+        _outboxJobId = outboxJobId;
         _sessions = sessions;
         _siloDetails = siloDetails;
         _handlerProbe = handlerProbe;
@@ -106,6 +120,8 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
+        _inbox.RegisterHandler("nullable/reference", new NullReferenceMessageHandler(this));
+        _inbox.RegisterHandler("nullable/value", new NullNullableValueMessageHandler(this));
         _inbox.RegisterHandler(new TypedMessageHandler(this));
         return base.OnActivateAsync(cancellationToken);
     }
@@ -118,11 +134,41 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         return envelope.MessageId;
     }
 
+    public async Task<Guid> SendDuplicateAsync(GrainId target, string route, DurableTestMessage message)
+    {
+        var envelope = CreateEnvelope(target, route, message);
+        _outbox.Send(envelope);
+        _outbox.Send(envelope);
+        await WriteStateAsync();
+        return envelope.MessageId;
+    }
+
+    public async Task<Guid> SendAndDeactivateAsync(GrainId target, string route, DurableTestMessage message)
+    {
+        var messageId = await SendAsync(target, route, message);
+        DeactivateOnIdle();
+        return messageId;
+    }
+
     public Task<Guid> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message)
     {
         var envelope = CreateEnvelope(target, route, message);
         _outbox.Send(envelope);
         return Task.FromResult(envelope.MessageId);
+    }
+
+    public async Task RetryWriteStateAsync() => await WriteStateAsync();
+
+    public async Task SetInboxJobIdAsync(string jobId)
+    {
+        _inboxJobId.Value = jobId;
+        await WriteStateAsync();
+    }
+
+    public Task DeactivateOnNextRecoveryAsync()
+    {
+        _deactivateOnNextRecovery = true;
+        return Task.CompletedTask;
     }
 
     public Task<DuplicateRouteRegistrationResult> RegisterDuplicateExactRouteHandlersAsync(string route)
@@ -148,7 +194,15 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     }
 
     public void OnWriteCompleted() => PublishSnapshot();
-    public void OnRecoveryCompleted() => PublishSnapshot();
+    public void OnRecoveryCompleted()
+    {
+        PublishSnapshot();
+        if (_deactivateOnNextRecovery)
+        {
+            _deactivateOnNextRecovery = false;
+            DeactivateOnIdle();
+        }
+    }
 
     private DurableEnvelope CreateEnvelope(GrainId target, string route, DurableTestMessage message) =>
         new DurableEnvelopeBuilder(_sessions, this.GetGrainId())
@@ -213,7 +267,10 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
             _inboxJobId.Value,
             _processedMessages.Count,
             _firstExactRouteHandlerCalls,
-            _replacementExactRouteHandlerCalls);
+            _replacementExactRouteHandlerCalls,
+            _outboxJobId.Value,
+            _nullReferenceMessageCalls,
+            _nullNullableValueMessageCalls);
 
     private static DurableDeadLetterSnapshot ToSnapshot(DurableDeadLetter deadLetter) =>
         new(
@@ -230,10 +287,47 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
             || context.Envelope.RouteKey == "typed";
 
         public ValueTask HandleAsync(
-            DurableTestMessage message,
+            DurableTestMessage? message,
             IInboxHandlerContext context,
             CancellationToken cancellationToken) =>
-            owner.HandleAsync(message, context, cancellationToken);
+            owner.HandleAsync(
+                message ?? throw new InvalidOperationException("A durable test message is required."),
+                context,
+                cancellationToken);
+    }
+
+    private sealed class NullReferenceMessageHandler(DurableMessagingTestGrain owner) : IInboxHandler<string?>
+    {
+        public ValueTask HandleAsync(
+            string? message,
+            IInboxHandlerContext context,
+            CancellationToken cancellationToken)
+        {
+            if (message is not null)
+            {
+                throw new InvalidOperationException("Expected a null reference message.");
+            }
+
+            owner._nullReferenceMessageCalls++;
+            return default;
+        }
+    }
+
+    private sealed class NullNullableValueMessageHandler(DurableMessagingTestGrain owner) : IInboxHandler<int?>
+    {
+        public ValueTask HandleAsync(
+            int? message,
+            IInboxHandlerContext context,
+            CancellationToken cancellationToken)
+        {
+            if (message is not null)
+            {
+                throw new InvalidOperationException("Expected a null nullable value message.");
+            }
+
+            owner._nullNullableValueMessageCalls++;
+            return default;
+        }
     }
 
     private sealed class CountingHandler(Action onCall) : IInboxHandler
