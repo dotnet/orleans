@@ -207,7 +207,7 @@ internal sealed partial class DurableInboxExtension :
         var key = (envelope.SenderId, envelope.MessageId);
         var result = DeliveryResult.Accepted();
 
-        await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(true);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
         try
         {
             var replaceExpiredDedupeRecord = false;
