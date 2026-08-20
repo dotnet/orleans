@@ -1,13 +1,17 @@
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Orleans.Runtime
 {
     [Serializable, GenerateSerializer, Immutable]
     [SuppressReferenceTracking]
+    [JsonConverter(typeof(UniqueKeyJsonConverter))]
     public sealed class UniqueKey : IComparable<UniqueKey>, IEquatable<UniqueKey>
     {
         /// <summary>
@@ -56,10 +60,18 @@ namespace Orleans.Runtime
 
         internal static readonly UniqueKey Empty = new UniqueKey();
 
-        internal static UniqueKey Parse(ReadOnlySpan<char> input)
+        internal static UniqueKey Parse(ReadOnlySpan<char> input) => ParseCore(input, trim: true);
+
+        internal static UniqueKey ParseCanonical(ReadOnlySpan<char> input) => ParseCore(input, trim: false);
+
+        private static UniqueKey ParseCore(ReadOnlySpan<char> input, bool trim)
         {
             const int minimumValidKeyLength = 48;
-            input = input.Trim();
+            if (trim)
+            {
+                input = input.Trim();
+            }
+
             if (input.Length >= minimumValidKeyLength)
             {
                 var n0 = ulong.Parse(input[..16].ToString(), NumberStyles.AllowHexSpecifier);
@@ -341,5 +353,66 @@ namespace Orleans.Runtime
         }
 
         private static ulong GetTypeCodeData(Category category, long typeData = 0) => ((ulong)category << 56) + ((ulong)typeData & 0x00FFFFFFFFFFFFFF);
+    }
+
+    /// <summary>
+    /// Functionality for converting <see cref="UniqueKey"/> instances to and from their JSON representation.
+    /// </summary>
+    public sealed class UniqueKeyJsonConverter : JsonConverter<UniqueKey>
+    {
+        private const int MaxBufferSize = 256;
+
+        /// <inheritdoc />
+        public override UniqueKey? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            Span<char> buffer = stackalloc char[MaxBufferSize];
+            return GetUniqueKey(ref reader, buffer) ?? throw new JsonException($"Could not deserialize {nameof(UniqueKey)}.");
+        }
+
+        private static UniqueKey? GetUniqueKey(ref Utf8JsonReader reader, scoped Span<char> buffer)
+        {
+            if (reader.TokenType is not JsonTokenType.String and not JsonTokenType.PropertyName)
+            {
+                throw new JsonException($"Could not deserialize {nameof(UniqueKey)}.");
+            }
+
+            if (reader.HasValueSequence)
+            {
+                var valueLength = checked((int)reader.ValueSequence.Length);
+                if (valueLength < buffer.Length)
+                {
+                    var written = reader.CopyString(buffer);
+                    return UniqueKey.ParseCanonical(buffer[..written]);
+                }
+            }
+            else
+            {
+                if (reader.ValueSpan.Length < buffer.Length)
+                {
+                    var written = reader.CopyString(buffer);
+                    return UniqueKey.ParseCanonical(buffer[..written]);
+                }
+            }
+
+            var str = reader.GetString();
+            return str is null ? null : UniqueKey.ParseCanonical(str);
+        }
+
+        /// <inheritdoc />
+        public override void Write(Utf8JsonWriter writer, UniqueKey value, JsonSerializerOptions options)
+            => writer.WriteStringValue(value.ToHexString());
+
+        /// <inheritdoc />
+        public override UniqueKey ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            Span<char> buffer = stackalloc char[MaxBufferSize];
+            return GetUniqueKey(ref reader, buffer) ?? throw new JsonException("Failed to parse UniqueKey from property name.");
+        }
+
+        /// <inheritdoc />
+        public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] UniqueKey value, JsonSerializerOptions options)
+        {
+            writer.WritePropertyName(value.ToHexString());
+        }
     }
 }

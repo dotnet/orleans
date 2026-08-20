@@ -382,6 +382,9 @@ namespace Orleans.Hosting
 
             services.TryAddSingleton<ITimerManager, TimerManagerImpl>();
 
+            services.AddOptions<SystemTextJsonGrainStorageSerializerOptions>();
+            services.AddSingleton<IPostConfigureOptions<SystemTextJsonGrainStorageSerializerOptions>, SystemTextJsonSerializerOptionsConfigure>();
+
             // persistent state facet support
             services.TryAddSingleton<IGrainStorageSerializer, JsonGrainStorageSerializer>();
             services.TryAddSingleton<IPersistentStateFactory, PersistentStateFactory>();

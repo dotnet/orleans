@@ -1,8 +1,12 @@
 using System;
 using System.Buffers.Text;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Runtime.Serialization;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.Runtime
@@ -13,7 +17,8 @@ namespace Orleans.Runtime
     [Immutable]
     [Serializable]
     [GenerateSerializer]
-    public readonly struct StreamId : IEquatable<StreamId>, IComparable<StreamId>, ISerializable, ISpanFormattable
+    [JsonConverter(typeof(StreamIdJsonConverter))]
+    public readonly struct StreamId : IEquatable<StreamId>, IComparable<StreamId>, ISerializable, ISpanFormattable, IUtf8SpanFormattable
     {
         [Id(0)]
         private readonly byte[] fullKey;
@@ -182,6 +187,7 @@ namespace Orleans.Runtime
             var len = Encoding.UTF8.GetCharCount(fullKey);
             if (keyIndex == 0)
             {
+                // QualifiedStreamId.ToString() is used as the pub/sub rendezvous grain key, so preserve its historical format.
                 if (destination.Length >= len + 5)
                 {
                     "null/".CopyTo(destination);
@@ -198,6 +204,31 @@ namespace Orleans.Runtime
             }
 
             charsWritten = 0;
+            return false;
+        }
+
+        bool IUtf8SpanFormattable.TryFormat(Span<byte> utf8Destination, out int bytesWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
+        {
+            if (keyIndex == 0)
+            {
+                if (utf8Destination.Length >= fullKey.Length + 5)
+                {
+                    "null/"u8.CopyTo(utf8Destination);
+                    fullKey.CopyTo(utf8Destination[5..]);
+                    bytesWritten = fullKey.Length + 5;
+                    return true;
+                }
+            }
+            else if (utf8Destination.Length > fullKey.Length)
+            {
+                fullKey[..keyIndex].CopyTo(utf8Destination);
+                utf8Destination[keyIndex] = (byte)'/';
+                fullKey[keyIndex..].CopyTo(utf8Destination[(keyIndex + 1)..]);
+                bytesWritten = fullKey.Length + 1;
+                return true;
+            }
+
+            bytesWritten = 0;
             return false;
         }
 
@@ -237,5 +268,143 @@ namespace Orleans.Runtime
         public string? GetNamespace() => keyIndex == 0 ? null : Encoding.UTF8.GetString(fullKey, 0, keyIndex);
 
         internal IdSpan GetKeyIdSpan() => keyIndex == 0 ? IdSpan.UnsafeCreate(fullKey, hash) : new(fullKey.AsSpan(keyIndex).ToArray());
+    }
+
+    /// <summary>
+    /// Functionality for converting <see cref="StreamId"/> instances to and from their JSON representation.
+    /// </summary>
+    public sealed class StreamIdJsonConverter : JsonConverter<StreamId>
+    {
+        private static readonly Encoding StrictUtf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+
+        public override StreamId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType != JsonTokenType.StartArray || !reader.Read())
+            {
+                throw new JsonException($"Could not deserialize {nameof(StreamId)}.");
+            }
+
+            var streamNamespace = reader.TokenType switch
+            {
+                JsonTokenType.Null => null,
+                JsonTokenType.String => reader.GetString(),
+                _ => throw new JsonException($"Could not deserialize {nameof(StreamId)}."),
+            };
+
+            if (!reader.Read() || reader.TokenType != JsonTokenType.String)
+            {
+                throw new JsonException($"Could not deserialize {nameof(StreamId)}.");
+            }
+
+            var key = reader.GetString();
+            if (!reader.Read() || reader.TokenType != JsonTokenType.EndArray)
+            {
+                throw new JsonException($"Could not deserialize {nameof(StreamId)}.");
+            }
+
+            return Create(hasNamespace: true, streamNamespace, key);
+        }
+
+        public override void Write(Utf8JsonWriter writer, StreamId value, JsonSerializerOptions options)
+        {
+            if (value == default || value.Key.IsEmpty)
+            {
+                throw new JsonException($"Could not serialize {nameof(StreamId)}.");
+            }
+
+            writer.WriteStartArray();
+            if (!value.Namespace.IsEmpty)
+            {
+                writer.WriteStringValue(Decode(value.Namespace.Span));
+            }
+            else
+            {
+                writer.WriteNullValue();
+            }
+
+            writer.WriteStringValue(Decode(value.Key.Span));
+            writer.WriteEndArray();
+        }
+
+        public override StreamId ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString() ?? throw new JsonException("Failed to parse StreamId from property name.");
+            return ParsePropertyName(value);
+        }
+
+        /// <inheritdoc />
+        public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] StreamId value, JsonSerializerOptions options)
+            => writer.WritePropertyName(FormatPropertyName(value));
+
+        internal static string FormatPropertyName(StreamId value)
+        {
+            if (value == default || value.Key.IsEmpty)
+            {
+                throw new JsonException($"Could not serialize {nameof(StreamId)}.");
+            }
+
+            var streamNamespace = value.Namespace.IsEmpty ? string.Empty : Decode(value.Namespace.Span);
+            return string.Concat(
+                streamNamespace.Length.ToString(CultureInfo.InvariantCulture),
+                ":",
+                streamNamespace,
+                Decode(value.Key.Span));
+        }
+
+        internal static StreamId ParsePropertyName(string value)
+        {
+            var encoded = value.AsSpan();
+            var separator = encoded.IndexOf(':');
+            if (separator <= 0
+                || !int.TryParse(encoded[..separator], NumberStyles.None, CultureInfo.InvariantCulture, out var namespaceLength))
+            {
+                throw new JsonException("Failed to parse StreamId from property name.");
+            }
+
+            var components = encoded[(separator + 1)..];
+            if (namespaceLength < 0 || namespaceLength > components.Length)
+            {
+                throw new JsonException("Failed to parse StreamId from property name.");
+            }
+
+            var streamNamespace = namespaceLength == 0 ? null : components[..namespaceLength].ToString();
+            var key = components[namespaceLength..].ToString();
+            return Create(hasNamespace: true, streamNamespace, key);
+        }
+
+        private static StreamId Create(bool hasNamespace, string? streamNamespace, string? key)
+        {
+            if (!hasNamespace || string.IsNullOrEmpty(key))
+            {
+                throw new JsonException($"Could not deserialize {nameof(StreamId)}.");
+            }
+
+            try
+            {
+                var namespaceBytes = streamNamespace is null ? Array.Empty<byte>() : StrictUtf8.GetBytes(streamNamespace);
+                if (namespaceBytes.Length > ushort.MaxValue)
+                {
+                    throw new JsonException($"{nameof(StreamId)} namespaces cannot exceed {ushort.MaxValue} UTF-8 bytes.");
+                }
+
+                return StreamId.Create(namespaceBytes, StrictUtf8.GetBytes(key));
+            }
+            catch (EncoderFallbackException exception)
+            {
+                throw new JsonException($"{nameof(StreamId)} components must contain valid UTF-8.", exception);
+            }
+        }
+
+        private static string Decode(ReadOnlySpan<byte> value)
+        {
+            try
+            {
+                return StrictUtf8.GetString(value);
+            }
+            catch (DecoderFallbackException exception)
+            {
+                throw new JsonException($"{nameof(StreamId)} components must contain valid UTF-8.", exception);
+            }
+        }
     }
 }

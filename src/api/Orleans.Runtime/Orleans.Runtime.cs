@@ -490,6 +490,11 @@ namespace Orleans.Hosting
         public static ISiloBuilder AddStartupTask<TStartup>(this ISiloBuilder builder, int stage = 20000)
             where TStartup : class, Runtime.IStartupTask { throw null; }
     }
+
+    public static partial class SystemTextJsonSerializerExtensions
+    {
+        public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder) { throw null; }
+    }
 }
 
 namespace Orleans.Metadata
