@@ -710,7 +710,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         bool didEnqueue;
         lock (_lock)
         {
-            ThrowIfWritesFenced();
+            ThrowIfWriteOperationsUnavailable();
             task = EnqueueOrGetPendingWorkItem<DeleteStateWorkItem>(out didEnqueue);
         }
 
@@ -722,7 +722,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         var startTimestamp = _shared.TimeProvider.GetTimestamp();
         try
         {
-            await task;
+            await task.WaitAsync(cancellationToken);
             _shared.Instruments.OnStateDeleteRequest(_shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: true);
         }
         catch
@@ -885,7 +885,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         string operation;
         lock (_lock)
         {
-            ThrowIfWritesFenced();
+            ThrowIfWriteOperationsUnavailable();
             var isSnapshot = _migrationSnapshotRequired || _storage.IsCompactionRequested;
             operation = isSnapshot ? JournalingInstruments.OperationSnapshot : JournalingInstruments.OperationAppend;
             pendingWrite = isSnapshot
@@ -934,6 +934,17 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         }
 
         await pendingRecovery.WaitAsync(cancellationToken);
+    }
+
+    private void ThrowIfWriteOperationsUnavailable()
+    {
+        _shutdownCancellation.Token.ThrowIfCancellationRequested();
+        if (_workLoop is null)
+        {
+            throw new InvalidOperationException("The journaled state manager has not been initialized.");
+        }
+
+        ThrowIfWritesFenced();
     }
 
     private void ThrowIfWritesFenced()
@@ -1061,11 +1072,33 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     private async Task StopAsync(CancellationToken cancellationToken)
     {
-        _shutdownCancellation.Cancel();
-        _workSignal.Signal();
-        if (_workLoop is { } task)
+        lock (_lock)
         {
-            await task.WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+            _shutdownCancellation.Cancel();
+        }
+
+        _workSignal.Signal();
+        try
+        {
+            if (_workLoop is { } task)
+            {
+                await task.WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+            }
+        }
+        finally
+        {
+            CancelQueuedWorkItems(_shutdownCancellation.Token);
+        }
+    }
+
+    private void CancelQueuedWorkItems(CancellationToken cancellationToken)
+    {
+        lock (_lock)
+        {
+            while (_workQueue.TryDequeue(out var workItem))
+            {
+                workItem.TrySetCanceled(cancellationToken);
+            }
         }
     }
 
