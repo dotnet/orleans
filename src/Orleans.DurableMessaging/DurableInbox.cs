@@ -140,8 +140,10 @@ internal sealed class DurableInbox : IDurableInbox
     /// </summary>
     /// <param name="routeKey">The route key to check.</param>
     /// <returns>True if a handler is registered for this route; otherwise, false.</returns>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="routeKey"/> is null, empty, or whitespace.</exception>
     public bool HasHandler(string routeKey)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(routeKey);
         return _exactRouteHandlers.ContainsKey(routeKey);
     }
 
@@ -151,8 +153,10 @@ internal sealed class DurableInbox : IDurableInbox
     /// <param name="routeKey">The route key to get the handler for.</param>
     /// <param name="handler">The handler if found.</param>
     /// <returns>True if a handler is registered for this route; otherwise, false.</returns>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="routeKey"/> is null, empty, or whitespace.</exception>
     public bool TryGetHandler(string routeKey, [MaybeNullWhen(false)] out IInboxHandler handler)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(routeKey);
         return _exactRouteHandlers.TryGetValue(routeKey, out handler);
     }
 

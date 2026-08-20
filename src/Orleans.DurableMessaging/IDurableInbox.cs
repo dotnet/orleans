@@ -71,6 +71,7 @@ public interface IDurableInbox
     /// </summary>
     /// <param name="routeKey">The route key to check.</param>
     /// <returns>True if a handler is registered for this route; otherwise, false.</returns>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="routeKey"/> is null, empty, or whitespace.</exception>
     bool HasHandler(string routeKey);
 
     /// <summary>
@@ -79,5 +80,6 @@ public interface IDurableInbox
     /// <param name="routeKey">The route key to get the handler for.</param>
     /// <param name="handler">The handler if found.</param>
     /// <returns>True if a handler is registered for this route; otherwise, false.</returns>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="routeKey"/> is null, empty, or whitespace.</exception>
     bool TryGetHandler(string routeKey, [MaybeNullWhen(false)] out IInboxHandler handler);
 }
