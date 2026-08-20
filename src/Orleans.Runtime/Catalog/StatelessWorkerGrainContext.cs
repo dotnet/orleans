@@ -326,17 +326,19 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
     {
         Debug.Assert(!_terminated, "CreateWorker must not be called on a terminated stateless worker context.");
         var address = GrainAddress.GetAddress(Address.SiloAddress, Address.GrainId, ActivationId.NewId());
-        var newWorker = (ActivationData)_innerActivator.CreateContext(address, []);
+        var newWorker = (ActivationData)((IDeferredGrainContextActivator)_innerActivator).CreateDeferredContext(address, []);
 
         // Observe the create/destroy lifecycle of the activation
         newWorker.SetComponent<IActivationLifecycleObserver>(this);
+        _workers.Add(newWorker);
+        newWorker.Start();
 
         // If this is a new worker and there is a message in scope, try to get the request context and activate the worker
         var requestContext = (message as Message)?.RequestContextData ?? [];
         var cancellation = new CancellationTokenSource(_shared.Shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
 
         newWorker.Activate(requestContext, cancellation.Token);
-        _workers.Add(newWorker);
+        newWorker.StartMessageLoop();
         StatelessWorkerEvents.EmitWorkerCreated(this, newWorker, _workers.Count);
 
         return newWorker;
