@@ -202,17 +202,22 @@ internal sealed partial class DurableInboxExtension :
         await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(true);
         try
         {
-            if (_processed.ContainsKey(key))
+            var replaceExpiredDedupeRecord = false;
+            if (_processed.TryGetValue(key, out var processedAt))
             {
-                LogDuplicateMessageDetected(
-                    _logger,
-                    envelope.MessageId,
-                    envelope.SenderId,
-                    envelope.ReceiverId,
-                    envelope.RouteKey,
-                    envelope.CorrelationKey?.ToString());
-                _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), envelope.RouteKey, "duplicate");
-                return DeliveryResult.Duplicate();
+                replaceExpiredDedupeRecord = _timeProvider.GetUtcNow() - processedAt >= _deduplicationWindow;
+                if (!replaceExpiredDedupeRecord)
+                {
+                    LogDuplicateMessageDetected(
+                        _logger,
+                        envelope.MessageId,
+                        envelope.SenderId,
+                        envelope.ReceiverId,
+                        envelope.RouteKey,
+                        envelope.CorrelationKey?.ToString());
+                    _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), envelope.RouteKey, "duplicate");
+                    return DeliveryResult.Duplicate();
+                }
             }
 
             if (_inboxDict.ContainsKey(key))
@@ -258,6 +263,11 @@ internal sealed partial class DurableInboxExtension :
                         envelope.CorrelationKey?.ToString());
                     _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), envelope.RouteKey, "route_not_found");
                     return DeliveryResult.RouteNotFound(envelope.RouteKey);
+                }
+
+                if (replaceExpiredDedupeRecord)
+                {
+                    _processed.Remove(key);
                 }
 
                 _inboxDict[key] = envelope;
@@ -516,7 +526,7 @@ internal sealed partial class DurableInboxExtension :
     private void CompactProcessedMessages()
     {
         var cutoff = _timeProvider.GetUtcNow() - _deduplicationWindow;
-        foreach (var entry in _processed.Where(pair => pair.Value < cutoff).ToList())
+        foreach (var entry in _processed.Where(pair => pair.Value <= cutoff).ToList())
         {
             _processed.Remove(entry.Key);
         }

@@ -58,8 +58,12 @@ public interface IDurableInbox
     /// <param name="handler">The handler implementation.</param>
     /// <remarks>
     /// This overload adapts the handler to exact, ordinal route matching. Use
-    /// <see cref="RegisterHandler(IInboxHandler)"/> for metadata-based matching.
+    /// <see cref="RegisterHandler(IInboxHandler)"/> for metadata-based matching. An exact route
+    /// can only be registered once for an inbox.
     /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// An exact route handler is already registered for <paramref name="routeKey"/>.
+    /// </exception>
     void RegisterHandler(string routeKey, IInboxHandler handler);
 
     /// <summary>

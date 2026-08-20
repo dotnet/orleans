@@ -57,7 +57,8 @@ public readonly struct DurableEnvelope
     /// <remarks>
     /// Used in combination with <see cref="MessageId"/> for deduplication tracking.
     /// When processing a message, the inbox checks if (SenderId, MessageId) has already
-    /// been processed to ensure exactly-once semantics.
+    /// been processed. This provides effectively-once handler effects while the deduplication
+    /// record is retained; transport remains at-least-once.
     /// </remarks>
     [Id(1)]
     public required GrainId SenderId { get; init; }
