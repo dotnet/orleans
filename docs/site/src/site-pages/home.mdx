@@ -41,7 +41,7 @@ Orleans combines a distributed programming model with runtime capabilities for b
     Connect producers and consumers using managed, persistent, or in-memory stream providers. [Explore streaming](/orleans/docs/streaming/).
   </Card>
   <Card title="Durable scheduling and execution" icon="clock">
-    Run activation-scoped callbacks, recurring durable reminders, and distributed one-time jobs. [Explore timers and reminders](/orleans/docs/grains/timers-and-reminders/).
+    Run activation-scoped callbacks, recurring durable reminders, and distributed one-time jobs. Explore [timers and reminders](/orleans/docs/grains/timers-and-reminders/) and [durable jobs](/orleans/docs/resources/nuget-packages/#reminders-and-durable-jobs).
   </Card>
   <Card title="Transactions" icon="approve-check">
     Coordinate supported persistent state across grains using ACID transactions with serializable isolation. [Explore transactions](/orleans/docs/grains/transactions/).
@@ -50,7 +50,7 @@ Orleans combines a distributed programming model with runtime capabilities for b
     Represent grain state as an ordered sequence of events using configurable log-consistency providers. [Explore event sourcing](/orleans/docs/grains/event-sourcing/).
   </Card>
   <Card title="Elastic scaling and load balancing" icon="analytics">
-    Add or remove silos while resource-aware placement, load shedding, and activation migration adapt work to cluster capacity and communication patterns. [Explore placement and load balancing](/orleans/docs/grains/grain-placement/).
+    Add or remove silos while resource-aware placement directs new activations; memory-pressure shedding reclaims capacity, and opt-in balancing or repartitioning migrates eligible activations. [Explore placement and load balancing](/orleans/docs/grains/grain-placement/).
   </Card>
   <Card title="Fault tolerance" icon="server">
     Detect failed silos and reactivate grains on healthy hosts, restoring state written to durable storage. [Explore clusters and recovery](/orleans/docs/overview/#silos-and-clusters).
