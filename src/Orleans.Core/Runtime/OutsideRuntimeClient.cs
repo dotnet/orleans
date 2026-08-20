@@ -28,6 +28,7 @@ namespace Orleans
 
         private readonly StripedCallbackDictionary<CallbackData> callbacks;
         private InvokableObjectManager localObjects;
+        private int _isStopping;
         private bool disposing;
         private bool disposed;
 
@@ -155,12 +156,9 @@ namespace Orleans
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            foreach (var (_, callback) in callbacks)
-            {
-                callback.OnHostShutdown();
-            }
-
+            Volatile.Write(ref _isStopping, 1);
             this.callbackTimer.Dispose();
+            BreakOutstandingMessages();
 
             if (this.callbackTimerTask is { } task)
             {
@@ -291,12 +289,28 @@ namespace Orleans
             if (!oneWay)
             {
                 var callbackData = new CallbackData(this.sharedCallbackData, context, message, _applicationRequestInstruments);
-                callbackData.SubscribeForCancellation(cancellationToken);
+                if (Volatile.Read(ref _isStopping) != 0)
+                {
+                    callbackData.OnHostShutdown();
+                    return;
+                }
+
                 callbacks.TryAdd(message.Id, callbackData);
+                callbackData.SubscribeForCancellation(cancellationToken);
+
+                if (Volatile.Read(ref _isStopping) != 0)
+                {
+                    callbackData.OnHostShutdown();
+                    return;
+                }
             }
             else
             {
                 context?.Complete();
+                if (Volatile.Read(ref _isStopping) != 0)
+                {
+                    return;
+                }
             }
 
             LogSendingMessage(logger, message);
@@ -418,8 +432,10 @@ namespace Orleans
         {
             if (this.disposing) return;
             this.disposing = true;
+            Volatile.Write(ref _isStopping, 1);
 
             Utils.SafeExecute(() => this.callbackTimer.Dispose());
+            BreakOutstandingMessages();
 
             Utils.SafeExecute(() => MessageCenter?.Dispose());
 
@@ -434,6 +450,21 @@ namespace Orleans
                 if (deadSilo.Equals(callback.Value.Message.TargetSilo))
                 {
                     callback.Value.OnTargetSiloFail();
+                }
+            }
+        }
+
+        private void BreakOutstandingMessages()
+        {
+            foreach (var (_, callback) in callbacks)
+            {
+                try
+                {
+                    callback.OnHostShutdown();
+                }
+                catch (Exception exception)
+                {
+                    LogErrorWhileProcessingCallbackExpiry(logger, exception);
                 }
             }
         }
