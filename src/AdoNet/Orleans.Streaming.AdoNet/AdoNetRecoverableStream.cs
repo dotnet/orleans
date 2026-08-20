@@ -33,6 +33,11 @@ internal sealed partial class AdoNetRecoverableStream(
         string expectedVersion,
         CancellationToken cancellationToken)
     {
+        if (_partition is not { } partition)
+        {
+            throw new InvalidOperationException("The ADO.NET stream partition checkpoint must be loaded before it can be updated.");
+        }
+
         var checkpointValue = long.Parse(checkpoint, NumberStyles.None, CultureInfo.InvariantCulture);
         var ownerEpoch = long.Parse(expectedVersion, NumberStyles.None, CultureInfo.InvariantCulture);
         var update = await queries.AdvanceStreamCheckpointAsync(
@@ -41,21 +46,26 @@ internal sealed partial class AdoNetRecoverableStream(
             queueId,
             ownerEpoch,
             checkpointValue).WaitAsync(cancellationToken);
-        if (update is not null)
-        {
-            if (update.OwnerEpoch != ownerEpoch)
-            {
-                throw new InvalidOperationException(
-                    $"ADO.NET stream partition ownership was lost for '{serviceId}/{providerId}/{queueId}' at epoch {ownerEpoch}. The stale receiver cannot advance its checkpoint.");
-            }
+        return ResolveCheckpointUpdate(
+            $"{serviceId}/{providerId}/{queueId}",
+            partition.OwnerEpoch,
+            update);
+    }
 
+    internal static StreamCheckpointStoreState ResolveCheckpointUpdate(
+        string partitionId,
+        long acquiredOwnerEpoch,
+        AdoNetStreamCheckpointUpdate? update)
+    {
+        if (update is not null && update.OwnerEpoch == acquiredOwnerEpoch)
+        {
             return new(
                 (update.Checkpoint ?? 0).ToString(CultureInfo.InvariantCulture),
                 update.OwnerEpoch.ToString(CultureInfo.InvariantCulture));
         }
 
         throw new InvalidOperationException(
-            $"ADO.NET stream partition ownership was lost for '{serviceId}/{providerId}/{queueId}' at epoch {ownerEpoch}. The stale receiver cannot advance its checkpoint.");
+            $"ADO.NET stream partition ownership was lost for '{partitionId}' at epoch {acquiredOwnerEpoch}. The stale receiver cannot advance its checkpoint.");
     }
 
     public Task Initialize(
