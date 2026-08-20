@@ -46,7 +46,7 @@ Each host has its own dependency-injection container. Registering a type creates
 
 ## Reuse a cluster across tests
 
-Cluster startup is more expensive than an isolated unit test. Reuse a cluster across tests which need the same configuration by using the lifecycle support from the test framework.
+Cluster startup is more expensive than an isolated unit test. Reuse a cluster across tests that need the same configuration by using the lifecycle support from the test framework.
 
 ### xUnit
 
@@ -54,7 +54,7 @@ Create an xUnit collection fixture:
 
 :::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/ClusterFixture.cs" id="cluster_fixture":::
 
-Register the fixture as a collection and apply that collection to each test class which shares the cluster:
+Register the fixture as a collection and apply that collection to each test class that shares the cluster:
 
 :::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/ClusterCollection.cs" id="cluster_collection":::
 :::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/HelloGrainTestsWithFixture.cs" id="shared_cluster_test":::
