@@ -37,6 +37,7 @@ If you are learning Orleans from an empty directory, start with the [tutorials a
 
 - [Persist grain state](../grains/grain-persistence/index.md)
 - [Add reminders and timers](../grains/timers-and-reminders.md)
+- [Configure Amazon DynamoDB reminders](../grains/reminders/dynamodb.md)
 - [Configure streams](../streaming/stream-providers.md)
 - [Use response streaming](../grains/response-streaming.md)
 - [Use stateless worker grains](../grains/stateless-worker-grains.md)

@@ -25,11 +25,11 @@ var builder = Host.CreateApplicationBuilder(args)
             // Configure DynamoDB as reminder storage
             .UseDynamoDBReminderService(options =>
             {
-                options.AccessKey = "YOUR_AWS_ACCESS_KEY";
-                options.SecretKey = "YOUR_AWS_SECRET_KEY";
-                options.Region = "us-east-1";
+                options.Service = "us-east-1";
                 options.TableName = "OrleansReminders";
-                options.CreateIfNotExists = true;
+                options.UseProvisionedThroughput = false;
+                options.CreateIfNotExists = false;
+                options.UpdateIfExists = false;
             });
     });
 
@@ -48,6 +48,8 @@ Console.WriteLine("Reminder started!");
 // Keep the host running until the application is shut down
 await host.WaitForShutdownAsync();
 ```
+
+`UseDynamoDBReminderService` configures reminder storage independently from the cluster membership provider. The AWS SDK credential and profile resolution chain supplies credentials when the reminder options omit explicit keys. This example uses on-demand capacity and an infrastructure-managed table.
 
 ## Example - Using Reminders in a Grain
 ```csharp
@@ -101,7 +103,8 @@ public class ReminderGrain : Grain, IReminderGrain, IRemindable
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
-- [Reminders and Timers](https://dotnet.github.io/orleans/docs/grains/timers-and-reminders/)
+- [Configure Amazon DynamoDB reminders](https://dotnet.github.io/orleans/docs/grains/reminders/dynamodb/)
+- [Grain timers and reminders](https://dotnet.github.io/orleans/docs/grains/timers-and-reminders/)
 - [AWS SDK for .NET Documentation](https://docs.aws.amazon.com/sdk-for-net/index.html)
 
 ## Feedback & Contributing
