@@ -1,5 +1,9 @@
+using System.Diagnostics.Metrics;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans.Configuration;
 using Orleans.DurableJobs;
@@ -72,7 +76,28 @@ public class DurableJobReceiverExtensionTests
     }
 
     [Fact]
-    public async Task HandleDurableJobAsync_WhenSameJobAttemptHasDifferentRunIds_DeduplicatesExecution()
+    public async Task HandleDurableJobAsync_WhenExecutionCompletesDuringLongPoll_CancelsTimeout()
+    {
+        var executionTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = Substitute.For<IDurableJobHandler>();
+        handler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+            .Returns(executionTask.Task);
+        var timeProvider = new TimerTrackingFakeTimeProvider(DateTimeOffset.UtcNow);
+        var extension = CreateExtension(handler, TimeSpan.FromMinutes(1), timeProvider);
+        var context = CreateJobContext("run-1");
+
+        var resultTask = extension.HandleDurableJobAsync(context, CancellationToken.None).AsTask();
+        await timeProvider.TimerCreated;
+        Assert.Equal(1, timeProvider.ActiveTimerCount);
+
+        executionTask.SetResult(true);
+
+        Assert.Equal(DurableJobRunStatus.Completed, (await resultTask).Status);
+        Assert.Equal(0, timeProvider.ActiveTimerCount);
+    }
+
+    [Fact]
+    public async Task HandleDurableJobAsync_DeduplicatesDifferentRunIdsForSameJobAttempt()
     {
         var executionTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var handler = Substitute.For<IDurableJobHandler>();
@@ -122,24 +147,174 @@ public class DurableJobReceiverExtensionTests
         await handler.Received(2).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
     }
 
-    private static DurableJobReceiverExtension CreateExtension(IDurableJobHandler handler, TimeSpan? jobStatusPollInterval = null)
+    [Fact]
+    public async Task HandleDurableJobAsync_DeduplicatesDelayedDuplicateWithinConfiguredRetentionHorizon()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var handler = Substitute.For<IDurableJobHandler>();
+        handler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        var extension = CreateExtension(
+            handler,
+            timeProvider: timeProvider,
+            completedAttemptRetentionPeriod: TimeSpan.FromHours(1));
+        var context = CreateJobContext("run-1");
+
+        Assert.Equal(DurableJobRunStatus.Completed, (await extension.HandleDurableJobAsync(context, CancellationToken.None)).Status);
+        timeProvider.Advance(TimeSpan.FromMinutes(59));
+        Assert.Equal(DurableJobRunStatus.Completed, (await extension.HandleDurableJobAsync(context, CancellationToken.None)).Status);
+
+        await handler.Received(1).ExecuteJobAsync(context, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleDurableJobAsync_FeatureNameMatchTakesPrecedenceOverGrainHandler()
+    {
+        var grainHandler = Substitute.For<IDurableJobHandler>();
+        var featureHandler = Substitute.For<IDurableJobFeatureHandler>();
+        featureHandler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromResult(DurableJobRunResult.Completed));
+        var registry = new DurableJobHandlerRegistry();
+        registry.Register("feature", featureHandler);
+        var extension = CreateExtension(grainHandler, registry: registry);
+        var context = CreateJobContext("run-1", jobName: "feature");
+
+        var result = await extension.HandleDurableJobAsync(context, CancellationToken.None);
+
+        Assert.Equal(DurableJobRunStatus.Completed, result.Status);
+        await featureHandler.Received(1).ExecuteJobAsync(context, Arg.Any<CancellationToken>());
+        await grainHandler.DidNotReceive().ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleDurableJobAsync_UnregisteredFeatureNameFallsBackToGrainHandler()
+    {
+        var grainHandler = Substitute.For<IDurableJobHandler>();
+        grainHandler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        var featureHandler = Substitute.For<IDurableJobFeatureHandler>();
+        var registry = new DurableJobHandlerRegistry();
+        registry.Register("other-feature", featureHandler);
+        var extension = CreateExtension(grainHandler, registry: registry);
+        var context = CreateJobContext("run-1", jobName: "grain-job");
+
+        var result = await extension.HandleDurableJobAsync(context, CancellationToken.None);
+
+        Assert.Equal(DurableJobRunStatus.Completed, result.Status);
+        await grainHandler.Received(1).ExecuteJobAsync(context, Arg.Any<CancellationToken>());
+        await featureHandler.DidNotReceive().ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleDurableJobAsync_WhenFeatureHandlerReturnsNull_RecordsOnlyFailure()
+    {
+        var services = new ServiceCollection();
+        services.AddMetrics();
+        using var serviceProvider = services.BuildServiceProvider();
+        var meterFactory = serviceProvider.GetRequiredService<IMeterFactory>();
+        var instruments = new DurableJobsInstruments(new OrleansInstruments(meterFactory));
+        using var executionCollector = new MetricCollector<long>(
+            meterFactory,
+            "Microsoft.Orleans",
+            "orleans-durablejobs-handler-executions");
+        var featureHandler = Substitute.For<IDurableJobFeatureHandler>();
+        featureHandler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromResult<DurableJobRunResult>(null!));
+        var registry = new DurableJobHandlerRegistry();
+        registry.Register("feature", featureHandler);
+        var extension = CreateExtension(
+            Substitute.For<IDurableJobHandler>(),
+            registry: registry,
+            durableJobsInstruments: instruments);
+        var context = CreateJobContext("run-1", jobName: "feature");
+
+        var result = await extension.HandleDurableJobAsync(context, CancellationToken.None);
+
+        Assert.Equal(DurableJobRunStatus.Failed, result.Status);
+        var measurement = Assert.Single(executionCollector.GetMeasurementSnapshot());
+        Assert.Equal(1, measurement.Value);
+        Assert.Equal("failed", measurement.Tags["status"]);
+    }
+
+    [Fact]
+    public async Task HandleDurableJobAsync_FeaturePollAfterReinvokesAfterDelayWithoutConcurrentDuplicates()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var secondInvocationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSecondInvocation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var invocationCount = 0;
+        var featureHandler = Substitute.For<IDurableJobFeatureHandler>();
+        featureHandler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+            .Returns(_ => ExecuteAsync());
+        var registry = new DurableJobHandlerRegistry();
+        registry.Register("feature", featureHandler);
+        var extension = CreateExtension(
+            Substitute.For<IDurableJobHandler>(),
+            jobStatusPollInterval: TimeSpan.FromSeconds(1),
+            timeProvider: timeProvider,
+            registry: registry);
+        var context = CreateJobContext("run-1", jobName: "feature");
+
+        var first = await extension.HandleDurableJobAsync(context, CancellationToken.None);
+        var duplicateBeforeDue = await extension.HandleDurableJobAsync(context, CancellationToken.None);
+
+        Assert.Equal(DurableJobRunStatus.PollAfter, first.Status);
+        Assert.Equal(DurableJobRunStatus.PollAfter, duplicateBeforeDue.Status);
+        Assert.Equal(1, Volatile.Read(ref invocationCount));
+
+        timeProvider.Advance(TimeSpan.FromSeconds(5));
+        var continuation = extension.HandleDurableJobAsync(context, CancellationToken.None);
+        await secondInvocationStarted.Task;
+        var concurrentDuplicate = await extension.HandleDurableJobAsync(context, CancellationToken.None);
+
+        Assert.True(concurrentDuplicate.IsPending);
+        Assert.Equal(2, Volatile.Read(ref invocationCount));
+
+        releaseSecondInvocation.SetResult();
+        Assert.Equal(DurableJobRunStatus.Completed, (await continuation).Status);
+        await featureHandler.Received(2).ExecuteJobAsync(context, Arg.Any<CancellationToken>());
+
+        async ValueTask<DurableJobRunResult> ExecuteAsync()
+        {
+            if (Interlocked.Increment(ref invocationCount) == 1)
+            {
+                return DurableJobRunResult.PollAfter(TimeSpan.FromSeconds(5));
+            }
+
+            secondInvocationStarted.SetResult();
+            await releaseSecondInvocation.Task;
+            return DurableJobRunResult.Completed;
+        }
+    }
+
+    private static DurableJobReceiverExtension CreateExtension(
+        IDurableJobHandler handler,
+        TimeSpan? jobStatusPollInterval = null,
+        TimeProvider? timeProvider = null,
+        TimeSpan? completedAttemptRetentionPeriod = null,
+        DurableJobHandlerRegistry? registry = null,
+        DurableJobsInstruments? durableJobsInstruments = null)
     {
         var grainContext = Substitute.For<IGrainContext>();
         grainContext.GrainInstance.Returns(handler);
         grainContext.GrainId.Returns(GrainId.Create("test", "grain-1"));
         var shared = new DurableJobReceiverExtensionShared(
             NullLogger<DurableJobReceiverExtension>.Instance,
-            Options.Create(new DurableJobsOptions { JobStatusPollInterval = jobStatusPollInterval ?? TimeSpan.FromSeconds(1) }),
+            Options.Create(new DurableJobsOptions
+            {
+                JobStatusPollInterval = jobStatusPollInterval ?? TimeSpan.FromSeconds(1),
+                CompletedJobAttemptRetentionPeriod = completedAttemptRetentionPeriod ?? TimeSpan.FromMinutes(10)
+            }),
             Options.Create(new SiloMessagingOptions()),
-            TimeProvider.System);
-        return new DurableJobReceiverExtension(grainContext, shared);
+            timeProvider ?? TimeProvider.System,
+            durableJobsInstruments);
+        return new DurableJobReceiverExtension(grainContext, shared, registry);
     }
 
     private static IJobRunContext CreateJobContext(
         string runId,
         string jobId = "job-1",
         int dequeueCount = 1,
-        long executionGeneration = 0)
+        long executionGeneration = 0,
+        string? jobName = null)
     {
         var context = Substitute.For<IJobRunContext>();
         context.RunId.Returns(runId);
@@ -147,7 +322,7 @@ public class DurableJobReceiverExtensionTests
         context.Job.Returns(new DurableJob
         {
             Id = jobId,
-            Name = jobId,
+            Name = jobName ?? jobId,
             DueTime = DateTimeOffset.UtcNow,
             TargetGrainId = GrainId.Create("test", "grain-1"),
             ShardId = "shard-1",
@@ -155,5 +330,64 @@ public class DurableJobReceiverExtensionTests
         });
 
         return context;
+    }
+
+    private sealed class TimerTrackingFakeTimeProvider(DateTimeOffset startDateTime) : FakeTimeProvider(startDateTime)
+    {
+        private readonly TaskCompletionSource _timerCreated = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _activeTimerCount;
+
+        public int ActiveTimerCount => Volatile.Read(ref _activeTimerCount);
+
+        public Task TimerCreated => _timerCreated.Task;
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            var timer = base.CreateTimer(callback, state, dueTime, period);
+            Interlocked.Increment(ref _activeTimerCount);
+            _timerCreated.TrySetResult();
+            return new TrackingTimer(this, timer);
+        }
+
+        private sealed class TrackingTimer(TimerTrackingFakeTimeProvider owner, ITimer timer) : ITimer
+        {
+            private readonly TimerTrackingFakeTimeProvider _owner = owner;
+            private readonly ITimer _timer = timer;
+            private int _disposed;
+
+            public bool Change(TimeSpan dueTime, TimeSpan period) => _timer.Change(dueTime, period);
+
+            public void Dispose()
+            {
+                try
+                {
+                    _timer.Dispose();
+                }
+                finally
+                {
+                    CompleteDisposal();
+                }
+            }
+
+            public async ValueTask DisposeAsync()
+            {
+                try
+                {
+                    await _timer.DisposeAsync();
+                }
+                finally
+                {
+                    CompleteDisposal();
+                }
+            }
+
+            private void CompleteDisposal()
+            {
+                if (Interlocked.Exchange(ref _disposed, 1) == 0)
+                {
+                    Interlocked.Decrement(ref _owner._activeTimerCount);
+                }
+            }
+        }
     }
 }
