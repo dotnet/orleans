@@ -10,6 +10,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)src\System.Distributed.DurableTasks\System.Distributed.DurableTasks.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.DurableTasks\Orleans.DurableTasks.csproj" />
   </ItemGroup>
 </Project>
