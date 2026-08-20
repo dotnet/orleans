@@ -78,20 +78,13 @@ internal partial class ActivationDataActivatorProvider(
             _startActivationSynchronously = state =>
             {
                 var context = (ActivationData)state!;
-                RuntimeContext.SetExecutionContext(context, out var originalContext);
-                try
-                {
-                    var task = new Task(
-                        _startActivation,
-                        context,
-                        CancellationToken.None,
-                        TaskCreationOptions.DenyChildAttach);
-                    task.RunSynchronously(context.ActivationTaskScheduler);
-                }
-                finally
-                {
-                    RuntimeContext.ResetExecutionContext(originalContext);
-                }
+                var task = new Task(
+                    _startActivation,
+                    context,
+                    CancellationToken.None,
+                    TaskCreationOptions.DenyChildAttach);
+                context.ActivationTaskScheduler.RunOrQueueTask(task);
+                task.GetAwaiter().GetResult();
             };
         }
 

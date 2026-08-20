@@ -117,6 +117,108 @@ namespace UnitTests.SchedulerTests
         }
 
         [Fact]
+        public async Task Sched_RunOrQueueTask_OwnsWorkItemGroup()
+        {
+            Task? queuedTask = null;
+            var inlineCompleted = 0;
+            var queuedTaskObservedInlineCompletion = 0;
+            var inlineTask = new Task(() =>
+            {
+                queuedTask = new Task(
+                    () =>
+                    {
+                        Volatile.Write(
+                            ref queuedTaskObservedInlineCompletion,
+                            Volatile.Read(ref inlineCompleted));
+
+                        var nestedTaskRan = false;
+                        var nestedTask = new Task(() => nestedTaskRan = true);
+                        nestedTask.RunSynchronously(_rootContext.WorkItemGroup.TaskScheduler);
+                        Assert.True(nestedTaskRan);
+                    });
+                queuedTask.Start(_rootContext.WorkItemGroup.TaskScheduler);
+
+                Assert.Contains("WorkGroupStatus=Running", _rootContext.WorkItemGroup.DumpStatus());
+                Assert.False(queuedTask.IsCompleted);
+                Volatile.Write(ref inlineCompleted, 1);
+            });
+
+            _rootContext.WorkItemGroup.RunOrQueueTask(inlineTask);
+            Assert.True(inlineTask.IsCompletedSuccessfully, inlineTask.Exception?.ToString());
+
+            await queuedTask!.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(1, queuedTaskObservedInlineCompletion);
+        }
+
+        [Fact]
+        public async Task Sched_RunOrQueueTask_QueuesWhenWorkItemGroupIsBusy()
+        {
+            using var releaseBlockingTask = new ManualResetEventSlim();
+            var blockingTaskStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var blockingTask = new Task(
+                () =>
+                {
+                    blockingTaskStarted.SetResult();
+                    releaseBlockingTask.Wait();
+                });
+            blockingTask.Start(_rootContext.WorkItemGroup.TaskScheduler);
+            await blockingTaskStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            var queuedTaskRan = false;
+            var queuedTask = new Task(() => queuedTaskRan = true);
+            _rootContext.WorkItemGroup.RunOrQueueTask(queuedTask);
+
+            Assert.False(queuedTask.IsCompleted);
+            releaseBlockingTask.Set();
+            await Task.WhenAll(blockingTask, queuedTask).WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.True(queuedTaskRan);
+        }
+
+        [Fact]
+        public async Task Sched_RunSynchronously_InlinesWhenCurrentSchedulerIsHidden()
+        {
+            var nestedTaskRan = false;
+            var outerTask = new Task(
+                () =>
+                {
+                    Assert.Same(TaskScheduler.Default, TaskScheduler.Current);
+                    var nestedTask = new Task(() => nestedTaskRan = true);
+                    nestedTask.RunSynchronously(_rootContext.WorkItemGroup.TaskScheduler);
+                },
+                CancellationToken.None,
+                TaskCreationOptions.HideScheduler);
+
+            outerTask.Start(_rootContext.WorkItemGroup.TaskScheduler);
+            await outerTask.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.True(nestedTaskRan);
+        }
+
+        [Fact]
+        public async Task Sched_RunOrQueueTask_RestoresParentWorkItemGroup()
+        {
+            using var childContext = UnitTestSchedulingContext.Create(_loggerFactory);
+            var parentTaskRestored = false;
+            var parentTask = new Task(
+                () =>
+                {
+                    Assert.Same(_rootContext, RuntimeContext.Current);
+                    var childTask = new Task(() => Assert.Same(childContext, RuntimeContext.Current));
+                    childContext.WorkItemGroup.RunOrQueueTask(childTask);
+                    Assert.True(childTask.IsCompletedSuccessfully, childTask.Exception?.ToString());
+
+                    Assert.Same(_rootContext, RuntimeContext.Current);
+                    var nestedParentTask = new Task(() => parentTaskRestored = true);
+                    nestedParentTask.RunSynchronously(_rootContext.WorkItemGroup.TaskScheduler);
+                },
+                CancellationToken.None,
+                TaskCreationOptions.HideScheduler);
+
+            parentTask.Start(_rootContext.WorkItemGroup.TaskScheduler);
+            await parentTask.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.True(parentTaskRestored);
+        }
+
+        [Fact]
         public async Task Sched_SimpleFifoTest()
         {
             // This is not a great test because there's a 50/50 shot that it will work even if the scheduling
