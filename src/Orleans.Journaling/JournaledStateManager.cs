@@ -985,11 +985,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     public async ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _shutdownCancellation.Token.ThrowIfCancellationRequested();
         Task pendingRecovery;
         bool didEnqueue;
         lock (_lock)
         {
+            _shutdownCancellation.Token.ThrowIfCancellationRequested();
             if (_state is ManagerState.Unknown)
             {
                 throw new InvalidOperationException("The journaled state manager has not been initialized.");
