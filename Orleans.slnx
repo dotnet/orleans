@@ -62,7 +62,7 @@
     <Project Path="src/Orleans.Streaming/Orleans.Streaming.csproj" />
     <Project Path="src/Orleans.TestingHost/Orleans.TestingHost.csproj" />
     <Project Path="src/Serializers/Orleans.Serialization.Protobuf/Orleans.Serialization.Protobuf.csproj" />
-    <Project Path="src/System.Distributed.DurableTasks/System.Distributed.DurableTasks.csproj" />
+    <Project Path="src/Orleans.DurableTasks/Orleans.DurableTasks.csproj" />
   </Folder>
   <Folder Name="/src/Dashboard/">
     <Project Path="src/Dashboard/Orleans.Dashboard.Abstractions/Orleans.Dashboard.Abstractions.csproj" />
@@ -153,7 +153,7 @@
     <Project Path="test/Orleans.DurableMessaging.Tests/Orleans.DurableMessaging.Tests.csproj" />
     <Project Path="test/Orleans.EventSourcing.Tests/Orleans.EventSourcing.Tests.csproj" />
     <Project Path="test/Orleans.DurableJobs.Tests/Orleans.DurableJobs.Tests.csproj" />
-    <Project Path="test/System.Distributed.DurableTasks.Tests/System.Distributed.DurableTasks.Tests.csproj" />
+    <Project Path="test/Orleans.DurableTasks.Tests/Orleans.DurableTasks.Tests.csproj" />
   </Folder>
   <Folder Name="/templates/">
     <Project Path="templates/Microsoft.Orleans.Templates/Microsoft.Orleans.Templates.csproj" />
