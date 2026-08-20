@@ -8,6 +8,7 @@ namespace Orleans.Streams
     internal static class StreamRequestContextKeys
     {
         public const string StreamProducer = "#StreamProducer";
+        public const string StreamResumeToken = "#StreamResumeToken";
     }
 
     // This is the extension interface for stream consumers

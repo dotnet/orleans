@@ -165,13 +165,14 @@ namespace Orleans.Streams
 
             try
             {
-                if (wasObserving)
+                if (wasObserving && token is not null)
                 {
                     await myExtension.RefreshStreamConsumer(
                         oldHandleImpl.SubscriptionId,
                         stream.InternalStreamId,
                         myGrainReference!.GetGrainId(),
-                        oldHandleImpl.FilterData);
+                        oldHandleImpl.FilterData,
+                        token);
                 }
             }
             catch

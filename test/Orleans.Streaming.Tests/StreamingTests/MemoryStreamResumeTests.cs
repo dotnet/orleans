@@ -41,7 +41,7 @@ namespace Tester.StreamingTests
         }
 
         [SkippableFact]
-        public async Task ImplicitResumeReplaysRetainedEventsWithoutNewProduction()
+        public async Task ImplicitResumeAfterInactivityReplaysRetainedEventsWithoutNewProduction()
         {
             using var observer = StreamingDiagnosticObserver.Create();
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -59,6 +59,7 @@ namespace Tester.StreamingTests
 
             await initialDrain;
             await WaitForEventCount(5);
+            await observer.WaitForStreamInactiveAsync(streamId, StreamProviderName, cts.Token);
 
             await grain.RewindToFirstToken();
 

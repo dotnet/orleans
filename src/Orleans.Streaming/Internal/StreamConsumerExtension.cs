@@ -88,19 +88,28 @@ namespace Orleans.Streams
             allStreamObservers[subscriptionId] = observer;
         }
 
-        internal Task RefreshStreamConsumer(
+        internal async Task RefreshStreamConsumer(
             GuidId subscriptionId,
             QualifiedStreamId streamId,
             GrainId streamConsumer,
-            string? filterData)
+            string? filterData,
+            StreamSequenceToken token)
         {
             if (!streamProducers.TryGetValue(subscriptionId, out var streamProducer))
             {
-                return Task.CompletedTask;
+                return;
             }
 
             var producer = providerRuntime.GrainFactory.GetGrain(streamProducer).AsReference<IStreamProducerExtension>();
-            return producer.AddSubscriber(subscriptionId, streamId, streamConsumer, filterData);
+            RequestContext.Set(StreamRequestContextKeys.StreamResumeToken, token);
+            try
+            {
+                await producer.AddSubscriber(subscriptionId, streamId, streamConsumer, filterData);
+            }
+            finally
+            {
+                RequestContext.Remove(StreamRequestContextKeys.StreamResumeToken);
+            }
         }
 
         public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken)
