@@ -44,15 +44,30 @@ The builder exposes separate configuration scopes:
 
 Each host has its own dependency-injection container. Registering a type creates one singleton per container. Registering a captured instance, as in the example, deliberately shares that instance with the client and all silos. Shared mutable test doubles must therefore be thread-safe.
 
-## Reuse a cluster with an xUnit fixture
+## Reuse a cluster across tests
 
-Cluster startup is more expensive than an isolated unit test. Reuse a cluster across tests which need the same configuration by using an xUnit collection fixture:
+Cluster startup is more expensive than an isolated unit test. Reuse a cluster across tests which need the same configuration by using the lifecycle support from the test framework.
+
+### xUnit
+
+Create an xUnit collection fixture:
 
 :::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/ClusterFixture.cs" id="cluster_fixture":::
 
-:::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/ClusterCollection.cs" id="cluster_collection":::
+Register the fixture as a collection and apply that collection to each test class which shares the cluster:
 
+:::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/ClusterCollection.cs" id="cluster_collection":::
 :::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/HelloGrainTestsWithFixture.cs" id="shared_cluster_test":::
+
+### MSTest
+
+Use MSTest assembly lifecycle methods to deploy one cluster for all MSTest classes in the test assembly:
+
+:::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/MSTestClusterFixture.cs" id="mstest_cluster_fixture":::
+
+Tests access the deployed cluster through the fixture:
+
+:::code language="csharp" source="snippets/testing/orleans-testing/Sample.OrleansTesting/MSTestClusterFixture.cs" id="mstest_shared_cluster_test":::
 
 Shared-cluster tests must not depend on execution order. Give each test distinct grain identities and reset any shared external state. Use separate fixtures when suites require incompatible silo or provider configuration.
 
