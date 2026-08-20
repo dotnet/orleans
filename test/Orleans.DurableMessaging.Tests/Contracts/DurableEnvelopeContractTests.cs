@@ -124,6 +124,7 @@ public sealed class DurableEnvelopeContractTests : IDisposable
         Assert.False(envelope.Data.TryGetContextValue<Guid>("count", out var wrongContext));
         Assert.Equal(Guid.Empty, wrongContext);
         Assert.True(envelope.Data.TryGetBody<TestMessage>(out var body));
+        Assert.NotNull(body);
         Assert.Equal(9, body.Id);
         Assert.True(envelope.Data.TryGetContextValue<string>("label", out var label));
         Assert.Equal("valid", label);

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -178,11 +179,14 @@ public interface IInboxHandler<TMessage> : IInboxHandler
     /// <summary>
     /// Handles a typed message.
     /// </summary>
-    /// <param name="message">The deserialized message body.</param>
+    /// <param name="message">
+    /// The deserialized message body. This can be <see langword="null"/> when the sender
+    /// serialized a null reference or nullable value.
+    /// </param>
     /// <param name="context">Handler context for creating and sending envelopes.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> representing the asynchronous operation.</returns>
-    ValueTask HandleAsync(TMessage message, IInboxHandlerContext context, CancellationToken cancellationToken);
+    ValueTask HandleAsync([AllowNull] TMessage message, IInboxHandlerContext context, CancellationToken cancellationToken);
 
     /// <summary>
     /// Default implementation that returns true (capability check deferred to derived class).

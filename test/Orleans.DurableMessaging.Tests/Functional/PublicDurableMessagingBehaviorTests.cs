@@ -260,6 +260,91 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task CommittedOutbox_DeactivationBeforeLocalFollowUp_RecoversDurableJobOwnership()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        var before = await sender.GetSnapshotAsync();
+        _ = await receiver.GetSnapshotAsync();
+        var receiverWrite = fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
+
+        await sender.SendAndDeactivateAsync(
+            receiver.GetGrainId(),
+            "messages/outbox-crash-window",
+            NewMessage(52, "durable-wakeup"));
+        await receiverWrite.WaitUntilEnteredAsync();
+        var committed = await sender.GetSnapshotAsync();
+
+        Assert.Equal(1, committed.OutboxCount);
+        Assert.False(string.IsNullOrEmpty(committed.OutboxJobId));
+
+        receiverWrite.Release();
+        var delivered = await fixture.WaitForEffectCountAsync(receiver, 1);
+        var recovered = await fixture.SnapshotProbe.WaitAsync(
+            sender.GetGrainId(),
+            snapshot => snapshot.ActivationId != before.ActivationId
+                && snapshot.OutboxCount == 0
+                && snapshot.OutboxJobId is null);
+
+        Assert.Equal("durable-wakeup", Assert.Single(delivered.Effects).Value);
+        Assert.NotEqual(before.ActivationId, recovered.ActivationId);
+        Assert.Equal(0, recovered.OutboxCount);
+        Assert.Null(recovered.OutboxJobId);
+    }
+
+    [Fact]
+    public async Task DuplicateOutboxEnqueue_PersistsOneStableJobOwnership()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+
+        await sender.SendDuplicateAsync(
+            receiver.GetGrainId(),
+            "messages/duplicate-outbox-enqueue",
+            NewMessage(54, "duplicate-enqueue"));
+        var delivered = await fixture.WaitForEffectCountAsync(receiver, 1);
+
+        Assert.Equal(1, Assert.Single(delivered.Effects).Count);
+        Assert.Equal(
+            1,
+            fixture.JobManagerProbe.GetSuccessCount(
+                "orleans.messaging.outbox-flush",
+                sender.GetGrainId()));
+    }
+
+    [Fact]
+    public async Task OutboxSchedulingFailure_AbortsCommitAndRetryUsesStableOwnership()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        fixture.JobManagerProbe.FailAfterNext("orleans.messaging.outbox-flush");
+
+        await Assert.ThrowsAsync<IOException>(
+            () => sender.SendAsync(
+                receiver.GetGrainId(),
+                "messages/schedule-retry",
+                NewMessage(55, "schedule-retry")));
+        Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
+
+        await sender.RetryWriteStateAsync();
+        var delivered = await fixture.WaitForEffectCountAsync(receiver, 1);
+
+        var effect = Assert.Single(delivered.Effects);
+        Assert.Equal("schedule-retry", effect.Value);
+        Assert.Equal(1, effect.Count);
+        Assert.Equal(
+            2,
+            fixture.JobManagerProbe.GetAttemptCount(
+                "orleans.messaging.outbox-flush",
+                sender.GetGrainId()));
+        Assert.Equal(
+            2,
+            fixture.JobManagerProbe.GetSuccessCount(
+                "orleans.messaging.outbox-flush",
+                sender.GetGrainId()));
+    }
+
+    [Fact]
     public async Task FailedAtomicWrite_ReloadExposesNeitherGrainEffectNorOutgoingMessage()
     {
         var sender = NewGrain();
@@ -273,6 +358,145 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
 
         Assert.Equal(0, (await sender.GetSnapshotAsync()).OutboxCount);
         Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
+        Assert.Equal(
+            1,
+            fixture.JobManagerProbe.GetSuccessCount(
+                "orleans.messaging.outbox-flush",
+                sender.GetGrainId()));
+    }
+
+    [Fact]
+    public async Task OutboxJobClearWriteFailure_RevertsOwnershipAndRetryCleansUp()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        var journalId = JournalId.FromGrainId(sender.GetGrainId());
+        fixture.Storage.FailWrite(journalId, matchingWrite: 3);
+
+        await sender.SendAsync(
+            receiver.GetGrainId(),
+            "messages/outbox-clear-retry",
+            NewMessage(56, "outbox-clear-retry"));
+        _ = await fixture.WaitForEffectCountAsync(receiver, 1);
+        var cleaned = await fixture.SnapshotProbe.WaitAsync(
+            sender.GetGrainId(),
+            static snapshot => snapshot.OutboxCount == 0 && snapshot.OutboxJobId is null);
+
+        Assert.Equal(0, cleaned.OutboxCount);
+        Assert.Null(cleaned.OutboxJobId);
+        await sender.RequestDeactivationAsync();
+        var recovered = await sender.GetSnapshotAsync();
+        Assert.Null(recovered.OutboxJobId);
+        Assert.Equal(0, recovered.OutboxCount);
+    }
+
+    [Fact]
+    public async Task InboxJobClearWriteFailure_RevertsThenRecoversAfterActivationLoss()
+    {
+        var receiver = NewGrain();
+        var before = await receiver.GetSnapshotAsync();
+        using var handler = fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/inbox-clear-retry");
+        using var envelope = CreateEnvelope(receiver, NewMessage(57, "inbox-clear-retry"), "messages/inbox-clear-retry");
+
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        await handler.WaitUntilEnteredAsync();
+        fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()), matchingWrite: 2);
+        await receiver.DeactivateOnNextRecoveryAsync();
+        handler.Release();
+
+        var recovered = await fixture.SnapshotProbe.WaitAsync(
+            receiver.GetGrainId(),
+            snapshot => snapshot.ActivationId != before.ActivationId);
+        var cleaned = await fixture.SnapshotProbe.WaitAsync(
+            receiver.GetGrainId(),
+            static snapshot => snapshot.InboxCount == 0 && snapshot.InboxJobId is null);
+
+        Assert.NotEqual(before.ActivationId, recovered.ActivationId);
+        Assert.Equal(1, Assert.Single(cleaned.Effects).Count);
+        Assert.Null(cleaned.InboxJobId);
+    }
+
+    [Fact]
+    public async Task DeliveryIntoEmptyInbox_ReplacesStalePersistedJobOwnership()
+    {
+        var receiver = NewGrain();
+        var staleJobId = $"stale-{Guid.NewGuid():N}";
+        await receiver.SetInboxJobIdAsync(staleJobId);
+        using var handler = fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/stale-owner");
+        using var envelope = CreateEnvelope(receiver, NewMessage(58, "stale-owner"), "messages/stale-owner");
+
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        await handler.WaitUntilEnteredAsync();
+        var accepted = await receiver.GetSnapshotAsync();
+
+        Assert.NotNull(accepted.InboxJobId);
+        Assert.NotEqual(staleJobId, accepted.InboxJobId);
+
+        handler.Release();
+        var completed = await fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.Equal("stale-owner", Assert.Single(completed.Effects).Value);
+    }
+
+    [Fact]
+    public async Task InboxSchedulingFailure_RevertsAcceptanceAndRetryDoesNotStrandMessage()
+    {
+        var receiver = NewGrain();
+        using var envelope = CreateEnvelope(receiver, NewMessage(59, "inbox-schedule-retry"));
+        fixture.JobManagerProbe.FailAfterNext("orleans.messaging.inbox-drain");
+
+        await Assert.ThrowsAsync<IOException>(
+            () => DeliverAsync(receiver, envelope.Value));
+        Assert.Equal(0, (await receiver.GetSnapshotAsync()).InboxCount);
+
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        var completed = await fixture.WaitForEffectCountAsync(receiver, 1);
+
+        var effect = Assert.Single(completed.Effects);
+        Assert.Equal("inbox-schedule-retry", effect.Value);
+        Assert.Equal(1, effect.Count);
+        Assert.Equal(
+            2,
+            fixture.JobManagerProbe.GetAttemptCount(
+                "orleans.messaging.inbox-drain",
+                receiver.GetGrainId()));
+        Assert.Equal(
+            2,
+            fixture.JobManagerProbe.GetSuccessCount(
+                "orleans.messaging.inbox-drain",
+                receiver.GetGrainId()));
+    }
+
+    [Fact]
+    public async Task NullBodyAndContext_DecodeSuccessfullyAndTypedHandlersReceiveNull()
+    {
+        var receiver = NewGrain();
+        using var referenceEnvelope = CreateEnvelope<string?>(
+            receiver,
+            body: null,
+            route: "nullable/reference",
+            builder => builder
+                .WithContextValue<string?>("null-reference", null)
+                .WithContextValue<int?>("null-value", null));
+
+        Assert.True(referenceEnvelope.Value.Data.TryGetBody<string?>(out var referenceBody));
+        Assert.Null(referenceBody);
+        Assert.True(referenceEnvelope.Value.Data.TryGetContextValue<string?>("null-reference", out var referenceContext));
+        Assert.Null(referenceContext);
+        Assert.True(referenceEnvelope.Value.Data.TryGetContextValue<int?>("null-value", out var valueContext));
+        Assert.Null(valueContext);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, referenceEnvelope.Value)).Status);
+
+        using var valueEnvelope = CreateEnvelope<int?>(receiver, body: null, route: "nullable/value");
+        Assert.True(valueEnvelope.Value.Data.TryGetBody<int?>(out var valueBody));
+        Assert.Null(valueBody);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, valueEnvelope.Value)).Status);
+
+        var completed = await fixture.SnapshotProbe.WaitAsync(
+            receiver.GetGrainId(),
+            static snapshot => snapshot.NullReferenceMessageCalls == 1
+                && snapshot.NullNullableValueMessageCalls == 1);
+        Assert.Equal(1, completed.NullReferenceMessageCalls);
+        Assert.Equal(1, completed.NullNullableValueMessageCalls);
     }
 
     [Fact]
@@ -407,6 +631,19 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             _ => throw new ArgumentException($"Unsupported test body type {body.GetType()}.", nameof(body)),
         };
         return new EnvelopeLease(envelope);
+    }
+
+    private EnvelopeLease CreateEnvelope<T>(
+        IDurableMessagingTestGrain receiver,
+        T body,
+        string route,
+        Action<DurableEnvelopeBuilder>? configure = null)
+    {
+        var sessions = fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
+        var sender = GrainId.Create("external-test-sender", Guid.NewGuid().ToString("N"));
+        var builder = new DurableEnvelopeBuilder(sessions, sender).To(receiver.GetGrainId(), route);
+        configure?.Invoke(builder);
+        return new EnvelopeLease(builder.WithBody<T>(body).Build());
     }
 
     private sealed class EnvelopeLease(DurableEnvelope value) : IDisposable

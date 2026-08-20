@@ -21,6 +21,7 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
     {
         Clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
         Storage = new ControlledJournalStorageProvider();
+        JobManagerProbe = new DurableJobManagerProbe();
         HandlerProbe = new HandlerProbe();
         SnapshotProbe = new SnapshotProbe();
         var clusterId = $"durable-messaging-{Guid.NewGuid():N}";
@@ -45,6 +46,8 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
             siloBuilder.Services.AddSingleton(SnapshotProbe);
             siloBuilder.UseInMemoryDurableJobs();
             siloBuilder.AddDurableMessaging(ConfigureOptions);
+            siloBuilder.ConfigureServices(services =>
+                ControlledDurableJobManager.Decorate(services, JobManagerProbe));
             siloBuilder.Services.Configure<JournaledStateManagerOptions>(
                 options => options.JournalFormatKey = "orleans-binary");
             siloBuilder.Services.RemoveAll<IJournalStorageProvider>();
@@ -59,6 +62,7 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
     public IClusterClient Client => Cluster.Client!;
     public FakeTimeProvider Clock { get; }
     public ControlledJournalStorageProvider Storage { get; }
+    public DurableJobManagerProbe JobManagerProbe { get; }
     public HandlerProbe HandlerProbe { get; }
     public SnapshotProbe SnapshotProbe { get; }
 
