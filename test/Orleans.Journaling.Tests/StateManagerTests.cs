@@ -691,6 +691,17 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task StateManager_DefaultRollbackImplementation_PreservesLegacyImplementations()
+    {
+        IJournaledStateManager manager = new LegacyStateManager();
+
+        var operation = manager.RevertPendingChangesAsync(CancellationToken.None);
+        var exception = await Assert.ThrowsAsync<NotSupportedException>(() => operation.AsTask());
+
+        Assert.Contains("does not support rollback", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task StateManager_Observer_FailedWriteDoesNotCommitAndRevertNotifiesRecovery()
     {
         var storage = new CapturingStorage();
@@ -1662,6 +1673,23 @@ public class StateManagerTests : JournalingTestBase
         }
 
         public void OnRecoveryCompleted() => RecoveryCompletedCount++;
+    }
+
+    private sealed class LegacyStateManager : IJournaledStateManager
+    {
+        public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
+        public void RegisterState(string name, IJournaledState state) { }
+
+        public bool TryGetState(
+            string name,
+            [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IJournaledState? state)
+        {
+            state = null;
+            return false;
+        }
+
+        public ValueTask WriteStateAsync(CancellationToken cancellationToken) => default;
+        public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
     }
 
     private sealed class ThrowingStateObserver : IJournaledStateObserver
