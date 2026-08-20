@@ -533,7 +533,8 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private ParameterSyntax GetParameterSyntax(int index, IParameterSymbol parameter, Dictionary<ITypeParameterSymbol, string> typeParameterSubstitutions)
+#nullable enable
+        private static ParameterSyntax GetParameterSyntax(int index, IParameterSymbol parameter, Dictionary<ITypeParameterSymbol, string>? typeParameterSubstitutions)
         {
             var result = Parameter(Identifier($"arg{index}")).WithType(parameter.Type.ToTypeSyntax(typeParameterSubstitutions));
             switch (parameter.RefKind)
@@ -555,5 +556,6 @@ namespace Orleans.CodeGenerator
 
             return result;
         }
+#nullable disable
     }
 }
