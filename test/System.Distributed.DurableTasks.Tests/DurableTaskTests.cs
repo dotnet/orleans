@@ -1028,10 +1028,14 @@ public class DurableTaskTests
     {
         Assert.Equal(string.Empty, TaskId.None.ToString());
         Assert.Equal(TaskId.None, TaskId.Parse(string.Empty));
+        Assert.True(TaskId.TryParse(string.Empty, out var fromStringWithoutProvider));
+        Assert.Equal(TaskId.None, fromStringWithoutProvider);
         Assert.True(TaskId.TryParse(string.Empty, provider: null, out var fromString));
         Assert.Equal(TaskId.None, fromString);
         Assert.False(TaskId.TryParse((string?)null, provider: null, out _));
-        Assert.Equal(TaskId.None, TaskId.Parse(ReadOnlySpan<char>.Empty, provider: null));
+        Assert.Equal(TaskId.None, TaskId.Parse(ReadOnlySpan<char>.Empty));
+        Assert.True(TaskId.TryParse(ReadOnlySpan<char>.Empty, out var fromSpanWithoutProvider));
+        Assert.Equal(TaskId.None, fromSpanWithoutProvider);
         Assert.True(TaskId.TryParse(ReadOnlySpan<char>.Empty, provider: null, out var fromSpan));
         Assert.Equal(TaskId.None, fromSpan);
 
