@@ -1,7 +1,7 @@
 ---
 title: Cluster membership protocol
 description: Understand Orleans membership storage, failure detection, ordered views, and death-vote invariants.
-ms.date: 08/11/2026
+ms.date: 08/20/2026
 ms.topic: concept-article
 ---
 
@@ -30,6 +30,14 @@ flowchart LR
     Manager --> Service
     Service --> Consumers
 ```
+
+## Consume membership views
+
+Resolve <xref:Orleans.Runtime.IClusterMembershipService> from dependency injection when a silo-hosted service or runtime component needs the cluster view. <xref:Orleans.Runtime.IClusterMembershipService.CurrentSnapshot> returns the current local, immutable <xref:Orleans.Runtime.ClusterMembershipSnapshot> without waiting for storage access.
+
+<xref:Orleans.Runtime.IClusterMembershipService.MembershipUpdates> is an asynchronous sequence which first yields the current local snapshot and then yields snapshots with strictly increasing <xref:Orleans.Runtime.ClusterMembershipSnapshot.Version> values. Consumers can retain and process each snapshot as a complete membership view.
+
+Compare the snapshot version with the required <xref:Orleans.Runtime.MembershipVersion>. When the local view must reach a minimum version, await <xref:Orleans.Runtime.IClusterMembershipService.Refresh*> with that version; it completes after the local snapshot catches up. The [BasicClustering sample](https://github.com/dotnet/orleans/tree/main/samples/BasicClustering) demonstrates a hosted service which consumes membership updates.
 
 ## Joining
 
@@ -115,8 +123,10 @@ This separation lets those services add stronger invariants without expanding th
 
 ## Source and tests
 
+- [`IClusterMembershipService`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/MembershipService/IClusterMembershipService.cs) exposes local snapshots, ordered updates, and minimum-version refresh.
 - [`MembershipAgent`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/MembershipService/MembershipAgent.cs) drives joining and active-state transitions.
 - [`MembershipTableManager`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/MembershipService/MembershipTableManager.cs) coordinates table updates and death declarations.
 - [`ClusterHealthMonitor`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/MembershipService/ClusterHealthMonitor.cs) owns peer monitoring.
+- [`ClusterMembershipSnapshotTests`](https://github.com/dotnet/orleans/blob/main/test/Orleans.Runtime.Internal.Tests/ClusterMembershipSnapshotTests.cs) cover snapshot version and membership-change semantics.
 - [`MembershipAgentTests`](https://github.com/dotnet/orleans/blob/main/test/Orleans.Core.Tests/Membership/MembershipAgentTests.cs) exercise startup connectivity.
 - [`MembershipTableManagerTests`](https://github.com/dotnet/orleans/blob/main/test/Orleans.Core.Tests/Membership/MembershipTableManagerTests.cs) cover vote expiry and status changes.
