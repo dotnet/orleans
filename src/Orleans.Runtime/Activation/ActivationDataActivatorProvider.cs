@@ -83,8 +83,7 @@ internal partial class ActivationDataActivatorProvider(
                     context,
                     CancellationToken.None,
                     TaskCreationOptions.DenyChildAttach);
-                context.ActivationTaskScheduler.RunOrQueueTask(task);
-                task.GetAwaiter().GetResult();
+                task.RunSynchronously(context.ActivationTaskScheduler);
             };
         }
 
