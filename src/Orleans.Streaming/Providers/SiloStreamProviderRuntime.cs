@@ -156,14 +156,14 @@ namespace Orleans.Runtime.Providers
             {
                 if (typeof(TExtension) != typeof(StreamConsumerExtension)
                     || typeof(TExtensionInterface) != typeof(IStreamConsumerExtension)
-                    || activationData.GrainInstance is not IStreamSubscriptionObserver observer)
+                    || activationData.GrainInstance is not IStreamSubscriptionObserver)
                 {
                     throw new InvalidOperationException(
                         $"The extension {typeof(TExtension)} cannot be bound to stateless worker grain '{activationData.GrainId}'. "
                         + $"Stateless worker stream consumers must implement {typeof(IStreamSubscriptionObserver).FullName}.");
                 }
 
-                extensionFactory = () => (TExtension)(object)new StreamConsumerExtension(this, observer, isStatelessWorker: true);
+                extensionFactory = () => (TExtension)(object)new StreamConsumerExtension(this, grainContext);
             }
 
             return grainContext.GetComponent<IGrainExtensionBinder>()! // Grain contexts expose an extension binder.

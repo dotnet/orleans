@@ -22,18 +22,12 @@ namespace Orleans.Streams
         /// <inheritdoc/>
         public void Configure(IGrainContext context)
         {
-            if (context.GrainInstance is IStreamSubscriptionObserver observer)
+            if (context.GrainInstance is IStreamSubscriptionObserver)
             {
-                InstallStreamConsumerExtension(context, observer);
+                context.GetComponent<IGrainExtensionBinder>()! // Grain contexts expose an extension binder.
+                    .GetOrSetExtension<StreamConsumerExtension, IStreamConsumerExtension>(
+                        () => new StreamConsumerExtension(_streamProviderRuntime, context));
             }
-        }
-
-        private void InstallStreamConsumerExtension(IGrainContext context, IStreamSubscriptionObserver observer)
-        {
-            var isStatelessWorker = context is ActivationData { IsStatelessWorker: true };
-            context.GetComponent<IGrainExtensionBinder>()! // Grain contexts expose an extension binder.
-                .GetOrSetExtension<StreamConsumerExtension, IStreamConsumerExtension>(
-                    () => new StreamConsumerExtension(_streamProviderRuntime, observer, isStatelessWorker));
         }
     }
 }

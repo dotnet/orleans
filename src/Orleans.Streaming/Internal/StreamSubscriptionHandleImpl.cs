@@ -23,8 +23,6 @@ namespace Orleans.Streams
         private readonly GuidId subscriptionId;
         [Id(3)]
         private readonly bool isRewindable;
-        [Id(4)]
-        private readonly bool disableHandshake;
 
         [NonSerialized]
         private IAsyncObserver<T>? observer;
@@ -66,9 +64,8 @@ namespace Orleans.Streams
             this.batchObserver = batchObserver;
             this.streamImpl = streamImpl ?? throw new ArgumentNullException(nameof(streamImpl));
             this.filterData = filterData;
-            this.isRewindable = streamImpl.IsRewindable;
-            this.disableHandshake = disableHandshake;
-            if (IsRewindable && !disableHandshake)
+            this.isRewindable = streamImpl.IsRewindable && !disableHandshake;
+            if (IsRewindable)
             {
                 expectedToken = StreamHandshakeToken.CreateStartToken(token);
             }
@@ -83,7 +80,7 @@ namespace Orleans.Streams
 
         public StreamHandshakeToken? GetSequenceToken()
         {
-            return disableHandshake ? null : expectedToken;
+            return expectedToken;
         }
 
         public override Task UnsubscribeAsync()
@@ -150,7 +147,7 @@ namespace Orleans.Streams
                 }
             }
 
-            if (IsRewindable && !disableHandshake)
+            if (IsRewindable)
             {
                 this.expectedToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken);
             }
@@ -207,7 +204,7 @@ namespace Orleans.Streams
                 if (!this.expectedToken.Equals(handshakeToken))
                     return this.expectedToken;
             }
-            if (IsRewindable && !disableHandshake)
+            if (IsRewindable)
             {
                 this.expectedToken = StreamHandshakeToken.CreateDeliveyToken(currentToken);
             }

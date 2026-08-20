@@ -108,13 +108,12 @@ namespace UnitTests.StreamingTests
                 GetStream(StatelessWorkerStreamConsumerGrain.ExplicitStreamNamespace, streamId)
                     .OnNextAsync($"item-{index}")));
             await state.WaitForDeliveriesAsync(Timeout);
-            await state.WaitForBlockedDeliveriesAsync(Timeout);
 
             Assert.Equal(PartitionCount, state.WaitingDeliveryCount);
             Assert.Equal(PartitionCount, state.DeliveryActivationCount);
             Assert.Equal(PartitionCount, state.ObserverActivationCount);
 
-            state.ReleaseDeliveries(PartitionCount);
+            state.ReleaseDeliveries();
             await state.WaitForReleasedDeliveriesAsync(Timeout);
             Assert.Equal(PartitionCount, state.DeliveryCount);
         }

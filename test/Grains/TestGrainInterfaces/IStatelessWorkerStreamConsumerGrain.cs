@@ -11,7 +11,6 @@ namespace UnitTests.GrainInterfaces
 
     public interface IImplicitStatelessWorkerStreamConsumerGrain : IGrainWithGuidKey
     {
-        Task Ping();
     }
 
     public interface IUnsupportedStatelessWorkerStreamConsumerGrain : IGrainWithIntegerKey

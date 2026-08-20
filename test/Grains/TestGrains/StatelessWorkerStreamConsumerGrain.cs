@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Linq;
-using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
@@ -14,10 +13,9 @@ namespace UnitTests.Grains
         private readonly ConcurrentDictionary<Guid, int> _deliveryCounts = new();
         private readonly ConcurrentDictionary<Guid, int> _observerCounts = new();
         private readonly SemaphoreSlim _deliverySemaphore = new(0);
-        private TaskCompletionSource _blockedDeliveriesReached = CreateCompletionSource();
         private TaskCompletionSource _deliveriesReleased = CreateCompletionSource();
         private TaskCompletionSource _deliveryTargetReached = CreateCompletionSource();
-        private int _blockDeliveries;
+        private bool _blockDeliveries;
         private int _deliveryCount;
         private int _expectedDeliveries;
         private int _waitingDeliveryCount;
@@ -45,38 +43,35 @@ namespace UnitTests.Grains
             _observerCounts.Clear();
             Interlocked.Exchange(ref _deliveryCount, 0);
             _expectedDeliveries = expectedDeliveries;
-            Volatile.Write(ref _blockDeliveries, blockDeliveries ? 1 : 0);
-            _blockedDeliveriesReached = CreateCompletionSource();
+            Volatile.Write(ref _blockDeliveries, blockDeliveries);
             _deliveriesReleased = CreateCompletionSource();
             _deliveryTargetReached = CreateCompletionSource();
         }
 
         public Task WaitForDeliveriesAsync(TimeSpan timeout) => _deliveryTargetReached.Task.WaitAsync(timeout);
 
-        public Task WaitForBlockedDeliveriesAsync(TimeSpan timeout) => _blockedDeliveriesReached.Task.WaitAsync(timeout);
-
         public Task WaitForReleasedDeliveriesAsync(TimeSpan timeout) => _deliveriesReleased.Task.WaitAsync(timeout);
 
-        public void ReleaseDeliveries(int count) => _deliverySemaphore.Release(count);
+        public void ReleaseDeliveries() => _deliverySemaphore.Release(_expectedDeliveries);
 
         internal void RecordObserver(Guid activationId) => _observerCounts.AddOrUpdate(activationId, 1, static (_, count) => count + 1);
 
         internal async Task RecordDelivery(Guid activationId)
         {
             _deliveryCounts.AddOrUpdate(activationId, 1, static (_, count) => count + 1);
-            if (Interlocked.Increment(ref _deliveryCount) >= _expectedDeliveries)
+            var deliveryCount = Interlocked.Increment(ref _deliveryCount);
+            if (!Volatile.Read(ref _blockDeliveries))
             {
-                _deliveryTargetReached.TrySetResult();
-            }
-
-            if (Volatile.Read(ref _blockDeliveries) == 0)
-            {
+                if (deliveryCount >= _expectedDeliveries)
+                {
+                    _deliveryTargetReached.TrySetResult();
+                }
                 return;
             }
 
             if (Interlocked.Increment(ref _waitingDeliveryCount) >= _expectedDeliveries)
             {
-                _blockedDeliveriesReached.TrySetResult();
+                _deliveryTargetReached.TrySetResult();
             }
 
             try
@@ -104,14 +99,10 @@ namespace UnitTests.Grains
         public const string ExplicitStreamNamespace = "StatelessWorkerStreamingNamespace";
 
         private readonly Guid _activationId = Guid.NewGuid();
-        private readonly ILogger _logger;
         private readonly StatelessWorkerStreamConsumerState _state;
 
-        public StatelessWorkerStreamConsumerGrain(
-            ILoggerFactory loggerFactory,
-            StatelessWorkerStreamConsumerState state)
+        public StatelessWorkerStreamConsumerGrain(StatelessWorkerStreamConsumerState state)
         {
-            _logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
             _state = state;
         }
 
@@ -151,11 +142,6 @@ namespace UnitTests.Grains
 
         public async Task OnSubscribed(IStreamSubscriptionHandleFactory handleFactory)
         {
-            _logger.LogInformation(
-                "Attaching activation {ActivationId} to stream {ProviderName}/{StreamId}",
-                _activationId,
-                handleFactory.ProviderName,
-                handleFactory.StreamId);
             _state.RecordObserver(_activationId);
             await handleFactory.Create<string>().ResumeAsync(OnNextAsync, OnErrorAsync, OnCompletedAsync);
         }
@@ -176,8 +162,6 @@ namespace UnitTests.Grains
         {
             _state = state;
         }
-
-        public Task Ping() => Task.CompletedTask;
 
         public async Task OnSubscribed(IStreamSubscriptionHandleFactory handleFactory)
         {

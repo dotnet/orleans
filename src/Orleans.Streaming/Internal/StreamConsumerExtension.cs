@@ -44,13 +44,10 @@ namespace Orleans.Streams
         [NonSerialized]
         private readonly bool isStatelessWorker;
 
-        internal StreamConsumerExtension(
-            IStreamProviderRuntime providerRt,
-            IStreamSubscriptionObserver? streamSubscriptionObserver = null,
-            bool isStatelessWorker = false)
+        internal StreamConsumerExtension(IStreamProviderRuntime providerRt, IGrainContext? grainContext = null)
         {
-            this.streamSubscriptionObserver = streamSubscriptionObserver;
-            this.isStatelessWorker = isStatelessWorker;
+            streamSubscriptionObserver = grainContext?.GrainInstance as IStreamSubscriptionObserver;
+            isStatelessWorker = grainContext is ActivationData { IsStatelessWorker: true };
             providerRuntime = providerRt;
             logger = providerRt.ServiceProvider.GetRequiredService<ILogger<StreamConsumerExtension>>();
         }

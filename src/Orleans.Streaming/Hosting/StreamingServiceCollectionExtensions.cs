@@ -43,12 +43,8 @@ namespace Orleans.Hosting
             services.AddKeyedTransient<IGrainExtension>(typeof(IStreamConsumerExtension), (sp, _) =>
             {
                 var runtime = sp.GetRequiredService<IStreamProviderRuntime>();
-                var grainContextAccessor = sp.GetRequiredService<IGrainContextAccessor>();
-                var grainContext = grainContextAccessor.GrainContext;
-                return new StreamConsumerExtension(
-                    runtime,
-                    grainContext?.GrainInstance as IStreamSubscriptionObserver,
-                    grainContext is ActivationData { IsStatelessWorker: true });
+                var grainContext = sp.GetRequiredService<IGrainContextAccessor>().GrainContext;
+                return new StreamConsumerExtension(runtime, grainContext);
             });
             services.AddSingleton<IStreamSubscriptionManagerAdmin>(sp =>
                 new StreamSubscriptionManagerAdmin(sp.GetRequiredService<IStreamProviderRuntime>()));
