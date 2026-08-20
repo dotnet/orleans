@@ -108,7 +108,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
                 return LongPollGetJobStatusAsync(key, context, state);
             }
 
-            return new(DurableJobRunResult.PollAfter(_shared.Options.JobStatusPollInterval));
+            return new(DurableJobRunResult.Running(_shared.Options.JobStatusPollInterval));
         }
 
         RecordCompletedJobAttempt(key, state);
@@ -137,7 +137,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
 
                 if (!state.Task.IsCompleted)
                 {
-                    return DurableJobRunResult.PollAfter(_shared.Options.JobStatusPollInterval);
+                    return DurableJobRunResult.Running(_shared.Options.JobStatusPollInterval);
                 }
             }
 

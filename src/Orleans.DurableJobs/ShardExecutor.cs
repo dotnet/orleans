@@ -254,7 +254,7 @@ internal sealed partial class ShardExecutor
                 var result = await target.HandleDurableJobAsync(jobContext, cancellationToken);
 
                 // Handle the result based on status
-                while (result.IsPending)
+                while (result.IsRunning)
                 {
                     // Enter polling loop
                     LogPollingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.PollAfterDelay.Value);
@@ -264,22 +264,49 @@ internal sealed partial class ShardExecutor
                     result = await target.HandleDurableJobAsync(jobContext, cancellationToken);
                 }
 
-                if (result.Status == DurableJobRunStatus.Completed)
+                switch (result.Status)
                 {
-                    await shard.RemoveJobAsync(jobContext.Job.Id, cancellationToken);
-                    LogJobExecutedSuccessfully(_logger, jobContext.Job.Id, jobContext.Job.Name);
-                    _durableJobsInstruments.OnJobCompleted(_timeProvider.GetElapsedTime(attemptStartTimestamp));
-                    activity?.SetTag(ActivityTagKeys.DurableJobStatus, "completed");
-                    activity?.SetStatus(ActivityStatusCode.Ok);
-                }
-                else if (result.IsFailed)
-                {
-                    // Handle failed result through retry policy
-                    LogJobFailedWithResult(_logger, jobContext.Job.Id, jobContext.Job.Name);
-                    failureException = result.Exception;
+                    case DurableJobRunStatus.Completed:
+                        await shard.RemoveJobAsync(jobContext.Job.Id, cancellationToken);
+                        LogJobExecutedSuccessfully(_logger, jobContext.Job.Id, jobContext.Job.Name);
+                        _durableJobsInstruments.OnJobCompleted(_timeProvider.GetElapsedTime(attemptStartTimestamp));
+                        activity?.SetTag(ActivityTagKeys.DurableJobStatus, "completed");
+                        activity?.SetStatus(ActivityStatusCode.Ok);
+                        break;
+                    case DurableJobRunStatus.RescheduleRequested when result.RescheduleTime is { } rescheduleTime:
+                        if (shard is not IResettableJobShard resettableShard)
+                        {
+                            throw new ResettableJobShardNotSupportedException(shard.GetType());
+                        }
+
+                        LogReschedulingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, rescheduleTime);
+                        await resettableShard.RescheduleJobAsync(jobContext, rescheduleTime, cancellationToken);
+                        _durableJobsInstruments.OnJobRescheduled(_timeProvider.GetElapsedTime(attemptStartTimestamp));
+                        activity?.SetTag(ActivityTagKeys.DurableJobStatus, "rescheduled");
+                        activity?.SetStatus(ActivityStatusCode.Ok);
+                        break;
+                    case DurableJobRunStatus.RescheduleRequested:
+                        failureException = new InvalidOperationException(
+                            $"Durable job '{jobContext.Job.Id}' returned RescheduleRequested without a reschedule time.");
+                        LogErrorExecutingJob(_logger, failureException, jobContext.Job.Id);
+                        break;
+                    case DurableJobRunStatus.Failed when result.Exception is { } exception:
+                        LogJobFailedWithResult(_logger, jobContext.Job.Id, jobContext.Job.Name);
+                        failureException = exception;
+                        break;
+                    case DurableJobRunStatus.Failed:
+                        failureException = new InvalidOperationException(
+                            $"Durable job '{jobContext.Job.Id}' returned Failed without an exception.");
+                        LogErrorExecutingJob(_logger, failureException, jobContext.Job.Id);
+                        break;
+                    default:
+                        failureException = new InvalidOperationException(
+                            $"Durable job '{jobContext.Job.Id}' returned unsupported status value {(int)result.Status}.");
+                        LogErrorExecutingJob(_logger, failureException, jobContext.Job.Id);
+                        break;
                 }
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (ex is not OperationCanceledException and not ResettableJobShardNotSupportedException)
             {
                 LogErrorExecutingJob(_logger, ex, jobContext.Job.Id);
                 failureException = ex;
@@ -305,6 +332,7 @@ internal sealed partial class ShardExecutor
                     DurableJobsDiagnostics.SetError(activity, failureException);
                 }
             }
+
         }
         catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
         {
@@ -323,4 +351,9 @@ internal sealed partial class ShardExecutor
             runningTasks?.TryRemove(jobContext.Job.Id, out _);
         }
     }
+
+    private sealed class ResettableJobShardNotSupportedException(Type shardType)
+        : NotSupportedException(
+            $"Job shard implementation '{shardType}' does not support successful reset-rescheduling. "
+            + "RescheduleRequested cannot be processed without changing failure-attempt semantics.");
 }

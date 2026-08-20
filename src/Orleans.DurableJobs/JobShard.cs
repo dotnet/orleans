@@ -99,7 +99,7 @@ public interface IJobShard : IAsyncDisposable
 /// <summary>
 /// Base implementation of <see cref="IJobShard"/> that provides common functionality for job shard implementations.
 /// </summary>
-public abstract class JobShard : IJobShard
+public abstract class JobShard : IJobShard, IResettableJobShard
 {
     private readonly InMemoryJobQueue _jobQueue;
 
@@ -194,6 +194,17 @@ public abstract class JobShard : IJobShard
         _jobQueue.RetryJobLater(jobContext, newDueTime);
     }
 
+    async Task IResettableJobShard.RescheduleJobAsync(
+        IJobRunContext jobContext,
+        DateTimeOffset newDueTime,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(jobContext);
+        var resetContext = new JobRunContext(jobContext.Job, jobContext.RunId, retryCount: 0);
+        await PersistRetryJobAsync(resetContext, newDueTime, cancellationToken);
+        _jobQueue.RetryJobLater(jobContext.Job.Id, newDueTime, dequeueCount: 0);
+    }
+
     /// <summary>
     /// Enqueues a job into the in-memory queue with the specified dequeue count.
     /// </summary>
@@ -238,4 +249,9 @@ public abstract class JobShard : IJobShard
         GC.SuppressFinalize(this);
         return default;
     }
+}
+
+internal interface IResettableJobShard
+{
+    Task RescheduleJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken);
 }

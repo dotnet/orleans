@@ -16,16 +16,27 @@ public sealed class DurableJobRunResult
     public bool IsFailed => Status == DurableJobRunStatus.Failed;
 
     /// <summary>
-    /// Gets a value indicating whether the job should be polled again after a delay.
+    /// Gets a value indicating whether the job is still running and should be polled after a delay.
     /// </summary>
     [MemberNotNullWhen(true, nameof(PollAfterDelay))]
-    public bool IsPending => Status == DurableJobRunStatus.PollAfter;
+    public bool IsRunning => Status == DurableJobRunStatus.Running;
 
-    private DurableJobRunResult(DurableJobRunStatus status, TimeSpan? pollAfter, Exception? exception)
+    /// <summary>
+    /// Gets a value indicating whether the successfully handled job requested durable rescheduling.
+    /// </summary>
+    [MemberNotNullWhen(true, nameof(RescheduleTime))]
+    public bool IsRescheduleRequested => Status == DurableJobRunStatus.RescheduleRequested && RescheduleTime is not null;
+
+    private DurableJobRunResult(
+        DurableJobRunStatus status,
+        TimeSpan? pollAfterDelay,
+        Exception? exception,
+        DateTimeOffset? rescheduleTime)
     {
         Status = status;
-        PollAfterDelay = pollAfter;
+        PollAfterDelay = pollAfterDelay;
         Exception = exception;
+        RescheduleTime = rescheduleTime;
     }
 
     /// <summary>
@@ -35,7 +46,7 @@ public sealed class DurableJobRunResult
     public DurableJobRunStatus Status { get; }
 
     /// <summary>
-    /// Gets the delay before the next status check when <see cref="Status"/> is <see cref="DurableJobRunStatus.PollAfter"/>.
+    /// Gets the delay before the executor polls the ongoing run when <see cref="Status"/> is <see cref="DurableJobRunStatus.Running"/>.
     /// </summary>
     [Id(1)]
     public TimeSpan? PollAfterDelay { get; }
@@ -46,7 +57,13 @@ public sealed class DurableJobRunResult
     [Id(2)]
     public Exception? Exception { get; }
 
-    private static readonly DurableJobRunResult CompletedInstance = new(DurableJobRunStatus.Completed, null, null);
+    /// <summary>
+    /// Gets the time at which the job should be durably rescheduled after the current execution completes successfully.
+    /// </summary>
+    [Id(3)]
+    public DateTimeOffset? RescheduleTime { get; }
+
+    private static readonly DurableJobRunResult CompletedInstance = new(DurableJobRunStatus.Completed, null, null, null);
 
     /// <summary>
     /// Gets a result indicating the job completed successfully.
@@ -54,20 +71,35 @@ public sealed class DurableJobRunResult
     public static DurableJobRunResult Completed => CompletedInstance;
 
     /// <summary>
-    /// Creates a result indicating the job should be polled again after the specified delay.
+    /// Creates a result indicating the job is still running and should be polled after the specified delay.
     /// </summary>
-    /// <param name="delay">The time to wait before checking the job status again.</param>
-    /// <returns>A poll-after job result.</returns>
+    /// <param name="delay">The time to wait before polling the run again.</param>
+    /// <returns>A running job result.</returns>
     /// <remarks>
-    /// The job will remain in an inline polling loop without being re-queued.
-    /// The polling loop will hold a concurrency slot until the job completes or fails.
+    /// The executor keeps the current run and its concurrency slot active, then polls the receiver again after the delay.
     /// TODO: Add validation for minimum/maximum poll delays to prevent abuse.
     /// TODO: Consider concurrency slot management for long-running polls.
     /// </remarks>
-    public static DurableJobRunResult PollAfter(TimeSpan delay)
+    public static DurableJobRunResult Running(TimeSpan delay)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(delay, TimeSpan.Zero, nameof(delay));
-        return new(DurableJobRunStatus.PollAfter, delay, null);
+        return new(DurableJobRunStatus.Running, delay, null, null);
+    }
+
+    /// <summary>
+    /// Creates a result indicating that the current execution completed successfully and requested durable rescheduling.
+    /// </summary>
+    /// <param name="dueTime">The time at which the next execution should become due.</param>
+    /// <returns>A durable rescheduling result.</returns>
+    /// <remarks>
+    /// Rescheduling resets the failure-attempt count, so the next dequeue count is one.
+    /// During a mixed-version rolling upgrade, callers emit this result after every durable job executor
+    /// understands <see cref="DurableJobRunStatus.RescheduleRequested"/> (serialized value 3).
+    /// This rollout order preserves compatibility with executors that understand serialized values 0 through 2.
+    /// </remarks>
+    public static DurableJobRunResult RescheduleAt(DateTimeOffset dueTime)
+    {
+        return new(DurableJobRunStatus.RescheduleRequested, null, null, dueTime);
     }
 
     /// <summary>
@@ -81,7 +113,7 @@ public sealed class DurableJobRunResult
     public static DurableJobRunResult Failed(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        return new(DurableJobRunStatus.Failed, null, exception);
+        return new(DurableJobRunStatus.Failed, null, exception, null);
     }
 }
 
@@ -93,15 +125,24 @@ public enum DurableJobRunStatus
     /// <summary>
     /// The job completed successfully and should be removed from the queue.
     /// </summary>
-    Completed,
+    Completed = 0,
 
     /// <summary>
     /// The job is still running and should be polled again after the specified delay.
     /// </summary>
-    PollAfter,
+    Running = 1,
 
     /// <summary>
     /// The job failed and should be processed through the retry policy.
     /// </summary>
-    Failed
+    Failed = 2,
+
+    /// <summary>
+    /// The current execution completed successfully and requested durable rescheduling with its failure-attempt count reset.
+    /// </summary>
+    /// <remarks>
+    /// This value is serialized as 3. During rolling upgrades, emit it after all durable job executors support it.
+    /// Newer executors treat unknown disposition values as failures and route them through the configured retry policy.
+    /// </remarks>
+    RescheduleRequested = 3
 }

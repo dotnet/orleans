@@ -72,6 +72,51 @@ public class JobShardTests
         Assert.Equal(3, persistedContext.DequeueCount);
     }
 
+    [Fact]
+    public async Task SuccessfulRescheduleResetsDequeueCountAndCreatesNewRunId()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var resetShard = await CreateShardWithDueJobAsync("reset", now);
+        var resetRun = await ConsumeNextAsync(resetShard);
+
+        await ((IResettableJobShard)resetShard).RescheduleJobAsync(resetRun, now.AddSeconds(-1), CancellationToken.None);
+
+        var rescheduledRun = await ConsumeNextAsync(resetShard);
+        Assert.Equal(1, rescheduledRun.DequeueCount);
+        Assert.NotEqual(resetRun.RunId, rescheduledRun.RunId);
+        Assert.Equal(0, resetShard.PersistedRetryContext!.DequeueCount);
+
+        var retryShard = await CreateShardWithDueJobAsync("retry", now);
+        var firstFailure = await ConsumeNextAsync(retryShard);
+
+        await retryShard.RetryJobLaterAsync(firstFailure, now.AddSeconds(-1), CancellationToken.None);
+
+        var retriedRun = await ConsumeNextAsync(retryShard);
+        Assert.Equal(2, retriedRun.DequeueCount);
+        Assert.Equal(1, retryShard.PersistedRetryContext!.DequeueCount);
+    }
+
+    private static async Task<TestJobShard> CreateShardWithDueJobAsync(string id, DateTimeOffset now)
+    {
+        var shard = new TestJobShard(now.AddHours(-1), now.AddHours(1));
+        Assert.NotNull(await shard.TryScheduleJobAsync(
+            new ScheduleJobRequest
+            {
+                Target = GrainId.Create("test", id),
+                JobName = id,
+                DueTime = now.AddSeconds(-2)
+            },
+            CancellationToken.None));
+        return shard;
+    }
+
+    private static async Task<IJobRunContext> ConsumeNextAsync(IJobShard shard)
+    {
+        await using var enumerator = shard.ConsumeDurableJobsAsync().GetAsyncEnumerator(CancellationToken.None);
+        Assert.True(await enumerator.MoveNextAsync());
+        return enumerator.Current;
+    }
+
     private sealed class TestJobShard(DateTimeOffset startTime, DateTimeOffset endTime)
         : JobShard("shard", startTime, endTime)
     {
