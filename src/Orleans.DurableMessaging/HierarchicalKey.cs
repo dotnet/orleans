@@ -3,16 +3,17 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 
-namespace Orleans;
+namespace Orleans.DurableMessaging;
 
 /// <summary>
-/// Represents a hierarchical key with support for parent-child relationships and segment-based navigation.
+/// Represents a hierarchical correlation key with support for parent-child relationships and segment-based navigation.
 /// </summary>
 /// <remarks>
-/// HierarchicalKey provides a way to represent hierarchical identifiers using slash-separated segments,
-/// similar to file paths or URLs. Segments can be escaped to allow literal slash characters.
+/// <see cref="HierarchicalKey"/> provides a durable correlation identifier using slash-separated segments.
+/// Segments can be escaped to allow literal slash characters.
 /// </remarks>
 [GenerateSerializer, Immutable]
+[Alias("Orleans.HierarchicalKey")]
 public sealed class HierarchicalKey : ISpanFormattable, IEquatable<HierarchicalKey>, IParsable<HierarchicalKey>, ISpanParsable<HierarchicalKey>
 {
     /// <summary>
