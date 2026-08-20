@@ -22,7 +22,6 @@ if (Test-Path -LiteralPath $packageSource) {
     --output $packageSource `
     -p:Version=$packageVersion `
     -p:BuildExternalAssets=$buildExternalAssets `
-    -p:PackUnpublishedSampleDependencies=true `
     --nologo
 if ($LASTEXITCODE -ne 0) {
     throw "Orleans package build failed with exit code $LASTEXITCODE."

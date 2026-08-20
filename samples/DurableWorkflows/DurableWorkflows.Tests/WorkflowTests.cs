@@ -117,8 +117,8 @@ public sealed class WorkflowTests : IAsyncLifetime
         var result = await recovered.WaitAsync();
 
         Assert.True(result.Canceled);
+        Assert.Equal(id, result.CancellationId);
         Assert.Equal("operator request", result.Reason);
-        Assert.Equal(id, (await Client.GetGrain<ICancellationGrain>(id).GetSnapshotAsync()).Signal!.CancellationId);
     }
 
     [Fact]
