@@ -18,25 +18,9 @@ items:
         href: quickstarts/build-your-first-orleans-app.md
       - name: Deploy and scale on Azure
         href: quickstarts/deploy-scale-orleans-on-azure.md
-  - name: Walkthroughs and tutorials
+  - name: Grains
     items:
-      - name: Model an adventure game
-        href: tutorials-and-samples/adventure.md
-      - name: Build custom grain storage
-        href: tutorials-and-samples/custom-grain-storage.md
-      - name: Deploy an Orleans application to Azure Container Apps
-        href: tutorials-and-samples/production-application.md
-      - name: Test an Orleans application end to end
-        href: tutorials-and-samples/testing-walkthrough.md
-      - name: Build and recover a streaming application
-        href: tutorials-and-samples/streaming-walkthrough.md
-  - name: How-to guides
-    items:
-      - name: Recipe index
-        href: how-to/index.md
-  - name: Develop applications
-    items:
-      - name: Grains
+      - name: Fundamentals
         items:
           - name: Develop grains
             href: grains/index.md
@@ -44,8 +28,16 @@ items:
             href: grains/grain-references.md
           - name: Grain identity
             href: grains/grain-identity.md
+          - name: Grain activation and lifecycle
+            href: grains/grain-lifecycle.md
           - name: Grain extensions
             href: grains/grain-extensions.md
+          - name: Grain services
+            href: grains/grainservices.md
+          - name: Stateless worker grains
+            href: grains/stateless-worker-grains.md
+      - name: Communication and scheduling
+        items:
           - name: Timers and reminders
             href: grains/timers-and-reminders.md
           - name: Observers
@@ -62,41 +54,9 @@ items:
             href: grains/external-tasks-and-grains.md
           - name: Interceptors
             href: grains/interceptors.md
-          - name: Grain services
-            href: grains/grainservices.md
-          - name: Stateless worker grains
-            href: grains/stateless-worker-grains.md
           - name: One-way requests
             href: grains/oneway.md
-          - name: Grain activation and lifecycle
-            href: grains/grain-lifecycle.md
-          - name: Code generation
-            items:
-              - name: Overview
-                href: grains/code-generation.md
-              - name: Advanced customization
-                href: grains/code-generation-customization.md
-      - name: Test Orleans applications
-        href: grains/testing.md
-      - name: Placement and versioning
-        items:
-          - name: Grain placement and migration
-            href: grains/grain-placement.md
-          - name: Placement filtering
-            href: grains/grain-placement-filtering.md
-          - name: Interface versioning
-            href: grains/grain-versioning/grain-versioning.md
-          - name: Contract compatibility analyzer
-            href: grains/grain-versioning/contract-compatibility-analyzer.md
-          - name: Backward compatibility guidelines
-            href: grains/grain-versioning/backward-compatibility-guidelines.md
-          - name: Compatible grains
-            href: grains/grain-versioning/compatible-grains.md
-          - name: Version selector strategy
-            href: grains/grain-versioning/version-selector-strategy.md
-          - name: Deploy new grain versions
-            href: grains/grain-versioning/deploying-new-versions-of-grains.md
-      - name: State and durability
+      - name: State management
         items:
           - name: Grain persistence
             items:
@@ -140,34 +100,86 @@ items:
                 href: grains/journaling/redis-journal-storage.md
           - name: Transactions
             href: grains/transactions.md
-      - name: Streaming
-        items:
-          - name: Overview
-            href: streaming/index.md
-          - name: Streams quickstart
-            href: streaming/streams-quick-start.md
-          - name: Why streams?
-            href: streaming/streams-why.md
-          - name: Programming APIs
-            href: streaming/streams-programming-apis.md
-          - name: Stream providers
-            href: streaming/stream-providers.md
-          - name: External producers and consumers
-            href: streaming/external-streams.md
-          - name: Customize stream data formats
-            href: streaming/data-adapters.md
-          - name: Write a custom queue adapter
-            href: streaming/custom-queue-adapter.md
-          - name: Amazon Kinesis
-            href: streaming/kinesis-streaming.md
-          - name: Delivery semantics
-            href: streaming/delivery-semantics.md
-          - name: Pub-sub storage
-            href: streaming/pubsub-storage.md
-          - name: Operate streaming applications
-            href: streaming/streaming-operations.md
-          - name: Broadcast channels
-            href: streaming/broadcast-channel.md
+  - name: Serialization and code generation
+    items:
+      - name: Serialization overview
+        href: host/configuration-guide/serialization.md
+      - name: Immutable types
+        href: host/configuration-guide/serialization-immutability.md
+      - name: Configure serialization
+        href: host/configuration-guide/serialization-configuration.md
+      - name: Customize serialization
+        href: host/configuration-guide/serialization-customization.md
+      - name: Source generation
+        href: grains/code-generation.md
+      - name: Advanced code-generation customization
+        href: grains/code-generation-customization.md
+  - name: Streaming
+    items:
+      - name: Overview
+        href: streaming/index.md
+      - name: Streams quickstart
+        href: streaming/streams-quick-start.md
+      - name: Why streams?
+        href: streaming/streams-why.md
+      - name: Programming APIs
+        href: streaming/streams-programming-apis.md
+      - name: Stream providers
+        href: streaming/stream-providers.md
+      - name: External producers and consumers
+        href: streaming/external-streams.md
+      - name: Customize stream data formats
+        href: streaming/data-adapters.md
+      - name: Write a custom queue adapter
+        href: streaming/custom-queue-adapter.md
+      - name: Amazon Kinesis
+        href: streaming/kinesis-streaming.md
+      - name: Delivery semantics
+        href: streaming/delivery-semantics.md
+      - name: Pub-sub storage
+        href: streaming/pubsub-storage.md
+      - name: Operate streaming applications
+        href: streaming/streaming-operations.md
+      - name: Broadcast channels
+        href: streaming/broadcast-channel.md
+  - name: Placement and versioning
+    items:
+      - name: Grain placement and migration
+        href: grains/grain-placement.md
+      - name: Placement filtering
+        href: grains/grain-placement-filtering.md
+      - name: Interface versioning
+        href: grains/grain-versioning/grain-versioning.md
+      - name: Contract compatibility analyzer
+        href: grains/grain-versioning/contract-compatibility-analyzer.md
+      - name: Backward compatibility guidelines
+        href: grains/grain-versioning/backward-compatibility-guidelines.md
+      - name: Compatible grains
+        href: grains/grain-versioning/compatible-grains.md
+      - name: Version selector strategy
+        href: grains/grain-versioning/version-selector-strategy.md
+      - name: Deploy new grain versions
+        href: grains/grain-versioning/deploying-new-versions-of-grains.md
+  - name: Testing
+    items:
+      - name: Test Orleans applications
+        href: grains/testing.md
+  - name: Walkthroughs and tutorials
+    items:
+      - name: Model an adventure game
+        href: tutorials-and-samples/adventure.md
+      - name: Build custom grain storage
+        href: tutorials-and-samples/custom-grain-storage.md
+      - name: Deploy an Orleans application to Azure Container Apps
+        href: tutorials-and-samples/production-application.md
+      - name: Test an Orleans application end to end
+        href: tutorials-and-samples/testing-walkthrough.md
+      - name: Build and recover a streaming application
+        href: tutorials-and-samples/streaming-walkthrough.md
+  - name: How-to guides
+    items:
+      - name: Recipe index
+        href: how-to/index.md
   - name: Host and configure
     items:
       - name: Hosting
@@ -220,16 +232,6 @@ items:
             href: host/configuration-guide/startup-tasks.md
           - name: Graceful shutdown
             href: host/configuration-guide/shutting-down-orleans.md
-      - name: Serialization
-        items:
-          - name: Overview
-            href: host/configuration-guide/serialization.md
-          - name: Immutable types
-            href: host/configuration-guide/serialization-immutability.md
-          - name: Configure serialization
-            href: host/configuration-guide/serialization-configuration.md
-          - name: Customize serialization
-            href: host/configuration-guide/serialization-customization.md
       - name: Observability and diagnostics
         items:
           - name: Overview
