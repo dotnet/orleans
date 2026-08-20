@@ -125,6 +125,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         ArgumentNullException.ThrowIfNull(pumpResults);
         ArgumentNullException.ThrowIfNull(jobTimeProvider);
         ArgumentNullException.ThrowIfNull(options);
+        DurableMessagingStateManagerCapabilities.Validate(manager);
 
         _stateManager = manager;
         _messages = messages;
@@ -751,11 +752,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             return result!;
         }
 
-        if (_pumpResults.TryStart(key))
+        if (_pumpResults.TryStart(key, cancellationToken, out var execution))
         {
             var state = new PumpTimerState(
                 this,
-                key,
+                execution,
                 ownershipId,
                 hasStableOwnership,
                 cancellationToken);
@@ -774,27 +775,44 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     }
 
     private async Task RunPumpTimerAsync(
-        DurableMessagingPumpExecutionKey key,
+        DurableMessagingPumpExecution execution,
         string ownershipId,
         bool hasStableOwnership,
         CancellationToken jobCancellation,
         CancellationToken timerCancellation)
     {
+        if (!_pumpResults.TryBegin(execution))
+        {
+            return;
+        }
+
+        DurableJobRunResult? result = null;
+        Exception? failure = null;
         try
         {
             using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
                 jobCancellation,
                 timerCancellation,
                 _shutdown.Token);
-            var result = await ExecuteJobCoreAsync(
+            result = await ExecuteJobCoreAsync(
                 ownershipId,
                 hasStableOwnership,
                 linkedCancellation.Token);
-            _pumpResults.Complete(key, result);
         }
         catch (Exception exception)
         {
-            _pumpResults.Fail(key, exception);
+            failure = exception;
+        }
+        finally
+        {
+            if (failure is null)
+            {
+                _pumpResults.Complete(execution, result!);
+            }
+            else
+            {
+                _pumpResults.Fail(execution, failure);
+            }
         }
     }
 
@@ -978,7 +996,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
     private sealed class PumpTimerState(
         DurableOutbox owner,
-        DurableMessagingPumpExecutionKey key,
+        DurableMessagingPumpExecution execution,
         string ownershipId,
         bool hasStableOwnership,
         CancellationToken jobCancellation)
@@ -990,7 +1008,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             try
             {
                 await owner.RunPumpTimerAsync(
-                    key,
+                    execution,
                     ownershipId,
                     hasStableOwnership,
                     jobCancellation,

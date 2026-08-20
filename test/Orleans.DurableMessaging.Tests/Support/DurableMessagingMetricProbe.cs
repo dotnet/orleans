@@ -6,6 +6,7 @@ namespace Orleans.DurableMessaging.Tests.Support;
 public sealed class DurableMessagingMetricProbe : IDisposable
 {
     private readonly ConcurrentDictionary<(string Instrument, string JobName), long> _measurements = [];
+    private readonly ConcurrentDictionary<string, long> _gauges = [];
     private readonly object _lock = new();
     private TaskCompletionSource _changed = CreateSignal();
     private readonly MeterListener _listener;
@@ -20,7 +21,9 @@ public sealed class DurableMessagingMetricProbe : IDisposable
                     && instrument.Name is "orleans-durable-messaging-orphaned-jobs-reclaimed"
                         or "orleans-durablejobs-job-attempts-started"
                         or "orleans-durablejobs-handler-executions-started"
-                        or "orleans-durablejobs-jobs-completed")
+                        or "orleans-durablejobs-jobs-completed"
+                        or "orleans-durable-messaging-inbox-depth"
+                        or "orleans-durable-messaging-outbox-depth")
                 {
                     listener.EnableMeasurementEvents(instrument);
                 }
@@ -32,6 +35,12 @@ public sealed class DurableMessagingMetricProbe : IDisposable
 
     public long GetCount(string instrument, string jobName = "") =>
         _measurements.TryGetValue((instrument, jobName), out var count) ? count : 0;
+
+    public long GetDepth(string instrument)
+    {
+        _listener.RecordObservableInstruments();
+        return _gauges.TryGetValue(instrument, out var value) ? value : 0;
+    }
 
     public async Task WaitForCountAsync(
         string instrument,
@@ -66,6 +75,12 @@ public sealed class DurableMessagingMetricProbe : IDisposable
         ReadOnlySpan<KeyValuePair<string, object?>> tags,
         object? state)
     {
+        if (instrument.Name is "orleans-durable-messaging-inbox-depth" or "orleans-durable-messaging-outbox-depth")
+        {
+            _gauges[instrument.Name] = measurement;
+            return;
+        }
+
         var jobName = "";
         foreach (var tag in tags)
         {
