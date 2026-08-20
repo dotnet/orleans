@@ -299,6 +299,28 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task DuplicateExactRouteRegistration_ThrowsAndPreservesLookupAndDispatch()
+    {
+        var receiver = NewGrain();
+        const string route = "exact/duplicate";
+
+        var registration = await receiver.RegisterDuplicateExactRouteHandlersAsync(route);
+
+        Assert.Equal(
+            "A handler is already registered for exact route 'exact/duplicate'.",
+            registration.ExceptionMessage);
+        Assert.True(registration.LookupRetainedFirstHandler);
+
+        using var envelope = CreateEnvelope(receiver, NewMessage(69, "first-handler"), route);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        var state = await fixture.SnapshotProbe.WaitAsync(
+            receiver.GetGrainId(),
+            static snapshot => snapshot.FirstExactRouteHandlerCalls == 1);
+        Assert.Equal(1, state.FirstExactRouteHandlerCalls);
+        Assert.Equal(0, state.ReplacementExactRouteHandlerCalls);
+    }
+
+    [Fact]
     public async Task RouteNotFound_IsRejectedWithoutInboxPersistence()
     {
         var receiver = NewGrain();
