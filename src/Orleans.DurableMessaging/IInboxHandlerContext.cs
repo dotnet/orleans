@@ -141,13 +141,17 @@ public interface IInboxHandlerContext
     /// context.Send(envelope);
     ///
     /// // Request with correlation and reply-to
-    /// var request = context.CreateEnvelope()
+    /// var requestBuilder = context.CreateEnvelope()
     ///     .To(paymentGrain, "payment/authorize")
     ///     .WithBody(new PaymentRequest { Amount = 100.00m })
-    ///     .WithCorrelationKey(context.Envelope.CorrelationKey?.CreateChildKey("payment"))
     ///     .WithReplyTo(context.GrainId)
-    ///     .WithContextValue("idempotency-key", Guid.NewGuid().ToString())
-    ///     .Build();
+    ///     .WithContextValue("idempotency-key", Guid.NewGuid().ToString());
+    /// if (context.Envelope.CorrelationKey is { } correlationKey)
+    /// {
+    ///     requestBuilder.WithCorrelationKey(correlationKey.CreateChildKey("payment"));
+    /// }
+    ///
+    /// var request = requestBuilder.Build();
     /// context.Send(request);
     /// </code>
     /// </example>
