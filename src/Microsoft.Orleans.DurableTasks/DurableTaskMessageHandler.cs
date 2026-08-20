@@ -21,17 +21,21 @@ internal sealed class DurableTaskMessageHandler(
                     throw new InvalidOperationException("The durable task invocation payload could not be deserialized.");
                 }
 
-                invocation.Request.Context!.CallerId = context.Envelope.ReplyTo ?? context.Envelope.SenderId;
-                invocation.Request.Context.SupportsDurableCompletion = true;
+                var request = invocation.Request
+                    ?? throw new InvalidOperationException("The durable task invocation request is missing.");
+                var requestContext = request.Context
+                    ?? throw new InvalidOperationException("The durable task invocation request has no context.");
+                requestContext.CallerId = context.Envelope.ReplyTo ?? context.Envelope.SenderId;
+                requestContext.SupportsDurableCompletion = true;
                 var response = await runtime.ScheduleFromInboxAsync(
                     invocation.TaskId,
-                    invocation.Request,
+                    request,
                     cancellationToken);
                 if (response.IsCompleted)
                 {
                     transport.SendCompletion(
                         context.GrainId,
-                        invocation.Request.Context.CallerId,
+                        requestContext.CallerId,
                         invocation.TaskId,
                         response);
                 }

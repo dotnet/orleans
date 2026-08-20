@@ -9,11 +9,13 @@ using NSubstitute;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.DurableJobs;
+using Orleans.DurableMessaging;
 using Orleans.Invocation;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
+using Orleans.Serialization.Session;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.Tests;
@@ -68,6 +70,43 @@ public sealed class DurableTaskRuntimeInvariantTests
             () => runtime.ScheduleFromInboxAsync(taskId, CreateRequest(2), default).AsTask());
 
         Assert.Contains("different request", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task InvocationWithoutRequestContextFailsBeforeChangingDurableState()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var services = new ServiceCollection();
+        services.AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskRuntimeInvariantTests).Assembly));
+        using var serviceProvider = services.BuildServiceProvider();
+        var sender = GrainId.Create("caller", "one");
+        var receiver = GrainId.Create("target", "one");
+        var envelope = new DurableEnvelopeBuilder(
+                serviceProvider.GetRequiredService<SerializerSessionPool>(),
+                sender)
+            .To(receiver, DurableTaskMessageTransport.InvocationRoute)
+            .WithBody(new DurableTaskInvocationMessage
+            {
+                TaskId = TaskId.Parse("legacy"),
+                Request = new TestDurableTaskRequest(),
+            })
+            .Build();
+        var context = Substitute.For<IInboxHandlerContext>();
+        context.Envelope.Returns(envelope);
+        context.GrainId.Returns(receiver);
+        var handler = (IInboxHandler)new DurableTaskMessageHandler(runtime, transport);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await handler.HandleAsync(context, CancellationToken.None));
+
+        Assert.Equal("The durable task invocation request has no context.", exception.Message);
+        Assert.Empty(storage.Tasks);
+        Assert.Equal(0, manager.WriteCount);
+        Assert.Empty(transport.Invocations);
+        Assert.Empty(transport.Completions);
+        Assert.Empty(transport.Cancellations);
+        Assert.Empty(transport.ScheduledResumes);
+        Assert.Equal(0, transport.CommitCount);
     }
 
     [Fact]
