@@ -56,10 +56,10 @@ namespace UnitTests.GrainInterfaces
     public interface IOneWayGrain : IGrainWithGuidKey
     {
         [OneWay]
-        Task Notify(ISimpleGrainObserver observer);
+        Task Notify();
 
         [OneWay]
-        ValueTask NotifyValueTask(ISimpleGrainObserver observer);
+        ValueTask NotifyValueTask();
 
         [OneWay]
         Task ThrowsOneWay();
@@ -67,15 +67,18 @@ namespace UnitTests.GrainInterfaces
         [OneWay]
         ValueTask ThrowsOneWayValueTask();
 
-        Task<bool> NotifyOtherGrain(IOneWayGrain otherGrain, ISimpleGrainObserver observer);
+        Task<bool> NotifyOtherGrain(IOneWayGrain otherGrain);
 
-        Task<bool> NotifyOtherGrainValueTask(IOneWayGrain otherGrain, ISimpleGrainObserver observer);
+        Task<bool> NotifyOtherGrainValueTask(IOneWayGrain otherGrain);
 
         Task<IOneWayGrain> GetOtherGrain();
 
         Task NotifyOtherGrain();
 
         Task<int> GetCount();
+
+        [AlwaysInterleave]
+        Task WaitForCount(int expectedCount);
 
         Task Deactivate();
 

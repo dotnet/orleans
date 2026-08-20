@@ -211,6 +211,7 @@ namespace UnitTests.Grains
     {
         private readonly string _id = Guid.NewGuid().ToString();
         private int count;
+        private TaskCompletionSource<int> countChanged = CreateCountChangedSource();
         private TaskCompletionSource<string> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private IOneWayGrain? other;
         private readonly GrainLocator grainLocator;
@@ -223,35 +224,35 @@ namespace UnitTests.Grains
 
         public Task Notify()
         {
-            this.count++;
+            IncrementCount();
             return Task.CompletedTask;
         }
 
-        public Task Notify(ISimpleGrainObserver observer)
+        public ValueTask NotifyValueTask()
         {
-            this.count++;
-            observer.StateChanged(this.count - 1, this.count);
-            return Task.CompletedTask;
-        }
-
-        public ValueTask NotifyValueTask(ISimpleGrainObserver observer)
-        {
-            this.count++;
-            observer.StateChanged(this.count - 1, this.count);
+            IncrementCount();
             return default;
         }
 
-        public async Task<bool> NotifyOtherGrain(IOneWayGrain otherGrain, ISimpleGrainObserver observer)
+        public async Task WaitForCount(int expectedCount)
         {
-            var task = otherGrain.Notify(observer);
+            while (this.count < expectedCount)
+            {
+                await this.countChanged.Task;
+            }
+        }
+
+        public async Task<bool> NotifyOtherGrain(IOneWayGrain otherGrain)
+        {
+            var task = otherGrain.Notify();
             var completedSynchronously = task.Status == TaskStatus.RanToCompletion;
             await task;
             return completedSynchronously;
         }
 
-        public async Task<bool> NotifyOtherGrainValueTask(IOneWayGrain otherGrain, ISimpleGrainObserver observer)
+        public async Task<bool> NotifyOtherGrainValueTask(IOneWayGrain otherGrain)
         {
-            var task = otherGrain.NotifyValueTask(observer);
+            var task = otherGrain.NotifyValueTask();
             var completedSynchronously = task.IsCompleted;
             await task;
             return completedSynchronously;
@@ -298,9 +299,18 @@ namespace UnitTests.Grains
             return Task.FromResult<string>(null!);
         }
 
-        public Task NotifyOtherGrain() => this.other!.Notify(this.AsReference<ISimpleGrainObserver>());
+        public Task NotifyOtherGrain() => this.other!.Notify();
 
         public Task<int> GetCount() => Task.FromResult(this.count);
+
+        private static TaskCompletionSource<int> CreateCountChangedSource() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        private void IncrementCount()
+        {
+            this.count++;
+            this.countChanged.TrySetResult(this.count);
+            this.countChanged = CreateCountChangedSource();
+        }
 
         public Task Deactivate()
         {

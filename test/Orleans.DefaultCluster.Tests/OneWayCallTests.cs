@@ -1,4 +1,3 @@
-using Orleans.Internal;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -31,13 +30,14 @@ namespace DefaultCluster.Tests.General
         public async Task OneWayMethodsReturnSynchronously_ViaClient()
         {
             var grain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
+            const int expectedCount = 1;
+            var countReached = grain.WaitForCount(expectedCount);
 
-            var observer = new SimpleGrainObserver();
-            var task = grain.Notify(this.Client.CreateObjectReference<ISimpleGrainObserver>(observer));
+            var task = grain.Notify();
             Assert.True(task.Status == TaskStatus.RanToCompletion, "Task should be synchronously completed.");
-            await WaitForNotification(observer);
+            await WaitForCount(grain, countReached, nameof(OneWayMethodsReturnSynchronously_ViaClient), expectedCount);
             var count = await grain.GetCount();
-            Assert.Equal(1, count);
+            Assert.Equal(expectedCount, count);
 
             // This should not throw.
             task = grain.ThrowsOneWay();
@@ -55,14 +55,14 @@ namespace DefaultCluster.Tests.General
         {
             var grain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
             var otherGrain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
+            const int expectedCount = 1;
+            var countReached = otherGrain.WaitForCount(expectedCount);
 
-            var observer = new SimpleGrainObserver();
-            var observerReference = this.Client.CreateObjectReference<ISimpleGrainObserver>(observer);
-            var completedSynchronously = await grain.NotifyOtherGrain(otherGrain, observerReference);
+            var completedSynchronously = await grain.NotifyOtherGrain(otherGrain);
             Assert.True(completedSynchronously, "Task should be synchronously completed.");
-            await WaitForNotification(observer);
+            await WaitForCount(otherGrain, countReached, nameof(OneWayMethodReturnSynchronously_ViaGrain), expectedCount);
             var count = await otherGrain.GetCount();
-            Assert.Equal(1, count);
+            Assert.Equal(expectedCount, count);
         }
 
         /// <summary>
@@ -75,13 +75,14 @@ namespace DefaultCluster.Tests.General
         public async Task OneWayMethodsReturnSynchronously_ViaClient_ValueTask()
         {
             var grain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
+            const int expectedCount = 1;
+            var countReached = grain.WaitForCount(expectedCount);
 
-            var observer = new SimpleGrainObserver();
-            var task = grain.NotifyValueTask(this.Client.CreateObjectReference<ISimpleGrainObserver>(observer));
+            var task = grain.NotifyValueTask();
             Assert.True(task.IsCompleted, "ValueTask should be synchronously completed.");
-            await WaitForNotification(observer);
+            await WaitForCount(grain, countReached, nameof(OneWayMethodsReturnSynchronously_ViaClient_ValueTask), expectedCount);
             var count = await grain.GetCount();
-            Assert.Equal(1, count);
+            Assert.Equal(expectedCount, count);
 
             // This should not throw.
             task = grain.ThrowsOneWayValueTask();
@@ -98,31 +99,28 @@ namespace DefaultCluster.Tests.General
         {
             var grain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
             var otherGrain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
+            const int expectedCount = 1;
+            var countReached = otherGrain.WaitForCount(expectedCount);
 
-            var observer = new SimpleGrainObserver();
-            var observerReference = this.Client.CreateObjectReference<ISimpleGrainObserver>(observer);
-            var completedSynchronously = await grain.NotifyOtherGrainValueTask(otherGrain, observerReference);
+            var completedSynchronously = await grain.NotifyOtherGrainValueTask(otherGrain);
             Assert.True(completedSynchronously, "Task should be synchronously completed.");
-            await WaitForNotification(observer);
+            await WaitForCount(otherGrain, countReached, nameof(OneWayMethodReturnSynchronously_ViaGrain_ValueTask), expectedCount);
             var count = await otherGrain.GetCount();
-            Assert.Equal(1, count);
+            Assert.Equal(expectedCount, count);
         }
 
-        private static async Task WaitForNotification(SimpleGrainObserver observer)
+        private static async Task WaitForCount(IOneWayGrain grain, Task countReached, string scenario, int expectedCount)
         {
-            await observer.ReceivedValue.WaitAsync(TimeSpan.FromSeconds(10));
-
-            // Client observer registrations are weak, so keep the target rooted until the callback completes.
-            GC.KeepAlive(observer);
-        }
-
-        private class SimpleGrainObserver : ISimpleGrainObserver
-        {
-            private readonly TaskCompletionSource<int> completion = new TaskCompletionSource<int>();
-            public Task ReceivedValue => this.completion.Task;
-            public void StateChanged(int a, int b)
+            try
             {
-                this.completion.SetResult(b);
+                await countReached.WaitAsync(TimeSpan.FromSeconds(10));
+            }
+            catch (TimeoutException exception)
+            {
+                var actualCount = await grain.GetCount();
+                throw new TimeoutException(
+                    $"Timed out waiting for one-way notification. Scenario: {scenario}. Expected count: {expectedCount}. Actual count: {actualCount}.",
+                    exception);
             }
         }
     }
