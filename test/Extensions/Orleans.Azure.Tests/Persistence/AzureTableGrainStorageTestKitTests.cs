@@ -12,7 +12,7 @@ namespace Tester.AzureUtils.Persistence;
 [TestCategory("Persistence"), TestCategory("AzureStorage")]
 public class AzureTableGrainStorageTestKitTests : GrainStorageTestRunner, IClassFixture<AzureTableGrainStorageTestKitTests.Fixture>
 {
-    public class Fixture : GrainStorageTestFixture
+    public class Fixture : GrainStorageTestFixture, IAsyncLifetime
     {
         protected override string StorageProviderName => "AzureTableStore";
 

@@ -1,6 +1,7 @@
 using Orleans.Runtime;
 using Orleans.Storage;
-using Xunit;
+using Assert = Orleans.Persistence.TestKit.StorageTestAssertions;
+using Record = Orleans.Persistence.TestKit.StorageTestExecution;
 
 namespace Orleans.Persistence.TestKit;
 
