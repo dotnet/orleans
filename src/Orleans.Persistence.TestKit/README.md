@@ -1,6 +1,6 @@
 # Orleans.Persistence.TestKit
 
-A comprehensive, framework-neutral testing kit for Orleans `IGrainStorage` providers. This package provides reusable asynchronous test methods which throw when a provider violates the expected behavior, so they can run under any .NET testing framework.
+Repository-internal, framework-neutral test infrastructure for Orleans `IGrainStorage` providers. The project provides reusable asynchronous storage conformance tests for Orleans-owned provider test suites.
 
 ## Features
 
@@ -10,12 +10,12 @@ A comprehensive, framework-neutral testing kit for Orleans `IGrainStorage` provi
 - **Easy Integration**: Simple base classes for quick test setup
 - **Framework Neutral**: Integrates with xUnit, NUnit, MSTest, and other .NET testing frameworks
 
-## Installation
+## Availability
 
-Add the test kit to a test project and use the same version as the other Microsoft Orleans packages in the project:
+Publication is intentionally deferred. Orleans provider test projects consume the test kit from source using a private project reference:
 
-```bash
-dotnet add package Microsoft.Orleans.Persistence.TestKit
+```xml
+<ProjectReference Include="$(SourceRoot)src\Orleans.Persistence.TestKit\Orleans.Persistence.TestKit.csproj" PrivateAssets="all" />
 ```
 
 ## Quick Start
@@ -273,7 +273,7 @@ public class MemoryStorageTests : GrainStorageTestRunner, IClassFixture<MemorySt
 
 ## Contributing
 
-This is an official Orleans package. For issues or contributions, please visit the [Orleans repository](https://github.com/dotnet/orleans).
+This project is maintained in the [Orleans repository](https://github.com/dotnet/orleans).
 
 ## License
 
