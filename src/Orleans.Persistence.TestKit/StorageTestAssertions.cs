@@ -6,7 +6,7 @@ internal static class StorageTestAssertions
     {
         if (!EqualityComparer<T>.Default.Equals(expected, actual))
         {
-            throw new InvalidOperationException($"Expected '{expected}', but found '{actual}'.");
+            throw new InvalidOperationException($"Expected '{FormatValue(expected)}', but found '{FormatValue(actual)}'.");
         }
     }
 
@@ -14,7 +14,7 @@ internal static class StorageTestAssertions
     {
         if (EqualityComparer<T>.Default.Equals(notExpected, actual))
         {
-            throw new InvalidOperationException($"Expected a value other than '{notExpected}'.");
+            throw new InvalidOperationException($"Expected a value other than '{FormatValue(notExpected)}'.");
         }
     }
 
@@ -54,7 +54,7 @@ internal static class StorageTestAssertions
     {
         if (value?.GetType() != typeof(T))
         {
-            throw new InvalidOperationException($"Expected a value of type '{typeof(T)}', but found '{value?.GetType()}'.");
+            throw new InvalidOperationException($"Expected a value of type '{typeof(T)}', but found '{FormatType(value)}'.");
         }
 
         return (T)value;
@@ -64,11 +64,15 @@ internal static class StorageTestAssertions
     {
         if (value is not T result)
         {
-            throw new InvalidOperationException($"Expected a value assignable to '{typeof(T)}', but found '{value?.GetType()}'.");
+            throw new InvalidOperationException($"Expected a value assignable to '{typeof(T)}', but found '{FormatType(value)}'.");
         }
 
         return result;
     }
+
+    private static string FormatValue<T>(T value) => value is null ? "<null>" : $"{value}";
+
+    private static string FormatType(object? value) => value?.GetType().ToString() ?? "<null>";
 }
 
 internal static class StorageTestExecution

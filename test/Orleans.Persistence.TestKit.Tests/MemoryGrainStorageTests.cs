@@ -52,14 +52,31 @@ public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<Mem
     [Fact]
     public async Task ProviderViolation_ThrowsFrameworkNeutralException()
     {
-        var runner = new TestRunner(new InvalidGrainStorage());
+        var runner = new TestRunner(new NullStateGrainStorage());
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(runner.PersistenceStorage_WriteRead_StringKey);
 
-        Assert.StartsWith("Expected", exception.Message);
+        Assert.Contains("found '<null>'", exception.Message);
     }
 
     private sealed class TestRunner(IGrainStorage storage) : GrainStorageTestRunner(storage);
+
+    private sealed class NullStateGrainStorage : IGrainStorage
+    {
+        public Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        {
+            grainState.State = default!;
+            return Task.CompletedTask;
+        }
+
+        public Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        {
+            grainState.RecordExists = true;
+            return Task.CompletedTask;
+        }
+
+        public Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState) => Task.CompletedTask;
+    }
 
     [Fact]
     public override Task PersistenceStorage_WriteReadIdCyrillic()
