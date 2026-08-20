@@ -14,11 +14,17 @@ messages whose state effects and outgoing messages must survive activation loss.
 ## Message and routing model
 
 Each <xref:Orleans.DurableMessaging.DurableEnvelope> identifies its sender, target,
-route, message ID, optional <xref:Orleans.HierarchicalKey> correlation, optional
+route, message ID, optional <xref:Orleans.DurableMessaging.HierarchicalKey> correlation, optional
 `ReplyTo` grain ID, and an opaque serialized body. A receiver evaluates registered
 handlers in registration order. Handlers can select envelopes by exact route, route
 prefix, correlation hierarchy, or arbitrary metadata, and typed handlers deserialize
 the body only when selected.
+
+The preview correlation key type now belongs to this package as
+<xref:Orleans.DurableMessaging.HierarchicalKey>. Draft consumers of
+`Orleans.HierarchicalKey` should update their namespace import. Its serialized alias
+and member identifiers remain unchanged, so envelopes written by the earlier draft
+remain readable.
 
 `ReplyTo` is general message metadata. Applications decide which route and body to use
 for a follow-up message.
