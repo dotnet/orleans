@@ -3,6 +3,7 @@ using System.Linq;
 using System.Net;
 using Orleans.Runtime;
 using Orleans.Testing.Reminders;
+using TestExtensions;
 using Xunit;
 using ReminderEvents = Orleans.Reminders.Diagnostics.ReminderEvents;
 
@@ -87,21 +88,32 @@ public class ReminderEventsTests
     public async Task ReminderDiagnosticObserver_WaitsForTickCondition_UntilConditionIsSatisfied()
     {
         using var observer = ReminderDiagnosticObserver.Create();
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        using var cancellation = new CancellationTokenSource(TestConstants.InitTimeout);
         var grainId = GrainId.Create("test", "grain");
         const string reminderName = "reminder";
         var now = DateTime.UtcNow;
         var period = TimeSpan.FromSeconds(5);
         var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 14003), 4);
-        var acceptedTickCount = 0;
+        var secondConditionCheck = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var conditionCheckCount = 0;
 
         var waitTask = observer.WaitForTickConditionAsync(
             grainId,
-            _ => Task.FromResult(acceptedTickCount >= 1),
-            cts.Token,
+            _ =>
+            {
+                var currentCheck = Interlocked.Increment(ref conditionCheckCount);
+                if (currentCheck == 2)
+                {
+                    secondConditionCheck.TrySetResult();
+                }
+
+                return Task.FromResult(currentCheck >= 3);
+            },
+            cancellation.Token,
             reminderName);
 
         Assert.False(waitTask.IsCompleted);
+        Assert.Equal(1, conditionCheckCount);
 
         ReminderEvents.EmitTickCompleted(
             grainId,
@@ -109,16 +121,17 @@ public class ReminderEventsTests
             new TickStatus(now, period, now),
             siloAddress);
 
+        await secondConditionCheck.Task.WaitAsync(cancellation.Token);
         Assert.False(waitTask.IsCompleted);
 
-        acceptedTickCount = 1;
         ReminderEvents.EmitTickCompleted(
             grainId,
             reminderName,
             new TickStatus(now, period, now.Add(period)),
             siloAddress);
 
-        await waitTask.WaitAsync(TimeSpan.FromSeconds(1));
+        await waitTask;
+        Assert.Equal(3, conditionCheckCount);
     }
 
     [TestSuite("BVT")]

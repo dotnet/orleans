@@ -12,7 +12,7 @@ namespace Orleans.Persistence.Memory.Tests;
 /// <summary>
 /// Example test fixture showing how to configure MemoryGrainStorage for testing.
 /// </summary>
-public class MemoryGrainStorageTestFixture : GrainStorageTestFixture
+public class MemoryGrainStorageTestFixture : GrainStorageTestFixture, IAsyncLifetime
 {
     protected override string StorageProviderName => "MemoryStore";
 
@@ -47,6 +47,35 @@ public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<Mem
         : base(fixture.Storage)
     {
         _fixture = fixture;
+    }
+
+    [Fact]
+    public async Task ProviderViolation_ThrowsFrameworkNeutralException()
+    {
+        var runner = new TestRunner(new NullStateGrainStorage());
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(runner.PersistenceStorage_WriteRead_StringKey);
+
+        Assert.Contains("found '<null>'", exception.Message);
+    }
+
+    private sealed class TestRunner(IGrainStorage storage) : GrainStorageTestRunner(storage);
+
+    private sealed class NullStateGrainStorage : IGrainStorage
+    {
+        public Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        {
+            grainState.State = default!;
+            return Task.CompletedTask;
+        }
+
+        public Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        {
+            grainState.RecordExists = true;
+            return Task.CompletedTask;
+        }
+
+        public Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState) => Task.CompletedTask;
     }
 
     [Fact]
