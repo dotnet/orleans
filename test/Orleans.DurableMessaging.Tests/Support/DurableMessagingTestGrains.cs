@@ -12,9 +12,15 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
 {
     Task<Guid> SendAsync(GrainId target, string route, DurableTestMessage message);
     Task<Guid> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message);
+    Task<DuplicateRouteRegistrationResult> RegisterDuplicateExactRouteHandlersAsync(string route);
     [AlwaysInterleave] Task<DurableEndpointSnapshot> GetSnapshotAsync();
     Task RequestDeactivationAsync();
 }
+
+[GenerateSerializer, Immutable]
+public sealed record DuplicateRouteRegistrationResult(
+    [property: Id(0)] string ExceptionMessage,
+    [property: Id(1)] bool LookupRetainedFirstHandler);
 
 [GenerateSerializer, Immutable]
 public sealed record DurableTestMessage(
@@ -41,7 +47,10 @@ public sealed record DurableEndpointSnapshot(
     [property: Id(5)] IReadOnlyList<DurableEffect> Effects,
     [property: Id(6)] IReadOnlyList<DurableDeadLetterSnapshot> InboxDeadLetters,
     [property: Id(7)] IReadOnlyList<DurableDeadLetterSnapshot> OutboxDeadLetters,
-    [property: Id(8)] string? InboxJobId);
+    [property: Id(8)] string? InboxJobId,
+    [property: Id(9)] int ProcessedMessageCount,
+    [property: Id(10)] int FirstExactRouteHandlerCalls,
+    [property: Id(11)] int ReplacementExactRouteHandlerCalls);
 
 [GenerateSerializer, Immutable]
 public sealed record DurableDeadLetterSnapshot(
@@ -58,6 +67,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     private readonly IDurableOutbox _outbox;
     private readonly IDurableMessagingDiagnostics _diagnostics;
     private readonly IDurableDictionary<Guid, DurableEffect> _effects;
+    private readonly IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> _processedMessages;
     private readonly SerializerSessionPool _sessions;
     private readonly IDurableValue<string> _inboxJobId;
     private readonly ILocalSiloDetails _siloDetails;
@@ -66,12 +76,15 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     private readonly Guid _activationId = Guid.NewGuid();
     private int _activeHandlers;
     private int _maxConcurrentHandlers;
+    private int _firstExactRouteHandlerCalls;
+    private int _replacementExactRouteHandlerCalls;
 
     public DurableMessagingTestGrain(
         IDurableInbox inbox,
         IDurableOutbox outbox,
         IDurableMessagingDiagnostics diagnostics,
         [FromKeyedServices("test-effects")] IDurableDictionary<Guid, DurableEffect> effects,
+        [FromKeyedServices("inbox-processed")] IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> processedMessages,
         [FromKeyedServices("inbox-job-id")] IDurableValue<string> inboxJobId,
         SerializerSessionPool sessions,
         ILocalSiloDetails siloDetails,
@@ -82,6 +95,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         _outbox = outbox;
         _diagnostics = diagnostics;
         _effects = effects;
+        _processedMessages = processedMessages;
         _inboxJobId = inboxJobId;
         _sessions = sessions;
         _siloDetails = siloDetails;
@@ -109,6 +123,16 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         var envelope = CreateEnvelope(target, route, message);
         _outbox.Send(envelope);
         return Task.FromResult(envelope.MessageId);
+    }
+
+    public Task<DuplicateRouteRegistrationResult> RegisterDuplicateExactRouteHandlersAsync(string route)
+    {
+        var first = new CountingHandler(() => _firstExactRouteHandlerCalls++);
+        var replacement = new CountingHandler(() => _replacementExactRouteHandlerCalls++);
+        _inbox.RegisterHandler(route, first);
+        var exception = GetDuplicateRegistrationException(route, replacement);
+        var retained = _inbox.TryGetHandler(route, out var cached) && ReferenceEquals(first, cached);
+        return Task.FromResult(new DuplicateRouteRegistrationResult(exception.Message, retained));
     }
 
     public Task<DurableEndpointSnapshot> GetSnapshotAsync() => Task.FromResult(CreateSnapshot());
@@ -186,7 +210,10 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
             _effects.Values.OrderBy(static effect => effect.Sequence).ToArray(),
             _diagnostics.InboxDeadLetters.Select(ToSnapshot).ToArray(),
             _diagnostics.OutboxDeadLetters.Select(ToSnapshot).ToArray(),
-            _inboxJobId.Value);
+            _inboxJobId.Value,
+            _processedMessages.Count,
+            _firstExactRouteHandlerCalls,
+            _replacementExactRouteHandlerCalls);
 
     private static DurableDeadLetterSnapshot ToSnapshot(DurableDeadLetter deadLetter) =>
         new(
@@ -209,4 +236,28 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
             owner.HandleAsync(message, context, cancellationToken);
     }
 
+    private sealed class CountingHandler(Action onCall) : IInboxHandler
+    {
+        public bool CanHandle(IInboxHandlerContext context) => true;
+
+        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        {
+            onCall();
+            return default;
+        }
+    }
+
+    private InvalidOperationException GetDuplicateRegistrationException(string route, IInboxHandler replacement)
+    {
+        try
+        {
+            _inbox.RegisterHandler(route, replacement);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return exception;
+        }
+
+        throw new InvalidOperationException("Duplicate exact route registration did not throw.");
+    }
 }

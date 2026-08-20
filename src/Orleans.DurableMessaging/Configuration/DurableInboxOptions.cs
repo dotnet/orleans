@@ -11,8 +11,9 @@ namespace Orleans.DurableMessaging.Configuration;
 /// deduplication tracking, retry behavior, and pump batch sizes.
 /// </para>
 /// <para>
-/// The durable inbox provides exactly-once message delivery with backpressure signaling.
-/// Configuration values affect memory usage, throughput, and recovery characteristics.
+/// Transport is at-least-once. Deduplication provides effectively-once handler effects only
+/// while the processed-message record is retained. Configuration values affect memory usage,
+/// throughput, and recovery characteristics.
 /// </para>
 /// </remarks>
 public class DurableInboxOptions
@@ -48,7 +49,8 @@ public class DurableInboxOptions
     /// </para>
     /// <para>
     /// Processed message tracking uses composite key (SenderId, MessageId) with timestamps.
-    /// Entries older than the deduplication window are eligible for compaction during snapshots.
+    /// Expired entries are removed atomically when a replay is accepted and are also eligible for
+    /// compaction during inbox pump maintenance.
     /// </para>
     /// <para>
     /// Consider your retry policies when setting this value. For example, if senders retry for
