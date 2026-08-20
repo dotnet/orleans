@@ -333,93 +333,107 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             var deliveredCount = 0;
             var backpressuredCount = 0;
             var failedCount = 0;
-            var stateChanged = false;
+            var batchDirty = false;
 
-            foreach (var envelope in pending)
+            try
             {
-                var stopwatch = Stopwatch.StartNew();
-                var messageNow = _jobTimeProvider.GetUtcNow();
-                if (_messageStates.TryGetValue(envelope.MessageId, out var existingState)
-                    && existingState.EnqueuedAt is { } enqueuedAt
-                    && messageNow - enqueuedAt >= _maxRetryAge)
+                foreach (var envelope in pending)
                 {
-                    DeadLetterExpiredMessage(envelope, existingState, messageNow);
-                    stateChanged = true;
-                    failedCount++;
-                    continue;
-                }
-
-                try
-                {
-                    var targetGrain = _grainFactory.GetGrain<IDurableInboxExtension>(envelope.ReceiverId);
-                    var result = await targetGrain.DeliverAsync(
-                        envelope,
-                        cancellationToken).ConfigureAwait(true);
-
-                    stopwatch.Stop();
-                    switch (result.Status)
+                    var stopwatch = Stopwatch.StartNew();
+                    var messageNow = _jobTimeProvider.GetUtcNow();
+                    if (_messageStates.TryGetValue(envelope.MessageId, out var existingState)
+                        && existingState.EnqueuedAt is { } enqueuedAt
+                        && messageNow - enqueuedAt >= _maxRetryAge)
                     {
-                        case DeliveryStatus.Accepted:
-                        case DeliveryStatus.Duplicate:
-                            RemoveMessage(envelope.MessageId);
-                            stateChanged = true;
-                            deliveredCount++;
-                            LogMessageDelivered(
-                                _logger,
-                                envelope.MessageId,
-                                envelope.SenderId,
-                                envelope.ReceiverId,
-                                envelope.RouteKey,
-                                result.Status,
-                                envelope.CorrelationKey?.ToString());
-                            _instruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, result.Status.ToString().ToLowerInvariant());
-                            break;
-                        case DeliveryStatus.Backpressured:
-                            RecordDeliveryFailure(envelope, "The receiver is backpressured.");
-                            stateChanged = true;
-                            backpressuredCount++;
-                            LogDeliveryBackpressured(_logger, envelope.MessageId, envelope.ReceiverId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
-                            _instruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "backpressured");
-                            break;
-                        case DeliveryStatus.RouteNotFound:
-                            RecordDeliveryFailure(envelope, result.Message ?? "The receiver has no compatible route.");
-                            stateChanged = true;
-                            failedCount++;
-                            LogDeliveryRouteNotFound(
-                                _logger,
-                                envelope.MessageId,
-                                envelope.SenderId,
-                                envelope.ReceiverId,
-                                envelope.RouteKey,
-                                envelope.CorrelationKey?.ToString(),
-                                result.Message ?? "(no message)");
-                            _instruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "route_not_found");
-                            break;
-                        default:
-                            RecordDeliveryFailure(envelope, $"Unexpected delivery status '{result.Status}'.");
-                            stateChanged = true;
-                            failedCount++;
-                            LogUnexpectedDeliveryStatus(_logger, result.Status, envelope.MessageId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
-                            break;
+                        batchDirty = true;
+                        DeadLetterExpiredMessage(envelope, existingState, messageNow);
+                        failedCount++;
+                        continue;
                     }
 
-                    _instruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+                    try
+                    {
+                        var targetGrain = _grainFactory.GetGrain<IDurableInboxExtension>(envelope.ReceiverId);
+                        var result = await targetGrain.DeliverAsync(
+                            envelope,
+                            cancellationToken).ConfigureAwait(true);
+
+                        stopwatch.Stop();
+                        switch (result.Status)
+                        {
+                            case DeliveryStatus.Accepted:
+                            case DeliveryStatus.Duplicate:
+                                batchDirty = true;
+                                RemoveMessage(envelope.MessageId);
+                                deliveredCount++;
+                                LogMessageDelivered(
+                                    _logger,
+                                    envelope.MessageId,
+                                    envelope.SenderId,
+                                    envelope.ReceiverId,
+                                    envelope.RouteKey,
+                                    result.Status,
+                                    envelope.CorrelationKey?.ToString());
+                                _instruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, result.Status.ToString().ToLowerInvariant());
+                                break;
+                            case DeliveryStatus.Backpressured:
+                                batchDirty = true;
+                                RecordDeliveryFailure(envelope, "The receiver is backpressured.");
+                                backpressuredCount++;
+                                LogDeliveryBackpressured(_logger, envelope.MessageId, envelope.ReceiverId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
+                                _instruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "backpressured");
+                                break;
+                            case DeliveryStatus.RouteNotFound:
+                                batchDirty = true;
+                                RecordDeliveryFailure(envelope, result.Message ?? "The receiver has no compatible route.");
+                                failedCount++;
+                                LogDeliveryRouteNotFound(
+                                    _logger,
+                                    envelope.MessageId,
+                                    envelope.SenderId,
+                                    envelope.ReceiverId,
+                                    envelope.RouteKey,
+                                    envelope.CorrelationKey?.ToString(),
+                                    result.Message ?? "(no message)");
+                                _instruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "route_not_found");
+                                break;
+                            default:
+                                batchDirty = true;
+                                RecordDeliveryFailure(envelope, $"Unexpected delivery status '{result.Status}'.");
+                                failedCount++;
+                                LogUnexpectedDeliveryStatus(_logger, result.Status, envelope.MessageId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
+                                break;
+                        }
+
+                        _instruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        stopwatch.Stop();
+                        batchDirty = true;
+                        RecordDeliveryFailure(envelope, ex.ToString());
+                        failedCount++;
+                        LogDeliveryError(_logger, ex, envelope.MessageId, envelope.SenderId, envelope.ReceiverId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
+                        _instruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "error");
+                        _instruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+                    }
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
+
+                if (batchDirty)
                 {
-                    stopwatch.Stop();
-                    RecordDeliveryFailure(envelope, ex.ToString());
-                    stateChanged = true;
-                    failedCount++;
-                    LogDeliveryError(_logger, ex, envelope.MessageId, envelope.SenderId, envelope.ReceiverId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
-                    _instruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "error");
-                    _instruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+                    batchDirty = false;
                 }
             }
-
-            if (stateChanged)
+            catch
             {
-                await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
+                if (batchDirty)
+                {
+                    await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
+                }
+
+                throw;
             }
 
             LogDeliveryComplete(_logger, deliveredCount, backpressuredCount, failedCount, Count);
