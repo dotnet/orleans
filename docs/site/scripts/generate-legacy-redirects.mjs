@@ -1,12 +1,15 @@
 import { access, mkdir, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import legacyJekyllPages from '../src/data/legacy-jekyll-pages.json' with { type: 'json' };
 import legacyPaths from '../src/data/legacy-pages.json' with { type: 'json' };
 import redirects from '../src/data/redirects.json' with { type: 'json' };
 import { compatibilityOutputPath, deploymentBase } from './lib/compatibility-paths.mjs';
+import { mergeLegacyRedirects } from './lib/legacy-routes.mjs';
 
 const siteRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const distRoot = path.join(siteRoot, 'dist');
+const allRedirects = mergeLegacyRedirects(redirects, legacyJekyllPages);
 
 async function walk(directory) {
   const files = [];
@@ -72,7 +75,7 @@ const conceptualRoutes = [...currentRoutes].filter(
 
 let written = 0;
 let preserved = 0;
-for (const [source, target] of Object.entries(redirects)) {
+for (const [source, target] of Object.entries(allRedirects)) {
   if (!source.startsWith(`${deploymentBase}/`) || source.includes('..')) {
     throw new Error(`Unsafe redirect source '${source}'.`);
   }
@@ -81,7 +84,7 @@ for (const [source, target] of Object.entries(redirects)) {
   }
 }
 
-for (const legacyPath of new Set([...legacyPaths, ...Object.keys(redirects)])) {
+for (const legacyPath of new Set([...legacyPaths, ...Object.keys(allRedirects)])) {
   if (!legacyPath.startsWith(`${deploymentBase}/`) || legacyPath.includes('..')) {
     throw new Error(`Unsafe legacy Pages path '${legacyPath}'.`);
   }
@@ -96,7 +99,7 @@ for (const legacyPath of new Set([...legacyPaths, ...Object.keys(redirects)])) {
     }
     exists = false;
   }
-  if (exists && Object.hasOwn(redirects, legacyPath)) {
+  if (exists && Object.hasOwn(allRedirects, legacyPath)) {
     throw new Error(`Explicit redirect source '${legacyPath}' is still served by a current page.`);
   }
   if (exists) {
@@ -104,7 +107,7 @@ for (const legacyPath of new Set([...legacyPaths, ...Object.keys(redirects)])) {
     continue;
   }
 
-  const target = redirects[legacyPath] ?? targetFor(legacyPath, currentRoutes, conceptualRoutes);
+  const target = allRedirects[legacyPath] ?? targetFor(legacyPath, currentRoutes, conceptualRoutes);
   const document = `<!doctype html>
 <html lang="en">
   <head>
