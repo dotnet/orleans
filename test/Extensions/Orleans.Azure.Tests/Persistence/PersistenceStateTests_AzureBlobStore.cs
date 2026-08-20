@@ -1,7 +1,6 @@
 //#define REREAD_STATE_AFTER_WRITE_FAILED
 
 using Xunit;
-using Xunit.Abstractions;
 using Orleans.TestingHost;
 using Orleans.Configuration;
 using Orleans.Storage;

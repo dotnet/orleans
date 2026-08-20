@@ -12,7 +12,6 @@ using TestExtensions;
 using UnitTests.GrainInterfaces.Directories;
 using UnitTests.Grains.Directories;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace NonSilo.Tests.Directory
 {

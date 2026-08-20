@@ -162,10 +162,10 @@ public abstract class AdoNetQueueAdapterReceiverTests(string invariant, TestEnvi
 
     private const string TestDatabaseName = "OrleansStreamTest";
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _testing = await RelationalStorageForTesting.SetupInstance(invariant, TestDatabaseName);
-        Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
+        Assert.SkipWhen(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
         _storage = _testing.Storage;
         _queries = await RelationalOrleansQueries.CreateInstance(invariant, _storage.ConnectionString);
@@ -174,7 +174,7 @@ public abstract class AdoNetQueueAdapterReceiverTests(string invariant, TestEnvi
     /// <summary>
     /// Tests that the <see cref="AdoNetQueueAdapterReceiver"/> can get and confirm messages.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task AdoNetQueueAdapterReceiver_GetsMessages_ConfirmsMessages()
     {
         // arrange - receiver
@@ -252,7 +252,7 @@ public abstract class AdoNetQueueAdapterReceiverTests(string invariant, TestEnvi
     /// <summary>
     /// Tests that shutting down a receiver immediately releases its unconfirmed messages.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task AdoNetQueueAdapterReceiver_Shutdown_ReleasesUnconfirmedMessages()
     {
         var serviceId = $"Service-{Guid.NewGuid()}";
@@ -290,7 +290,7 @@ public abstract class AdoNetQueueAdapterReceiverTests(string invariant, TestEnvi
     /// <summary>
     /// Tests that <see cref="AdoNetQueueAdapterReceiver.Shutdown(TimeSpan)"/> waits for the outstanding task.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task AdoNetQueueAdapterReceiver_Shutdown_WaitsForOutstandingTask()
     {
         var serviceId = $"Service-{Guid.NewGuid()}";
@@ -326,7 +326,7 @@ public abstract class AdoNetQueueAdapterReceiverTests(string invariant, TestEnvi
         await replacement.Shutdown(TimeSpan.FromSeconds(10));
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [GenerateSerializer]
     [Alias("Tester.AdoNet.Streaming.AdoNetQueueAdapterReceiverTests.TestModel")]

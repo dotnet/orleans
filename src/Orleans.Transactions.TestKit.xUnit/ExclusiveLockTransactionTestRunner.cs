@@ -1,5 +1,4 @@
-﻿using Xunit;
-using Xunit.Abstractions;
+using Xunit;
 
 namespace Orleans.Transactions.TestKit.xUnit
 {
@@ -10,14 +9,14 @@ namespace Orleans.Transactions.TestKit.xUnit
         {
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         public override Task ConcurrentReadThenWriteWithoutExclusiveLock_ThrowsLockException(string grainStates)
         {
             return base.ConcurrentReadThenWriteWithoutExclusiveLock_ThrowsLockException(grainStates);
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         public override Task ConcurrentReadThenWriteWithExclusiveLock_NoLockException(string grainStates)
         {

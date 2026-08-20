@@ -20,14 +20,14 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             this.fixture = fixture;
         }
 
-        [SkippableFact]
+        [Fact]
         public virtual async Task StreamingTests_ImplicitSubscribProvider_DontHaveSubscriptionManager()
         {
             var subGrain = this.fixture.GrainFactory.GetGrain<ISubscribeGrain>(Guid.NewGuid());
             Assert.False(await subGrain.CanGetSubscriptionManager(StreamProviderName));
         }
 
-        [SkippableFact]
+        [Fact]
         public virtual async Task StreamingTests_Consumer_Producer_Subscribe()
         {
             using var observer = StreamingDiagnosticObserver.Create();
@@ -50,7 +50,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             await implicitConsumer.StopConsuming();
         }
 
-        [SkippableFact]
+        [Fact]
         public virtual async Task StreamingTests_Consumer_Producer_SubscribeToTwoStream_MessageWithPolymorphism()
         {
             using var observer = StreamingDiagnosticObserver.Create();
@@ -87,7 +87,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             await implicitConsumer.StopConsuming();
         }
 
-        [SkippableFact]
+        [Fact]
         public virtual async Task StreamingTests_Consumer_Producer_SubscribeToStreamsHandledByDifferentStreamProvider()
         {
             using var observer = StreamingDiagnosticObserver.Create();

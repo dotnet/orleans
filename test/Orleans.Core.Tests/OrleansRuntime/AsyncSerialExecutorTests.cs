@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using Orleans;
 using Orleans.Internal;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.OrleansRuntime
 {

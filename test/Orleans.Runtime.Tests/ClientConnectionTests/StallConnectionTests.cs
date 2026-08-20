@@ -52,12 +52,12 @@ namespace Tester.ClientConnectionTests
             var gwEndpoint = this.HostedCluster.Primary!.GatewayAddress.Endpoint;
 
             // Close current client connection
-            await this.Client.ServiceProvider.GetRequiredService<IHost>().StopAsync();
+            await this.Client.ServiceProvider.GetRequiredService<IHost>().StopAsync(TestContext.Current.CancellationToken);
 
             // Stall connection to GW
             using (stalledSocket = new Socket(gwEndpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp))
             {
-                await stalledSocket.ConnectAsync(gwEndpoint);
+                await stalledSocket.ConnectAsync(gwEndpoint, TestContext.Current.CancellationToken);
 
                 // Try to reconnect to GW
                 var stopwatch = Stopwatch.StartNew();
@@ -80,7 +80,7 @@ namespace Tester.ClientConnectionTests
             // Stall connection to GW
             using (stalledSocket = new Socket(siloEndpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp))
             {
-                await stalledSocket.ConnectAsync(siloEndpoint);
+                await stalledSocket.ConnectAsync(siloEndpoint, TestContext.Current.CancellationToken);
 
                 // Try to add a new silo in the cluster
                 this.HostedCluster.StartAdditionalSilo();

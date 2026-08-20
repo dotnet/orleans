@@ -7,7 +7,6 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace DefaultCluster.Tests.General
 {
@@ -153,7 +152,7 @@ namespace DefaultCluster.Tests.General
         /// </summary>
         [TestSuite("Functional")]
         [TestProvider("None")]
-        [SkippableFact(Skip = "Skipping test for now, since there seems to be a bug"), TestCategory("Functional"), TestCategory("StatelessWorker")]
+        [Fact(Skip = "Skipping test for now, since there seems to be a bug"), TestCategory("Functional"), TestCategory("StatelessWorker")]
         public async Task StatelessWorkerFastActivationsDontFailInMultiSiloDeployment()
         {
             var gatewayOptions = this.Fixture.Client.ServiceProvider.GetRequiredService<IOptions<StaticGatewayListProviderOptions>>();
@@ -161,7 +160,7 @@ namespace DefaultCluster.Tests.General
 
             if (gatewaysCount < 2)
             {
-                throw new SkipException("This test was created to run with more than 1 gateway. 2 is the default at the time of this writing");
+                throw Xunit.Sdk.SkipException.ForSkip("This test was created to run with more than 1 gateway. 2 is the default at the time of this writing");
             }
 
             // do extra calls to trigger activation of ExpectedMaxLocalActivations local activations

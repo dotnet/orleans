@@ -6,7 +6,6 @@ using StackExchange.Redis;
 using Tester.Directories;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Tester.Redis.GrainDirectory
 {

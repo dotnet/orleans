@@ -1,6 +1,5 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Transactions.TestKit.xUnit
 {
@@ -10,7 +9,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         : base(grainFactory, output.WriteLine)
         { }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
@@ -19,7 +18,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.AbortTransactionOnExceptions(grainStates);
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
@@ -28,7 +27,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.AbortTransactionOnReadOnlyViolatedException(grainStates);
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
@@ -37,7 +36,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.MultiGrainAbortTransactionOnExceptions(grainStates);
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
@@ -46,7 +45,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.AbortTransactionExceptionInnerExceptionOnlyContainsOneRootCauseException(grainStates);
         }
 
-        [SkippableTheory()]
+        [Theory()]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]

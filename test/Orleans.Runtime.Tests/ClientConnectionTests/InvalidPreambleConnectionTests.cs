@@ -32,7 +32,7 @@ namespace Tester.ClientConnectionTests
             // Set receive timeout to avoid hanging indefinitely
             socket.ReceiveTimeout = 25_000;
 
-            await socket.ConnectAsync(gwEndpoint);
+            await socket.ConnectAsync(gwEndpoint, TestContext.Current.CancellationToken);
 
             // Send invalid preamble size (exceeds MaxPreambleLength of 1024 from ConnectionPreambleHelper)
             int invalidSize = 99999;

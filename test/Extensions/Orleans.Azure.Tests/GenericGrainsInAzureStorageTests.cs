@@ -50,7 +50,7 @@ namespace Tester.AzureUtils.General
             this.fixture = fixture;
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Generic_OnAzureTableStorage_LongNamedGrain_EchoValue()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ISimpleGenericGrainUsingAzureStorageAndLongGrainName<int>>(Guid.NewGuid());
@@ -59,7 +59,7 @@ namespace Tester.AzureUtils.General
             await grain.ClearState();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Generic_OnAzureTableStorage_ShortNamedGrain_EchoValue()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ITinyNameGrain<int>>(Guid.NewGuid());
@@ -111,7 +111,7 @@ namespace Tester.AzureUtils.General
             this.fixture = fixture;
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Generic_OnAzureBlobStorage_LongNamedGrain_EchoValue()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ISimpleGenericGrainUsingAzureStorageAndLongGrainName<int>>(Guid.NewGuid());
@@ -120,7 +120,7 @@ namespace Tester.AzureUtils.General
             await grain.ClearState();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Generic_OnAzureBlobStorage_ShortNamedGrain_EchoValue()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ITinyNameGrain<int>>(Guid.NewGuid());

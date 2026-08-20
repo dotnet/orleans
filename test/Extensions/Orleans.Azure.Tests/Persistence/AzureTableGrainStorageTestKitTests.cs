@@ -36,121 +36,121 @@ public class AzureTableGrainStorageTestKitTests : GrainStorageTestRunner, IClass
         fixture.EnsurePreconditionsMet();
     }
 
-    [SkippableFact]
+    [Fact]
     public override Task PersistenceStorage_WriteReadIdCyrillic()
     {
         return base.PersistenceStorage_WriteReadIdCyrillic();
     }
 
-    [SkippableFact]
+    [Fact]
     public override Task PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException()
     {
         return base.PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException();
     }
 
-    [SkippableFact]
+    [Fact]
     public override Task PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException()
     {
         return base.PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException();
     }
 
-    [SkippableFact]
+    [Fact]
     public override Task PersistenceStorage_WriteReadWriteReadStatesInParallel()
     {
         return RunPersistenceStorage_WriteReadWriteReadStatesInParallel("AzureTableTest", 50);
     }
 
-    [SkippableFact]
+    [Fact]
     public override Task PersistenceStorage_ReadNonExistentState()
     {
         return base.PersistenceStorage_ReadNonExistentState();
     }
 
-    [SkippableFact]
+    [Fact]
     public override Task PersistenceStorage_ReadNonExistentStateHasNonNullState()
     {
         return base.PersistenceStorage_ReadNonExistentStateHasNonNullState();
     }
 
-    [SkippableFact]
+    [Fact]
     public override Task PersistenceStorage_WriteClearWrite()
     {
         return base.PersistenceStorage_WriteClearWrite();
     }
 
-    [SkippableFact]
+    [Fact]
     public override Task PersistenceStorage_WriteClearRead()
     {
         return base.PersistenceStorage_WriteClearRead();
     }
 
-    [SkippableFact]
+    [Fact]
     public override Task PersistenceStorage_WriteReadClearReadCycle()
     {
         return base.PersistenceStorage_WriteReadClearReadCycle();
     }
 
-    [SkippableFact]
+    [Fact]
     public override Task PersistenceStorage_WriteRead_StringKey()
     {
         return base.PersistenceStorage_WriteRead_StringKey();
     }
 
-    [SkippableFact]
+    [Fact]
     public override Task PersistenceStorage_WriteRead_IntegerKey()
     {
         return base.PersistenceStorage_WriteRead_IntegerKey();
     }
 
-    [SkippableFact]
+    [Fact]
     public override Task PersistenceStorage_ETagChangesOnWrite()
     {
         return base.PersistenceStorage_ETagChangesOnWrite();
     }
 
-    [SkippableFact]
+    [Fact]
     public override Task PersistenceStorage_ClearBeforeWrite()
     {
         return base.PersistenceStorage_ClearBeforeWrite();
     }
 
-    [SkippableFact]
+    [Fact]
     public override Task PersistenceStorage_ClearStateDoesNotNullifyState()
     {
         return base.PersistenceStorage_ClearStateDoesNotNullifyState();
     }
 
-    [SkippableFact]
+    [Fact]
     public override Task PersistenceStorage_ClearUpdatesETag()
     {
         return base.PersistenceStorage_ClearUpdatesETag();
     }
 
-    [SkippableFact]
+    [Fact]
     public override Task PersistenceStorage_ReadAfterClear()
     {
         return base.PersistenceStorage_ReadAfterClear();
     }
 
-    [SkippableFact]
+    [Fact]
     public override Task PersistenceStorage_MultipleClearOperations()
     {
         return base.PersistenceStorage_MultipleClearOperations();
     }
 
-    [SkippableFact]
+    [Fact]
     public override Task PersistenceStorage_WriteWithSameValuesUpdatesETag()
     {
         return base.PersistenceStorage_WriteWithSameValuesUpdatesETag();
     }
 
-    [SkippableFact]
+    [Fact]
     public override Task PersistenceStorage_StateNamesUseIndependentRecords()
     {
         return base.PersistenceStorage_StateNamesUseIndependentRecords();
     }
 
-    [SkippableFact]
+    [Fact]
     public override Task PersistenceStorage_ClearInconsistentFailsWithInconsistentStateException()
     {
         return base.PersistenceStorage_ClearInconsistentFailsWithInconsistentStateException();

@@ -13,7 +13,6 @@ using System.Linq;
 using System.Text;
 using Xunit;
 using Orleans.Serialization.Serializers;
-using Xunit.Abstractions;
 using Orleans.Serialization.GeneratedCodeHelpers;
 
 namespace Orleans.Serialization.TestKit

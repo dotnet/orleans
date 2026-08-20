@@ -27,7 +27,7 @@ namespace AWSUtils.Tests.RemindersTest
         protected override IReminderTable CreateRemindersTable()
         {
             if (!AWSTestConstants.IsDynamoDbAvailable)
-                throw new SkipException("Unable to connect to AWS DynamoDB simulator");
+                throw Xunit.Sdk.SkipException.ForSkip("Unable to connect to AWS DynamoDB simulator");
 
             var options = new DynamoDBReminderStorageOptions();
             options.ParseConnectionString(this.connectionStringFixture.ConnectionString);
@@ -43,24 +43,24 @@ namespace AWSUtils.Tests.RemindersTest
             return Task.FromResult(AWSTestConstants.IsDynamoDbAvailable ? $"Service={AWSTestConstants.DynamoDbService}" : null!);
         }
 
-        [SkippableFact]
+        [Fact]
         public void RemindersTable_AWS_Init()
         {
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task RemindersTable_AWS_RemindersRange()
         {
             await RemindersRange(50);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task RemindersTable_AWS_RemindersParallelUpsert()
         {
             await RemindersParallelUpsert();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task RemindersTable_AWS_ReminderSimple()
         {
             await ReminderSimple();

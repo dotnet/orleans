@@ -59,8 +59,8 @@ namespace Tester
 
             try
             {
-                await host.StartAsync();
-                await clientHost.StartAsync();
+                await host.StartAsync(TestContext.Current.CancellationToken);
+                await clientHost.StartAsync(TestContext.Current.CancellationToken);
                 var grain = client.GetGrain<IEchoGrain>(Guid.NewGuid());
                 var result = await grain.Echo("test");
                 Assert.Equal("test", result);
@@ -122,9 +122,9 @@ namespace Tester
 
             try
             {
-                await silo1.StartAsync();
-                await silo2.StartAsync();
-                await clientHost.StartAsync();
+                await silo1.StartAsync(TestContext.Current.CancellationToken);
+                await silo2.StartAsync(TestContext.Current.CancellationToken);
+                await clientHost.StartAsync(TestContext.Current.CancellationToken);
 
                 var grain = client.GetGrain<IEchoGrain>(Guid.NewGuid());
                 var result = await grain.Echo("test");

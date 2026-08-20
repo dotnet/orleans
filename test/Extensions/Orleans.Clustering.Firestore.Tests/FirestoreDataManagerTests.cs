@@ -16,7 +16,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
     private const string TEST_PARTITION = "Test";
     private FirestoreDataManager _manager = default!;
 
-    [SkippableFact]
+    [Fact]
     public async Task CreateEntry()
     {
         var data = GetDummyEntity();
@@ -35,7 +35,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.Equal(Utils.ParseTimestamp(eTag), returned.ETag);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task CreateEntryRejectsWhitespaceId()
     {
         var data = GetDummyEntity();
@@ -44,7 +44,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         await Assert.ThrowsAsync<InvalidOperationException>(() => this._manager.CreateEntity(data));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UpsertEntry()
     {
         var data = GetDummyEntity();
@@ -63,7 +63,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.Equal(Utils.ParseTimestamp(eTag2), returned.ETag);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UpdateEntryRequiresIdAndEtag()
     {
         var data = GetDummyEntity();
@@ -74,7 +74,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         await Assert.ThrowsAsync<InvalidOperationException>(() => this._manager.Update(data));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UpdateMissingEntryFails()
     {
         var data = GetDummyEntity();
@@ -87,7 +87,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.Equal(StatusCode.FailedPrecondition, exception.StatusCode);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UpdateWithStaleEtagFails()
     {
         var data = GetDummyEntity();
@@ -106,7 +106,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.Equal(Utils.ParseTimestamp(eTag), returned.ETag);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UpdateEntry()
     {
         var data = GetDummyEntity();
@@ -126,7 +126,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.Equal(Utils.ParseTimestamp(eTag2), returned.ETag!.Value);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DeleteEntry()
     {
         var data = GetDummyEntity();
@@ -152,7 +152,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.False(result, "A previously deleted entry should not be deleted again.");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task ReadAllEntries()
     {
         var data = GetDummyEntity();
@@ -211,7 +211,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.Empty(all);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DeleteEntitiesRejectsOversizedBatch()
     {
         var tasks = Enumerable.Range(0, FirestoreDataManager.MaxBatchSize + 1).Select(x =>
@@ -229,7 +229,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.Equal("entities", exception.ParamName);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DeleteEntitiesRejectsStaleEtag()
     {
         await Task.WhenAll(Enumerable.Range(0, 2)
@@ -243,7 +243,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.Equal(2, (await this._manager.ReadAllEntities<DummyFirestoreEntity>()).Length);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DeleteEntitiesRejectsInvalidEntity()
     {
         var data = GetDummyEntity();
@@ -256,7 +256,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.Single(await this._manager.ReadAllEntities<DummyFirestoreEntity>());
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DeleteEntities()
     {
         await Task.WhenAll(Enumerable.Range(0, 3)
@@ -272,7 +272,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         await this._manager.DeleteEntities(entities);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task QueryEntities()
     {
         var data = GetDummyEntity();
@@ -329,7 +329,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         };
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var id = $"Orleans-Test-{Guid.NewGuid()}";
         var opt = new FirestoreOptions
@@ -348,7 +348,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         await this._manager.Initialize();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [FirestoreData]
     private class DummyFirestoreEntity : FirestoreEntity

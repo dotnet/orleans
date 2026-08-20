@@ -1,4 +1,4 @@
-﻿using CsCheck;
+using CsCheck;
 #if NET8_0_OR_GREATER
 using Orleans;
 using Orleans.CodeGeneration;
@@ -28,7 +28,6 @@ using Orleans.Runtime.Serialization;
 #endif
 using Xunit;
 using Microsoft.FSharp.Collections;
-using Xunit.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Configuration;
 using System.Reflection;

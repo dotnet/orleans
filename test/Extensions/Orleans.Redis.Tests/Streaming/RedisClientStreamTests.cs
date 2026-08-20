@@ -4,7 +4,6 @@ using Orleans.TestingHost;
 using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Tester.Redis.Streaming;
 
@@ -25,20 +24,29 @@ public sealed class RedisClientStreamTests : TestClusterPerTest
         _output = output;
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Redis_StreamProducerOnDroppedClientTest() => await _runner.StreamProducerOnDroppedClientTest(StreamProviderName, StreamNamespace);
 
-    [SkippableFact]
+    [Fact]
     public async Task Redis_StreamConsumerOnDroppedClientTest() => await _runner.StreamConsumerOnDroppedClientTest(StreamProviderName, StreamNamespace, _output);
 
-    public override async Task InitializeAsync()
+    public override async ValueTask InitializeAsync()
     {
         await base.InitializeAsync();
+        if (!PreconditionsMet)
+        {
+            return;
+        }
         _runner = new ClientStreamTestRunner(HostedCluster);
     }
 
-    public override async Task DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
+        if (!PreconditionsMet)
+        {
+            return;
+        }
+
         var serviceId = HostedCluster?.Options.ServiceId;
         await base.DisposeAsync();
         await RedisStreamTestUtils.DeleteServiceKeysAsync(serviceId);

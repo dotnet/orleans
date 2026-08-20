@@ -14,7 +14,6 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.Serialization
 {

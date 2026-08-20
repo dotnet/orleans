@@ -4,7 +4,7 @@ using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
 using TestExtensions;
-using Xunit.Abstractions;
+using Xunit;
 
 namespace Tester.Redis.Streaming;
 
@@ -19,8 +19,13 @@ public sealed class RedisStreamCacheMissTests : StreamingCacheMissTests
     {
     }
 
-    public override async Task DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
+        if (!PreconditionsMet)
+        {
+            return;
+        }
+
         var serviceId = HostedCluster?.Options.ServiceId;
         await base.DisposeAsync();
         await RedisStreamTestUtils.DeleteServiceKeysAsync(serviceId);

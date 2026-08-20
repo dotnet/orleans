@@ -6,7 +6,6 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.TestHelper;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.MembershipTests
 {
@@ -46,7 +45,7 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact(Skip = "Not reliable in PR build, skipping for now")]
-        //[SkippableFact(typeof(SiloUnavailableException)), TestCategory("Functional")]
+        //[Fact(typeof(SiloUnavailableException)), TestCategory("Functional")]
         public async Task ReconstructClientIdPartitionTest_Observer()
         {
             // Ensure the client entry is on Silo2 partition and get a grain that live on Silo3
@@ -71,7 +70,7 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact(Skip = "Not reliable in PR build, skipping for now")]
-        //[SkippableFact(typeof(SiloUnavailableException)), TestCategory("Functional")]
+        //[Fact(typeof(SiloUnavailableException)), TestCategory("Functional")]
         public async Task ReconstructClientIdPartitionTest_Request()
         {
             // Ensure the client entry is on Silo2 partition and get a grain that live on Silo2

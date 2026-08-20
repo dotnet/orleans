@@ -64,9 +64,9 @@ public abstract class AdoNetStreamFilteringTests : StreamFilteringTestsBase, IAs
         fixture.EnsurePreconditionsMet();
     }
 
-    public Task InitializeAsync() => fixture.InitializeAsync();
+    public ValueTask InitializeAsync() => fixture.InitializeAsync();
 
-    public Task DisposeAsync() => fixture.DisposeAsync();
+    public ValueTask DisposeAsync() => fixture.DisposeAsync();
 
     public class Fixture : BaseTestClusterFixture
     {
@@ -77,14 +77,22 @@ public abstract class AdoNetStreamFilteringTests : StreamFilteringTestsBase, IAs
             _invariant = invariant;
         }
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             // set up the adonet environment before the base initializes
             _testing = await RelationalStorageForTesting.SetupInstance(_invariant, TestDatabaseName);
 
-            Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
+            Assert.SkipWhen(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
             await base.InitializeAsync();
+
+            if (!PreconditionsMet)
+
+            {
+
+                return;
+
+            }
         }
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -128,12 +136,12 @@ public abstract class AdoNetStreamFilteringTests : StreamFilteringTestsBase, IAs
 
     protected override TimeSpan WaitTime => TimeSpan.FromSeconds(2);
 
-    [SkippableFact, TestCategory("BVT"), TestCategory("Filters")]
+    [Fact, TestCategory("BVT"), TestCategory("Filters")]
     public override Task IgnoreBadFilter() => base.IgnoreBadFilter();
 
-    [SkippableFact, TestCategory("BVT"), TestCategory("Filters")]
+    [Fact, TestCategory("BVT"), TestCategory("Filters")]
     public override Task OnlyEvenItems() => base.OnlyEvenItems();
 
-    [SkippableFact, TestCategory("BVT"), TestCategory("Filters")]
+    [Fact, TestCategory("BVT"), TestCategory("Filters")]
     public override Task MultipleSubscriptionsDifferentFilterData() => base.MultipleSubscriptionsDifferentFilterData();
 }

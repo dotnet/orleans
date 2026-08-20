@@ -18,7 +18,7 @@ namespace Tester.Redis.Persistence
     [TestArea("Persistence")]
     public class RedisPersistenceSetupTests
     {
-        [SkippableTheory]
+        [Theory]
         [InlineData(null)]
         [InlineData("localhost:1234")]
         public void StorageOptionsValidator(string? connectionString)

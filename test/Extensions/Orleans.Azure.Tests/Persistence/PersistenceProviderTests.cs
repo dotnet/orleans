@@ -18,7 +18,6 @@ using UnitTests.Persistence;
 using Orleans.Persistence.TestKit;
 using UnitTests.StorageTests;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Tester.AzureUtils.Persistence
 {
@@ -70,7 +69,7 @@ namespace Tester.AzureUtils.Persistence
             await Test_PersistenceProvider_WriteRead(testName, store);
         }
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage")]
+        [Fact, TestCategory("Functional"), TestCategory("AzureStorage")]
         [TestSuite("Functional")]
         [TestProvider("AzureStorage")]
         [TestArea("Persistence")]
@@ -83,7 +82,7 @@ namespace Tester.AzureUtils.Persistence
             await Test_PersistenceProvider_Read(testName, store);
         }
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("ModelBased")]
+        [Fact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("ModelBased")]
         [TestSuite("Functional")]
         [TestProvider("AzureStorage")]
         [TestArea("Persistence")]
@@ -96,7 +95,7 @@ namespace Tester.AzureUtils.Persistence
             await runner.RunGeneratedConformanceTests();
         }
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("ModelBased")]
+        [Fact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("ModelBased")]
         [TestSuite("Functional")]
         [TestProvider("AzureStorage")]
         [TestArea("Persistence")]
@@ -109,7 +108,7 @@ namespace Tester.AzureUtils.Persistence
             await runner.RunGeneratedConformanceTests();
         }
 
-        [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
+        [Theory, TestCategory("Functional"), TestCategory("AzureStorage")]
         [TestSuite("Functional")]
         [TestProvider("AzureStorage")]
         [TestArea("Persistence")]
@@ -132,7 +131,7 @@ namespace Tester.AzureUtils.Persistence
             await Test_PersistenceProvider_WriteRead(testName, store, grainState);
         }
 
-        [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
+        [Theory, TestCategory("Functional"), TestCategory("AzureStorage")]
         [TestSuite("Functional")]
         [TestProvider("AzureStorage")]
         [TestArea("Persistence")]
@@ -156,7 +155,7 @@ namespace Tester.AzureUtils.Persistence
             await Test_PersistenceProvider_WriteClearRead(testName, store, grainState);
         }
 
-        [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
+        [Theory, TestCategory("Functional"), TestCategory("AzureStorage")]
         [TestSuite("Functional")]
         [TestProvider("AzureStorage")]
         [TestArea("Persistence")]
@@ -186,7 +185,7 @@ namespace Tester.AzureUtils.Persistence
             await Test_PersistenceProvider_Read(testName, store, grainState, grainId);
         }
 
-        [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
+        [Theory, TestCategory("Functional"), TestCategory("AzureStorage")]
         [TestSuite("Functional")]
         [TestProvider("AzureStorage")]
         [TestArea("Persistence")]
@@ -219,7 +218,7 @@ namespace Tester.AzureUtils.Persistence
             await Test_PersistenceProvider_WriteRead(testName, store, grainState, grainId);
         }
 
-        [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
+        [Theory, TestCategory("Functional"), TestCategory("AzureStorage")]
         [TestSuite("Functional")]
         [TestProvider("AzureStorage")]
         [TestArea("Persistence")]
@@ -256,7 +255,7 @@ namespace Tester.AzureUtils.Persistence
             await Test_PersistenceProvider_WriteRead(testName, store, grainState, grainId);
         }
 
-        [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
+        [Theory, TestCategory("Functional"), TestCategory("AzureStorage")]
         [TestSuite("Functional")]
         [TestProvider("AzureStorage")]
         [TestArea("Persistence")]
@@ -290,7 +289,7 @@ namespace Tester.AzureUtils.Persistence
             Assert.Equal(initialState.C, actualState.C);
         }
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage")]
+        [Fact, TestCategory("Functional"), TestCategory("AzureStorage")]
         [TestSuite("Functional")]
         [TestProvider("AzureStorage")]
         [TestArea("Persistence")]
@@ -339,14 +338,14 @@ namespace Tester.AzureUtils.Persistence
             sw.Start();
             await store.WriteStateAsync(testName, reference, state);
             TimeSpan writeTime = sw.Elapsed;
-            this.output.WriteLine("{0} - Write time = {1}", store.GetType().FullName, writeTime);
+            this.output.WriteLine("{0} - Write time = {1}", store.GetType().FullName!, writeTime);
             Assert.True(writeTime >= expectedLatency, $"Write: Expected minimum latency = {expectedLatency} Actual = {writeTime}");
 
             sw.Restart();
             var storedState = new GrainState<TestStoreGrainState>();
             await store.ReadStateAsync(testName, reference, storedState);
             TimeSpan readTime = sw.Elapsed;
-            this.output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
+            this.output.WriteLine("{0} - Read time = {1}", store.GetType().FullName!, readTime);
             Assert.True(readTime >= expectedLatency, $"Read: Expected minimum latency = {expectedLatency} Actual = {readTime}");
         }
 
@@ -414,7 +413,7 @@ namespace Tester.AzureUtils.Persistence
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
 
             TimeSpan readTime = sw.Elapsed;
-            this.output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
+            this.output.WriteLine("{0} - Read time = {1}", store.GetType().FullName!, readTime);
 
             var expectedState = grainState.State;
             var storedState = storedGrainState.State;
@@ -449,7 +448,7 @@ namespace Tester.AzureUtils.Persistence
             };
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
             TimeSpan readTime = sw.Elapsed;
-            this.output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+            this.output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName!, writeTime, readTime);
             var expectedState = grainState.State;
             var actualState = storedGrainState.State;
             Assert.NotNull(expectedState);
@@ -487,7 +486,7 @@ namespace Tester.AzureUtils.Persistence
             };
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
             TimeSpan readTime = sw.Elapsed;
-            this.output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+            this.output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName!, writeTime, readTime);
             Assert.NotNull(storedGrainState.State);
             Assert.Equal(default, storedGrainState.State.A);
             Assert.Equal(default, storedGrainState.State.B);

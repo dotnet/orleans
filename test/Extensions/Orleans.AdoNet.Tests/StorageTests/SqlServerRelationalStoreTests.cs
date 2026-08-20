@@ -36,12 +36,12 @@ namespace UnitTests.StorageTests.AdoNet
 
             public RelationalStorageForTesting Storage { get; private set; } = null!;
 
-            public async Task InitializeAsync()
+            public async ValueTask InitializeAsync()
             {
                 Storage = await _storageFactory();
             }
 
-            public Task DisposeAsync() => Task.CompletedTask;
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
         }
 
         public SqlServerRelationalStoreTests(Fixture fixture) : base(AdoNetInvariantName)
@@ -49,7 +49,7 @@ namespace UnitTests.StorageTests.AdoNet
             _storage = fixture.Storage;
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Streaming_SqlServer_Test()
         {
             using(var tokenSource = new CancellationTokenSource(StreamCancellationTimeoutLimit))
@@ -59,16 +59,16 @@ namespace UnitTests.StorageTests.AdoNet
             }
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task CancellationToken_SqlServer_Test()
         {
             await CancellationTokenTest(_storage, CancellationTestTimeoutLimit);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task DataSource_SqlServer_Test()
         {
-            Skip.If(string.IsNullOrWhiteSpace(_storage.CurrentConnectionString), "Connection string not provided.");
+            Assert.SkipWhen(string.IsNullOrWhiteSpace(_storage.CurrentConnectionString), "Connection string not provided.");
             using var dataSource = new ProviderDbDataSource(
                 _storage.CurrentConnectionString,
                 () => new SqlConnection(_storage.CurrentConnectionString));
@@ -91,7 +91,7 @@ namespace UnitTests.StorageTests.AdoNet
             var expectedException = new InvalidOperationException("Simulated SQL Server database initialization failure.");
             var fixture = new SqlServerRelationalStoreTests.Fixture(() => throw expectedException);
 
-            var exception = await Assert.ThrowsAsync<InvalidOperationException>(fixture.InitializeAsync);
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () => await fixture.InitializeAsync());
 
             Assert.Same(expectedException, exception);
         }

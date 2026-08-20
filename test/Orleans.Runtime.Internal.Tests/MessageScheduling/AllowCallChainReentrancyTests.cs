@@ -1,6 +1,5 @@
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.General
 {

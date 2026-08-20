@@ -12,16 +12,12 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="System.IO.Pipelines" />
-    <PackageReference Include="xunit.assert" />
-    <PackageReference Include="xunit.core" />
-    <PackageReference Include="xunit.extensibility.core" />
+    <PackageReference Include="xunit.v3.assert" />
+    <PackageReference Include="xunit.v3.extensibility.core" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.1'">
-    <PackageReference Update="xunit.assert" VersionOverride="2.4.2" />
-    <PackageReference Update="xunit.core" VersionOverride="2.4.2" />
-    <PackageReference Update="xunit.extensibility.core" VersionOverride="2.4.2" />
-    <PackageReference Update="xunit.extensibility.execution" VersionOverride="2.4.2" />
+  <ItemGroup>
+    <Using Include="Xunit" />
   </ItemGroup>
 
   <ItemGroup>

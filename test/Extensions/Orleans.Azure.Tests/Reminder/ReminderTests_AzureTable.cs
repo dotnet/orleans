@@ -32,7 +32,14 @@ namespace Tester.AzureUtils.TimerTests
             private readonly ReminderDiagnosticObserver _startupObserver = ReminderDiagnosticObserver.Create();
             private IReadOnlyList<SiloAddress>? _initialSilos;
             private IReadOnlyList<SiloAddress>? _startedReminderServices;
-            internal ReminderTestClock ReminderClock => _reminderClock ?? throw new InvalidOperationException($"{nameof(ReminderTestClock)} has not been configured.");
+            internal ReminderTestClock ReminderClock
+            {
+                get
+                {
+                    EnsurePreconditionsMet();
+                    return _reminderClock ?? throw new InvalidOperationException($"{nameof(ReminderTestClock)} has not been configured.");
+                }
+            }
             internal IReadOnlyList<SiloAddress> InitialSilos => _initialSilos
                 ?? throw new InvalidOperationException("The initial silos have not been captured.");
             internal IReadOnlyList<SiloAddress> StartedReminderServices => _startedReminderServices
@@ -50,9 +57,13 @@ namespace Tester.AzureUtils.TimerTests
                 });
             }
 
-            public override async Task InitializeAsync()
+            public override async ValueTask InitializeAsync()
             {
                 await base.InitializeAsync();
+                if (!PreconditionsMet)
+                {
+                    return;
+                }
 
                 var silos = HostedCluster.Silos.ToArray();
                 _initialSilos = silos.Select(silo => silo.SiloAddress).ToArray();
@@ -77,7 +88,7 @@ namespace Tester.AzureUtils.TimerTests
                 }
             }
 
-            public override async Task DisposeAsync()
+            public override async ValueTask DisposeAsync()
             {
                 try
                 {
@@ -99,25 +110,25 @@ namespace Tester.AzureUtils.TimerTests
 
         // Basic tests
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public void Fixture_WaitsForReminderServicesToStart()
         {
             Assert.Equal(_fixture.InitialSilos, _fixture.StartedReminderServices);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_Basic_StopByRef()
         {
             await Test_Reminders_Basic_StopByRef();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_UpdateReminder_DoesNotRestartLocalReminder()
         {
             await Test_Reminders_UpdateReminder_DoesNotRestartLocalReminder();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();
@@ -125,19 +136,19 @@ namespace Tester.AzureUtils.TimerTests
 
         // Single join tests ... multi grain, multi reminders
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_1J_MultiGrainMultiReminders()
         {
             await Test_Reminders_1J_MultiGrainMultiReminders();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_ReminderNotFound()
         {
             await Test_Reminders_ReminderNotFound();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_Basic()
         {
             using var cts = new CancellationTokenSource(ENDWAIT);
@@ -155,7 +166,7 @@ namespace Tester.AzureUtils.TimerTests
             Assert.Equal(last, curr);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_Basic_Restart()
         {
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -177,20 +188,20 @@ namespace Tester.AzureUtils.TimerTests
             await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder, cts.Token);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_MultipleReminders()
         {
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             await PerGrainMultiReminderTest(grain);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_2J_MultiGrainMultiReminders()
         {
             await Test_Reminders_2J_MultiGrainMultiReminders();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_MultiGrainMultiReminders()
         {
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -210,7 +221,7 @@ namespace Tester.AzureUtils.TimerTests
                 g5);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_1F_Basic()
         {
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -230,7 +241,7 @@ namespace Tester.AzureUtils.TimerTests
             await CompleteGrainFailureTestAsync(cts.Token, g1);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_2F_MultiGrain()
         {
             using var cts = new CancellationTokenSource(ENDWAIT);
@@ -262,7 +273,7 @@ namespace Tester.AzureUtils.TimerTests
             await CompleteGrainFailureTestAsync(cts.Token, grains);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_1F1J_MultiGrain()
         {
             using var cts = new CancellationTokenSource(ENDWAIT);
@@ -292,7 +303,7 @@ namespace Tester.AzureUtils.TimerTests
             log.LogInformation("\n\n\nReminderTest_1F1J_MultiGrain passed OK.\n\n\n");
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_RegisterSameReminderTwice()
         {
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -304,7 +315,7 @@ namespace Tester.AzureUtils.TimerTests
             // TODO: write tests where period of a reminder is changed
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_GT_Basic()
         {
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -326,7 +337,7 @@ namespace Tester.AzureUtils.TimerTests
             await StopReminderAndWaitForQuiescenceAsync(g2, DR, g2.StopReminder, cts.Token);
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4319"), TestCategory("Functional")]
+        [Fact(Skip = "https://github.com/dotnet/orleans/issues/4319"), TestCategory("Functional")]
         public async Task Rem_Azure_GT_1F1J_MultiGrain()
         {
             using var cts = new CancellationTokenSource(ENDWAIT);
@@ -351,7 +362,7 @@ namespace Tester.AzureUtils.TimerTests
             await CompleteGrainFailureTestAsync(cts.Token, grains);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_Wrong_LowerThanAllowedPeriod()
         {
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -359,7 +370,7 @@ namespace Tester.AzureUtils.TimerTests
                 grain.StartReminder(DR, TimeSpan.FromMilliseconds(3000), true));
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_Wrong_Grain()
         {
             IReminderGrainWrong grain = this.GrainFactory.GetGrain<IReminderGrainWrong>(0);

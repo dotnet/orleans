@@ -2,11 +2,11 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using TestExtensions;
-using Xunit.Abstractions;
 using Orleans.Internal;
 using Orleans.Configuration;
 using Orleans.TestingHost.Utils;
 using Orleans.Reminders.Cosmos;
+using Xunit;
 
 namespace Tester.Cosmos.Reminders;
 
@@ -38,7 +38,7 @@ public class ReminderTests_Cosmos_Standalone
         _serviceId = Guid.NewGuid().ToString();
     }
 
-    [SkippableFact, TestCategory("Reminders"), TestCategory("Performance")]
+    [Fact, TestCategory("Reminders"), TestCategory("Performance")]
     public async Task Reminders_AzureTable_InsertRate()
     {
         var clusterOptions = Options.Create(new ClusterOptions { ClusterId = "TMSLocalTesting", ServiceId = _serviceId });
@@ -53,7 +53,7 @@ public class ReminderTests_Cosmos_Standalone
         await TestTableInsertRate(table, 500);
     }
 
-    [SkippableFact, TestCategory("Reminders"), TestCategory("Functional")]
+    [Fact, TestCategory("Reminders"), TestCategory("Functional")]
     public async Task Reminders_AzureTable_InsertNewRowAndReadBack()
     {
         string clusterId = NewClusterId();

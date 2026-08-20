@@ -493,7 +493,7 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
         var regularTask = grain.LongWait(regularCts.Token, TimeSpan.FromSeconds(30), regularCallId);
 
         // Wait for the regular request to start
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
         // Start an interleaving request (this should run concurrently)
         using var interleavingCts = new CancellationTokenSource();
@@ -501,7 +501,7 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
         var interleavingTask = grain.LongWaitInterleaving(interleavingCts.Token, TimeSpan.FromSeconds(10), interleavingCallId);
 
         // Wait a bit for the interleaving request to start
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
         // Cancel the interleaving request
         await interleavingCts.CancelAsync();
@@ -535,7 +535,7 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
         var task3 = grain.LongWaitInterleaving(cts3.Token, TimeSpan.FromSeconds(10), callId3);
 
         // Wait for all to be running
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
         // Cancel only the second request
         await cts2.CancelAsync();

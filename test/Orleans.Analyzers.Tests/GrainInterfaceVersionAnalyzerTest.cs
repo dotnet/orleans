@@ -1073,7 +1073,7 @@ public class MyGrain : Grain, IGrainWithStringKey
         var changedDocument = changedSolution.GetAdditionalDocument(additionalDocumentId!);
         Assert.NotNull(changedDocument);
 
-        return (await changedDocument!.GetTextAsync()).ToString();
+        return (await changedDocument!.GetTextAsync(TestContext.Current.CancellationToken)).ToString();
     }
 
     private static Project CreateProjectWithAdditionalFilesForCodeFix(string source, string? grainInterfacesFileContent)
@@ -1275,7 +1275,7 @@ public interface IMyGrain : IGrain
         var changedDocument = changedSolution.GetAdditionalDocument(additionalDocumentId!);
         Assert.NotNull(changedDocument);
 
-        var changedText = await changedDocument!.GetTextAsync();
+        var changedText = await changedDocument!.GetTextAsync(TestContext.Current.CancellationToken);
         var content = changedText.ToString();
 
         // Should contain the new interface
@@ -1304,7 +1304,7 @@ public interface IMyGrain : IGrain
         var changedDocument = changedSolution.GetAdditionalDocument(additionalDocumentId!);
         Assert.NotNull(changedDocument);
 
-        var changedText = await changedDocument!.GetTextAsync();
+        var changedText = await changedDocument!.GetTextAsync(TestContext.Current.CancellationToken);
         var content = changedText.ToString();
 
         Assert.DoesNotContain("[Alias(", content);
@@ -1335,7 +1335,7 @@ public interface IMiddle : IGrain
         var changedDocument = changedSolution.GetAdditionalDocument(additionalDocumentId!);
         Assert.NotNull(changedDocument);
 
-        var changedText = await changedDocument!.GetTextAsync();
+        var changedText = await changedDocument!.GetTextAsync(TestContext.Current.CancellationToken);
         var content = changedText.ToString();
 
         var alphaInterface = content.IndexOf("IAlpha [Version(1)]", StringComparison.Ordinal);
@@ -1443,7 +1443,7 @@ IMyGrain.DoSomething() -> Task";
         var changedDocument = changedSolution.GetAdditionalDocument(additionalDocumentId!);
         Assert.NotNull(changedDocument);
 
-        var changedText = await changedDocument!.GetTextAsync();
+        var changedText = await changedDocument!.GetTextAsync(TestContext.Current.CancellationToken);
         var content = changedText.ToString();
 
         // Should have updated version
@@ -1480,7 +1480,7 @@ IFoo.DoSomething() -> Task";
         var changedDocument = changedSolution.GetAdditionalDocument(additionalDocumentId!);
         Assert.NotNull(changedDocument);
 
-        var changedText = await changedDocument!.GetTextAsync();
+        var changedText = await changedDocument!.GetTextAsync(TestContext.Current.CancellationToken);
         var content = changedText.ToString();
 
         Assert.Contains("IFooBar [Version(1)]", content);
@@ -1505,7 +1505,7 @@ public interface IMyGrain : IGrain
         var changedDocument = changedSolution.GetAdditionalDocument(additionalDocumentId!);
         Assert.NotNull(changedDocument);
 
-        var changedText = await changedDocument!.GetTextAsync();
+        var changedText = await changedDocument!.GetTextAsync(TestContext.Current.CancellationToken);
         var content = changedText.ToString();
 
         Assert.DoesNotContain("\r", content);
@@ -1537,7 +1537,7 @@ IMyGrain.DoSomething() -> Task";
         var changedDocument = changedSolution.GetAdditionalDocument(additionalDocumentId!);
         Assert.NotNull(changedDocument);
 
-        var changedText = await changedDocument!.GetTextAsync();
+        var changedText = await changedDocument!.GetTextAsync(TestContext.Current.CancellationToken);
         var content = changedText.ToString();
 
         // Should contain the new member
@@ -1567,7 +1567,7 @@ IMyGrain.DoSomething() -> Task";
         var changedDocument = changedSolution.GetAdditionalDocument(additionalDocumentId!);
         Assert.NotNull(changedDocument);
 
-        var changedText = await changedDocument!.GetTextAsync();
+        var changedText = await changedDocument!.GetTextAsync(TestContext.Current.CancellationToken);
         var content = changedText.ToString();
 
         Assert.Contains("\n  new-method(int) -> Task", content);
@@ -1644,7 +1644,7 @@ IFooBar.ExistingMethod() -> Task";
         var changedDocument = changedSolution.GetAdditionalDocument(additionalDocumentId!);
         Assert.NotNull(changedDocument);
 
-        var changedText = await changedDocument!.GetTextAsync();
+        var changedText = await changedDocument!.GetTextAsync(TestContext.Current.CancellationToken);
         var content = changedText.ToString();
 
         Assert.True(
@@ -1763,7 +1763,7 @@ IOldGrain.DoSomething() -> Task";
         var changedDocument = changedSolution.GetAdditionalDocument(additionalDocumentId!);
         Assert.NotNull(changedDocument);
 
-        var changedText = await changedDocument!.GetTextAsync();
+        var changedText = await changedDocument!.GetTextAsync(TestContext.Current.CancellationToken);
         var content = changedText.ToString();
 
         // Should have *RETIRED* prefix
@@ -1786,7 +1786,7 @@ IFooBar [Version(1)]";
         var changedDocument = changedSolution.GetAdditionalDocument(additionalDocumentId!);
         Assert.NotNull(changedDocument);
 
-        var changedText = await changedDocument!.GetTextAsync();
+        var changedText = await changedDocument!.GetTextAsync(TestContext.Current.CancellationToken);
         var content = changedText.ToString();
 
         Assert.Contains("*RETIRED* interface IFoo [Version(1)]", content);

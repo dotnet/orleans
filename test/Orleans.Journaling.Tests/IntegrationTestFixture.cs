@@ -34,12 +34,12 @@ public class IntegrationTestFixture : IAsyncLifetime
     {
     }
 
-    public virtual async Task InitializeAsync()
+    public virtual async ValueTask InitializeAsync()
     {
         await Cluster.DeployAsync();
     }
 
-    public virtual async Task DisposeAsync()
+    public virtual async ValueTask DisposeAsync()
     {
         if (Cluster != null)
         {

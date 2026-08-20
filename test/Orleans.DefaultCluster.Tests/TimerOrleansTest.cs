@@ -7,7 +7,6 @@ using TestExtensions;
 using UnitTestGrains;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace DefaultCluster.Tests.TimerTests
 {

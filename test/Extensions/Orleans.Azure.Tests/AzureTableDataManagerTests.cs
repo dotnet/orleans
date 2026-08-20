@@ -31,7 +31,7 @@ namespace Tester.AzureUtils
             PartitionKey = "PK-AzureTableDataManagerTests-" + Guid.NewGuid();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AzureTableDataManager_CreateTableEntryAsync()
         {
             var data = GenerateNewData();
@@ -57,7 +57,7 @@ namespace Tester.AzureUtils
             Assert.Equal(data.StringData, tuple.Entity.StringData);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AzureTableDataManager_UpsertTableEntryAsync()
         {
             var data = GenerateNewData();
@@ -74,7 +74,7 @@ namespace Tester.AzureUtils
             Assert.Equal(data2.StringData, tuple.Entity.StringData);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AzureTableDataManager_UpdateTableEntryAsync()
         {
             StorageEmulatorUtilities.EnsureEmulatorIsNotUsed();
@@ -129,7 +129,7 @@ namespace Tester.AzureUtils
             }
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AzureTableDataManager_DeleteTableAsync()
         {
             var data = GenerateNewData();
@@ -166,7 +166,7 @@ namespace Tester.AzureUtils
             Assert.Null(tuple.Entity);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AzureTableDataManager_MergeTableAsync()
         {
             StorageEmulatorUtilities.EnsureEmulatorIsNotUsed();
@@ -211,7 +211,7 @@ namespace Tester.AzureUtils
             Assert.Equal("NewData", tuple.Entity.StringData);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AzureTableDataManager_ReadSingleTableEntryAsync()
         {
             var data = GenerateNewData();
@@ -219,7 +219,7 @@ namespace Tester.AzureUtils
             Assert.Null(tuple.Entity);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AzureTableDataManager_CreateAndUpdateTableEntriesAsync()
         {
             StorageEmulatorUtilities.EnsureEmulatorIsNotUsed();
@@ -277,7 +277,7 @@ namespace Tester.AzureUtils
             };
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task AzureTableDataManager_UpdateTableEntriesAsync()
         {
             StorageEmulatorUtilities.EnsureEmulatorIsNotUsed();

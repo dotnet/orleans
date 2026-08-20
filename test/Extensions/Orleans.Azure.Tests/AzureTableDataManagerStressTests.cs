@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Globalization;
 using Orleans.TestingHost.Utils;
 using Xunit;
-using Xunit.Abstractions;
 using Orleans.Internal;
 using AzureStoragePolicyOptions = Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions;
 
@@ -31,7 +30,7 @@ namespace Tester.AzureUtils
             PartitionKey = "AzureTableDataManagerStressTests-" + Guid.NewGuid();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task AzureTableDataManagerStressTests_WriteAlot_SinglePartition()
         {
             const string testName = "AzureTableDataManagerStressTests_WriteAlot_SinglePartition";
@@ -43,7 +42,7 @@ namespace Tester.AzureUtils
             await WriteAlot_Async(testName, numPartitions, iterations, batchSize);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task AzureTableDataManagerStressTests_WriteAlot_MultiPartition()
         {
             const string testName = "AzureTableDataManagerStressTests_WriteAlot_MultiPartition";
@@ -55,7 +54,7 @@ namespace Tester.AzureUtils
             await WriteAlot_Async(testName, numPartitions, iterations, batchSize);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task AzureTableDataManagerStressTests_ReadAll_SinglePartition()
         {
             const string testName = "AzureTableDataManagerStressTests_ReadAll";
@@ -76,7 +75,7 @@ namespace Tester.AzureUtils
             Assert.True(count >= iterations, $"ReadAllshould return some data: Found={count}");
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task AzureTableDataManagerStressTests_ReadAllTableEntities()
         {
             const string testName = "AzureTableDataManagerStressTests_ReadAllTableEntities";

@@ -69,27 +69,27 @@ namespace Tests.GeoClusterTests
             this.random = new Random();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task DefaultStorage()
         {
             await DoBasicLogTestGrainTest("TestGrains.LogTestGrainDefaultStorage");
         }
-        [SkippableFact]
+        [Fact]
         public async Task MemoryStorage()
         {
             await DoBasicLogTestGrainTest("TestGrains.LogTestGrainMemoryStorage");
         }
-        [SkippableFact]
+        [Fact]
         public async Task SharedStorage()
         {
             await DoBasicLogTestGrainTest("TestGrains.LogTestGrainSharedStateStorage");
         }
-        [SkippableFact]
+        [Fact]
         public async Task SharedLogStorage()
         {
             await DoBasicLogTestGrainTest("TestGrains.LogTestGrainSharedLogStorage");
         }
-        [SkippableFact]
+        [Fact]
         public async Task CustomStorage()
         {
             await DoBasicLogTestGrainTest("TestGrains.LogTestGrainCustomStorage");

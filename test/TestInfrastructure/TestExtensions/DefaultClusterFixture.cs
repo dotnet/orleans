@@ -20,7 +20,7 @@ namespace TestExtensions
 
         public ILogger Logger { get; private set; } = null!;
 
-        public virtual async Task InitializeAsync()
+        public virtual async ValueTask InitializeAsync()
         {
             var builder = new TestClusterBuilder();
             TestDefaultConfiguration.ConfigureTestCluster(builder);
@@ -36,7 +36,7 @@ namespace TestExtensions
             this.Logger = this.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
         }
 
-        public virtual async Task DisposeAsync()
+        public virtual async ValueTask DisposeAsync()
         {
             var cluster = this.HostedCluster;
             if (cluster is null) return;

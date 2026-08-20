@@ -269,7 +269,7 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
             });
         }
 
-        public override async Task DisposeAsync()
+        public override async ValueTask DisposeAsync()
         {
             try
             {

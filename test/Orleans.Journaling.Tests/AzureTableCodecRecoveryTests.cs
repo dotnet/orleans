@@ -28,7 +28,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         JournalingAzureStorageTestConfiguration.CheckPreconditionsOrThrow();
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var services = new ServiceCollection();
         services.AddLogging();
@@ -52,7 +52,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         await _siloLifecycle.OnStart(cts.Token);
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_siloLifecycle is not null)
         {
@@ -63,7 +63,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         await _azureServiceProvider.DisposeAsync();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AzureTableStorage_BinaryJournal_MigratesToJsonOnFirstWrite()
     {
         var grainId = GrainId.Create("journaling-table-codec-migration", Guid.NewGuid().ToString("N"));
@@ -104,7 +104,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         ((IDisposable)recoveredManager).Dispose();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AzureTableStorage_AllDurableTypes_RecoverWithBinaryCodec()
     {
         var grainId = GrainId.Create("journaling-table-codec-recovery", Guid.NewGuid().ToString("N"));
@@ -147,7 +147,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         await recoveredStorage.DeleteAsync(cts.Token);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AzureTableStorage_ReplaceAndAppend_RecoverAcrossFreshProviderInstances()
     {
         var grainId = GrainId.Create("journaling-table-replace-recovery", Guid.NewGuid().ToString("N"));
@@ -176,7 +176,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         await recoveredStorage.DeleteAsync(cts.Token);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AzureTableStorage_LargeAppend_RoundTripsAcrossPropertiesAndRows()
     {
         var grainId = GrainId.Create("journaling-table-large-append", Guid.NewGuid().ToString("N"));
@@ -345,7 +345,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         DurableState<string> State,
         DurableTaskCompletionSource<int> Tcs);
 
-    [SkippableTheory]
+    [Theory]
     [InlineData(OrleansBinaryJournalFormat.JournalFormatKey)]
     [InlineData(JsonJournalExtensions.JournalFormatKey)]
     public async Task AzureTableStorage_JournalCodec_RecoversAcrossFreshProviderInstances(string journalFormatKey)
@@ -386,7 +386,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         ((IDisposable)recoveredManager).Dispose();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AzureTableStorage_JsonJournal_MigratesToBinaryOnFirstWrite()
     {
         var grainId = GrainId.Create("journaling-table-json-to-binary", Guid.NewGuid().ToString("N"));
@@ -439,7 +439,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         ((IDisposable)finalManager).Dispose();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AzureTableStorage_UnknownStoredFormat_ReportsKeyWithoutMutatingJournal()
     {
         const string unknownFormat = "unknown-table-journal-format";
@@ -468,7 +468,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         await storage.DeleteAsync(cts.Token);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AzureTableStorage_MismatchedStoredFormat_ReportsDeclaredAndConfiguredKeysWithoutMutation()
     {
         var grainId = GrainId.Create("journaling-table-mismatched-format", Guid.NewGuid().ToString("N"));
@@ -497,7 +497,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         await storage.DeleteAsync(cts.Token);
     }
 
-    [SkippableTheory]
+    [Theory]
     [InlineData(OrleansBinaryJournalFormat.JournalFormatKey)]
     [InlineData(JsonJournalExtensions.JournalFormatKey)]
     public async Task AzureTableStorage_TruncatedCodecPayload_PropagatesRecoveryFailureWithoutMutation(string journalFormatKey)
@@ -562,12 +562,16 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         var tableServiceClient = await options.CreateClient!(cancellationToken);
         var table = tableServiceClient.GetTableClient(options.TableName);
         var partitionKey = options.GetPartitionKeyForJournal(journalId);
-        var patch = new Azure.Data.Tables.TableEntity(partitionKey, AzureTableJournalStorage.HeaderRowKey)
+        var patch = new global::Azure.Data.Tables.TableEntity(partitionKey, AzureTableJournalStorage.HeaderRowKey)
         {
             [AzureTableJournalStorage.FormatPropertyName] = format,
         };
 
-        await table.UpdateEntityAsync(patch, Azure.ETag.All, Azure.Data.Tables.TableUpdateMode.Merge, cancellationToken);
+        await table.UpdateEntityAsync(
+            patch,
+            global::Azure.ETag.All,
+            global::Azure.Data.Tables.TableUpdateMode.Merge,
+            cancellationToken);
     }
 
     private static async Task<StoredJournalSnapshot> CaptureStoredJournalAsync(

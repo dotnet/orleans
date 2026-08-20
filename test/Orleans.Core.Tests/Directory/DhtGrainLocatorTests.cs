@@ -7,7 +7,6 @@ using TestExtensions;
 using UnitTests.SchedulerTests;
 using UnitTests.TesterInternal;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.Directory
 {

@@ -9,7 +9,6 @@ using Orleans.Streams;
 using Orleans.Streaming.Kinesis;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 using Orleans.Configuration;
 using Orleans.Serialization;
 using Microsoft.Extensions.DependencyInjection;
@@ -44,18 +43,21 @@ namespace Orleans.Streaming.Kinesis.Tests
             this.clusterId = MakeClusterId();
         }
 
-        public async Task InitializeAsync()
+        public async ValueTask InitializeAsync()
         {
             await KinesisStreamTestResource.Create(KinesisStreamName);
             streamCreated = true;
         }
 
-        public Task DisposeAsync()
-            => streamCreated
-                ? KinesisStreamTestResource.Delete(KinesisStreamName)
-                : Task.CompletedTask;
+        public async ValueTask DisposeAsync()
+        {
+            if (streamCreated)
+            {
+                await KinesisStreamTestResource.Delete(KinesisStreamName);
+            }
+        }
 
-        [SkippableFact]
+        [Fact]
         public async Task SendAndReceiveFromKinesis()
         {
             var options = new KinesisStreamOptions

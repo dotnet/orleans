@@ -9,7 +9,6 @@ using Orleans.Runtime;
 using Orleans.Streams;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 using Orleans.Serialization;
 
 namespace Tester.AzureUtils.Streaming
@@ -36,19 +35,19 @@ namespace Tester.AzureUtils.Streaming
             this.loggerFactory = this.fixture.Services.GetService<ILoggerFactory>()!;
         }
 
-        public Task InitializeAsync() => Task.CompletedTask;
+        public ValueTask InitializeAsync() => ValueTask.CompletedTask;
 
-        public async Task DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             try
             {
                 TestUtils.CheckForAzureStorage();
                 await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(this.loggerFactory, azureQueueNames, new AzureQueueOptions().ConfigureTestDefaults());
             }
-            catch (SkipException) { }
+            catch (Xunit.Sdk.SkipException) { }
         }
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("Halo")]
+        [Fact, TestCategory("Functional"), TestCategory("Halo")]
         public async Task SendAndReceiveFromAzureQueue()
         {
             var options = new AzureQueueOptions

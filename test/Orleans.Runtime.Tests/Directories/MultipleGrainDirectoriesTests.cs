@@ -19,11 +19,11 @@ namespace Tester.Directories
             builder.Options.InitialSilosCount = 2;
         }
 
-        [SkippableFact, TestCategory("Directory"), TestCategory("Functional")]
+        [Fact, TestCategory("Directory"), TestCategory("Functional")]
         public async Task PingGrain()
         {
-            var grainOnPrimary = await GetGrainOnPrimary().WaitAsync(TimeSpan.FromSeconds(5));
-            var grainOnSecondary = await GetGrainOnSecondary().WaitAsync(TimeSpan.FromSeconds(5));
+            var grainOnPrimary = await GetGrainOnPrimary().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            var grainOnSecondary = await GetGrainOnSecondary().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
             // Setup
             var primaryCounter = await grainOnPrimary.Ping();
@@ -33,7 +33,7 @@ namespace Tester.Directories
             Assert.Equal(++primaryCounter, await grainOnSecondary.ProxyPing(grainOnPrimary));
             Assert.Equal(++secondaryCounter, await grainOnPrimary.ProxyPing(grainOnSecondary));
 
-            await Task.Delay(5000);
+            await Task.Delay(5000, TestContext.Current.CancellationToken);
 
             // Shutdown the secondary silo
             await this.HostedCluster.StopSecondarySilosAsync();

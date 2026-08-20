@@ -59,60 +59,60 @@ namespace UnitTests.MembershipTests
             return instance.CurrentConnectionString;
         }
 
-        [SkippableFact]
+        [Fact]
         public void MembershipTable_MySql_Init()
         {
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_MySql_GetGateways()
         {
             await MembershipTable_GetGateways();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_MySql_ReadAll_EmptyTable()
         {
             await MembershipTable_ReadAll_EmptyTable();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_MySql_InsertRow()
         {
             await MembershipTable_InsertRow();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_MySql_ReadRow_Insert_Read()
         {
             await MembershipTable_ReadRow_Insert_Read();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_MySql_ReadAll_Insert_ReadAll()
         {
             await MembershipTable_ReadAll_Insert_ReadAll();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_MySql_UpdateRow()
         {
             await MembershipTable_UpdateRow();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_MySql_UpdateRowInParallel()
         {
             await MembershipTable_UpdateRowInParallel();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_MySql_UpdateIAmAlive()
         {
             await MembershipTable_UpdateIAmAlive();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_MySql_CleanupDefunctSiloEntries()
         {
             await MembershipTable_CleanupDefunctSiloEntries();

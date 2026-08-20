@@ -33,19 +33,34 @@ namespace Tester.AdoNet.Reminders
         {
             private string _connectionString = null!;
             private ReminderTestClock? _reminderClock;
-            internal ReminderTestClock ReminderClock => _reminderClock ?? throw new InvalidOperationException($"{nameof(ReminderTestClock)} has not been configured.");
+            internal ReminderTestClock ReminderClock
+            {
+                get
+                {
+                    EnsurePreconditionsMet();
+                    return _reminderClock ?? throw new InvalidOperationException($"{nameof(ReminderTestClock)} has not been configured.");
+                }
+            }
 
             protected override void CheckPreconditionsOrThrow()
             {
                 RelationalStorageForTesting.CheckPreconditionsOrThrow(AdoInvariant);
             }
 
-            public override async Task InitializeAsync()
+            public override async ValueTask InitializeAsync()
             {
-                EnsurePreconditionsMet();
+                if (!PreconditionsMet)
+                {
+                    return;
+                }
+
                 var relationalStorage = await RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName);
                 _connectionString = relationalStorage.CurrentConnectionString;
                 await base.InitializeAsync();
+                if (!PreconditionsMet)
+                {
+                    return;
+                }
             }
 
             protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
@@ -61,7 +76,7 @@ namespace Tester.AdoNet.Reminders
                 });
             }
 
-            public override async Task DisposeAsync()
+            public override async ValueTask DisposeAsync()
             {
                 try
                 {
@@ -78,7 +93,7 @@ namespace Tester.AdoNet.Reminders
         {
         }
 
-        public async Task InitializeAsync()
+        public async ValueTask InitializeAsync()
         {
             // ReminderTable.Clear() cannot be called from a non-Orleans thread,
             // so we must proxy the call through a grain.
@@ -86,23 +101,23 @@ namespace Tester.AdoNet.Reminders
             await controlProxy.EraseReminderTable().WaitAsync(TestConstants.InitTimeout);
         }
 
-        Task IAsyncLifetime.DisposeAsync() => Task.CompletedTask;
+        ValueTask IAsyncDisposable.DisposeAsync() => ValueTask.CompletedTask;
         
         // Basic tests
 
-        [SkippableFact]
+        [Fact]
         public async Task Rem_Sql_Basic_StopByRef()
         {
             await Test_Reminders_Basic_StopByRef();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Rem_Sql_UpdateReminder_DoesNotRestartLocalReminder()
         {
             await Test_Reminders_UpdateReminder_DoesNotRestartLocalReminder();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Rem_Sql_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();
@@ -110,13 +125,13 @@ namespace Tester.AdoNet.Reminders
 
         // Single join tests ... multi grain, multi reminders
 
-        [SkippableFact]
+        [Fact]
         public async Task Rem_Sql_1J_MultiGrainMultiReminders()
         {
             await Test_Reminders_1J_MultiGrainMultiReminders();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Rem_Sql_ReminderNotFound()
         {
             await Test_Reminders_ReminderNotFound();

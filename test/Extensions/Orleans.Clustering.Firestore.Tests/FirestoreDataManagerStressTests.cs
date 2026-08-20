@@ -3,7 +3,7 @@ using Google.Cloud.Firestore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Clustering.Firestore;
-using Xunit.Abstractions;
+using Xunit;
 
 
 namespace Orleans.Clustering.Firestore.Tests;
@@ -21,7 +21,7 @@ public class FirestoreDataManagerStressTests : IAsyncLifetime
         this._output = output;
     }
 
-    [SkippableFact]
+    [Fact]
     public Task WriteMany_SinglePartition()
     {
         const string testName = "WriteMany_SinglePartition";
@@ -32,7 +32,7 @@ public class FirestoreDataManagerStressTests : IAsyncLifetime
         return WriteMany(testName, numPartitions, iterations, batchSize);
     }
 
-    [SkippableFact]
+    [Fact]
     public Task WriteMany_MultiPartition()
     {
         const string testName = "WriteMany_MultiPartition";
@@ -88,12 +88,12 @@ public class FirestoreDataManagerStressTests : IAsyncLifetime
             testName, iterations, numPartitions, sw.Elapsed, iterations / sw.Elapsed.TotalSeconds);
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         await Task.WhenAll(_managers.Select(manager => manager.ClearCollection()));
     }
 
-    public Task InitializeAsync()
+    public ValueTask InitializeAsync()
     {
         _options = new FirestoreOptions
         {
@@ -101,7 +101,7 @@ public class FirestoreDataManagerStressTests : IAsyncLifetime
             EmulatorHost = GoogleEmulatorHost.FirestoreEndpoint,
             RootCollectionName = $"orleans-test-{Guid.NewGuid():N}",
         };
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [FirestoreData]

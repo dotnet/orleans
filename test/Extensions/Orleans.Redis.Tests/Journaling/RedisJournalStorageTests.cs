@@ -35,7 +35,7 @@ public sealed class RedisJournalStorageTests
         Assert.Contains(nameof(RedisJournalStorageOptions.KeyPrefix), exception.Message);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AppendAndRead_RoundTripsBytesAndMetadata()
     {
         TestUtils.CheckForRedis();
@@ -60,7 +60,7 @@ public sealed class RedisJournalStorageTests
         Assert.Equal(metadata.Format, consumer.Metadata?.Format);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task ReplaceListAndDelete_UseJournalIds()
     {
         TestUtils.CheckForRedis();
@@ -85,7 +85,7 @@ public sealed class RedisJournalStorageTests
         Assert.Equal([child, idB], listed);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UpdateMetadata_UsesETagCasAndPreservesNoChangeETag()
     {
         TestUtils.CheckForRedis();
@@ -124,7 +124,7 @@ public sealed class RedisJournalStorageTests
         Assert.Equal(updated.ETag, noChange.ETag);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task StaleAppend_ThrowsInconsistentStateException()
     {
         TestUtils.CheckForRedis();
@@ -143,7 +143,7 @@ public sealed class RedisJournalStorageTests
             () => second.AppendAsync(new ReadOnlySequence<byte>([3]), CancellationToken.None).AsTask());
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task ColdAppendToExistingJournal_AppendsCurrentVersion()
     {
         TestUtils.CheckForRedis();
@@ -158,7 +158,7 @@ public sealed class RedisJournalStorageTests
         Assert.Equal([1, 2], consumer.Bytes);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task StaleAppendAfterDelete_DoesNotRecreateJournal()
     {
         TestUtils.CheckForRedis();
@@ -173,7 +173,7 @@ public sealed class RedisJournalStorageTests
         Assert.Null(await context.Provider.CreateStorage(id).GetMetadataAsync());
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Read_PreservesIncompleteRecordsAcrossSegments()
     {
         TestUtils.CheckForRedis();
@@ -190,7 +190,7 @@ public sealed class RedisJournalStorageTests
         Assert.Equal([5, 6, 7, 8, 9], consumer.Records[1]);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Read_ObservesCancellationBetweenSegments()
     {
         TestUtils.CheckForRedis();
@@ -208,7 +208,7 @@ public sealed class RedisJournalStorageTests
         Assert.False(consumer.IsCompleted);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task MetadataOnlyUpdate_DoesNotInvalidateContentWriter()
     {
         TestUtils.CheckForRedis();
@@ -230,7 +230,7 @@ public sealed class RedisJournalStorageTests
         Assert.Equal([1, 2], consumer.Bytes);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task ConcurrentReadAndReplace_ReturnsAtomicSnapshot()
     {
         TestUtils.CheckForRedis();
@@ -263,7 +263,7 @@ public sealed class RedisJournalStorageTests
         await Task.WhenAll(readTasks.Append(replaceTask));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task ConcurrentDeleteAndCreate_NeverLeavesMetadataWithoutData()
     {
         TestUtils.CheckForRedis();
@@ -288,7 +288,7 @@ public sealed class RedisJournalStorageTests
         }
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task List_KeyPrefixWithPatternCharacters_RoundTrips()
     {
         TestUtils.CheckForRedis();
@@ -300,7 +300,7 @@ public sealed class RedisJournalStorageTests
         Assert.Equal([id], await ToListAsync(context.Provider.ListAsync()));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task MappedKeyCollision_IsRejected()
     {
         TestUtils.CheckForRedis();
@@ -314,7 +314,7 @@ public sealed class RedisJournalStorageTests
         Assert.Contains("key mapping collision", exception.Message);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Replace_ResetsCompactionAccounting()
     {
         TestUtils.CheckForRedis();
@@ -329,7 +329,7 @@ public sealed class RedisJournalStorageTests
         Assert.True(storage.IsCompactionRequested);
     }
 
-    [SkippableTheory]
+    [Theory]
     [InlineData("-1")]
     [InlineData("1.5")]
     public async Task InvalidAppendLength_BlocksMutations(string invalidAppendLength)
@@ -359,7 +359,7 @@ public sealed class RedisJournalStorageTests
         Assert.False((await storage.GetMetadataAsync())!.Properties.ContainsKey("owner"));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task CurrentSchemaVersion_IsStored()
     {
         TestUtils.CheckForRedis();
@@ -374,7 +374,7 @@ public sealed class RedisJournalStorageTests
         Assert.Equal(RedisJournalStorage.CurrentSchemaVersion, schemaVersion.ToString());
     }
 
-    [SkippableTheory]
+    [Theory]
     [InlineData(null)]
     [InlineData("2")]
     public async Task MissingOrUnsupportedSchemaVersion_BlocksAccessAndMutations(string? schemaVersion)
@@ -420,7 +420,7 @@ public sealed class RedisJournalStorageTests
         Assert.False((await storage.GetMetadataAsync())!.Properties.ContainsKey("owner"));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task CallerMayUseFormatMetadata()
     {
         TestUtils.CheckForRedis();
@@ -434,7 +434,7 @@ public sealed class RedisJournalStorageTests
         Assert.Equal("caller", metadata.Properties["format"]);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task CallerCannotSetProviderOwnedProperties()
     {
         TestUtils.CheckForRedis();

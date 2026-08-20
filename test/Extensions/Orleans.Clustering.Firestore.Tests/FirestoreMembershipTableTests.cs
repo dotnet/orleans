@@ -55,34 +55,34 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
 
     protected override Task<string> GetConnectionString() => Task.FromResult("<dummy>");
 
-    [SkippableFact]
+    [Fact]
     public Task GetGateways() => MembershipTable_GetGateways();
 
-    [SkippableFact]
+    [Fact]
     public Task ReadAll_EmptyTable() => MembershipTable_ReadAll_EmptyTable();
 
-    [SkippableFact]
+    [Fact]
     public Task InsertRow() => MembershipTable_InsertRow();
 
-    [SkippableFact]
+    [Fact]
     public Task ReadRow_Insert_Read() => MembershipTable_ReadRow_Insert_Read();
 
-    [SkippableFact]
+    [Fact]
     public Task ReadAll_Insert_ReadAll() => MembershipTable_ReadAll_Insert_ReadAll();
 
-    [SkippableFact]
+    [Fact]
     public Task UpdateRow() => MembershipTable_UpdateRow();
 
-    [SkippableFact]
+    [Fact]
     public Task CleanupDefunctSiloEntries() => MembershipTable_CleanupDefunctSiloEntries();
 
-    [SkippableFact]
+    [Fact]
     public Task UpdateRowInParallel() => MembershipTable_UpdateRowInParallel();
 
-    [SkippableFact]
+    [Fact]
     public Task UpdateIAmAlive() => MembershipTable_UpdateIAmAlive();
 
-    [SkippableFact]
+    [Fact]
     public async Task MembershipReadsReturnAtomicSnapshotsDuringConcurrentUpdates()
     {
         const int fillerCount = 16;

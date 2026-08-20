@@ -28,7 +28,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         JournalingAzureStorageTestConfiguration.CheckPreconditionsOrThrow();
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var services = new ServiceCollection();
         services.AddLogging();
@@ -52,7 +52,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         await _siloLifecycle.OnStart(cts.Token);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AzureBlobStorage_BinaryJournal_MigratesToJsonOnFirstWrite()
     {
         var blobName = $"journaling-codec-migration/{Guid.NewGuid():N}";
@@ -94,7 +94,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         ((IDisposable)recoveredManager).Dispose();
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_siloLifecycle is not null)
         {
@@ -105,7 +105,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         await _azureServiceProvider.DisposeAsync();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AzureBlobStorage_AllDurableTypes_RecoverWithBinaryCodec()
     {
         var grainId = GrainId.Create("journaling-codec-recovery", Guid.NewGuid().ToString("N"));
@@ -146,7 +146,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         Assert.Equal(17, await recovered.Tcs.Task);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AzureBlobStorage_CheckpointAndWal_RecoverAcrossFreshProviderInstances()
     {
         var blobName = $"journaling-checkpoint-wal-recovery/{Guid.NewGuid():N}";

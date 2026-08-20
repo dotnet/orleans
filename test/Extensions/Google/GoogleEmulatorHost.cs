@@ -71,7 +71,7 @@ public static class GoogleEmulatorHost
         }
         catch (Exception exception) when (exception is SocketException or TimeoutException)
         {
-            throw new SkipException();
+            throw Xunit.Sdk.SkipException.ForSkip("The Google emulator is not available");
         }
     }
 }

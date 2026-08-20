@@ -58,30 +58,30 @@ namespace Tester.Redis.Reminders
 
         protected override Task<string> GetConnectionString() => Task.FromResult(TestDefaultConfiguration.RedisConnectionString!);
 
-        [SkippableFact]
+        [Fact]
         public void RemindersTable_Redis_Init()
         {
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task RemindersTable_Redis_RemindersRange()
         {
             await RemindersRange(iterations: 50);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task RemindersTable_Redis_RemindersParallelUpsert()
         {
             await RemindersParallelUpsert();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task RemindersTable_Redis_ReminderSimple()
         {
             await ReminderSimple();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task RemindersTable_Redis_Upsert_IgnoresNewtonsoftDefaultSettings()
         {
             await RemindersTable.TestOnlyClearTable();

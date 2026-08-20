@@ -27,7 +27,7 @@ public class NatsStreamTests : TestClusterPerTest
     {
         if (!NatsTestConstants.IsNatsAvailable)
         {
-            throw new SkipException("Nats Server is not available");
+            throw Xunit.Sdk.SkipException.ForSkip("Nats Server is not available");
         }
 
         this.natsConnection = NatsTestConstants.CreateConnection();
@@ -38,7 +38,7 @@ public class NatsStreamTests : TestClusterPerTest
     {
         if (!NatsTestConstants.IsNatsAvailable)
         {
-            throw new SkipException("Empty connection string");
+            throw Xunit.Sdk.SkipException.ForSkip("Empty connection string");
         }
 
         builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
@@ -79,7 +79,7 @@ public class NatsStreamTests : TestClusterPerTest
         }
     }
 
-    public override async Task InitializeAsync()
+    public override async ValueTask InitializeAsync()
     {
         await natsConnection.ConnectAsync();
 
@@ -106,10 +106,18 @@ public class NatsStreamTests : TestClusterPerTest
         }
 
         await base.InitializeAsync();
+
+        if (!PreconditionsMet)
+
+        {
+
+            return;
+
+        }
         runner = new SingleStreamTestRunner(this.InternalClient, NatsStreamProviderName);
     }
 
-    public override async Task DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
         await base.DisposeAsync();
 
@@ -137,25 +145,25 @@ public class NatsStreamTests : TestClusterPerTest
 
     ////------------------------ One to One ----------------------//
 
-    [SkippableFact]
+    [Fact]
     public async Task Nats_01_OneProducerGrainOneConsumerGrain()
     {
         await runner.StreamTest_01_OneProducerGrainOneConsumerGrain();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Nats_02_OneProducerGrainOneConsumerClient()
     {
         await runner.StreamTest_02_OneProducerGrainOneConsumerClient();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Nats_03_OneProducerClientOneConsumerGrain()
     {
         await runner.StreamTest_03_OneProducerClientOneConsumerGrain();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Nats_04_OneProducerClientOneConsumerClient()
     {
         await runner.StreamTest_04_OneProducerClientOneConsumerClient();
@@ -163,50 +171,50 @@ public class NatsStreamTests : TestClusterPerTest
 
     //------------------------ MANY to Many different grains ----------------------//
 
-    [SkippableFact]
+    [Fact]
     public async Task Nats_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
     {
         await runner.StreamTest_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Nats_06_ManyDifferent_ManyProducerGrainManyConsumerClients()
     {
         await runner.StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Nats_07_ManyDifferent_ManyProducerClientsManyConsumerGrains()
     {
         await runner.StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Nats_08_ManyDifferent_ManyProducerClientsManyConsumerClients()
     {
         await runner.StreamTest_08_ManyDifferent_ManyProducerClientsManyConsumerClients();
     }
 
     //------------------------ MANY to Many Same grains ----------------------//
-    [SkippableFact]
+    [Fact]
     public async Task Nats_09_ManySame_ManyProducerGrainsManyConsumerGrains()
     {
         await runner.StreamTest_09_ManySame_ManyProducerGrainsManyConsumerGrains();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Nats_10_ManySame_ManyConsumerGrainsManyProducerGrains()
     {
         await runner.StreamTest_10_ManySame_ManyConsumerGrainsManyProducerGrains();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Nats_11_ManySame_ManyProducerGrainsManyConsumerClients()
     {
         await runner.StreamTest_11_ManySame_ManyProducerGrainsManyConsumerClients();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Nats_12_ManySame_ManyProducerClientsManyConsumerGrains()
     {
         await runner.StreamTest_12_ManySame_ManyProducerClientsManyConsumerGrains();
@@ -214,13 +222,13 @@ public class NatsStreamTests : TestClusterPerTest
 
     //------------------------ MANY to Many producer consumer same grain ----------------------//
 
-    [SkippableFact]
+    [Fact]
     public async Task Nats_13_SameGrain_ConsumerFirstProducerLater()
     {
         await runner.StreamTest_13_SameGrain_ConsumerFirstProducerLater(false);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Nats_14_SameGrain_ProducerFirstConsumerLater()
     {
         await runner.StreamTest_14_SameGrain_ProducerFirstConsumerLater(false);
@@ -228,20 +236,20 @@ public class NatsStreamTests : TestClusterPerTest
 
     //----------------------------------------------//
 
-    [SkippableFact]
+    [Fact]
     public async Task Nats_15_ConsumeAtProducersRequest()
     {
         await runner.StreamTest_15_ConsumeAtProducersRequest();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Nats_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
     {
         var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, NatsStreamProviderName, 16, false);
         await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Nats_17_MultipleStreams_1J_ManyProducerGrainsManyConsumerGrains()
     {
         var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, NatsStreamProviderName, 17, false);

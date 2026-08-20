@@ -37,9 +37,13 @@ namespace ServiceBus.Tests
             TestUtils.CheckForEventHub();
         }
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             await base.InitializeAsync();
+            if (!PreconditionsMet)
+            {
+                return;
+            }
             var collectors = HostedCluster.Silos
                 .Select(silo => HostedCluster.GetSiloServiceProvider(silo.SiloAddress).GetRequiredService<IMeterFactory>())
                 .Select(meterFactory => new MetricCollector<long>(meterFactory, "Microsoft.Orleans", "orleans-streams-queue-read-duration"))

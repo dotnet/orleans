@@ -17,38 +17,47 @@ public sealed class RedisSubscriptionMultiplicityTests : TestClusterPerTest
 
     private SubscriptionMultiplicityTestRunner _runner = null!;
 
-    [SkippableFact]
+    [Fact]
     public async Task Redis_MultipleParallelSubscriptionTest() => await _runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
 
-    [SkippableFact]
+    [Fact]
     public async Task Redis_MultipleLinearSubscriptionTest() => await _runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace);
 
-    [SkippableFact]
+    [Fact]
     public async Task Redis_MultipleSubscriptionTest_AddRemove() => await _runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
 
-    [SkippableFact]
+    [Fact]
     public async Task Redis_ResubscriptionTest() => await _runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
 
-    [SkippableFact]
+    [Fact]
     public async Task Redis_ResubscriptionAfterDeactivationTest() => await _runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
 
-    [SkippableFact]
+    [Fact]
     public async Task Redis_ActiveSubscriptionTest() => await _runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
 
-    [SkippableFact]
+    [Fact]
     public async Task Redis_TwoIntermittentStreamTest() => await _runner.TwoIntermittentStreamTest(Guid.NewGuid());
 
-    [SkippableFact]
+    [Fact]
     public async Task Redis_SubscribeFromClientTest() => await _runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace);
 
-    public override async Task InitializeAsync()
+    public override async ValueTask InitializeAsync()
     {
         await base.InitializeAsync();
+        if (!PreconditionsMet)
+        {
+            return;
+        }
         _runner = new SubscriptionMultiplicityTestRunner(StreamProviderName, HostedCluster);
     }
 
-    public override async Task DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
+        if (!PreconditionsMet)
+        {
+            return;
+        }
+
         var serviceId = HostedCluster?.Options.ServiceId;
         await base.DisposeAsync();
         await RedisStreamTestUtils.DeleteServiceKeysAsync(serviceId);

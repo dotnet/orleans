@@ -11,7 +11,7 @@ namespace Tester.AzureUtils
                 && (connectionString.Contains("UseDevelopmentStorage", StringComparison.OrdinalIgnoreCase)
                 || connectionString.Contains("devstoreaccount", StringComparison.OrdinalIgnoreCase)))
             {
-                throw new SkipException("This test does not support the storage emulator.");
+                throw Xunit.Sdk.SkipException.ForSkip("This test does not support the storage emulator.");
             }
         }
     }

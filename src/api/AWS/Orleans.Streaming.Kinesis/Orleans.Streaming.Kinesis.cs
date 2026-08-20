@@ -6,6 +6,39 @@
 //     the code is regenerated.
 // </auto-generated>
 //------------------------------------------------------------------------------
+namespace Orleans.Configuration
+{
+    public sealed partial class DynamoDBStreamQueueCheckpointerOptions
+    {
+        [Redact]
+        public string? AccessKey { get { throw null; } set { } }
+
+        public bool CreateIfNotExists { get { throw null; } set { } }
+
+        public System.TimeSpan InitializationTimeout { get { throw null; } set { } }
+
+        public System.TimeSpan PersistInterval { get { throw null; } set { } }
+
+        public string? ProfileName { get { throw null; } set { } }
+
+        public int ReadCapacityUnits { get { throw null; } set { } }
+
+        [Redact]
+        public string? SecretKey { get { throw null; } set { } }
+
+        public string Service { get { throw null; } set { } }
+
+        public string TableName { get { throw null; } set { } }
+
+        [Redact]
+        public string? Token { get { throw null; } set { } }
+
+        public bool UseProvisionedThroughput { get { throw null; } set { } }
+
+        public int WriteCapacityUnits { get { throw null; } set { } }
+    }
+}
+
 namespace Orleans.Hosting
 {
     public static partial class ClientBuilderExtensions
@@ -42,56 +75,21 @@ namespace Orleans.Hosting
 
         public SiloKinesisStreamConfigurator ConfigureKinesis(System.Action<Streaming.Kinesis.KinesisStreamOptions> configureOptions) { throw null; }
 
-        public SiloKinesisStreamConfigurator UseDynamoDBCheckpointer(System.Action<Configuration.DynamoDBStreamQueueCheckpointerOptions> configureOptions) { throw null; }
-
         public SiloKinesisStreamConfigurator UseDynamoDBCheckpointer(System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.DynamoDBStreamQueueCheckpointerOptions>>? configureOptions = null) { throw null; }
-    }
-}
 
-namespace Orleans.Configuration
-{
-    public sealed partial class DynamoDBStreamQueueCheckpointerOptions
-    {
-        public DynamoDBStreamQueueCheckpointerOptions() { }
-
-        [Redact]
-        public string? AccessKey { get { throw null; } set { } }
-
-        public bool CreateIfNotExists { get { throw null; } set { } }
-
-        public System.TimeSpan InitializationTimeout { get { throw null; } set { } }
-
-        public string? ProfileName { get { throw null; } set { } }
-
-        public int ReadCapacityUnits { get { throw null; } set { } }
-
-        public System.TimeSpan PersistInterval { get { throw null; } set { } }
-
-        [Redact]
-        public string? SecretKey { get { throw null; } set { } }
-
-        public string Service { get { throw null; } set { } }
-
-        public string TableName { get { throw null; } set { } }
-
-        [Redact]
-        public string? Token { get { throw null; } set { } }
-
-        public bool UseProvisionedThroughput { get { throw null; } set { } }
-
-        public int WriteCapacityUnits { get { throw null; } set { } }
+        public SiloKinesisStreamConfigurator UseDynamoDBCheckpointer(System.Action<Configuration.DynamoDBStreamQueueCheckpointerOptions> configureOptions) { throw null; }
     }
 }
 
 namespace Orleans.Streaming.Kinesis
 {
-    public sealed partial class DynamoDBStreamQueueCheckpointerFactory : System.IDisposable, Streams.IStreamQueueCheckpointerFactory
+    public sealed partial class DynamoDBStreamQueueCheckpointerFactory : Streams.IStreamQueueCheckpointerFactory, System.IDisposable
     {
         public DynamoDBStreamQueueCheckpointerFactory(string providerName, Configuration.DynamoDBStreamQueueCheckpointerOptions options, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
 
-        public System.Threading.Tasks.Task<Streams.IStreamQueueCheckpointer<string>> Create(string partition) { throw null; }
-
         public System.Threading.Tasks.Task<Streams.IStreamQueueCheckpointer<string>> Create(string partition, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.Task<Streams.IStreamQueueCheckpointer<string>> Create(string partition) { throw null; }
 
         public static Streams.IStreamQueueCheckpointerFactory CreateFactory(System.IServiceProvider services, string providerName) { throw null; }
 

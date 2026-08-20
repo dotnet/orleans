@@ -11,7 +11,7 @@ public sealed class MSTestClusterFixture
     public static InProcessTestCluster Cluster { get; private set; } = null!;
 
     [AssemblyInitialize]
-    public static async Task Initialize(TestContext _)
+    public static async Task Initialize(Microsoft.VisualStudio.TestTools.UnitTesting.TestContext _)
     {
         var builder = new InProcessTestClusterBuilder();
         Cluster = builder.Build();

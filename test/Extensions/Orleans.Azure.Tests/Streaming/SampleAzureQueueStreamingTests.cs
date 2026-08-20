@@ -40,7 +40,7 @@ namespace Tester.AzureUtils.Streaming
             }
         }
 
-        public override async Task DisposeAsync()
+        public override async ValueTask DisposeAsync()
         {
             await base.DisposeAsync();
             try
@@ -50,10 +50,10 @@ namespace Tester.AzureUtils.Streaming
                     AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
                     new AzureQueueOptions().ConfigureTestDefaults());
             }
-            catch (SkipException) { }
+            catch (Xunit.Sdk.SkipException) { }
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task SampleStreamingTests_4()
         {
             logger.LogInformation("************************ SampleStreamingTests_4 *********************************");
@@ -61,7 +61,7 @@ namespace Tester.AzureUtils.Streaming
             await runner.StreamingTests_Consumer_Producer(Guid.NewGuid());
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task SampleStreamingTests_5()
         {
             logger.LogInformation("************************ SampleStreamingTests_5 *********************************");

@@ -70,18 +70,18 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
         return Task.FromResult(TestDefaultConfiguration.CosmosDBAccountKey!);
     }
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public void MembershipTable_Cosmos_Init()
     {
     }
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_GetGateways()
     {
         await MembershipTable_GetGateways();
     }
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_ReadAll_EmptyTable()
     {
         await MembershipTable_ReadAll_EmptyTable();
@@ -92,13 +92,13 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     /// Verifies document creation with proper partition key assignment
     /// and automatic indexing for efficient queries.
     /// </summary>
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_InsertRow()
     {
         await MembershipTable_InsertRow();
     }
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_ReadRow_Insert_Read()
     {
         CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorTransactionalBatchConditionSkipReason);
@@ -106,13 +106,13 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
         await MembershipTable_ReadRow_Insert_Read();
     }
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_ReadAll_Insert_ReadAll()
     {
         await MembershipTable_ReadAll_Insert_ReadAll();
     }
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_UpdateRow()
     {
         CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorTransactionalBatchConditionSkipReason);
@@ -125,7 +125,7 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     /// Verifies that optimistic concurrency control prevents
     /// conflicting updates and ensures data consistency.
     /// </summary>
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_UpdateRowInParallel()
     {
         CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorTransactionalBatchConditionSkipReason);
@@ -138,7 +138,7 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     /// Verifies efficient partial document updates for liveness
     /// information without rewriting entire membership entries.
     /// </summary>
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_UpdateIAmAlive()
     {
         await MembershipTable_UpdateIAmAlive();

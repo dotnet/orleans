@@ -1,6 +1,5 @@
 using System.Threading.Tasks;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Transactions.TestKit.xUnit
 {
@@ -14,7 +13,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         /// </summary>
         /// <param name="grainStates"></param>
         /// <returns></returns>
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
@@ -28,7 +27,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         /// </summary>
         /// <param name="grainStates"></param>
         /// <returns></returns>
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
@@ -42,7 +41,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         /// </summary>
         /// <param name="grainStates"></param>
         /// <returns></returns>
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]

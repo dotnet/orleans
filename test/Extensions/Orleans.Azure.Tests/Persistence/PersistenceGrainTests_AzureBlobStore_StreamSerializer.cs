@@ -6,7 +6,6 @@ using Orleans.TestingHost;
 using System.Threading;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Xunit.Abstractions;
 using static Tester.AzureUtils.Persistence.Base_PersistenceGrainTests_AzureStore;
 
 namespace Tester.AzureUtils.Persistence;
@@ -28,7 +27,7 @@ public class PersistenceGrainTests_AzureBlobStore_StreamSerializer : IClassFixtu
         fixture.EnsurePreconditionsMet();
     }
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task AzureBlobStorage_UsesStreamSerializerWhenAvailable()
     {
         CountingGrainStorageSerializer.Reset();

@@ -105,9 +105,13 @@ namespace Tester
             }
         }
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             await base.InitializeAsync();
+            if (!PreconditionsMet)
+            {
+                return;
+            }
             this.runtimeClient = this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
         }
 
@@ -146,7 +150,7 @@ namespace Tester
                 await TestingUtils.WaitUntilAsync(
                     (_, _) => Task.FromResult(clientGatewayManager.IsGatewayAvailable(gatewayAddress)),
                     TimeSpan.FromSeconds(3),
-                    TimeSpan.FromMilliseconds(20));
+                    TimeSpan.FromMilliseconds(20), TestContext.Current.CancellationToken);
 
                 // Make a bunch of calls
                 for (var i = 0; i < 100; i++)
@@ -201,9 +205,9 @@ namespace Tester
                     ;
                 });
             var host = hostBuilder.Build();
-            var exception = await Assert.ThrowsAsync<ConnectionFailedException>(async () => await host.StartAsync());
+            var exception = await Assert.ThrowsAsync<ConnectionFailedException>(async () => await host.StartAsync(TestContext.Current.CancellationToken));
             Assert.Contains("Unable to connect to", exception.Message);
-            await host.StopAsync();
+            await host.StopAsync(TestContext.Current.CancellationToken);
         }
     }
 }

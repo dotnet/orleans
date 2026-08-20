@@ -11,7 +11,6 @@ using OrleansAWSUtils.Streams;
 using AWSUtils.Tests.StorageTests;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 using OrleansAWSUtils.Storage;
 using Orleans.Configuration;
 
@@ -38,7 +37,7 @@ namespace AWSUtils.Tests.Streaming
         {
             if (!AWSTestConstants.IsSqsAvailable)
             {
-                throw new SkipException("Empty connection string");
+                throw Xunit.Sdk.SkipException.ForSkip("Empty connection string");
             }
 
             this.output = output;
@@ -46,9 +45,9 @@ namespace AWSUtils.Tests.Streaming
             this.clusterId = MakeClusterId();
         }
 
-        public Task InitializeAsync() => Task.CompletedTask;
+        public ValueTask InitializeAsync() => ValueTask.CompletedTask;
 
-        public async Task DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             if (!string.IsNullOrWhiteSpace(AWSTestConstants.SqsConnectionString))
             {
@@ -60,7 +59,7 @@ namespace AWSUtils.Tests.Streaming
             }
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task SendAndReceiveFromSQS()
         {
             var options = new SqsOptions

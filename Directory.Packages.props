@@ -112,14 +112,12 @@
     <PackageVersion Include="Testcontainers" Version="4.10.0" />
     <PackageVersion Include="Testcontainers.Consul" Version="4.10.0" />
     <PackageVersion Include="Utf8Json" Version="1.3.7" />
-    <PackageVersion Include="Verify.Xunit" Version="29.5.0" />
-    <PackageVersion Include="xunit.assert" Version="2.9.3" />
-    <PackageVersion Include="xunit.core" Version="2.9.3" />
-    <PackageVersion Include="xunit.extensibility.core" Version="2.9.3" />
-    <PackageVersion Include="xunit.extensibility.execution" Version="2.9.3" />
+    <PackageVersion Include="Verify.XunitV3" Version="29.5.0" />
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <PackageVersion Include="xunit.v3.assert" Version="3.2.2" />
+    <PackageVersion Include="xunit.v3.core" Version="3.2.2" />
+    <PackageVersion Include="xunit.v3.extensibility.core" Version="3.2.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
-    <PackageVersion Include="Xunit.SkippableFact" Version="1.5.61" />
-    <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="ZeroFormatter" Version="1.6.4" />
     <PackageVersion Include="ZooKeeperNetEx" Version="3.4.12.4" />
   </ItemGroup>
@@ -171,19 +169,6 @@
     <PackageVersion Update="System.Drawing.Common" Version="10.0.3" />
     <PackageVersion Update="System.IO.Pipelines" Version="10.0.5" />
     <PackageVersion Update="System.Memory.Data" Version="10.0.3" />
-    <PackageVersion Update="System.Text.Json" Version="10.0.5" />
-  </ItemGroup>
-  <ItemGroup Condition=" '$(TargetFramework)' == 'net8.0' and (
-      '$(MSBuildProjectName)' == 'Orleans.Persistence.TestKit' or
-      '$(MSBuildProjectName)' == 'Orleans.Persistence.TestKit.Tests' or
-      '$(MSBuildProjectName)' == 'Orleans.AWS.Tests' or
-      '$(MSBuildProjectName)' == 'Orleans.AdoNet.Tests' or
-      '$(MSBuildProjectName)' == 'Orleans.Azure.Tests' or
-      '$(MSBuildProjectName)' == 'Orleans.Cosmos.Tests' or
-      '$(MSBuildProjectName)' == 'Orleans.Persistence.Firestore.Tests' or
-      '$(MSBuildProjectName)' == 'Orleans.Redis.Tests') ">
-    <PackageVersion Update="System.Collections.Immutable" Version="10.0.0" />
-    <PackageVersion Update="System.IO.Pipelines" Version="10.0.5" />
     <PackageVersion Update="System.Text.Json" Version="10.0.5" />
   </ItemGroup>
 </Project>

@@ -1,7 +1,6 @@
 //#define REREAD_STATE_AFTER_WRITE_FAILED
 
 using Xunit;
-using Xunit.Abstractions;
 using Orleans.TestingHost;
 using Orleans.Configuration;
 
@@ -62,7 +61,7 @@ public class PersistenceGrainTests_AzureBlobStore : Base_PersistenceGrainTests_A
         fixture.EnsurePreconditionsMet();
     }
 
-    [SkippableTheory, TestCategory("Functional")]
+    [Theory, TestCategory("Functional")]
     [InlineData("AzureStore")]
     [InlineData("AzureStore1")]
     [InlineData("AzureStore2")]

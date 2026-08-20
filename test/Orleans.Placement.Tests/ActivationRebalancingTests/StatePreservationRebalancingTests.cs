@@ -6,7 +6,6 @@ using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 using SPFixture = UnitTests.ActivationRebalancingTests.StatePreservationRebalancingTests.StatePreservationFixture;
 
 #nullable enable

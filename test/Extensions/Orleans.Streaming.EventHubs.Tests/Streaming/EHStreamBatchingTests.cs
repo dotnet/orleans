@@ -5,7 +5,6 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.StreamingTests;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace ServiceBus.Tests.Streaming
 {

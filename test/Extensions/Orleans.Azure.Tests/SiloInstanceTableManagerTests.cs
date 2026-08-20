@@ -7,7 +7,6 @@ using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;
-using Xunit.Abstractions;
 using Orleans.Internal;
 using Orleans.Clustering.AzureStorage;
 
@@ -74,13 +73,13 @@ namespace Tester.AzureUtils
             }
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public void SiloInstanceTable_Op_RegisterSiloInstance()
         {
             RegisterSiloInstance();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task SiloInstanceTable_Op_ActivateSiloInstance()
         {
             RegisterSiloInstance();
@@ -88,7 +87,7 @@ namespace Tester.AzureUtils
             await manager.ActivateSiloInstance(myEntry);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task SiloInstanceTable_Op_UnregisterSiloInstance()
         {
             RegisterSiloInstance();
@@ -96,7 +95,7 @@ namespace Tester.AzureUtils
             await manager.UnregisterSiloInstance(myEntry);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task SiloInstanceTable_Op_CleanDeadSiloInstance()
         {
             // Register a silo entry
@@ -133,7 +132,7 @@ namespace Tester.AzureUtils
         }
 
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task SiloInstanceTable_Op_CreateSiloEntryConditionally()
         {
             bool didInsert = await manager.TryCreateTableVersionEntryAsync()
@@ -152,7 +151,7 @@ namespace Tester.AzureUtils
             Assert.Equal(SiloInstanceTableTestConstants.INSTANCE_STATUS_ACTIVE, after.Entity?.Status);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task SiloInstanceTable_Register_CheckData()
         {
             const string testName = "SiloInstanceTable_Register_CheckData";
@@ -173,7 +172,7 @@ namespace Tester.AzureUtils
             output.WriteLine("End {0}", testName);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task SiloInstanceTable_Activate_CheckData()
         {
             RegisterSiloInstance();
@@ -194,7 +193,7 @@ namespace Tester.AzureUtils
             CheckSiloInstanceTableEntry(myEntry, siloEntry);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task SiloInstanceTable_Unregister_CheckData()
         {
             RegisterSiloInstance();
@@ -213,7 +212,7 @@ namespace Tester.AzureUtils
             CheckSiloInstanceTableEntry(myEntry, siloEntry);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task SiloInstanceTable_FindAllGatewayProxyEndpoints()
         {
             await manager.TryCreateTableVersionEntryAsync();
@@ -232,7 +231,7 @@ namespace Tester.AzureUtils
             Assert.Equal(myEntry.ProxyPort,  myGateway.Port.ToString(CultureInfo.InvariantCulture));  // "Gateway port"
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public void SiloAddress_ToFrom_RowKey()
         {
             string ipAddress = "1.2.3.4";

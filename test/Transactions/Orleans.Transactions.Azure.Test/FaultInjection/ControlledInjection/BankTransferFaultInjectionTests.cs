@@ -4,7 +4,6 @@ using Orleans.Transactions.Tests;
 using Orleans.Transactions.TestKit;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Azure.Tests.FaultInjection.ControlledInjection;
 
@@ -24,7 +23,7 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
         _output = output;
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task StorageExceptionAfterCommitStore_CommitsDurableFullBankTransfer()
     {
         var commitFault = new BankTransferFault
@@ -44,7 +43,7 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
             useDepositAsManager: true);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task GenericStorageExceptionAfterCommitStore_CommitsDurableFullBankTransfer()
     {
         var commitFault = new BankTransferFault
@@ -64,7 +63,7 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
             useDepositAsManager: true);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task ExceptionAfterStorageWriteCompleted_CommitsDurableFullBankTransfer()
     {
         await RunFaultedTransfer(

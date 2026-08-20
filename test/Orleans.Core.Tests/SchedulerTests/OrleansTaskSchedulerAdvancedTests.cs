@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
 using Orleans.Internal;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.SchedulerTests
 {
@@ -736,8 +735,8 @@ namespace UnitTests.SchedulerTests
             output.WriteLine("#{0} - {1} -- Thread={2} Worker={3} TaskScheduler.Current={4}",
                 level, what,
                 Environment.CurrentManagedThreadId,
-                Thread.CurrentThread.Name,
-                TaskScheduler.Current);
+                Thread.CurrentThread.Name!,
+                TaskScheduler.Current!);
         }
 
         private static void CheckRuntimeContext(IGrainContext context)

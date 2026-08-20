@@ -89,7 +89,7 @@ public abstract class GrainStorageTestFixture
     /// Initializes the test cluster and resolves the configured storage provider.
     /// </summary>
     /// <returns>A task which represents the asynchronous initialization operation.</returns>
-    public virtual async Task InitializeAsync()
+    public virtual async ValueTask InitializeAsync()
     {
         try
         {
@@ -117,7 +117,7 @@ public abstract class GrainStorageTestFixture
     /// Stops and disposes the test cluster.
     /// </summary>
     /// <returns>A task which represents the asynchronous disposal operation.</returns>
-    public virtual async Task DisposeAsync()
+    public virtual async ValueTask DisposeAsync()
     {
         if (_cluster is not { } cluster)
         {

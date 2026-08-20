@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 using OrleansAWSUtils.Streams;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -33,9 +32,13 @@ namespace AWSUtils.Tests.Streaming
             this.output = output;
         }
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             await base.InitializeAsync();
+            if (!PreconditionsMet)
+            {
+                return;
+            }
             runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 
@@ -43,7 +46,7 @@ namespace AWSUtils.Tests.Streaming
         {
             if (!AWSTestConstants.IsSqsAvailable)
             {
-                throw new SkipException("Empty connection string");
+                throw Xunit.Sdk.SkipException.ForSkip("Empty connection string");
             }
 
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
@@ -76,8 +79,13 @@ namespace AWSUtils.Tests.Streaming
             }
         }
 
-        public override async Task DisposeAsync()
+        public override async ValueTask DisposeAsync()
         {
+            if (!PreconditionsMet)
+            {
+                return;
+            }
+
             var clusterId = HostedCluster.Options.ClusterId;
             await base.DisposeAsync();
             if (!string.IsNullOrWhiteSpace(StorageConnectionString))
@@ -86,7 +94,7 @@ namespace AWSUtils.Tests.Streaming
             }
         }
 
-        [SkippableFact, TestCategory("AWS")]
+        [Fact, TestCategory("AWS")]
         public async Task SQSStreamProducerOnDroppedClientTest()
         {
             logger.LogInformation("************************ AQStreamProducerOnDroppedClientTest *********************************");

@@ -1,10 +1,10 @@
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging.Abstractions;
 using Tester.Directories;
-using Xunit.Abstractions;
 using Orleans.Runtime;
 using Orleans.Configuration;
 using Orleans.GrainDirectory.Firestore;
+using Xunit;
 
 namespace Orleans.GrainDirectory.Firestore.Tests;
 
@@ -24,7 +24,7 @@ public class FirestoreGrainDirectoryTests : GrainDirectoryTests<FirestoreGrainDi
     protected override FirestoreGrainDirectory CreateGrainDirectory() =>
         _grainDirectory ?? throw new InvalidOperationException("The grain directory has not been initialized.");
 
-    [SkippableFact]
+    [Fact]
     public async Task UnregisterSilosSupportsMoreThanOneQueryBatch()
     {
         const int count = 12;
@@ -49,7 +49,7 @@ public class FirestoreGrainDirectoryTests : GrainDirectoryTests<FirestoreGrainDi
         }
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UnregisterSilosToleratesConcurrentCleanup()
     {
         var address = new GrainAddress
@@ -69,7 +69,7 @@ public class FirestoreGrainDirectoryTests : GrainDirectoryTests<FirestoreGrainDi
         Assert.Null(await GrainDirectory.Lookup(address.GrainId));
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var clusterOptions = new ClusterOptions
         {
@@ -88,5 +88,5 @@ public class FirestoreGrainDirectoryTests : GrainDirectoryTests<FirestoreGrainDi
         await lifecycle.OnStart();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

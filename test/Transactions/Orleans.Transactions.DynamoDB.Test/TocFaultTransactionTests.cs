@@ -1,7 +1,6 @@
 
 using Orleans.Transactions.TestKit.xUnit;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Transactions.DynamoDB.Tests
 {

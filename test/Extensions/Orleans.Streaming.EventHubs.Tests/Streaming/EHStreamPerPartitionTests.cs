@@ -80,7 +80,7 @@ namespace ServiceBus.Tests.StreamingTests
             fixture.EnsurePreconditionsMet();
         }
 
-        [SkippableFact(Skip = "Not sure what this test is testing, also the hacky test approach would make this test fail if there's any messages in the hub" +
+        [Fact(Skip = "Not sure what this test is testing, also the hacky test approach would make this test fail if there's any messages in the hub" +
                               "left from previous tests")]
         public async Task EH100StreamsTo4PartitionStreamsTest()
         {

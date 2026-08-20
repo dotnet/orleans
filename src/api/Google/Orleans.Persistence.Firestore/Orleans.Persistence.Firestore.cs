@@ -45,5 +45,4 @@ namespace Orleans.Persistence.Firestore
 
         public Storage.IGrainStorageSerializer GrainStorageSerializer { get { throw null; } set { } }
     }
-
 }

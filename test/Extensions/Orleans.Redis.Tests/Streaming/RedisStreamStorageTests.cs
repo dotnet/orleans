@@ -14,7 +14,7 @@ namespace Tester.Redis.Streaming;
 [TestCategory("Redis"), TestCategory("Streaming")]
 public sealed class RedisStreamStorageTests
 {
-    [SkippableFact]
+    [Fact]
     public async Task RedisStreamStorage_Shutdown_DoesNotDisposeSharedMultiplexer()
     {
         TestUtils.CheckForRedis();
@@ -36,7 +36,7 @@ public sealed class RedisStreamStorageTests
         await connection.GetDatabase().PingAsync();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task RedisStreamStorage_Shutdown_DisposesExclusiveMultiplexer()
     {
         TestUtils.CheckForRedis();

@@ -11,7 +11,6 @@ using Orleans.Runtime.Placement.Repartitioning;
 using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.ActivationRepartitioningTests;
 

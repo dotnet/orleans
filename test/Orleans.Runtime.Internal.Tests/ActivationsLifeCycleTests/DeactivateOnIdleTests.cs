@@ -3,7 +3,6 @@ using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Xunit.Abstractions;
 using Orleans.Internal;
 using Orleans.Configuration;
 using Microsoft.Extensions.Configuration;

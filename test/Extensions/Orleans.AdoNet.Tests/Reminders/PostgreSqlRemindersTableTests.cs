@@ -51,24 +51,24 @@ namespace UnitTests.RemindersTest
             return instance.CurrentConnectionString;
         }
 
-        [SkippableFact]
+        [Fact]
         public void RemindersTable_PostgreSql_Init()
         {
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task RemindersTable_PostgreSql_RemindersRange()
         {
             await RemindersRange(iterations: 50);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task RemindersTable_PostgreSql_RemindersParallelUpsert()
         {
             await RemindersParallelUpsert();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task RemindersTable_PostgreSql_ReminderSimple()
         {
             await ReminderSimple();

@@ -27,14 +27,14 @@ public class NatsClientStreamTests : TestClusterPerTest
     {
         if (!NatsTestConstants.IsNatsAvailable)
         {
-            throw new SkipException("Nats Server is not available");
+            throw Xunit.Sdk.SkipException.ForSkip("Nats Server is not available");
         }
 
         this.natsConnection = NatsTestConstants.CreateConnection();
         this.natsContext = new NatsJSContext(this.natsConnection);
     }
 
-    public override async Task InitializeAsync()
+    public override async ValueTask InitializeAsync()
     {
         await natsConnection.ConnectAsync();
 
@@ -50,11 +50,24 @@ public class NatsClientStreamTests : TestClusterPerTest
         }
 
         await base.InitializeAsync();
+
+        if (!PreconditionsMet)
+
+        {
+
+            return;
+
+        }
         runner = new ClientStreamTestRunner(this.HostedCluster);
     }
 
-    public override async Task DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
+        if (!PreconditionsMet)
+        {
+            return;
+        }
+
         var clusterId = HostedCluster.Options.ClusterId;
         await base.DisposeAsync();
 
@@ -72,7 +85,7 @@ public class NatsClientStreamTests : TestClusterPerTest
     {
         if (!NatsTestConstants.IsNatsAvailable)
         {
-            throw new SkipException("Empty connection string");
+            throw Xunit.Sdk.SkipException.ForSkip("Empty connection string");
         }
 
         builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
@@ -108,7 +121,7 @@ public class NatsClientStreamTests : TestClusterPerTest
         }
     }
 
-    [SkippableFact, TestCategory("NATS")]
+    [Fact, TestCategory("NATS")]
     public async Task StreamProducerOnDroppedClientTest()
     {
         logger.LogInformation(

@@ -2,7 +2,6 @@ using System.Globalization;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Xunit;
-using Xunit.Abstractions;
 
 // ReSharper disable ConvertToLambdaExpression
 

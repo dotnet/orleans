@@ -5,13 +5,13 @@ public sealed class ClusterFixture : IAsyncLifetime
 {
     public InProcessTestCluster Cluster { get; private set; } = null!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var builder = new InProcessTestClusterBuilder();
         Cluster = builder.Build();
         await Cluster.DeployAsync();
     }
 
-    public async Task DisposeAsync() => await Cluster.DisposeAsync();
+    public async ValueTask DisposeAsync() => await Cluster.DisposeAsync();
 }
 // </cluster_fixture>

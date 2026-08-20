@@ -7,7 +7,6 @@ using Orleans.TestingHost;
 using TestExtensions;
 using TestExtensions.Runners;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests;
 

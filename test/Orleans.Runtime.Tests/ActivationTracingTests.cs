@@ -11,7 +11,6 @@ using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
@@ -26,10 +25,11 @@ namespace UnitTests.General
     public class ActivationTracingTests : OrleansTestingBase, IClassFixture<ActivationTracingTests.Fixture>
     {
         private static readonly ConcurrentBag<Activity> Started = new();
+        private static readonly ActivityListener Listener;
 
         static ActivationTracingTests()
         {
-            var listener = new ActivityListener
+            Listener = new ActivityListener
             {
                 ShouldListenTo = src => src.Name == ActivitySources.ApplicationGrainActivitySourceName
                                         || src.Name == ActivitySources.LifecycleActivitySourceName
@@ -38,7 +38,7 @@ namespace UnitTests.General
                 SampleUsingParentId = (ref _) => ActivitySamplingResult.AllData,
                 ActivityStarted = activity => Started.Add(activity),
             };
-            ActivitySource.AddActivityListener(listener);
+            ActivitySource.AddActivityListener(Listener);
         }
 
         public class Fixture : BaseTestClusterFixture
@@ -333,7 +333,7 @@ namespace UnitTests.General
                 Assert.Equal(expectedState, newState);
 
                 // Give some time for all activities to complete
-                await Task.Delay(500);
+                await Task.Delay(500, TestContext.Current.CancellationToken);
 
                 var testParentTraceId = parent!.TraceId.ToString();
 
@@ -409,7 +409,7 @@ namespace UnitTests.General
                 Assert.Equal(expectedState, newState);
 
                 // Give some time for all activities to complete
-                await Task.Delay(500);
+                await Task.Delay(500, TestContext.Current.CancellationToken);
 
                 var testParentTraceId = parent!.TraceId.ToString();
 
@@ -474,7 +474,7 @@ namespace UnitTests.General
                 GrainAddress newAddress;
                 do
                 {
-                    await Task.Delay(100);
+                    await Task.Delay(100, TestContext.Current.CancellationToken);
                     newAddress = await grain.GetGrainAddress();
                 } while (newAddress.ActivationId == originalAddress.ActivationId);
 
@@ -487,7 +487,7 @@ namespace UnitTests.General
                 Assert.Equal(expectedStateB, actualB);
 
                 // Give some time for all activities to complete
-                await Task.Delay(500);
+                await Task.Delay(500, TestContext.Current.CancellationToken);
 
                 // Verify dehydrate span was NOT created (grain doesn't implement IGrainMigrationParticipant)
                 var dehydrateSpans = Started.Where(a => a.OperationName == ActivityNames.ActivationDehydrate).ToList();
@@ -548,7 +548,7 @@ namespace UnitTests.General
                 _ = await grain.GetState();
 
                 // Give some time for all activities to complete
-                await Task.Delay(500);
+                await Task.Delay(500, TestContext.Current.CancellationToken);
 
                 // Verify dehydrate span was NOT created (grain doesn't implement IGrainMigrationParticipant)
                 var dehydrateSpans = Started.Where(a => a.OperationName == ActivityNames.ActivationDehydrate).ToList();
@@ -591,7 +591,9 @@ namespace UnitTests.General
                 const int elementCount = 5;
 
                 var values = new List<ActivityData>();
-                await foreach (var entry in grain.GetActivityDataStream(elementCount).WithBatchSize(1))
+                await foreach (var entry in grain.GetActivityDataStream(
+                    elementCount,
+                    TestContext.Current.CancellationToken).WithBatchSize(1))
                 {
                     values.Add(entry);
                 }

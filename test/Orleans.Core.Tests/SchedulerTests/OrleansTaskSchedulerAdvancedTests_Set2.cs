@@ -10,7 +10,6 @@ using Orleans.Statistics;
 using TestExtensions;
 using UnitTests.Grains;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.SchedulerTests
 {
@@ -78,12 +77,12 @@ namespace UnitTests.SchedulerTests
             Task<Task> wrapped = new Task<Task>(() =>
             {
                 this.output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
-                    SynchronizationContext.Current, TaskScheduler.Current);
+                    SynchronizationContext.Current!, TaskScheduler.Current!);
 
                 Task t0 = new Task(() =>
                 {
                     this.output.WriteLine("#1 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
-                        SynchronizationContext.Current, TaskScheduler.Current);
+                        SynchronizationContext.Current!, TaskScheduler.Current!);
                     Assert.Equal(scheduler, TaskScheduler.Current);  // "TaskScheduler.Current #1"
                 });
                 Task t1 = t0.ContinueWith(task =>
@@ -91,7 +90,7 @@ namespace UnitTests.SchedulerTests
                     Assert.False(task.IsFaulted, "Task #1 Faulted=" + task.Exception);
 
                     this.output.WriteLine("#2 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
-                        SynchronizationContext.Current, TaskScheduler.Current);
+                        SynchronizationContext.Current!, TaskScheduler.Current!);
                     Assert.Equal(scheduler, TaskScheduler.Current);  // "TaskScheduler.Current #2"
                 });
                 t0.Start(scheduler);
@@ -687,7 +686,7 @@ namespace UnitTests.SchedulerTests
             Task<Task> wrapper = new Task<Task>(() =>
             {
                 this.output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
-                    SynchronizationContext.Current, TaskScheduler.Current);
+                    SynchronizationContext.Current!, TaskScheduler.Current!);
 
                 Task t1 = grain.Test1();
 
@@ -750,9 +749,9 @@ namespace UnitTests.SchedulerTests
                     + " Task.Factory.Scheduler={2}\n"
                     + " SynchronizationContext.Current={3}",
                     what,
-                    (TaskScheduler.Current == null ? "null" : TaskScheduler.Current.ToString()),
-                    (Task.Factory.Scheduler == null ? "null" : Task.Factory.Scheduler.ToString()),
-                    (SynchronizationContext.Current == null ? "null" : SynchronizationContext.Current.ToString())
+                    (TaskScheduler.Current == null ? "null" : TaskScheduler.Current.ToString())!,
+                    (Task.Factory.Scheduler == null ? "null" : Task.Factory.Scheduler.ToString())!,
+                    (SynchronizationContext.Current == null ? "null" : SynchronizationContext.Current.ToString())!
                 );
 
                 //var st = new StackTrace();

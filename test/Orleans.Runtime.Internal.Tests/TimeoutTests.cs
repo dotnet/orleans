@@ -6,7 +6,6 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests
 {
@@ -137,7 +136,7 @@ namespace UnitTests
         /// </summary>
         [TestSuite("SlowBVT")]
         [TestProvider("None")]
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/3995"), TestCategory("SlowBVT")]
+        [Fact(Skip = "https://github.com/dotnet/orleans/issues/3995"), TestCategory("SlowBVT")]
         public async Task CallThatShouldHaveBeenDroppedNotExecutedTest()
         {
             var responseTimeout = TimeSpan.FromSeconds(2);
@@ -159,8 +158,8 @@ namespace UnitTests
             }
             catch
             {
-                output.WriteLine(firstCall.IsFaulted ? $"firstCall: faulted" : $"firstCall: {firstCall.Result}");
-                output.WriteLine(secondCall.IsFaulted ? $"secondCall: faulted" : $"secondCall: {secondCall.Result}");
+                output.WriteLine($"firstCall: {firstCall.Status}, Exception: {firstCall.Exception}");
+                output.WriteLine($"secondCall: {secondCall.Status}, Exception: {secondCall.Exception}");
                 throw;
             }
 

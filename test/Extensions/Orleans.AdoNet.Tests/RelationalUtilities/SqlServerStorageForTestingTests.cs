@@ -11,7 +11,7 @@ public class SqlServerStorageForTestingTests
 {
     private const string TestDatabaseName = "OrleansSqlServerSetupTest";
 
-    [SkippableFact]
+    [Fact]
     public async Task RecreatesDatabaseWithPooledConnections()
     {
         for (var iteration = 0; iteration < 3; iteration++)

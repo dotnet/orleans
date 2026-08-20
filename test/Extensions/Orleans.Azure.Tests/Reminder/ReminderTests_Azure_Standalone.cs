@@ -2,7 +2,6 @@ using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -41,7 +40,7 @@ namespace Tester.AzureUtils.TimerTests
             this.serviceId = Guid.NewGuid().ToString();
         }
 
-        [SkippableFact, TestCategory("Reminders"), TestCategory("Performance")]
+        [Fact, TestCategory("Reminders"), TestCategory("Performance")]
         public async Task Reminders_AzureTable_InsertRate()
         {
             var clusterOptions = Options.Create(new ClusterOptions { ClusterId = "TMSLocalTesting", ServiceId = this.serviceId });
@@ -55,7 +54,7 @@ namespace Tester.AzureUtils.TimerTests
             await TestTableInsertRate(table, 500);
         }
 
-        [SkippableFact, TestCategory("Reminders"), TestCategory("Functional")]
+        [Fact, TestCategory("Reminders"), TestCategory("Functional")]
         public async Task Reminders_AzureTable_InsertNewRowAndReadBack()
         {
             string clusterId = NewClusterId();

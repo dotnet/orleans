@@ -12,7 +12,6 @@ using Orleans.TestingHost;
 using Tester.Directories;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.GrainDirectory;
 

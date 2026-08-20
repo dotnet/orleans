@@ -5,7 +5,6 @@ using Orleans.GrainDirectory.AzureStorage;
 using Orleans.TestingHost.Utils;
 using Tester.Directories;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Tester.AzureUtils
 {
@@ -43,7 +42,7 @@ namespace Tester.AzureUtils
         /// <summary>
         /// Tests batch unregistration of multiple grain addresses, including handling of concurrent modifications.
         /// </summary>
-        [SkippableFact]
+        [Fact]
         public async Task UnregisterMany()
         {
             const int N = 25;

@@ -8,7 +8,6 @@ using Orleans.Storage;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
@@ -23,10 +22,11 @@ namespace UnitTests.General
     public class DeactivationTracingTests : OrleansTestingBase, IClassFixture<ActivationTracingTests.Fixture>
     {
         private static readonly ConcurrentBag<Activity> Started = new();
+        private static readonly ActivityListener Listener;
 
         static DeactivationTracingTests()
         {
-            var listener = new ActivityListener
+            Listener = new ActivityListener
             {
                 ShouldListenTo = src => src.Name == ActivitySources.ApplicationGrainActivitySourceName
                                         || src.Name == ActivitySources.LifecycleActivitySourceName
@@ -35,7 +35,7 @@ namespace UnitTests.General
                 SampleUsingParentId = (ref _) => ActivitySamplingResult.AllData,
                 ActivityStarted = activity => Started.Add(activity),
             };
-            ActivitySource.AddActivityListener(listener);
+            ActivitySource.AddActivityListener(Listener);
         }
 
         private readonly ActivationTracingTests.Fixture _fixture;
@@ -447,7 +447,7 @@ namespace UnitTests.General
                 }
 
                 // Wait briefly for any deactivation to complete
-                await Task.Delay(500);
+                await Task.Delay(500, TestContext.Current.CancellationToken);
 
                 var onDeactivateSpans = Started.Where(a => a.OperationName == ActivityNames.OnDeactivate).ToList();
                 Assert.True(onDeactivateSpans.Count == 0,

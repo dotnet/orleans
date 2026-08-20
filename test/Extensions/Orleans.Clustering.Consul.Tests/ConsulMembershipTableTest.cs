@@ -85,7 +85,7 @@ namespace Consul.Tests
         /// Verifies that clients can retrieve the list of available
         /// gateway silos from the Consul service registry.
         /// </summary>
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_GetGateways()
         {
             await MembershipTable_GetGateways();
@@ -96,37 +96,37 @@ namespace Consul.Tests
         /// Verifies that the provider correctly handles the case
         /// when no silos have registered yet.
         /// </summary>
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_ReadAll_EmptyTable()
         {
             await MembershipTable_ReadAll_EmptyTable();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_InsertRow()
         {
             await MembershipTable_InsertRow(false);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_ReadRow_Insert_Read()
         {
             await MembershipTable_ReadRow_Insert_Read(false);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_ReadAll_Insert_ReadAll()
         {
             await MembershipTable_ReadAll_Insert_ReadAll(false);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_UpdateRow()
         {
             await MembershipTable_UpdateRow(false);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_UpdateRowInParallel()
         {
             await MembershipTable_UpdateRowInParallel(false);
@@ -137,7 +137,7 @@ namespace Consul.Tests
         /// Verifies that silos can update their liveness timestamp
         /// in Consul to indicate they are still running.
         /// </summary>
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_UpdateIAmAlive()
         {
             await MembershipTable_UpdateIAmAlive(false);
@@ -149,7 +149,7 @@ namespace Consul.Tests
         /// for silos that have been declared dead to prevent
         /// the table from growing indefinitely.
         /// </summary>
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_CleanupDefunctSiloEntries()
         {
             await MembershipTable_CleanupDefunctSiloEntries(false);

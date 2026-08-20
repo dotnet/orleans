@@ -9,7 +9,6 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using Xunit;
-using Xunit.Abstractions;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.WireProtocol;
 using System.Runtime.InteropServices;

@@ -12,10 +12,8 @@
 
   <ItemGroup>
     <PackageReference Include="System.Reactive" />
-    <PackageReference Include="xunit.assert" />
-    <PackageReference Include="xunit.extensibility.core" />
-    <PackageReference Include="xunit.extensibility.execution" />
-    <PackageReference Include="Xunit.SkippableFact" />
+    <PackageReference Include="xunit.v3.assert" />
+    <PackageReference Include="xunit.v3.extensibility.core" />
     <PackageReference Include="AwesomeAssertions" />
     <PackageReference Include="Azure.Identity" />
   </ItemGroup>

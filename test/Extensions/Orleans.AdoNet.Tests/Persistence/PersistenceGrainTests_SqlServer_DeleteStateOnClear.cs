@@ -6,7 +6,6 @@ using TestExtensions;
 using TestExtensions.Runners;
 using UnitTests.General;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Tester.AdoNet.Persistence
 {
@@ -32,16 +31,24 @@ namespace Tester.AdoNet.Persistence
             {
                 if (string.IsNullOrEmpty(TestDefaultConfiguration.MsSqlConnectionString))
                 {
-                    throw new SkipException("SQL Server connection string is not specified.");
+                    throw Xunit.Sdk.SkipException.ForSkip("SQL Server connection string is not specified.");
                 }
             }
 
-            public override async Task InitializeAsync()
+            public override async ValueTask InitializeAsync()
             {
-                EnsurePreconditionsMet();
+                if (!PreconditionsMet)
+                {
+                    return;
+                }
+
                 var relationalStorage = await RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName);
                 _connectionString = relationalStorage.CurrentConnectionString;
                 await base.InitializeAsync();
+                if (!PreconditionsMet)
+                {
+                    return;
+                }
             }
 
             protected override void ConfigureTestCluster(TestClusterBuilder builder)

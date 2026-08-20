@@ -1,7 +1,7 @@
 using TestExtensions;
-using Xunit.Abstractions;
 using Orleans.TestingHost;
 using Orleans.Runtime.Placement;
+using Xunit;
 
 namespace UnitTests.ActivationRebalancingTests;
 
@@ -62,7 +62,7 @@ public abstract class RebalancingTestBase<TFixture>
         return (int)variance;
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await GrainFactory
             .GetGrain<IManagementGrain>(0)

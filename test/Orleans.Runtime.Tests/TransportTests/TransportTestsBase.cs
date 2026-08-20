@@ -17,7 +17,7 @@ public abstract class TransportTestsBase
         Assert.True(fixture.HostedCluster.Silos.Count >= 2);
     }
 
-    [SkippableFact, TestCategory("BVT"), TestCategory("Transport")]
+    [Fact, TestCategory("BVT"), TestCategory("Transport")]
     public async Task SimplePing()
     {
         var grain = _fixture.Client.GetGrain<IGenericPingSelf<int>>(Guid.NewGuid());
@@ -25,7 +25,7 @@ public abstract class TransportTestsBase
         Assert.Equal(10, value);
     }
 
-    [SkippableFact, TestCategory("BVT"), TestCategory("Transport")]
+    [Fact, TestCategory("BVT"), TestCategory("Transport")]
     public async Task ProxyPing()
     {
         var grain1 = _fixture.Client.GetGrain<IGenericPingSelf<int>>(Guid.NewGuid());

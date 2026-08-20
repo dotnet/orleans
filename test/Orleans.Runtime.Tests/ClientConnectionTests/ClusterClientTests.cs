@@ -60,9 +60,9 @@ namespace Tester.ClientConnectionTests
 
             var client = host.Services.GetRequiredService<IClusterClient>();
 
-            await host.StartAsync();
+            await host.StartAsync(TestContext.Current.CancellationToken);
             Assert.Single(exceptions);
-            await host.StopAsync();
+            await host.StopAsync(TestContext.Current.CancellationToken);
         }
 
         public class MockGatewayListProvider : IGatewayListProvider

@@ -44,27 +44,27 @@ public class CosmosRemindersTableTests : ReminderTableTestsBase
     }
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public void RemindersTable_Cosmos_Init()
     {
     }
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task RemindersTable_Cosmos_RemindersRange()
     {
         await RemindersRange(50);
     }
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task RemindersTable_Cosmos_RemindersParallelUpsert()
     {
         await RemindersParallelUpsert();
     }
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task RemindersTable_Cosmos_ReminderSimple()
     {
         await ReminderSimple();

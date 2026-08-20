@@ -6,7 +6,6 @@ using Orleans.Transactions.TestKit;
 using Orleans.Transactions.Tests;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Transactions.DynamoDB.Tests.FaultInjection.ControlledInjection;
 
@@ -26,7 +25,7 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
         this.output = output;
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task StorageExceptionAfterCommitStore_CommitsDurableFullBankTransfer()
     {
         var commitFault = new BankTransferFault
@@ -42,7 +41,7 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
             "the transaction manager committed its durable state before the storage exception was surfaced");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task GenericStorageExceptionAfterCommitStore_CommitsDurableFullBankTransfer()
     {
         var commitFault = new BankTransferFault

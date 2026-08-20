@@ -26,7 +26,7 @@ public class NatsSubscriptionMultiplicityTests : TestClusterPerTest
     {
         if (!NatsTestConstants.IsNatsAvailable)
         {
-            throw new SkipException("Nats Server is not available");
+            throw Xunit.Sdk.SkipException.ForSkip("Nats Server is not available");
         }
 
         this.natsConnection = NatsTestConstants.CreateConnection();
@@ -37,7 +37,7 @@ public class NatsSubscriptionMultiplicityTests : TestClusterPerTest
     {
         if (!NatsTestConstants.IsNatsAvailable)
         {
-            throw new SkipException("Empty connection string");
+            throw Xunit.Sdk.SkipException.ForSkip("Empty connection string");
         }
 
         builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
@@ -71,7 +71,7 @@ public class NatsSubscriptionMultiplicityTests : TestClusterPerTest
         }
     }
 
-    public override async Task InitializeAsync()
+    public override async ValueTask InitializeAsync()
     {
         await natsConnection.ConnectAsync();
 
@@ -87,10 +87,18 @@ public class NatsSubscriptionMultiplicityTests : TestClusterPerTest
         }
 
         await base.InitializeAsync();
+
+        if (!PreconditionsMet)
+
+        {
+
+            return;
+
+        }
         runner = new SubscriptionMultiplicityTestRunner(NatsStreamProviderName, this.HostedCluster);
     }
 
-    public override async Task DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
         await base.DisposeAsync();
 
@@ -108,7 +116,7 @@ public class NatsSubscriptionMultiplicityTests : TestClusterPerTest
         }
     }
 
-    [SkippableFact, TestCategory("NATS")]
+    [Fact, TestCategory("NATS")]
     public async Task NatsMultipleLinearSubscriptionTest()
     {
         logger.LogInformation(
@@ -116,7 +124,7 @@ public class NatsSubscriptionMultiplicityTests : TestClusterPerTest
         await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace);
     }
 
-    [SkippableFact, TestCategory("NATS")]
+    [Fact, TestCategory("NATS")]
     public async Task NatsMultipleSubscriptionTest_AddRemove()
     {
         logger.LogInformation(
@@ -124,14 +132,14 @@ public class NatsSubscriptionMultiplicityTests : TestClusterPerTest
         await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
     }
 
-    [SkippableFact, TestCategory("NATS")]
+    [Fact, TestCategory("NATS")]
     public async Task NatsResubscriptionTest()
     {
         logger.LogInformation("************************ NatsResubscriptionTest *********************************");
         await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
     }
 
-    [SkippableFact, TestCategory("NATS")]
+    [Fact, TestCategory("NATS")]
     public async Task NatsResubscriptionAfterDeactivationTest()
     {
         logger.LogInformation(
@@ -139,21 +147,21 @@ public class NatsSubscriptionMultiplicityTests : TestClusterPerTest
         await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
     }
 
-    [SkippableFact, TestCategory("NATS")]
+    [Fact, TestCategory("NATS")]
     public async Task NatsActiveSubscriptionTest()
     {
         logger.LogInformation("************************ NatsActiveSubscriptionTest *********************************");
         await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
     }
 
-    [SkippableFact, TestCategory("NATS")]
+    [Fact, TestCategory("NATS")]
     public async Task NatsTwoIntermittentStreamTest()
     {
         logger.LogInformation("************************ NatsTwoIntermittentStreamTest *********************************");
         await runner.TwoIntermittentStreamTest(Guid.NewGuid());
     }
 
-    [SkippableFact, TestCategory("NATS")]
+    [Fact, TestCategory("NATS")]
     public async Task NatsSubscribeFromClientTest()
     {
         logger.LogInformation("************************ NatsSubscribeFromClientTest *********************************");

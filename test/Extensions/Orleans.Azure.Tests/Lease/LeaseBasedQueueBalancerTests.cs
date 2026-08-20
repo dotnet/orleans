@@ -60,7 +60,7 @@ namespace Tester.AzureUtils.Lease
             }
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task LeaseBalancedQueueBalancer_SupportAutoScaleScenario()
         {
             var mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
@@ -77,7 +77,7 @@ namespace Tester.AzureUtils.Lease
             await WaitUntilAgentManagersOwnCorrectAmountOfAgents(2, 2, mgmtGrain);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task LeaseBalancedQueueBalancer_SupportUnexpectedNodeFailureScenerio()
         {
             var mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);

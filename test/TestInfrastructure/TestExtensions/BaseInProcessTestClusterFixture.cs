@@ -10,6 +10,9 @@ namespace TestExtensions;
 public abstract class BaseInProcessTestClusterFixture : Xunit.IAsyncLifetime
 {
     private readonly ExceptionDispatchInfo? preconditionsException;
+    private InProcessTestCluster? hostedCluster;
+
+    protected bool PreconditionsMet => preconditionsException is null;
 
     static BaseInProcessTestClusterFixture()
     {
@@ -40,19 +43,45 @@ public abstract class BaseInProcessTestClusterFixture : Xunit.IAsyncLifetime
     {
     }
 
-    public InProcessTestCluster HostedCluster { get; private set; } = null!;
+    public InProcessTestCluster HostedCluster
+    {
+        get
+        {
+            EnsurePreconditionsMet();
+            return hostedCluster ?? throw new InvalidOperationException("The test cluster has not been initialized.");
+        }
+        private set => hostedCluster = value;
+    }
 
-    public IGrainFactory GrainFactory => Client;
+    public IGrainFactory GrainFactory
+    {
+        get
+        {
+            EnsurePreconditionsMet();
+            return Client;
+        }
+    }
 
-    public IClusterClient Client => HostedCluster.Client;
+    public IClusterClient Client
+    {
+        get
+        {
+            EnsurePreconditionsMet();
+            return HostedCluster.Client;
+        }
+    }
 
     public ILogger Logger { get; private set; } = null!;
 
     public string GetClientServiceId() => Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
 
-    public virtual async Task InitializeAsync()
+    public virtual async ValueTask InitializeAsync()
     {
-        EnsurePreconditionsMet();
+        if (!PreconditionsMet)
+        {
+            return;
+        }
+
         var builder = new InProcessTestClusterBuilder();
 #pragma warning disable ORLEANSEXP003 // Distributed grain directory is enabled by default for Orleans tests.
         builder.Options.UseDistributedGrainDirectory = true;
@@ -67,9 +96,9 @@ public abstract class BaseInProcessTestClusterFixture : Xunit.IAsyncLifetime
         Logger = Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
     }
 
-    public virtual async Task DisposeAsync()
+    public virtual async ValueTask DisposeAsync()
     {
-        var cluster = HostedCluster;
+        var cluster = hostedCluster;
         if (cluster is null) return;
 
         try

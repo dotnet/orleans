@@ -22,7 +22,14 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     public class Fixture : BaseInProcessTestClusterFixture
     {
         private ReminderTestClock? _reminderClock;
-        internal ReminderTestClock ReminderClock => _reminderClock ?? throw new InvalidOperationException($"{nameof(ReminderTestClock)} has not been configured.");
+        internal ReminderTestClock ReminderClock
+        {
+            get
+            {
+                EnsurePreconditionsMet();
+                return _reminderClock ?? throw new InvalidOperationException($"{nameof(ReminderTestClock)} has not been configured.");
+            }
+        }
 
         protected override void CheckPreconditionsOrThrow() => CosmosTestUtils.CheckCosmosStorage();
 
@@ -38,7 +45,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
             });
         }
 
-        public override async Task DisposeAsync()
+        public override async ValueTask DisposeAsync()
         {
             try
             {
@@ -59,21 +66,21 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     // Basic tests
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_Basic_StopByRef()
     {
         await Test_Reminders_Basic_StopByRef();
     }
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Rem_Cosmos_UpdateReminder_DoesNotRestartLocalReminder()
     {
         await Test_Reminders_UpdateReminder_DoesNotRestartLocalReminder();
     }
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_Basic_ListOps()
     {
         await Test_Reminders_Basic_ListOps();
@@ -82,21 +89,21 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     // Single join tests ... multi grain, multi reminders
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_1J_MultiGrainMultiReminders()
     {
         await Test_Reminders_1J_MultiGrainMultiReminders();
     }
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_ReminderNotFound()
     {
         await Test_Reminders_ReminderNotFound();
     }
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_Basic()
     {
         // start up a test grain and get the period that it's programmed to use.
@@ -114,7 +121,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     }
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_Basic_Restart()
     {
         IReminderTestGrain2 grain = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -139,7 +146,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     }
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_MultipleReminders()
     {
         IReminderTestGrain2 grain = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -147,14 +154,14 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     }
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_2J_MultiGrainMultiReminders()
     {
         await Test_Reminders_2J_MultiGrainMultiReminders();
     }
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_MultiGrainMultiReminders()
     {
         IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -175,7 +182,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     }
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_1F_Basic()
     {
         IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -196,7 +203,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     }
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_2F_MultiGrain()
     {
         using var cts = new CancellationTokenSource(ENDWAIT);
@@ -229,7 +236,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     }
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_1F1J_MultiGrain()
     {
         using var cts = new CancellationTokenSource(ENDWAIT);
@@ -260,7 +267,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     }
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_RegisterSameReminderTwice()
     {
         IReminderTestGrain2 grain = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -273,7 +280,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     }
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_GT_Basic()
     {
         IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -304,7 +311,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     }
 
     [TestSuite("Functional")]
-    [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4319"), TestCategory("Functional")]
+    [Fact(Skip = "https://github.com/dotnet/orleans/issues/4319"), TestCategory("Functional")]
     public async Task Rem_Azure_GT_1F1J_MultiGrain()
     {
         using var cts = new CancellationTokenSource(ENDWAIT);
@@ -330,7 +337,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     }
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_Wrong_LowerThanAllowedPeriod()
     {
         IReminderTestGrain2 grain = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -339,7 +346,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     }
 
     [TestSuite("Functional")]
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_Wrong_Grain()
     {
         IReminderGrainWrong grain = GrainFactory.GetGrain<IReminderGrainWrong>(0);

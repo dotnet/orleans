@@ -61,11 +61,11 @@ public abstract class AdoNetQueueAdapterFactoryTests(string invariant, TestEnvir
 
     private const string TestDatabaseName = "OrleansStreamTest";
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _testing = await RelationalStorageForTesting.SetupInstance(invariant, TestDatabaseName);
 
-        Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
+        Assert.SkipWhen(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
         _storage = _testing.Storage;
     }
@@ -73,7 +73,7 @@ public abstract class AdoNetQueueAdapterFactoryTests(string invariant, TestEnvir
     /// <summary>
     /// Tests that the <see cref="AdoNetQueueAdapterFactory"/> creates an <see cref="AdoNetQueueAdapter"/> instance.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task AdoNetQueueAdapterFactory_CreatesAdapter()
     {
         // arrange
@@ -108,7 +108,7 @@ public abstract class AdoNetQueueAdapterFactoryTests(string invariant, TestEnvir
     /// <summary>
     /// Tests that the <see cref="AdoNetQueueAdapterFactory"/> gets a <see cref="AdoNetStreamFailureHandler"/> instance.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task AdoNetQueueAdapterFactory_GetsDeliveryFailureHandler()
     {
         // arrange
@@ -142,7 +142,7 @@ public abstract class AdoNetQueueAdapterFactoryTests(string invariant, TestEnvir
     /// <summary>
     /// Tests that the <see cref="AdoNetQueueAdapterFactory"/> gets a <see cref="SimpleQueueCache"/> instance.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public void AdoNetQueueAdapterFactory_GetsQueueAdapterCache()
     {
         // arrange
@@ -174,7 +174,7 @@ public abstract class AdoNetQueueAdapterFactoryTests(string invariant, TestEnvir
     /// <summary>
     /// Tests that the <see cref="AdoNetQueueAdapterFactory"/> gets a <see cref="HashRingBasedStreamQueueMapper"/> instance.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public void AdoNetQueueAdapterFactory_GetsStreamQueueMapper()
     {
         // arrange
@@ -206,7 +206,7 @@ public abstract class AdoNetQueueAdapterFactoryTests(string invariant, TestEnvir
     /// <summary>
     /// Tests that the <see cref="AdoNetQueueAdapterFactory"/> constructs via its static factory method.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public void AdoNetQueueAdapterFactory_ConstructsViaStaticFactory()
     {
         // arrange
@@ -220,5 +220,5 @@ public abstract class AdoNetQueueAdapterFactoryTests(string invariant, TestEnvir
         Assert.IsType<AdoNetQueueAdapterFactory>(factory);
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

@@ -1,8 +1,8 @@
-using Xunit.Abstractions;
 using Orleans.LeaseProviders;
 using TestExtensions.Runners;
 using Orleans.Configuration;
 using Microsoft.Extensions.Options;
+using Xunit;
 
 namespace Tester.AzureUtils.Lease
 {

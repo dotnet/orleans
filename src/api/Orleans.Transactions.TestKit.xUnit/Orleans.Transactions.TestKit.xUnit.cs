@@ -10,13 +10,13 @@ namespace Orleans.Transactions.TestKit.xUnit
 {
     public abstract partial class ConsistencyTransactionTestRunnerxUnit : ConsistencyTransactionTestRunner
     {
-        public ConsistencyTransactionTestRunnerxUnit(IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) : base(default!, default!) { }
+        public ConsistencyTransactionTestRunnerxUnit(IGrainFactory grainFactory, Xunit.ITestOutputHelper output) : base(default!, default!) { }
 
         protected override bool StorageAdaptorHasLimitedCommitSpace { get { throw null; } }
 
         protected override bool StorageErrorInjectionActive { get { throw null; } }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/ConsistencyTransactionTestRunner.cs", 17)]
         [Xunit.InlineData(new[] { 2, 2, true, true, Consistency.ReadWriteDetermination.PerGrain })]
         [Xunit.InlineData(new[] { 2, 3, true, true, Consistency.ReadWriteDetermination.PerGrain })]
         [Xunit.InlineData(new[] { 2, 4, true, true, Consistency.ReadWriteDetermination.PerGrain })]
@@ -103,9 +103,9 @@ namespace Orleans.Transactions.TestKit.xUnit
 
     public partial class ControlledFaultInjectionTransactionTestRunnerxUnit : ControlledFaultInjectionTransactionTestRunner
     {
-        public ControlledFaultInjectionTransactionTestRunnerxUnit(IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) : base(default!, default!) { }
+        public ControlledFaultInjectionTransactionTestRunnerxUnit(IGrainFactory grainFactory, Xunit.ITestOutputHelper output) : base(default!, default!) { }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/ControlledFaultInjectionTransactionTestRunner.cs", 24)]
         [Xunit.InlineData(new[] { TransactionFaultInjectPhase.AfterPrepare, FaultInjectionType.Deactivation })]
         [Xunit.InlineData(new[] { TransactionFaultInjectPhase.AfterConfirm, FaultInjectionType.Deactivation })]
         [Xunit.InlineData(new[] { TransactionFaultInjectPhase.AfterPrepared, FaultInjectionType.Deactivation })]
@@ -118,86 +118,86 @@ namespace Orleans.Transactions.TestKit.xUnit
         [Xunit.InlineData(new[] { TransactionFaultInjectPhase.BeforePrepareAndCommit, FaultInjectionType.ExceptionBeforeStore })]
         public override System.Threading.Tasks.Task MultiGrainWriteTransaction_FaultInjection(TransactionFaultInjectPhase injectionPhase, FaultInjectionType injectionType) { throw null; }
 
-        [SkippableFact(new[] { })]
+        [Xunit.Fact("/_/src/Orleans.Transactions.TestKit.xUnit/ControlledFaultInjectionTransactionTestRunner.cs", 12)]
         public override System.Threading.Tasks.Task SingleGrainReadTransaction() { throw null; }
 
-        [SkippableFact(new[] { })]
+        [Xunit.Fact("/_/src/Orleans.Transactions.TestKit.xUnit/ControlledFaultInjectionTransactionTestRunner.cs", 18)]
         public override System.Threading.Tasks.Task SingleGrainWriteTransaction() { throw null; }
     }
 
     public partial class DisabledTransactionsTestRunnerxUnit : DisabledTransactionsTestRunner
     {
-        protected DisabledTransactionsTestRunnerxUnit(IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) : base(default!, default!) { }
+        protected DisabledTransactionsTestRunnerxUnit(IGrainFactory grainFactory, Xunit.ITestOutputHelper output) : base(default!, default!) { }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/DisabledTransactionsTestRunner.cs", 17)]
         [Xunit.InlineData(new[] { "NoStateTransactionalGrain" })]
         public override void MultiTransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName) { }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/DisabledTransactionsTestRunner.cs", 10)]
         [Xunit.InlineData(new[] { "NoStateTransactionalGrain" })]
         public override void TransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName) { }
     }
 
     public abstract partial class ExclusiveLockTransactionTestRunnerxUnit : ExclusiveLockTransactionTestRunner
     {
-        protected ExclusiveLockTransactionTestRunnerxUnit(IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) : base(default!, default!) { }
+        protected ExclusiveLockTransactionTestRunnerxUnit(IGrainFactory grainFactory, Xunit.ITestOutputHelper output) : base(default!, default!) { }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/ExclusiveLockTransactionTestRunner.cs", 19)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task ConcurrentReadThenWriteWithExclusiveLock_NoLockException(string grainStates) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/ExclusiveLockTransactionTestRunner.cs", 12)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task ConcurrentReadThenWriteWithoutExclusiveLock_ThrowsLockException(string grainStates) { throw null; }
     }
 
     public abstract partial class GoldenPathTransactionTestRunnerxUnit : GoldenPathTransactionTestRunner
     {
-        protected GoldenPathTransactionTestRunnerxUnit(IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) : base(default!, default!) { }
+        protected GoldenPathTransactionTestRunnerxUnit(IGrainFactory grainFactory, Xunit.ITestOutputHelper output) : base(default!, default!) { }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/GoldenPathTransactionTestRunner.cs", 38)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain", 8 })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain", 4 })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain", 1 })]
         public override System.Threading.Tasks.Task MultiGrainReadWriteTransaction(string grainStates, int grainCount) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/GoldenPathTransactionTestRunner.cs", 29)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain", 8 })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain", 4 })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain", 1 })]
         public override System.Threading.Tasks.Task MultiGrainWriteTransaction(string grainStates, int grainCount) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/GoldenPathTransactionTestRunner.cs", 56)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task MultiWriteToSingleGrainTransaction(string grainStates) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/GoldenPathTransactionTestRunner.cs", 47)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain", 8 })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain", 4 })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain", 1 })]
         public override System.Threading.Tasks.Task RepeatGrainReadWriteTransaction(string grainStates, int grainCount) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/GoldenPathTransactionTestRunner.cs", 65)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain", 8 })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain", 4 })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain", 1 })]
         public override System.Threading.Tasks.Task RWRWTest(string grainStates, int grainCount) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/GoldenPathTransactionTestRunner.cs", 11)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task SingleGrainReadTransaction(string grainStates) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/GoldenPathTransactionTestRunner.cs", 20)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task SingleGrainWriteTransaction(string grainStates) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/GoldenPathTransactionTestRunner.cs", 74)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain", 8 })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain", 4 })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain", 1 })]
@@ -206,33 +206,33 @@ namespace Orleans.Transactions.TestKit.xUnit
 
     public partial class GrainFaultTransactionTestRunnerxUnit : GrainFaultTransactionTestRunner
     {
-        public GrainFaultTransactionTestRunnerxUnit(IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) : base(default!, default!) { }
+        public GrainFaultTransactionTestRunnerxUnit(IGrainFactory grainFactory, Xunit.ITestOutputHelper output) : base(default!, default!) { }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/GrainFaultTransactionTestRunner.cs", 39)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task AbortTransactionExceptionInnerExceptionOnlyContainsOneRootCauseException(string grainStates) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/GrainFaultTransactionTestRunner.cs", 12)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task AbortTransactionOnExceptions(string grainStates) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/GrainFaultTransactionTestRunner.cs", 48)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task AbortTransactionOnOrphanCalls(string grainStates) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/GrainFaultTransactionTestRunner.cs", 21)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task AbortTransactionOnReadOnlyViolatedException(string grainStates) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/GrainFaultTransactionTestRunner.cs", 30)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
@@ -241,27 +241,27 @@ namespace Orleans.Transactions.TestKit.xUnit
 
     public abstract partial class ScopedTransactionsTestRunnerxUnit : ScopedTransactionsTestRunner
     {
-        protected ScopedTransactionsTestRunnerxUnit(IGrainFactory grainFactory, ITransactionClient transactionFrame, Xunit.Abstractions.ITestOutputHelper output) : base(default!, default!, default!) { }
+        protected ScopedTransactionsTestRunnerxUnit(IGrainFactory grainFactory, ITransactionClient transactionFrame, Xunit.ITestOutputHelper output) : base(default!, default!, default!) { }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/ScopedTransactionsTestRunnerxUnit.cs", 39)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task CreateNestedTransactionScopeAndSetValueAndInnerFailAndAssert(string grainStates) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/ScopedTransactionsTestRunnerxUnit.cs", 12)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task CreateTransactionScopeAndSetValue(string grainStates) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/ScopedTransactionsTestRunnerxUnit.cs", 30)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task CreateTransactionScopeAndSetValueAndAssert(string grainStates) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/ScopedTransactionsTestRunnerxUnit.cs", 21)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
@@ -270,15 +270,15 @@ namespace Orleans.Transactions.TestKit.xUnit
 
     public abstract partial class TocFaultTransactionTestRunnerxUnit : TocFaultTransactionTestRunner
     {
-        protected TocFaultTransactionTestRunnerxUnit(IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) : base(default!, default!) { }
+        protected TocFaultTransactionTestRunnerxUnit(IGrainFactory grainFactory, Xunit.ITestOutputHelper output) : base(default!, default!) { }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/TocFaultTransactionTestRunner.cs", 20)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain", 8 })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain", 4 })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain", 1 })]
         public override System.Threading.Tasks.Task MultiGrainWriteTransactionWithCommitException(string grainStates, int grainCount) { throw null; }
 
-        [SkippableTheory(new[] { }, Skip = "https://github.com/dotnet/orleans/issues/9556")]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/TocFaultTransactionTestRunner.cs", 11, Skip = "https://github.com/dotnet/orleans/issues/9556")]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain", 8 })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain", 4 })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain", 1 })]
@@ -287,9 +287,9 @@ namespace Orleans.Transactions.TestKit.xUnit
 
     public abstract partial class TocGoldenPathTestRunnerxUnit : TocGoldenPathTestRunner
     {
-        protected TocGoldenPathTestRunnerxUnit(IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) : base(default!, default!) { }
+        protected TocGoldenPathTestRunnerxUnit(IGrainFactory grainFactory, Xunit.ITestOutputHelper output) : base(default!, default!) { }
 
-        [SkippableTheory(new[] { }, Skip = "https://github.com/dotnet/orleans/issues/9556")]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/TOCGoldenPathTestRunner.cs", 11, Skip = "https://github.com/dotnet/orleans/issues/9556")]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain", 8 })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain", 4 })]
         public override System.Threading.Tasks.Task MultiGrainWriteTransaction(string grainStates, int grainCount) { throw null; }
@@ -297,18 +297,18 @@ namespace Orleans.Transactions.TestKit.xUnit
 
     public abstract partial class TransactionalStateStorageTestRunnerxUnit<TState> : TransactionalStateStorageTestRunner<TState> where TState : class, new()
     {
-        public TransactionalStateStorageTestRunnerxUnit(System.Func<System.Threading.Tasks.Task<Abstractions.ITransactionalStateStorage<TState>>> stateStorageFactory, System.Func<int, TState> stateFactory, IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper testOutput, System.Func<AwesomeAssertions.Equivalency.EquivalencyOptions<TState>, AwesomeAssertions.Equivalency.EquivalencyOptions<TState>>? assertConfig = null) : base(default!, default!, default!, default!, default) { }
+        public TransactionalStateStorageTestRunnerxUnit(System.Func<System.Threading.Tasks.Task<Abstractions.ITransactionalStateStorage<TState>>> stateStorageFactory, System.Func<int, TState> stateFactory, IGrainFactory grainFactory, Xunit.ITestOutputHelper testOutput, System.Func<AwesomeAssertions.Equivalency.EquivalencyOptions<TState>, AwesomeAssertions.Equivalency.EquivalencyOptions<TState>>? assertConfig = null) : base(default!, default!, default!, default!, default) { }
 
-        [Xunit.Theory]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs", 110)]
         [Xunit.InlineData(new[] { 99 })]
         [Xunit.InlineData(new[] { 100 })]
         [Xunit.InlineData(new[] { 200 })]
         public override System.Threading.Tasks.Task CancelMany(int count) { throw null; }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs", 56)]
         public override System.Threading.Tasks.Task CancelOne() { throw null; }
 
-        [Xunit.Theory]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs", 98)]
         [Xunit.InlineData(new[] { 99, true })]
         [Xunit.InlineData(new[] { 99, false })]
         [Xunit.InlineData(new[] { 100, true })]
@@ -317,59 +317,65 @@ namespace Orleans.Transactions.TestKit.xUnit
         [Xunit.InlineData(new[] { 200, false })]
         public override System.Threading.Tasks.Task ConfirmMany(int count, bool useTwoSteps) { throw null; }
 
-        [Xunit.Theory]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs", 48)]
         [Xunit.InlineData(new[] { true })]
         [Xunit.InlineData(new[] { false })]
         public override System.Threading.Tasks.Task ConfirmOne(bool useTwoSteps) { throw null; }
 
-        [Xunit.Theory]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs", 68)]
         [Xunit.InlineData(new[] { false, false })]
         [Xunit.InlineData(new[] { true, true })]
         [Xunit.InlineData(new[] { true, false })]
         public override System.Threading.Tasks.Task ConfirmOneAndCancelOne(bool useTwoSteps, bool reverseOrder) { throw null; }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs", 30)]
         public override System.Threading.Tasks.Task FirstTime_Load_ShouldReturnEmptyLoadResponse() { throw null; }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs", 77)]
         public override System.Threading.Tasks.Task GrowingBatch() { throw null; }
 
-        [Xunit.Theory]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs", 89)]
         [Xunit.InlineData(new[] { 99 })]
         [Xunit.InlineData(new[] { 100 })]
         [Xunit.InlineData(new[] { 200 })]
         public override System.Threading.Tasks.Task PrepareMany(int count) { throw null; }
 
-        [Xunit.Theory]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs", 119)]
         [Xunit.InlineData(new[] { 99 })]
         [Xunit.InlineData(new[] { 100 })]
         [Xunit.InlineData(new[] { 200 })]
         public override System.Threading.Tasks.Task ReplaceMany(int count) { throw null; }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs", 62)]
         public override System.Threading.Tasks.Task ReplaceOne() { throw null; }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs", 83)]
         public override System.Threading.Tasks.Task ShrinkingBatch() { throw null; }
+
+        [Xunit.Fact("/_/src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs", 36)]
+        public override System.Threading.Tasks.Task StoreWithoutChanges() { throw null; }
+
+        [Xunit.Fact("/_/src/Orleans.Transactions.TestKit.xUnit/TransactionalStateStorageTestRunner.cs", 42)]
+        public override System.Threading.Tasks.Task WrongEtags() { throw null; }
     }
 
     public abstract partial class TransactionConcurrencyTestRunnerxUnit : TransactionConcurrencyTestRunner
     {
-        protected TransactionConcurrencyTestRunnerxUnit(IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) : base(default!, default!) { }
+        protected TransactionConcurrencyTestRunnerxUnit(IGrainFactory grainFactory, Xunit.ITestOutputHelper output) : base(default!, default!) { }
 
-        [SkippableTheory(new[] { }, Skip = "https://github.com/dotnet/orleans/issues/9554")]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/TransactionConcurrencyTestRunner.cs", 16)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task SingleSharedGrainTest(string grainStates) { throw null; }
 
-        [SkippableTheory(new[] { }, Skip = "https://github.com/dotnet/orleans/issues/9554")]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/TransactionConcurrencyTestRunner.cs", 30)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task TransactionChainTest(string grainStates) { throw null; }
 
-        [SkippableTheory(new[] { }, Skip = "https://github.com/dotnet/orleans/issues/9554")]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/TransactionConcurrencyTestRunner.cs", 44)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
@@ -378,14 +384,14 @@ namespace Orleans.Transactions.TestKit.xUnit
 
     public partial class TransactionRecoveryTestsRunnerxUnit : TransactionRecoveryTestsRunner
     {
-        public TransactionRecoveryTestsRunnerxUnit(TestingHost.TestCluster cluster, Xunit.Abstractions.ITestOutputHelper testOutput) : base(default!, default!) { }
+        public TransactionRecoveryTestsRunnerxUnit(TestingHost.TestCluster cluster, Xunit.ITestOutputHelper testOutput) : base(default!, default!) { }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/TransactionRecoveryTestsRunner.cs", 14)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain", 30 })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain", 20 })]
         public override System.Threading.Tasks.Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/TransactionRecoveryTestsRunner.cs", 22)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain", 30 })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain", 20 })]
         public override System.Threading.Tasks.Task TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(string transactionTestGrainClassName, int concurrent) { throw null; }

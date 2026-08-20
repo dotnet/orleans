@@ -7,7 +7,6 @@ using Orleans.GrainReferences;
 using Orleans.Runtime;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.General
 {

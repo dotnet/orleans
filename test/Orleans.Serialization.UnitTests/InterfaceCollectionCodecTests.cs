@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -18,7 +18,6 @@ using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TestKit;
 using Orleans.Serialization.Utilities;
 using Xunit;
-using Xunit.Abstractions;
 using static VerifyXunit.Verifier;
 
 namespace Orleans.Serialization.UnitTests;

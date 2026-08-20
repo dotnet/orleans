@@ -8,7 +8,6 @@ using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Internal;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.MessageCenterTests
 {

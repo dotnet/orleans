@@ -25,12 +25,12 @@ namespace UnitTests.StorageTests.AdoNet
         {
             public RelationalStorageForTesting Storage { get; private set; } = null!;
 
-            public async Task InitializeAsync()
+            public async ValueTask InitializeAsync()
             {
                 Storage = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
             }
 
-            public Task DisposeAsync() => Task.CompletedTask;
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
         }
 
         public MySqlRelationalStoreTests(Fixture fixture) : base(AdoNetInvariantName)
@@ -38,7 +38,7 @@ namespace UnitTests.StorageTests.AdoNet
             _storage = fixture.Storage;
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Streaming_MySql_Test()
         {
             using(var tokenSource = new CancellationTokenSource(StreamCancellationTimeoutLimit))
@@ -48,13 +48,13 @@ namespace UnitTests.StorageTests.AdoNet
             }
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task CancellationToken_MySql_Test()
         {
             await CancellationTokenTest(_storage, CancellationTestTimeoutLimit);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task DataSource_MySql_Test()
         {
             using var dataSource = new ProviderDbDataSource(

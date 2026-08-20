@@ -269,12 +269,12 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             }
         }
 
-        public Task InitializeAsync()
+        public ValueTask InitializeAsync()
         {
-            return Task.CompletedTask;
+            return ValueTask.CompletedTask;
         }
 
-        public async Task DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             if (deployedSilos.Count == 0) return;
 

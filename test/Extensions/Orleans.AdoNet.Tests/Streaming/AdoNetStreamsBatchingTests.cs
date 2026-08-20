@@ -9,8 +9,8 @@ using TestExtensions;
 using UnitTests.General;
 using UnitTests.GrainInterfaces;
 using UnitTests.StreamingTests;
-using Xunit.Abstractions;
 using static System.String;
+using Xunit;
 
 namespace Tester.AdoNet.Streaming;
 
@@ -64,9 +64,9 @@ public abstract class AdoNetStreamsBatchingTests : StreamBatchingTestRunner, IAs
         fixture.EnsurePreconditionsMet();
     }
 
-    public Task InitializeAsync() => fixture.InitializeAsync();
+    public ValueTask InitializeAsync() => fixture.InitializeAsync();
 
-    public Task DisposeAsync() => fixture.DisposeAsync();
+    public ValueTask DisposeAsync() => fixture.DisposeAsync();
 
     public class Fixture : BaseTestClusterFixture
     {
@@ -77,14 +77,22 @@ public abstract class AdoNetStreamsBatchingTests : StreamBatchingTestRunner, IAs
             _invariant = invariant;
         }
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             // set up the adonet environment before the base initializes
             _testing = await RelationalStorageForTesting.SetupInstance(_invariant, TestDatabaseName);
 
-            Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
+            Assert.SkipWhen(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
             await base.InitializeAsync();
+
+            if (!PreconditionsMet)
+
+            {
+
+                return;
+
+            }
         }
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)

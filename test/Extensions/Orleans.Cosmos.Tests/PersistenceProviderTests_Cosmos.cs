@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit.Abstractions;
 using TestExtensions;
 using Orleans.Runtime;
 using Orleans.Storage;
@@ -12,6 +11,7 @@ using Orleans.Persistence.Cosmos;
 using UnitTests.Persistence;
 using Orleans.Persistence.TestKit;
 using Microsoft.Extensions.Options;
+using Xunit;
 
 namespace Tester.Cosmos.Persistence;
 
@@ -65,7 +65,7 @@ public class PersistenceProviderTests_Cosmos
         return store;
     }
 
-    [SkippableFact, TestCategory("Functional"), TestCategory("ModelBased")]
+    [Fact, TestCategory("Functional"), TestCategory("ModelBased")]
     public async Task CosmosStorage_ModelBasedGeneratedConformance()
     {
         var storage = await InitializeStorage(deleteStateOnClear: false);
@@ -74,7 +74,7 @@ public class PersistenceProviderTests_Cosmos
         await runner.RunGeneratedConformanceTests();
     }
 
-    [SkippableFact, TestCategory("Functional"), TestCategory("ModelBased")]
+    [Fact, TestCategory("Functional"), TestCategory("ModelBased")]
     public async Task CosmosStorage_DeleteStateOnClear_ModelBasedGeneratedConformance()
     {
         var storage = await InitializeStorage(deleteStateOnClear: true);
@@ -83,7 +83,7 @@ public class PersistenceProviderTests_Cosmos
         await runner.RunGeneratedConformanceTests();
     }
 
-    [SkippableFact, TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task PersistenceProvider_Azure_Read()
     {
         const string testName = nameof(PersistenceProvider_Azure_Read);
@@ -92,7 +92,7 @@ public class PersistenceProviderTests_Cosmos
         await Test_PersistenceProvider_Read(testName, store, null, grainId: GrainId.Create("testgrain", Guid.NewGuid().ToString()));
     }
 
-    [SkippableTheory, TestCategory("Functional")]
+    [Theory, TestCategory("Functional")]
     [InlineData(null)]
     [InlineData(15 * 64 * 1024 - 256)]
     [InlineData(15 * 32 * 1024 - 256)]
@@ -109,7 +109,7 @@ public class PersistenceProviderTests_Cosmos
         await Test_PersistenceProvider_WriteRead(testName, store, grainState, GrainId.Create("testgrain", Guid.NewGuid().ToString()));
     }
 
-    [SkippableTheory, TestCategory("Functional")]
+    [Theory, TestCategory("Functional")]
     [InlineData(null)]
     [InlineData(15 * 64 * 1024 - 256)]
     [InlineData(15 * 32 * 1024 - 256)]
@@ -126,7 +126,7 @@ public class PersistenceProviderTests_Cosmos
         await Test_PersistenceProvider_WriteClearRead(testName, store, grainState);
     }
 
-    [SkippableTheory, TestCategory("Functional")]
+    [Theory, TestCategory("Functional")]
     [InlineData(null)]
     [InlineData(15 * 32 * 1024 - 256)]
     public async Task PersistenceProvider_Azure_ChangeReadFormat(int? stringLength)
@@ -147,7 +147,7 @@ public class PersistenceProviderTests_Cosmos
         await Test_PersistenceProvider_Read(testName, store, grainState, grainId);
     }
 
-    [SkippableTheory, TestCategory("Functional")]
+    [Theory, TestCategory("Functional")]
     [InlineData(null)]
     [InlineData(15 * 32 * 1024 - 256)]
     public async Task PersistenceProvider_Azure_ChangeWriteFormat(int? stringLength)
@@ -186,7 +186,7 @@ public class PersistenceProviderTests_Cosmos
         await store.ReadStateAsync(grainTypeName, grainId, storedGrainState);
 
         TimeSpan readTime = sw.Elapsed;
-        output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
+        output.WriteLine("{0} - Read time = {1}", store.GetType().FullName!, readTime);
 
         var storedState = storedGrainState.State;
         Assert.NotNull(grainState.State);
@@ -215,7 +215,7 @@ public class PersistenceProviderTests_Cosmos
         };
         await store.ReadStateAsync(grainTypeName, grainId, storedGrainState);
         TimeSpan readTime = sw.Elapsed;
-        output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+        output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName!, writeTime, readTime);
         Assert.NotNull(grainState.State);
         Assert.NotNull(storedGrainState.State);
         Assert.Equal(grainState.State.A, storedGrainState.State.A);
@@ -251,7 +251,7 @@ public class PersistenceProviderTests_Cosmos
         };
         await store.ReadStateAsync(grainTypeName, grainId, storedGrainState);
         TimeSpan readTime = sw.Elapsed;
-        output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+        output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName!, writeTime, readTime);
         Assert.NotNull(storedGrainState.State);
         Assert.Equal(default, storedGrainState.State.A);
         Assert.Equal(default, storedGrainState.State.B);

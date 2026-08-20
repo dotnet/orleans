@@ -4,7 +4,6 @@ using Orleans.TestingHost;
 using Tester.StreamingTests.ProgrammaticSubscribeTests;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace ServiceBus.Tests.StreamingTests
 {

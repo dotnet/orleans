@@ -36,7 +36,7 @@ namespace AWSUtils.Tests.MembershipTests
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
             if (!AWSTestConstants.IsDynamoDbAvailable)
-                throw new SkipException("Unable to connect to AWS DynamoDB simulator");
+                throw Xunit.Sdk.SkipException.ForSkip("Unable to connect to AWS DynamoDB simulator");
             var options = new DynamoDBClusteringOptions();
             DynamoDBMembershipHelper.ParseDataConnectionString(this.connectionString, options);
             return new DynamoDBMembershipTable(this.loggerFactory, Options.Create(options), this._clusterOptions);
@@ -54,55 +54,55 @@ namespace AWSUtils.Tests.MembershipTests
             return Task.FromResult(AWSTestConstants.IsDynamoDbAvailable ? $"Service={AWSTestConstants.DynamoDbService}" : null!);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_DynamoDB_GetGateways()
         {
             await MembershipTable_GetGateways();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_DynamoDB_ReadAll_EmptyTable()
         {
             await MembershipTable_ReadAll_EmptyTable();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_DynamoDB_InsertRow()
         {
             await MembershipTable_InsertRow();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_DynamoDB_ReadRow_Insert_Read()
         {
             await MembershipTable_ReadRow_Insert_Read();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_DynamoDB_ReadAll_Insert_ReadAll()
         {
             await MembershipTable_ReadAll_Insert_ReadAll();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_DynamoDB_UpdateRow()
         {
             await MembershipTable_UpdateRow();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_DynamoDB_CleanupDefunctSiloEntries()
         {
             await MembershipTable_CleanupDefunctSiloEntries();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_DynamoDB_UpdateRowInParallel()
         {
             await MembershipTable_UpdateRowInParallel();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task MembershipTable_DynamoDB_UpdateIAmAlive()
         {
             await MembershipTable_UpdateIAmAlive();

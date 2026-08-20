@@ -9,7 +9,6 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.StreamingTests;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Tester.AzureUtils.Streaming
 {
@@ -68,7 +67,7 @@ namespace Tester.AzureUtils.Streaming
                 }
             }
 
-            public override async Task DisposeAsync()
+            public override async ValueTask DisposeAsync()
             {
                 await base.DisposeAsync();
                 try
@@ -81,7 +80,7 @@ namespace Tester.AzureUtils.Streaming
                         AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount),
                         new AzureQueueOptions().ConfigureTestDefaults());
                 }
-                catch (SkipException) { }
+                catch (Xunit.Sdk.SkipException) { }
             }
         }
 

@@ -93,12 +93,12 @@ public sealed class NatsOptionsTests
         Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task NumReplicas_IsAppliedToJetStreamConfig()
     {
         if (!NatsTestConstants.IsNatsAvailable)
         {
-            throw new SkipException("Nats Server is not available");
+            throw Xunit.Sdk.SkipException.ForSkip("Nats Server is not available");
         }
 
         var providerName = $"test-replicas-{Guid.NewGuid():N}";
@@ -145,14 +145,14 @@ public sealed class NatsOptionsTests
     // testing should be done in a CI environment with a 3-node cluster configured
     // via docker-compose or similar infrastructure.
 
-    [SkippableTheory]
+    [Theory]
     [InlineData(StreamConfigStorage.File)]
     [InlineData(StreamConfigStorage.Memory)]
     public async Task StorageType_IsAppliedToJetStreamConfig(StreamConfigStorage storageType)
     {
         if (!NatsTestConstants.IsNatsAvailable)
         {
-            throw new SkipException("Nats Server is not available");
+            throw Xunit.Sdk.SkipException.ForSkip("Nats Server is not available");
         }
 
         var providerName = $"test-storage-{Guid.NewGuid():N}";

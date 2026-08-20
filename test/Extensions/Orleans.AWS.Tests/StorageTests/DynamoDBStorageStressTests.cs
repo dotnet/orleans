@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Globalization;
 using AWSUtils.Tests.StorageTests.AWSUtils;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace AWSUtils.Tests.StorageTests
 {
@@ -24,7 +23,7 @@ namespace AWSUtils.Tests.StorageTests
         public DynamoDBStorageStressTests(DynamoDBStorageTestsFixture fixture, ITestOutputHelper output)
         {
             if (!AWSTestConstants.IsDynamoDbAvailable)
-                throw new SkipException("Unable to connect to AWS DynamoDB simulator");
+                throw Xunit.Sdk.SkipException.ForSkip("Unable to connect to AWS DynamoDB simulator");
 
             this.output = output;
 
@@ -32,7 +31,7 @@ namespace AWSUtils.Tests.StorageTests
             PartitionKey = "PK-DynamoDBDataManagerStressTests-" + Guid.NewGuid();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task DynamoDBDataManagerStressTests_WriteAlot_SinglePartition()
         {
             const string testName = "DynamoDBDataManagerStressTests_WriteAlot_SinglePartition";
@@ -44,7 +43,7 @@ namespace AWSUtils.Tests.StorageTests
             await WriteAlot_Async(testName, numPartitions, iterations, batchSize);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task DynamoDBDataManagerStressTests_WriteAlot_MultiPartition()
         {
             const string testName = "DynamoDBDataManagerStressTests_WriteAlot_MultiPartition";
@@ -56,7 +55,7 @@ namespace AWSUtils.Tests.StorageTests
             await WriteAlot_Async(testName, numPartitions, iterations, batchSize);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task DynamoDBDataManagerStressTests_ReadAll_SinglePartition()
         {
             const string testName = "DynamoDBDataManagerStressTests_ReadAll";

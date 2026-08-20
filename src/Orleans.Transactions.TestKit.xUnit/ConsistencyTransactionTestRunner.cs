@@ -1,7 +1,6 @@
 using System.Threading.Tasks;
 using Orleans.Transactions.TestKit.Consistency;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Transactions.TestKit.xUnit
 {
@@ -15,7 +14,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         protected override bool StorageAdaptorHasLimitedCommitSpace => true;
         protected override bool StorageErrorInjectionActive => true;
 
-        [SkippableTheory]
+        [Theory]
         // high congestion
         [InlineData(2, 2, true, true, ReadWriteDetermination.PerGrain)]
         [InlineData(2, 3, true, true, ReadWriteDetermination.PerGrain)]

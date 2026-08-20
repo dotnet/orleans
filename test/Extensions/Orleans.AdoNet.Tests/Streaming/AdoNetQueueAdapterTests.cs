@@ -61,11 +61,11 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
 
     private const string TestDatabaseName = "OrleansStreamTest";
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _testing = await RelationalStorageForTesting.SetupInstance(invariant, TestDatabaseName);
 
-        Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
+        Assert.SkipWhen(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
         _storage = _testing.Storage;
         _queries = await RelationalOrleansQueries.CreateInstance(invariant, _testing.CurrentConnectionString);
@@ -74,7 +74,7 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
     /// <summary>
     /// Tests that the <see cref="AdoNetQueueAdapter"/> constructs with the expected state.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public void AdoNetQueueAdapter_Constructs()
     {
         // arrange
@@ -106,7 +106,7 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
     /// <summary>
     /// Tests that the <see cref="AdoNetQueueAdapter"/> can enqueue messages.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task AdoNetQueueAdapter_EnqueuesMessages()
     {
         // arrange
@@ -173,7 +173,7 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
     /// <summary>
     /// Tests that the <see cref="AdoNetQueueAdapter"/> can enqueue messages that are visible to its receivers.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task AdoNetQueueAdapter_WiresUpReceiver()
     {
         // arrange
@@ -258,7 +258,7 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
         }
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [GenerateSerializer]
     [Alias("Tester.AdoNet.Streaming.AdoNetQueueAdapterTests.TestModel")]

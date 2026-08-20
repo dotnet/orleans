@@ -1,8 +1,8 @@
 using Orleans.Tests.SqlUtils;
 using Orleans.TestingHost;
 using UnitTests.General;
-using Xunit.Abstractions;
 using Microsoft.Extensions.Hosting;
+using Xunit;
 
 namespace UnitTests.MembershipTests
 {
@@ -26,11 +26,15 @@ namespace UnitTests.MembershipTests
 
         protected override void CheckPreconditionsOrThrow() => RelationalStorageForTesting.CheckPreconditionsOrThrow(AdoNetInvariantName);
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             var relationalStorage = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
             _connectionString = relationalStorage.CurrentConnectionString;
             await base.InitializeAsync();
+            if (!PreconditionsMet)
+            {
+                return;
+            }
         }
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -56,31 +60,31 @@ namespace UnitTests.MembershipTests
             }
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Liveness_SqlServer_1()
         {
             await Do_Liveness_OracleTest_1();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Liveness_SqlServer_2_Restart_Primary()
         {
             await Do_Liveness_OracleTest_2(0);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Liveness_SqlServer_3_Restartl_GW()
         {
             await Do_Liveness_OracleTest_2(1);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Liveness_SqlServer_4_Restart_Silo_1()
         {
             await Do_Liveness_OracleTest_2(2);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Liveness_SqlServer_5_Kill_Silo_1_With_Timers()
         {
             await Do_Liveness_OracleTest_2(2, false, true);
@@ -107,11 +111,15 @@ namespace UnitTests.MembershipTests
 
         protected override void CheckPreconditionsOrThrow() => RelationalStorageForTesting.CheckPreconditionsOrThrow(AdoNetInvariantName);
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             var relationalStorage = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
             _connectionString = relationalStorage.CurrentConnectionString;
             await base.InitializeAsync();
+            if (!PreconditionsMet)
+            {
+                return;
+            }
         }
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -137,31 +145,31 @@ namespace UnitTests.MembershipTests
             }
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Liveness_PostgreSql_1()
         {
             await Do_Liveness_OracleTest_1();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Liveness_PostgreSql_2_Restart_Primary()
         {
             await Do_Liveness_OracleTest_2(0);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Liveness_PostgreSql_3_Restartl_GW()
         {
             await Do_Liveness_OracleTest_2(1);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Liveness_PostgreSql_4_Restart_Silo_1()
         {
             await Do_Liveness_OracleTest_2(2);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Liveness_PostgreSql_5_Kill_Silo_1_With_Timers()
         {
             await Do_Liveness_OracleTest_2(2, false, true);
@@ -188,11 +196,15 @@ namespace UnitTests.MembershipTests
 
         protected override void CheckPreconditionsOrThrow() => RelationalStorageForTesting.CheckPreconditionsOrThrow(AdoNetInvariantName);
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             var relationalStorage = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
             _connectionString = relationalStorage.CurrentConnectionString;
             await base.InitializeAsync();
+            if (!PreconditionsMet)
+            {
+                return;
+            }
         }
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -218,31 +230,31 @@ namespace UnitTests.MembershipTests
             }
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Liveness_MySql_1()
         {
             await Do_Liveness_OracleTest_1();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Liveness_MySql_2_Restart_Primary()
         {
             await Do_Liveness_OracleTest_2(0);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Liveness_MySql_3_Restartl_GW()
         {
             await Do_Liveness_OracleTest_2(1);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Liveness_MySql_4_Restart_Silo_1()
         {
             await Do_Liveness_OracleTest_2(2);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task Liveness_MySql_5_Kill_Silo_1_With_Timers()
         {
             await Do_Liveness_OracleTest_2(2, false, true);

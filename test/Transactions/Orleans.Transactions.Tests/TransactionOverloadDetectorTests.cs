@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.Options;
-using Xunit.Abstractions;
+using Microsoft.Extensions.Options;
 using Xunit;
 using Orleans.Transactions.Abstractions;
 
@@ -18,7 +17,7 @@ namespace Orleans.Transactions.Tests
             this.output = output;
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(60, TransactionRateLoadSheddingOptions.DEFAULT_LIMIT)]
         [InlineData(60, TransactionRateLoadSheddingOptions.DEFAULT_LIMIT * 2)]
         [InlineData(60, 1)]

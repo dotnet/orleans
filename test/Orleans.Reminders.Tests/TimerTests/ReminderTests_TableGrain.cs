@@ -63,9 +63,13 @@ namespace UnitTests.TimerTests
                 });
             }
 
-            public override async Task InitializeAsync()
+            public override async ValueTask InitializeAsync()
             {
                 await base.InitializeAsync();
+                if (!PreconditionsMet)
+                {
+                    return;
+                }
 
                 using var cancellation = new CancellationTokenSource(TestConstants.InitTimeout);
                 var started = HostedCluster.Silos.Select(silo =>
@@ -73,7 +77,7 @@ namespace UnitTests.TimerTests
                 _startedReminderServices = (await Task.WhenAll(started)).Select(e => e.SiloAddress!).ToArray();
             }
 
-            public override async Task DisposeAsync()
+            public override async ValueTask DisposeAsync()
             {
                 try
                 {
@@ -96,7 +100,7 @@ namespace UnitTests.TimerTests
         private readonly Fixture _fixture;
         private readonly ReminderTableReadController _readController;
 
-        public async Task InitializeAsync()
+        public async ValueTask InitializeAsync()
         {
             // ReminderTable.Clear() cannot be called from a non-Orleans thread,
             // so we must proxy the call through a grain.
@@ -104,7 +108,7 @@ namespace UnitTests.TimerTests
             await controlProxy.EraseReminderTable().WaitAsync(TestConstants.InitTimeout);
         }
 
-        Task IAsyncLifetime.DisposeAsync() => Task.CompletedTask;
+        ValueTask IAsyncDisposable.DisposeAsync() => ValueTask.CompletedTask;
 
         // Basic tests
 
@@ -154,13 +158,13 @@ namespace UnitTests.TimerTests
         public async Task Rem_Grain_MultipleReminders()
         {
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            await PerGrainMultiReminderTest(grain);
+            await PerGrainMultiReminderTest(grain, TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task Rem_Grain_UpdateReminder_DoesNotRestartLocalReminder()
         {
-            await Test_Reminders_UpdateReminder_DoesNotRestartLocalReminder();
+            await Test_Reminders_UpdateReminder_DoesNotRestartLocalReminder(TestContext.Current.CancellationToken);
         }
 
         [Fact]

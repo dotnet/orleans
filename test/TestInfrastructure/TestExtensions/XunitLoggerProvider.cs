@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Logging;
-using Xunit.Abstractions;
+using Xunit;
 
 namespace TestExtensions
 {

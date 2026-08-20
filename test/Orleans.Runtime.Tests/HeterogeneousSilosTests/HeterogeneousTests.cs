@@ -205,12 +205,12 @@ namespace Tester.HeterogeneousSilosTests
             Assert.Contains("Could not find an implementation for interface", exception.Message);
         }
 
-        public Task InitializeAsync()
+        public ValueTask InitializeAsync()
         {
-            return Task.CompletedTask;
+            return ValueTask.CompletedTask;
         }
 
-        public async Task DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             try
             {

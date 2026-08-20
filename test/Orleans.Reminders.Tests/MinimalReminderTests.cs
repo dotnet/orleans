@@ -23,7 +23,7 @@ namespace UnitTests.CatalogTests
                 builder.AddSiloBuilderConfigurator<SiloConfiguration>();
             }
 
-            public override async Task DisposeAsync()
+            public override async ValueTask DisposeAsync()
             {
                 try
                 {

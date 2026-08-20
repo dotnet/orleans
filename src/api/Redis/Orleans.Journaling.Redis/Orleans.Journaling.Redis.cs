@@ -18,7 +18,6 @@ namespace Orleans.Journaling
     public sealed partial class RedisJournalStorageOptions
     {
         public const long DEFAULT_COMPACTION_THRESHOLD_BYTES = 134217728L;
-
         public long CompactionThresholdBytes { get { throw null; } set { } }
 
         public StackExchange.Redis.ConfigurationOptions? ConfigurationOptions { get { throw null; } set { } }

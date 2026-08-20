@@ -3,7 +3,6 @@ using Orleans.TestingHost;
 using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace ServiceBus.Tests.Streaming
 {

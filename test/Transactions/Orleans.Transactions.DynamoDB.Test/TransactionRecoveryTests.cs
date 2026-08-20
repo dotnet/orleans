@@ -6,7 +6,6 @@ using Orleans.Transactions.TestKit.xUnit;
 using Tester;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Transactions.DynamoDB.Tests
 {
@@ -28,9 +27,13 @@ namespace Orleans.Transactions.DynamoDB.Tests
             this.helper = helper;
         }
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             await base.InitializeAsync();
+            if (!PreconditionsMet)
+            {
+                return;
+            }
             this.testRunner = new TransactionRecoveryTestsRunnerxUnit(this.HostedCluster, helper);
         }
 
@@ -39,7 +42,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
             base.CheckPreconditionsOrThrow();
             if (!AWSTestConstants.IsDynamoDbAvailable)
             {
-                throw new SkipException("DynamoDB is not configured");
+                throw Xunit.Sdk.SkipException.ForSkip("DynamoDB is not configured");
             }
         }
 
@@ -51,7 +54,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
             builder.AddClientBuilderConfigurator<ClientBuilderConfiguratorUsingDynamoDBClustering>();
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, 30)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, 20)]
         public Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent)
@@ -59,7 +62,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
             return this.testRunner.TransactionWillRecoverAfterRandomSiloGracefulShutdown(transactionTestGrainClassName, concurrent);
         }
 
-        [SkippableTheory]
+        [Theory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, 30)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, 20)]
         public Task TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(string transactionTestGrainClassName, int concurrent)
@@ -67,21 +70,21 @@ namespace Orleans.Transactions.DynamoDB.Tests
             return this.testRunner.TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(transactionTestGrainClassName, concurrent);
         }
 
-        [SkippableFact]
+        [Fact]
         public Task TransactionWillRecoverAfterManagerWait()
         {
             return this.testRunner.TransactionWillRecoverAfterManagerWait(
                 TransactionTestConstants.SingleStateTransactionalGrain);
         }
 
-        [SkippableFact]
+        [Fact]
         public Task TransactionWillRecoverAfterRemotePreparePersisted()
         {
             return this.testRunner.TransactionWillRecoverAfterRemotePreparePersisted(
                 TransactionTestConstants.SingleStateTransactionalGrain);
         }
 
-        [SkippableFact]
+        [Fact]
         public Task TransactionWillRecoverAfterLocalCommitStored()
         {
             return this.testRunner.TransactionWillRecoverAfterLocalCommitStored(

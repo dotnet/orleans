@@ -9,7 +9,6 @@ using System.Buffers;
 using System.IO.Pipelines;
 using System.Text;
 using Xunit;
-using Xunit.Abstractions;
 using System.Threading.Tasks;
 
 namespace Orleans.Serialization.UnitTests

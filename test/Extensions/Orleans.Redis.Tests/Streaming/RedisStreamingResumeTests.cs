@@ -13,8 +13,13 @@ namespace Tester.Redis.Streaming;
 [TestCategory("Redis"), TestCategory("Streaming"), TestCategory("StreamingResume")]
 public sealed class RedisStreamingResumeTests : StreamingResumeTests
 {
-    public override async Task DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
+        if (!PreconditionsMet)
+        {
+            return;
+        }
+
         var serviceId = HostedCluster?.Options.ServiceId;
         await base.DisposeAsync();
         await RedisStreamTestUtils.DeleteServiceKeysAsync(serviceId);

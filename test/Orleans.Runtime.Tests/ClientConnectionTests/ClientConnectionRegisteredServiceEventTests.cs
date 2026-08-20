@@ -21,9 +21,13 @@ namespace Tester
 
         private EventNotifier<GatewayCountChangedEventArgs> gatewayCountChangedNotifier = null!;
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             await base.InitializeAsync();
+            if (!PreconditionsMet)
+            {
+                return;
+            }
             this.clusterConnectionLostNotifier = this.HostedCluster.ServiceProvider.GetRequiredService<EventNotifier<EventArgs>>();
             this.gatewayCountChangedNotifier = this.HostedCluster.ServiceProvider.GetRequiredService<EventNotifier<GatewayCountChangedEventArgs>>();
         }
@@ -87,7 +91,7 @@ namespace Tester
 
                 await this.HostedCluster.StopAllSilosAsync();
 
-                Assert.True(await semaphore.WaitAsync(TimeSpan.FromSeconds(10)));
+                Assert.True(await semaphore.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
             }
             finally
             {
@@ -120,7 +124,7 @@ namespace Tester
                 var silo = this.HostedCluster.SecondarySilos[0];
                 await silo.StopSiloAsync(true);
 
-                Assert.True(await lostGatewaySemaphore.WaitAsync(TimeSpan.FromSeconds(20)));
+                Assert.True(await lostGatewaySemaphore.WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken));
 
                 await this.HostedCluster.RestartStoppedSecondarySiloAsync(silo.Name);
 
@@ -130,7 +134,7 @@ namespace Tester
                 do
                 {
                     this.Client.GetGrain<ITestGrain>(Guid.NewGuid().GetHashCode()).SetLabel("test").Ignore();
-                    reconnected = await regainedGatewaySemaphore.WaitAsync(TimeSpan.FromSeconds(1));
+                    reconnected = await regainedGatewaySemaphore.WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
                 } while (!reconnected && --remainingAttempts > 0);
 
                 Assert.True(reconnected, "Failed to reconnect to restarted gateway.");

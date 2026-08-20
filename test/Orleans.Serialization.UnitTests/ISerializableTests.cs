@@ -13,7 +13,6 @@ using System.IO.Pipelines;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Serialization.UnitTests
 {

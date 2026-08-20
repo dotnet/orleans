@@ -60,16 +60,20 @@ namespace Orleans.Streaming.Kinesis.Tests
             }
         }
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             EnsurePreconditionsMet();
             await KinesisStreamTestResource.Create(KinesisStreamName);
             streamCreated = true;
             await base.InitializeAsync();
+            if (!PreconditionsMet)
+            {
+                return;
+            }
             runner = new SubscriptionMultiplicityTestRunner(KinesisStreamProviderName, this.HostedCluster);
         }
 
-        public override async Task DisposeAsync()
+        public override async ValueTask DisposeAsync()
         {
             try
             {
@@ -84,56 +88,56 @@ namespace Orleans.Streaming.Kinesis.Tests
             }
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task KinesisMultipleParallelSubscriptionTest()
         {
             logger.LogInformation("************************ KinesisMultipleParallelSubscriptionTest *********************************");
             await runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task KinesisMultipleLinearSubscriptionTest()
         {
             logger.LogInformation("************************ KinesisMultipleLinearSubscriptionTest *********************************");
             await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task KinesisMultipleSubscriptionTest_AddRemoveSubscriptions()
         {
             logger.LogInformation("************************ KinesisMultipleSubscriptionTest_AddRemoveSubscriptions *********************************");
             await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task KinesisResubscriptionTest()
         {
             logger.LogInformation("************************ KinesisResubscriptionTest *********************************");
             await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task KinesisResubscriptionAfterDeactivationTest()
         {
             logger.LogInformation("************************ KinesisResubscriptionAfterDeactivationTest *********************************");
             await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task KinesisActiveSubscriptionTest()
         {
             logger.LogInformation("************************ KinesisActiveSubscriptionTest *********************************");
             await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task KinesisTwoIntermitentStreamTest()
         {
             logger.LogInformation("************************ KinesisTwoIntermitentStreamTest *********************************");
             await runner.TwoIntermittentStreamTest(Guid.NewGuid());
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task KinesisSubscribeFromClientTest()
         {
             logger.LogInformation("************************ KinesisSubscribeFromClientTest *********************************");

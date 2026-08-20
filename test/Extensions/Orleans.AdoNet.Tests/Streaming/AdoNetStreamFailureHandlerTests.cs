@@ -59,11 +59,11 @@ public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsync
 
     private const string TestDatabaseName = "OrleansStreamTest";
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _testing = await RelationalStorageForTesting.SetupInstance(invariant, TestDatabaseName);
 
-        Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
+        Assert.SkipWhen(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
         _storage = _testing.Storage;
         _queries = await RelationalOrleansQueries.CreateInstance(invariant, _testing.CurrentConnectionString);
@@ -72,7 +72,7 @@ public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsync
     /// <summary>
     /// Tests that a <see cref="AdoNetStreamFailureHandler"/> can be constructed.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public void AdoNetStreamFailureHandler_Constructs()
     {
         // arrange
@@ -99,7 +99,7 @@ public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsync
     /// <summary>
     /// Tests that a <see cref="AdoNetStreamFailureHandler"/> can move a poisoned message to dead letters.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task AdoNetStreamFailureHandler_OnDeliveryFailure_MovesPoisonedMessageToDeadLetters()
     {
         // arrange - handler
@@ -163,7 +163,7 @@ public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsync
     /// <summary>
     /// Tests that a <see cref="AdoNetStreamFailureHandler"/> can move a poisoned message to dead letters.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task AdoNetStreamFailureHandler_OnDeliveryFailure_DoesNotMoveHealthyMessageToDeadLetters()
     {
         // arrange - handler
@@ -209,5 +209,5 @@ public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsync
         Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

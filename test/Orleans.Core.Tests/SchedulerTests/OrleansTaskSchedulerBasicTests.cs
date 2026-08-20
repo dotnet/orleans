@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
 using UnitTests.TesterInternal;
 using Xunit;
-using Xunit.Abstractions;
 using Orleans.TestingHost.Utils;
 
 // ReSharper disable ConvertToConstant.Local
@@ -224,14 +223,14 @@ namespace UnitTests.SchedulerTests
                 try
                 {
                     _output.WriteLine("#0 - TaskWorkItem - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
-                        SynchronizationContext.Current, TaskScheduler.Current);
+                        SynchronizationContext.Current!, TaskScheduler.Current!);
                     var taskScheduler = ((WorkItemGroup)_rootContext.Scheduler).TaskScheduler;
                     Assert.Equal(taskScheduler, TaskScheduler.Current); //
 
                     t1 = new Task(() =>
                     {
                         _output.WriteLine("#1 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
-                            SynchronizationContext.Current, TaskScheduler.Current);
+                            SynchronizationContext.Current!, TaskScheduler.Current!);
                         var taskScheduler = ((WorkItemGroup)_rootContext.Scheduler).TaskScheduler;  // "TaskScheduler.Current #1"
                         Assert.Equal(taskScheduler, TaskScheduler.Current); //
                         result1.SetResult(true);
@@ -335,27 +334,27 @@ namespace UnitTests.SchedulerTests
             RequestContext.Set(key, val);
 
             _output.WriteLine("Initial - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
-                SynchronizationContext.Current, TaskScheduler.Current);
+                SynchronizationContext.Current!, TaskScheduler.Current!);
 
             Assert.Equal(val, RequestContext.Get(key));  // "RequestContext.Get Initial"
 
             Task t0 = Task.Factory.StartNew(async () =>
             {
                 _output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
-                    SynchronizationContext.Current, TaskScheduler.Current);
+                    SynchronizationContext.Current!, TaskScheduler.Current!);
 
                 Assert.Equal(val, RequestContext.Get(key));  // "RequestContext.Get #0"
 
                 Task t1 = Task.Factory.StartNew(() =>
                 {
                     _output.WriteLine("#1 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
-                        SynchronizationContext.Current, TaskScheduler.Current);
+                        SynchronizationContext.Current!, TaskScheduler.Current!);
                     Assert.Equal(val, RequestContext.Get(key));  // "RequestContext.Get #1"
                 });
                 Task t2 = t1.ContinueWith((_) =>
                 {
                     _output.WriteLine("#2 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
-                        SynchronizationContext.Current, TaskScheduler.Current);
+                        SynchronizationContext.Current!, TaskScheduler.Current!);
                     Assert.Equal(val, RequestContext.Get(key));  // "RequestContext.Get #2"
                 });
                 await t2.WaitAsync(TimeSpan.FromSeconds(5));
@@ -423,10 +422,10 @@ namespace UnitTests.SchedulerTests
                     + " SynchronizationContext.Current={3}\n"
                     + " Orleans-RuntimeContext.Current={4}",
                     what,
-                    (TaskScheduler.Current == null ? "null" : TaskScheduler.Current.ToString()),
-                    (Task.Factory.Scheduler == null ? "null" : Task.Factory.Scheduler.ToString()),
-                    (SynchronizationContext.Current == null ? "null" : SynchronizationContext.Current.ToString()),
-                    (RuntimeContext.Current == null ? "null" : RuntimeContext.Current.ToString())
+                    (TaskScheduler.Current == null ? "null" : TaskScheduler.Current.ToString())!,
+                    (Task.Factory.Scheduler == null ? "null" : Task.Factory.Scheduler.ToString())!,
+                    (SynchronizationContext.Current == null ? "null" : SynchronizationContext.Current.ToString())!,
+                    (RuntimeContext.Current == null ? "null" : RuntimeContext.Current.ToString())!
                 );
 
                 //var st = new StackTrace();

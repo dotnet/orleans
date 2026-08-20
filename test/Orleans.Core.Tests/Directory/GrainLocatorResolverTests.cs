@@ -16,7 +16,6 @@ using Orleans.Runtime.Hosting;
 using TestExtensions;
 using UnitTests.Grains.Directories;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace NonSilo.Tests.Directory
 {

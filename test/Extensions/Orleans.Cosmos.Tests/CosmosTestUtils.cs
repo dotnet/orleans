@@ -18,7 +18,7 @@ public class CosmosTestUtils
         if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.CosmosDBAccountEndpoint)
             || string.IsNullOrWhiteSpace(TestDefaultConfiguration.CosmosDBAccountKey))
         {
-            throw new SkipException();
+            throw Xunit.Sdk.SkipException.ForSkip("Cosmos DB is not configured");
         }
     }
 
@@ -28,7 +28,7 @@ public class CosmosTestUtils
 
         if (IsCosmosEmulator)
         {
-            throw new SkipException(reason);
+            throw Xunit.Sdk.SkipException.ForSkip(reason);
         }
     }
 }

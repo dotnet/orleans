@@ -103,12 +103,14 @@ public class JournaledJobShardManagerTests
             CancellationToken.None);
         var storageId = ((JournaledJobShard)shard).StorageId;
 
-        Assert.NotNull(await storageProvider.CreateStorage(storageId).GetMetadataAsync());
+        Assert.NotNull(await storageProvider.CreateStorage(storageId).GetMetadataAsync(TestContext.Current.CancellationToken));
 
         await manager.UnregisterShardAsync(shard, CancellationToken.None);
 
-        Assert.Null(await storageProvider.CreateStorage(storageId).GetMetadataAsync());
-        Assert.Empty(await ToListAsync(storageProvider.ListAsync(JobShardId.StoragePrefix)));
+        Assert.Null(await storageProvider.CreateStorage(storageId).GetMetadataAsync(TestContext.Current.CancellationToken));
+        Assert.Empty(await ToListAsync(storageProvider.ListAsync(
+            JobShardId.StoragePrefix,
+            TestContext.Current.CancellationToken)));
     }
 
     [Fact]
@@ -193,9 +195,11 @@ public class JournaledJobShardManagerTests
             }, CancellationToken.None))
             .ToArray();
 
-        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5));
+        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         storageProvider.AllowAppends();
-        var scheduledJobs = await Task.WhenAll(scheduleTasks).WaitAsync(TimeSpan.FromSeconds(5));
+        var scheduledJobs = await Task.WhenAll(scheduleTasks).WaitAsync(
+            TimeSpan.FromSeconds(5),
+            TestContext.Current.CancellationToken);
 
         Assert.All(scheduledJobs, job => Assert.NotNull(job));
         Assert.True(
@@ -252,10 +256,14 @@ public class JournaledJobShardManagerTests
             }, CancellationToken.None))
             .ToArray();
 
-        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5));
+        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         storageProvider.AllowAppends();
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => scheduleTasks[InvalidIndex].WaitAsync(TimeSpan.FromSeconds(5)));
-        var scheduledJobs = await Task.WhenAll(scheduleTasks.Where((_, index) => index != InvalidIndex)).WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => scheduleTasks[InvalidIndex].WaitAsync(
+            TimeSpan.FromSeconds(5),
+            TestContext.Current.CancellationToken));
+        var scheduledJobs = await Task.WhenAll(scheduleTasks.Where((_, index) => index != InvalidIndex)).WaitAsync(
+            TimeSpan.FromSeconds(5),
+            TestContext.Current.CancellationToken);
 
         Assert.All(scheduledJobs, job => Assert.NotNull(job));
         Assert.True(

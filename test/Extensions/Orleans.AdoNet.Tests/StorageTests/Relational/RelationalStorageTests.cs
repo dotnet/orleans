@@ -44,14 +44,14 @@ namespace UnitTests.StorageTests.Relational
             _deleteStateOnClear = deleteStateOnClear;
         }
 
-        public async Task InitializeAsync()
+        public async ValueTask InitializeAsync()
         {
             var persistenceStorage = await Fixture.GetStorageProvider(_adoNetInvariant, _deleteStateOnClear);
-            Skip.If(persistenceStorage is null, $"Persistence storage not available for {_adoNetInvariant}.");
+            Assert.SkipWhen(persistenceStorage is null, $"Persistence storage not available for {_adoNetInvariant}.");
             PersistenceStorageTests = new CommonStorageTests(persistenceStorage);
         }
 
-        public Task DisposeAsync() => Task.CompletedTask;
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
         internal Task Relational_WriteReadWriteRead100StatesInParallel()
         {

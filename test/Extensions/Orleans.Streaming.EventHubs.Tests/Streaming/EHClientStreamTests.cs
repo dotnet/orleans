@@ -10,7 +10,6 @@ using Tester;
 using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -35,9 +34,13 @@ namespace ServiceBus.Tests.StreamingTests
             this.output = output;
         }
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             await base.InitializeAsync();
+            if (!PreconditionsMet)
+            {
+                return;
+            }
             runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 
@@ -87,14 +90,14 @@ namespace ServiceBus.Tests.StreamingTests
             }
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5657")]
+        [Fact(Skip = "https://github.com/dotnet/orleans/issues/5657")]
         public async Task EHStreamProducerOnDroppedClientTest()
         {
             logger.LogInformation("************************ EHStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(StreamProviderName, StreamNamespace);
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5634")]
+        [Fact(Skip = "https://github.com/dotnet/orleans/issues/5634")]
         public async Task EHStreamConsumerOnDroppedClientTest()
         {
             logger.LogInformation("************************ EHStreamConsumerOnDroppedClientTest *********************************");

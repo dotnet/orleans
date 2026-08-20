@@ -28,7 +28,7 @@ namespace UnitTests
                     return connString;
                 }
 
-                throw new SkipException("Environment is not correctly set up to run these tests. Connection string is empty.");
+                throw Xunit.Sdk.SkipException.ForSkip("Environment is not correctly set up to run these tests. Connection string is empty.");
             }
         }
     }

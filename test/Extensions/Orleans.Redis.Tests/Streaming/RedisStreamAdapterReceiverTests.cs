@@ -16,7 +16,7 @@ namespace Tester.Redis.Streaming;
 [TestCategory("Redis"), TestCategory("Streaming")]
 public sealed class RedisStreamAdapterReceiverTests
 {
-    [SkippableFact]
+    [Fact]
     public async Task RedisStreamAdapterReceiver_TracksReadOffsetAndPersistsCheckpoint()
     {
         TestUtils.CheckForRedis();

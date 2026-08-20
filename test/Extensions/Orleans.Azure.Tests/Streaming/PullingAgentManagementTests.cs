@@ -58,7 +58,7 @@ namespace UnitTests.StreamingTests
             this.fixture.EnsurePreconditionsMet();
         }
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task PullingAgents_ControlCmd_1()
         {
             var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);;

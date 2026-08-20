@@ -54,7 +54,7 @@ namespace UnitTests.MembershipTests
             this.connectionString = fixture.ConnectionString;
             if (string.IsNullOrEmpty(this.connectionString))
             {
-                throw new SkipException("No connection string configured");
+                throw Xunit.Sdk.SkipException.ForSkip("No connection string configured");
             }
             this._clusterOptions = Options.Create(new ClusterOptions { ClusterId = this.clusterId });
             var adoVariant = GetAdoInvariant();

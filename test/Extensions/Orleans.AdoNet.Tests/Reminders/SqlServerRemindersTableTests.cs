@@ -52,24 +52,24 @@ namespace UnitTests.RemindersTest
             return instance.CurrentConnectionString;
         }
 
-        [SkippableFact]
+        [Fact]
         public void RemindersTable_SqlServer_Init()
         {
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task RemindersTable_SqlServer_RemindersRange()
         {
             await RemindersRange(iterations: 30);
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task RemindersTable_SqlServer_RemindersParallelUpsert()
         {
             await RemindersParallelUpsert();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task RemindersTable_SqlServer_ReminderSimple()
         {
             await ReminderSimple();

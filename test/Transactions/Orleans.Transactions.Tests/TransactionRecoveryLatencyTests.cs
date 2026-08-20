@@ -232,7 +232,7 @@ public class TransactionRecoveryLatencyTests
                 && protocol.ManagerPromise is not null
                 && protocol.ManagerPromise.Task.IsCompleted,
             TimeSpan.FromSeconds(1)));
-        var (status, exception) = await resolution.WaitAsync(TimeSpan.FromSeconds(1));
+        var (status, exception) = await resolution.WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
 
         Assert.Equal(TransactionalStatus.PrepareTimeout, status);
         Assert.Null(exception);
@@ -256,11 +256,11 @@ public class TransactionRecoveryLatencyTests
         var remoteSend = queue.CancelInvocations.Single(send => send.Target.Equals(remote));
         var selfSend = queue.CancelInvocations.Single(send => send.Target.Equals(selfResource));
         remoteGate.TrySetResult();
-        await remoteSend.SendTask.WaitAsync(TimeSpan.FromSeconds(1));
+        await remoteSend.SendTask.WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
         Assert.False(selfSend.SendTask.IsCompleted);
 
         selfGate.TrySetResult();
-        await selfSend.SendTask.WaitAsync(TimeSpan.FromSeconds(1));
+        await selfSend.SendTask.WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -341,7 +341,7 @@ public class TransactionRecoveryLatencyTests
             TimeSpan.FromSeconds(1)));
 
         Assert.False(protocol.ManagerFanOutTask!.IsCompleted);
-        var (status, exception) = await resolution.WaitAsync(outerDeadline);
+        var (status, exception) = await resolution.WaitAsync(outerDeadline, TestContext.Current.CancellationToken);
 
         Assert.Equal(TransactionalStatus.PrepareTimeout, status);
         Assert.Null(exception);
@@ -354,7 +354,7 @@ public class TransactionRecoveryLatencyTests
         Assert.Equal(TransactionalStatus.PrepareTimeout, send.Status);
         Assert.Equal(TransactionDiagnosticEvents.CancelReason.TransactionAbort, send.Reason);
 
-        await protocol.ManagerFanOutTask.WaitAsync(outerDeadline);
+        await protocol.ManagerFanOutTask.WaitAsync(outerDeadline, TestContext.Current.CancellationToken);
 
         Assert.True(protocol.ManagerFanOutTask.IsCompletedSuccessfully);
         var failed = Assert.Single(observer.Events.OfType<TransactionDiagnosticEvents.CancelFanOutFailed>());
@@ -370,7 +370,7 @@ public class TransactionRecoveryLatencyTests
         Assert.IsType<TransactionDiagnosticEvents.CancelFanOutFailed>(observer.Events[^1]);
 
         cancelGate.TrySetResult();
-        await send.SendTask.WaitAsync(outerDeadline);
+        await send.SendTask.WaitAsync(outerDeadline, TestContext.Current.CancellationToken);
     }
 
     [Fact]
