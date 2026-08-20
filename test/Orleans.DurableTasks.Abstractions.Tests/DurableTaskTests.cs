@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using Orleans.DurableTasks;
 using Xunit;
 
-namespace Orleans.DurableTasks.Tests;
+namespace Orleans.DurableTasks.Abstractions.Tests;
 
 [Trait("Category", "BVT")]
 public class DurableTaskTests
