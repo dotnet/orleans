@@ -462,7 +462,11 @@ namespace System.Distributed.DurableTasks
 
         static TaskId ISpanParsable<TaskId>.Parse(ReadOnlySpan<char> s, IFormatProvider? provider) { throw null; }
 
+        public static TaskId Parse(ReadOnlySpan<char> s) { throw null; }
+
         static TaskId IParsable<TaskId>.Parse(string s, IFormatProvider? provider) { throw null; }
+
+        public static TaskId Parse(string s) { throw null; }
 
         public override readonly string ToString() { throw null; }
 
@@ -470,7 +474,11 @@ namespace System.Distributed.DurableTasks
 
         public readonly bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider) { throw null; }
 
+        public static bool TryParse(ReadOnlySpan<char> s, out TaskId result) { throw null; }
+
         static bool ISpanParsable<TaskId>.TryParse(ReadOnlySpan<char> s, IFormatProvider? provider, out TaskId result) { throw null; }
+
+        public static bool TryParse(string? s, out TaskId result) { throw null; }
 
         static bool IParsable<TaskId>.TryParse(string? s, IFormatProvider? provider, out TaskId result) { throw null; }
     }
