@@ -22,6 +22,13 @@ public sealed class DurableJobRunResult
     public bool IsRunning => Status == DurableJobRunStatus.Running;
 
     /// <summary>
+    /// Gets a value indicating whether the job is still running and should be polled after a delay.
+    /// </summary>
+    [Obsolete($"Use {nameof(IsRunning)} instead.")]
+    [MemberNotNullWhen(true, nameof(PollAfterDelay))]
+    public bool IsPending => IsRunning;
+
+    /// <summary>
     /// Gets a value indicating whether the successfully handled job requested durable rescheduling.
     /// </summary>
     [MemberNotNullWhen(true, nameof(RescheduleTime))]
@@ -87,6 +94,14 @@ public sealed class DurableJobRunResult
     }
 
     /// <summary>
+    /// Creates a result indicating the job is still running and should be polled after the specified delay.
+    /// </summary>
+    /// <param name="delay">The time to wait before polling the run again.</param>
+    /// <returns>A running job result.</returns>
+    [Obsolete($"Use {nameof(Running)} instead.")]
+    public static DurableJobRunResult PollAfter(TimeSpan delay) => Running(delay);
+
+    /// <summary>
     /// Creates a result indicating that the current execution completed successfully and requested durable rescheduling.
     /// </summary>
     /// <param name="dueTime">The time at which the next execution should become due.</param>
@@ -131,6 +146,12 @@ public enum DurableJobRunStatus
     /// The job is still running and should be polled again after the specified delay.
     /// </summary>
     Running = 1,
+
+    /// <summary>
+    /// The job is still running and should be polled again after the specified delay.
+    /// </summary>
+    [Obsolete($"Use {nameof(Running)} instead.")]
+    PollAfter = Running,
 
     /// <summary>
     /// The job failed and should be processed through the retry policy.

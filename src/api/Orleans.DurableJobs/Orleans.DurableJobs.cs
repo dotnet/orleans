@@ -50,6 +50,10 @@ namespace Orleans.DurableJobs
         [System.Diagnostics.CodeAnalysis.MemberNotNullWhen(true, "Exception")]
         public bool IsFailed { get { throw null; } }
 
+        [System.Obsolete("Use IsRunning instead.")]
+        [System.Diagnostics.CodeAnalysis.MemberNotNullWhen(true, "PollAfterDelay")]
+        public bool IsPending { get { throw null; } }
+
         [System.Diagnostics.CodeAnalysis.MemberNotNullWhen(true, "RescheduleTime")]
         public bool IsRescheduleRequested { get { throw null; } }
 
@@ -67,6 +71,9 @@ namespace Orleans.DurableJobs
 
         public static DurableJobRunResult Failed(System.Exception exception) { throw null; }
 
+        [System.Obsolete("Use Running instead.")]
+        public static DurableJobRunResult PollAfter(System.TimeSpan delay) { throw null; }
+
         public static DurableJobRunResult RescheduleAt(System.DateTimeOffset dueTime) { throw null; }
 
         public static DurableJobRunResult Running(System.TimeSpan delay) { throw null; }
@@ -76,6 +83,8 @@ namespace Orleans.DurableJobs
     {
         Completed = 0,
         Running = 1,
+        [System.Obsolete("Use Running instead.")]
+        PollAfter = 1,
         Failed = 2,
         RescheduleRequested = 3
     }

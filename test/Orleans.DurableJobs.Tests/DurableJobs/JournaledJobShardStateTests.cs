@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Text.Json;
 using Orleans.DurableJobs;
 using Orleans.Runtime;
 using Xunit;
@@ -82,6 +83,54 @@ public class JournaledJobShardStateTests
         var entry = Assert.Single(state.CaptureSnapshot().Jobs);
         Assert.Equal(shardId.Value, entry.Job.ShardId);
         Assert.Equal(retryDueTime, entry.Job.DueTime);
+    }
+
+    [Fact]
+    public void Replay_RestoresSuccessfulRescheduleGeneration()
+    {
+        var shardId = new JobShardId("shard-generation");
+        var start = DateTimeOffset.UtcNow;
+        var state = new JournaledJobShardState(shardId, start, start.AddHours(1));
+        var job = CreateJob(shardId, "job-1", "job", start.AddMinutes(1));
+
+        state.Apply(DurableJobShardJournalRecord.ForSchedule(job));
+        state.Apply(DurableJobShardJournalRecord.ForRetry(
+            job.Id,
+            start.AddMinutes(2),
+            dequeueCount: 0,
+            executionGeneration: 1));
+
+        var entry = Assert.Single(state.CaptureSnapshot().Jobs);
+        Assert.Equal(1, entry.Job.ExecutionGeneration);
+        Assert.Equal(0, entry.DequeueCount);
+    }
+
+    [Fact]
+    public void JsonSnapshot_RoundTripsSuccessfulRescheduleGeneration()
+    {
+        var shardId = new JobShardId("shard-json-generation");
+        var start = DateTimeOffset.UtcNow;
+        var state = new JournaledJobShardState(shardId, start, start.AddHours(1));
+        var job = CreateJob(shardId, "job-1", "job", start.AddMinutes(1));
+
+        state.Apply(DurableJobShardJournalRecord.ForSchedule(job));
+        state.Apply(DurableJobShardJournalRecord.ForRetry(
+            job.Id,
+            start.AddMinutes(2),
+            dequeueCount: 0,
+            executionGeneration: 1));
+
+        var json = JsonSerializer.Serialize(
+            state.CaptureSnapshot(),
+            DurableJobsJsonContext.Default.DurableJobShardSnapshot);
+        var snapshot = JsonSerializer.Deserialize(
+            json,
+            DurableJobsJsonContext.Default.DurableJobShardSnapshot);
+
+        Assert.NotNull(snapshot);
+        var entry = Assert.Single(snapshot.Jobs);
+        Assert.Equal(1, entry.Job.ExecutionGeneration);
+        Assert.Equal(0, entry.DequeueCount);
     }
 
     [Fact]

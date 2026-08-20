@@ -106,6 +106,22 @@ public class DurableJobReceiverExtensionTests
         await handler.Received(2).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task HandleDurableJobAsync_WhenExecutionGenerationChanges_StartsNewExecution()
+    {
+        var handler = Substitute.For<IDurableJobHandler>();
+        handler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        var extension = CreateExtension(handler);
+        var firstRun = CreateJobContext("run-1", executionGeneration: 0);
+        var rescheduledRun = CreateJobContext("run-2", executionGeneration: 1);
+
+        Assert.Equal(DurableJobRunStatus.Completed, (await extension.HandleDurableJobAsync(firstRun, CancellationToken.None)).Status);
+        Assert.Equal(DurableJobRunStatus.Completed, (await extension.HandleDurableJobAsync(rescheduledRun, CancellationToken.None)).Status);
+        await handler.Received(2).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
+    }
+
     private static DurableJobReceiverExtension CreateExtension(IDurableJobHandler handler, TimeSpan? jobStatusPollInterval = null)
     {
         var grainContext = Substitute.For<IGrainContext>();
@@ -119,7 +135,11 @@ public class DurableJobReceiverExtensionTests
         return new DurableJobReceiverExtension(grainContext, shared);
     }
 
-    private static IJobRunContext CreateJobContext(string runId, string jobId = "job-1", int dequeueCount = 1)
+    private static IJobRunContext CreateJobContext(
+        string runId,
+        string jobId = "job-1",
+        int dequeueCount = 1,
+        long executionGeneration = 0)
     {
         var context = Substitute.For<IJobRunContext>();
         context.RunId.Returns(runId);
@@ -130,7 +150,8 @@ public class DurableJobReceiverExtensionTests
             Name = jobId,
             DueTime = DateTimeOffset.UtcNow,
             TargetGrainId = GrainId.Create("test", "grain-1"),
-            ShardId = "shard-1"
+            ShardId = "shard-1",
+            ExecutionGeneration = executionGeneration
         });
 
         return context;

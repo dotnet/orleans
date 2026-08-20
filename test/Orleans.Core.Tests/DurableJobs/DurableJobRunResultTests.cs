@@ -57,6 +57,21 @@ public class DurableJobRunResultTests
     }
 
     [Fact]
+    public void PollAfterCompatibilityMembers_ForwardToRunning()
+    {
+#pragma warning disable CS0618 // Verify compatibility members remain functional.
+        var delay = TimeSpan.FromSeconds(5);
+        var result = DurableJobRunResult.PollAfter(delay);
+
+        Assert.Equal(DurableJobRunStatus.Running, result.Status);
+        Assert.Equal(DurableJobRunStatus.Running, DurableJobRunStatus.PollAfter);
+        Assert.True(result.IsPending);
+        Assert.True(result.IsRunning);
+        Assert.Equal(delay, result.PollAfterDelay);
+#pragma warning restore CS0618
+    }
+
+    [Fact]
     public void Failed_RequiresExceptionAndExposesFailure()
     {
         var exception = new InvalidOperationException("failed");

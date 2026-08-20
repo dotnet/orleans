@@ -84,6 +84,7 @@ public class JobShardTests
         var rescheduledRun = await ConsumeNextAsync(resetShard);
         Assert.Equal(1, rescheduledRun.DequeueCount);
         Assert.NotEqual(resetRun.RunId, rescheduledRun.RunId);
+        Assert.Equal(resetRun.Job.ExecutionGeneration + 1, rescheduledRun.Job.ExecutionGeneration);
         Assert.Equal(0, resetShard.PersistedRetryContext!.DequeueCount);
 
         var retryShard = await CreateShardWithDueJobAsync("retry", now);

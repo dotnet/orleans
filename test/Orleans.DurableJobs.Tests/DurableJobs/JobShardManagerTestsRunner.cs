@@ -193,6 +193,7 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
         Assert.Equal(job!.Id, rescheduled.Job.Id);
         Assert.Equal(1, rescheduled.DequeueCount);
         Assert.NotEqual(run.RunId, rescheduled.RunId);
+        Assert.Equal(run.Job.ExecutionGeneration + 1, rescheduled.Job.ExecutionGeneration);
     }
 
     [SkippableFact]

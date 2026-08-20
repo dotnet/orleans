@@ -30,7 +30,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
 
     private readonly IGrainContext _grain;
     private readonly DurableJobReceiverExtensionShared _shared;
-    private readonly Dictionary<(string JobId, int DequeueCount), JobAttemptState> _jobAttempts = [];
+    private readonly Dictionary<(string JobId, long ExecutionGeneration, int DequeueCount), JobAttemptState> _jobAttempts = [];
     private readonly Queue<CompletedJobAttempt> _completedJobAttempts = new();
     private int _completedJobAttemptCount;
 
@@ -96,7 +96,11 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         }
     }
 
-    private ValueTask<DurableJobRunResult> GetJobStatusAsync((string JobId, int DequeueCount) key, IJobRunContext context, JobAttemptState state, bool newJob)
+    private ValueTask<DurableJobRunResult> GetJobStatusAsync(
+        (string JobId, long ExecutionGeneration, int DequeueCount) key,
+        IJobRunContext context,
+        JobAttemptState state,
+        bool newJob)
     {
         // Cancellation is cooperative: only terminal task state is authoritative for job outcome.
         if (!state.Task.IsCompleted)
@@ -127,7 +131,10 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
 
         return ValueTask.FromCanceled<DurableJobRunResult>(new CancellationToken(canceled: true));
 
-        async ValueTask<DurableJobRunResult> LongPollGetJobStatusAsync((string JobId, int DequeueCount) key, IJobRunContext context, JobAttemptState state)
+        async ValueTask<DurableJobRunResult> LongPollGetJobStatusAsync(
+            (string JobId, long ExecutionGeneration, int DequeueCount) key,
+            IJobRunContext context,
+            JobAttemptState state)
         {
             if (!state.Task.IsCompleted)
             {
@@ -155,7 +162,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         }
     }
 
-    private void RecordCompletedJobAttempt((string JobId, int DequeueCount) key, JobAttemptState state)
+    private void RecordCompletedJobAttempt((string JobId, long ExecutionGeneration, int DequeueCount) key, JobAttemptState state)
     {
         if (!state.CompletionRecorded)
         {
@@ -190,16 +197,16 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
                 && state.Task.IsCompleted
                 && state.CompletedTimestamp == completedAttempt.CompletedTimestamp)
             {
-                ((ICollection<KeyValuePair<(string JobId, int DequeueCount), JobAttemptState>>)_jobAttempts).Remove(
-                    new KeyValuePair<(string JobId, int DequeueCount), JobAttemptState>(completedAttempt.Key, state));
+                ((ICollection<KeyValuePair<(string JobId, long ExecutionGeneration, int DequeueCount), JobAttemptState>>)_jobAttempts).Remove(
+                    new KeyValuePair<(string JobId, long ExecutionGeneration, int DequeueCount), JobAttemptState>(completedAttempt.Key, state));
             }
 
             _completedJobAttemptCount--;
         }
     }
 
-    private static (string JobId, int DequeueCount) GetExecutionKey(IJobRunContext context)
-        => (context.Job.Id, context.DequeueCount);
+    private static (string JobId, long ExecutionGeneration, int DequeueCount) GetExecutionKey(IJobRunContext context)
+        => (context.Job.Id, context.Job.ExecutionGeneration, context.DequeueCount);
 
     private sealed class JobAttemptState(Task<DurableJobRunResult> task)
     {
@@ -210,7 +217,9 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         public long CompletedTimestamp;
     }
 
-    private readonly record struct CompletedJobAttempt((string JobId, int DequeueCount) Key, long CompletedTimestamp);
+    private readonly record struct CompletedJobAttempt(
+        (string JobId, long ExecutionGeneration, int DequeueCount) Key,
+        long CompletedTimestamp);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Error executing durable job {JobId} on grain {GrainId}")]
     private static partial void LogErrorExecutingDurableJob(ILogger logger, Exception exception, string jobId, GrainId grainId);

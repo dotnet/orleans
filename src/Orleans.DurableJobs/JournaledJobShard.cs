@@ -169,7 +169,11 @@ internal sealed class JournaledJobShard : IJobShard, IResettableJobShard
         ArgumentNullException.ThrowIfNull(jobContext);
         ThrowIfDisposed();
 
-        var operation = new RetryJobLaterOperation(jobContext, newDueTime, resetDequeueCount: true, cancellationToken);
+        var operation = new RetryJobLaterOperation(
+            jobContext,
+            newDueTime,
+            resetDequeueCount: true,
+            cancellationToken);
         try
         {
             EnqueueOperation(operation);
@@ -702,7 +706,8 @@ internal sealed class JournaledJobShard : IJobShard, IResettableJobShard
             shard._state.RetryJobLater(
                 jobContext.Job.Id,
                 newDueTime,
-                resetDequeueCount ? 0 : jobContext.DequeueCount);
+                resetDequeueCount ? 0 : jobContext.DequeueCount,
+                resetDequeueCount ? checked(jobContext.Job.ExecutionGeneration + 1) : null);
             result = true;
             return true;
         }

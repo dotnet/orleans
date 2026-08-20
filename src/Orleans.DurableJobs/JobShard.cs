@@ -200,9 +200,13 @@ public abstract class JobShard : IJobShard, IResettableJobShard
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(jobContext);
-        var resetContext = new JobRunContext(jobContext.Job, jobContext.RunId, retryCount: 0);
+        var executionGeneration = checked(jobContext.Job.ExecutionGeneration + 1);
+        var resetContext = new JobRunContext(
+            jobContext.Job.WithExecutionGeneration(executionGeneration),
+            jobContext.RunId,
+            retryCount: 0);
         await PersistRetryJobAsync(resetContext, newDueTime, cancellationToken);
-        _jobQueue.RetryJobLater(jobContext.Job.Id, newDueTime, dequeueCount: 0);
+        _jobQueue.RetryJobLater(jobContext.Job.Id, newDueTime, dequeueCount: 0, executionGeneration);
     }
 
     /// <summary>

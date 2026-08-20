@@ -104,16 +104,19 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
     public bool RetryJobLater(IJobRunContext jobContext, DateTimeOffset newDueTime)
     {
         ArgumentNullException.ThrowIfNull(jobContext);
-        return RetryJobLater(jobContext.Job.Id, newDueTime, jobContext.DequeueCount);
+        return RetryJobLater(jobContext.Job.Id, newDueTime, jobContext.DequeueCount, executionGeneration: null);
     }
 
     public bool RetryJobLater(string jobId, DateTimeOffset newDueTime, int dequeueCount)
+        => RetryJobLater(jobId, newDueTime, dequeueCount, executionGeneration: null);
+
+    public bool RetryJobLater(string jobId, DateTimeOffset newDueTime, int dequeueCount, long? executionGeneration)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
         ValidateDequeueCount(dequeueCount);
 
-        Write(DurableJobShardJournalRecord.ForRetry(jobId, newDueTime, dequeueCount));
-        return ApplyRetry(jobId, newDueTime, dequeueCount);
+        Write(DurableJobShardJournalRecord.ForRetry(jobId, newDueTime, dequeueCount, executionGeneration));
+        return ApplyRetry(jobId, newDueTime, dequeueCount, executionGeneration);
     }
 
     public void MarkAsComplete()
@@ -156,7 +159,7 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
                 break;
             case DurableJobShardJournalRecordKind.Retry:
                 var retry = GetRequired(record.Retry, nameof(record.Retry));
-                ApplyRetry(retry.JobId, retry.DueTime, retry.DequeueCount);
+                ApplyRetry(retry.JobId, retry.DueTime, retry.DequeueCount, retry.ExecutionGeneration);
                 break;
             case DurableJobShardJournalRecordKind.Snapshot:
                 ApplySnapshot(GetRequired(record.Snapshot, nameof(record.Snapshot)));
@@ -195,10 +198,10 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
 
     private bool ApplyRemove(string jobId) => _jobQueue.CancelJob(jobId);
 
-    private bool ApplyRetry(string jobId, DateTimeOffset dueTime, int dequeueCount)
+    private bool ApplyRetry(string jobId, DateTimeOffset dueTime, int dequeueCount, long? executionGeneration)
     {
         ValidateDequeueCount(dequeueCount);
-        return _jobQueue.RetryJobLater(jobId, dueTime, dequeueCount);
+        return _jobQueue.RetryJobLater(jobId, dueTime, dequeueCount, executionGeneration);
     }
 
     private void ApplySnapshot(DurableJobShardSnapshot snapshot)
@@ -289,7 +292,11 @@ internal sealed class DurableJobShardJournalRecord
         };
     }
 
-    public static DurableJobShardJournalRecord ForRetry(string jobId, DateTimeOffset dueTime, int dequeueCount)
+    public static DurableJobShardJournalRecord ForRetry(
+        string jobId,
+        DateTimeOffset dueTime,
+        int dequeueCount,
+        long? executionGeneration = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
 
@@ -300,7 +307,8 @@ internal sealed class DurableJobShardJournalRecord
             {
                 JobId = jobId,
                 DueTime = dueTime,
-                DequeueCount = dequeueCount
+                DequeueCount = dequeueCount,
+                ExecutionGeneration = executionGeneration
             }
         };
     }
@@ -345,6 +353,9 @@ internal sealed class DurableJobShardRetryOperation
 
     [Id(2)]
     public int DequeueCount { get; init; }
+
+    [Id(3)]
+    public long? ExecutionGeneration { get; init; }
 }
 
 [GenerateSerializer]
