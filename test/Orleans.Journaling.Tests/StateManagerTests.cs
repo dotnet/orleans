@@ -806,6 +806,24 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task StateManager_ObserverRegisteredByStateDuringRecovery_JoinsNextRecovery()
+    {
+        var sut = CreateTestSystem();
+        var lateObserver = new RecordingStateObserver();
+        sut.Manager.RegisterState(
+            "registering",
+            new RecoveryRegisteringState(() => sut.Manager.RegisterObserver(lateObserver)));
+
+        await sut.Lifecycle.OnStart();
+
+        Assert.Equal(0, lateObserver.RecoveryCompletedCount);
+
+        await sut.Manager.RevertPendingChangesAsync(CancellationToken.None);
+
+        Assert.Equal(1, lateObserver.RecoveryCompletedCount);
+    }
+
+    [Fact]
     public async Task StateManager_PreparationFailureAbortsCaptureAndRetryPersistsPreparedState()
     {
         var storage = new CapturingStorage();
@@ -2477,6 +2495,18 @@ public class StateManagerTests : JournalingTestBase
             }
         }
 
+        public IJournaledState DeepCopy() => throw new NotSupportedException();
+    }
+
+    private sealed class RecoveryRegisteringState(Action onRecoveryCompleted) : IJournaledState
+    {
+        private Action? _onRecoveryCompleted = onRecoveryCompleted;
+
+        public void ReplayEntry(JournalEntry entry, JournalReplayContext context) { }
+        public void Reset(JournalStreamWriter writer) { }
+        public void AppendEntries(JournalStreamWriter writer) { }
+        public void AppendSnapshot(JournalStreamWriter writer) { }
+        public void OnRecoveryCompleted() => Interlocked.Exchange(ref _onRecoveryCompleted, null)?.Invoke();
         public IJournaledState DeepCopy() => throw new NotSupportedException();
     }
 
