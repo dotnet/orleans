@@ -134,10 +134,10 @@ public sealed class HandlerRoutingContractTests : IDisposable
         public RoutedMessage? Message { get; private set; }
         public IInboxHandlerContext? Context { get; private set; }
 
-        public ValueTask HandleAsync(RoutedMessage message, IInboxHandlerContext context, CancellationToken cancellationToken)
+        public ValueTask HandleAsync(RoutedMessage? message, IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             CallCount++;
-            Message = message;
+            Message = message ?? throw new InvalidOperationException("A routed message is required.");
             Context = context;
             return default;
         }
