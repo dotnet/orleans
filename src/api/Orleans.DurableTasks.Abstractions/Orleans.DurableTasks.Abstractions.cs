@@ -63,8 +63,6 @@ namespace Orleans.DurableTasks
     {
         protected DurableExecutionContext(TaskId taskId) { }
 
-        protected DurableExecutionContext(TaskId taskId, Threading.CancellationToken shutdownToken) { }
-
         public Threading.CancellationToken CancellationToken { get { throw null; } }
 
         public static DurableExecutionContext? Current { get { throw null; } }

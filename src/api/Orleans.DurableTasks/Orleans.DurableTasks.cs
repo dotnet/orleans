@@ -10,9 +10,9 @@ namespace Orleans
 {
     public static partial class TaskIdExtensions
     {
-        public static HierarchicalKey? ToHierarchicalKey(this System.Distributed.DurableTasks.TaskId taskId) { throw null; }
+        public static DurableMessaging.HierarchicalKey? ToHierarchicalKey(this System.Distributed.DurableTasks.TaskId taskId) { throw null; }
 
-        public static System.Distributed.DurableTasks.TaskId ToTaskId(this HierarchicalKey? key) { throw null; }
+        public static System.Distributed.DurableTasks.TaskId ToTaskId(this DurableMessaging.HierarchicalKey? key) { throw null; }
     }
 }
 
@@ -90,11 +90,13 @@ namespace Orleans.DurableTasks
 
         System.Threading.Tasks.ValueTask<Serialization.Invocation.Response> Serialization.Invocation.IInvokable.Invoke() { throw null; }
 
+        [System.Diagnostics.DebuggerStepThrough]
         protected override System.Threading.Tasks.ValueTask<System.Distributed.DurableTasks.DurableTaskResponse> RunAsync(System.Distributed.DurableTasks.DurableExecutionContext executionContext) { throw null; }
 
         public virtual void SetArgument(int index, object value) { }
 
         public abstract void SetTarget(Serialization.Invocation.ITargetHolder holder);
+        [System.Diagnostics.DebuggerStepThrough]
         System.Threading.Tasks.ValueTask<System.Distributed.DurableTasks.DurableTaskResponse> System.Distributed.DurableTasks.ISchedulableTask.ScheduleAsync(System.Distributed.DurableTasks.TaskId taskId, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public override string ToString() { throw null; }
@@ -107,11 +109,11 @@ namespace Orleans.DurableTasks
         [Id(0)]
         public Runtime.GrainId CallerId { get { throw null; } set { } }
 
-        [Id(1)]
-        public Runtime.GrainId TargetId { get { throw null; } set { } }
-
         [Id(3)]
         public bool SupportsDurableCompletion { get { throw null; } set { } }
+
+        [Id(1)]
+        public Runtime.GrainId TargetId { get { throw null; } set { } }
 
         [Id(2)]
         public System.Collections.Generic.Dictionary<string, byte[]>? Values { get { throw null; } set { } }
@@ -163,8 +165,10 @@ namespace Orleans.DurableTasks
 
         System.Threading.Tasks.ValueTask<Serialization.Invocation.Response> Serialization.Invocation.IInvokable.Invoke() { throw null; }
 
+        [System.Diagnostics.DebuggerStepThrough]
         protected override System.Threading.Tasks.ValueTask<System.Distributed.DurableTasks.DurableTaskResponse> RunAsync(System.Distributed.DurableTasks.DurableExecutionContext executionContext) { throw null; }
 
+        [System.Diagnostics.DebuggerStepThrough]
         public System.Threading.Tasks.ValueTask<System.Distributed.DurableTasks.DurableTaskResponse> ScheduleAsync(System.Distributed.DurableTasks.TaskId taskId, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public virtual void SetArgument(int index, object value) { }
@@ -196,9 +200,9 @@ namespace Orleans.DurableTasks
         bool RemoveTask(System.Distributed.DurableTasks.TaskId taskId);
         void RequestCancellation(System.Distributed.DurableTasks.TaskId taskId, IDurableTaskState state);
         void SetDelay(System.Distributed.DurableTasks.TaskId taskId, IDurableTaskState state, System.DateTimeOffset dueTime, long generation);
+        void SetRemoteRequest(System.Distributed.DurableTasks.TaskId taskId, IDurableTaskState state, Runtime.GrainId target, string fingerprint);
         void SetRequest(System.Distributed.DurableTasks.TaskId taskId, IDurableTaskState state, IDurableTaskRequest request);
         void SetRequestFingerprint(System.Distributed.DurableTasks.TaskId taskId, IDurableTaskState state, string fingerprint);
-        void SetRemoteRequest(System.Distributed.DurableTasks.TaskId taskId, IDurableTaskState state, Runtime.GrainId target, string fingerprint);
         void SetResponse(System.Distributed.DurableTasks.TaskId taskId, IDurableTaskState state, System.Distributed.DurableTasks.DurableTaskResponse response);
         bool TryGetTask(System.Distributed.DurableTasks.TaskId taskId, out IDurableTaskState? state);
         System.Threading.Tasks.ValueTask WriteAsync(System.Threading.CancellationToken cancellationToken);
@@ -246,13 +250,13 @@ namespace Orleans.DurableTasks
 
         System.DateTimeOffset? DueTime { get; }
 
-        IDurableTaskRequest? Request { get; }
-
-        string? RequestFingerprint { get; }
-
         string? RemoteRequestFingerprint { get; }
 
         Runtime.GrainId RemoteTarget { get; }
+
+        IDurableTaskRequest? Request { get; }
+
+        string? RequestFingerprint { get; }
 
         System.Distributed.DurableTasks.DurableTaskResponse? Result { get; }
 
@@ -322,17 +326,17 @@ namespace Orleans.Runtime.DurableTasks
 
         Orleans.DurableTasks.IDurableTaskRequest? Orleans.DurableTasks.IDurableTaskState.Request { get { throw null; } }
 
-        [Id(2)]
-        public Orleans.DurableTasks.IDurableTaskRequest? Request { get { throw null; } set { } }
-
-        [Id(9)]
-        public string? RequestFingerprint { get { throw null; } set { } }
-
         [Id(12)]
         public string? RemoteRequestFingerprint { get { throw null; } set { } }
 
         [Id(11)]
         public GrainId RemoteTarget { get { throw null; } set { } }
+
+        [Id(2)]
+        public Orleans.DurableTasks.IDurableTaskRequest? Request { get { throw null; } set { } }
+
+        [Id(9)]
+        public string? RequestFingerprint { get { throw null; } set { } }
 
         [Id(0)]
         public System.Distributed.DurableTasks.DurableTaskResponse? Result { get { throw null; } set { } }
@@ -372,11 +376,11 @@ namespace Orleans.Runtime.DurableTasks
 
         public void SetDelay(System.Distributed.DurableTasks.TaskId taskId, Orleans.DurableTasks.IDurableTaskState state, System.DateTimeOffset dueTime, long generation) { }
 
+        public void SetRemoteRequest(System.Distributed.DurableTasks.TaskId taskId, Orleans.DurableTasks.IDurableTaskState state, GrainId target, string fingerprint) { }
+
         public void SetRequest(System.Distributed.DurableTasks.TaskId taskId, Orleans.DurableTasks.IDurableTaskState state, Orleans.DurableTasks.IDurableTaskRequest request) { }
 
         public void SetRequestFingerprint(System.Distributed.DurableTasks.TaskId taskId, Orleans.DurableTasks.IDurableTaskState state, string fingerprint) { }
-
-        public void SetRemoteRequest(System.Distributed.DurableTasks.TaskId taskId, Orleans.DurableTasks.IDurableTaskState state, GrainId target, string fingerprint) { }
 
         public void SetResponse(System.Distributed.DurableTasks.TaskId taskId, Orleans.DurableTasks.IDurableTaskState state, System.Distributed.DurableTasks.DurableTaskResponse response) { }
 

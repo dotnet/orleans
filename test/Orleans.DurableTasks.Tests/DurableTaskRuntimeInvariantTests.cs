@@ -210,22 +210,111 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task StopCancelsAndDrainsExecutionWithoutPersistingShutdownAsTerminal()
+    public async Task StopDiscardsSuccessReturnedAfterCatchingExecutionShutdown()
+    {
+        var (runtime, storage, _, transport) = CreateRuntime();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var caughtShutdown = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = CreateRequest(
+            1,
+            () => DurableTask.Run(async durableCancellation =>
+            {
+                started.TrySetResult();
+                try
+                {
+                    await DurableTask.Delay(TimeSpan.FromDays(1));
+                }
+                catch (OperationCanceledException)
+                {
+                    Assert.False(durableCancellation.IsCancellationRequested);
+                    caughtShutdown.TrySetResult();
+                }
+
+                return 42;
+            }));
+        var taskId = TaskId.Parse("root");
+
+        await ((IDurableTaskServer)runtime).ScheduleAsync(taskId, request);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var stopping = runtime.StopAsync(default);
+        await caughtShutdown.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await stopping.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Null(storage.Get(taskId).Result);
+        Assert.Empty(transport.Completions);
+    }
+
+    [Fact]
+    public async Task StopDiscardsFailureProducedAfterExecutionShutdown()
+    {
+        var (runtime, storage, _, transport) = CreateRuntime();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = CreateRequest(
+            1,
+            () => DurableTask.Run(async _ =>
+            {
+                started.TrySetResult();
+                try
+                {
+                    await DurableTask.Delay(TimeSpan.FromDays(1));
+                }
+                catch (OperationCanceledException exception)
+                {
+                    throw new InvalidOperationException("Failure after shutdown.", exception);
+                }
+            }));
+        var taskId = TaskId.Parse("root");
+
+        await ((IDurableTaskServer)runtime).ScheduleAsync(taskId, request);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtime.StopAsync(default).WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Null(storage.Get(taskId).Result);
+        Assert.Empty(transport.Completions);
+    }
+
+    [Fact]
+    public async Task DurableCancellationStillTerminalizesRunningExecution()
+    {
+        var (runtime, storage, _, _) = CreateRuntime();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = CreateRequest(
+            1,
+            () => DurableTask.Run(async durableCancellation =>
+            {
+                started.TrySetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, durableCancellation);
+            }));
+        var taskId = TaskId.Parse("root");
+
+        await ((IDurableTaskServer)runtime).ScheduleAsync(taskId, request);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtime.SignalCancellationAsync(taskId, default);
+        await WaitUntilAsync(() => storage.Get(taskId).Result is { IsCompleted: true });
+
+        Assert.NotNull(storage.Get(taskId).CancellationRequestedAt);
+        Assert.Equal(DurableTaskStatus.Canceled, storage.Get(taskId).Result!.Status);
+        await runtime.StopAsync(default);
+    }
+
+    [Fact]
+    public async Task StopDrainsUncooperativeExecutionBeforeReplacementReplay()
     {
         var (runtime, storage, manager, _) = CreateRuntime();
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var active = 0;
         var maxActive = 0;
         var request = CreateRequest(
             1,
-            () => DurableTask.Run(async token =>
+            () => DurableTask.Run(async _ =>
             {
                 var count = Interlocked.Increment(ref active);
                 maxActive = Math.Max(maxActive, count);
                 started.TrySetResult();
                 try
                 {
-                    await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                    await release.Task;
                 }
                 finally
                 {
@@ -238,6 +327,8 @@ public sealed class DurableTaskRuntimeInvariantTests
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
         var firstStop = runtime.StopAsync(default);
         Assert.Same(firstStop, runtime.StopAsync(default));
+        Assert.False(firstStop.IsCompleted);
+        release.TrySetResult();
         await firstStop.WaitAsync(TimeSpan.FromSeconds(5));
 
         Assert.Equal(0, active);
@@ -246,36 +337,15 @@ public sealed class DurableTaskRuntimeInvariantTests
             () => runtime.ResumePendingTasksAsync(default));
 
         started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        release = new(TaskCreationOptions.RunContinuationsAsynchronously);
         var (replacement, _, _, _) = CreateRuntime(storage, manager);
         await replacement.ResumePendingTasksAsync(default);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(1, maxActive);
-        await replacement.StopAsync(default);
+        var replacementStop = replacement.StopAsync(default);
+        release.TrySetResult();
+        await replacementStop.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Null(storage.Get(taskId).Result);
-    }
-
-    [Fact]
-    public async Task StopDrainsAndPersistsNaturalCompletionWhichWinsShutdownRace()
-    {
-        var (runtime, storage, _, _) = CreateRuntime();
-        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var complete = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var request = CreateRequest(
-            1,
-            () => DurableTask.Run(async _ =>
-            {
-                started.TrySetResult();
-                await complete.Task;
-            }));
-        var taskId = TaskId.Parse("root");
-
-        await ((IDurableTaskServer)runtime).ScheduleAsync(taskId, request);
-        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        var stopping = runtime.StopAsync(default);
-        complete.TrySetResult();
-        await stopping.WaitAsync(TimeSpan.FromSeconds(5));
-
-        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, storage.Get(taskId).Result!.Status);
     }
 
     [Fact]
