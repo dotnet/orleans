@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
-    <IsPackable>false</IsPackable>
+    <IsPackable Condition="'$(PackUnpublishedSampleDependencies)' != 'true'">false</IsPackable>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <OrleansBuildTimeCodeGen>false</OrleansBuildTimeCodeGen>
     <EnableOrleansContractsAnalyzer>false</EnableOrleansContractsAnalyzer>
@@ -11,5 +11,9 @@
 
   <ItemGroup>
     <AssemblyAttribute Remove="Orleans.Metadata.FrameworkPartAttribute" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>

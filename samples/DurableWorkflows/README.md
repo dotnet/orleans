@@ -61,7 +61,7 @@ For manual process failover, start an approval workflow, stop its active `servic
 
 ## Publication gate
 
-This sample is stacked on the experimental packages introduced by the dependent pull requests. `Microsoft.Orleans.DurableTasks` currently depends on the incubating, non-published `System.Distributed.DurableTasks` package, so a copied folder cannot restore from NuGet until that package is published. The sample intentionally does not bypass the package boundary with source project references. In-tree sample validation uses the repository's local package feed once every dependency is packable; keep this PR draft and dependent until then.
+This sample is stacked on the experimental packages introduced by the dependent pull requests. During in-tree validation, `Build-Samples.ps1` produces a temporary local `System.Distributed.DurableTasks` package alongside the Orleans packages, preserving the package boundary while its source project remains non-packable for normal builds. A copied folder becomes independently restorable when the experimental packages are published. Keep this PR draft and dependent until publication.
 
 ## Test
 
