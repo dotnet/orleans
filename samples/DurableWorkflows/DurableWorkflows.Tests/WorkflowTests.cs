@@ -366,13 +366,18 @@ public sealed class WorkflowEndpointTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task StatusResourcesRejectInvalidIdsAndDoNotCreateMissingWorkflows()
+    public async Task StatusResourcesEscapeValidIdsAndRejectInvalidOrMissingWorkflows()
     {
+        const string reservedId = "approval?fragment#";
+        var encodedId = Uri.EscapeDataString(reservedId);
+        using var reserved = await _http.PostAsync($"/workflows/approval/{encodedId}?subject=test", null);
         using var invalidApproval = await _http.PostAsync("/workflows/approval/$invalid?subject=test", null);
         using var invalidCancellation = await _http.PostAsync("/workflows/cancellation/$invalid", null);
         using var missingApproval = await _http.GetAsync($"/workflows/approval/{UniqueId()}/status");
         using var missingCancellation = await _http.GetAsync($"/workflows/cancellation/{UniqueId()}/status");
 
+        Assert.Equal(HttpStatusCode.Accepted, reserved.StatusCode);
+        Assert.Equal($"/workflows/approval/{encodedId}/status", reserved.Headers.Location!.OriginalString);
         Assert.Equal(HttpStatusCode.BadRequest, invalidApproval.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, invalidCancellation.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, missingApproval.StatusCode);

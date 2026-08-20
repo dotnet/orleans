@@ -287,7 +287,8 @@ public static class WorkflowEndpoints
         !string.IsNullOrWhiteSpace(value) && !value.Contains('/') && !value.StartsWith('$');
 
     private static string RootId(string kind, string id) => $"{kind}-{id}";
-    private static string StatusLocation(string kind, string id) => $"/workflows/{kind}/{id}/status";
+    private static string StatusLocation(string kind, string id) =>
+        $"/workflows/{kind}/{Uri.EscapeDataString(id)}/status";
 }
 
 public sealed record ApprovalSubmission(string Subject, bool Approved, string Reason);
