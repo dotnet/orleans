@@ -50,7 +50,7 @@ public static class DurableMessagingExtensions
                     options.Validate();
                     return true;
                 }
-                catch
+                catch (ArgumentOutOfRangeException)
                 {
                     return false;
                 }
