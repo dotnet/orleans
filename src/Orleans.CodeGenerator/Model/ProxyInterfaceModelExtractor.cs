@@ -90,13 +90,12 @@ internal static class ProxyInterfaceModelExtractor
         }
 
         var proxyBaseType = proxyBaseTypeSymbol.OriginalDefinition;
-        var invokableBaseTypes = ExtractInvokableBaseTypeMappings(proxyBaseType, compilation, cancellationToken);
         var generatedClassNameComponent = isExtension ? $"{proxyBaseType.Name}_Ext" : proxyBaseType.Name;
         var proxyBase = new ProxyBaseModel(
             new TypeRef(proxyBaseType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)),
             isExtension,
             generatedClassNameComponent,
-            invokableBaseTypes);
+            TypeMetadataIdentity.Create(proxyBaseType));
 
         var name = GetProxyInterfaceName(typeSymbol, libraryTypes);
         var typeParameters = ExtractInterfaceTypeParameters(typeSymbol);
@@ -185,35 +184,6 @@ internal static class ProxyInterfaceModelExtractor
         }
 
         return true;
-    }
-
-    private static ImmutableArray<InvokableBaseTypeMapping> ExtractInvokableBaseTypeMappings(
-        INamedTypeSymbol proxyBaseType,
-        Compilation compilation,
-        CancellationToken cancellationToken)
-    {
-        var resolver = new InvokableBaseTypeResolver(compilation);
-        var mappings = new Dictionary<string, InvokableBaseTypeMapping>(StringComparer.Ordinal);
-        foreach (var mapping in resolver.GetMappingsForProxy(proxyBaseType))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var returnTypeRef = new TypeRef(mapping.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
-            var invokableBaseTypeRef = new TypeRef(mapping.InvokableBaseType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
-            mappings[returnTypeRef.SyntaxString] = new InvokableBaseTypeMapping(returnTypeRef, invokableBaseTypeRef);
-        }
-
-        if (mappings.Count == 0)
-        {
-            return [];
-        }
-
-        var builder = ImmutableArray.CreateBuilder<InvokableBaseTypeMapping>(mappings.Count);
-        foreach (var mapping in mappings.OrderBy(static m => m.Key, StringComparer.Ordinal))
-        {
-            builder.Add(mapping.Value);
-        }
-
-        return builder.MoveToImmutable();
     }
 
     private static ImmutableArray<TypeParameterModel> ExtractInterfaceTypeParameters(INamedTypeSymbol typeSymbol)

@@ -450,8 +450,10 @@ public class IncrementalCachingTests
         var updatedCompilation = compilation.ReplaceSyntaxTree(registrationTree, CSharpSyntaxTree.ParseText(registrationB));
         var (result1, result2) = await RunTwice(compilation, updatedCompilation);
 
-        AssertTrackedStepModifiedOrNew(result2, OrleansSerializationSourceGenerator.DirectProxyInterfacesTrackingName);
-        AssertTrackedStepModifiedOrNew(result2, OrleansSerializationSourceGenerator.CollectedProxyInterfacesTrackingName);
+        AssertTrackedStepsCachedOrUnchanged(
+            result2,
+            OrleansSerializationSourceGenerator.DirectProxyInterfacesTrackingName,
+            OrleansSerializationSourceGenerator.CollectedProxyInterfacesTrackingName);
         AssertTrackedStepModifiedOrNew(result2, OrleansSerializationSourceGenerator.PreparedProxyOutputsTrackingName);
         AssertTrackedStepModifiedOrNew(result2, OrleansSerializationSourceGenerator.ProxyOutputsTrackingName);
         AssertSourcesChanged(result1, result2, static hint => hint.Contains(".orleans.proxy.", StringComparison.Ordinal));

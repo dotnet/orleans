@@ -397,7 +397,11 @@ internal static class ProxySourceOutputGenerator
                 throw new InvalidOperationException($"Unable to resolve proxy interface '{model.InterfaceType.SyntaxString}'.");
             }
 
-            if (!resolver.TryResolveType(model.ProxyBase.ProxyBaseType, cancellationToken, out var proxyBaseType))
+            if (!resolver.TryResolveType(
+                model.ProxyBase.ProxyBaseType,
+                model.ProxyBase.MetadataIdentity,
+                cancellationToken,
+                out var proxyBaseType))
             {
                 throw new InvalidOperationException($"Unable to resolve proxy base type '{model.ProxyBase.ProxyBaseType.SyntaxString}'.");
             }

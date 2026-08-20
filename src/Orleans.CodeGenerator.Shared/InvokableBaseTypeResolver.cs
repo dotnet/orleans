@@ -20,7 +20,7 @@ internal sealed class InvokableBaseTypeResolver
     internal const string ReturnValueProxyAttributeMetadataName = "Orleans.Invocation.ReturnValueProxyAttribute";
     internal const string GeneratedActivatorConstructorAttributeMetadataName = "Orleans.GeneratedActivatorConstructorAttribute";
 
-    private static readonly ConditionalWeakTable<Compilation, Discovery> Discoveries = new();
+    private static readonly ConditionalWeakTable<Compilation, Lazy<Discovery>> Discoveries = new();
     private static readonly ConditionalWeakTable<Compilation, Lazy<BindingCache>> BindingCaches = new();
     private static readonly ImmutableArray<MappingMatchKind> MappingMatchKinds =
         [MappingMatchKind.Exact, MappingMatchKind.OpenGeneric];
@@ -29,11 +29,19 @@ internal sealed class InvokableBaseTypeResolver
     private readonly BindingCache _bindingCache;
     private readonly Func<INamedTypeSymbol, Lazy<bool>> _constructorBindingFactory;
     private readonly Func<InitializerBindingKey, Lazy<bool>> _initializerBindingFactory;
+    private readonly Func<IMethodSymbol, Lazy<ImmutableArray<Mapping>>> _methodMappingsFactory;
+    private readonly Func<INamedTypeSymbol, Lazy<ImmutableArray<Mapping>>> _returnTypeMappingsFactory;
+    private readonly Func<INamedTypeSymbol, Lazy<ImmutableArray<Mapping>>> _defaultMappingsFactory;
+    private readonly Func<INamedTypeSymbol, Lazy<ImmutableArray<ResolvedMapping>>> _proxyMappingsFactory;
 
     public InvokableBaseTypeResolver(Compilation compilation)
     {
         _compilation = compilation;
-        _discovery = Discoveries.GetValue(compilation, static value => Discovery.Create(value));
+        _discovery = Discoveries.GetValue(
+            compilation,
+            static value => new Lazy<Discovery>(
+                () => Discovery.Create(value),
+                LazyThreadSafetyMode.ExecutionAndPublication)).Value;
         _bindingCache = BindingCaches.GetValue(
             compilation,
             static value => new Lazy<BindingCache>(
@@ -51,6 +59,18 @@ internal sealed class InvokableBaseTypeResolver
                 key.MethodName,
                 out var isValid)
                 && isValid,
+            LazyThreadSafetyMode.ExecutionAndPublication);
+        _methodMappingsFactory = method => new Lazy<ImmutableArray<Mapping>>(
+            () => GetMethodMappingsCore(method),
+            LazyThreadSafetyMode.ExecutionAndPublication);
+        _returnTypeMappingsFactory = returnType => new Lazy<ImmutableArray<Mapping>>(
+            () => GetReturnTypeMappingsCore(returnType),
+            LazyThreadSafetyMode.ExecutionAndPublication);
+        _defaultMappingsFactory = proxyBaseType => new Lazy<ImmutableArray<Mapping>>(
+            () => GetDefaultMappingsCore(proxyBaseType),
+            LazyThreadSafetyMode.ExecutionAndPublication);
+        _proxyMappingsFactory = proxyBaseType => new Lazy<ImmutableArray<ResolvedMapping>>(
+            () => GetMappingsForProxyCore(proxyBaseType),
             LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
@@ -134,39 +154,66 @@ internal sealed class InvokableBaseTypeResolver
         out ResolverDiagnostic? diagnostic)
     {
         var returnType = method.ReturnType;
-        var candidateGroups = GetCandidateGroups(proxyBaseType, method, returnType).ToArray();
         foreach (var matchKind in MappingMatchKinds)
         {
-            foreach (var source in candidateGroups)
+            var status = TryResolveCandidateGroup(
+                MappingKind.Method,
+                GetMethodMappings(method),
+                proxyBaseType,
+                proxyInterface,
+                method,
+                returnType,
+                matchKind,
+                out invokableBaseType,
+                out diagnostic);
+            if (status != CandidateResolutionStatus.NoMatch)
             {
-                var matching = GetMatches(source.Mappings, proxyBaseType, returnType, matchKind);
-                if (matching.Count == 0)
-                {
-                    continue;
-                }
+                return status == CandidateResolutionStatus.Success;
+            }
 
-                if (!TryCoalesce(matching, out var mapping, out diagnostic))
-                {
-                    invokableBaseType = null;
-                    return false;
-                }
+            status = TryResolveCandidateGroup(
+                MappingKind.ReturnType,
+                GetReturnTypeMappings(returnType),
+                proxyBaseType,
+                proxyInterface,
+                method,
+                returnType,
+                matchKind,
+                out invokableBaseType,
+                out diagnostic);
+            if (status != CandidateResolutionStatus.NoMatch)
+            {
+                return status == CandidateResolutionStatus.Success;
+            }
 
-                if (source.Kind == MappingKind.Assembly
-                    && IsBuiltInReplacement(proxyBaseType, returnType, mapping!, out var defaultMapping))
-                {
-                    invokableBaseType = null;
-                    diagnostic = CreateDiagnostic(
-                        mapping!,
-                        $"Assembly registration for return type '{Display(returnType)}' cannot replace proxy default '{Display(defaultMapping!.InvokableBaseType)}' with '{Display(mapping!.InvokableBaseType)}'.");
-                    return false;
-                }
+            status = TryResolveCandidateGroup(
+                MappingKind.Assembly,
+                _discovery.AssemblyMappings,
+                proxyBaseType,
+                proxyInterface,
+                method,
+                returnType,
+                matchKind,
+                out invokableBaseType,
+                out diagnostic);
+            if (status != CandidateResolutionStatus.NoMatch)
+            {
+                return status == CandidateResolutionStatus.Success;
+            }
 
-                if (!TryConstructAndValidate(proxyBaseType, proxyInterface, method, returnType, mapping!, out invokableBaseType, out diagnostic))
-                {
-                    return false;
-                }
-
-                return true;
+            status = TryResolveCandidateGroup(
+                MappingKind.Default,
+                GetDefaultMappings(proxyBaseType),
+                proxyBaseType,
+                proxyInterface,
+                method,
+                returnType,
+                matchKind,
+                out invokableBaseType,
+                out diagnostic);
+            if (status != CandidateResolutionStatus.NoMatch)
+            {
+                return status == CandidateResolutionStatus.Success;
             }
         }
 
@@ -179,11 +226,20 @@ internal sealed class InvokableBaseTypeResolver
     }
 
     public ImmutableArray<ResolvedMapping> GetMappingsForProxy(INamedTypeSymbol proxyBaseType)
+        => _bindingCache.ProxyMappings.GetOrAdd(
+            proxyBaseType.OriginalDefinition,
+            _proxyMappingsFactory).Value;
+
+    private ImmutableArray<ResolvedMapping> GetMappingsForProxyCore(INamedTypeSymbol proxyBaseType)
     {
-        var result = new Dictionary<string, ResolvedMapping>(StringComparer.Ordinal);
+        var result = new Dictionary<INamedTypeSymbol, ResolvedMapping>(SymbolEqualityComparer.Default);
         Add(_discovery.AssemblyMappings);
         Add(GetDefaultMappings(proxyBaseType));
-        return [.. result.Values.OrderBy(static value => value.ReturnTypeName, StringComparer.Ordinal)];
+        return [.. result.Values
+            .OrderBy(static value => value.ReturnTypeName, StringComparer.Ordinal)
+            .ThenBy(static value => value.ReturnType.ContainingAssembly.Identity.GetDisplayName(), StringComparer.Ordinal)
+            .ThenBy(static value => value.InvokableBaseTypeName, StringComparer.Ordinal)
+            .ThenBy(static value => value.InvokableBaseType.ContainingAssembly.Identity.GetDisplayName(), StringComparer.Ordinal)];
 
         void Add(ImmutableArray<Mapping> mappings)
         {
@@ -194,10 +250,9 @@ internal sealed class InvokableBaseTypeResolver
                     continue;
                 }
 
-                var key = Display(mapping.ReturnType);
-                if (!result.ContainsKey(key))
+                if (!result.ContainsKey(mapping.ReturnType))
                 {
-                    result.Add(key, new ResolvedMapping(
+                    result.Add(mapping.ReturnType, new ResolvedMapping(
                         mapping.ReturnType,
                         mapping.InvokableBaseType,
                         Display(mapping.ReturnType),
@@ -207,15 +262,59 @@ internal sealed class InvokableBaseTypeResolver
         }
     }
 
-    private IEnumerable<CandidateGroup> GetCandidateGroups(INamedTypeSymbol proxyBaseType, IMethodSymbol method, ITypeSymbol returnType)
+    private CandidateResolutionStatus TryResolveCandidateGroup(
+        MappingKind kind,
+        ImmutableArray<Mapping> mappings,
+        INamedTypeSymbol proxyBaseType,
+        INamedTypeSymbol? proxyInterface,
+        IMethodSymbol method,
+        ITypeSymbol returnType,
+        MappingMatchKind matchKind,
+        out INamedTypeSymbol? invokableBaseType,
+        out ResolverDiagnostic? diagnostic)
     {
-        yield return new(MappingKind.Method, GetMethodMappings(method));
-        yield return new(MappingKind.ReturnType, GetReturnTypeMappings(returnType));
-        yield return new(MappingKind.Assembly, _discovery.AssemblyMappings);
-        yield return new(MappingKind.Default, GetDefaultMappings(proxyBaseType));
+        var matching = GetMatches(mappings, proxyBaseType, returnType, matchKind);
+        if (matching is null)
+        {
+            invokableBaseType = null;
+            diagnostic = null;
+            return CandidateResolutionStatus.NoMatch;
+        }
+
+        if (!TryCoalesce(matching, out var mapping, out diagnostic))
+        {
+            invokableBaseType = null;
+            return CandidateResolutionStatus.Failure;
+        }
+
+        if (kind == MappingKind.Assembly
+            && IsBuiltInReplacement(proxyBaseType, returnType, mapping!, out var defaultMapping))
+        {
+            invokableBaseType = null;
+            diagnostic = CreateDiagnostic(
+                mapping!,
+                $"Assembly registration for return type '{Display(returnType)}' cannot replace proxy default '{Display(defaultMapping!.InvokableBaseType)}' with '{Display(mapping!.InvokableBaseType)}'.");
+            return CandidateResolutionStatus.Failure;
+        }
+
+        return TryConstructAndValidate(
+            proxyBaseType,
+            proxyInterface,
+            method,
+            returnType,
+            mapping!,
+            out invokableBaseType,
+            out diagnostic)
+            ? CandidateResolutionStatus.Success
+            : CandidateResolutionStatus.Failure;
     }
 
     private ImmutableArray<Mapping> GetMethodMappings(IMethodSymbol method)
+        => _bindingCache.MethodMappings.GetOrAdd(
+            method.OriginalDefinition,
+            _methodMappingsFactory).Value;
+
+    private ImmutableArray<Mapping> GetMethodMappingsCore(IMethodSymbol method)
     {
         var builder = ImmutableArray.CreateBuilder<Mapping>();
         foreach (var appliedAttribute in method.GetAttributes())
@@ -236,14 +335,26 @@ internal sealed class InvokableBaseTypeResolver
             return [];
         }
 
+        return _bindingCache.ReturnTypeMappings.GetOrAdd(
+            named.OriginalDefinition,
+            _returnTypeMappingsFactory).Value;
+    }
+
+    private ImmutableArray<Mapping> GetReturnTypeMappingsCore(INamedTypeSymbol returnType)
+    {
         var builder = ImmutableArray.CreateBuilder<Mapping>();
-        AddMappings(named.OriginalDefinition.GetAttributes(), MappingKind.ReturnType, builder);
+        AddMappings(returnType.GetAttributes(), MappingKind.ReturnType, builder);
         return Sort(builder);
     }
 
     private ImmutableArray<Mapping> GetDefaultMappings(INamedTypeSymbol proxyBaseType)
+        => _bindingCache.DefaultMappings.GetOrAdd(
+            proxyBaseType.OriginalDefinition,
+            _defaultMappingsFactory).Value;
+
+    private ImmutableArray<Mapping> GetDefaultMappingsCore(INamedTypeSymbol proxyBaseType)
     {
-        var attributeType = _compilation.GetTypeByMetadataName(DefaultInvokableBaseTypeAttributeMetadataName);
+        var attributeType = _bindingCache.DefaultInvokableBaseTypeAttribute;
         if (attributeType is null)
         {
             return [];
@@ -277,7 +388,7 @@ internal sealed class InvokableBaseTypeResolver
         MappingKind kind,
         ImmutableArray<Mapping>.Builder builder)
     {
-        var attributeType = _compilation.GetTypeByMetadataName(InvokableBaseTypeAttributeMetadataName);
+        var attributeType = _bindingCache.InvokableBaseTypeAttribute;
         if (attributeType is null)
         {
             return;
@@ -304,21 +415,21 @@ internal sealed class InvokableBaseTypeResolver
         }
     }
 
-    private static List<Mapping> GetBestMatches(ImmutableArray<Mapping> mappings, INamedTypeSymbol proxyBaseType, ITypeSymbol returnType)
+    private static List<Mapping>? GetBestMatches(ImmutableArray<Mapping> mappings, INamedTypeSymbol proxyBaseType, ITypeSymbol returnType)
     {
         var exact = GetMatches(mappings, proxyBaseType, returnType, MappingMatchKind.Exact);
-        return exact.Count > 0
+        return exact is not null
             ? exact
             : GetMatches(mappings, proxyBaseType, returnType, MappingMatchKind.OpenGeneric);
     }
 
-    private static List<Mapping> GetMatches(
+    private static List<Mapping>? GetMatches(
         ImmutableArray<Mapping> mappings,
         INamedTypeSymbol proxyBaseType,
         ITypeSymbol returnType,
         MappingMatchKind matchKind)
     {
-        var result = new List<Mapping>();
+        List<Mapping>? result = null;
         foreach (var mapping in mappings)
         {
             if (!SymbolEqualityComparer.Default.Equals(mapping.ProxyBaseType.OriginalDefinition, proxyBaseType.OriginalDefinition))
@@ -329,7 +440,7 @@ internal sealed class InvokableBaseTypeResolver
             if (matchKind == MappingMatchKind.Exact
                 && SymbolEqualityComparer.Default.Equals(mapping.ReturnType, returnType))
             {
-                result.Add(mapping);
+                (result ??= []).Add(mapping);
             }
             else if (matchKind == MappingMatchKind.OpenGeneric
                 && returnType is INamedTypeSymbol namedReturnType
@@ -337,7 +448,7 @@ internal sealed class InvokableBaseTypeResolver
                 && mapping.ReturnType.IsUnboundGenericType
                 && SymbolEqualityComparer.Default.Equals(mapping.ReturnType.OriginalDefinition, namedReturnType.OriginalDefinition))
             {
-                result.Add(mapping);
+                (result ??= []).Add(mapping);
             }
         }
 
@@ -373,7 +484,7 @@ internal sealed class InvokableBaseTypeResolver
     private bool IsBuiltInReplacement(INamedTypeSymbol proxyBaseType, ITypeSymbol returnType, Mapping mapping, out Mapping? defaultMapping)
     {
         var defaults = GetBestMatches(GetDefaultMappings(proxyBaseType), proxyBaseType, returnType);
-        if (defaults.Count == 0)
+        if (defaults is null)
         {
             defaultMapping = null;
             return false;
@@ -645,7 +756,7 @@ internal sealed class InvokableBaseTypeResolver
 
     private bool HasUsableConstructorCore(INamedTypeSymbol baseType)
     {
-        var generatedActivatorConstructorAttribute = _compilation.GetTypeByMetadataName(GeneratedActivatorConstructorAttributeMetadataName);
+        var generatedActivatorConstructorAttribute = _bindingCache.GeneratedActivatorConstructorAttribute;
         var generatedActivatorConstructor = generatedActivatorConstructorAttribute is null
             ? null
             : GetConstructorsInGeneratorOrder(baseType).FirstOrDefault(constructor =>
@@ -703,7 +814,7 @@ internal sealed class InvokableBaseTypeResolver
         Mapping mapping,
         out ResolverDiagnostic? diagnostic)
     {
-        var returnValueProxyAttribute = _compilation.GetTypeByMetadataName(ReturnValueProxyAttributeMetadataName);
+        var returnValueProxyAttribute = _bindingCache.ReturnValueProxyAttribute;
         var attribute = returnValueProxyAttribute is null
             ? null
             : baseType.GetAttributes().FirstOrDefault(candidate =>
@@ -1039,9 +1150,10 @@ internal sealed class InvokableBaseTypeResolver
         => $"{assembly?.Identity}|{attribute.ApplicationSyntaxReference?.SyntaxTree.FilePath}|{attribute.ApplicationSyntaxReference?.Span.Start ?? -1}";
 
     private static ImmutableArray<Mapping> Sort(ImmutableArray<Mapping>.Builder builder)
-        => [.. builder.OrderBy(static mapping => mapping, MappingComparer.Instance)];
-
-    private readonly record struct CandidateGroup(MappingKind Kind, ImmutableArray<Mapping> Mappings);
+    {
+        builder.Sort(MappingComparer.Instance);
+        return builder.ToImmutable();
+    }
 
     private readonly record struct InitializerBindingKey(
         INamedTypeSymbol ProxyBaseType,
@@ -1072,10 +1184,21 @@ internal sealed class InvokableBaseTypeResolver
         OpenGeneric,
     }
 
+    private enum CandidateResolutionStatus
+    {
+        NoMatch,
+        Success,
+        Failure,
+    }
+
     private sealed class BindingCache
     {
         public BindingCache(Compilation compilation)
         {
+            InvokableBaseTypeAttribute = compilation.GetTypeByMetadataName(InvokableBaseTypeAttributeMetadataName);
+            DefaultInvokableBaseTypeAttribute = compilation.GetTypeByMetadataName(DefaultInvokableBaseTypeAttributeMetadataName);
+            GeneratedActivatorConstructorAttribute = compilation.GetTypeByMetadataName(GeneratedActivatorConstructorAttributeMetadataName);
+            ReturnValueProxyAttribute = compilation.GetTypeByMetadataName(ReturnValueProxyAttributeMetadataName);
             ParseOptions = compilation.SyntaxTrees
                 .Select(static tree => tree.Options)
                 .OfType<CSharpParseOptions>()
@@ -1088,6 +1211,22 @@ internal sealed class InvokableBaseTypeResolver
         public ConcurrentDictionary<InitializerBindingKey, Lazy<bool>> InitializerBindings { get; } =
             new(InitializerBindingKeyComparer.Instance);
 
+        public ConcurrentDictionary<IMethodSymbol, Lazy<ImmutableArray<Mapping>>> MethodMappings { get; } =
+            new(SymbolEqualityComparer.Default);
+
+        public ConcurrentDictionary<INamedTypeSymbol, Lazy<ImmutableArray<Mapping>>> ReturnTypeMappings { get; } =
+            new(SymbolEqualityComparer.Default);
+
+        public ConcurrentDictionary<INamedTypeSymbol, Lazy<ImmutableArray<Mapping>>> DefaultMappings { get; } =
+            new(SymbolEqualityComparer.Default);
+
+        public ConcurrentDictionary<INamedTypeSymbol, Lazy<ImmutableArray<ResolvedMapping>>> ProxyMappings { get; } =
+            new(SymbolEqualityComparer.Default);
+
+        public INamedTypeSymbol? InvokableBaseTypeAttribute { get; }
+        public INamedTypeSymbol? DefaultInvokableBaseTypeAttribute { get; }
+        public INamedTypeSymbol? GeneratedActivatorConstructorAttribute { get; }
+        public INamedTypeSymbol? ReturnValueProxyAttribute { get; }
         public CSharpParseOptions? ParseOptions { get; }
     }
 

@@ -529,7 +529,7 @@ public record DemoRecord([Id(42)] string Value);
     }
 
     [Fact]
-    public async Task ExtractProxyInterfaceModel_ProxyBase_IncludesInvokableBaseMappings()
+    public async Task ExtractProxyInterfaceModel_ProxyBase_IncludesMetadataIdentity()
     {
         const string code = """
             using Orleans;
@@ -547,11 +547,9 @@ public record DemoRecord([Id(42)] string Value);
         var compilation = await CreateCompilation(code);
         var model = ExtractProxyInterfaceModel(compilation, "TestProject.ITestGrain");
 
-        Assert.NotEmpty(model.ProxyBase.InvokableBaseTypes);
-        Assert.Contains(
-            model.ProxyBase.InvokableBaseTypes,
-            mapping => mapping.ReturnType.SyntaxString.Contains("ValueTask", StringComparison.Ordinal)
-                && mapping.InvokableBaseType.SyntaxString.Contains("Request", StringComparison.Ordinal));
+        Assert.Equal("Orleans.Runtime.GrainReference", model.ProxyBase.MetadataIdentity.MetadataName);
+        Assert.Equal("Orleans.Core.Abstractions", model.ProxyBase.MetadataIdentity.AssemblyName);
+        Assert.False(string.IsNullOrEmpty(model.ProxyBase.MetadataIdentity.AssemblyIdentity));
     }
 
     [Fact]
