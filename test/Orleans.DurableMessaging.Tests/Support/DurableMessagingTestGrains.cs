@@ -18,6 +18,7 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
     Task SetInboxJobIdAsync(string jobId);
     [AlwaysInterleave] Task DeactivateOnNextRecoveryAsync();
     Task<DuplicateRouteRegistrationResult> RegisterDuplicateExactRouteHandlersAsync(string route);
+    Task<RouteLookupValidationResult> ValidateRouteLookupAsync(string? route);
     [AlwaysInterleave] Task<DurableEndpointSnapshot> GetSnapshotAsync();
     Task RequestDeactivationAsync();
 }
@@ -26,6 +27,11 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
 public sealed record DuplicateRouteRegistrationResult(
     [property: Id(0)] string ExceptionMessage,
     [property: Id(1)] bool LookupRetainedFirstHandler);
+
+[GenerateSerializer, Immutable]
+public sealed record RouteLookupValidationResult(
+    [property: Id(0)] string HasHandlerParameterName,
+    [property: Id(1)] string TryGetHandlerParameterName);
 
 [GenerateSerializer, Immutable]
 public sealed record DurableTestMessage(
@@ -179,6 +185,15 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         var exception = GetDuplicateRegistrationException(route, replacement);
         var retained = _inbox.TryGetHandler(route, out var cached) && ReferenceEquals(first, cached);
         return Task.FromResult(new DuplicateRouteRegistrationResult(exception.Message, retained));
+    }
+
+    public Task<RouteLookupValidationResult> ValidateRouteLookupAsync(string? route)
+    {
+        var hasHandlerParameterName = GetRouteLookupExceptionParameterName(() => _inbox.HasHandler(route!));
+        var tryGetHandlerParameterName = GetRouteLookupExceptionParameterName(() => _inbox.TryGetHandler(route!, out _));
+        return Task.FromResult(new RouteLookupValidationResult(
+            hasHandlerParameterName,
+            tryGetHandlerParameterName));
     }
 
     public Task<DurableEndpointSnapshot> GetSnapshotAsync() => Task.FromResult(CreateSnapshot());
@@ -353,5 +368,20 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         }
 
         throw new InvalidOperationException("Duplicate exact route registration did not throw.");
+    }
+
+    private static string GetRouteLookupExceptionParameterName(Func<bool> lookup)
+    {
+        try
+        {
+            lookup();
+        }
+        catch (ArgumentException exception)
+        {
+            return exception.ParamName
+                ?? throw new InvalidOperationException("Invalid route lookup exception did not identify its parameter.");
+        }
+
+        throw new InvalidOperationException("Invalid route lookup did not throw.");
     }
 }
