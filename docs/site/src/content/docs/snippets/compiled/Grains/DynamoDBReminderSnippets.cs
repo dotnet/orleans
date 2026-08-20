@@ -28,6 +28,7 @@ internal static class DynamoDBReminderConfiguration
                 options.TableName = "OrleansReminders";
                 options.UseProvisionedThroughput = false;
                 options.CreateIfNotExists = false;
+                options.UpdateIfExists = false;
             });
         // </configure_dynamodb_reminders>
     }

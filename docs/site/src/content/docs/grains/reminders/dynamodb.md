@@ -11,7 +11,7 @@ Install the [`Microsoft.Orleans.Reminders.DynamoDB`](https://www.nuget.org/packa
 
 A silo which uses DynamoDB for both membership and reminders configures the providers independently:
 
-:::code language="csharp" source="../snippets/compiled/Grains/DynamoDBReminderSnippets.cs" id="configure_dynamodb_reminders":::
+:::code language="csharp" source="../../snippets/compiled/Grains/DynamoDBReminderSnippets.cs" id="configure_dynamodb_reminders":::
 
 <xref:Orleans.Configuration.DynamoDBClusteringOptions> and <xref:Orleans.Configuration.DynamoDBReminderStorageOptions> are separate typed options. Set the AWS region through each options instance, as shown above. A silo which uses another membership provider configures that provider alongside <xref:Orleans.Hosting.DynamoDBSiloBuilderReminderExtensions.UseDynamoDBReminderService*>.
 
