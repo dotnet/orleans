@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -16,7 +15,6 @@ using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 using static Orleans.Internal.StandardExtensions;
 
-#nullable disable
 namespace Orleans
 {
     internal partial class OutsideRuntimeClient : IRuntimeClient, IDisposable, IClusterConnectionStatusListener
@@ -27,7 +25,7 @@ namespace Orleans
         private readonly ClientMessagingOptions clientMessagingOptions;
 
         private readonly StripedCallbackDictionary<CallbackData> callbacks;
-        private InvokableObjectManager localObjects;
+        private InvokableObjectManager? localObjects;
         private int _isStopping;
         private bool disposing;
         private bool disposed;
@@ -35,35 +33,35 @@ namespace Orleans
         private readonly MessagingTrace messagingTrace;
         private readonly InterfaceToImplementationMappingCache _interfaceToImplementationMapping;
         private readonly ApplicationRequestInstruments _applicationRequestInstruments;
-        private IGrainCallCancellationManager _cancellationManager;
-        private IClusterConnectionStatusObserver[] _statusObservers;
+        private IGrainCallCancellationManager? _cancellationManager;
+        private IClusterConnectionStatusObserver[]? _statusObservers;
 
-        public IInternalGrainFactory InternalGrainFactory { get; private set; }
+        public IInternalGrainFactory InternalGrainFactory { get; private set; } = null!;
 
-        private ClientClusterManifestProvider _manifestProvider;
-        private MessageFactory messageFactory;
+        private ClientClusterManifestProvider? _manifestProvider;
+        private MessageFactory? messageFactory;
         private readonly LocalClientDetails _localClientDetails;
         private readonly ILoggerFactory loggerFactory;
 
         private readonly SharedCallbackData sharedCallbackData;
         private readonly PeriodicTimer callbackTimer;
-        private Task callbackTimerTask;
+        private Task? callbackTimerTask;
 
         public GrainAddress CurrentActivationAddress
         {
             get;
             private set;
-        }
-        public ClientGatewayObserver gatewayObserver { get; private set; }
+        } = null!;
+        public ClientGatewayObserver? gatewayObserver { get; private set; }
 
         public string CurrentActivationIdentity
         {
             get { return CurrentActivationAddress.ToString(); }
         }
 
-        public IGrainReferenceRuntime GrainReferenceRuntime { get; private set; }
+        public IGrainReferenceRuntime GrainReferenceRuntime { get; private set; } = null!;
 
-        internal ClientMessageCenter MessageCenter { get; private set; }
+        internal ClientMessageCenter? MessageCenter { get; private set; }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
@@ -158,6 +156,9 @@ namespace Orleans
         {
             Volatile.Write(ref _isStopping, 1);
             this.callbackTimer.Dispose();
+
+            // Fault callbacks before any cancellation-sensitive waits. Completing them can resume code
+            // which issues follow-up calls, so request admission must already be closed.
             BreakOutstandingMessages();
 
             if (this.callbackTimerTask is { } task)
@@ -192,20 +193,20 @@ namespace Orleans
             MessageCenter = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider);
             MessageCenter.RegisterLocalMessageHandler(this.HandleMessage);
             await ExecuteWithRetries(
-                async () => await MessageCenter.StartAsync(cancellationToken),
+                async () => await MessageCenter!.StartAsync(cancellationToken),
                 retryFilter,
                 cancellationToken);
             CurrentActivationAddress = GrainAddress.NewActivationAddress(MessageCenter.MyAddress, _localClientDetails.ClientId.GrainId);
 
             this.gatewayObserver = new ClientGatewayObserver(gatewayManager);
-            this.InternalGrainFactory.CreateObjectReference<IClientGatewayObserver>(this.gatewayObserver);
+            this.InternalGrainFactory.CreateObjectReference<IClientGatewayObserver>(this.gatewayObserver!);
 
             await ExecuteWithRetries(
-                _manifestProvider.StartAsync,
+                _manifestProvider!.StartAsync,
                 retryFilter,
                 cancellationToken);
 
-            static async Task ExecuteWithRetries(Func<Task> task, IClientConnectionRetryFilter retryFilter, CancellationToken cancellationToken)
+            static async Task ExecuteWithRetries(Func<Task> task, IClientConnectionRetryFilter? retryFilter, CancellationToken cancellationToken)
             {
                 do
                 {
@@ -239,7 +240,7 @@ namespace Orleans
                 case Message.Directions.OneWay:
                 case Message.Directions.Request:
                     {
-                        this.localObjects.Dispatch(message);
+                        this.localObjects!.Dispatch(message);
                         break;
                     }
                 default:
@@ -251,19 +252,19 @@ namespace Orleans
         public void SendResponse(Message request, Response response)
         {
             ThrowIfDisposed();
-            var message = this.messageFactory.CreateResponseMessage(request);
+            var message = this.messageFactory!.CreateResponseMessage(request);
             OrleansOutsideRuntimeClientEvent.Instance.SendResponse(message);
             message.BodyObject = response;
 
-            MessageCenter.SendMessage(message);
+            MessageCenter!.SendMessage(message);
         }
 
-        public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource context, InvokeMethodOptions options)
+        public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource? context, InvokeMethodOptions options)
         {
             ThrowIfDisposed();
             var cancellationToken = request.GetCancellationToken();
             cancellationToken.ThrowIfCancellationRequested();
-            var message = this.messageFactory.CreateMessage(request, options);
+            var message = this.messageFactory!.CreateMessage(request, options);
             OrleansOutsideRuntimeClientEvent.Instance.SendRequest(message);
 
             message.InterfaceType = target.InterfaceType;
@@ -288,7 +289,7 @@ namespace Orleans
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(this.sharedCallbackData, context, message, _applicationRequestInstruments);
+                var callbackData = new CallbackData(this.sharedCallbackData, context!, message, _applicationRequestInstruments);
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
@@ -314,7 +315,7 @@ namespace Orleans
             }
 
             LogSendingMessage(logger, message);
-            MessageCenter.SendMessage(message);
+            MessageCenter!.SendMessage(message);
         }
 
         public void ReceiveResponse(Message response)
@@ -325,12 +326,12 @@ namespace Orleans
 
             if (response.Result is Message.ResponseTypes.Status)
             {
-                var status = (StatusResponse)response.BodyObject;
+                var status = (StatusResponse)response.BodyObject!;
                 callbacks.TryGetValue(response.Id, out var callback);
                 var request = callback?.Message;
                 if (request is not null)
                 {
-                    callback.OnStatusUpdate(status);
+                    callback!.OnStatusUpdate(status);
                     if (status.Diagnostics != null && status.Diagnostics.Count > 0)
                     {
                         LogReceivedStatusUpdateForPendingRequest(logger, request, new(status.Diagnostics));
@@ -358,14 +359,14 @@ namespace Orleans
                 return;
             }
 
-            CallbackData callbackData;
+            CallbackData? callbackData;
             var found = callbacks.TryRemove(response.Id, out callbackData);
             if (found)
             {
                 // We need to import the RequestContext here as well.
                 // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
                 // RequestContextExtensions.Import(response.RequestContextData);
-                callbackData.DoCallback(response);
+                callbackData!.DoCallback(response);
             }
             else
             {
@@ -402,7 +403,7 @@ namespace Orleans
                 : ObserverGrainId.Create(_localClientDetails.ClientId);
             var reference = this.InternalGrainFactory.GetGrain(observerId.GrainId);
 
-            if (!localObjects.TryRegister(obj, observerId))
+            if (!localObjects!.TryRegister(obj, observerId))
             {
                 throw new ArgumentException($"Failed to add new observer {reference} to localObjects collection.", nameof(obj));
             }
@@ -422,7 +423,7 @@ namespace Orleans
                 throw new ArgumentException($"Reference {reference.GrainId} is not an observer reference");
             }
 
-            if (!localObjects.TryDeregister(observerId))
+            if (!localObjects!.TryDeregister(observerId))
             {
                 throw new ArgumentException("Reference is not associated with a local object.", nameof(obj));
             }
@@ -475,7 +476,7 @@ namespace Orleans
         /// <inheritdoc />
         public void NotifyClusterConnectionLost()
         {
-            foreach (var observer in _statusObservers)
+            foreach (var observer in _statusObservers!)
             {
                 try
                 {
@@ -491,7 +492,7 @@ namespace Orleans
         /// <inheritdoc />
         public void NotifyGatewayCountChanged(int currentNumberOfGateways, int previousNumberOfGateways)
         {
-            foreach (var observer in _statusObservers)
+            foreach (var observer in _statusObservers!)
             {
                 try
                 {

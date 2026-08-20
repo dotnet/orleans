@@ -3,6 +3,7 @@ using System;
 using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 namespace Orleans.Runtime;
@@ -13,6 +14,7 @@ namespace Orleans.Runtime;
 /// </summary>
 /// <typeparam name="TValue">The type of values stored in the dictionary.</typeparam>
 internal sealed class StripedCallbackDictionary<TValue> : IEnumerable<KeyValuePair<CorrelationId, TValue>>
+    where TValue : notnull
 {
     /// <summary>
     /// The number of bits used to identify the stripe (stored in the upper bits of the CorrelationId).
@@ -104,7 +106,7 @@ internal sealed class StripedCallbackDictionary<TValue> : IEnumerable<KeyValuePa
     /// Attempts to get the value associated with the specified key.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryGetValue(CorrelationId key, out TValue? value)
+    public bool TryGetValue(CorrelationId key, [NotNullWhen(true)] out TValue? value)
     {
         var stripe = GetStripe(key);
         lock (stripe.Lock)
@@ -117,7 +119,7 @@ internal sealed class StripedCallbackDictionary<TValue> : IEnumerable<KeyValuePa
     /// Attempts to remove the value with the specified key.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryRemove(CorrelationId key, out TValue? value)
+    public bool TryRemove(CorrelationId key, [NotNullWhen(true)] out TValue? value)
     {
         var stripe = GetStripe(key);
         lock (stripe.Lock)
@@ -263,7 +265,9 @@ internal sealed class StripedCallbackDictionary<TValue> : IEnumerable<KeyValuePa
         {
             if (_currentSnapshot is { } snapshot)
             {
-                ArrayPool<KeyValuePair<CorrelationId, TValue>>.Shared.Return(snapshot, clearArray: true);
+                ArrayPool<KeyValuePair<CorrelationId, TValue>>.Shared.Return(
+                    snapshot,
+                    clearArray: RuntimeHelpers.IsReferenceOrContainsReferences<KeyValuePair<CorrelationId, TValue>>());
                 _currentSnapshot = null;
                 _snapshotCount = 0;
             }
