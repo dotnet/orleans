@@ -99,7 +99,6 @@ public abstract class RoutePrefixHandler : IInboxHandler
     /// <exception cref="ArgumentException">Thrown when <paramref name="prefix"/> is empty or whitespace.</exception>
     protected RoutePrefixHandler(string prefix)
     {
-        ArgumentNullException.ThrowIfNull(prefix);
         ArgumentException.ThrowIfNullOrWhiteSpace(prefix);
 
         // Normalize prefix to always end with '/' for proper boundary matching

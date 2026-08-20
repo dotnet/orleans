@@ -218,6 +218,7 @@ public interface IInboxHandler<TMessage> : IInboxHandler
             return HandleAsync(typed, context, cancellationToken);
         }
 
-        throw new InvalidOperationException($"Failed to deserialize message body as {typeof(TMessage).Name}");
+        throw new InvalidOperationException(
+            $"Failed to deserialize message body for route '{context.Envelope.RouteKey}' as '{typeof(TMessage).FullName}'.");
     }
 }
