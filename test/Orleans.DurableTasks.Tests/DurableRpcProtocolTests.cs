@@ -64,6 +64,18 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
+    public void TaskIdsRoundTripThroughDurableMessagingCorrelationKeys()
+    {
+        var taskId = TaskId.Parse("workflow/child");
+
+        Orleans.DurableMessaging.HierarchicalKey? correlationKey = taskId.ToHierarchicalKey();
+
+        Assert.NotNull(correlationKey);
+        Assert.Equal(taskId, correlationKey.ToTaskId());
+        Assert.Equal(TaskId.None, ((Orleans.DurableMessaging.HierarchicalKey?)null).ToTaskId());
+    }
+
+    [Fact]
     public void CompletionWaiterRemainsUntilAcknowledgedAndTombstoneRetainsIdentity()
     {
         var destination = GrainId.Create("caller", "one");

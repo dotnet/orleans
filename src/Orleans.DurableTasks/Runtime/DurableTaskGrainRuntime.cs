@@ -39,7 +39,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     private readonly IJournaledStateManager _stateManager = stateManager;
     private readonly CancellationTokenSource _deactivationCts = new();
     private Task? _stopTask;
-    private bool _stopping;
+    private volatile bool _stopping;
 
     private GrainId GrainId => _shared.GrainContextAccessor.GrainContext.GrainId;
 
@@ -649,11 +649,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         try
         {
-            var isShutdownCancellation = _stopping
-                && response.Status == DurableTaskStatus.Canceled
-                && (!_storage.TryGetTask(context.TaskId, out var durableState)
-                    || !durableState.CancellationRequestedAt.HasValue);
-            if (response.IsCompleted && !isShutdownCancellation)
+            if (response.IsCompleted && !_stopping)
             {
                 await SetResponseAsync(context.TaskId, response, CancellationToken.None);
             }
@@ -1029,7 +1025,8 @@ internal sealed partial class DurableTaskGrainRuntime(
             }
 
             // Abandoning the drain would allow a replacement activation to overlap this one.
-            // The lifecycle token triggers shutdown, but completion waits for every execution to observe it.
+            // Adapter-controlled waits observe the lifecycle token. Arbitrary user code can ignore it, so
+            // deactivation deliberately waits for every execution before replacement replay can begin.
             await Task.WhenAll(running);
         }
     }

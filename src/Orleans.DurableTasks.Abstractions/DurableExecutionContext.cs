@@ -8,21 +8,14 @@ public abstract class DurableExecutionContext
     private const char GeneratedSegmentPrefix = '$';
     private static readonly AsyncLocal<DurableExecutionContext?> AmbientContext = new();
     private readonly object _lock = new();
-    private readonly CancellationTokenSource _cancellationSource;
+    private readonly CancellationTokenSource _cancellationSource = new();
     private List<CancellationRegistration>? _registrations;
     private CancellationOperation? _cancellationOperation;
     private bool _cancellationRequested;
     private long _nextChildId;
     private long _nextOperationId;
 
-    protected DurableExecutionContext(TaskId taskId) : this(taskId, default)
-    {
-    }
-
-    /// <summary>Initializes an execution context which also stops when the host activation stops.</summary>
-    /// <param name="taskId">The durable task identifier.</param>
-    /// <param name="shutdownToken">A host-lifetime token which does not represent durable cancellation.</param>
-    protected DurableExecutionContext(TaskId taskId, CancellationToken shutdownToken)
+    protected DurableExecutionContext(TaskId taskId)
     {
         if (taskId.IsDefault)
         {
@@ -30,7 +23,6 @@ public abstract class DurableExecutionContext
         }
 
         TaskId = taskId;
-        _cancellationSource = CancellationTokenSource.CreateLinkedTokenSource(shutdownToken);
     }
 
     /// <summary>Gets the current durable execution context.</summary>
