@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using System.Runtime.ExceptionServices;
 
 namespace System.Distributed.DurableTasks;
 
@@ -13,10 +12,10 @@ public abstract class ScheduledTask
     public ScheduledTaskAwaiter GetAwaiter() => new(this, CancellationToken.None);
     /// <summary>Polls whether the task has reached a terminal state.</summary>
     public async Task<bool> IsCompletedAsync(PollingOptions options = default, CancellationToken cancellationToken = default)
-        => (await PollAsyncCore(options, cancellationToken)).IsCompleted;
+        => (await PollAsyncCore(options, cancellationToken).ConfigureAwait(false)).IsCompleted;
     /// <summary>Polls the current task status.</summary>
     public async Task<DurableTaskStatus> GetStatusAsync(PollingOptions options = default, CancellationToken cancellationToken = default)
-        => (await PollAsyncCore(options, cancellationToken)).Status;
+        => (await PollAsyncCore(options, cancellationToken).ConfigureAwait(false)).Status;
     /// <summary>Waits for and returns the terminal response.</summary>
     public Task<DurableTaskResponse> GetResponseAsync(CancellationToken cancellationToken = default)
         => WaitAsyncCore(cancellationToken).AsTask();
@@ -26,7 +25,7 @@ public abstract class ScheduledTask
 
     /// <summary>Waits for successful completion.</summary>
     public async ValueTask WaitAsync(CancellationToken cancellationToken = default)
-        => (await WaitAsyncCore(cancellationToken)).EnsureSuccessfulCompletion();
+        => (await WaitAsyncCore(cancellationToken).ConfigureAwait(false)).EnsureSuccessfulCompletion();
 
     /// <summary>Durably requests cancellation.</summary>
     public abstract ValueTask CancelAsync(CancellationToken cancellationToken = default);
@@ -37,11 +36,17 @@ public abstract class ScheduledTask
 
     /// <summary>Waits for every scheduled task to complete successfully.</summary>
     public static async Task WhenAll(IReadOnlyList<ScheduledTask> tasks, CancellationToken cancellationToken = default)
-        => await Task.WhenAll(tasks.Select(task => task.WaitAsync(cancellationToken).AsTask()));
+    {
+        ArgumentNullException.ThrowIfNull(tasks);
+        await Task.WhenAll(tasks.Select(task => task.WaitAsync(cancellationToken).AsTask())).ConfigureAwait(false);
+    }
 
     /// <summary>Waits for every scheduled task to complete successfully.</summary>
     public static async Task WhenAll<TResult>(IReadOnlyList<ScheduledTask<TResult>> tasks, CancellationToken cancellationToken = default)
-        => await Task.WhenAll(tasks.Select(task => WaitForSuccessAsync(task, cancellationToken)));
+    {
+        ArgumentNullException.ThrowIfNull(tasks);
+        await Task.WhenAll(tasks.Select(task => WaitForSuccessAsync(task, cancellationToken))).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Returns the first scheduled task whose response completes, including failed or canceled durable
@@ -49,7 +54,10 @@ public abstract class ScheduledTask
     /// without canceling the durable tasks.
     /// </summary>
     public static async Task<ScheduledTask> WhenAny(IReadOnlyList<ScheduledTask> tasks, CancellationToken cancellationToken = default)
-        => tasks[await WaitForAnyIndexAsync(tasks, cancellationToken)];
+    {
+        ArgumentNullException.ThrowIfNull(tasks);
+        return tasks[await WaitForAnyIndexAsync(tasks, cancellationToken).ConfigureAwait(false)];
+    }
 
     /// <summary>
     /// Returns the first scheduled task whose response completes, including failed or canceled durable
@@ -59,15 +67,21 @@ public abstract class ScheduledTask
     public static async Task<ScheduledTask<TResult>> WhenAny<TResult>(
         IReadOnlyList<ScheduledTask<TResult>> tasks,
         CancellationToken cancellationToken = default)
-        => tasks[await WaitForAnyIndexAsync(tasks, cancellationToken)];
+    {
+        ArgumentNullException.ThrowIfNull(tasks);
+        return tasks[await WaitForAnyIndexAsync(tasks, cancellationToken).ConfigureAwait(false)];
+    }
 
     private static async Task<int> WaitForAnyIndexAsync<TTask>(
         IReadOnlyList<TTask> tasks,
         CancellationToken cancellationToken)
         where TTask : ScheduledTask
     {
-        ArgumentOutOfRangeException.ThrowIfZero(tasks.Count);
-        using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        ArgumentNullException.ThrowIfNull(tasks);
+        ArgumentOutOfRangeException.ThrowIfZero(tasks.Count, nameof(tasks));
+        using var waitCancellation = cancellationToken.CanBeCanceled
+            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+            : new CancellationTokenSource();
         var waits = new List<Task<DurableTaskResponse>>(tasks.Count);
         try
         {
@@ -78,20 +92,20 @@ public abstract class ScheduledTask
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            await CancelAndDrainWaitsPreservingFailureAsync(waitCancellation, waits);
+            await CancelAndDrainWaitsPreservingFailureAsync(waitCancellation, waits).ConfigureAwait(false);
             throw new OperationCanceledException(cancellationToken);
         }
         catch
         {
-            await CancelAndDrainWaitsPreservingFailureAsync(waitCancellation, waits);
+            await CancelAndDrainWaitsPreservingFailureAsync(waitCancellation, waits).ConfigureAwait(false);
             throw;
         }
 
-        var completed = await Task.WhenAny(waits);
+        var completed = await Task.WhenAny(waits).ConfigureAwait(false);
         var winnerIndex = waits.IndexOf(completed);
         try
         {
-            _ = await completed;
+            _ = await completed.ConfigureAwait(false);
             return winnerIndex;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -100,7 +114,7 @@ public abstract class ScheduledTask
         }
         finally
         {
-            await CancelAndDrainWaitsAsync(waitCancellation, waits, winnerIndex);
+            await CancelAndDrainWaitsAsync(waitCancellation, waits, winnerIndex).ConfigureAwait(false);
         }
     }
 
@@ -110,7 +124,7 @@ public abstract class ScheduledTask
     {
         try
         {
-            await CancelAndDrainWaitsAsync(waitCancellation, waits, winnerIndex: -1);
+            await CancelAndDrainWaitsAsync(waitCancellation, waits, winnerIndex: -1).ConfigureAwait(false);
         }
         catch
         {
@@ -123,21 +137,16 @@ public abstract class ScheduledTask
         IReadOnlyList<Task<DurableTaskResponse>> waits,
         int winnerIndex)
     {
-        Exception? cancellationException = null;
         try
         {
             waitCancellation.Cancel();
         }
-        catch (Exception exception)
+        catch
         {
-            cancellationException = exception;
+            // Canceling losing wait observations is best-effort cleanup.
         }
 
-        await DrainLosingWaitsAsync(waits, winnerIndex);
-        if (cancellationException is not null)
-        {
-            ExceptionDispatchInfo.Capture(cancellationException).Throw();
-        }
+        await DrainLosingWaitsAsync(waits, winnerIndex).ConfigureAwait(false);
     }
 
     private static async Task DrainLosingWaitsAsync(
@@ -153,7 +162,7 @@ public abstract class ScheduledTask
 
             try
             {
-                _ = await waits[index];
+                _ = await waits[index].ConfigureAwait(false);
             }
             catch
             {
@@ -163,7 +172,7 @@ public abstract class ScheduledTask
     }
 
     private static async Task WaitForSuccessAsync(ScheduledTask task, CancellationToken cancellationToken)
-        => (await task.WaitAsyncCore(cancellationToken)).EnsureSuccessfulCompletion();
+        => (await task.WaitAsyncCore(cancellationToken).ConfigureAwait(false)).EnsureSuccessfulCompletion();
 }
 
 /// <summary>Represents a host-scheduled durable task with a result.</summary>
