@@ -232,10 +232,10 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         {
             if (startSilosTask is not null)
             {
-                using var cleanupCts = new CancellationTokenSource(CHURN_ENDWAIT);
                 try
                 {
-                    await startSilosTask.WaitAsync(cleanupCts.Token);
+                    using var startupCompletionCts = new CancellationTokenSource(CHURN_ENDWAIT);
+                    await startSilosTask.WaitAsync(startupCompletionCts.Token);
                 }
                 catch (Exception exception)
                 {
@@ -247,6 +247,7 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
                     .ToArray();
                 if (additionalSilos.Length > 0)
                 {
+                    using var cleanupCts = new CancellationTokenSource(CHURN_ENDWAIT);
                     await Task.WhenAll(additionalSilos.Select(StopSiloAsync)).WaitAsync(cleanupCts.Token);
                     await WaitForLivenessToStabilizeAsync().WaitAsync(cleanupCts.Token);
                 }
