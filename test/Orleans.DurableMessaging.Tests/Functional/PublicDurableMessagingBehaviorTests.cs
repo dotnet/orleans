@@ -93,6 +93,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
     {
         var receiver = NewGrain();
         _ = await receiver.GetSnapshotAsync();
+        var depthBaseline = fixture.Metrics.GetDepth("orleans-durable-messaging-inbox-depth");
         fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         using var envelope = CreateEnvelope(receiver, NewMessage(2, "failed-acceptance"));
 
@@ -102,11 +103,17 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         var reverted = await receiver.GetSnapshotAsync();
         Assert.Equal(0, reverted.InboxCount);
         Assert.Empty(reverted.Effects);
+        Assert.Equal(depthBaseline, fixture.Metrics.GetDepth("orleans-durable-messaging-inbox-depth"));
         await receiver.RequestDeactivationAsync();
         var recovered = await receiver.GetSnapshotAsync();
         Assert.NotEqual(reverted.ActivationId, recovered.ActivationId);
         Assert.Equal(0, recovered.InboxCount);
         Assert.Empty(recovered.Effects);
+        Assert.Equal(depthBaseline, fixture.Metrics.GetDepth("orleans-durable-messaging-inbox-depth"));
+
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        await fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.Equal(depthBaseline, fixture.Metrics.GetDepth("orleans-durable-messaging-inbox-depth"));
     }
 
     [Fact]
