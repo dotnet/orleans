@@ -7,7 +7,6 @@ using Orleans.Configuration.Internal;
 using Orleans.Hosting;
 
 namespace Orleans.Hosting;
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
 
 public static class DurableTaskStorageExtensions
 {
