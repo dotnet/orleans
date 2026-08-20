@@ -82,7 +82,7 @@ namespace UnitTests.General
                     WAITFOR DELAY '00:00:00.050';
                 END;
                 """;
-            readinessCommand.CommandTimeout = 5;
+            readinessCommand.CommandTimeout = 30;
             readinessCommand.Parameters.AddWithValue("DatabaseName", databaseConnectionStringBuilder.InitialCatalog);
             await readinessCommand.ExecuteNonQueryAsync();
         }
