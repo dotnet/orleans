@@ -1198,9 +1198,10 @@ public class CustomReturnTypeTests
         Assert.Contains(
             forwardMappings,
             static mapping => mapping == "Owner.CustomCall [ReturnTypeOwner] -> ValidAdapter.CustomRequest [ValidAdapter]");
+        var taskAssemblyName = forwardCompilation.GetTypeByMetadataName("System.Threading.Tasks.Task")!.ContainingAssembly.Name;
         Assert.Contains(
             forwardMappings,
-            static mapping => mapping == "System.Threading.Tasks.Task [System.Runtime] -> Orleans.Runtime.TaskRequest [Orleans.Core.Abstractions]");
+            mapping => mapping == $"System.Threading.Tasks.Task [{taskAssemblyName}] -> Orleans.Runtime.TaskRequest [Orleans.Core.Abstractions]");
         Assert.DoesNotContain(forwardMappings, static mapping => mapping.Contains("InvalidAdapter.CustomTaskRequest", StringComparison.Ordinal));
 
         static string[] GetEffectiveMappings(Compilation compilation)
