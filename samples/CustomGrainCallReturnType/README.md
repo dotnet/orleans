@@ -23,4 +23,4 @@ dotnet run --project CustomGrainCallReturnType.csproj
 
 The client prints a successful result and then observes an exception returned by the grain.
 
-For the registration rules and compatibility guidance, see [Customize Orleans serialization code generation](../../docs/site/src/content/docs/host/configuration-guide/serialization-code-generation-customization.md). For the generated proxy, request, dispatch, and response path, see [Serialization and code generation internals](../../docs/site/src/content/docs/implementation/serialization.md).
+For the registration rules and compatibility guidance, see [Customize Orleans serialization code generation](../../docs/site/src/content/docs/grains/code-generation-customization.md). For the generated proxy, request, dispatch, and response path, see [Serialization and code generation internals](../../docs/site/src/content/docs/implementation/serialization.md).

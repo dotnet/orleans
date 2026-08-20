@@ -49,4 +49,6 @@ Treat Orleans analyzer and generator diagnostics as contract errors, not warning
 
 The optional [Orleans contract compatibility analyzer](grain-versioning/contract-compatibility-analyzer.md) records grain RPC identities and signatures in `OrleansContracts.txt` so contract drift can be reviewed before a rolling upgrade.
 
+Libraries which define custom grain-call return types can extend the generated proxy and invokable request model. See [Customize Orleans serialization code generation](code-generation-customization.md).
+
 For serialization rules and version tolerance, see [Orleans serialization](../host/configuration-guide/serialization.md).

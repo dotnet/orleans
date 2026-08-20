@@ -17,7 +17,7 @@ For a complete application, see the custom grain-call return type entry in the [
 
 The following `GrainCall<T>` is task-backed. Calling a generated proxy starts one Orleans request immediately. The returned value can be awaited multiple times, caches its terminal result, and propagates remote failures through the task.
 
-:::code language="csharp" source="../../snippets/compiled/Serialization/CustomGrainCallReturnType.cs" id="grain_call_return_type":::
+:::code language="csharp" source="../snippets/compiled/Serialization/CustomGrainCallReturnType.cs" id="grain_call_return_type":::
 
 <xref:Orleans.InvokableBaseTypeAttribute> registers the open generic family for proxies derived from <xref:Orleans.Runtime.GrainReference>. For every `GrainCall<T>` method, the generator closes `GrainCallRequest<T>` with the same `T`.
 
@@ -28,7 +28,7 @@ The request base performs two jobs:
 1. On the caller, its initializer submits the generated request through <xref:Orleans.Runtime.IGrainReferenceRuntime> and returns the application-facing `GrainCall<T>`.
 2. On the target, its <xref:Orleans.Serialization.Invocation.IInvokable.Invoke*> implementation awaits the value returned by the grain implementation and creates a <xref:Orleans.Serialization.Invocation.Response>.
 
-:::code language="csharp" source="../../snippets/compiled/Serialization/CustomGrainCallReturnType.cs" id="grain_call_request":::
+:::code language="csharp" source="../snippets/compiled/Serialization/CustomGrainCallReturnType.cs" id="grain_call_request":::
 
 <xref:Orleans.Invocation.ReturnValueProxyAttribute> tells the generated proxy to return `request.InitializeRequest(this)`. The initializer is therefore the handoff point which starts the operation or creates the application-facing adapter. Orleans validates that overload resolution selects an accessible, concrete, non-generic instance method with one by-value parameter accepting the generated proxy and a result implicitly convertible to the grain method's declared return type.
 
@@ -38,7 +38,7 @@ The request base performs two jobs:
 
 Both the interface and implementation use the custom return type. The generated request overrides `InvokeInner` with that same signature, while the request base determines how its value is completed and transported.
 
-:::code language="csharp" source="../../snippets/compiled/Serialization/CustomGrainCallReturnType.cs" id="grain_call_contract":::
+:::code language="csharp" source="../snippets/compiled/Serialization/CustomGrainCallReturnType.cs" id="grain_call_contract":::
 
 The sample's contract is:
 
@@ -91,7 +91,7 @@ Treat these diagnostics as extension-contract failures. They identify the regist
 
 An adapter package can register types from independent assemblies:
 
-:::code language="csharp" source="../../snippets/compiled/Serialization/CustomGrainCallReturnType.cs" id="cross_assembly_registration":::
+:::code language="csharp" source="../snippets/compiled/Serialization/CustomGrainCallReturnType.cs" id="cross_assembly_registration":::
 
 The consuming project must reference the return-type owner, proxy owner, and adapter assembly. The generator reads assembly attributes from source and referenced assemblies, then validates accessibility and binding in the consuming compilation. Public types and members give every consumer the same mapping; `internal` members require an explicit friend-assembly relationship with each generated proxy assembly.
 
@@ -103,13 +103,13 @@ The generated request type is the serialized message body. Orleans gives it a co
 
 The custom request base controls invocation behavior, while generated members hold method arguments and target dispatch metadata. Keep serialized member IDs and aliases stable, and keep argument and result types compatible during rolling upgrades. Changing a mapping can change the generated request's base behavior across caller and silo versions even when the grain method signature is unchanged.
 
-The same Orleans.Serialization codecs, copiers, activators, and converters process generated request arguments and response values. Review the [serialization and code-generation internals](../../implementation/serialization.md) before publishing an adapter library.
+The same Orleans.Serialization codecs, copiers, activators, and converters process generated request arguments and response values. Review the [serialization and code-generation internals](../implementation/serialization.md) before publishing an adapter library.
 
 ## Related customization surfaces
 
-- [Customize serialization](serialization-customization.md) with <xref:Orleans.Serialization.Serializers.IGeneralizedCodec>, <xref:Orleans.Serialization.Cloning.IGeneralizedCopier>, and type filters.
-- [Configure serialization](serialization-configuration.md) and register codecs, copiers, activators, converters, or external serializers through <xref:Orleans.Serialization.ISerializerBuilder>.
-- [Declare immutable types](serialization-immutability.md) with <xref:Orleans.ImmutableAttribute>.
-- [Generate serializers and stable identities](../../grains/code-generation.md) with <xref:Orleans.GenerateSerializerAttribute>, <xref:Orleans.IdAttribute>, and <xref:Orleans.AliasAttribute>.
-- [Inspect or modify generated request arguments](../../grains/interceptors.md) in grain call filters.
-- [Use generated request metadata for scheduling](../../grains/request-scheduling.md).
+- [Customize serialization](../host/configuration-guide/serialization-customization.md) with <xref:Orleans.Serialization.Serializers.IGeneralizedCodec>, <xref:Orleans.Serialization.Cloning.IGeneralizedCopier>, and type filters.
+- [Configure serialization](../host/configuration-guide/serialization-configuration.md) and register codecs, copiers, activators, converters, or external serializers through <xref:Orleans.Serialization.ISerializerBuilder>.
+- [Declare immutable types](../host/configuration-guide/serialization-immutability.md) with <xref:Orleans.ImmutableAttribute>.
+- [Generate serializers and stable identities](code-generation.md) with <xref:Orleans.GenerateSerializerAttribute>, <xref:Orleans.IdAttribute>, and <xref:Orleans.AliasAttribute>.
+- [Inspect or modify generated request arguments](interceptors.md) in grain call filters.
+- [Use generated request metadata for scheduling](request-scheduling.md).

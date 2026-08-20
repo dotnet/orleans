@@ -71,7 +71,11 @@ items:
           - name: Grain activation and lifecycle
             href: grains/grain-lifecycle.md
           - name: Code generation
-            href: grains/code-generation.md
+            items:
+              - name: Overview
+                href: grains/code-generation.md
+              - name: Advanced customization
+                href: grains/code-generation-customization.md
       - name: Test Orleans applications
         href: grains/testing.md
       - name: Placement and versioning
@@ -226,8 +230,6 @@ items:
             href: host/configuration-guide/serialization-configuration.md
           - name: Customize serialization
             href: host/configuration-guide/serialization-customization.md
-          - name: Customize code generation
-            href: host/configuration-guide/serialization-code-generation-customization.md
       - name: Observability and diagnostics
         items:
           - name: Overview
