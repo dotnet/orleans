@@ -88,7 +88,8 @@ public sealed class HandlerRoutingContractTests : IDisposable
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await ((IInboxHandler)handler).HandleAsync(context, CancellationToken.None));
 
-        Assert.Contains(nameof(RoutedMessage), exception.Message, StringComparison.Ordinal);
+        Assert.Contains(typeof(RoutedMessage).FullName!, exception.Message, StringComparison.Ordinal);
+        Assert.Contains("typed", exception.Message, StringComparison.Ordinal);
         Assert.Equal(0, handler.CallCount);
         Assert.Null(handler.Message);
     }
