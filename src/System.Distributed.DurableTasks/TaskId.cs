@@ -42,11 +42,27 @@ public readonly struct TaskId : IEquatable<TaskId>, IParsable<TaskId>, ISpanPars
     public bool IsChildOf(TaskId other) => other.IsParentOf(this);
 
     /// <summary>Parses an escaped hierarchical path.</summary>
-    public static TaskId Parse(string s, IFormatProvider? provider = null) => new(HierarchicalKey.Parse(s));
+    public static TaskId Parse(string s, IFormatProvider? provider = null)
+    {
+        ArgumentNullException.ThrowIfNull(s);
+        return s.Length == 0 ? None : new(HierarchicalKey.Parse(s));
+    }
 
     /// <summary>Attempts to parse an escaped hierarchical path.</summary>
     public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, out TaskId result)
     {
+        if (s is null)
+        {
+            result = default;
+            return false;
+        }
+
+        if (s.Length == 0)
+        {
+            result = None;
+            return true;
+        }
+
         if (HierarchicalKey.TryParse(s, out var key))
         {
             result = new(key);
@@ -58,11 +74,18 @@ public readonly struct TaskId : IEquatable<TaskId>, IParsable<TaskId>, ISpanPars
     }
 
     /// <summary>Parses an escaped hierarchical path.</summary>
-    public static TaskId Parse(ReadOnlySpan<char> s, IFormatProvider? provider) => new(HierarchicalKey.Parse(s));
+    public static TaskId Parse(ReadOnlySpan<char> s, IFormatProvider? provider)
+        => s.IsEmpty ? None : new(HierarchicalKey.Parse(s));
 
     /// <summary>Attempts to parse an escaped hierarchical path.</summary>
     public static bool TryParse(ReadOnlySpan<char> s, IFormatProvider? provider, out TaskId result)
     {
+        if (s.IsEmpty)
+        {
+            result = None;
+            return true;
+        }
+
         if (HierarchicalKey.TryParse(s, out var key))
         {
             result = new(key);
@@ -81,15 +104,13 @@ public readonly struct TaskId : IEquatable<TaskId>, IParsable<TaskId>, ISpanPars
     /// <summary>Attempts to format this identifier into <paramref name="destination"/>.</summary>
     public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
     {
-        var value = _key?.ToString() ?? string.Empty;
-        if (value.AsSpan().TryCopyTo(destination))
+        if (_key is null)
         {
-            charsWritten = value.Length;
+            charsWritten = 0;
             return true;
         }
 
-        charsWritten = 0;
-        return false;
+        return _key.TryFormat(destination, out charsWritten);
     }
 
     /// <inheritdoc />
@@ -210,6 +231,48 @@ internal sealed class HierarchicalKey : IEquatable<HierarchicalKey>
     }
 
     public override string ToString() => string.Join(Separator, _segments.Select(EscapeSegment));
+
+    public bool TryFormat(Span<char> destination, out int charsWritten)
+    {
+        charsWritten = 0;
+        for (var segmentIndex = 0; segmentIndex < _segments.Length; segmentIndex++)
+        {
+            if (segmentIndex > 0)
+            {
+                if (charsWritten >= destination.Length)
+                {
+                    charsWritten = 0;
+                    return false;
+                }
+
+                destination[charsWritten++] = Separator;
+            }
+
+            foreach (var character in _segments[segmentIndex])
+            {
+                if (character is Separator or Escape)
+                {
+                    if (charsWritten >= destination.Length)
+                    {
+                        charsWritten = 0;
+                        return false;
+                    }
+
+                    destination[charsWritten++] = Escape;
+                }
+
+                if (charsWritten >= destination.Length)
+                {
+                    charsWritten = 0;
+                    return false;
+                }
+
+                destination[charsWritten++] = character;
+            }
+        }
+
+        return true;
+    }
 
     private static string EscapeSegment(string segment)
         => segment.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("/", "\\/", StringComparison.Ordinal);
