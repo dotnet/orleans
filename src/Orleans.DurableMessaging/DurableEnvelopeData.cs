@@ -75,9 +75,9 @@ public sealed class DurableEnvelopeData
     /// Returns false if deserialization fails (type mismatch, corruption, etc.).
     /// </summary>
     /// <typeparam name="T">The type to deserialize the body as.</typeparam>
-    /// <param name="value">The deserialized value, or default if deserialization fails.</param>
+    /// <param name="value">The deserialized value, which can be <see langword="null"/>, or default if deserialization fails.</param>
     /// <returns>True if deserialization succeeded; otherwise, false.</returns>
-    public bool TryGetBody<T>([MaybeNullWhen(false)] out T value)
+    public bool TryGetBody<T>([MaybeNull] out T value)
     {
         if (_sessionPool is null || _bodySlice.Length == 0)
         {
@@ -92,7 +92,7 @@ public sealed class DurableEnvelopeData
             var reader = Reader.Create(slice, session);
             var field = reader.ReadFieldHeader();
             value = _sessionPool.CodecProvider.GetCodec<T>().ReadValue(ref reader, field);
-            return value is not null;
+            return true;
         }
         catch
         {
@@ -107,9 +107,9 @@ public sealed class DurableEnvelopeData
     /// </summary>
     /// <typeparam name="T">The type to deserialize the context value as.</typeparam>
     /// <param name="key">The context key to retrieve.</param>
-    /// <param name="value">The deserialized value, or default if not found or deserialization fails.</param>
+    /// <param name="value">The deserialized value, which can be <see langword="null"/>, or default if not found or deserialization fails.</param>
     /// <returns>True if the key exists and deserialization succeeded; otherwise, false.</returns>
-    public bool TryGetContextValue<T>(string key, [MaybeNullWhen(false)] out T value)
+    public bool TryGetContextValue<T>(string key, [MaybeNull] out T value)
     {
         if (_sessionPool is null || _contextIndices is null || !_contextIndices.TryGetValue(key, out var slice))
         {
@@ -124,7 +124,7 @@ public sealed class DurableEnvelopeData
             var reader = Reader.Create(buffer, session);
             var field = reader.ReadFieldHeader();
             value = _sessionPool.CodecProvider.GetCodec<T>().ReadValue(ref reader, field);
-            return value is not null;
+            return true;
         }
         catch
         {
