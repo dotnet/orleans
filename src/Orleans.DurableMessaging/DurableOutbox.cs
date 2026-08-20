@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -171,29 +172,36 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     public void Send(DurableEnvelope envelope)
     {
         EnsureMetricsActive();
-        var isNewMessage = !_messages.ContainsKey(envelope.MessageId);
+        if (_messages.TryGetValue(envelope.MessageId, out var existingEnvelope))
+        {
+            if (!AreEquivalent(existingEnvelope, envelope))
+            {
+                throw new InvalidOperationException(
+                    $"The durable outbox already contains a different envelope with message ID '{envelope.MessageId}'.");
+            }
+
+            return;
+        }
+
         var startsNewBatch = Count == 0 && _pendingMessageIds.Count == 0;
 
         // Track this message as pending (not yet durable)
         _pendingMessageIds.Add(envelope.MessageId);
 
         // Store envelope keyed by MessageId for O(1) lookup during removal
-        _messages[envelope.MessageId] = envelope;
-        if (isNewMessage)
+        _messages.Add(envelope.MessageId, envelope);
+        if (startsNewBatch)
         {
-            if (startsNewBatch)
-            {
-                _jobId.Value = DurableMessagingJobOwnership.NextId(_jobSequence);
-                _pendingJobDueTime = _jobTimeProvider.GetUtcNow();
-                _jobScheduleConfirmed = false;
-            }
-
-            _messageStates[envelope.MessageId] = new OutboxMessageState
-            {
-                EnqueuedAt = _jobTimeProvider.GetUtcNow()
-            };
-            _instruments.OnOutboxDepthChanged(1);
+            _jobId.Value = DurableMessagingJobOwnership.NextId(_jobSequence);
+            _pendingJobDueTime = _jobTimeProvider.GetUtcNow();
+            _jobScheduleConfirmed = false;
         }
+
+        _messageStates[envelope.MessageId] = new OutboxMessageState
+        {
+            EnqueuedAt = _jobTimeProvider.GetUtcNow()
+        };
+        _instruments.OnOutboxDepthChanged(1);
 
         // Record metric for message sent
         var grainType = _grainContext.GrainId.Type.ToString();
@@ -201,6 +209,62 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
         // Durable scheduling is completed by OnWritePreparingAsync before this state can commit.
         // Delivery remains fenced by _pendingMessageIds until the commit completes.
+    }
+
+    private static bool AreEquivalent(DurableEnvelope left, DurableEnvelope right)
+    {
+        if (left.MessageId != right.MessageId
+            || left.SenderId != right.SenderId
+            || left.ReceiverId != right.ReceiverId
+            || !string.Equals(left.RouteKey, right.RouteKey, StringComparison.Ordinal)
+            || !Equals(left.CorrelationKey, right.CorrelationKey)
+            || !Nullable.Equals(left.ReplyTo, right.ReplyTo)
+            || left.CreatedAt != right.CreatedAt)
+        {
+            return false;
+        }
+
+        if (ReferenceEquals(left.Data, right.Data))
+        {
+            return true;
+        }
+
+        if (left.Data is null || right.Data is null
+            || !SequenceEqual(left.Data.GetBodyBytes(), right.Data.GetBodyBytes()))
+        {
+            return false;
+        }
+
+        var leftContextKeys = left.Data.ContextKeys.ToHashSet(StringComparer.Ordinal);
+        var rightContextKeys = right.Data.ContextKeys.ToHashSet(StringComparer.Ordinal);
+        if (!leftContextKeys.SetEquals(rightContextKeys))
+        {
+            return false;
+        }
+
+        foreach (var key in leftContextKeys)
+        {
+            if (!left.Data.TryGetContextBytes(key, out var leftContext)
+                || !right.Data.TryGetContextBytes(key, out var rightContext)
+                || !SequenceEqual(leftContext, rightContext))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool SequenceEqual(ReadOnlySequence<byte> left, ReadOnlySequence<byte> right)
+    {
+        if (left.Length != right.Length)
+        {
+            return false;
+        }
+
+        return left.IsSingleSegment && right.IsSingleSegment
+            ? left.FirstSpan.SequenceEqual(right.FirstSpan)
+            : left.ToArray().AsSpan().SequenceEqual(right.ToArray());
     }
 
     /// <summary>
