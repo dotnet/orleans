@@ -149,7 +149,32 @@ internal sealed class JournaledJobShard : IJobShard
         ArgumentNullException.ThrowIfNull(jobContext);
         ThrowIfDisposed();
 
-        var operation = new RetryJobLaterOperation(jobContext, newDueTime, cancellationToken);
+        var operation = new RetryJobLaterOperation(jobContext, newDueTime, resetDequeueCount: false, cancellationToken);
+        try
+        {
+            EnqueueOperation(operation);
+            await operation.Task.ConfigureAwait(false);
+        }
+        finally
+        {
+            operation.Dispose();
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task RescheduleJobAsync(
+        IJobRunContext jobContext,
+        DateTimeOffset newDueTime,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(jobContext);
+        ThrowIfDisposed();
+
+        var operation = new RetryJobLaterOperation(
+            jobContext,
+            newDueTime,
+            resetDequeueCount: true,
+            cancellationToken);
         try
         {
             EnqueueOperation(operation);
@@ -668,14 +693,22 @@ internal sealed class JournaledJobShard : IJobShard
         }
     }
 
-    private sealed class RetryJobLaterOperation(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken)
+    private sealed class RetryJobLaterOperation(
+        IJobRunContext jobContext,
+        DateTimeOffset newDueTime,
+        bool resetDequeueCount,
+        CancellationToken cancellationToken)
         : PendingMutationOperation<bool>(cancellationToken)
     {
         protected override bool NotOwnedResult => true;
 
         protected override bool Apply(JournaledJobShard shard, out bool result)
         {
-            shard._state.RetryJobLater(jobContext, newDueTime);
+            shard._state.RetryJobLater(
+                jobContext.Job.Id,
+                newDueTime,
+                resetDequeueCount ? 0 : jobContext.DequeueCount,
+                resetDequeueCount ? checked(jobContext.Job.ExecutionGeneration + 1) : null);
             result = true;
             return true;
         }

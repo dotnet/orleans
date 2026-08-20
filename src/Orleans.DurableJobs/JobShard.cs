@@ -87,6 +87,18 @@ public interface IJobShard : IAsyncDisposable
     Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Reschedules a successfully completed execution with its dequeue count reset.
+    /// </summary>
+    /// <param name="jobContext">The context of the completed execution.</param>
+    /// <param name="newDueTime">
+    /// The new due time for the job. This value supersedes <see cref="DurableJob.DueTime"/> on
+    /// <see cref="IJobRunContext.Job"/>.
+    /// </param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    Task RescheduleJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Attempts to schedule a new job on this shard.
     /// </summary>
     /// <param name="request">The request containing the job scheduling parameters.</param>
@@ -192,6 +204,22 @@ public abstract class JobShard : IJobShard
     {
         await PersistRetryJobAsync(jobContext, newDueTime, cancellationToken);
         _jobQueue.RetryJobLater(jobContext, newDueTime);
+    }
+
+    /// <inheritdoc/>
+    public async Task RescheduleJobAsync(
+        IJobRunContext jobContext,
+        DateTimeOffset newDueTime,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(jobContext);
+        var executionGeneration = checked(jobContext.Job.ExecutionGeneration + 1);
+        var resetContext = new JobRunContext(
+            jobContext.Job.WithExecutionGeneration(executionGeneration),
+            jobContext.RunId,
+            retryCount: 0);
+        await PersistRetryJobAsync(resetContext, newDueTime, cancellationToken);
+        _jobQueue.RetryJobLater(jobContext.Job.Id, newDueTime, dequeueCount: 0, executionGeneration);
     }
 
     /// <summary>

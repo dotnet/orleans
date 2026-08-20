@@ -29,7 +29,7 @@ public class DurableJobReceiverExtensionTests
     }
 
     [Fact]
-    public async Task HandleDurableJobAsync_WhenTokenIsCanceledButExecutionIsStillRunning_RemainsPending()
+    public async Task HandleDurableJobAsync_WhenTokenIsCanceledButExecutionIsStillRunning_RemainsRunning()
     {
         var executionTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var handler = Substitute.For<IDurableJobHandler>();
@@ -44,15 +44,15 @@ public class DurableJobReceiverExtensionTests
         var first = await extension.HandleDurableJobAsync(context, cts.Token);
         var second = await extension.HandleDurableJobAsync(context, cts.Token);
 
-        Assert.True(first.IsPending);
-        Assert.True(second.IsPending);
+        Assert.True(first.IsInProgress);
+        Assert.True(second.IsInProgress);
         await handler.Received(1).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
 
         executionTask.SetResult(true);
     }
 
     [Fact]
-    public async Task HandleDurableJobAsync_WhenExecutionIsPending_UsesConfiguredPollInterval()
+    public async Task HandleDurableJobAsync_WhenExecutionIsInProgress_UsesConfiguredPollInterval()
     {
         var executionTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var handler = Substitute.For<IDurableJobHandler>();
@@ -65,7 +65,7 @@ public class DurableJobReceiverExtensionTests
 
         var result = await extension.HandleDurableJobAsync(context, CancellationToken.None);
 
-        Assert.True(result.IsPending);
+        Assert.True(result.IsInProgress);
         Assert.Equal(pollInterval, result.PollAfterDelay);
 
         executionTask.SetResult(true);
@@ -87,7 +87,7 @@ public class DurableJobReceiverExtensionTests
         var second = await extension.HandleDurableJobAsync(secondNotification, CancellationToken.None);
 
         Assert.False(first.IsCompleted);
-        Assert.True(second.IsPending);
+        Assert.True(second.IsInProgress);
         await handler.Received(1).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
 
         executionTask.SetResult(true);
@@ -107,9 +107,19 @@ public class DurableJobReceiverExtensionTests
     }
 
     [Fact]
-    public void DurableJobRunResult_Failed_ThrowsForNullException()
+    public async Task HandleDurableJobAsync_WhenExecutionGenerationChanges_StartsNewExecution()
     {
-        Assert.Throws<ArgumentNullException>(() => DurableJobRunResult.Failed(null!));
+        var handler = Substitute.For<IDurableJobHandler>();
+        handler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        var extension = CreateExtension(handler);
+        var firstRun = CreateJobContext("run-1", executionGeneration: 0);
+        var rescheduledRun = CreateJobContext("run-2", executionGeneration: 1);
+
+        Assert.Equal(DurableJobRunStatus.Completed, (await extension.HandleDurableJobAsync(firstRun, CancellationToken.None)).Status);
+        Assert.Equal(DurableJobRunStatus.Completed, (await extension.HandleDurableJobAsync(rescheduledRun, CancellationToken.None)).Status);
+        await handler.Received(2).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
     }
 
     private static DurableJobReceiverExtension CreateExtension(IDurableJobHandler handler, TimeSpan? jobStatusPollInterval = null)
@@ -125,7 +135,11 @@ public class DurableJobReceiverExtensionTests
         return new DurableJobReceiverExtension(grainContext, shared);
     }
 
-    private static IJobRunContext CreateJobContext(string runId, string jobId = "job-1", int dequeueCount = 1)
+    private static IJobRunContext CreateJobContext(
+        string runId,
+        string jobId = "job-1",
+        int dequeueCount = 1,
+        long executionGeneration = 0)
     {
         var context = Substitute.For<IJobRunContext>();
         context.RunId.Returns(runId);
@@ -136,7 +150,8 @@ public class DurableJobReceiverExtensionTests
             Name = jobId,
             DueTime = DateTimeOffset.UtcNow,
             TargetGrainId = GrainId.Create("test", "grain-1"),
-            ShardId = "shard-1"
+            ShardId = "shard-1",
+            ExecutionGeneration = executionGeneration
         });
 
         return context;

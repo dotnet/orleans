@@ -112,7 +112,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     public void RetryJobLater(IJobRunContext jobContext, DateTimeOffset newDueTime)
     {
         ArgumentNullException.ThrowIfNull(jobContext);
-        _ = RetryJobLater(jobContext.Job.Id, newDueTime, jobContext.DequeueCount);
+        _ = RetryJobLater(jobContext.Job.Id, newDueTime, jobContext.DequeueCount, executionGeneration: null);
     }
 
     /// <summary>
@@ -123,6 +123,9 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     /// <param name="dequeueCount">The persisted dequeue count to associate with the retried job.</param>
     /// <returns>True if the job was found and rescheduled; false if the job was not found.</returns>
     public bool RetryJobLater(string jobId, DateTimeOffset newDueTime, int dequeueCount)
+        => RetryJobLater(jobId, newDueTime, dequeueCount, executionGeneration: null);
+
+    internal bool RetryJobLater(string jobId, DateTimeOffset newDueTime, int dequeueCount, long? executionGeneration)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
         if (dequeueCount < 0)
@@ -147,6 +150,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                 Metadata = existing.Job.Metadata,
                 TraceParent = existing.Job.TraceParent,
                 TraceState = existing.Job.TraceState,
+                ExecutionGeneration = executionGeneration ?? existing.Job.ExecutionGeneration,
             };
 
             oldBucket.RemoveJob(jobId);

@@ -43,6 +43,12 @@ internal sealed partial class ShardExecutor
     private static partial void LogRetryingJob(ILogger logger, string jobId, string jobName, DateTimeOffset retryTime, int dequeueCount);
 
     [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Rescheduling job {JobId} (Name: '{JobName}') at {RescheduleTime}"
+    )]
+    private static partial void LogReschedulingJob(ILogger logger, string jobId, string jobName, DateTimeOffset rescheduleTime);
+
+    [LoggerMessage(
         Level = LogLevel.Debug,
         Message = "Polling job {JobId} (Name: '{JobName}') - will check status again in {PollDelay}"
     )]

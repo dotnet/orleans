@@ -51,24 +51,33 @@ namespace Orleans.DurableJobs
         public bool IsFailed { get { throw null; } }
 
         [System.Diagnostics.CodeAnalysis.MemberNotNullWhen(true, "PollAfterDelay")]
-        public bool IsPending { get { throw null; } }
+        public bool IsInProgress { get { throw null; } }
+
+        [System.Diagnostics.CodeAnalysis.MemberNotNullWhen(true, "RescheduleTime")]
+        public bool IsRescheduleRequested { get { throw null; } }
 
         [Id(1)]
         public System.TimeSpan? PollAfterDelay { get { throw null; } }
+
+        [Id(3)]
+        public System.DateTimeOffset? RescheduleTime { get { throw null; } }
 
         [Id(0)]
         public DurableJobRunStatus Status { get { throw null; } }
 
         public static DurableJobRunResult Failed(System.Exception exception) { throw null; }
 
-        public static DurableJobRunResult PollAfter(System.TimeSpan delay) { throw null; }
+        public static DurableJobRunResult InProgress(System.TimeSpan delay) { throw null; }
+
+        public static DurableJobRunResult RescheduleAt(System.DateTimeOffset dueTime) { throw null; }
     }
 
     public enum DurableJobRunStatus
     {
         Completed = 0,
-        PollAfter = 1,
-        Failed = 2
+        InProgress = 1,
+        Failed = 2,
+        RescheduleRequested = 3
     }
 
     public static partial class DurableJobTimeProviderNames
@@ -106,6 +115,7 @@ namespace Orleans.DurableJobs
         System.Threading.Tasks.ValueTask<int> GetJobCountAsync();
         System.Threading.Tasks.Task MarkAsCompleteAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<bool> RemoveJobAsync(string jobId, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task RescheduleJobAsync(IJobRunContext jobContext, System.DateTimeOffset newDueTime, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task RetryJobLaterAsync(IJobRunContext jobContext, System.DateTimeOffset newDueTime, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, System.Threading.CancellationToken cancellationToken);
     }
@@ -144,6 +154,8 @@ namespace Orleans.DurableJobs
         protected abstract System.Threading.Tasks.Task PersistRemoveJobAsync(string jobId, System.Threading.CancellationToken cancellationToken);
         protected abstract System.Threading.Tasks.Task PersistRetryJobAsync(IJobRunContext jobContext, System.DateTimeOffset newDueTime, System.Threading.CancellationToken cancellationToken);
         public System.Threading.Tasks.Task<bool> RemoveJobAsync(string jobId, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.Task RescheduleJobAsync(IJobRunContext jobContext, System.DateTimeOffset newDueTime, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task RetryJobLaterAsync(IJobRunContext jobContext, System.DateTimeOffset newDueTime, System.Threading.CancellationToken cancellationToken) { throw null; }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using Orleans.Runtime;
 
 namespace Orleans.DurableJobs;
@@ -60,4 +61,22 @@ public sealed class DurableJob
     /// </summary>
     [Id(7)]
     public string? TraceState { get; init; }
+
+    [Id(8)]
+    [JsonInclude]
+    internal long ExecutionGeneration { get; init; }
+
+    internal DurableJob WithExecutionGeneration(long executionGeneration) =>
+        new()
+        {
+            Id = Id,
+            Name = Name,
+            DueTime = DueTime,
+            TargetGrainId = TargetGrainId,
+            ShardId = ShardId,
+            Metadata = Metadata,
+            TraceParent = TraceParent,
+            TraceState = TraceState,
+            ExecutionGeneration = executionGeneration
+        };
 }

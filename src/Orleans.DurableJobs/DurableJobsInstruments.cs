@@ -15,6 +15,7 @@ internal sealed class DurableJobsInstruments(OrleansInstruments instruments)
     private const string StatusCompleted = "completed";
     private const string StatusFailed = "failed";
     private const string StatusRetried = "retried";
+    private const string StatusRescheduled = "rescheduled";
     private const string StatusCanceled = "canceled";
     private const string StatusError = "error";
     private const string StatusOk = "ok";
@@ -34,6 +35,7 @@ internal sealed class DurableJobsInstruments(OrleansInstruments instruments)
     private readonly Counter<long> JobsCompleted = instruments.Meter.CreateCounter<long>("orleans-durablejobs-jobs-completed");
     private readonly Counter<long> JobsFailed = instruments.Meter.CreateCounter<long>("orleans-durablejobs-jobs-failed");
     private readonly Counter<long> JobsRetried = instruments.Meter.CreateCounter<long>("orleans-durablejobs-jobs-retried");
+    private readonly Counter<long> JobsRescheduled = instruments.Meter.CreateCounter<long>("orleans-durablejobs-jobs-rescheduled");
     private readonly Counter<long> JobsCanceled = instruments.Meter.CreateCounter<long>("orleans-durablejobs-jobs-canceled");
     private readonly Counter<long> ShardsProcessed = instruments.Meter.CreateCounter<long>("orleans-durablejobs-shards-processed");
     private readonly Counter<long> ScheduleJobCalls = instruments.Meter.CreateCounter<long>("orleans-durablejobs-schedule-job-calls");
@@ -84,6 +86,12 @@ internal sealed class DurableJobsInstruments(OrleansInstruments instruments)
     {
         JobsRetried.Add(1);
         Record(JobAttemptDuration, latency, StatusRetried);
+    }
+
+    internal void OnJobRescheduled(TimeSpan latency)
+    {
+        JobsRescheduled.Add(1);
+        Record(JobAttemptDuration, latency, StatusRescheduled);
     }
 
     internal void OnJobCanceled()
