@@ -236,6 +236,7 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         await ((IDurableTaskServer)runtime).ScheduleAsync(taskId, request);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await transport.ScheduledResume.WaitAsync(TimeSpan.FromSeconds(5));
         var stopping = runtime.StopAsync(default);
         await caughtShutdown.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await stopping.WaitAsync(TimeSpan.FromSeconds(5));
@@ -267,10 +268,33 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         await ((IDurableTaskServer)runtime).ScheduleAsync(taskId, request);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await runtime.StopAsync(default).WaitAsync(TimeSpan.FromSeconds(5));
+        await transport.ScheduledResume.WaitAsync(TimeSpan.FromSeconds(5));
+        var stopping = runtime.StopAsync(default);
+        await stopping.WaitAsync(TimeSpan.FromSeconds(5));
 
         Assert.Null(storage.Get(taskId).Result);
         Assert.Empty(transport.Completions);
+    }
+
+    [Fact]
+    public async Task ExecutionShutdownCancelsAdapterSchedulingWithoutRequestingDurableCancellation()
+    {
+        var runtime = new ShutdownProbeRuntime();
+        using var shutdown = new CancellationTokenSource();
+        var context = new GrainDurableExecutionContext(TaskId.Parse("root"), runtime, shutdown.Token);
+        var invocation = DurableTaskRuntimeHelper.RunAsync(
+            DurableTask.Delay(TimeSpan.FromDays(1)),
+            context).AsTask();
+        var executionCancellation = await runtime.SchedulingStarted.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.False(context.CancellationToken.IsCancellationRequested);
+        Assert.False(executionCancellation.IsCancellationRequested);
+        await shutdown.CancelAsync();
+        var response = await invocation.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(DurableTaskStatus.Canceled, response.Status);
+        Assert.True(executionCancellation.IsCancellationRequested);
+        Assert.False(context.CancellationToken.IsCancellationRequested);
     }
 
     [Fact]
@@ -506,6 +530,60 @@ public sealed class DurableTaskRuntimeInvariantTests
         while (!predicate())
         {
             await Task.Delay(10, timeout.Token);
+        }
+    }
+
+    private sealed class ShutdownProbeRuntime : IDurableTaskGrainRuntime
+    {
+        private readonly TaskCompletionSource<CancellationToken> _schedulingStarted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
+        public Task<CancellationToken> SchedulingStarted => _schedulingStarted.Task;
+
+        public ValueTask<DurableTaskResponse> ScheduleDelayAsync(
+            TaskId taskId,
+            DateTimeOffset dueTime,
+            CancellationToken cancellationToken)
+        {
+            _schedulingStarted.TrySetResult(cancellationToken);
+            return WaitForCancellationAsync(cancellationToken);
+        }
+
+        public ValueTask<IScheduledTaskHandle> ScheduleChildAsync(
+            TaskId taskId,
+            DurableTask taskDefinition,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ValueTask<DurableTaskResponse> ScheduleRemoteAsync(
+            TaskId taskId,
+            IDurableTaskRequest request,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ValueTask CancelRemoteAsync(
+            TaskId taskId,
+            GrainId target,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ValueTask<TaskId> SelectCompletionAsync(
+            TaskId decisionId,
+            IReadOnlyList<TaskId> candidates,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId) => throw new NotSupportedException();
+
+        private static async ValueTask<DurableTaskResponse> WaitForCancellationAsync(
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return DurableTaskResponse.Completed;
+            }
+            catch (OperationCanceledException exception)
+            {
+                return DurableTaskResponse.FromCanceled(exception);
+            }
         }
     }
 
