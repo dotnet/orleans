@@ -56,6 +56,8 @@ namespace Orleans.Runtime.Scheduler
             }
         }
 
+        internal void RunOrQueueTask(Task task) => workerGroup.RunOrQueueTask(task);
+
         /// <summary>Queues a task to the scheduler.</summary>
         /// <param name="task">The task to be queued.</param>
         protected override void QueueTask(Task task)
@@ -101,7 +103,6 @@ namespace Orleans.Runtime.Scheduler
 #if DEBUG
             LogTraceTryExecuteTaskInlineYes(myId, task.Id, System.Environment.CurrentManagedThreadId);
 #endif
-            // Try to run the task.
             bool done = TryExecuteTask(task);
 #if DEBUG
             if (!done)

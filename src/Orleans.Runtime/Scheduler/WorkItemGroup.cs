@@ -119,6 +119,80 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
         }
     }
 
+    internal void RunOrQueueTask(Task task)
+    {
+        if (Equals(RuntimeContext.Current, GrainContext))
+        {
+            task.RunSynchronously(TaskScheduler);
+            return;
+        }
+
+        if (!TryAcquireExecution(task, out var taskStart))
+        {
+            task.Start(TaskScheduler);
+            return;
+        }
+
+        RuntimeContext.SetExecutionContext(GrainContext, out var originalContext);
+        try
+        {
+#if DEBUG
+            LogTaskStart(task);
+#endif
+            task.RunSynchronously(TaskScheduler);
+        }
+        finally
+        {
+            RuntimeContext.ResetExecutionContext(originalContext);
+            try
+            {
+                CompleteTask(
+                    task,
+                    taskStart,
+                    (long)Math.Ceiling(_schedulingOptions.TurnWarningLengthThreshold.TotalMilliseconds));
+            }
+            finally
+            {
+                ReleaseExecution();
+            }
+        }
+    }
+
+    private bool TryAcquireExecution(Task task, out long taskStart)
+    {
+        lock (_lockObj)
+        {
+            if (_state != WorkGroupStatus.Waiting)
+            {
+                taskStart = 0;
+                return false;
+            }
+
+            _state = WorkGroupStatus.Running;
+            _currentTask = task;
+            _currentTaskStarted = taskStart = Environment.TickCount64;
+            _totalItemsEnqueued++;
+            return true;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ReleaseExecution()
+    {
+        lock (_lockObj)
+        {
+            if (_workItems.Count > 0)
+            {
+                _state = WorkGroupStatus.Runnable;
+                ScheduleExecution(this);
+            }
+            else
+            {
+                _state = WorkGroupStatus.Waiting;
+            }
+        }
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void LogTooManyTasksInQueue(int count, int maxPendingItemsLimit)
     {
@@ -179,17 +253,8 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
                 }
                 finally
                 {
-                    _totalItemsProcessed++;
-                    taskEnd = Environment.TickCount64;
-                    var taskDurationMs = taskEnd - taskStart;
+                    taskEnd = CompleteTask(task, taskStart, turnWarningDurationMs);
                     taskStart = taskEnd;
-                    if (taskDurationMs > turnWarningDurationMs)
-                    {
-                        _schedulerInstruments.OnLongRunningTurn();
-                        LogLongRunningTurn(task, taskDurationMs);
-                    }
-
-                    _currentTask = null;
                 }
             }
             while (activationSchedulingQuantumMs <= 0 || taskEnd - loopStart < activationSchedulingQuantumMs);
@@ -200,24 +265,31 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
         }
         finally
         {
-            // Now we're not Running anymore.
-            // If we left work items on our run list, we're Runnable, and need to go back on the silo run queue;
-            // If our run list is empty, then we're waiting.
-            lock (_lockObj)
+            try
             {
-                if (_workItems.Count > 0)
-                {
-                    _state = WorkGroupStatus.Runnable;
-                    ScheduleExecution(this);
-                }
-                else
-                {
-                    _state = WorkGroupStatus.Waiting;
-                }
+                ReleaseExecution();
             }
-
-            RuntimeContext.ResetExecutionContext(originalContext);
+            finally
+            {
+                RuntimeContext.ResetExecutionContext(originalContext);
+            }
         }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private long CompleteTask(Task task, long taskStart, long turnWarningDurationMs)
+    {
+        _totalItemsProcessed++;
+        var taskEnd = Environment.TickCount64;
+        var taskDurationMs = taskEnd - taskStart;
+        if (taskDurationMs > turnWarningDurationMs)
+        {
+            _schedulerInstruments.OnLongRunningTurn();
+            LogLongRunningTurn(task, taskDurationMs);
+        }
+
+        _currentTask = null;
+        return taskEnd;
     }
 
 #if DEBUG
