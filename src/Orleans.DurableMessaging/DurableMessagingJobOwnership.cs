@@ -54,4 +54,33 @@ internal static class DurableMessagingJobOwnership
                 out var current)
             && current <= completed;
     }
+
+    public static OwnershipMismatchDisposition ResolveMismatch(
+        bool recoveryCompleted,
+        bool hasCurrentOwner,
+        bool ownershipCompleted,
+        bool hasWork)
+    {
+        if (!recoveryCompleted)
+        {
+            return OwnershipMismatchDisposition.WaitForRecovery;
+        }
+
+        if (hasCurrentOwner || ownershipCompleted)
+        {
+            return OwnershipMismatchDisposition.CompleteStale;
+        }
+
+        return hasWork
+            ? OwnershipMismatchDisposition.WaitForReplacement
+            : OwnershipMismatchDisposition.ReclaimOrphan;
+    }
+}
+
+internal enum OwnershipMismatchDisposition
+{
+    WaitForRecovery,
+    WaitForReplacement,
+    CompleteStale,
+    ReclaimOrphan
 }

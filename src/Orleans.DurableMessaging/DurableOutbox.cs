@@ -73,6 +73,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private readonly HashSet<Guid> _committingMessageIds = [];
     private DateTimeOffset? _pendingJobDueTime;
     private bool _jobScheduleConfirmed;
+    private bool _recoveryCompleted;
 
     private int _metricsActive;
 
@@ -250,6 +251,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
     public void OnRecoveryCompleted()
     {
+        _recoveryCompleted = true;
         _pendingMessageIds.Clear();
         _committingMessageIds.Clear();
         _pendingJobDueTime = null;
@@ -259,6 +261,8 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             QueueEnsureJobScheduled(replaceExisting: true);
         }
     }
+
+    public void OnRecoveryStarted() => _recoveryCompleted = false;
 
     /// <summary>
     /// Removes a message after successful delivery.
@@ -599,6 +603,38 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         var hasStableOwnership = DurableMessagingJobOwnership.TryGetOwnershipId(
             context.Job,
             out var ownershipId);
+        if (!string.Equals(_jobId.Value, ownershipId, StringComparison.Ordinal))
+        {
+            if (!hasStableOwnership)
+            {
+                return DurableJobRunResult.Completed;
+            }
+
+            var disposition = DurableMessagingJobOwnership.ResolveMismatch(
+                _recoveryCompleted,
+                !string.IsNullOrEmpty(_jobId.Value),
+                DurableMessagingJobOwnership.IsCompleted(_completedJobId.Value, ownershipId),
+                Count > 0);
+            if (disposition == OwnershipMismatchDisposition.ReclaimOrphan)
+            {
+                LogOrphanedJobReclaimed(_logger, ownershipId, _grainContext.GrainId);
+                _instruments.OnOrphanedJobReclaimed(_grainContext.GrainId.Type.ToString(), JobName);
+                return DurableJobRunResult.Completed;
+            }
+
+            if (disposition == OwnershipMismatchDisposition.CompleteStale)
+            {
+                return DurableJobRunResult.Completed;
+            }
+
+            return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
+        }
+
+        if (!_recoveryCompleted)
+        {
+            return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
+        }
+
         var key = new DurableMessagingPumpExecutionKey(JobName, context.Job.Id, context.RunId);
         if (_pumpResults.TryTake(key, out var result, out var exception))
         {
@@ -665,14 +701,24 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
         try
         {
+            if (!_recoveryCompleted)
+            {
+                return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
+            }
+
             if (string.IsNullOrEmpty(_jobId.Value))
             {
                 if (hasStableOwnership
                     && !DurableMessagingJobOwnership.IsCompleted(_completedJobId.Value, jobId))
                 {
-                    RequestRefreshWhenSafe();
-                    return DurableJobRunResult.RetryAt(
-                        _jobTimeProvider.GetUtcNow() + _backpressureRetryDelay);
+                    if (Count == 0)
+                    {
+                        LogOrphanedJobReclaimed(_logger, jobId, _grainContext.GrainId);
+                        _instruments.OnOrphanedJobReclaimed(_grainContext.GrainId.Type.ToString(), JobName);
+                        return DurableJobRunResult.Completed;
+                    }
+
+                    return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
                 }
                 else if (Count == 0)
                 {
@@ -723,6 +769,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                 }
             }
 
+            if (_pendingMessageIds.Count > 0)
+            {
+                return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
+            }
+
             var now = _jobTimeProvider.GetUtcNow();
             var attempts = _messages.Values
                 .Select(envelope => GetNextAttemptAt(envelope, now))
@@ -736,17 +787,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         finally
         {
             _gate.Release();
-        }
-    }
-
-    private void RequestRefreshWhenSafe()
-    {
-        if (_stateManager.PendingWriteByteCount == 0)
-        {
-            _grainContext.Deactivate(
-                new DeactivationReason(
-                    DeactivationReasonCode.ApplicationRequested,
-                    "Refreshing durable outbox ownership after a precommit wake-up."));
         }
     }
 
@@ -825,6 +865,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         Level = LogLevel.Error,
         Message = "Error in outbox pump loop")]
     private static partial void LogPumpLoopError(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Reclaimed orphaned outbox job ownership {OwnershipId} for grain {GrainId}")]
+    private static partial void LogOrphanedJobReclaimed(ILogger logger, string ownershipId, GrainId grainId);
 
     private sealed class PumpTimerState(
         DurableOutbox owner,
