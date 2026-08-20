@@ -78,12 +78,27 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _items[taskId] = typedState;
     }
 
+    public void SetRemoteRequest(TaskId taskId, IDurableTaskState state, GrainId target, string fingerprint)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(target, default);
+        ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
+        var typedState = GetState(taskId, state);
+        typedState.RemoteTarget = target;
+        typedState.RemoteRequestFingerprint = fingerprint;
+        _items[taskId] = typedState;
+    }
+
     public void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
     {
         ArgumentNullException.ThrowIfNull(response);
         var typedState = GetState(taskId, state);
         typedState.Result = response;
         typedState.CompletedAt = _timeProvider.GetUtcNow();
+        typedState.DueTime = null;
+        if (typedState.ResumeGeneration > 0)
+        {
+            typedState.ResumeGeneration = checked(typedState.ResumeGeneration + 1);
+        }
         _items[taskId] = typedState;
     }
 

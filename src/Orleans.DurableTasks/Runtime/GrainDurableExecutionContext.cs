@@ -11,7 +11,10 @@ using Orleans.DurableTasks;
 
 namespace Orleans.Runtime.DurableTasks;
 
-internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskGrainRuntime runtime) : DurableExecutionContext(taskId)
+internal sealed class GrainDurableExecutionContext(
+    TaskId taskId,
+    IDurableTaskGrainRuntime runtime,
+    CancellationToken shutdownToken) : DurableExecutionContext(taskId, shutdownToken)
 {
     // The sequence number for named children.
     private Dictionary<string, int>? _nextChildIds;

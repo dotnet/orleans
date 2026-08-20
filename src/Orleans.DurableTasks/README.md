@@ -27,7 +27,8 @@ available only for tests through `AddVolatileDurableTaskStorage`.
 ## Guarantees
 
 - `(target GrainId, TaskId)` identifies one execution. A stable request
-  fingerprint detects reuse with a different interface, method, or arguments.
+  fingerprint uses canonical Orleans serialization and SHA-256 to detect reuse
+  with a different aliased interface, method, argument type, or argument value.
   Cleanup retains an identity tombstone so an expired identifier cannot execute
   again.
 - A target starts a request only after its request identity, task state, caller
@@ -37,8 +38,9 @@ available only for tests through `AddVolatileDurableTaskStorage`.
   Journaling commit boundary. Failed turns are rolled back by Durable Messaging.
 - A terminal response and all completion notifications commit together. The
   target retains every waiter until that caller durably records completion and
-  returns an idempotent completion acknowledgement. Polling remains available
-  for the configured retention period.
+  returns an idempotent completion acknowledgement. External clients are
+  polling-only destinations, since they cannot participate in durable completion
+  acknowledgement. Polling remains available for the configured retention period.
 - Cancellation is monotonic. A cancellation tombstone is durable before child
   propagation, cancellation before invocation prevents execution, duplicates
   are harmless, and the first durable terminal result wins a race.
@@ -48,6 +50,8 @@ available only for tests through `AddVolatileDurableTaskStorage`.
 - Recovery occurs before new request execution. Child identifiers and
   `WhenAny` decisions are replay-stable, and outbound effects use durable,
   idempotent messaging records.
+- Activation shutdown stops new execution, signals running execution contexts,
+  and drains them before a replacement activation can replay pending requests.
 
 ## Limits
 

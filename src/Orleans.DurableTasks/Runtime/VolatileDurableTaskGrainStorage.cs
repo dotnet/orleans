@@ -92,11 +92,24 @@ public class VolatileDurableTaskGrainStorage(
         AddOrUpdateTask(taskId, typedState);
     }
 
+    public void SetRemoteRequest(TaskId taskId, IDurableTaskState state, GrainId target, string fingerprint)
+    {
+        var typedState = GetState(state);
+        typedState.RemoteTarget = target;
+        typedState.RemoteRequestFingerprint = fingerprint;
+        AddOrUpdateTask(taskId, typedState);
+    }
+
     public void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
     {
         var typedState = GetState(state);
         typedState.Result = response;
         typedState.CompletedAt = _timeProvider.GetUtcNow();
+        typedState.DueTime = null;
+        if (typedState.ResumeGeneration > 0)
+        {
+            typedState.ResumeGeneration = checked(typedState.ResumeGeneration + 1);
+        }
         AddOrUpdateTask(taskId, typedState);
     }
 
