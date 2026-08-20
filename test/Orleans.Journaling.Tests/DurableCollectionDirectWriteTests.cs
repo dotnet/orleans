@@ -205,8 +205,6 @@ public sealed class DurableCollectionDirectWriteTests
 
         public ValueTask WriteStateAsync(CancellationToken cancellationToken) => default;
 
-        public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
-
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
     }
 
