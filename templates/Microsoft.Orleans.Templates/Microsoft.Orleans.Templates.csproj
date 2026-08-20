@@ -1,4 +1,40 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <UsingTask
+    TaskName="SetOrleansTemplatePackageVersion"
+    TaskFactory="RoslynCodeTaskFactory"
+    AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <ManifestPath ParameterType="System.String" Required="true" />
+      <DevelopmentVersion ParameterType="System.String" Required="true" />
+      <PackageVersion ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Text" />
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
+        var contents = File.ReadAllText(ManifestPath);
+        var developmentDefault = $"\"defaultValue\": \"{DevelopmentVersion}\"";
+        var packageDefault = $"\"defaultValue\": \"{PackageVersion}\"";
+        var defaultIndex = contents.IndexOf(developmentDefault, StringComparison.Ordinal);
+
+        if (defaultIndex < 0
+            || contents.IndexOf(developmentDefault, defaultIndex + developmentDefault.Length, StringComparison.Ordinal) >= 0)
+        {
+            Log.LogError(
+                $"Template manifest '{ManifestPath}' must contain exactly one default Orleans version '{DevelopmentVersion}'.");
+        }
+        else
+        {
+            contents = contents.Remove(defaultIndex, developmentDefault.Length).Insert(defaultIndex, packageDefault);
+            File.WriteAllText(ManifestPath, contents, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        }
+        ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <PackageId>Microsoft.Orleans.Templates</PackageId>
@@ -16,11 +52,44 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);NU5128</NoWarn>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PrepareTemplateManifestsForPack</TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Remove="templates\**\*" />
-    <Content Include="templates\**\*" Exclude="templates\**\bin\**;templates\**\obj\**" />
+    <Content
+      Include="templates\**\*"
+      Exclude="templates\**\bin\**;templates\**\obj\**;templates\**\.template.config\template.json" />
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
+
+  <Target Name="PrepareTemplateManifestsForPack">
+    <PropertyGroup>
+      <_TemplatePackRoot>$(IntermediateOutputPath)template-pack\</_TemplatePackRoot>
+      <_TemplateDevelopmentOrleansVersion>10.0.0-dev</_TemplateDevelopmentOrleansVersion>
+      <_OrleansTemplateManifest>$(_TemplatePackRoot)templates\orleans\.template.config\template.json</_OrleansTemplateManifest>
+      <_OrleansWebTemplateManifest>$(_TemplatePackRoot)templates\orleans-web\.template.config\template.json</_OrleansWebTemplateManifest>
+    </PropertyGroup>
+
+    <Copy
+      SourceFiles="templates\orleans\.template.config\template.json;templates\orleans-web\.template.config\template.json"
+      DestinationFiles="$(_OrleansTemplateManifest);$(_OrleansWebTemplateManifest)" />
+    <SetOrleansTemplatePackageVersion
+      ManifestPath="$(_OrleansTemplateManifest)"
+      DevelopmentVersion="$(_TemplateDevelopmentOrleansVersion)"
+      PackageVersion="$(PackageVersion)" />
+    <SetOrleansTemplatePackageVersion
+      ManifestPath="$(_OrleansWebTemplateManifest)"
+      DevelopmentVersion="$(_TemplateDevelopmentOrleansVersion)"
+      PackageVersion="$(PackageVersion)" />
+
+    <ItemGroup>
+      <TfmSpecificPackageFile
+        Include="$(_OrleansTemplateManifest)"
+        PackagePath="content\templates\orleans\.template.config\template.json" />
+      <TfmSpecificPackageFile
+        Include="$(_OrleansWebTemplateManifest)"
+        PackagePath="content\templates\orleans-web\.template.config\template.json" />
+    </ItemGroup>
+  </Target>
 </Project>

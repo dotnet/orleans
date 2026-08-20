@@ -26,7 +26,7 @@ Both templates target .NET 10 by default. Pass `--framework net8.0` to target .N
 dotnet new orleans --name MyOrleansApp --framework net8.0
 ```
 
-Templates reference the current stable Orleans release. Pass `--orleans-version` when your application needs another Orleans version:
+Templates reference the Orleans version shipped with the template package, including prerelease versions. Pass `--orleans-version` to select another Orleans version:
 
 ```dotnetcli
 dotnet new orleans-web --name MyOrleansWebApp --orleans-version 10.2.2
