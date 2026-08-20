@@ -584,13 +584,13 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         }
         finally
         {
+            UnlockRange(addedRange, current.Version, tcs, sw.Elapsed, GrainDirectoryEvents.AcquireOperationName);
+
             if (duplicateActivations.Count > 0)
             {
                 cleanupTask = DeleteDuplicateActivationsAsync(duplicateActivations);
                 _recoveryCleanupTasks.Add((addedRange, current.Version, cleanupTask));
             }
-
-            UnlockRange(addedRange, current.Version, tcs, sw.Elapsed, GrainDirectoryEvents.AcquireOperationName);
         }
 
         try
