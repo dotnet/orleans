@@ -30,24 +30,34 @@ internal sealed class DurableTaskPopulator : IConverter<DurableTask, DurableTask
 {
     public void DeepCopy(DurableTask input, DurableTask output, CopyContext context)
     {
-        // No-op
+        EnsureRequest(input);
+        EnsureRequest(output);
     }
 
     public void Populate(in DurableTaskSurrogate surrogate, DurableTask value)
     {
-        // No-op
+        EnsureRequest(value);
     }
 
     DurableTask IConverter<DurableTask, DurableTaskSurrogate>.ConvertFromSurrogate(in DurableTaskSurrogate surrogate)
-    {
-        // Populator will be used instead.
-        throw new NotImplementedException();
-    }
+        => throw GetUnsupportedSerializationException();
 
     DurableTaskSurrogate IConverter<DurableTask, DurableTaskSurrogate>.ConvertToSurrogate(in DurableTask value)
     {
+        EnsureRequest(value);
         return default;
     }
+
+    private static void EnsureRequest(DurableTask value)
+    {
+        if (value is not IDurableTaskRequest)
+        {
+            throw GetUnsupportedSerializationException();
+        }
+    }
+
+    private static NotSupportedException GetUnsupportedSerializationException() =>
+        new("DurableTask values cannot be serialized directly. Only generated durable grain-call requests are serializable.");
 }
 
 [RegisterConverter, RegisterCopier]
@@ -55,24 +65,34 @@ internal sealed class DurableTaskPopulator<T> : IConverter<DurableTask<T>, Durab
 {
     public void DeepCopy(DurableTask<T> input, DurableTask<T> output, CopyContext context)
     {
-        // No-op
+        EnsureRequest(input);
+        EnsureRequest(output);
     }
 
     public void Populate(in DurableTaskSurrogate surrogate, DurableTask<T> value)
     {
-        // No-op
+        EnsureRequest(value);
     }
 
     DurableTask<T> IConverter<DurableTask<T>, DurableTaskSurrogate>.ConvertFromSurrogate(in DurableTaskSurrogate surrogate)
-    {
-        // Populator will be used instead.
-        throw new NotImplementedException();
-    }
+        => throw GetUnsupportedSerializationException();
 
     DurableTaskSurrogate IConverter<DurableTask<T>, DurableTaskSurrogate>.ConvertToSurrogate(in DurableTask<T> value)
     {
+        EnsureRequest(value);
         return default;
     }
+
+    private static void EnsureRequest(DurableTask<T> value)
+    {
+        if (value is not IDurableTaskRequest)
+        {
+            throw GetUnsupportedSerializationException();
+        }
+    }
+
+    private static NotSupportedException GetUnsupportedSerializationException() =>
+        new("DurableTask<T> values cannot be serialized directly. Only generated durable grain-call requests are serializable.");
 }
 
 [GenerateSerializer, Immutable]
