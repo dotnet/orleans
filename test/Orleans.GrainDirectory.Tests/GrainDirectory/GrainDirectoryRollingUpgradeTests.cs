@@ -1111,17 +1111,6 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         string stage,
         StaleCacheEvidenceCapture staleCacheEvidence)
     {
-        var distributedPartitionCount = 0;
-        foreach (var silo in cluster.Silos)
-        {
-            if (silo.ServiceProvider.GetService<DirectoryMembershipService>() is not { } membershipService)
-            {
-                continue;
-            }
-
-            distributedPartitionCount += membershipService.PartitionsPerSilo;
-        }
-
         // Validate bounded grains using fresh directory lookups before checking phase-wide activation invariants.
         await ValidateObservedAddressesAsync(
             cluster,
@@ -1132,9 +1121,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             staleCacheEvidence);
 
         await ValidateDirectoryPhaseInvariantsAsync(cluster, stage);
-        output.WriteLine(
-            $"  Validated {observations.Count} bounded tracked grains and "
-            + $"{distributedPartitionCount} DistributedGrainDirectory partitions during '{stage}'.");
+        output.WriteLine($"  Validated {observations.Count} bounded tracked grains during '{stage}'.");
     }
 
     private static async Task ValidateObservedAddressesAsync(
