@@ -223,6 +223,10 @@ namespace Orleans.Journaling
     {
         long PendingWriteByteCount { get; }
 
+        bool SupportsRollback { get; }
+
+        bool SupportsObservers { get; }
+
         System.Threading.Tasks.ValueTask DeleteStateAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask InitializeAsync(System.Threading.CancellationToken cancellationToken);
         void RegisterState(string name, IJournaledState state);

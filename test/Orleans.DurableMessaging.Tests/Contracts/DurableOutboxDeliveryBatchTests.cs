@@ -238,6 +238,17 @@ public sealed class DurableOutboxDeliveryBatchTests
     }
 
     [Fact]
+    public void ConstructionWithoutObserverSupport_FailsWithSpecificDiagnostic()
+    {
+        var exception = Assert.Throws<TargetInvocationException>(
+            () => new OutboxFixture(supportsObservers: false));
+
+        var diagnostic = Assert.IsType<InvalidOperationException>(exception.InnerException);
+        Assert.Contains("Durable messaging", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("IJournaledStateManager.RegisterObserver", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task NormalDeliveryCommitsBatchOnce()
     {
         var fixture = new OutboxFixture(
@@ -283,7 +294,8 @@ public sealed class DurableOutboxDeliveryBatchTests
             int maxDeliveryAttempts = 3,
             Exception? writeException = null,
             Exception? revertException = null,
-            bool hasDurableMessage = true)
+            bool hasDurableMessage = true,
+            bool supportsObservers = true)
         {
             MessageId = Guid.NewGuid();
             SenderId = GrainId.Create("sender", "1");
@@ -303,7 +315,8 @@ public sealed class DurableOutboxDeliveryBatchTests
             Manager = new TestStateManager(
                 [Messages, MessageStates, DeadLetters],
                 writeException,
-                revertException);
+                revertException,
+                supportsObservers);
 
             var delivery = deliver ?? (_ => ValueTask.FromResult(DeliveryResult.Accepted()));
             var inbox = Substitute.For<IDurableInboxExtension>();
@@ -500,7 +513,8 @@ public sealed class DurableOutboxDeliveryBatchTests
     private sealed class TestStateManager(
         IEnumerable<ITestDurableState> states,
         Exception? writeException,
-        Exception? revertException) : IJournaledStateManager
+        Exception? revertException,
+        bool supportsObservers) : IJournaledStateManager
     {
         private readonly ITestDurableState[] _states = states.ToArray();
         private object[] _durableSnapshots = states.Select(static state => state.Capture()).ToArray();
@@ -508,6 +522,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         private IJournaledStateObserver? _observer;
 
         public bool SupportsRollback => true;
+        public bool SupportsObservers => supportsObservers;
         public int WriteCount { get; private set; }
         public int WriteCompletedCount { get; private set; }
         public int RevertCount { get; private set; }
