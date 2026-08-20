@@ -60,6 +60,7 @@ internal sealed partial class DurableInboxExtension :
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly CancellationTokenSource _shutdownCts = new();
     private int _metricsActive;
+    private int _reportedDepth;
     private bool _recoveryCompleted;
 
     /// <summary>
@@ -121,6 +122,7 @@ internal sealed partial class DurableInboxExtension :
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(jobTimeProvider);
         ArgumentNullException.ThrowIfNull(options);
+        DurableMessagingStateManagerCapabilities.Validate(stateManager);
 
         _grainContext = grainContext;
         _grainFactory = grainFactory;
@@ -285,7 +287,7 @@ internal sealed partial class DurableInboxExtension :
                 _inboxDict[key] = envelope;
                 _messageStates[key] = new InboxMessageState();
                 _provisionalAcceptances.Add(key);
-                _instruments.OnInboxDepthChanged(1);
+                UpdateInboxDepth(1);
                 var committed = false;
                 try
                 {
@@ -386,7 +388,11 @@ internal sealed partial class DurableInboxExtension :
 
     public void OnRecoveryStarted() => _recoveryCompleted = false;
 
-    public void OnRecoveryCompleted() => _recoveryCompleted = true;
+    public void OnRecoveryCompleted()
+    {
+        _recoveryCompleted = true;
+        ReconcileInboxDepth();
+    }
 
     public async ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
@@ -441,11 +447,11 @@ internal sealed partial class DurableInboxExtension :
             return result!;
         }
 
-        if (_pumpResults.TryStart(key))
+        if (_pumpResults.TryStart(key, cancellationToken, out var execution))
         {
             var state = new PumpTimerState(
                 this,
-                key,
+                execution,
                 ownershipId,
                 hasStableOwnership,
                 cancellationToken);
@@ -464,28 +470,45 @@ internal sealed partial class DurableInboxExtension :
     }
 
     private async Task RunPumpTimerAsync(
-        DurableMessagingPumpExecutionKey key,
+        DurableMessagingPumpExecution execution,
         string ownershipId,
         bool hasStableOwnership,
         CancellationToken jobCancellation,
         CancellationToken timerCancellation)
     {
+        if (!_pumpResults.TryBegin(execution))
+        {
+            return;
+        }
+
+        DurableJobRunResult? result = null;
+        Exception? failure = null;
         try
         {
             using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
                 jobCancellation,
                 timerCancellation,
                 _shutdownCts.Token);
-            var result = await ExecuteJobCoreAsync(
+            result = await ExecuteJobCoreAsync(
                 ownershipId,
                 clearOwnershipWhenEmpty: true,
                 hasStableOwnership,
                 linkedCancellation.Token);
-            _pumpResults.Complete(key, result);
         }
         catch (Exception exception)
         {
-            _pumpResults.Fail(key, exception);
+            failure = exception;
+        }
+        finally
+        {
+            if (failure is null)
+            {
+                _pumpResults.Complete(execution, result!);
+            }
+            else
+            {
+                _pumpResults.Fail(execution, failure);
+            }
         }
     }
 
@@ -804,7 +827,7 @@ internal sealed partial class DurableInboxExtension :
         _shutdownCts.Cancel();
         if (Interlocked.Exchange(ref _metricsActive, 0) != 0)
         {
-            _instruments.OnInboxDepthChanged(-_inboxDict.Count);
+            _instruments.OnInboxDepthChanged(-Interlocked.Exchange(ref _reportedDepth, 0));
         }
     }
 
@@ -818,7 +841,32 @@ internal sealed partial class DurableInboxExtension :
     {
         if (Interlocked.Exchange(ref _metricsActive, 1) == 0)
         {
+            Volatile.Write(ref _reportedDepth, _inboxDict.Count);
             _instruments.OnInboxDepthChanged(_inboxDict.Count);
+        }
+    }
+
+    private void UpdateInboxDepth(int delta)
+    {
+        if (Volatile.Read(ref _metricsActive) != 0)
+        {
+            Interlocked.Add(ref _reportedDepth, delta);
+            _instruments.OnInboxDepthChanged(delta);
+        }
+    }
+
+    private void ReconcileInboxDepth()
+    {
+        if (Volatile.Read(ref _metricsActive) == 0)
+        {
+            return;
+        }
+
+        var count = _inboxDict.Count;
+        var delta = count - Interlocked.Exchange(ref _reportedDepth, count);
+        if (delta != 0)
+        {
+            _instruments.OnInboxDepthChanged(delta);
         }
     }
 
@@ -829,10 +877,7 @@ internal sealed partial class DurableInboxExtension :
             return false;
         }
 
-        if (Volatile.Read(ref _metricsActive) != 0)
-        {
-            _instruments.OnInboxDepthChanged(-1);
-        }
+        UpdateInboxDepth(-1);
 
         return true;
     }
@@ -896,7 +941,7 @@ internal sealed partial class DurableInboxExtension :
 
     private sealed class PumpTimerState(
         DurableInboxExtension owner,
-        DurableMessagingPumpExecutionKey key,
+        DurableMessagingPumpExecution execution,
         string ownershipId,
         bool hasStableOwnership,
         CancellationToken jobCancellation)
@@ -908,7 +953,7 @@ internal sealed partial class DurableInboxExtension :
             try
             {
                 await owner.RunPumpTimerAsync(
-                    key,
+                    execution,
                     ownershipId,
                     hasStableOwnership,
                     jobCancellation,

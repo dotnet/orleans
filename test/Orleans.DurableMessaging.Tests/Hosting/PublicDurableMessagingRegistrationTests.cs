@@ -1,7 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.DurableMessaging.Configuration;
 using Orleans.Hosting;
+using Orleans.Journaling;
 using Orleans.Runtime;
 using Xunit;
 
@@ -62,6 +64,36 @@ public sealed class PublicDurableMessagingRegistrationTests
     }
 
     [Fact]
+    public async Task AddDurableMessaging_StateManagerWithoutObserverSupportFailsWithSpecificDiagnostic()
+    {
+        var services = new ServiceCollection();
+        services.AddDurableMessaging();
+        services.AddScoped<IJournaledStateManager, RollbackOnlyStateManager>();
+        await using var provider = services.BuildServiceProvider();
+        var extensionType = services.Single(descriptor => descriptor.ServiceType.Name == "DurableInboxExtension").ServiceType;
+
+        var exception = Assert.Throws<InvalidOperationException>(() => provider.GetRequiredService(extensionType));
+
+        Assert.Contains("Durable messaging", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("IJournaledStateManager.RegisterObserver", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("observer support", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AddDurableMessaging_DoesNotReplaceUnrelatedConstructionErrors()
+    {
+        var services = new ServiceCollection();
+        services.AddDurableMessaging();
+        services.AddScoped<IJournaledStateManager, FullyCapableStateManager>();
+        await using var provider = services.BuildServiceProvider();
+        var extensionType = services.Single(descriptor => descriptor.ServiceType.Name == "DurableInboxExtension").ServiceType;
+
+        var exception = Assert.Throws<InvalidOperationException>(() => provider.GetRequiredService(extensionType));
+
+        Assert.DoesNotContain("observer support", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void ExternalConsumerAssembly_HasNoFriendAccessToDurableMessaging()
     {
         var sourceAssembly = typeof(IDurableInbox).Assembly;
@@ -79,5 +111,30 @@ public sealed class PublicDurableMessagingRegistrationTests
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => utcNow;
+    }
+
+    private class RollbackOnlyStateManager : IJournaledStateManager
+    {
+        public bool SupportsRollback => true;
+        public virtual bool SupportsObservers => false;
+        public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
+        public void RegisterState(string name, IJournaledState state) { }
+        public virtual void RegisterObserver(IJournaledStateObserver observer) =>
+            throw new NotSupportedException();
+        public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state)
+        {
+            state = null;
+            return false;
+        }
+
+        public ValueTask WriteStateAsync(CancellationToken cancellationToken) => default;
+        public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) => default;
+        public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
+    }
+
+    private sealed class FullyCapableStateManager : RollbackOnlyStateManager
+    {
+        public override bool SupportsObservers => true;
+        public override void RegisterObserver(IJournaledStateObserver observer) { }
     }
 }
