@@ -3,6 +3,7 @@ using System.Linq;
 using System.Net;
 using Orleans.Runtime;
 using Orleans.Testing.Reminders;
+using TestExtensions;
 using Xunit;
 using ReminderEvents = Orleans.Reminders.Diagnostics.ReminderEvents;
 
@@ -87,6 +88,7 @@ public class ReminderEventsTests
     public async Task ReminderDiagnosticObserver_WaitsForTickCondition_UntilConditionIsSatisfied()
     {
         using var observer = ReminderDiagnosticObserver.Create();
+        using var cancellation = new CancellationTokenSource(TestConstants.InitTimeout);
         var grainId = GrainId.Create("test", "grain");
         const string reminderName = "reminder";
         var now = DateTime.UtcNow;
@@ -107,7 +109,7 @@ public class ReminderEventsTests
 
                 return Task.FromResult(currentCheck >= 3);
             },
-            CancellationToken.None,
+            cancellation.Token,
             reminderName);
 
         Assert.False(waitTask.IsCompleted);
@@ -119,7 +121,7 @@ public class ReminderEventsTests
             new TickStatus(now, period, now),
             siloAddress);
 
-        await secondConditionCheck.Task;
+        await secondConditionCheck.Task.WaitAsync(cancellation.Token);
         Assert.False(waitTask.IsCompleted);
 
         ReminderEvents.EmitTickCompleted(
