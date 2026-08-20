@@ -1,0 +1,212 @@
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Concurrency;
+using Orleans.DurableMessaging;
+using Orleans.Journaling;
+using Orleans.Runtime;
+using Orleans.Serialization;
+using Orleans.Serialization.Session;
+
+namespace Orleans.DurableMessaging.Tests.Support;
+
+public interface IDurableMessagingTestGrain : IGrainWithGuidKey
+{
+    Task<Guid> SendAsync(GrainId target, string route, DurableTestMessage message);
+    Task<Guid> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message);
+    [AlwaysInterleave] Task<DurableEndpointSnapshot> GetSnapshotAsync();
+    Task RequestDeactivationAsync();
+}
+
+[GenerateSerializer, Immutable]
+public sealed record DurableTestMessage(
+    [property: Id(0)] Guid LogicalId,
+    [property: Id(1)] int Sequence,
+    [property: Id(2)] string Value,
+    [property: Id(3)] GrainId? ForwardTo = null,
+    [property: Id(4)] bool ThrowAfterStaging = false);
+
+[GenerateSerializer, Immutable]
+public sealed record DurableEffect(
+    [property: Id(0)] Guid LogicalId,
+    [property: Id(1)] int Count,
+    [property: Id(2)] int Sequence,
+    [property: Id(3)] string Value);
+
+[GenerateSerializer, Immutable]
+public sealed record DurableEndpointSnapshot(
+    [property: Id(0)] Guid ActivationId,
+    [property: Id(1)] string SiloAddress,
+    [property: Id(2)] int InboxCount,
+    [property: Id(3)] int OutboxCount,
+    [property: Id(4)] int MaxConcurrentHandlers,
+    [property: Id(5)] IReadOnlyList<DurableEffect> Effects,
+    [property: Id(6)] IReadOnlyList<DurableDeadLetterSnapshot> InboxDeadLetters,
+    [property: Id(7)] IReadOnlyList<DurableDeadLetterSnapshot> OutboxDeadLetters,
+    [property: Id(8)] string? InboxJobId);
+
+[GenerateSerializer, Immutable]
+public sealed record DurableDeadLetterSnapshot(
+    [property: Id(0)] Guid MessageId,
+    [property: Id(1)] string Route,
+    [property: Id(2)] string Reason,
+    [property: Id(3)] int AttemptCount,
+    [property: Id(4)] DateTimeOffset DeadLetteredAt);
+
+[GrainType("durable-messaging-public-test")]
+public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingTestGrain, IJournaledStateObserver
+{
+    private readonly IDurableInbox _inbox;
+    private readonly IDurableOutbox _outbox;
+    private readonly IDurableMessagingDiagnostics _diagnostics;
+    private readonly IDurableDictionary<Guid, DurableEffect> _effects;
+    private readonly SerializerSessionPool _sessions;
+    private readonly IDurableValue<string> _inboxJobId;
+    private readonly ILocalSiloDetails _siloDetails;
+    private readonly HandlerProbe _handlerProbe;
+    private readonly SnapshotProbe _snapshotProbe;
+    private readonly Guid _activationId = Guid.NewGuid();
+    private int _activeHandlers;
+    private int _maxConcurrentHandlers;
+
+    public DurableMessagingTestGrain(
+        IDurableInbox inbox,
+        IDurableOutbox outbox,
+        IDurableMessagingDiagnostics diagnostics,
+        [FromKeyedServices("test-effects")] IDurableDictionary<Guid, DurableEffect> effects,
+        [FromKeyedServices("inbox-job-id")] IDurableValue<string> inboxJobId,
+        SerializerSessionPool sessions,
+        ILocalSiloDetails siloDetails,
+        HandlerProbe handlerProbe,
+        SnapshotProbe snapshotProbe)
+    {
+        _inbox = inbox;
+        _outbox = outbox;
+        _diagnostics = diagnostics;
+        _effects = effects;
+        _inboxJobId = inboxJobId;
+        _sessions = sessions;
+        _siloDetails = siloDetails;
+        _handlerProbe = handlerProbe;
+        _snapshotProbe = snapshotProbe;
+        StateManager.RegisterObserver(this);
+    }
+
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        _inbox.RegisterHandler(new TypedMessageHandler(this));
+        return base.OnActivateAsync(cancellationToken);
+    }
+
+    public async Task<Guid> SendAsync(GrainId target, string route, DurableTestMessage message)
+    {
+        var envelope = CreateEnvelope(target, route, message);
+        _outbox.Send(envelope);
+        await WriteStateAsync();
+        return envelope.MessageId;
+    }
+
+    public Task<Guid> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message)
+    {
+        var envelope = CreateEnvelope(target, route, message);
+        _outbox.Send(envelope);
+        return Task.FromResult(envelope.MessageId);
+    }
+
+    public Task<DurableEndpointSnapshot> GetSnapshotAsync() => Task.FromResult(CreateSnapshot());
+
+    public Task RequestDeactivationAsync()
+    {
+        DeactivateOnIdle();
+        return Task.CompletedTask;
+    }
+
+    public void OnWriteStarted()
+    {
+    }
+
+    public void OnWriteCompleted() => PublishSnapshot();
+    public void OnRecoveryCompleted() => PublishSnapshot();
+
+    private DurableEnvelope CreateEnvelope(GrainId target, string route, DurableTestMessage message) =>
+        new DurableEnvelopeBuilder(_sessions, this.GetGrainId())
+            .To(target, route)
+            .WithBody(message)
+            .Build();
+
+    private async ValueTask HandleAsync(
+        DurableTestMessage message,
+        IInboxHandlerContext context,
+        CancellationToken cancellationToken)
+    {
+        var active = Interlocked.Increment(ref _activeHandlers);
+        _maxConcurrentHandlers = Math.Max(_maxConcurrentHandlers, active);
+        try
+        {
+            if (_handlerProbe.TryGet(this.GetGrainId(), context.Envelope.RouteKey, out var gate))
+            {
+                gate.Entered.TrySetResult();
+                await gate.Continue.Task.WaitAsync(cancellationToken);
+            }
+
+            _effects.TryGetValue(message.LogicalId, out var prior);
+            _effects[message.LogicalId] = new DurableEffect(
+                message.LogicalId,
+                (prior?.Count ?? 0) + 1,
+                message.Sequence,
+                message.Value);
+
+            if (message.ForwardTo is { } target)
+            {
+                var outgoing = context.CreateEnvelope()
+                    .To(target, "messages/forwarded")
+                    .WithBody(message with { ForwardTo = null, ThrowAfterStaging = false })
+                    .Build();
+                context.Send(outgoing);
+            }
+
+            if (message.ThrowAfterStaging)
+            {
+                throw new InvalidOperationException($"Injected handler failure for {message.LogicalId}.");
+            }
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _activeHandlers);
+        }
+    }
+
+    private void PublishSnapshot() => _snapshotProbe.Publish(this.GetGrainId(), CreateSnapshot());
+
+    private DurableEndpointSnapshot CreateSnapshot() =>
+        new(
+            _activationId,
+            _siloDetails.SiloAddress.ToParsableString(),
+            _inbox.Count,
+            _outbox.Count,
+            _maxConcurrentHandlers,
+            _effects.Values.OrderBy(static effect => effect.Sequence).ToArray(),
+            _diagnostics.InboxDeadLetters.Select(ToSnapshot).ToArray(),
+            _diagnostics.OutboxDeadLetters.Select(ToSnapshot).ToArray(),
+            _inboxJobId.Value);
+
+    private static DurableDeadLetterSnapshot ToSnapshot(DurableDeadLetter deadLetter) =>
+        new(
+            deadLetter.Message.MessageId,
+            deadLetter.Message.RouteKey,
+            deadLetter.Reason,
+            deadLetter.AttemptCount,
+            deadLetter.DeadLetteredAt);
+
+    private sealed class TypedMessageHandler(DurableMessagingTestGrain owner) : IInboxHandler<DurableTestMessage>
+    {
+        bool IInboxHandler.CanHandle(IInboxHandlerContext context) =>
+            context.Envelope.RouteKey.StartsWith("messages/", StringComparison.Ordinal)
+            || context.Envelope.RouteKey == "typed";
+
+        public ValueTask HandleAsync(
+            DurableTestMessage message,
+            IInboxHandlerContext context,
+            CancellationToken cancellationToken) =>
+            owner.HandleAsync(message, context, cancellationToken);
+    }
+
+}
