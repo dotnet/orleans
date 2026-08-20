@@ -1,4 +1,4 @@
-namespace System.Distributed.DurableTasks;
+namespace Orleans.DurableTasks;
 
 /// <summary>Provides the host entry points for running and canceling durable definitions.</summary>
 public static class DurableTaskRuntimeHelper
