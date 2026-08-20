@@ -30,11 +30,16 @@ cancellation. Task definitions and application code depend only on this assembly
   Suppressed `ExecutionContext` flow and unsafe dispatch detach that causality and behave as
   external observers.
 - Callbacks registered directly on `CancellationToken` are ordinary synchronous .NET observers,
-  not durable cancellation callbacks. They run using standard registration-time `ExecutionContext`
-  capture and optional `SynchronizationContext` dispatch. They must return promptly and must not
+  not durable cancellation callbacks. They follow standard registration-time `ExecutionContext`
+  capture and optional `SynchronizationContext` dispatch. A callback registered outside a durable
+  cancellation callback is an external observer. One registered inside an active durable callback
+  inherits its cancellation-operation causality unless execution-context flow is suppressed or an
+  unsafe registration API is used. This also applies to immediate registration on an already-canceled
+  token: the context current at registration determines its causality.
+- Regardless of inherited causality, ordinary token callbacks must return promptly and must not
   synchronously block on `RequestCancellationAsync` or any other durable cancellation completion.
-  Use `RegisterCancellationCallbackAsync` for asynchronous work, cross-context cancellation
-  dependencies, and failure aggregation.
+  Use `RegisterCancellationCallbackAsync` for asynchronous work, awaited cross-context cancellation
+  dependencies, failure aggregation, and clear cycle semantics.
 - Disposing a durable cancellation registration prevents a snapshotted callback which has not
   started, or waits for an active callback to finish, including when that callback fails. A callback
   can dispose its own registration without blocking.
@@ -46,10 +51,11 @@ cancellation. Task definitions and application code depend only on this assembly
 `RequestCancellationAsync` starts the durable request once and all callers observe the same
 monotonic completion. External callers and acyclic durable callback dependencies wait until all
 observers finish and receive their aggregated failures. Dependency edges are created only from
-the explicit cancellation operation flowed by `RegisterCancellationCallbackAsync`; there is no
-global active-operation inference. If adding an edge would close a durable callback cycle, the
-target cancellation is initiated but the cycle-closing call returns without waiting on that edge.
-Completed operations release their graph edges.
+the explicit cancellation operation flowed by `RegisterCancellationCallbackAsync`, including when
+standard `ExecutionContext` capture carries that operation into an ordinary token callback. There
+is no global or thread activity inference. If adding an edge would close a durable callback cycle,
+the target cancellation is initiated but the cycle-closing call returns without waiting on that
+edge. Completed operations release their graph edges.
 
 The cancellation token passed to `RequestCancellationAsync` only abandons that caller's wait.
 It cannot reverse or withdraw the durable request.

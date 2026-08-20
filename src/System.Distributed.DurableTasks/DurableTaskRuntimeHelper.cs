@@ -23,15 +23,21 @@ public static class DurableTaskRuntimeHelper
     /// <remarks>
     /// Repeated requests share one completion and the aggregated failures of its durable and ordinary
     /// cancellation observers. External callers and acyclic durable dependencies wait for that
-    /// completion. When an explicitly flowed durable cancellation operation would close a dependency
-    /// cycle, the target request is still initiated but that cycle-closing edge is not awaited.
+    /// completion. Dependencies are based only on the cancellation operation explicitly flowed by
+    /// <see cref="DurableExecutionContext.RegisterCancellationCallbackAsync"/> and standard
+    /// <see cref="ExecutionContext"/> capture, including capture by an ordinary token callback
+    /// registered while a durable callback is active. There is no global or thread-based inference.
+    /// When an explicitly flowed operation would close a dependency cycle, the target request is
+    /// still initiated but that cycle-closing edge is not awaited.
     ///
     /// <para>
     /// The <paramref name="cancellationToken"/> only abandons this caller's wait; it does not undo the
-    /// durable request. Do not synchronously wait for this method from a callback registered directly
-    /// on <see cref="DurableExecutionContext.CancellationToken"/>. Such callbacks are ordinary
-    /// synchronous .NET observers; asynchronous or cross-context cancellation belongs in
-    /// <see cref="DurableExecutionContext.RegisterCancellationCallbackAsync"/>.
+    /// durable request. Callbacks registered directly on
+    /// <see cref="DurableExecutionContext.CancellationToken"/> follow standard registration-time
+    /// execution-context behavior, but remain synchronous observers: they must return promptly and
+    /// must not synchronously wait for this method. Use
+    /// <see cref="DurableExecutionContext.RegisterCancellationCallbackAsync"/> for asynchronous work,
+    /// awaited cross-context cancellation dependencies, failure aggregation, and clear cycle semantics.
     /// </para>
     /// </remarks>
     public static Task RequestCancellationAsync(
