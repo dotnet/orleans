@@ -1,7 +1,7 @@
 ---
 title: Cluster membership protocol
 description: Understand Orleans membership storage, failure detection, ordered views, and death-vote invariants.
-ms.date: 08/11/2026
+ms.date: 08/20/2026
 ms.topic: concept-article
 ---
 
@@ -30,6 +30,12 @@ flowchart LR
     Manager --> Service
     Service --> Consumers
 ```
+
+## Consume membership views
+
+Silo-hosted services and grain classes can inject <xref:Orleans.Runtime.IClusterMembershipService>. <xref:Orleans.Runtime.IClusterMembershipService.CurrentSnapshot*> is the latest immutable membership view observed by the local silo. <xref:Orleans.Runtime.IClusterMembershipService.MembershipUpdates*> begins with that view and then yields snapshots with strictly increasing <xref:Orleans.Runtime.ClusterMembershipSnapshot.Version*> values.
+
+Membership versions establish a total order across the cluster, so consumers can compare the version used for a decision with a newer view and detect stale decisions. When coordination requires a minimum version, <xref:Orleans.Runtime.IClusterMembershipService.Refresh*> waits until the local view reaches it. The [Basic Clustering sample](https://github.com/dotnet/orleans/tree/main/samples/BasicClustering) demonstrates a hosted service observing membership updates.
 
 ## Joining
 
@@ -115,6 +121,7 @@ This separation lets those services add stronger invariants without expanding th
 
 ## Source and tests
 
+- [`IClusterMembershipService`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/MembershipService/IClusterMembershipService.cs) defines the public snapshot, update, and refresh API.
 - [`MembershipAgent`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/MembershipService/MembershipAgent.cs) drives joining and active-state transitions.
 - [`MembershipTableManager`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/MembershipService/MembershipTableManager.cs) coordinates table updates and death declarations.
 - [`ClusterHealthMonitor`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/MembershipService/ClusterHealthMonitor.cs) owns peer monitoring.
