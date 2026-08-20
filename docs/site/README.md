@@ -151,7 +151,7 @@ Actions**. The workflow publishes after pushes to `main`, nightly at 09:00 UTC,
 and on manual dispatch.
 
 The production build also emits compatibility redirects for the two legacy
-`gh-pages` site maps. `src/data/legacy-jekyll-pages.json` maps every
+`gh-pages` sitemaps. `src/data/legacy-jekyll-pages.json` maps every
 pre-DocFX documentation page to its best current successor. GitHub Pages serves
 each generated `.html` redirect through its historical extensionless alias as
 well. `src/data/legacy-pages.json` captures the final DocFX-era site. Existing
