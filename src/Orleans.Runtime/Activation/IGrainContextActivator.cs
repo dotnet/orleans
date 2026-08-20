@@ -57,11 +57,19 @@ namespace Orleans.Runtime
         /// <param name="address">The grain address.</param>
         /// <returns>The grain context.</returns>
         public IGrainContext CreateInstance(GrainAddress address)
+            => CreateInstance(address, deferActivation: false);
+
+        internal IGrainContext CreateInstance(GrainAddress address, bool deferActivation)
         {
             var grainId = address.GrainId;
             if (!_activators.TryGetValue(grainId.Type, out var activator))
             {
                 activator = this.CreateActivator(grainId.Type);
+            }
+
+            if (deferActivation && activator.Activator is IDeferredGrainContextActivator deferredActivator)
+            {
+                return deferredActivator.CreateDeferredContext(address, activator.ConfigureActions);
             }
 
             return activator.Activator.CreateContext(address, activator.ConfigureActions);
@@ -132,6 +140,11 @@ namespace Orleans.Runtime
         /// <param name="configureActions">The actions which must be used to configure the context before grain construction begins.</param>
         /// <returns>The newly created grain context.</returns>
         public IGrainContext CreateContext(GrainAddress address, IConfigureGrainContext[] configureActions);
+    }
+
+    internal interface IDeferredGrainContextActivator : IGrainContextActivator
+    {
+        IGrainContext CreateDeferredContext(GrainAddress address, IConfigureGrainContext[] configureActions);
     }
 
     /// <summary>

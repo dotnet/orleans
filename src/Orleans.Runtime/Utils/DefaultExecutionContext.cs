@@ -13,22 +13,25 @@ internal static class DefaultExecutionContext
     internal static ExecutionContext CaptureDefault()
     {
         var completion = new TaskCompletionSource<ExecutionContext>(TaskCreationOptions.RunContinuationsAsynchronously);
-        ThreadPool.UnsafeQueueUserWorkItem(
-            static completion =>
-            {
-                try
+        if (!ThreadPool.UnsafeQueueUserWorkItem(
+                static completion =>
                 {
-                    completion.SetResult(
-                        ExecutionContext.Capture()
-                            ?? throw new InvalidOperationException("Could not capture the default execution context."));
-                }
-                catch (Exception exception)
-                {
-                    completion.SetException(exception);
-                }
-            },
-            completion,
-            preferLocal: false);
+                    try
+                    {
+                        completion.SetResult(
+                            ExecutionContext.Capture()
+                                ?? throw new InvalidOperationException("Could not capture the default execution context."));
+                    }
+                    catch (Exception exception)
+                    {
+                        completion.SetException(exception);
+                    }
+                },
+                completion,
+                preferLocal: false))
+        {
+            throw new InvalidOperationException("Could not queue work to capture the default execution context.");
+        }
 
         return completion.Task.GetAwaiter().GetResult();
     }
