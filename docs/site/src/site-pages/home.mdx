@@ -7,9 +7,9 @@ prev: false
 next: false
 head:
   - tag: title
-    content: Microsoft Orleans — Distributed systems, simplified
+    content: Microsoft Orleans — Distributed applications for .NET
 hero:
-  tagline: Distributed systems, simplified. <p>Build scalable, resilient applications using virtual actors and the familiar tools and patterns of .NET.</p>
+  tagline: Build business-critical distributed services in .NET. <p>Orleans combines the virtual actor model with runtime support for clustering, failure recovery, persistence, durable jobs, transactions, and streams.</p>
   image:
     alt: Microsoft Orleans
     file: ../../assets/orleans-logo.svg
@@ -26,24 +26,63 @@ hero:
 
 import { Card, CardGrid, Code, LinkCard } from '@astrojs/starlight/components';
 
-## Distributed systems, without distributed complexity
+## Features for stateful distributed applications
+
+Orleans combines a distributed programming model with runtime capabilities for building and operating stateful services. It is used across Microsoft to run critical services at large scale.
 
 <CardGrid>
   <Card title="Virtual actors" icon="puzzle">
-    Model your application as grains with stable identities, behavior, and state. Orleans activates and locates them on demand.
+    Model application entities as grains with stable identities, isolated behavior, and turn-based execution. [Explore grains](/orleans/docs/grains/).
   </Card>
-  <Card title="Automatic lifecycle" icon="setting">
-    Let the runtime place, activate, deactivate, and recover grains while your code focuses on business behavior.
+  <Card title="Durable state" icon="database">
+    Persist grain state with providers for Azure, AWS, Google Cloud, relational databases, Redis, and custom storage systems. [Explore persistence](/orleans/docs/grains/grain-persistence/).
   </Card>
-  <Card title="Elastic by design" icon="rocket">
-    Scale from one process to a resilient cluster without changing the programming model or managing actor placement.
+  <Card title="Streams and event processing" icon="random">
+    Connect producers and consumers using managed, persistent, or in-memory stream providers. [Explore streaming](/orleans/docs/streaming/).
   </Card>
-  <Card title="Built for .NET" icon="laptop">
-    Use interfaces, dependency injection, async/await, generic hosting, and the libraries your team already knows.
+  <Card title="Durable scheduling and execution" icon="clock">
+    Run activation-scoped callbacks, recurring durable reminders, and distributed one-time jobs. [Explore timers and reminders](/orleans/docs/grains/timers-and-reminders/).
+  </Card>
+  <Card title="Transactions" icon="approve-check">
+    Coordinate supported persistent state across grains using ACID transactions with serializable isolation. [Explore transactions](/orleans/docs/grains/transactions/).
+  </Card>
+  <Card title="Event sourcing" icon="code-branch">
+    Represent grain state as an ordered sequence of events using configurable log-consistency providers. [Explore event sourcing](/orleans/docs/grains/event-sourcing/).
+  </Card>
+  <Card title="Elastic scaling and load balancing" icon="analytics">
+    Add or remove silos while resource-aware placement, load shedding, and activation migration adapt work to cluster capacity and communication patterns. [Explore placement and load balancing](/orleans/docs/grains/grain-placement/).
+  </Card>
+  <Card title="Fault tolerance" icon="server">
+    Detect failed silos and reactivate grains on healthy hosts, restoring state written to durable storage. [Explore clusters and recovery](/orleans/docs/overview/#silos-and-clusters).
   </Card>
 </CardGrid>
 
-## Familiar code. Distributed by default.
+## Common application scenarios
+
+Orleans is well suited to applications with many independently addressable entities whose state and work partition by identity. [Explore the full scenarios and use cases guide](/orleans/docs/scenarios/).
+
+<CardGrid>
+  <Card title="AI agents and conversational sessions" icon="comment-alt">
+    Manage conversation state, tool configuration, pending work, and coordination for each agent session. [Read about AI agent scenarios](/orleans/docs/scenarios/#ai-agents-and-conversational-sessions).
+  </Card>
+  <Card title="Fraud, risk, and real-time decisioning" icon="padlock">
+    Apply rapidly changing account, market, policy, or event state to low-latency decisions. [Read about decisioning scenarios](/orleans/docs/scenarios/#fraud-protection-risk-and-low-latency-decisioning).
+  </Card>
+  <Card title="IoT and digital twins" icon="mobile-android">
+    Represent devices and assets with stable identities, evolving state, ordered commands, and scheduled work. [Read about IoT scenarios](/orleans/docs/scenarios/#internet-of-things-and-digital-twins).
+  </Card>
+  <Card title="Monitoring and job orchestration" icon="analytics">
+    Track resources, health, quotas, jobs, dependencies, retries, and progress over time. [Read about orchestration scenarios](/orleans/docs/scenarios/#monitoring-resource-governance-and-job-orchestration).
+  </Card>
+  <Card title="Multiplayer and online games" icon="star">
+    Coordinate players, rooms, matches, presence, progression, and authoritative session state. [Read about game scenarios](/orleans/docs/scenarios/#multiplayer-and-online-games).
+  </Card>
+  <Card title="Commerce and reservations" icon="database">
+    Manage carts, orders, accounts, reservations, subscriptions, and customer context. [Read about commerce scenarios](/orleans/docs/scenarios/#commerce-reservations-and-customer-services).
+  </Card>
+</CardGrid>
+
+## Programming model
 
 Define a grain contract, implement it as an ordinary .NET class, and call it from anywhere in the cluster.
 
@@ -69,35 +108,6 @@ public sealed class Counter : Grain, ICounter
 var total = await counter.Add(1);`} lang="csharp" title="Program.cs" />
   </div>
 </div>
-
-## Production capabilities included
-
-<CardGrid>
-  <LinkCard
-    icon="database"
-    href="/orleans/docs/grains/grain-persistence/"
-    title="Persistence"
-    description="Keep grain state in Azure Storage, Cosmos DB, relational databases, Redis, DynamoDB, or custom stores."
-  />
-  <LinkCard
-    icon="random"
-    href="/orleans/docs/streaming/"
-    title="Streaming"
-    description="Build reliable producers and consumers over managed, persistent, or in-memory stream providers."
-  />
-  <LinkCard
-    icon="clock"
-    href="/orleans/docs/grains/timers-and-reminders/"
-    title="Timers and reminders"
-    description="Schedule transient work or durable callbacks which survive activations and failures."
-  />
-  <LinkCard
-    icon="approve-check"
-    href="/orleans/docs/grains/transactions/"
-    title="Distributed transactions"
-    description="Coordinate state changes across grains with decentralized ACID transactions."
-  />
-</CardGrid>
 
 ## Start building
 
