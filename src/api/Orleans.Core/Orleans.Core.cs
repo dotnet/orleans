@@ -1919,12 +1919,12 @@ namespace Orleans.Storage
 
     public partial interface IGrainStorage
     {
-        System.Threading.Tasks.Task ClearStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState);
         System.Threading.Tasks.Task ClearStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.Task ReadStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState);
+        System.Threading.Tasks.Task ClearStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState);
         System.Threading.Tasks.Task ReadStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.Task WriteStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState);
+        System.Threading.Tasks.Task ReadStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState);
         System.Threading.Tasks.Task WriteStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task WriteStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState);
     }
 
     public partial interface IGrainStorageSerializer

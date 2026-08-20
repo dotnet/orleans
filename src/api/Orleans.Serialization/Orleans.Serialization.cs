@@ -3340,6 +3340,10 @@ namespace Orleans.Serialization.Configuration
         void ConfigureProviders(System.Collections.Generic.IDictionary<(string Target, string Kind, string Name), System.Type> providers);
     }
 
+    public partial interface ITypeManifestProvider : Microsoft.Extensions.Options.IConfigureOptions<TypeManifestOptions>
+    {
+    }
+
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     public static partial class ProviderMetadataRegistry
     {
@@ -3347,16 +3351,8 @@ namespace Orleans.Serialization.Configuration
         public static void Register(IProviderMetadataProvider provider) { }
     }
 
-    public partial interface ITypeManifestProvider : Microsoft.Extensions.Options.IConfigureOptions<TypeManifestOptions>
-    {
-    }
-
     public sealed partial class TypeManifestOptions
     {
-        public void AddAllowedAssembly(System.Reflection.Assembly assembly) { }
-
-        public void AddAllowedType(System.Type type) { }
-
         public System.Collections.Generic.HashSet<System.Type> Activators { get { throw null; } }
 
         public bool AllowAllTypes { get { throw null; } set { } }
@@ -3386,6 +3382,10 @@ namespace Orleans.Serialization.Configuration
         public System.Collections.Generic.Dictionary<string, System.Type> WellKnownTypeAliases { get { throw null; } }
 
         public System.Collections.Generic.Dictionary<uint, System.Type> WellKnownTypeIds { get { throw null; } }
+
+        public void AddAllowedAssembly(System.Reflection.Assembly assembly) { }
+
+        public void AddAllowedType(System.Type type) { }
     }
 
     [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = true)]
@@ -3393,6 +3393,7 @@ namespace Orleans.Serialization.Configuration
     {
         public TypeManifestProviderAttribute(System.Type providerType) { }
 
+        [System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembers(System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicConstructors)]
         public System.Type ProviderType { get { throw null; } }
     }
 

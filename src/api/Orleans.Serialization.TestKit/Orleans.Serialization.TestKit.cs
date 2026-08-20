@@ -9,6 +9,9 @@
 namespace Orleans.Serialization.TestKit
 {
     [Xunit.Trait("Category", "BVT")]
+    [Xunit.Trait("Suite", "BVT")]
+    [Xunit.Trait("Provider", "None")]
+    [Xunit.Trait("Area", "Serialization")]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public abstract partial class CopierTester<TValue, TCopier> : SerializationTester where TCopier : class, Cloning.IDeepCopier<TValue>
     {
@@ -24,21 +27,21 @@ namespace Orleans.Serialization.TestKit
 
         protected virtual System.Action<System.Action<TValue>>? ValueProvider { get { throw null; } }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/CopierTester.cs", 221)]
         public void CanCopyCollectionViaSerializer() { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/CopierTester.cs", 248)]
         public void CanCopyCollectionViaUntypedSerializer() { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/CopierTester.cs", 160)]
         public void CanCopyTupleViaSerializer() { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/CopierTester.cs", 190)]
         public void CanCopyUntypedTupleViaSerializer() { }
 
         protected virtual void Configure(ISerializerBuilder builder) { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/CopierTester.cs", 106)]
         public void CopiedValuesAreEqual() { }
 
         protected virtual TCopier CreateCopier() { throw null; }
@@ -48,11 +51,14 @@ namespace Orleans.Serialization.TestKit
         protected abstract TValue CreateValue();
         protected virtual bool Equals(TValue? left, TValue? right) { throw null; }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/CopierTester.cs", 133)]
         public void ReferencesAreAddedToCopyContext() { }
     }
 
     [Xunit.Trait("Category", "BVT")]
+    [Xunit.Trait("Suite", "BVT")]
+    [Xunit.Trait("Provider", "None")]
+    [Xunit.Trait("Area", "Serialization")]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public abstract partial class FieldCodecTester<TValue, TCodec> : SerializationTester where TCodec : class, Codecs.IFieldCodec<TValue>
     {
@@ -68,57 +74,57 @@ namespace Orleans.Serialization.TestKit
 
         protected virtual System.Action<System.Action<TValue>>? ValueProvider { get { throw null; } }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/FieldCodecTester.cs", 589)]
         public void CanRoundTripCollectionViaSerializer() { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/FieldCodecTester.cs", 811)]
         public void CanRoundTripDefaultValueViaCodec() { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/FieldCodecTester.cs", 681)]
         public void CanRoundTripTupleViaSerializer() { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/FieldCodecTester.cs", 758)]
         public void CanRoundTripViaObjectSerializer() { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/FieldCodecTester.cs", 720)]
         public void CanRoundTripViaSerializer() { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/FieldCodecTester.cs", 294)]
         public void CanRoundTripViaSerializer_Array() { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/FieldCodecTester.cs", 330)]
         public void CanRoundTripViaSerializer_Memory() { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/FieldCodecTester.cs", 366)]
         public void CanRoundTripViaSerializer_MemoryStream() { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/FieldCodecTester.cs", 409)]
         public void CanRoundTripViaSerializer_ReadByteByByte() { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/FieldCodecTester.cs", 258)]
         public void CanRoundTripViaSerializer_Span() { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/FieldCodecTester.cs", 220)]
         public void CanRoundTripViaSerializer_StreamPooled() { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/FieldCodecTester.cs", 633)]
         public void CanRoundTripWeaklyTypedCollectionViaSerializer() { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/FieldCodecTester.cs", 823)]
         public void CanSkipDefaultValue() { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/FieldCodecTester.cs", 817)]
         public void CanSkipValue() { }
 
         protected virtual void Configure(ISerializerBuilder builder) { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/FieldCodecTester.cs", 173)]
         public void CorrectlyAdvancesReferenceCounter() { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/FieldCodecTester.cs", 117)]
         public void CorrectlyAdvancesReferenceCounterStream() { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/FieldCodecTester.cs", 829)]
         public void CorrectlyHandlesBuffers() { }
 
         protected virtual TCodec CreateCodec() { throw null; }
@@ -130,17 +136,17 @@ namespace Orleans.Serialization.TestKit
 
         protected virtual TValue? GetWriteCopy(TValue? input) { throw null; }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/FieldCodecTester.cs", 448)]
         public void ProducesValidBitStream() { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/FieldCodecTester.cs", 805)]
         public void RoundTrippedValuesEqual() { }
 
         protected T RoundTripThroughCodec<T>(T original) { throw null; }
 
         protected object? RoundTripThroughUntypedSerializer(object? original, out string formattedBitStream) { throw null; }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/FieldCodecTester.cs", 483)]
         public void WritersProduceSameResults() { }
     }
 
@@ -226,10 +232,10 @@ namespace Orleans.Serialization.TestKit
 
         protected ValueTypeFieldCodecTester(Xunit.ITestOutputHelper output) : base(default!) { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/ValueTypeFieldCodecTester.cs", 34)]
         public void DirectAccessValueSerializerRoundTrip() { }
 
-        [Xunit.Fact]
+        [Xunit.Fact("/_/src/Orleans.Serialization.TestKit/ValueTypeFieldCodecTester.cs", 20)]
         public void ValueSerializerRoundTrip() { }
     }
 }

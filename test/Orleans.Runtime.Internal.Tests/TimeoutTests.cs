@@ -158,8 +158,8 @@ namespace UnitTests
             }
             catch
             {
-                output.WriteLine($"firstCall: {firstCall.Status}");
-                output.WriteLine($"secondCall: {secondCall.Status}");
+                output.WriteLine($"firstCall: {firstCall.Status}, Exception: {firstCall.Exception}");
+                output.WriteLine($"secondCall: {secondCall.Status}, Exception: {secondCall.Exception}");
                 throw;
             }
 
