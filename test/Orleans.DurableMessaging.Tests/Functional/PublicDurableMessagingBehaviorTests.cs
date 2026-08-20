@@ -572,6 +572,18 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         Assert.Equal(0, state.ReplacementExactRouteHandlerCalls);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task RouteLookup_RejectsInvalidRouteKeys(string? route)
+    {
+        var result = await NewGrain().ValidateRouteLookupAsync(route);
+
+        Assert.Equal("routeKey", result.HasHandlerParameterName);
+        Assert.Equal("routeKey", result.TryGetHandlerParameterName);
+    }
+
     [Fact]
     public async Task RouteNotFound_IsRejectedWithoutInboxPersistence()
     {
