@@ -36,6 +36,9 @@
     <Project Path="Chirper/Chirper.Grains/Chirper.Grains.csproj" />
     <Project Path="Chirper/Chirper.Server/Chirper.Server.csproj" />
   </Folder>
+  <Folder Name="/CustomGrainCallReturnType/">
+    <Project Path="CustomGrainCallReturnType/CustomGrainCallReturnType.csproj" />
+  </Folder>
   <Folder Name="/Deployment/" />
   <Folder Name="/Deployment/AzureAppService/" />
   <Folder Name="/Deployment/AzureAppService/Abstractions/">

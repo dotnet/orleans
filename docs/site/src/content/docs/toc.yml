@@ -226,6 +226,8 @@ items:
             href: host/configuration-guide/serialization-configuration.md
           - name: Customize serialization
             href: host/configuration-guide/serialization-customization.md
+          - name: Customize code generation
+            href: host/configuration-guide/serialization-code-generation-customization.md
       - name: Observability and diagnostics
         items:
           - name: Overview

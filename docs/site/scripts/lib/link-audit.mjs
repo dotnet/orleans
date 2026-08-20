@@ -651,13 +651,14 @@ function repositorySourceTarget(url, repositoryRoot) {
     return undefined;
   }
   const match =
-    /^\/dotnet\/orleans\/blob\/(?:main|[a-f\d]{40})\/(.+)$/i.exec(url.pathname);
-  if (!match || (url.hash && !/^#L\d+(?:-L\d+)?$/i.test(url.hash))) {
+    /^\/dotnet\/orleans\/(blob|tree)\/(?:main|[a-f\d]{40})\/(.+)$/i.exec(url.pathname);
+  const isDirectory = match?.[1].toLowerCase() === 'tree';
+  if (!match || (url.hash && (isDirectory || !/^#L\d+(?:-L\d+)?$/i.test(url.hash)))) {
     return undefined;
   }
   let relative;
   try {
-    relative = decodeURIComponent(match[1]);
+    relative = decodeURIComponent(match[2]);
   } catch {
     return { error: `malformed encoded repository path in '${url.href}'` };
   }
@@ -668,6 +669,7 @@ function repositorySourceTarget(url, repositoryRoot) {
   const lineMatch = /^#L(\d+)(?:-L(\d+))?$/i.exec(url.hash);
   return {
     target,
+    isDirectory,
     lastLine: lineMatch ? Number(lineMatch[2] ?? lineMatch[1]) : undefined,
   };
 }
@@ -744,6 +746,12 @@ export async function auditRenderedInternalLinks({
         if (sourceTarget) {
           if (sourceTarget.error) {
             issues.push(`${route}: ${sourceTarget.error}.`);
+          } else if (sourceTarget.isDirectory) {
+            if (!(await pathExists(sourceTarget.target))) {
+              issues.push(
+                `${route}: repository source link '${href}' targets a missing directory.`,
+              );
+            }
           } else {
             const lines = await sourceLineCount(sourceTarget.target);
             if (lines === 0) {

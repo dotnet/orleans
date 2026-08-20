@@ -396,6 +396,7 @@ describe('rendered internal link audit', () => {
     const repositoryRoot = await temporaryDirectory();
     const distRoot = path.join(repositoryRoot, 'dist');
     await mkdir(path.join(repositoryRoot, 'src'));
+    await mkdir(path.join(repositoryRoot, 'samples', 'Example'), { recursive: true });
     await writeFile(path.join(repositoryRoot, 'src', 'Widget.cs'), 'line 1\nline 2\n');
     const commit = 'a'.repeat(40);
     await writePage(
@@ -405,6 +406,8 @@ describe('rendered internal link audit', () => {
         `<a href="https://github.com/dotnet/orleans/blob/${commit}/src/Widget.cs#L2">valid</a>`,
         `<a href="https://github.com/dotnet/orleans/blob/${commit}/src/Missing.cs#L1">missing</a>`,
         `<a href="https://github.com/dotnet/orleans/blob/${commit}/src/Widget.cs#L4">line</a>`,
+        '<a href="https://github.com/dotnet/orleans/tree/main/samples/Example">directory</a>',
+        '<a href="https://github.com/dotnet/orleans/tree/main/samples/Missing">missing directory</a>',
       ].join(''),
     );
     const externalTargets = new Map();
@@ -419,6 +422,7 @@ describe('rendered internal link audit', () => {
       expect.arrayContaining([
         expect.stringContaining('targets a missing file'),
         expect.stringContaining('targets line 4'),
+        expect.stringContaining('targets a missing directory'),
       ]),
     );
     expect(externalTargets.size).toBe(0);
