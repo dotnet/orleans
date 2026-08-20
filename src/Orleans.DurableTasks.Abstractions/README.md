@@ -1,12 +1,13 @@
-# Orleans.DurableTasks
+# Orleans.DurableTasks.Abstractions
 
 > [!IMPORTANT]
-> This assembly contains incubating Orleans API under evaluation. Release packaging remains
-> disabled until incubation concludes.
+> This assembly contains incubating Orleans abstractions under evaluation. Release packaging
+> remains disabled until incubation concludes.
 
-This assembly defines the Orleans programming model for durable asynchronous operations.
-An Orleans host supplies scheduling, persistence, deterministic time, and durable cancellation.
-Task definitions and application code depend only on this assembly.
+This assembly defines the Orleans programming model for durable asynchronous operations under
+the `Orleans.DurableTasks` namespace. An Orleans host supplies scheduling, persistence,
+deterministic time, and durable cancellation. Task definitions and application code depend only
+on this abstractions assembly.
 
 ## Execution model
 
