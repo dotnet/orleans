@@ -4,6 +4,7 @@ using Xunit;
 
 namespace System.Distributed.DurableTasks.Tests;
 
+[Trait("Category", "BVT")]
 public class DurableTaskTests
 {
     [Fact]
@@ -1023,6 +1024,40 @@ public class DurableTaskTests
     }
 
     [Fact]
+    public void TaskIdNoneRoundTripsThroughStringAndSpanContracts()
+    {
+        Assert.Equal(string.Empty, TaskId.None.ToString());
+        Assert.Equal(TaskId.None, TaskId.Parse(string.Empty));
+        Assert.True(TaskId.TryParse(string.Empty, provider: null, out var fromString));
+        Assert.Equal(TaskId.None, fromString);
+        Assert.False(TaskId.TryParse((string?)null, provider: null, out _));
+        Assert.Equal(TaskId.None, TaskId.Parse(ReadOnlySpan<char>.Empty, provider: null));
+        Assert.True(TaskId.TryParse(ReadOnlySpan<char>.Empty, provider: null, out var fromSpan));
+        Assert.Equal(TaskId.None, fromSpan);
+
+        Span<char> destination = stackalloc char[1];
+        Assert.True(TaskId.None.TryFormat(destination, out var charsWritten, default, provider: null));
+        Assert.Equal(0, charsWritten);
+    }
+
+    [Fact]
+    public void PublicFactoriesValidateDelegatesAndTaskCollections()
+    {
+        Assert.Throws<ArgumentNullException>(() => DurableTask.Run((Action<CancellationToken>)null!));
+        Assert.Throws<ArgumentNullException>(() => DurableTask.Run((Func<CancellationToken, int>)null!));
+        Assert.Throws<ArgumentNullException>(() => DurableTask.Run((Func<CancellationToken, Task>)null!));
+        Assert.Throws<ArgumentNullException>(() => DurableTask.Run((Func<CancellationToken, Task<int>>)null!));
+        Assert.Throws<ArgumentNullException>(
+            () => DurableTask.Run<object?>((Action<object?, CancellationToken>)null!, state: null));
+        Assert.Throws<ArgumentNullException>(
+            () => DurableTask.Run<object?, int>((Func<object?, CancellationToken, int>)null!, state: null));
+        Assert.Throws<ArgumentNullException>(() => DurableTask.WhenAll((IReadOnlyList<DurableTask>)null!));
+        Assert.Throws<ArgumentNullException>(() => DurableTask.WhenAll((IReadOnlyList<DurableTask<int>>)null!));
+        Assert.Throws<ArgumentNullException>(() => DurableTask.WhenAny((IReadOnlyList<DurableTask>)null!));
+        Assert.Throws<ArgumentOutOfRangeException>(() => DurableTask.WhenAny([]));
+    }
+
+    [Fact]
     public void DefaultPollingOptionsUsesDocumentedTimeout()
         => Assert.Equal(PollingOptions.DefaultPollTimeout, default(PollingOptions).PollTimeout);
 
@@ -1058,6 +1093,7 @@ public class DurableTaskTests
     }
 }
 
+[Trait("Category", "BVT")]
 public class SchedulingTests
 {
     [Fact]
@@ -1168,6 +1204,28 @@ public class SchedulingTests
         Assert.True(host.Contains(TaskId.Parse("root/$when-any-1/0")));
         Assert.False(host.IsCancellationRequested(TaskId.Parse("root/$when-any-1/0")));
         slowCompletion.SetResult();
+    }
+
+    [Fact]
+    public async Task CombinatorsSnapshotInputsAtDefinitionCreation()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var inputs = new List<DurableTask<int>> { DurableTask.FromResult(1) };
+        var whenAll = DurableTask.WhenAll(inputs);
+        var whenAny = DurableTask.WhenAny(inputs);
+        inputs.Clear();
+        var root = host.CreateRootDefinition<(IReadOnlyList<TaskId> All, TaskId Any)>(async _ =>
+        {
+            var all = await whenAll;
+            var any = await whenAny;
+            return DurableTaskResponse.FromResult((all, any));
+        });
+
+        var scheduled = await root.ScheduleAsync("snapshot");
+        var result = await scheduled;
+
+        Assert.Equal(TaskId.Parse("snapshot/$when-all-1/0"), Assert.Single(result.All));
+        Assert.Equal(TaskId.Parse("snapshot/$when-any-2/0"), result.Any);
     }
 
     [Fact]
