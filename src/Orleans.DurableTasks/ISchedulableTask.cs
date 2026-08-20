@@ -1,4 +1,4 @@
-namespace System.Distributed.DurableTasks;
+namespace Orleans.DurableTasks;
 
 /// <summary>Defines a durable task which a host can schedule independently.</summary>
 public interface ISchedulableTask

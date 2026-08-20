@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace System.Distributed.DurableTasks;
+namespace Orleans.DurableTasks;
 
 /// <summary>Represents a host-scheduled durable task.</summary>
 public abstract class ScheduledTask
