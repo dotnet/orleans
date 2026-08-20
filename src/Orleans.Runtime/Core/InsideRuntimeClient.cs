@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,7 +19,6 @@ using Orleans.Serialization.Invocation;
 using Orleans.Storage;
 using static Orleans.Internal.StandardExtensions;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -37,18 +37,18 @@ namespace Orleans.Runtime
         private readonly PeriodicTimer callbackTimer;
         private int _isStopping;
 
-        private GrainLocator grainLocator;
-        private MessageCenter messageCenter;
-        private List<IIncomingGrainCallFilter> grainCallFilters;
+        private GrainLocator grainLocator = null!;
+        private MessageCenter messageCenter = null!;
+        private List<IIncomingGrainCallFilter> grainCallFilters = null!;
         private readonly DeepCopier _deepCopier;
         private readonly ApplicationRequestInstruments _applicationRequestInstruments;
-        private IGrainCallCancellationManager _cancellationManager;
-        private HostedClient hostedClient;
+        private IGrainCallCancellationManager _cancellationManager = null!;
+        private HostedClient hostedClient = null!;
 
         private HostedClient HostedClient => this.hostedClient;
         private readonly MessageFactory messageFactory;
-        private IGrainReferenceRuntime grainReferenceRuntime;
-        private Task callbackTimerTask;
+        private IGrainReferenceRuntime grainReferenceRuntime = null!;
+        private Task? callbackTimerTask;
         private readonly MessagingTrace messagingTrace;
         private readonly DeepCopier<Response> responseCopier;
 
@@ -92,7 +92,7 @@ namespace Orleans.Runtime
                 this.messagingOptions.ResponseTimeout,
                 this.messagingOptions.CancelRequestOnTimeout,
                 this.messagingOptions.WaitForCancellationAcknowledgement,
-                cancellationManager: null);
+                cancellationManager: null!);
 
             this.systemSharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.Id),
@@ -100,7 +100,7 @@ namespace Orleans.Runtime
                 this.messagingOptions.SystemResponseTimeout,
                 cancelOnTimeout: false,
                 waitForCancellationAcknowledgement: this.messagingOptions.WaitForCancellationAcknowledgement,
-                cancellationManager: null);
+                cancellationManager: null!);
         }
 
         public IServiceProvider ServiceProvider { get; }
@@ -134,7 +134,7 @@ namespace Orleans.Runtime
         public void SendRequest(
             GrainReference target,
             IInvokable request,
-            IResponseCompletionSource context,
+            IResponseCompletionSource? context,
             InvokeMethodOptions options)
         {
             var cancellationToken = request.GetCancellationToken();
@@ -148,7 +148,7 @@ namespace Orleans.Runtime
             if (message.SendingSilo == null)
                 message.SendingSilo = MySilo;
 
-            IGrainContext sendingActivation = RuntimeContext.Current;
+            IGrainContext? sendingActivation = RuntimeContext.Current;
 
             if (sendingActivation == null)
             {
@@ -181,7 +181,7 @@ namespace Orleans.Runtime
             }
 
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
-            CallbackData callbackData = null;
+            CallbackData? callbackData = null;
             if (!oneWay)
             {
                 Debug.Assert(context is not null);
@@ -206,6 +206,8 @@ namespace Orleans.Runtime
                 }
             }
 
+            // Completing callbacks during shutdown can resume application code which issues follow-up
+            // calls. Reject those calls so that they cannot outlive the shutdown callback sweep.
             if (Volatile.Read(ref _isStopping) != 0)
             {
                 callbackData?.OnHostShutdown();
@@ -312,12 +314,13 @@ namespace Orleans.Runtime
                                 {
                                     var invoker = new GrainMethodInvoker(message, target, invokable, GrainCallFilters, this.interfaceToImplementationMapping, this.responseCopier);
                                     await invoker.Invoke();
-                                    response = invoker.Response;
+                                    response = invoker.Response!;
                                 }
                                 else
                                 {
                                     response = await invokable.Invoke();
-                                    response = this.responseCopier.Copy(response);
+                                    // The copier preserves the null state of its input.
+                                    response = this.responseCopier.Copy(response)!;
                                 }
 
                                 invokable.Dispose();
@@ -378,7 +381,8 @@ namespace Orleans.Runtime
         {
             try
             {
-                SendResponse(message, (Response)this._deepCopier.Copy(response));
+                // The copier preserves the null state of its input.
+                SendResponse(message, (Response)this._deepCopier.Copy(response)!);
             }
             catch (Exception exc)
             {
@@ -410,9 +414,17 @@ namespace Orleans.Runtime
         public void ReceiveResponse(Message message)
         {
             OrleansInsideRuntimeClientEvent.Instance.ReceiveResponse(message);
-            if (message.Result is Message.ResponseTypes.Rejection)
+
+            var result = message.Result;
+            if (result != Message.ResponseTypes.Rejection && result != Message.ResponseTypes.Status)
             {
-                if (!message.TargetSilo.Matches(this.MySilo))
+                ProcessResponseCallback(message);
+                return;
+            }
+
+            if (result is Message.ResponseTypes.Rejection)
+            {
+                if (!message.TargetSilo!.Matches(this.MySilo))
                 {
                     // gatewayed message - gateway back to sender
                     LogTraceNoCallbackForRejection(this.logger, message);
@@ -421,7 +433,7 @@ namespace Orleans.Runtime
                 }
 
                 LogHandleMessage(this.logger, message);
-                var rejection = (RejectionResponse)message.BodyObject;
+                var rejection = (RejectionResponse)message.BodyObject!;
                 switch (rejection.RejectionType)
                 {
                     case Message.RejectionTypes.Overloaded:
@@ -444,46 +456,18 @@ namespace Orleans.Runtime
                         LogErrorUnsupportedRejectionType(this.logger, rejection.RejectionType);
                         break;
                 }
+
+                ProcessResponseCallback(message);
             }
-            else if (message.Result == Message.ResponseTypes.Status)
+            else
             {
-                var status = (StatusResponse)message.BodyObject;
-                callbacks.TryGetValue(message.Id, out var callback);
-                var request = callback?.Message;
-                if (request is not null)
-                {
-                    callback.OnStatusUpdate(status);
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0)
-                    {
-                        LogInformationReceivedStatusUpdate(this.logger, request, status.Diagnostics);
-                    }
-                }
-                else
-                {
-                    if (messagingOptions.CancelUnknownRequestOnStatusUpdate)
-                    {
-                        // Cancel the call since the caller has abandoned it.
-                        // Note that the target and sender arguments are swapped because this is a response to the original request.
-                        _cancellationManager.SignalCancellation(
-                            message.SendingSilo,
-                            targetGrainId: message.SendingGrain,
-                            sendingGrainId: message.TargetGrain,
-                            messageId: message.Id);
-                    }
-
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Debug))
-                    {
-                        var diagnosticsString = string.Join("\n", status.Diagnostics);
-                        LogDebugReceivedStatusUpdateUnknownRequest(this.logger, message, diagnosticsString);
-                    }
-                }
-
-                return;
+                ProcessStatusResponse(message);
             }
+        }
 
-            CallbackData callbackData;
-            bool found = callbacks.TryRemove(message.Id, out callbackData);
-            if (found)
+        private void ProcessResponseCallback(Message message)
+        {
+            if (callbacks.TryRemove(message.Id, out var callbackData))
             {
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
                 // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
@@ -492,6 +476,45 @@ namespace Orleans.Runtime
             else
             {
                 LogDebugNoCallbackForResponse(this.logger, message);
+            }
+        }
+
+        private void ProcessStatusResponse(Message message)
+        {
+            var status = (StatusResponse)message.BodyObject!;
+            callbacks.TryGetValue(message.Id, out var callback);
+            var request = callback?.Message;
+            if (request is not null)
+            {
+                callback!.OnStatusUpdate(status);
+                if (status.Diagnostics is { Count: > 0 })
+                {
+                    LogInformationReceivedStatusUpdate(this.logger, request, status.Diagnostics);
+                }
+
+                return;
+            }
+
+            HandleUnknownStatusUpdate(message, status);
+        }
+
+        private void HandleUnknownStatusUpdate(Message message, StatusResponse status)
+        {
+            if (messagingOptions.CancelUnknownRequestOnStatusUpdate)
+            {
+                // Cancel the call since the caller has abandoned it.
+                // Note that the target and sender arguments are swapped because this is a response to the original request.
+                _cancellationManager.SignalCancellation(
+                    message.SendingSilo,
+                    targetGrainId: message.SendingGrain,
+                    sendingGrainId: message.TargetGrain,
+                    messageId: message.Id);
+            }
+
+            if (status.Diagnostics is { Count: > 0 } && logger.IsEnabled(LogLevel.Debug))
+            {
+                var diagnosticsString = string.Join("\n", status.Diagnostics);
+                LogDebugReceivedStatusUpdateUnknownRequest(this.logger, message, diagnosticsString);
             }
         }
 
@@ -527,6 +550,11 @@ namespace Orleans.Runtime
         {
             Volatile.Write(ref _isStopping, 1);
             this.callbackTimer.Dispose();
+            // Once the silo is shutting down it can no longer receive responses, so any requests which
+            // are still outstanding will never complete. Fault them now so that in-flight grain calls
+            // observe a terminal result instead of hanging forever, which would otherwise deadlock grain
+            // deactivation and host disposal during an ungraceful shutdown. This must happen before
+            // waiting for the timer task since that wait observes the shutdown cancellation token.
             BreakOutstandingMessages();
 
             if (this.callbackTimerTask is { } task)
