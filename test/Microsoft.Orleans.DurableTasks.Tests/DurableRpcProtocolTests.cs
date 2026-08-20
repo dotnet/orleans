@@ -160,6 +160,28 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
+    public void StandaloneDurableTaskSerializationFailsWithClearError()
+    {
+        IConverter<DurableTask, DurableTaskSurrogate> converter = new DurableTaskPopulator();
+
+        var exception = Assert.Throws<NotSupportedException>(
+            () => converter.ConvertToSurrogate(DurableTask.Delay(TimeSpan.FromSeconds(1))));
+
+        Assert.Contains("cannot be serialized directly", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StandaloneGenericDurableTaskSerializationFailsWithClearError()
+    {
+        IConverter<DurableTask<int>, DurableTaskSurrogate> converter = new DurableTaskPopulator<int>();
+
+        var exception = Assert.Throws<NotSupportedException>(
+            () => converter.ConvertToSurrogate(DurableTask.FromResult(42)));
+
+        Assert.Contains("cannot be serialized directly", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     [Obsolete]
     public void HostingIsOptInAndRegistersClientAndSiloAdapters()
     {
