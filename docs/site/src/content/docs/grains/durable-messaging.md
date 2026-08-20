@@ -38,6 +38,9 @@ Durable Messaging has the following boundaries:
   durably schedules the outbox job. The envelope, job ownership, and other journaled
   grain effects then become durable in one commit. The job polls safely while the
   envelope is provisional, and dispatch starts only after that commit succeeds.
+- Sending an equivalent envelope with the same `MessageId` more than once is idempotent,
+  whether the original is provisional or durable. Reusing that ID with different routing,
+  correlation, body, or request-context content throws without changing the outbox.
 - A failed turn restores the last durable journal version. Its staged effects and
   outgoing envelopes are discarded before the inbox records a retry or dead letter.
 - A receiver allocates a stable ownership token and places it in a scheduled inbox job

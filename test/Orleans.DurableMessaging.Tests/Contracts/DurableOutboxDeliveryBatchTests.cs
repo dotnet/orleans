@@ -18,6 +18,112 @@ namespace Orleans.DurableMessaging.Tests.Contracts;
 public sealed class DurableOutboxDeliveryBatchTests
 {
     [Fact]
+    public async Task DuplicateAfterCommitRemainsDeliverableAndUnfenced()
+    {
+        var fixture = new OutboxFixture(hasDurableMessage: false);
+        fixture.Send(fixture.Envelope);
+        await fixture.CommitAsync();
+        var duplicate = fixture.CreateEquivalentEnvelope();
+
+        fixture.Send(duplicate);
+
+        Assert.NotSame(fixture.Envelope.Data, duplicate.Data);
+        Assert.Equal(0, fixture.PendingMessageCount);
+        await fixture.DeliverAsync();
+        Assert.Equal(1, fixture.DeliveryCount);
+        Assert.False(fixture.Messages.ContainsKey(fixture.MessageId));
+    }
+
+    [Fact]
+    public async Task DurableDuplicateFollowedByNoOpWriteDoesNotFenceDelivery()
+    {
+        var fixture = new OutboxFixture();
+
+        fixture.Send(fixture.CreateEquivalentEnvelope());
+        await fixture.CommitAsync();
+
+        Assert.Equal(0, fixture.Manager.WriteCompletedCount);
+        Assert.Equal(0, fixture.PendingMessageCount);
+        await fixture.DeliverAsync();
+        Assert.Equal(1, fixture.DeliveryCount);
+    }
+
+    [Fact]
+    public async Task DuplicateBeforeFirstCommitRemainsPendingUntilOwningCommit()
+    {
+        var fixture = new OutboxFixture(hasDurableMessage: false);
+
+        fixture.Send(fixture.Envelope);
+        fixture.Send(fixture.CreateEquivalentEnvelope());
+
+        Assert.Single(fixture.Messages);
+        Assert.Equal(1, fixture.PendingMessageCount);
+        await fixture.DeliverAsync();
+        Assert.Equal(0, fixture.DeliveryCount);
+
+        await fixture.CommitAsync();
+
+        Assert.Equal(0, fixture.PendingMessageCount);
+        await fixture.DeliverAsync();
+        Assert.Equal(1, fixture.DeliveryCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConflictingDuplicateFailsWithoutMutatingDurableOrProvisionalMessage(bool commitFirst)
+    {
+        var fixture = new OutboxFixture(hasDurableMessage: false);
+        fixture.Send(fixture.Envelope);
+        if (commitFirst)
+        {
+            await fixture.CommitAsync();
+        }
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => fixture.Send(fixture.CreateConflictingEnvelope()));
+
+        Assert.Contains(fixture.MessageId.ToString(), exception.Message, StringComparison.Ordinal);
+        Assert.True(fixture.Messages.TryGetValue(fixture.MessageId, out var stored));
+        Assert.Equal(fixture.Envelope.RouteKey, stored.RouteKey);
+        Assert.Equal(commitFirst ? 0 : 1, fixture.PendingMessageCount);
+    }
+
+    [Fact]
+    public async Task RollbackClearsFenceAndAllowsMessageToBeSentAgain()
+    {
+        var fixture = new OutboxFixture(hasDurableMessage: false);
+        fixture.Send(fixture.Envelope);
+
+        await fixture.Manager.RevertPendingChangesAsync(CancellationToken.None);
+
+        Assert.Empty(fixture.Messages);
+        Assert.Equal(0, fixture.PendingMessageCount);
+        fixture.Send(fixture.CreateEquivalentEnvelope());
+        Assert.Equal(1, fixture.PendingMessageCount);
+
+        await fixture.CommitAsync();
+        Assert.Equal(0, fixture.PendingMessageCount);
+        await fixture.DeliverAsync();
+        Assert.Equal(1, fixture.DeliveryCount);
+    }
+
+    [Fact]
+    public async Task MessageAddedAfterWriteCaptureRemainsFencedForNextCommit()
+    {
+        var fixture = new OutboxFixture(hasDurableMessage: false);
+        fixture.Send(fixture.Envelope);
+        var reentrantEnvelope = fixture.CreateEnvelope(Guid.NewGuid());
+
+        fixture.Manager.CommitWithInterleavedMutation(() => fixture.Send(reentrantEnvelope));
+
+        Assert.False(fixture.IsPending(fixture.MessageId));
+        Assert.True(fixture.IsPending(reentrantEnvelope.MessageId));
+        await fixture.CommitAsync();
+        Assert.Equal(0, fixture.PendingMessageCount);
+    }
+
+    [Fact]
     public async Task CancellationAfterSuccessfulDeliveryRevertsRemoval()
     {
         using var cancellation = new CancellationTokenSource();
@@ -154,45 +260,49 @@ public sealed class DurableOutboxDeliveryBatchTests
     private sealed class OutboxFixture
     {
         private static readonly Assembly DurableMessagingAssembly = typeof(IDurableOutbox).Assembly;
-        private readonly object _outbox;
+        private readonly IDurableOutbox _outbox;
         private readonly MethodInfo _deliverMethod;
+        private readonly FieldInfo _pendingMessageIdsField;
 
         public OutboxFixture(
-            Func<CancellationToken, ValueTask<DeliveryResult>> deliver,
+            Func<CancellationToken, ValueTask<DeliveryResult>>? deliver = null,
             int maxDeliveryAttempts = 3,
             Exception? writeException = null,
-            Exception? revertException = null)
+            Exception? revertException = null,
+            bool hasDurableMessage = true)
         {
             MessageId = Guid.NewGuid();
-            var senderId = GrainId.Create("sender", "1");
-            var receiverId = GrainId.Create("receiver", "1");
-            var envelope = new DurableEnvelope
-            {
-                MessageId = MessageId,
-                SenderId = senderId,
-                ReceiverId = receiverId,
-                RouteKey = "test",
-                Data = (DurableEnvelopeData)RuntimeHelpers.GetUninitializedObject(typeof(DurableEnvelopeData))
-            };
+            SenderId = GrainId.Create("sender", "1");
+            ReceiverId = GrainId.Create("receiver", "1");
+            Envelope = CreateEnvelope(MessageId);
 
-            Messages.Add(MessageId, envelope);
             MessageStates = CreateInternalDictionary("Orleans.DurableMessaging.OutboxMessageState");
             DeadLetters = CreateInternalDictionary("Orleans.DurableMessaging.OutboxDeadLetter");
-            var messageState = CreateInternal("Orleans.DurableMessaging.OutboxMessageState");
-            messageState.GetType().GetProperty("EnqueuedAt")!.SetValue(messageState, TimeProvider.System.GetUtcNow());
-            MessageStates.Add(MessageId, messageState);
+            if (hasDurableMessage)
+            {
+                Messages.Add(MessageId, Envelope);
+                var messageState = CreateInternal("Orleans.DurableMessaging.OutboxMessageState");
+                messageState.GetType().GetProperty("EnqueuedAt")!.SetValue(messageState, TimeProvider.System.GetUtcNow());
+                MessageStates.Add(MessageId, messageState);
+            }
+
             Manager = new TestStateManager(
                 [Messages, MessageStates, DeadLetters],
                 writeException,
                 revertException);
 
+            var delivery = deliver ?? (_ => ValueTask.FromResult(DeliveryResult.Accepted()));
             var inbox = Substitute.For<IDurableInboxExtension>();
             inbox.DeliverAsync(Arg.Any<DurableEnvelope>(), Arg.Any<CancellationToken>())
-                .Returns(call => deliver(call.ArgAt<CancellationToken>(1)));
+                .Returns(call =>
+                {
+                    DeliveryCount++;
+                    return delivery(call.ArgAt<CancellationToken>(1));
+                });
             var grainFactory = Substitute.For<IGrainFactory>();
             grainFactory.GetGrain<IDurableInboxExtension>(Arg.Any<GrainId>()).Returns(inbox);
             var grainContext = Substitute.For<IGrainContext>();
-            grainContext.GrainId.Returns(senderId);
+            grainContext.GrainId.Returns(SenderId);
             grainContext.ObservableLifecycle.Returns(Substitute.For<IGrainLifecycle>());
 
             var outboxType = GetInternalType("Orleans.DurableMessaging.DurableOutbox");
@@ -205,7 +315,7 @@ public sealed class DurableOutboxDeliveryBatchTests
                 nonPublic: true)!;
             var logger = Activator.CreateInstance(typeof(NullLogger<>).MakeGenericType(outboxType))!;
 
-            _outbox = Activator.CreateInstance(
+            _outbox = (IDurableOutbox)Activator.CreateInstance(
                 outboxType,
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
                 binder: null,
@@ -237,16 +347,65 @@ public sealed class DurableOutboxDeliveryBatchTests
                 ],
                 culture: null)!;
             _deliverMethod = outboxType.GetMethod("DeliverPendingMessagesAsync")!;
+            _pendingMessageIdsField = outboxType.GetField("_pendingMessageIds", BindingFlags.Instance | BindingFlags.NonPublic)!;
         }
 
         public Guid MessageId { get; }
+        public GrainId SenderId { get; }
+        public GrainId ReceiverId { get; }
+        public DurableEnvelope Envelope { get; }
+        public int DeliveryCount { get; private set; }
         public TestDurableDictionary<Guid, DurableEnvelope> Messages { get; } = new();
         public UntypedDurableDictionary MessageStates { get; }
         public UntypedDurableDictionary DeadLetters { get; }
         public TestStateManager Manager { get; }
+        public int PendingMessageCount => GetPendingMessageIds().Count;
 
         public Task DeliverAsync(CancellationToken cancellationToken = default) =>
             (Task)_deliverMethod.Invoke(_outbox, [cancellationToken])!;
+
+        public void Send(DurableEnvelope envelope) => _outbox.Send(envelope);
+
+        public ValueTask CommitAsync() => Manager.WriteStateAsync(CancellationToken.None);
+
+        public bool IsPending(Guid messageId) => GetPendingMessageIds().Contains(messageId);
+
+        public DurableEnvelope CreateEquivalentEnvelope() => CreateEnvelope(MessageId);
+
+        public DurableEnvelope CreateConflictingEnvelope() => CreateEnvelope(MessageId, routeKey: "conflict");
+
+        public DurableEnvelope CreateEnvelope(Guid messageId, string routeKey = "test") => new()
+        {
+            MessageId = messageId,
+            SenderId = SenderId,
+            ReceiverId = ReceiverId,
+            RouteKey = routeKey,
+            CorrelationKey = HierarchicalKey.Create("operation/1"),
+            ReplyTo = SenderId,
+            Data = CreateEnvelopeData(),
+            CreatedAt = DateTimeOffset.UnixEpoch
+        };
+
+        private HashSet<Guid> GetPendingMessageIds() =>
+            (HashSet<Guid>)_pendingMessageIdsField.GetValue(_outbox)!;
+
+        private static DurableEnvelopeData CreateEnvelopeData()
+        {
+            var result = (DurableEnvelopeData)RuntimeHelpers.GetUninitializedObject(typeof(DurableEnvelopeData));
+            typeof(DurableEnvelopeData)
+                .GetMethod("Initialize", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(
+                    result,
+                    [
+                        new byte[] { 1, 2 },
+                        (Offset: 0, Length: 1),
+                        new Dictionary<string, (int Offset, int Length)>
+                        {
+                            ["trace"] = (1, 1)
+                        }
+                    ]);
+            return result;
+        }
 
         private static UntypedDurableDictionary CreateInternalDictionary(string valueTypeName)
         {
@@ -264,6 +423,7 @@ public sealed class DurableOutboxDeliveryBatchTests
 
     private interface ITestDurableState
     {
+        long Version { get; }
         object Capture();
         void Restore(object snapshot);
     }
@@ -274,6 +434,7 @@ public sealed class DurableOutboxDeliveryBatchTests
 
         public object Instance { get; } = instance;
         public int Count => (int)_type.GetProperty("Count")!.GetValue(Instance)!;
+        public long Version => ((ITestDurableState)Instance).Version;
 
         public void Add(Guid key, object value) =>
             _type.GetMethod("Add", [typeof(Guid), value.GetType()])!.Invoke(Instance, [key, value]);
@@ -298,10 +459,12 @@ public sealed class DurableOutboxDeliveryBatchTests
     {
         private readonly ITestDurableState[] _states = states.ToArray();
         private object[] _durableSnapshots = states.Select(static state => state.Capture()).ToArray();
+        private long[] _durableVersions = states.Select(static state => state.Version).ToArray();
         private IJournaledStateObserver? _observer;
 
         public bool SupportsRollback => true;
         public int WriteCount { get; private set; }
+        public int WriteCompletedCount { get; private set; }
         public int RevertCount { get; private set; }
 
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
@@ -324,9 +487,30 @@ public sealed class DurableOutboxDeliveryBatchTests
             }
 
             _observer?.OnWriteStarted();
+            var currentVersions = _states.Select(static state => state.Version).ToArray();
+            if (currentVersions.SequenceEqual(_durableVersions))
+            {
+                return default;
+            }
+
             _durableSnapshots = _states.Select(static state => state.Capture()).ToArray();
+            _durableVersions = currentVersions;
             _observer?.OnWriteCompleted();
+            WriteCompletedCount++;
             return default;
+        }
+
+        public void CommitWithInterleavedMutation(Action mutation)
+        {
+            WriteCount++;
+            _observer?.OnWriteStarted();
+            var committedSnapshots = _states.Select(static state => state.Capture()).ToArray();
+            var committedVersions = _states.Select(static state => state.Version).ToArray();
+            mutation();
+            _durableSnapshots = committedSnapshots;
+            _durableVersions = committedVersions;
+            _observer?.OnWriteCompleted();
+            WriteCompletedCount++;
         }
 
         public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken)
@@ -343,6 +527,7 @@ public sealed class DurableOutboxDeliveryBatchTests
                 _states[i].Restore(_durableSnapshots[i]);
             }
 
+            _durableVersions = _states.Select(static state => state.Version).ToArray();
             _observer?.OnRecoveryStarted();
             _observer?.OnRecoveryCompleted();
             return default;
@@ -361,24 +546,72 @@ public sealed class DurableOutboxDeliveryBatchTests
         where TKey : notnull
     {
         private readonly Dictionary<TKey, TValue> _items = [];
+        private long _version;
 
-        public TValue this[TKey key] { get => _items[key]; set => _items[key] = value; }
+        public TValue this[TKey key]
+        {
+            get => _items[key];
+            set
+            {
+                _items[key] = value;
+                _version++;
+            }
+        }
+
         public ICollection<TKey> Keys => _items.Keys;
         public ICollection<TValue> Values => _items.Values;
         public int Count => _items.Count;
         public bool IsReadOnly => false;
+        public long Version => _version;
 
-        public void Add(TKey key, TValue value) => _items.Add(key, value);
-        public void Add(KeyValuePair<TKey, TValue> item) => ((ICollection<KeyValuePair<TKey, TValue>>)_items).Add(item);
-        public void Clear() => _items.Clear();
+        public void Add(TKey key, TValue value)
+        {
+            _items.Add(key, value);
+            _version++;
+        }
+
+        public void Add(KeyValuePair<TKey, TValue> item)
+        {
+            ((ICollection<KeyValuePair<TKey, TValue>>)_items).Add(item);
+            _version++;
+        }
+
+        public void Clear()
+        {
+            if (_items.Count > 0)
+            {
+                _items.Clear();
+                _version++;
+            }
+        }
+
         public bool Contains(KeyValuePair<TKey, TValue> item) => ((ICollection<KeyValuePair<TKey, TValue>>)_items).Contains(item);
         public bool ContainsKey(TKey key) => _items.ContainsKey(key);
         public void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex) =>
             ((ICollection<KeyValuePair<TKey, TValue>>)_items).CopyTo(array, arrayIndex);
         public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() => _items.GetEnumerator();
-        public bool Remove(TKey key) => _items.Remove(key);
-        public bool Remove(KeyValuePair<TKey, TValue> item) =>
-            ((ICollection<KeyValuePair<TKey, TValue>>)_items).Remove(item);
+        public bool Remove(TKey key)
+        {
+            if (!_items.Remove(key))
+            {
+                return false;
+            }
+
+            _version++;
+            return true;
+        }
+
+        public bool Remove(KeyValuePair<TKey, TValue> item)
+        {
+            if (!((ICollection<KeyValuePair<TKey, TValue>>)_items).Remove(item))
+            {
+                return false;
+            }
+
+            _version++;
+            return true;
+        }
+
         public bool TryGetValue(TKey key, out TValue value) => _items.TryGetValue(key, out value!);
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
@@ -392,6 +625,8 @@ public sealed class DurableOutboxDeliveryBatchTests
             {
                 _items.Add(key, CloneValue(value));
             }
+
+            _version++;
         }
 
         private static TValue CloneValue(TValue value)
