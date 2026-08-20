@@ -562,6 +562,99 @@ public class DurableTaskTests
     }
 
     [Fact]
+    public async Task LateRegistrationJoinsActiveCancellationCompletionAndErrors()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot("late-active"));
+        var blockerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseBlocker = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var lateStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseLate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstFailure = new InvalidOperationException("first late callback failed");
+        var secondFailure = new ArgumentException("second late callback failed");
+        await context.RegisterCancellationCallbackAsync(async _ =>
+        {
+            blockerStarted.SetResult();
+            await releaseBlocker.Task;
+        });
+
+        var first = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+        await blockerStarted.Task;
+        var registration = await context.RegisterCancellationCallbackAsync(async _ =>
+        {
+            lateStarted.SetResult();
+            await releaseLate.Task;
+            throw firstFailure;
+        });
+        var secondRegistration = await context.RegisterCancellationCallbackAsync(_ => throw secondFailure);
+        var second = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+
+        Assert.Same(first, second);
+        Assert.False(lateStarted.Task.IsCompleted);
+        releaseBlocker.SetResult();
+        await lateStarted.Task;
+        Assert.False(first.IsCompleted);
+
+        releaseLate.SetResult();
+        foreach (var observer in new[] { first, second })
+        {
+            var exception = await Assert.ThrowsAsync<AggregateException>(async () => await observer);
+            Assert.Collection(
+                exception.InnerExceptions,
+                item => Assert.Same(firstFailure, item),
+                item => Assert.Same(secondFailure, item));
+        }
+
+        await registration.DisposeAsync();
+        await secondRegistration.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ConcurrentLateCallbacksBreakMutualCancellationCycle()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var first = host.CreateContext(TaskId.CreateRoot("late-cycle-first"));
+        var second = host.CreateContext(TaskId.CreateRoot("late-cycle-second"));
+        var firstBlockerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondBlockerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseBlockers = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstDependencyAdded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await first.RegisterCancellationCallbackAsync(async _ =>
+        {
+            firstBlockerStarted.SetResult();
+            await releaseBlockers.Task;
+        });
+        await second.RegisterCancellationCallbackAsync(async _ =>
+        {
+            secondBlockerStarted.SetResult();
+            await releaseBlockers.Task;
+        });
+
+        var firstCancellation = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
+        var secondCancellation = DurableTaskRuntimeHelper.RequestCancellationAsync(second);
+        await Task.WhenAll(firstBlockerStarted.Task, secondBlockerStarted.Task);
+        await first.RegisterCancellationCallbackAsync(async _ =>
+        {
+            var request = DurableTaskRuntimeHelper.RequestCancellationAsync(second);
+            firstDependencyAdded.SetResult();
+            await request;
+        });
+        await second.RegisterCancellationCallbackAsync(async _ =>
+        {
+            await firstDependencyAdded.Task;
+            var cycleClosingRequest = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
+            Assert.True(cycleClosingRequest.IsCompletedSuccessfully);
+            await cycleClosingRequest;
+        });
+
+        releaseBlockers.SetResult();
+        await Task.WhenAll(firstCancellation, secondCancellation).WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.True(firstCancellation.IsCompletedSuccessfully);
+        Assert.True(secondCancellation.IsCompletedSuccessfully);
+    }
+
+    [Fact]
     public async Task CancellationCycleDoesNotHideSiblingCallbackErrors()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
@@ -738,6 +831,100 @@ public class DurableTaskTests
         });
 
         Assert.Null(DurableExecutionContext.Current);
+    }
+
+    [Fact]
+    public async Task PostCompletionCallbackHasIndependentObservableCompletion()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot("post-completion"));
+        var cancellation = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+        await cancellation;
+        var callbackStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCallback = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var expected = new InvalidOperationException("post-completion failure");
+        var calls = 0;
+
+        var registration = await context.RegisterCancellationCallbackAsync(async token =>
+        {
+            Assert.Same(context, DurableExecutionContext.Current);
+            Assert.True(token.IsCancellationRequested);
+            Interlocked.Increment(ref calls);
+            callbackStarted.SetResult();
+            await releaseCallback.Task;
+            throw expected;
+        });
+        await callbackStarted.Task;
+
+        var disposal = registration.DisposeAsync().AsTask();
+        Assert.False(disposal.IsCompleted);
+        Assert.Same(cancellation, DurableTaskRuntimeHelper.RequestCancellationAsync(context));
+        Assert.True(cancellation.IsCompletedSuccessfully);
+
+        releaseCallback.SetResult();
+        Assert.Same(expected, await Assert.ThrowsAsync<InvalidOperationException>(async () => await disposal));
+        Assert.Same(
+            expected,
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                async () => await registration.DisposeAsync()));
+        Assert.Equal(1, calls);
+        Assert.True(cancellation.IsCompletedSuccessfully);
+        Assert.Null(DurableExecutionContext.Current);
+    }
+
+    [Fact]
+    public async Task RegistrationRacingCancellationCompletionLandsOnExactlyOneSide()
+    {
+        for (var iteration = 0; iteration < 100; iteration++)
+        {
+            var host = new TestHost(DateTimeOffset.UnixEpoch);
+            var context = host.CreateContext(TaskId.CreateRoot($"completion-race-{iteration}"));
+            var blockerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releaseBlocker = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var callbackStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releaseCallback = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var expected = new InvalidOperationException($"race failure {iteration}");
+            var calls = 0;
+            await context.RegisterCancellationCallbackAsync(async _ =>
+            {
+                blockerStarted.SetResult();
+                await releaseBlocker.Task;
+            });
+            var cancellation = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+            await blockerStarted.Task;
+
+            var registrationTask = Task.Run(
+                async () => await context.RegisterCancellationCallbackAsync(async _ =>
+                {
+                    Interlocked.Increment(ref calls);
+                    callbackStarted.SetResult();
+                    await releaseCallback.Task;
+                    throw expected;
+                }));
+            var releaseTask = Task.Run(releaseBlocker.SetResult);
+            var registration = await registrationTask;
+            await releaseTask;
+            await callbackStarted.Task;
+            var joinedCancellation = !cancellation.IsCompleted;
+
+            releaseCallback.SetResult();
+            if (joinedCancellation)
+            {
+                var exception = await Assert.ThrowsAsync<AggregateException>(async () => await cancellation);
+                Assert.Same(expected, Assert.Single(exception.InnerExceptions));
+                await registration.DisposeAsync();
+            }
+            else
+            {
+                Assert.True(cancellation.IsCompletedSuccessfully);
+                Assert.Same(
+                    expected,
+                    await Assert.ThrowsAsync<InvalidOperationException>(
+                        async () => await registration.DisposeAsync()));
+            }
+
+            Assert.Equal(1, calls);
+        }
     }
 
     [Fact]
