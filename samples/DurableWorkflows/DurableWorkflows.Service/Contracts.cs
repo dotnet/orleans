@@ -21,6 +21,7 @@ public interface IActivityGrain : IGrainWithStringKey
 public interface IApprovalGrain : IGrainWithStringKey
 {
     DurableTask<ApprovalDecision> WaitForDecisionAsync(string correlationId);
+    Task RegisterRequestAsync(string subject);
     Task SubmitDecisionAsync(ApprovalDecision decision);
     Task<ApprovalSnapshot> GetSnapshotAsync();
 }
@@ -28,6 +29,7 @@ public interface IApprovalGrain : IGrainWithStringKey
 public interface ICancellationGrain : IGrainWithStringKey
 {
     DurableTask<CancellationSignal> WaitForCancellationAsync(string cancellationId);
+    Task RegisterRequestAsync();
     Task RequestCancellationAsync(CancellationSignal signal);
     Task<CancellationSnapshot> GetSnapshotAsync();
 }
@@ -96,7 +98,8 @@ public sealed record ApprovalWorkflowResult(
 [GenerateSerializer, Immutable]
 public sealed record ApprovalSnapshot(
     [property: Id(0)] string CorrelationId,
-    [property: Id(1)] ApprovalDecision? Decision);
+    [property: Id(1)] ApprovalDecision? Decision,
+    [property: Id(2)] string? Subject);
 
 [GenerateSerializer, Immutable]
 public sealed record CancellationSignal(
@@ -115,7 +118,8 @@ public sealed record CancellationWorkflowResult(
 [GenerateSerializer, Immutable]
 public sealed record CancellationSnapshot(
     [property: Id(0)] string CancellationId,
-    [property: Id(1)] CancellationSignal? Signal);
+    [property: Id(1)] CancellationSignal? Signal,
+    [property: Id(2)] bool Registered);
 
 [GenerateSerializer, Immutable]
 public sealed record WorkflowRuntimeInfo(

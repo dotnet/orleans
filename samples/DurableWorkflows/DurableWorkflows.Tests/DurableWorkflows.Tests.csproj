@@ -6,6 +6,9 @@
     <Nullable>enable</Nullable>
     <IsTestProject>true</IsTestProject>
     <NoWarn>$(NoWarn);ORLEANSEXP003;ORLEANSEXP005</NoWarn>
+    <OrleansDocumentationVersionException>
+      This publication-gated sample requires the unreleased Durable Tasks and Journaling packages.
+    </OrleansDocumentationVersionException>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,6 +25,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DurableWorkflows.Service\DurableWorkflows.Service.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
 </Project>

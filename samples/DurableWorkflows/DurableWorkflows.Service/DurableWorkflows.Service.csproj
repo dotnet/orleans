@@ -5,6 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);ORLEANSEXP003;ORLEANSEXP005</NoWarn>
+    <OrleansDocumentationVersionException>
+      This publication-gated sample requires the unreleased Durable Tasks, Durable Jobs, and Journaling packages.
+    </OrleansDocumentationVersionException>
   </PropertyGroup>
 
   <ItemGroup>

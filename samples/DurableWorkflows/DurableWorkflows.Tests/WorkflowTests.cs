@@ -1,5 +1,12 @@
 using System.Distributed.DurableTasks;
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
 using DurableWorkflows;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -78,6 +85,21 @@ public sealed class WorkflowTests : IAsyncLifetime
         Assert.Equal(approved, result.Approved);
         Assert.Equal(reason, result.Reason);
         Assert.Equal(correlationId, (await Client.GetGrain<IApprovalGrain>(correlationId).GetSnapshotAsync()).CorrelationId);
+    }
+
+    [Fact]
+    public async Task DecisionRecordedBeforeWorkflowWaitIsRetained()
+    {
+        var correlationId = UniqueId();
+        var decision = new ApprovalDecision(correlationId, Approved: true, "recorded first");
+        await Client.GetGrain<IApprovalGrain>(correlationId).SubmitDecisionAsync(decision);
+
+        var result = await RunAsync(
+            Client.GetGrain<IWorkflowGrain>(correlationId).RunApprovalAsync(new(correlationId, "deploy")),
+            $"approval-{correlationId}");
+
+        Assert.True(result.Approved);
+        Assert.Equal("recorded first", result.Reason);
     }
 
     [Fact]
@@ -203,4 +225,184 @@ public sealed class WorkflowRecoveryTests
         Assert.NotEqual(before.ActivationId, after.ActivationId);
         Assert.Equal(after.SiloAddress, result.SiloAddress);
     }
+}
+
+public sealed class WorkflowEndpointTests : IAsyncLifetime
+{
+    private readonly VolatileJournalStorageProvider _storage = WorkflowTests.CreateStorage();
+    private InProcessTestCluster _cluster = null!;
+    private WebApplication _app = null!;
+    private HttpClient _http = null!;
+
+    public async Task InitializeAsync()
+    {
+        _cluster = WorkflowTests.CreateCluster(1, _storage);
+        await _cluster.DeployAsync();
+
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Services.AddSingleton<IClusterClient>(_cluster.Client);
+        _app = builder.Build();
+        _app.MapDurableWorkflowEndpoints();
+        await _app.StartAsync();
+
+        var server = _app.Services.GetRequiredService<IServer>();
+        var address = Assert.Single(server.Features.Get<IServerAddressesFeature>()!.Addresses);
+        _http = new HttpClient { BaseAddress = new Uri(address) };
+    }
+
+    public async Task DisposeAsync()
+    {
+        _http.Dispose();
+        await _app.DisposeAsync();
+        await _cluster.DisposeAsync();
+    }
+
+    [Theory]
+    [InlineData(true, "approved")]
+    [InlineData(false, "rejected")]
+    public async Task ApprovalResourceTransitionsFromPendingToTerminal(bool approved, string reason)
+    {
+        var id = UniqueId();
+        var expectedLocation = $"/workflows/approval/{id}/status";
+
+        using var start = await _http.PostAsync($"/workflows/approval/{id}?subject=production", null);
+        Assert.Equal(HttpStatusCode.Accepted, start.StatusCode);
+        Assert.Equal(expectedLocation, start.Headers.Location!.OriginalString);
+        var accepted = await start.Content.ReadFromJsonAsync<AcceptedDocument>();
+        Assert.Equal(expectedLocation, accepted!.StatusUrl);
+
+        var pending = await GetStatusAsync(expectedLocation);
+        Assert.Equal("pending", pending.Status);
+        Assert.Equal(accepted.TaskId, pending.TaskId);
+
+        using var submit = await _http.PutAsJsonAsync(
+            $"/workflows/approval/{id}",
+            new ApprovalSubmission("production", approved, reason));
+        Assert.Equal(HttpStatusCode.Accepted, submit.StatusCode);
+        Assert.Equal(expectedLocation, submit.Headers.Location!.OriginalString);
+
+        var completed = await WaitForStatusAsync(expectedLocation, "succeeded");
+        Assert.Equal(accepted.TaskId, completed.TaskId);
+        Assert.Equal(approved, completed.Result.GetProperty("approved").GetBoolean());
+        Assert.Equal(reason, completed.Result.GetProperty("reason").GetString());
+    }
+
+    [Fact]
+    public async Task DecisionSubmittedByPutBeforeWaitIsRetainedAndIdempotent()
+    {
+        var id = UniqueId();
+        var submission = new ApprovalSubmission("emergency", Approved: true, "reviewed");
+        var location = $"/workflows/approval/{id}/status";
+
+        using var first = await _http.PutAsJsonAsync($"/workflows/approval/{id}", submission);
+        using var duplicate = await _http.PutAsJsonAsync($"/workflows/approval/{id}", submission);
+
+        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, duplicate.StatusCode);
+        Assert.Equal(location, first.Headers.Location!.OriginalString);
+        Assert.Equal(location, duplicate.Headers.Location!.OriginalString);
+
+        var completed = await WaitForStatusAsync(location, "succeeded");
+        Assert.True(completed.Result.GetProperty("approved").GetBoolean());
+        Assert.Equal("emergency", completed.Result.GetProperty("subject").GetString());
+    }
+
+    [Fact]
+    public async Task ConflictingSubjectAndDecisionCannotMutateOriginalApproval()
+    {
+        var id = UniqueId();
+        using var start = await _http.PostAsync($"/workflows/approval/{id}?subject=production", null);
+        Assert.Equal(HttpStatusCode.Accepted, start.StatusCode);
+
+        using var wrongSubject = await _http.PutAsJsonAsync(
+            $"/workflows/approval/{id}",
+            new ApprovalSubmission("staging", Approved: false, "wrong workflow"));
+        Assert.Equal(HttpStatusCode.Conflict, wrongSubject.StatusCode);
+        var afterWrongSubject = await _cluster.Client.GetGrain<IApprovalGrain>(id).GetSnapshotAsync();
+        Assert.Equal("production", afterWrongSubject.Subject);
+        Assert.Null(afterWrongSubject.Decision);
+
+        var acceptedDecision = new ApprovalSubmission("production", Approved: true, "accepted");
+        using var submit = await _http.PutAsJsonAsync($"/workflows/approval/{id}", acceptedDecision);
+        Assert.Equal(HttpStatusCode.Accepted, submit.StatusCode);
+
+        using var conflictingDecision = await _http.PutAsJsonAsync(
+            $"/workflows/approval/{id}",
+            new ApprovalSubmission("production", Approved: false, "changed"));
+        Assert.Equal(HttpStatusCode.Conflict, conflictingDecision.StatusCode);
+
+        var snapshot = await _cluster.Client.GetGrain<IApprovalGrain>(id).GetSnapshotAsync();
+        Assert.Equal(new ApprovalDecision(id, Approved: true, "accepted"), snapshot.Decision);
+        var completed = await WaitForStatusAsync($"/workflows/approval/{id}/status", "succeeded");
+        Assert.True(completed.Result.GetProperty("approved").GetBoolean());
+        Assert.Equal("production", completed.Result.GetProperty("subject").GetString());
+    }
+
+    [Fact]
+    public async Task CancellationResourceIsPollableAndIdempotent()
+    {
+        var id = UniqueId();
+        var location = $"/workflows/cancellation/{id}/status";
+
+        using var first = await _http.PostAsync($"/workflows/cancellation/{id}", null);
+        using var duplicate = await _http.PostAsync($"/workflows/cancellation/{id}", null);
+        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, duplicate.StatusCode);
+        Assert.Equal(location, first.Headers.Location!.OriginalString);
+        Assert.Equal(location, duplicate.Headers.Location!.OriginalString);
+        var firstAccepted = await first.Content.ReadFromJsonAsync<AcceptedDocument>();
+        var duplicateAccepted = await duplicate.Content.ReadFromJsonAsync<AcceptedDocument>();
+        Assert.Equal(firstAccepted, duplicateAccepted);
+        Assert.Equal("pending", (await GetStatusAsync(location)).Status);
+
+        using var cancel = await _http.DeleteAsync($"/workflows/cancellation/{id}?reason=operator-request");
+        Assert.Equal(HttpStatusCode.Accepted, cancel.StatusCode);
+        Assert.Equal(location, cancel.Headers.Location!.OriginalString);
+
+        var completed = await WaitForStatusAsync(location, "succeeded");
+        Assert.True(completed.Result.GetProperty("canceled").GetBoolean());
+        Assert.Equal("operator-request", completed.Result.GetProperty("reason").GetString());
+    }
+
+    [Fact]
+    public async Task StatusResourcesRejectInvalidIdsAndDoNotCreateMissingWorkflows()
+    {
+        using var invalidApproval = await _http.PostAsync("/workflows/approval/$invalid?subject=test", null);
+        using var invalidCancellation = await _http.PostAsync("/workflows/cancellation/$invalid", null);
+        using var missingApproval = await _http.GetAsync($"/workflows/approval/{UniqueId()}/status");
+        using var missingCancellation = await _http.GetAsync($"/workflows/cancellation/{UniqueId()}/status");
+
+        Assert.Equal(HttpStatusCode.BadRequest, invalidApproval.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, invalidCancellation.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, missingApproval.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, missingCancellation.StatusCode);
+    }
+
+    private async Task<StatusDocument> WaitForStatusAsync(string location, string expected)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        while (true)
+        {
+            var status = await GetStatusAsync(location, timeout.Token);
+            if (string.Equals(status.Status, expected, StringComparison.Ordinal))
+            {
+                return status;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(25), timeout.Token);
+        }
+    }
+
+    private async Task<StatusDocument> GetStatusAsync(string location, CancellationToken cancellationToken = default)
+    {
+        using var response = await _http.GetAsync(location, cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<StatusDocument>(cancellationToken))!;
+    }
+
+    private static string UniqueId() => Guid.NewGuid().ToString("N");
+
+    private sealed record AcceptedDocument(string TaskId, string StatusUrl);
+    private sealed record StatusDocument(string TaskId, string Status, JsonElement Result, string? Error);
 }

@@ -22,14 +22,29 @@ Open the service endpoint shown in the Aspire dashboard. Example requests, where
 ```shell
 curl -X POST "$service/workflows/basic/basic-1?input=hello"
 curl -X POST "$service/workflows/fan-out/fan-1" -H "Content-Type: application/json" -d '["one","two","three"]'
-curl -X POST "$service/workflows/approval/approval-1?subject=production"
+curl -i -X POST "$service/workflows/approval/approval-1?subject=production"
+curl "$service/workflows/approval/approval-1/status"
 curl -X PUT "$service/workflows/approval/approval-1" -H "Content-Type: application/json" -d '{"subject":"production","approved":true,"reason":"reviewed"}'
-curl -X POST "$service/workflows/cancellation/cancel-1"
+curl "$service/workflows/approval/approval-1/status"
+curl -i -X POST "$service/workflows/cancellation/cancel-1"
+curl "$service/workflows/cancellation/cancel-1/status"
 curl -X DELETE "$service/workflows/cancellation/cancel-1?reason=operator-request"
+curl "$service/workflows/cancellation/cancel-1/status"
 curl -X POST "$service/workflows/orders/order-1?failShipping=true"
 ```
 
-The subject in an approval PUT must match the subject used to start that correlation id; durable request fingerprinting rejects conflicting reuse of a task id.
+Approval and cancellation commands return `202 Accepted`. Their `Location` header names the corresponding GET status resource. A status response always includes the stable durable task ID and one of `pending`, `running`, `succeeded`, `canceled`, or `failed`. Successful responses include the workflow result. Canceled and failed responses include only a safe summary, not internal exception details.
+
+```json
+{
+  "taskId": "approval-approval-1",
+  "status": "pending",
+  "result": null,
+  "error": null
+}
+```
+
+Repeating the same command returns the same status resource and task ID. The subject in an approval PUT must match the subject used to start that correlation id; request registration and durable request fingerprinting reject conflicting reuse before recording a decision. Repeating the same decision is idempotent, while a different decision returns `409 Conflict` without changing the original workflow.
 
 For manual process failover, start an approval workflow, stop its active `service` replica in the Aspire dashboard, and then submit the decision. The automated test suite deterministically terminates the owning silo while the workflow is in progress and verifies completion on the other silo.
 

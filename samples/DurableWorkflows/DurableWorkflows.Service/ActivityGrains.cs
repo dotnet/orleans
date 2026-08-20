@@ -34,7 +34,8 @@ public sealed class ActivityGrain(
 }
 
 public sealed class ApprovalGrain(
-    [FromKeyedServices("decision")] IDurableTaskCompletionSource<ApprovalDecision> decision)
+    [FromKeyedServices("decision")] IDurableTaskCompletionSource<ApprovalDecision> decision,
+    [FromKeyedServices("subject")] IDurableValue<string> subject)
     : DurableGrain, IApprovalGrain
 {
     public DurableTask<ApprovalDecision> WaitForDecisionAsync(string correlationId)
@@ -45,6 +46,20 @@ public sealed class ApprovalGrain(
         }
 
         return DurableTask.Run(token => decision.Task.WaitAsync(token));
+    }
+
+    public async Task RegisterRequestAsync(string value)
+    {
+        if (subject.Value is { } existing && !string.Equals(existing, value, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("A different subject has already been registered for this correlation id.");
+        }
+
+        if (subject.Value is null)
+        {
+            subject.Value = value;
+            await WriteStateAsync();
+        }
     }
 
     public async Task SubmitDecisionAsync(ApprovalDecision value)
@@ -63,11 +78,12 @@ public sealed class ApprovalGrain(
     }
 
     public Task<ApprovalSnapshot> GetSnapshotAsync() =>
-        Task.FromResult(new ApprovalSnapshot(this.GetPrimaryKeyString(), decision.State.Value));
+        Task.FromResult(new ApprovalSnapshot(this.GetPrimaryKeyString(), decision.State.Value, subject.Value));
 }
 
 public sealed class CancellationGrain(
-    [FromKeyedServices("cancellation")] IDurableTaskCompletionSource<CancellationSignal> cancellation)
+    [FromKeyedServices("cancellation")] IDurableTaskCompletionSource<CancellationSignal> cancellation,
+    [FromKeyedServices("registered")] IDurableValue<bool> registered)
     : DurableGrain, ICancellationGrain
 {
     public DurableTask<CancellationSignal> WaitForCancellationAsync(string cancellationId)
@@ -78,6 +94,15 @@ public sealed class CancellationGrain(
         }
 
         return DurableTask.Run(token => cancellation.Task.WaitAsync(token));
+    }
+
+    public async Task RegisterRequestAsync()
+    {
+        if (!registered.Value)
+        {
+            registered.Value = true;
+            await WriteStateAsync();
+        }
     }
 
     public async Task RequestCancellationAsync(CancellationSignal signal)
@@ -96,7 +121,7 @@ public sealed class CancellationGrain(
     }
 
     public Task<CancellationSnapshot> GetSnapshotAsync() =>
-        Task.FromResult(new CancellationSnapshot(this.GetPrimaryKeyString(), cancellation.State.Value));
+        Task.FromResult(new CancellationSnapshot(this.GetPrimaryKeyString(), cancellation.State.Value, registered.Value));
 }
 
 public sealed class InventoryGrain(
