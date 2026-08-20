@@ -288,6 +288,101 @@ public class DurableTaskTests
     }
 
     [Fact]
+    public async Task TokenObserverRegisteredInsideDurableCallbackInheritsCausality()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var first = host.CreateContext(TaskId.CreateRoot("inherited-observer-first"));
+        var second = host.CreateContext(TaskId.CreateRoot("inherited-observer-second"));
+        var expected = new InvalidOperationException("second callback failed");
+        Task? reverseRequest = null;
+        await first.RegisterCancellationCallbackAsync(async _ =>
+        {
+            using var tokenRegistration = second.CancellationToken.Register(() =>
+            {
+                reverseRequest = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
+                Assert.True(reverseRequest.IsCompletedSuccessfully);
+            });
+
+            await DurableTaskRuntimeHelper.RequestCancellationAsync(second);
+        });
+        await second.RegisterCancellationCallbackAsync(_ => throw expected);
+
+        var exception = await Assert.ThrowsAsync<AggregateException>(
+            () => DurableTaskRuntimeHelper.RequestCancellationAsync(first));
+
+        Assert.NotNull(reverseRequest);
+        Assert.True(reverseRequest.IsCompletedSuccessfully);
+        Assert.Same(expected, Assert.Single(exception.Flatten().InnerExceptions));
+    }
+
+    [Fact]
+    public async Task TokenObserverRegisteredWithSuppressedFlowIsExternal()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var first = host.CreateContext(TaskId.CreateRoot("suppressed-observer-first"));
+        var second = host.CreateContext(TaskId.CreateRoot("suppressed-observer-second"));
+        var expected = new InvalidOperationException("second callback failed");
+        Task? reverseRequest = null;
+        var reverseRequestCompletedSynchronously = true;
+        await first.RegisterCancellationCallbackAsync(async _ =>
+        {
+            CancellationTokenRegistration tokenRegistration;
+            using (ExecutionContext.SuppressFlow())
+            {
+                tokenRegistration = second.CancellationToken.Register(() =>
+                {
+                    reverseRequest = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
+                    reverseRequestCompletedSynchronously = reverseRequest.IsCompletedSuccessfully;
+                });
+            }
+
+            using (tokenRegistration)
+            {
+                await DurableTaskRuntimeHelper.RequestCancellationAsync(second);
+            }
+        });
+        await second.RegisterCancellationCallbackAsync(_ => throw expected);
+
+        var firstRequest = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
+        var exception = await Assert.ThrowsAsync<AggregateException>(() => firstRequest);
+
+        Assert.NotNull(reverseRequest);
+        Assert.Same(firstRequest, reverseRequest);
+        Assert.False(reverseRequestCompletedSynchronously);
+        Assert.Same(expected, Assert.Single(exception.Flatten().InnerExceptions));
+    }
+
+    [Fact]
+    public async Task ImmediateTokenObserverUsesRegistrationTimeCausality()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var first = host.CreateContext(TaskId.CreateRoot("immediate-observer-first"));
+        var alreadyCanceled = host.CreateContext(TaskId.CreateRoot("immediate-observer-canceled"));
+        var expected = new InvalidOperationException("first sibling failed");
+        Task? immediateRequest = null;
+        await DurableTaskRuntimeHelper.RequestCancellationAsync(alreadyCanceled);
+        await first.RegisterCancellationCallbackAsync(_ =>
+        {
+            using var tokenRegistration = alreadyCanceled.CancellationToken.Register(() =>
+            {
+                immediateRequest = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
+                Assert.True(immediateRequest.IsCompletedSuccessfully);
+            });
+
+            Assert.NotNull(immediateRequest);
+            return ValueTask.CompletedTask;
+        });
+        await first.RegisterCancellationCallbackAsync(_ => throw expected);
+
+        var exception = await Assert.ThrowsAsync<AggregateException>(
+            () => DurableTaskRuntimeHelper.RequestCancellationAsync(first));
+
+        Assert.NotNull(immediateRequest);
+        Assert.True(immediateRequest.IsCompletedSuccessfully);
+        Assert.Same(expected, Assert.Single(exception.InnerExceptions));
+    }
+
+    [Fact]
     public async Task UnsafeTokenCallbackIsAnExternalObserver()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);

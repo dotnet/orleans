@@ -50,12 +50,20 @@ public abstract class DurableExecutionContext
     /// Gets the durable cancellation token for this execution.
     /// </summary>
     /// <remarks>
-    /// Registrations on this token are ordinary synchronous .NET cancellation observers. They run
-    /// under the execution context captured when they are registered and, when requested by the
-    /// registration overload, its synchronization context. They must return promptly and must not
+    /// Registrations on this token are ordinary synchronous .NET cancellation observers and follow
+    /// standard registration-time <see cref="ExecutionContext"/> and <see cref="SynchronizationContext"/>
+    /// behavior. A callback registered outside a durable cancellation callback is an external observer.
+    /// A callback registered inside an active durable cancellation callback inherits that callback's
+    /// cancellation-operation causality unless execution-context flow is suppressed or an unsafe
+    /// registration API is used.
+    ///
+    /// <para>
+    /// Regardless of inherited causality, these observers must return promptly and must not
     /// synchronously wait for <see cref="DurableTaskRuntimeHelper.RequestCancellationAsync"/> or
     /// another durable cancellation operation. Use <see cref="RegisterCancellationCallbackAsync"/>
-    /// for asynchronous callbacks, durable cancellation dependencies, and failure aggregation.
+    /// for asynchronous work, awaited cross-context cancellation dependencies, failure aggregation,
+    /// and explicit cycle semantics.
+    /// </para>
     /// </remarks>
     public CancellationToken CancellationToken => _cancellationSource.Token;
 
@@ -117,7 +125,10 @@ public abstract class DurableExecutionContext
     /// flows with <see cref="ExecutionContext"/> across ordinary awaits and safe thread-pool dispatch,
     /// including <see cref="Task.Run(Action)"/>. Suppressing execution-context flow or using an unsafe
     /// dispatch API detaches that work, so cancellation requests made by it are external observers
-    /// rather than durable dependencies.
+    /// rather than durable dependencies. An ordinary cancellation-token callback registered while
+    /// this callback is active also captures that operation under standard .NET execution-context
+    /// rules. Dependency edges are based only on the explicitly flowed operation; no thread or global
+    /// activity is inferred.
     ///
     /// <para>
     /// Disposing the returned registration prevents an invocation which has not started, or
