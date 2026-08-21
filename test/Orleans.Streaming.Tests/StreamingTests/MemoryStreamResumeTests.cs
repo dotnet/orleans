@@ -40,7 +40,7 @@ namespace Tester.StreamingTests
             await WaitForStreamProviderReadyAsync();
         }
 
-        [SkippableFact]
+        [Fact]
         public async Task ImplicitResumeAfterInactivityReplaysRetainedEventsWithoutNewProduction()
         {
             using var observer = StreamingDiagnosticObserver.Create();
