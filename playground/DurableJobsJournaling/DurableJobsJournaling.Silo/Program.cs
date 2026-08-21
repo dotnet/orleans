@@ -35,7 +35,6 @@ builder.Services.AddHostedService<StorageInventoryReporter>();
 
 builder.UseOrleans(siloBuilder =>
 {
-#pragma warning disable ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
     if (backend.UsesTableJournal())
     {
         siloBuilder.AddAzureTableJournalStorage("jobs-a", options =>
@@ -91,7 +90,6 @@ builder.UseOrleans(siloBuilder =>
                 ? DateTimeOffset.UtcNow.AddMilliseconds(250 * Math.Pow(2, context.DequeueCount))
                 : null;
         });
-#pragma warning restore ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 });
 
 var app = builder.Build();
