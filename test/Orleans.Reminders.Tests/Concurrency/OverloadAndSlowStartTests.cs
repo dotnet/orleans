@@ -16,7 +16,9 @@ namespace UnitTests.Concurrency;
 /// </summary>
 public sealed class OverloadBackoffTests
 {
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task RespectOverload_SkipImmediately_SkipsWhenOverloaded()
     {
         var detector = new FakeOverloadDetector { IsOverloaded = true };
@@ -33,7 +35,9 @@ public sealed class OverloadBackoffTests
         Assert.Equal(10, throttle.AvailableConcurrencyPermits); // overload skip didn't consume any permit
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task RespectOverload_NotConfigured_IgnoresOverloadDetector()
     {
         var detector = new FakeOverloadDetector { IsOverloaded = true };
@@ -48,7 +52,9 @@ public sealed class OverloadBackoffTests
         lease.Dispose();
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task RespectOverload_Wait_AdmitsAfterOverloadClears()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
@@ -71,7 +77,9 @@ public sealed class OverloadBackoffTests
         lease.Dispose();
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task RespectOverload_WaitUpTo_SkipsAfterTimeout()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
@@ -96,7 +104,9 @@ public sealed class OverloadBackoffTests
         Assert.Equal(10, throttle.AvailableConcurrencyPermits);
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void RespectOverload_RequiresOverloadDetector_OrThrowsAtConstruction()
     {
         var config = new ReminderThrottleConfigBuilder()
@@ -109,7 +119,9 @@ public sealed class OverloadBackoffTests
         Assert.Contains("IOverloadDetector", ex.Message);
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task RespectOverload_AsSoleTier_IsValid()
     {
         var detector = new FakeOverloadDetector { IsOverloaded = false };
@@ -126,7 +138,9 @@ public sealed class OverloadBackoffTests
     /// Regression for composed admission gates: once an earlier gate establishes a timeout budget,
     /// a later wait-based gate must honor only the remaining budget rather than starting over.
     /// </summary>
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task RespectOverload_ConsumesSharedBudgetBeforeConcurrencyWait()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
@@ -166,7 +180,9 @@ public sealed class OverloadBackoffTests
 /// </summary>
 public sealed class SlowStartTests
 {
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task SlowStart_StartsAtInitialCapacity_AndBlocksBeyond()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
@@ -191,7 +207,9 @@ public sealed class SlowStartTests
         l2.Dispose();
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task SlowStart_RampsUpOverTime()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
@@ -221,7 +239,9 @@ public sealed class SlowStartTests
         Assert.Equal(16, throttle.SlowStartCurrentCapacity);
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task SlowStart_WaitMode_AdmitsAfterRampOpensCapacity()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
@@ -248,7 +268,9 @@ public sealed class SlowStartTests
         lease.Dispose();
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task SlowStart_WaitUpTo_SkipsIfRampDoesNotOpenInTime()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
@@ -273,7 +295,9 @@ public sealed class SlowStartTests
         l1.Dispose();
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void SlowStart_RejectedWithoutMaxConcurrent()
     {
         var ex = Assert.Throws<ArgumentException>(() => new ReminderThrottleConfigBuilder()
@@ -283,7 +307,9 @@ public sealed class SlowStartTests
         Assert.Contains("SlowStart requires MaxConcurrent", ex.Message);
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void SlowStart_RejectedWhenInitialExceedsMaxConcurrent()
     {
         var ex = Assert.Throws<ArgumentException>(() => new ReminderThrottleConfigBuilder()
@@ -293,7 +319,9 @@ public sealed class SlowStartTests
         Assert.Contains("InitialCapacity", ex.Message);
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void SlowStart_RejectsZeroInitialCapacity()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new ReminderThrottleConfigBuilder()
@@ -302,7 +330,9 @@ public sealed class SlowStartTests
             .Build());
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void SlowStart_RejectsZeroInterval()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new ReminderThrottleConfigBuilder()

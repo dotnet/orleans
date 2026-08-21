@@ -14,31 +14,41 @@ namespace UnitTests.Concurrency;
 
 public sealed class ThrottleBlockModeTests
 {
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void Wait_IsSingleton()
     {
         Assert.Same(ThrottleBlockMode.Wait, ThrottleBlockMode.Wait);
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void SkipImmediately_IsSingleton()
     {
         Assert.Same(ThrottleBlockMode.SkipImmediately, ThrottleBlockMode.SkipImmediately);
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void WaitUpTo_RejectsZero()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => ThrottleBlockMode.WaitUpTo(TimeSpan.Zero));
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void WaitUpTo_RejectsNegative()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => ThrottleBlockMode.WaitUpTo(TimeSpan.FromSeconds(-1)));
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void WaitUpTo_ProducesDistinctValuesForDistinctTimeouts()
     {
         Assert.NotEqual(ThrottleBlockMode.WaitUpTo(TimeSpan.FromSeconds(1)), ThrottleBlockMode.WaitUpTo(TimeSpan.FromSeconds(2)));
@@ -47,7 +57,9 @@ public sealed class ThrottleBlockModeTests
 
 public sealed class ReminderThrottleInstrumentsTests
 {
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void ActiveLeases_ReportsCurrentValue_WhenListenerStartsAfterAcquire()
     {
         var services = new ServiceCollection();
@@ -96,48 +108,62 @@ public sealed class ReminderThrottleInstrumentsTests
 
 public sealed class ThrottleConfigTests
 {
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void Builder_RejectsEmptyConfig()
     {
         var b = new ReminderThrottleConfigBuilder();
         Assert.Throws<ArgumentException>(() => b.Build());
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void Builder_RejectsZeroMaxConcurrent()
     {
         var b = new ReminderThrottleConfigBuilder().MaxConcurrent(0, ThrottleBlockMode.Wait);
         Assert.Throws<ArgumentOutOfRangeException>(() => b.Build());
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void Builder_RejectsNegativeRate()
     {
         var b = new ReminderThrottleConfigBuilder().PermitsPerSecond(-1.0, 1, ThrottleBlockMode.Wait);
         Assert.Throws<ArgumentOutOfRangeException>(() => b.Build());
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void Builder_RejectsNonFiniteRate()
     {
         var b = new ReminderThrottleConfigBuilder().PermitsPerSecond(double.PositiveInfinity, 1, ThrottleBlockMode.Wait);
         Assert.Throws<ArgumentOutOfRangeException>(() => b.Build());
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void Builder_RejectsNonPositiveBurst()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new ReminderThrottleConfigBuilder().PermitsPerSecond(10, 0, ThrottleBlockMode.Wait).Build());
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void Builder_HonorsExplicitBurstSize()
     {
         var c = new ReminderThrottleConfigBuilder().PermitsPerSecond(10, 100, ThrottleBlockMode.Wait).Build();
         Assert.Equal(100, c.BurstSize);
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void Builder_AllowsIndependentLocalLimiterBlockModes()
     {
         var concurrencyMode = ThrottleBlockMode.Wait;
@@ -156,7 +182,9 @@ public sealed class ThrottleConfigTests
 
 public sealed class NoOpThrottleTests
 {
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task AcquireAsync_AlwaysReturnsSharedAdmittedLease()
     {
         var throttle = NoOpReminderDeliveryThrottle.Instance;
@@ -174,7 +202,9 @@ public sealed class NoOpThrottleTests
         Assert.Null(l1.TierName);
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task Dispose_OnNoOpLease_IsIdempotentNoOp()
     {
         var lease = await NoOpReminderDeliveryThrottle.Instance.AcquireAsync(TestContext.Default(), CancellationToken.None);
@@ -186,7 +216,9 @@ public sealed class NoOpThrottleTests
 
 public sealed class LocalThrottleConcurrencyTests
 {
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task MaxConcurrent_BoundsInFlight()
     {
         var config = new ReminderThrottleConfigBuilder()
@@ -210,7 +242,9 @@ public sealed class LocalThrottleConcurrencyTests
         Assert.Equal(2, throttle.AvailableConcurrencyPermits);
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task SkipImmediately_ReturnsSkippedWhenFull()
     {
         var config = new ReminderThrottleConfigBuilder()
@@ -231,7 +265,9 @@ public sealed class LocalThrottleConcurrencyTests
         l2.Dispose(); // No-op for skipped lease.
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task Cancellation_DoesNotConsumePermit()
     {
         var config = new ReminderThrottleConfigBuilder()
@@ -250,7 +286,9 @@ public sealed class LocalThrottleConcurrencyTests
         Assert.Equal(1, throttle.AvailableConcurrencyPermits);
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task PermitIsSpentOnDisposeRegardlessOfCallerOutcome()
     {
         var config = new ReminderThrottleConfigBuilder().MaxConcurrent(1, ThrottleBlockMode.Wait).Build();
@@ -270,7 +308,9 @@ public sealed class LocalThrottleConcurrencyTests
     /// next refill), the concurrency permit acquired in the preceding phase must be released
     /// before the exception propagates. Otherwise the permit is leaked permanently.
     /// </summary>
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task Cancellation_DuringRateWait_ReleasesConcurrencyPermit()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
@@ -313,7 +353,9 @@ public sealed class LocalThrottleConcurrencyTests
 
 public sealed class LocalThrottleRateTests
 {
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task PermitsPerSecond_AdmitsBurstThenSkips()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
@@ -348,7 +390,9 @@ public sealed class LocalThrottleRateTests
         refilled.Dispose();
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task WaitMode_PacesAcquiresAtConfiguredRate()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
@@ -371,7 +415,9 @@ public sealed class LocalThrottleRateTests
         next.Dispose();
     }
 
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task ExplicitLimiterBlockModes_AreAppliedIndependently()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
@@ -399,7 +445,9 @@ public sealed class LocalThrottleRateTests
     /// sequential waiting gates. Previously, the rate phase started a fresh budget after the
     /// concurrency phase, allowing total wait to exceed the configured timeout.
     /// </summary>
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task WaitUpTo_BudgetIsSharedAcrossConcurrencyAndRatePhases()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
@@ -436,7 +484,9 @@ public sealed class LocalThrottleRateTests
     /// could succeed against a pre-cancelled token, producing an admitted lease the caller
     /// expected to be cancelled.
     /// </summary>
-    [Fact, TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task AcquireAsync_ThrowsImmediately_WhenTokenAlreadyCancelled()
     {
         var config = new ReminderThrottleConfigBuilder().MaxConcurrent(1, ThrottleBlockMode.Wait).Build();

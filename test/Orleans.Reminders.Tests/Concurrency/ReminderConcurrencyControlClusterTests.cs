@@ -27,7 +27,9 @@ namespace UnitTests.Concurrency;
 /// <see cref="InProcessTestCluster"/> with <see cref="ReminderTestClock"/> so the throttle's
 /// token bucket and the reminder schedule share a single deterministic clock.
 /// </summary>
-[TestCategory("Functional"), TestCategory("Reminders")]
+[TestSuite("Functional")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 public sealed class ReminderConcurrencyControlClusterTests
 {
     /// <summary>
