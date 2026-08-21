@@ -136,7 +136,6 @@ namespace TestGrains
 
     // use the explicitly specified "CustomStorage" log-consistency provider with a separate ICustomStorageInterface implementation
     [LogConsistencyProvider(ProviderName = "CustomStorage")]
-    [CustomStorageProvider(ProviderName = "SeparateCustomStorage")]
     public class LogTestGrainSeparateCustomStorage : LogTestGrain
     {
     }
