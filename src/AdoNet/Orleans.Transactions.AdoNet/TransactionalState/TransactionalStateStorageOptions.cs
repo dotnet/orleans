@@ -10,7 +10,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
     public class TransactionalStateStorageOptions
     {
         /// <summary>
-        /// The default ADO.NET invariant used for storage if none is given. 
+        /// The default ADO.NET invariant used for storage if none is given.
         /// </summary>
         public const string DEFAULT_ADONET_INVARIANT = AdoNetInvariants.InvariantNameSqlServer;
 
