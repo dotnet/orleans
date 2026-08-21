@@ -26,7 +26,7 @@ namespace Tester.AzureUtils
             var clientOptions = GetTableClientOptions();
             return TestDefaultConfiguration.UseAadAuthentication
                 ? new(TestDefaultConfiguration.TableEndpoint, TestDefaultConfiguration.TokenCredential, clientOptions)
-                : new(TestDefaultConfiguration.DataConnectionString, clientOptions);
+                : new(TestDefaultConfiguration.AzureStorageConnectionString, clientOptions);
         }
 
         internal static TableClientOptions GetTableClientOptions()
@@ -60,42 +60,27 @@ namespace Tester.AzureUtils
 
         public static Orleans.Configuration.AzureBlobStorageOptions ConfigureTestDefaults(this Orleans.Configuration.AzureBlobStorageOptions options)
         {
-            if (TestDefaultConfiguration.UseAadAuthentication)
-            {
-                options.BlobServiceClient = new(TestDefaultConfiguration.DataBlobUri, TestDefaultConfiguration.TokenCredential);
-            }
-            else
-            {
-                options.BlobServiceClient = new(TestDefaultConfiguration.DataConnectionString);
-            }
+            options.BlobServiceClient = TestDefaultConfiguration.UseAadAuthentication
+                ? new(TestDefaultConfiguration.DataBlobUri, TestDefaultConfiguration.TokenCredential)
+                : new(TestDefaultConfiguration.AzureStorageConnectionString);
 
             return options;
         }
 
         public static Orleans.Configuration.AzureQueueOptions ConfigureTestDefaults(this Orleans.Configuration.AzureQueueOptions options)
         {
-            if (TestDefaultConfiguration.UseAadAuthentication)
-            {
-                options.QueueServiceClient = new(TestDefaultConfiguration.DataQueueUri, TestDefaultConfiguration.TokenCredential);
-            }
-            else
-            {
-                options.QueueServiceClient = new(TestDefaultConfiguration.DataConnectionString);
-            }
+            options.QueueServiceClient = TestDefaultConfiguration.UseAadAuthentication
+                ? new(TestDefaultConfiguration.DataQueueUri, TestDefaultConfiguration.TokenCredential)
+                : new(TestDefaultConfiguration.AzureStorageConnectionString);
 
             return options;
         }
 
         public static Orleans.Configuration.AzureBlobLeaseProviderOptions ConfigureTestDefaults(this Orleans.Configuration.AzureBlobLeaseProviderOptions options)
         {
-            if (TestDefaultConfiguration.UseAadAuthentication)
-            {
-                options.BlobServiceClient = new(TestDefaultConfiguration.DataBlobUri, TestDefaultConfiguration.TokenCredential);
-            }
-            else
-            {
-                options.BlobServiceClient = new(TestDefaultConfiguration.DataConnectionString);
-            }
+            options.BlobServiceClient = TestDefaultConfiguration.UseAadAuthentication
+                ? new(TestDefaultConfiguration.DataBlobUri, TestDefaultConfiguration.TokenCredential)
+                : new(TestDefaultConfiguration.AzureStorageConnectionString);
 
             return options;
         }

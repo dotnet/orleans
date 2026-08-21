@@ -50,18 +50,18 @@ namespace Tests.GeoClusterTests
                         {
                             options.TableServiceClient = GetTableServiceClient();
                         }))
-                        .AddMemoryGrainStorage("MemoryStore"); 
+                        .AddMemoryGrainStorage("MemoryStore");
                 }
 
                 private static TableServiceClient GetTableServiceClient()
                 {
                     return TestDefaultConfiguration.UseAadAuthentication
                         ? new(TestDefaultConfiguration.TableEndpoint, TestDefaultConfiguration.TokenCredential)
-                        : new(TestDefaultConfiguration.DataConnectionString);
+                        : new(TestDefaultConfiguration.AzureStorageConnectionString);
                 }
             }
         }
-        
+
         public BasicLogTestGrainTests(Fixture fixture)
         {
             this.fixture = fixture;
@@ -109,7 +109,7 @@ namespace Tests.GeoClusterTests
 
         private async Task ThreeCheckers(string grainClass, int phases)
         {
-            // Global 
+            // Global
             async Task checker1()
             {
                 int x = GetRandom();

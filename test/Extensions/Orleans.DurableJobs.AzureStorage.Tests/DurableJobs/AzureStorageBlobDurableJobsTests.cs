@@ -60,7 +60,7 @@ public class AzureStorageBlobDurableJobsTests : TestClusterPerTest
     {
         return TestDefaultConfiguration.UseAadAuthentication
             ? new BlobContainerClient(new Uri(TestDefaultConfiguration.DataBlobUri, containerName), TestDefaultConfiguration.TokenCredential)
-            : new BlobContainerClient(TestDefaultConfiguration.DataConnectionString, containerName);
+            : new BlobContainerClient(TestDefaultConfiguration.AzureStorageConnectionString, containerName);
     }
 
     public class SiloHostConfigurator : ISiloConfigurator
@@ -180,7 +180,7 @@ internal static class AzureBlobDurableJobsTestConfiguration
         }
         else
         {
-            options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataConnectionString!);
+            options.ConfigureBlobServiceClient(TestDefaultConfiguration.AzureStorageConnectionString);
         }
 
         return options;

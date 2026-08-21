@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
+using TestExtensions;
 using Xunit;
 using static TestExtensions.TestDefaultConfiguration;
 
@@ -13,32 +14,34 @@ namespace Tester
 
         public static void CheckForAzureStorage()
         {
-            if ((UseAadAuthentication && (TableEndpoint == null)) ||
-                (!UseAadAuthentication && string.IsNullOrWhiteSpace(DataConnectionString)))
+            if (UseAadAuthentication)
             {
-                throw Xunit.Sdk.SkipException.ForSkip("No connection string found. Skipping");
-            }
+                if (!GetValue(nameof(TableEndpoint), out _))
+                {
+                    throw Xunit.Sdk.SkipException.ForSkip("No Azure Storage table endpoint was configured. Skipping.");
+                }
 
-            bool usingLocalWAS = string.Equals(DataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
-
-            if (!usingLocalWAS)
-            {
-                // Tests are using Azure Cloud Storage, not local WAS emulator.
                 return;
             }
 
-            //Starts the storage emulator if not started already and it exists (i.e. is installed).
-            if (!StorageEmulator.TryStart())
+            if (UseAzurite)
             {
-                string errorMsg = "Azure Storage Emulator could not be started.";
-                Console.WriteLine(errorMsg);
-                throw Xunit.Sdk.SkipException.ForSkip(errorMsg);
+                AzuriteContainerManager.EnsureStarted();
+                return;
+            }
+
+            var usingLocalStorageEmulator = string.Equals(DataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
+            if (usingLocalStorageEmulator && !StorageEmulator.TryStart())
+            {
+                const string errorMessage = "Azure Storage Emulator could not be started.";
+                Console.WriteLine(errorMessage);
+                throw Xunit.Sdk.SkipException.ForSkip(errorMessage);
             }
         }
 
         public static void CheckForEventHub()
         {
-            if ((UseAadAuthentication && (EventHubFullyQualifiedNamespace == null)) ||
+            if ((UseAadAuthentication && string.IsNullOrWhiteSpace(EventHubFullyQualifiedNamespace)) ||
                 (!UseAadAuthentication && string.IsNullOrWhiteSpace(EventHubConnectionString)))
             {
                 throw Xunit.Sdk.SkipException.ForSkip("No connection string found. Skipping");

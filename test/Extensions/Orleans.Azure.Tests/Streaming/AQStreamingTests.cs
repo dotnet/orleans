@@ -63,7 +63,7 @@ namespace Tester.AzureUtils.Streaming
                     }
                     else
                     {
-                        ConfigureStreaming("ConnectionString", TestDefaultConfiguration.DataConnectionString);
+                        ConfigureStreaming("ConnectionString", TestDefaultConfiguration.AzureStorageConnectionString);
                     }
 
                     var names = AzureQueueUtilities.GenerateQueueNames(builder.Options.ClusterId, queueCount);
