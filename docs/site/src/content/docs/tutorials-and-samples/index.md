@@ -66,12 +66,12 @@ The [`samples` directory](https://github.com/dotnet/orleans/tree/main/samples) c
 | Sample | Demonstrates |
 | --- | --- |
 | [Bank Account](https://github.com/dotnet/orleans/tree/main/samples/BankAccount) | ACID transactions across stateful grains. |
-| [Journaled Todo List](https://github.com/dotnet/orleans/tree/main/samples/JournaledTodoList) | Experimental Journaling APIs, Aspire, and durable journaled grain state. |
+| [Journaled Todo List](https://github.com/dotnet/orleans/tree/main/samples/JournaledTodoList) | Event Sourcing with `JournaledGrain`, log-consistency providers, and Aspire. |
 | [Journaling with Azure Blob JSON](https://github.com/dotnet/orleans/tree/main/samples/JournalingAzureBlobJson) | Experimental Journaling APIs with Azure Blob Storage. |
 | [Chat Room](https://github.com/dotnet/orleans/tree/main/samples/ChatRoom) | A terminal chat application using Orleans Streams. |
 | [Stocks](https://github.com/dotnet/orleans/tree/main/samples/Stocks) | Grain timers, HTTP calls, and temporary caching. |
 
-The Journaling samples use the experimental `Microsoft.Orleans.Journaling` package. They are separate from the supported [Orleans Event Sourcing](../grains/event-sourcing/index.md) model.
+The Azure Blob JSON sample uses the experimental `Microsoft.Orleans.Journaling` package. The Journaled Todo List uses the supported [Orleans Event Sourcing](../grains/event-sourcing/index.md) model. See the [Journaling sample guide](../grains/journaling/samples.md) to run and inspect the durable-state sample.
 
 ### Deployment and operations
 

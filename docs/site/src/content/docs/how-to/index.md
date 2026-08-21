@@ -36,6 +36,7 @@ If you are learning Orleans from an empty directory, start with the [tutorials a
 ## Use Orleans features
 
 - [Persist grain state](../grains/grain-persistence/index.md)
+- [Configure experimental Journaling](../grains/journaling/configuration.md)
 - [Schedule activation-scoped work with grain timers](../grains/timers.md)
 - [Schedule durable work with reminders](../grains/reminders.md)
 - [Configure Amazon DynamoDB reminders](../grains/reminders/dynamodb.md)
@@ -51,5 +52,6 @@ If you are learning Orleans from an empty directory, start with the [tutorials a
 - [Monitor silo and client error codes](../host/monitoring/silo-error-code-monitoring.md)
 - [Configure signals and alerting](../host/monitoring/signals.md)
 - [Handle failures and uncertain outcomes](../deployment/handling-failures.md)
+- [Troubleshoot experimental Orleans Journaling](../grains/journaling/operations.md)
 
 For public types, defaults, exceptions, and overloads, use the [C# API reference](https://dotnet.github.io/orleans/docs/api/csharp/). Reference entries provide the precise contract; the recipes above show how to apply it.

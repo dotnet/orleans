@@ -1,7 +1,7 @@
 ---
 title: Orleans NuGet packages
 description: Choose Orleans packages for hosts, providers, serialization, observability, and testing.
-ms.date: 08/02/2026
+ms.date: 08/21/2026
 ms.topic: reference
 ---
 
@@ -110,9 +110,9 @@ These packages don't replace the cluster membership provider.
 | Package | Purpose |
 | --- | --- |
 | [Microsoft.Orleans.EventSourcing](https://www.nuget.org/packages/Microsoft.Orleans.EventSourcing) | Event-sourced grain base types and log-consistency abstractions. |
-| [Microsoft.Orleans.Journaling](https://www.nuget.org/packages/Microsoft.Orleans.Journaling) | Experimental durable journaled collections and values (`ORLEANSEXP005`). |
-| [Microsoft.Orleans.Journaling.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.AzureStorage) | Experimental Azure Blob Storage provider for Orleans Journaling. |
-| [Microsoft.Orleans.Journaling.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.Redis) | Experimental Redis storage provider for Orleans Journaling. |
+| [Microsoft.Orleans.Journaling](https://www.nuget.org/packages/Microsoft.Orleans.Journaling) | Pre-release alpha durable journaled collections and values with experimental diagnostic `ORLEANSEXP005`; see the [Journaling overview](../grains/journaling/index.md). |
+| [Microsoft.Orleans.Journaling.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.AzureStorage) | Pre-release alpha Azure Blob and Azure Table providers for Orleans Journaling. |
+| [Microsoft.Orleans.Journaling.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.Redis) | Pre-release alpha Redis provider for Orleans Journaling. |
 | [Microsoft.Orleans.Transactions](https://www.nuget.org/packages/Microsoft.Orleans.Transactions) | Distributed transaction runtime. |
 | [Microsoft.Orleans.Transactions.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Transactions.AzureStorage) | Azure Storage transaction state. |
 | [Microsoft.Orleans.Transactions.DynamoDB](https://www.nuget.org/packages/Microsoft.Orleans.Transactions.DynamoDB) | Amazon DynamoDB transaction state. |
