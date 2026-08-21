@@ -488,10 +488,7 @@ namespace UnitTests.StreamingTests
             }
         }
 
-        private sealed class RecoverableCacheMissQueueCache(
-            StreamSequenceToken requestedToken,
-            StreamSequenceToken oldestToken,
-            StreamSequenceToken newestToken) : IQueueCache
+        private sealed class RecoverableCacheMissQueueCache(QueueCacheMissException cacheMissException) : IQueueCache
         {
             private TaskCompletionSource<StreamSequenceToken?> cursorRequested = CreateCursorRequestedSource();
 
@@ -517,17 +514,14 @@ namespace UnitTests.StreamingTests
 
             public bool IsUnderPressure() => false;
 
-            public IQueueCacheCursor CreateCacheMissCursor() => new CacheMissCursor(requestedToken, oldestToken, newestToken);
+            public IQueueCacheCursor CreateCacheMissCursor() => new CacheMissCursor(cacheMissException);
 
             public void ResetCursorRequest() => cursorRequested = CreateCursorRequestedSource();
 
             private static TaskCompletionSource<StreamSequenceToken?> CreateCursorRequestedSource() =>
                 new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            private sealed class CacheMissCursor(
-                StreamSequenceToken requestedToken,
-                StreamSequenceToken oldestToken,
-                StreamSequenceToken newestToken) : IQueueCacheCursor
+            private sealed class CacheMissCursor(QueueCacheMissException cacheMissException) : IQueueCacheCursor
             {
                 public void Dispose()
                 {
@@ -535,7 +529,7 @@ namespace UnitTests.StreamingTests
 
                 public IBatchContainer GetCurrent(out Exception exception) => throw new InvalidOperationException();
 
-                public bool MoveNext() => throw new QueueCacheMissException(requestedToken, oldestToken, newestToken);
+                public bool MoveNext() => throw cacheMissException;
 
                 public void Refresh(StreamSequenceToken token)
                 {
@@ -752,6 +746,34 @@ namespace UnitTests.StreamingTests
         [Fact]
         public async Task ReadFromQueue_ResumesFromOldestAvailableTokenAfterCacheMiss()
         {
+            var requestedToken = new EventSequenceTokenV2(1, 2);
+            var oldestToken = new EventSequenceTokenV2(10, 3);
+            var newestToken = new EventSequenceTokenV2(20, 4);
+            var exception = new QueueCacheMissException(requestedToken, oldestToken, newestToken);
+
+            var recoveryToken = await RunCacheMissRecovery(exception, requestedToken, newestToken);
+            Assert.Same(oldestToken, recoveryToken);
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Fact]
+        public async Task ReadFromQueue_UsesDefaultCursorWhenCacheMissDoesNotIncludeTypedToken()
+        {
+            var requestedToken = new EventSequenceTokenV2(1, 2);
+            var newestToken = new EventSequenceTokenV2(20, 4);
+            var exception = new QueueCacheMissException("Cache miss from a custom queue cache");
+
+            var recoveryToken = await RunCacheMissRecovery(exception, requestedToken, newestToken);
+            Assert.Null(recoveryToken);
+        }
+
+        private static async Task<StreamSequenceToken?> RunCacheMissRecovery(
+            QueueCacheMissException exception,
+            StreamSequenceToken requestedToken,
+            StreamSequenceToken newestToken)
+        {
             var pubSub = Substitute.For<IStreamPubSub>();
             pubSub.RegisterProducer(default, default)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
@@ -759,10 +781,7 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var streamId = StreamId.Create("namespace", Guid.NewGuid());
             var qualifiedStreamId = new QualifiedStreamId("provider", streamId);
-            var requestedToken = new EventSequenceTokenV2(1, 2);
-            var oldestToken = new EventSequenceTokenV2(10, 3);
-            var newestToken = new EventSequenceTokenV2(20, 4);
-            var queueCache = new RecoverableCacheMissQueueCache(requestedToken, oldestToken, newestToken);
+            var queueCache = new RecoverableCacheMissQueueCache(exception);
             var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
             queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
             var receiver = Substitute.For<IQueueAdapterReceiver>();
@@ -787,8 +806,7 @@ namespace UnitTests.StreamingTests
 
             Assert.True(await testAccessor.ReadFromQueue(queueId, receiver, 1));
 
-            var recoveryToken = await queueCache.CursorRequested.WaitAsync(TimeSpan.FromSeconds(5));
-            Assert.Same(oldestToken, recoveryToken);
+            return await queueCache.CursorRequested.WaitAsync(TimeSpan.FromSeconds(5));
         }
 
         [TestSuite("BVT")]

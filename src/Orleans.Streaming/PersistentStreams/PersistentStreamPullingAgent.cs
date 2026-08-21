@@ -863,9 +863,7 @@ namespace Orleans.Streams
                     {
                         exceptionOccured = exc;
                         consumerData.SafeDisposeCursor(logger);
-                        var lowToken = exc.LowToken
-                            ?? throw new InvalidOperationException("Queue cache miss did not include the earliest available sequence token.", exc);
-                        consumerData.Cursor = queueCache!.GetCacheCursor(consumerData.StreamId, lowToken);
+                        consumerData.Cursor = queueCache!.GetCacheCursor(consumerData.StreamId, exc.LowToken);
                     }
                     catch (Exception exc)
                     {
