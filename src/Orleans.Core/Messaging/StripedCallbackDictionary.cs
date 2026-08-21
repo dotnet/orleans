@@ -185,7 +185,7 @@ internal sealed class StripedCallbackDictionary<TValue> : IEnumerable<KeyValuePa
         public readonly Dictionary<CorrelationId, TValue> Dictionary = new();
     }
 
-    public struct Enumerator : IEnumerator<KeyValuePair<CorrelationId, TValue>>
+    public sealed class Enumerator : IEnumerator<KeyValuePair<CorrelationId, TValue>>
     {
         private readonly StripedCallbackDictionary<TValue> _dictionary;
         private int _stripeIndex;
