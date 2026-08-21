@@ -116,6 +116,25 @@ namespace UnitTests.General
             }
         }
 
+        protected override async Task DropDatabaseAsync(string databaseName)
+        {
+            const int maxAttempts = 3;
+
+            for (var attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    await base.DropDatabaseAsync(databaseName);
+                    return;
+                }
+                catch (SqlException exception) when (exception.Number == 3702 && attempt < maxAttempts)
+                {
+                    Console.WriteLine("SQL Server database '{0}' remained in use after reset attempt {1}; retrying.", databaseName, attempt);
+                    PrepareForDatabaseReset(databaseName);
+                }
+            }
+        }
+
         protected override string ExistsDatabaseTemplate
         {
             get

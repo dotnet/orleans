@@ -230,7 +230,7 @@ namespace UnitTests.General
         /// </summary>
         /// <param name="databaseName">The name of the database to drop.</param>
         /// <returns>The call will be successful if the DDL query is successful. Otherwise an exception will be thrown.</returns>
-        private async Task DropDatabaseAsync(string databaseName)
+        protected virtual async Task DropDatabaseAsync(string databaseName)
         {
             await Storage.ExecuteAsync(string.Format(DropDatabaseTemplate, databaseName), command => { });
         }
