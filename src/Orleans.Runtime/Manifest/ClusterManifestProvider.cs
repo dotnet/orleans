@@ -308,6 +308,7 @@ namespace Orleans.Runtime.Metadata
                             continue;
                         }
 
+                        _manifestCache[expectedHash] = manifest;
                         builder[silo] = manifest;
                         missing.Remove(silo);
                         modified = true;
@@ -422,6 +423,7 @@ namespace Orleans.Runtime.Metadata
                 var manifest = await remoteManifestProvider.GetSiloManifestByHash(hash).AsTask().WaitAsync(_shutdownCts.Token);
                 if (manifest is not null && ManifestHashCalculator.ComputeHash(manifest) == hash)
                 {
+                    _manifestCache[hash] = manifest;
                     return manifest;
                 }
             }
