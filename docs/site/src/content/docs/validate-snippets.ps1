@@ -421,11 +421,16 @@ function Invoke-ProjectValidation {
     
     $relativePath = [IO.Path]::GetRelativePath($validationRoot, $ProjectPath)
     $command = if ($IsTestProject) { "test" } else { "build" }
+    $arguments = if ($IsTestProject) {
+        @($command, "--project", $ProjectPath, "--minimum-expected-tests", "1")
+    } else {
+        @($command, $ProjectPath)
+    }
     $action = if ($IsTestProject) { "Testing" } else { "Building" }
     
     Write-Host "${action}: $relativePath" -ForegroundColor Yellow -NoNewline
     
-    $output = & dotnet $command $ProjectPath --framework net10.0 --nologo -v q 2>&1
+    $output = & dotnet @arguments --framework net10.0 -v q 2>&1
     $exitCode = $LASTEXITCODE
     
     if ($exitCode -eq 0) {
@@ -466,8 +471,13 @@ if ($Parallel) {
             [xml] $projectXml = Get-Content -LiteralPath $ProjectPath -Raw
             $isTestProject = $projectXml.Project.PropertyGroup.IsTestProject -contains "true"
             $command = if ($isTestProject) { "test" } else { "build" }
+            $arguments = if ($isTestProject) {
+                @($command, "--project", $ProjectPath, "--minimum-expected-tests", "1")
+            } else {
+                @($command, $ProjectPath)
+            }
 
-            $output = & dotnet $command $ProjectPath --framework net10.0 --nologo -v q --artifacts-path $ArtifactsPath 2>&1
+            $output = & dotnet @arguments --framework net10.0 -v q -p:ArtifactsPath=$ArtifactsPath 2>&1
             $exitCode = $LASTEXITCODE
 
             @{

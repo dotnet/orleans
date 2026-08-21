@@ -37,9 +37,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="xunit.v3" />
-    <PackageReference Include="xunit.runner.visualstudio" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
   </ItemGroup>
 
   <ItemGroup>
@@ -55,13 +52,6 @@
 
   <ItemGroup>
     <Protobuf Include="Serialization\Models\ProtoIntClass.proto" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Update="coverlet.collector">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
   </ItemGroup>
 
 </Project>

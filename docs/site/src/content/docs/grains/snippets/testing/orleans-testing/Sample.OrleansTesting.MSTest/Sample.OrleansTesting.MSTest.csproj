@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableMSTestRunner>true</EnableMSTestRunner>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.TestingHost" Version="10.2.2" />
+    <PackageReference Include="MSTest.TestAdapter" Version="4.3.3">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="MSTest.TestFramework" Version="4.3.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Sample.OrleansTesting\HelloGrain.cs" Link="HelloGrain.cs" />
+    <Compile Include="..\Sample.OrleansTesting\IHelloGrain.cs" Link="IHelloGrain.cs" />
+    <Compile Include="..\Sample.OrleansTesting\MSTestClusterFixture.cs" Link="MSTestClusterFixture.cs" />
+  </ItemGroup>
+
+</Project>

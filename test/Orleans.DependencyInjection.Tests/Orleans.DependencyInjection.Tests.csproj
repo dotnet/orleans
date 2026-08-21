@@ -8,9 +8,6 @@
   <ItemGroup>
     <PackageReference Include="Autofac.Extensions.DependencyInjection" />
     <PackageReference Include="StructureMap.Microsoft.DependencyInjection" />
-    <PackageReference Include="xunit.v3" />
-    <PackageReference Include="xunit.runner.visualstudio" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
   </ItemGroup>
 
   <ItemGroup>

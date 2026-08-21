@@ -6,10 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Google\Orleans.GrainDirectory.Firestore\Orleans.GrainDirectory.Firestore.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Tests\Orleans.Runtime.Tests.csproj" />
   </ItemGroup>

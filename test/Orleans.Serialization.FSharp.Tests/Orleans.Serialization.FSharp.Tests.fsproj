@@ -5,17 +5,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk"/>
-    <PackageReference Include="FSharp.Core"/>
-    <PackageReference Include="xunit.v3" />
-    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FSharp.Core" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)src/Orleans.Serialization.FSharp/Orleans.Serialization.FSharp.csproj"/>
-    <ProjectReference Include="$(SourceRoot)test/TestInfrastructure/TestExtensions/TestExtensions.csproj"/>
-    <ProjectReference Include="$(SourceRoot)test/Grains/TestFSharp/TestFSharp.fsproj"/>
-    <ProjectReference Include="$(SourceRoot)test/Grains/TestFSharpGrainInterfaces/TestFSharpGrainInterfaces.csproj"/>
+    <ProjectReference Include="$(SourceRoot)src/Orleans.Serialization.FSharp/Orleans.Serialization.FSharp.csproj" />
+    <ProjectReference Include="$(SourceRoot)test/TestInfrastructure/TestExtensions/TestExtensions.csproj" />
+    <ProjectReference Include="$(SourceRoot)test/Grains/TestFSharp/TestFSharp.fsproj" />
+    <ProjectReference Include="$(SourceRoot)test/Grains/TestFSharpGrainInterfaces/TestFSharpGrainInterfaces.csproj" />
   </ItemGroup>
 
   <ItemGroup>

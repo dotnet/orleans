@@ -28,4 +28,12 @@
       Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' "/>
   </ItemGroup>
 
+  <ItemGroup Condition="'$(IsTestingPlatformApplication)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)test\testconfig.json"
+          Link="testconfig.json"
+          TargetPath="$(AssemblyName).testconfig.json"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
