@@ -79,6 +79,16 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
+    public void HierarchicalKeyParseExampleUsesSupportedOverload()
+    {
+        var key = global::Orleans.DurableMessaging.HierarchicalKey.Parse(
+            "workflow/task-123",
+            provider: null);
+
+        Assert.Equal(TaskId.Parse("workflow/task-123"), key.ToTaskId());
+    }
+
+    [Fact]
     public void CompletionWaiterRemainsUntilAcknowledgedAndTombstoneRetainsIdentity()
     {
         var destination = GrainId.Create("caller", "one");

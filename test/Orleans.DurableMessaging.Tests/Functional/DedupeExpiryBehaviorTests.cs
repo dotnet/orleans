@@ -24,18 +24,18 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
     {
         var receiver = fixture.Client.GetGrain<IDurableMessagingTestGrain>(Guid.NewGuid());
         var original = new DurableTestMessage(Guid.NewGuid(), 15, "expires");
-        using var first = CreateEnvelope(receiver, original);
+        var first = CreateEnvelope(receiver, original);
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, first.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, first)).Status);
         await fixture.WaitForEffectCountAsync(receiver, 1);
         await WaitForIdleInboxAsync(receiver);
         fixture.Clock.Advance(TimeSpan.FromMinutes(10) - TimeSpan.FromTicks(1));
 
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, first.Value)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, first)).Status);
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
 
         fixture.Clock.Advance(TimeSpan.FromTicks(1));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, first.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, first)).Status);
         var state = await fixture.WaitForEffectCountAsync(receiver, 2);
 
         Assert.Equal(2, state.Effects.Single(effect => effect.LogicalId == original.LogicalId).Count);
@@ -45,17 +45,17 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
     public async Task ExpiryReplacement_WhenJournalWriteFails_RetainsDedupeRecord()
     {
         var receiver = fixture.Client.GetGrain<IDurableMessagingTestGrain>(Guid.NewGuid());
-        using var envelope = CreateEnvelope(
+        var envelope = CreateEnvelope(
             receiver,
             new DurableTestMessage(Guid.NewGuid(), 16, "failed-expiry-replacement"));
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await fixture.WaitForEffectCountAsync(receiver, 1);
         await WaitForIdleInboxAsync(receiver);
         fixture.Clock.Advance(TimeSpan.FromMinutes(10));
         fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()));
 
-        await Assert.ThrowsAnyAsync<Exception>(() => DeliverAsync(receiver, envelope.Value));
+        await Assert.ThrowsAnyAsync<Exception>(() => DeliverAsync(receiver, envelope));
 
         var failed = await receiver.GetSnapshotAsync();
         Assert.Equal(0, failed.InboxCount);
@@ -69,7 +69,7 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
         Assert.Equal(1, recovered.ProcessedMessageCount);
         Assert.Equal(1, Assert.Single(recovered.Effects).Count);
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         var retried = await fixture.WaitForEffectCountAsync(receiver, 2);
         Assert.Equal(2, Assert.Single(retried.Effects).Count);
     }
@@ -84,7 +84,7 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
         DurableEnvelope envelope) =>
         await receiver.AsReference<IDurableInboxExtension>().DeliverAsync(envelope);
 
-    private EnvelopeLease CreateEnvelope(
+    private DurableEnvelope CreateEnvelope(
         IDurableMessagingTestGrain receiver,
         DurableTestMessage message,
         Guid? messageId = null)
@@ -110,14 +110,6 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
             };
         }
 
-        return new EnvelopeLease(built);
-    }
-
-    private sealed class EnvelopeLease(DurableEnvelope value) : IDisposable
-    {
-        public DurableEnvelope Value { get; } = value;
-        public void Dispose()
-        {
-        }
+        return built;
     }
 }

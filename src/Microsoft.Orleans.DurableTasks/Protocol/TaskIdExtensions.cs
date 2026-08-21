@@ -43,7 +43,7 @@ public static class TaskIdExtensions
     /// <example>
     /// <code>
     /// Orleans.DurableMessaging.HierarchicalKey key =
-    ///     Orleans.DurableMessaging.HierarchicalKey.Parse("workflow/task-123");
+    ///     Orleans.DurableMessaging.HierarchicalKey.Parse("workflow/task-123", provider: null);
     /// TaskId taskId = key.ToTaskId();
     /// // taskId.ToString() == "workflow/task-123"
     /// </code>
