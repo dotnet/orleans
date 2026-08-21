@@ -41,6 +41,7 @@
   </PropertyGroup>
 
   <ItemGroup Condition="'$(IsOrleansTestApplication)' == 'true'">
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Condition="'$(TargetFramework)' == 'net10.0'" />
     <PackageReference Include="Microsoft.Testing.Extensions.CrashDump" />
     <PackageReference Include="Microsoft.Testing.Extensions.HangDump" />
     <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" />

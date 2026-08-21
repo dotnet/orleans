@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Configuration>
+  <IncludeTestAssembly>False</IncludeTestAssembly>
+  <ExcludeAssembliesWithoutSources>MissingAll</ExcludeAssembliesWithoutSources>
+  <CodeCoverage>
+    <EnableDynamicManagedInstrumentation>False</EnableDynamicManagedInstrumentation>
+    <EnableStaticManagedInstrumentation>True</EnableStaticManagedInstrumentation>
+    <EnableStaticManagedInstrumentationRestore>True</EnableStaticManagedInstrumentationRestore>
+  </CodeCoverage>
+</Configuration>

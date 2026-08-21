@@ -112,6 +112,7 @@ jobs:
         retention-days: 1
         path: |
           **/TestResults/*
+          !**/*.cobertura.xml
           **/logs/*
   test-cassandra:
     name: Cassandra provider tests
@@ -1085,7 +1086,16 @@ jobs:
         --crashdump --crashdump-type Full
         --hangdump-type Full
         --report-trx --report-trx-filename "test_results_${{ matrix.suite }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        ${{ github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0' && format('--coverage --coverage-output-format cobertura --coverage-settings {0}/.github/coverage.config.xml', github.workspace) || '' }}
         --max-parallel-test-modules 1
+    - name: Archive coverage
+      if: always() && github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      with:
+        name: coverage_output_${{ matrix.suite }}
+        if-no-files-found: error
+        retention-days: 1
+        path: "**/*.cobertura.xml"
     - name: Archive Test Results
       if: always()
       continue-on-error: true
