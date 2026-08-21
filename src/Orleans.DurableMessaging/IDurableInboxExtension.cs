@@ -8,7 +8,7 @@ namespace Orleans.DurableMessaging;
 /// Non-generic grain extension for durable inbox message delivery.
 /// </summary>
 [Alias("IDurableInboxExtension")]
-public interface IDurableInboxExtension : IGrainExtension
+internal interface IDurableInboxExtension : IGrainExtension
 {
     /// <summary>
     /// Delivers a message to this grain's durable inbox.
