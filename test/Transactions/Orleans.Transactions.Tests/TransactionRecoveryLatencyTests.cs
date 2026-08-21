@@ -63,6 +63,29 @@ public class TransactionRecoveryLatencyTests
     }
 
     [Fact]
+    public async Task CancelBeforePrepareReleasesPrePrepareLock()
+    {
+        var resource = CreateParticipant("resource", ParticipantId.Role.Resource);
+        var queue = new GatedCancelTransactionQueue(resource, new TestActivationLifetime());
+        var transactionId = Guid.NewGuid();
+        var timeStamp = new DateTime(2026, 8, 8, 12, 0, 0, DateTimeKind.Utc);
+        var accessCount = new AccessCounter { Writes = 1 };
+
+        await queue.RWLock.EnterLock(
+            transactionId,
+            timeStamp,
+            default,
+            isRead: false,
+            exclusiveLock: false,
+            static () => 0);
+
+        await queue.NotifyOfCancel(transactionId, timeStamp, TransactionalStatus.CascadingAbort);
+
+        var (status, _) = await queue.RWLock.ValidateLock(transactionId, accessCount);
+        Assert.Equal(TransactionalStatus.BrokenLock, status);
+    }
+
+    [Fact]
     public void StorageBatchTracksCommittedTransactionIds()
     {
         var firstTransactionId = Guid.NewGuid();
