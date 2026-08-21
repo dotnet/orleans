@@ -28,15 +28,18 @@ namespace Orleans.Reminders.EntityFrameworkCore.SqlServer.Data.Migrations
             modelBuilder.Entity("Orleans.Reminders.EntityFrameworkCore.Data.ReminderRecord<byte[]>", b =>
                 {
                     b.Property<string>("ServiceId")
-                        .HasColumnType("nvarchar(450)")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)")
                         .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<string>("GrainId")
-                        .HasColumnType("nvarchar(450)")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)")
                         .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<string>("Name")
-                        .HasColumnType("nvarchar(450)")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)")
                         .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<byte[]>("ETag")
@@ -56,6 +59,8 @@ namespace Orleans.Reminders.EntityFrameworkCore.SqlServer.Data.Migrations
 
                     b.HasKey("ServiceId", "GrainId", "Name")
                         .HasName("PK_Reminders");
+
+                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("ServiceId", "GrainId", "Name"), false);
 
                     b.HasIndex("ServiceId", "GrainHash")
                         .HasDatabaseName("IDX_Reminders_ServiceId_GrainHash");

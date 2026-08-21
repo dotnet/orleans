@@ -1,11 +1,10 @@
 using System;
 using System.Linq;
-using System.Text.Json;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.Configuration;
@@ -19,9 +18,10 @@ internal class EFGrainStorage<TDbContext, TETag> : IGrainStorage, ILifecyclePart
     private readonly ILogger _logger;
     private readonly string _name;
     private readonly string _serviceId;
-    private readonly IServiceProvider _serviceProvider;
     private readonly IDbContextFactory<TDbContext> _dbContextFactory;
     private readonly IEFGrainStorageETagConverter<TETag> _eTagConverter;
+    private readonly IGrainStorageSerializer _grainStorageSerializer;
+    private readonly IServiceProvider _serviceProvider;
 
     public EFGrainStorage(
         string name,
@@ -29,14 +29,16 @@ internal class EFGrainStorage<TDbContext, TETag> : IGrainStorage, ILifecyclePart
         IOptions<ClusterOptions> clusterOptions,
         IDbContextFactory<TDbContext> dbContextFactory,
         IEFGrainStorageETagConverter<TETag> eTagConverter,
+        IGrainStorageSerializer grainStorageSerializer,
         IServiceProvider serviceProvider)
     {
-        this._serviceProvider = serviceProvider;
         this._name = name;
         this._serviceId = clusterOptions.Value.ServiceId;
         this._logger = loggerFactory.CreateLogger<EFGrainStorage<TDbContext, TETag>>();
         this._dbContextFactory = dbContextFactory;
         this._eTagConverter = eTagConverter;
+        this._grainStorageSerializer = grainStorageSerializer;
+        this._serviceProvider = serviceProvider;
     }
 
     public async Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
@@ -58,13 +60,15 @@ internal class EFGrainStorage<TDbContext, TETag> : IGrainStorage, ILifecyclePart
 
             if (record is null)
             {
-                grainState.State = ActivatorUtilities.CreateInstance<T>(_serviceProvider);
+                grainState.State = CreateInstance<T>();
                 grainState.RecordExists = false;
                 grainState.ETag = null;
                 return;
             }
 
-            grainState.State = !string.IsNullOrEmpty(record.Data) ? JsonSerializer.Deserialize<T>(record.Data)! : Activator.CreateInstance<T>();
+            grainState.State = record.Data is { Length: > 0 }
+                ? this._grainStorageSerializer.Deserialize<T>(record.Data) ?? CreateInstance<T>()
+                : CreateInstance<T>();
 
             grainState.RecordExists = true;
             grainState.ETag = this._eTagConverter.FromDbETag(record.ETag);
@@ -92,7 +96,7 @@ internal class EFGrainStorage<TDbContext, TETag> : IGrainStorage, ILifecyclePart
             GrainType = grainType,
             StateType = stateName,
             GrainId = id,
-            Data = JsonSerializer.Serialize(grainState.State),
+            Data = this._grainStorageSerializer.Serialize(grainState.State).ToArray(),
         };
 
         if (string.IsNullOrWhiteSpace(grainState.ETag))
@@ -166,7 +170,8 @@ internal class EFGrainStorage<TDbContext, TETag> : IGrainStorage, ILifecyclePart
         if (!grainState.RecordExists || string.IsNullOrWhiteSpace(grainState.ETag))
         {
             grainState.ETag = null;
-            grainState.State = Activator.CreateInstance<T>();
+            grainState.State = CreateInstance<T>();
+            grainState.RecordExists = false;
             return;
         }
 
@@ -222,18 +227,29 @@ internal class EFGrainStorage<TDbContext, TETag> : IGrainStorage, ILifecyclePart
         }
 
         grainState.ETag = null;
-        grainState.State = Activator.CreateInstance<T>();
+        grainState.State = CreateInstance<T>();
         grainState.RecordExists = false;
     }
 
     public void Participate(ISiloLifecycle lifecycle) =>
         this._logger.LogInformation("EFCore Grain Storage {Storage} initialized!", this._name);
+
+    private T CreateInstance<T>() => ActivatorUtilities.CreateInstance<T>(this._serviceProvider);
 }
 
 internal static class EFStorageFactory
 {
     public static EFGrainStorage<TDbContext, TETag> Create<TDbContext, TETag>(IServiceProvider services, string name) where TDbContext : GrainStateDbContext<TDbContext, TETag>
     {
-        return ActivatorUtilities.CreateInstance<EFGrainStorage<TDbContext, TETag>>(services, name);
+        var dbContextFactory = services.GetKeyedService<IDbContextFactory<TDbContext>>(name)
+            ?? services.GetRequiredService<IDbContextFactory<TDbContext>>();
+        var grainStorageSerializer = services.GetKeyedService<IGrainStorageSerializer>(name)
+            ?? services.GetRequiredService<IGrainStorageSerializer>();
+
+        return ActivatorUtilities.CreateInstance<EFGrainStorage<TDbContext, TETag>>(
+            services,
+            name,
+            dbContextFactory,
+            grainStorageSerializer);
     }
 }

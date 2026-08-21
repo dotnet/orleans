@@ -85,7 +85,7 @@ public sealed class GuidDbContextETagTests
 
     [Fact]
     public Task GrainStateRecord_ETagLifecycleAndStaleConcurrency_AreApplicationManaged() =>
-        VerifyLifecycleAndConcurrency<SqliteGrainStateDbContext, GrainStateRecord<Guid>, string>(
+        VerifyLifecycleAndConcurrency<SqliteGrainStateDbContext, GrainStateRecord<Guid>, byte[]>(
             options => new SqliteGrainStateDbContext(options),
             () => new GrainStateRecord<Guid>
             {
@@ -93,14 +93,14 @@ public sealed class GuidDbContextETagTests
                 GrainType = "grain-type-one",
                 StateType = "state-type-one",
                 GrainId = "grain-one",
-                Data = """{"value":"initial"}""",
+                Data = [1, 2, 3],
                 ETag = InitialETag
             },
             record => record.ETag,
             (record, value) => record.Data = value,
             record => record.Data!,
-            winnerValue: """{"value":"winner"}""",
-            staleValue: """{"value":"stale"}""");
+            winnerValue: [4, 5, 6],
+            staleValue: [7, 8, 9]);
 
     [Fact]
     public Task ReminderRecord_ETagLifecycleAndStaleConcurrency_AreApplicationManaged() =>

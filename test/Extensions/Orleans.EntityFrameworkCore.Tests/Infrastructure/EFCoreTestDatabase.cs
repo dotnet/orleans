@@ -45,9 +45,16 @@ public abstract class EFCoreTestDatabase
             result.Append(char.IsAsciiLetterOrDigit(character) ? char.ToLowerInvariant(character) : '_');
         }
 
-        // PostgreSQL identifiers are limited to 63 bytes. Keeping every provider to that
-        // limit makes generated database names portable across the provider matrix.
-        return result.Length <= 63 ? result.ToString() : result.ToString(0, 63);
+        if (result.Length <= 63)
+        {
+            return result.ToString();
+        }
+
+        const int suffixLength = 33;
+        return string.Concat(
+            result.ToString(0, 63 - suffixLength),
+            "_",
+            result.ToString(result.Length - suffixLength + 1, suffixLength - 1));
     }
 
     public abstract string WithDatabase(string connectionString, string databaseName);

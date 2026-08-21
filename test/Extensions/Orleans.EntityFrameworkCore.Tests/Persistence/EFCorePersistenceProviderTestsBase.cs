@@ -6,6 +6,7 @@ using Orleans.Configuration;
 using Orleans.EntityFrameworkCore.Tests.Infrastructure;
 using Orleans.Persistence.EntityFrameworkCore.Data;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Storage;
 using UnitTests.Persistence;
 
@@ -19,6 +20,7 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
     private readonly string _serviceId = $"service-{Guid.NewGuid():N}";
     private readonly ITestOutputHelper _testOutput;
     private readonly RecordingLoggerProvider _loggerProvider = new();
+    private TrackingGrainStorageSerializer? _trackingSerializer;
     private EFCoreDatabaseFixture<TDbContext>? _databaseFixture;
     private ServiceProvider? _services;
     private EFGrainStorage<TDbContext, TETag>? _storage;
@@ -48,6 +50,13 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
         services.AddSingleton(_databaseFixture.Factory);
         services.AddSingleton(provider.CreateGrainStorageETagConverter());
         services.AddSingleton(new ConstructorDependency("resolved-from-di"));
+        services.AddSerializer();
+        services.AddSingleton<IGrainStorageSerializer, OrleansGrainStorageSerializer>();
+        services.AddKeyedSingleton<IGrainStorageSerializer>(
+            StorageName,
+            (serviceProvider, _) =>
+                _trackingSerializer = new TrackingGrainStorageSerializer(
+                    serviceProvider.GetRequiredService<IGrainStorageSerializer>()));
         _services = services.BuildServiceProvider();
 
         _storage = EFStorageFactory.Create<TDbContext, TETag>(_services, StorageName);
@@ -103,6 +112,22 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
         Assert.Equal("profile", record.StateType);
         Assert.Equal(grainId.Type.ToString(), record.GrainType);
         Assert.Equal(grainId.Key.ToString(), record.GrainId);
+    }
+
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
+    public async Task WriteRead_UsesNamedOrleansSerializerForPrivateMembers()
+    {
+        var grainId = NewGrainId("orleans-serializer");
+        var state = new GrainState<PrivateSerializedState>(new PrivateSerializedState("private-value"));
+
+        await Storage.WriteStateAsync("private", grainId, state);
+        var read = new GrainState<PrivateSerializedState>();
+        await Storage.ReadStateAsync("private", grainId, read);
+
+        Assert.Equal("private-value", Assert.IsType<PrivateSerializedState>(read.State).GetValue());
+        Assert.NotNull(_trackingSerializer);
+        Assert.Equal(1, _trackingSerializer.SerializeCount);
+        Assert.Equal(1, _trackingSerializer.DeserializeCount);
     }
 
     [Fact, TestSuite(EFCoreTestCategories.Functional)]
@@ -307,7 +332,8 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
 
     private EFGrainStorage<TDbContext, TETag> CreateStorage(string serviceId)
     {
-        var loggerFactory = _services!.GetRequiredService<ILoggerFactory>();
+        var services = _services ?? throw new InvalidOperationException("The services have not been initialized.");
+        var loggerFactory = services.GetRequiredService<ILoggerFactory>();
         return new EFGrainStorage<TDbContext, TETag>(
             StorageName,
             loggerFactory,
@@ -318,7 +344,8 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
             }),
             Factory,
             new TProvider().CreateGrainStorageETagConverter(),
-            _services ?? throw new InvalidOperationException("The services have not been initialized."));
+            services.GetRequiredService<IGrainStorageSerializer>(),
+            services);
     }
 
     private async Task<GrainState<PersistenceState>> Read(string stateName, GrainId grainId) =>
@@ -420,12 +447,16 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
 #endif
     }
 
+    [GenerateSerializer]
     public sealed class PersistenceState
     {
+        [Id(0)]
         public string? Name { get; set; }
 
+        [Id(1)]
         public int Revision { get; set; }
 
+        [Id(2)]
         public long Checksum { get; set; }
     }
 
@@ -440,6 +471,43 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
     }
 
     public sealed record ConstructorDependency(string Value);
+
+    [GenerateSerializer]
+    public sealed class PrivateSerializedState
+    {
+        [Id(0)]
+        private string? _value;
+
+        public PrivateSerializedState()
+        {
+        }
+
+        public PrivateSerializedState(string value)
+        {
+            _value = value;
+        }
+
+        public string? GetValue() => _value;
+    }
+
+    private sealed class TrackingGrainStorageSerializer(IGrainStorageSerializer inner) : IGrainStorageSerializer
+    {
+        public int SerializeCount { get; private set; }
+
+        public int DeserializeCount { get; private set; }
+
+        public BinaryData Serialize<T>(T? input)
+        {
+            SerializeCount++;
+            return inner.Serialize(input);
+        }
+
+        public T? Deserialize<T>(BinaryData input)
+        {
+            DeserializeCount++;
+            return inner.Deserialize<T>(input);
+        }
+    }
 
     private sealed class RecordingLoggerProvider : ILoggerProvider
     {

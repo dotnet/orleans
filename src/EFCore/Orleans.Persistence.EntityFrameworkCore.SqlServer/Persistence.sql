@@ -17,11 +17,11 @@ IF NOT EXISTS (
 )
 BEGIN
     CREATE TABLE [GrainState] (
-        [ServiceId] nvarchar(280) COLLATE Latin1_General_100_BIN2 NOT NULL,
-        [GrainType] nvarchar(280) COLLATE Latin1_General_100_BIN2 NOT NULL,
-        [StateType] nvarchar(280) COLLATE Latin1_General_100_BIN2 NOT NULL,
-        [GrainId] nvarchar(280) COLLATE Latin1_General_100_BIN2 NOT NULL,
-        [Data] nvarchar(max) NULL,
+        [ServiceId] nvarchar(150) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [GrainType] nvarchar(250) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [StateType] nvarchar(150) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [GrainId] nvarchar(299) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [Data] varbinary(max) NULL,
         [ETag] rowversion NOT NULL,
         CONSTRAINT [PK_GrainState] PRIMARY KEY NONCLUSTERED ([ServiceId], [GrainType], [StateType], [GrainId])
     );
@@ -40,4 +40,3 @@ GO
 
 COMMIT;
 GO
-
