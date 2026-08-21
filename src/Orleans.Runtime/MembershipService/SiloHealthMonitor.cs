@@ -211,11 +211,12 @@ namespace Orleans.Runtime.MembershipService
                     var timeout = CalculateProbeTimeout(failureDetector, options, localDegradationScore, isDirectProbe, Debugger.IsAttached);
                     probeStartTimestamp = _timeProvider.GetTimestamp();
                     using var cancellation = new CancellationTokenSource(timeout, _timeProvider);
+                    var gcPauseBefore = isDirectProbe ? _getTotalPauseDuration() : TimeSpan.Zero;
 
                     if (isDirectProbe)
                     {
                         // Probe the silo directly.
-                        probeResult = await this.ProbeDirectly(cancellation.Token, timeout).ConfigureAwait(false);
+                        probeResult = await this.ProbeDirectly(cancellation.Token, timeout, gcPauseBefore).ConfigureAwait(false);
                     }
                     else
                     {
@@ -325,13 +326,13 @@ namespace Orleans.Runtime.MembershipService
         /// </summary>
         /// <param name="cancellation">A token to cancel and fail the probe attempt.</param>
         /// <param name="probeTimeout">The timeout used for this probe, for GC pause evaluation.</param>
+        /// <param name="gcPauseBefore">The cumulative GC pause duration when the probe timeout was armed.</param>
         /// <returns>The number of failed probes since the last successful probe.</returns>
-        private async Task<ProbeResult> ProbeDirectly(CancellationToken cancellation, TimeSpan probeTimeout)
+        private async Task<ProbeResult> ProbeDirectly(CancellationToken cancellation, TimeSpan probeTimeout, TimeSpan gcPauseBefore)
         {
             var id = ++_nextProbeId;
             LogTraceGoingToSendPing(_log, id, TargetSiloAddress);
 
-            var gcPauseBefore = _getTotalPauseDuration();
             var roundTripTimer = TimeProviderValueStopwatch.StartNew(_timeProvider);
             ProbeResult probeResult;
             Exception? failureException;
