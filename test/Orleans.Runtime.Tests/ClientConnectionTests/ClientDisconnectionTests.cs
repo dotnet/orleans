@@ -100,7 +100,7 @@ public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) 
 
         var observerB = new EchoGrainObserver();
         observerB.SelfReference = clientB.CreateObjectReference<IEchoGrainObserver>(observerB);
-        
+
         // Create references from each to the other.
         var aToB = (IEchoGrainObserver)clientA.ServiceProvider.GetRequiredService<GrainReferenceActivator>().CreateReference(observerB.SelfReference.GetGrainId(), GrainInterfaceType.Create("IEchoGrainObserver"));
         var bToA = (IEchoGrainObserver)clientB.ServiceProvider.GetRequiredService<GrainReferenceActivator>().CreateReference(observerA.SelfReference.GetGrainId(), GrainInterfaceType.Create("IEchoGrainObserver"));
