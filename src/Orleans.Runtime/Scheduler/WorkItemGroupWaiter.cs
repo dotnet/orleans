@@ -26,7 +26,8 @@ internal sealed class WorkItemGroupWaiter(WorkItemGroup workItemGroup) : IValueT
     // ResetMask is used to clear both status flags.
     private const uint ResetMask = ~SignaledFlag & ~WaitingFlag;
 
-    private static readonly Action<object?> Sentinel = static _ => Debug.Fail("The sentinel delegate should never be invoked.");
+    private static readonly Action<object?> CompletingSentinel = static _ => Debug.Fail("The completing sentinel delegate should never be invoked.");
+    private static readonly Action<object?> CompletedSentinel = static _ => Debug.Fail("The completed sentinel delegate should never be invoked.");
 
     private readonly WorkItemGroup _workItemGroup = workItemGroup;
 
@@ -37,9 +38,9 @@ internal sealed class WorkItemGroupWaiter(WorkItemGroup workItemGroup) : IValueT
     ValueTaskSourceStatus IValueTaskSource.GetStatus(short token)
     {
         // We only support success completion (no exception/cancellation paths)
-        return (Volatile.Read(ref _status) & SignaledFlag) == 0
-            ? ValueTaskSourceStatus.Pending
-            : ValueTaskSourceStatus.Succeeded;
+        return ReferenceEquals(Volatile.Read(ref _continuation), CompletedSentinel)
+            ? ValueTaskSourceStatus.Succeeded
+            : ValueTaskSourceStatus.Pending;
     }
 
     void IValueTaskSource.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags)
@@ -54,7 +55,7 @@ internal sealed class WorkItemGroupWaiter(WorkItemGroup workItemGroup) : IValueT
         // We need to set the continuation state before we swap in the delegate, so that
         // if there's a race between this and Signal() and Signal() sees the _continuation
         // as non-null, it'll be able to invoke it with the state stored here.
-        object? storedContinuation = _continuation;
+        object? storedContinuation = Volatile.Read(ref _continuation);
         if (storedContinuation is null)
         {
             _continuationState = state;
@@ -67,13 +68,20 @@ internal sealed class WorkItemGroupWaiter(WorkItemGroup workItemGroup) : IValueT
             }
         }
 
-        // Operation already completed, so we need to queue the supplied callback.
-        // At this point the storedContinuation should be the sentinel; if it's not, the instance was misused.
-        Debug.Assert(storedContinuation is not null);
-        Debug.Assert(ReferenceEquals(storedContinuation, Sentinel));
+        if (ReferenceEquals(storedContinuation, CompletingSentinel))
+        {
+            var spinner = new SpinWait();
+            do
+            {
+                spinner.SpinOnce();
+                storedContinuation = Volatile.Read(ref _continuation);
+            }
+            while (ReferenceEquals(storedContinuation, CompletingSentinel));
+        }
 
-        // Schedule the continuation on the WorkItemGroup
-        _workItemGroup.QueueAction(continuation, state);
+        // Operation already completed, so queue the supplied callback.
+        Debug.Assert(ReferenceEquals(storedContinuation, CompletedSentinel));
+        _workItemGroup.QueueNullableAction(continuation, state);
 
         [DoesNotReturn]
         static void ThrowArgumentNullException() => throw new ArgumentNullException(nameof(continuation));
@@ -151,16 +159,18 @@ internal sealed class WorkItemGroupWaiter(WorkItemGroup workItemGroup) : IValueT
 
     private void SignalCompletion()
     {
-        Action<object?>? continuation =
-            Volatile.Read(ref _continuation) ??
-            Interlocked.CompareExchange(ref _continuation, Sentinel, null);
+        var continuation = Interlocked.Exchange(ref _continuation, CompletingSentinel);
+        Debug.Assert(continuation is null || (!ReferenceEquals(continuation, CompletingSentinel) && !ReferenceEquals(continuation, CompletedSentinel)));
 
+        // The continuation slot is the completion authority. Publish completion only after
+        // atomically claiming it so GetStatus and OnCompleted observe one ordered state transition.
+        Volatile.Write(ref _continuation, CompletedSentinel);
         if (continuation is not null)
         {
             Debug.Assert(continuation is not null);
 
             // Always schedule on the WorkItemGroup
-            _workItemGroup.QueueAction(continuation, _continuationState);
+            _workItemGroup.QueueNullableAction(continuation, _continuationState);
         }
     }
 
