@@ -38,12 +38,20 @@ public struct DurableTaskMethodBuilder
     /// <summary>Registers the next state-machine step with a safe awaiter.</summary>
     public readonly void AwaitOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
         where TAwaiter : INotifyCompletion where TStateMachine : IAsyncStateMachine
-        => awaiter.OnCompleted(Invocation.MoveNext);
+    {
+        var invocation = Invocation;
+        invocation.CaptureExecutionContext();
+        awaiter.OnCompleted(invocation.MoveNextAction);
+    }
 
     /// <summary>Registers the next state-machine step with a critical awaiter.</summary>
     public readonly void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
         where TAwaiter : ICriticalNotifyCompletion where TStateMachine : IAsyncStateMachine
-        => awaiter.UnsafeOnCompleted(Invocation.MoveNext);
+    {
+        var invocation = Invocation;
+        invocation.CaptureExecutionContext();
+        awaiter.UnsafeOnCompleted(invocation.MoveNextAction);
+    }
 }
 
 /// <summary>Builds compiler-lowered asynchronous methods which return <see cref="DurableTask{TResult}"/>.</summary>
@@ -81,10 +89,18 @@ public struct DurableTaskMethodBuilder<TResult>
     /// <summary>Registers the next state-machine step with a safe awaiter.</summary>
     public readonly void AwaitOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
         where TAwaiter : INotifyCompletion where TStateMachine : IAsyncStateMachine
-        => awaiter.OnCompleted(Invocation.MoveNext);
+    {
+        var invocation = Invocation;
+        invocation.CaptureExecutionContext();
+        awaiter.OnCompleted(invocation.MoveNextAction);
+    }
 
     /// <summary>Registers the next state-machine step with a critical awaiter.</summary>
     public readonly void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
         where TAwaiter : ICriticalNotifyCompletion where TStateMachine : IAsyncStateMachine
-        => awaiter.UnsafeOnCompleted(Invocation.MoveNext);
+    {
+        var invocation = Invocation;
+        invocation.CaptureExecutionContext();
+        awaiter.UnsafeOnCompleted(invocation.MoveNextAction);
+    }
 }
