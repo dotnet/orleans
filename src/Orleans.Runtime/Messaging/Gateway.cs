@@ -89,6 +89,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     DropDisconnectedClients();
                     DropExpiredRoutingCachedEntries();
+                    DropExpiredClientRequests();
                 }
                 catch (Exception exception)
                 {
@@ -192,13 +193,6 @@ namespace Orleans.Runtime.Messaging
                 return msg.TargetSilo;
             }
 
-            if (msg.Direction == Message.Directions.Response
-                && ClientGrainId.TryParse(msg.SendingGrain, out var respondingClientId)
-                && clients.TryGetValue(respondingClientId, out var respondingClient))
-            {
-                respondingClient.OnClientResponse(msg);
-            }
-
             // for responses from ClientAddressableObject to ClientGrain try to use clientsReplyRoutingCache for sending replies directly back.
             if (!msg.SendingGrain.IsClient() || !msg.TargetGrain.IsClient())
             {
@@ -218,11 +212,29 @@ namespace Orleans.Runtime.Messaging
             return null;
         }
 
+        internal void RecordClientResponse(Message message)
+        {
+            if (message.Direction == Message.Directions.Response
+                && ClientGrainId.TryParse(message.SendingGrain, out var respondingClientId)
+                && clients.TryGetValue(respondingClientId, out var respondingClient))
+            {
+                respondingClient.OnClientResponse(message);
+            }
+        }
+
         internal void DropExpiredRoutingCachedEntries()
         {
             lock (clients)
             {
                 clientsReplyRoutingCache.DropExpiredEntries();
+            }
+        }
+
+        private void DropExpiredClientRequests()
+        {
+            foreach (var client in clients.Values)
+            {
+                client.DropExpiredRequests();
             }
         }
 
@@ -320,7 +332,8 @@ namespace Orleans.Runtime.Messaging
             private readonly Gateway _gateway;
             private readonly Task _messageLoop;
             private readonly Dictionary<(GrainId, CorrelationId), Message> _outstandingRequestsToClient = [];
-            private readonly ConcurrentQueue<(WorkItemType Type, Message Message)> _pendingToSend = new();
+            private readonly ConcurrentQueue<WorkItem> _pendingToSend = new();
+            private readonly object _lifecycleLock = new();
             private readonly SingleWaiterAutoResetEvent _signal = new()
             {
                 RunContinuationsAsynchronously = true
@@ -334,7 +347,10 @@ namespace Orleans.Runtime.Messaging
             {
                 SendMessageToClient,
                 ReceivedResponseFromClient,
+                DropExpiredRequests,
             }
+
+            private readonly record struct WorkItem(WorkItemType Type, Message? Message);
 
             internal ClientState(Gateway gateway, ClientGrainId id)
             {
@@ -394,13 +410,31 @@ namespace Orleans.Runtime.Messaging
 
             public void Drop()
             {
-                Interlocked.Exchange(ref _dropped, 1);
+                lock (_lifecycleLock)
+                {
+                    Volatile.Write(ref _dropped, 1);
+                }
+
                 _signal.Signal();
             }
 
             public void Send(Message msg)
             {
-                _pendingToSend.Enqueue((WorkItemType.SendMessageToClient, msg));
+                lock (_lifecycleLock)
+                {
+                    if (IsDropped)
+                    {
+                        _gateway.messageCenter.RejectMessage(
+                            msg,
+                            Message.RejectionTypes.Transient,
+                            exc: new ClientNotAvailableException(Id.GrainId),
+                            rejectInfo: "Client dropped");
+                        return;
+                    }
+
+                    _pendingToSend.Enqueue(new(WorkItemType.SendMessageToClient, msg));
+                }
+
                 _signal.Signal();
                 LogTraceQueuedMessage(_gateway.logger, msg, msg.TargetGrain);
             }
@@ -416,37 +450,49 @@ namespace Orleans.Runtime.Messaging
                         if (IsDropped)
                         {
                             RejectDroppedClientMessages();
-                            continue;
+                            return;
                         }
 
-                        var connection = Volatile.Read(ref _connection);
-                        if (connection is null)
+                        var pendingCount = _pendingToSend.Count;
+                        while (pendingCount-- > 0 && _pendingToSend.TryDequeue(out var workItem))
                         {
-                            continue;
-                        }
-
-                        // Send all pending messages.
-                        while (_pendingToSend.TryDequeue(out var workItem))
-                        {
-                            var (workItemType, message) = workItem;
-                            if (workItemType is WorkItemType.SendMessageToClient)
+                            if (workItem.Type is WorkItemType.DropExpiredRequests)
                             {
+                                RemoveExpiredRequests();
+                                continue;
+                            }
+
+                            var message = workItem.Message!;
+                            if (workItem.Type is WorkItemType.SendMessageToClient)
+                            {
+                                var connection = Volatile.Read(ref _connection);
+                                if (connection is null)
+                                {
+                                    _pendingToSend.Enqueue(workItem);
+                                    continue;
+                                }
+
+                                var requestKey = (message.SendingGrain, message.Id);
+                                var isRequest = message.Direction == Message.Directions.Request;
+                                if (isRequest)
+                                {
+                                    _outstandingRequestsToClient[requestKey] = message;
+                                }
+
                                 if (TrySend(connection, message))
                                 {
-                                    if (message.Direction == Message.Directions.Request)
-                                    {
-                                        _outstandingRequestsToClient[(message.SendingGrain, message.Id)] = message;
-                                    }
-
                                     LogTraceSentQueuedMessage(_gateway.logger, message, Id);
                                 }
                                 else
                                 {
-                                    _pendingToSend.Enqueue((WorkItemType.SendMessageToClient, message));
-                                    break;
+                                    if (isRequest)
+                                    {
+                                        _outstandingRequestsToClient.Remove(requestKey);
+                                    }
+                                    _pendingToSend.Enqueue(workItem);
                                 }
                             }
-                            else if (workItemType is WorkItemType.ReceivedResponseFromClient)
+                            else
                             {
                                 _outstandingRequestsToClient.Remove((message.TargetGrain, message.Id));
                             }
@@ -466,11 +512,12 @@ namespace Orleans.Runtime.Messaging
                 {
                     if (workItem.Type == WorkItemType.SendMessageToClient)
                     {
-                        RejectMessage(ref exception, workItem.Message);
+                        RejectMessage(ref exception, workItem.Message!);
                     }
-                    else
+                    else if (workItem.Type == WorkItemType.ReceivedResponseFromClient)
                     {
-                        _outstandingRequestsToClient.Remove((workItem.Message.TargetGrain, workItem.Message.Id));
+                        var message = workItem.Message!;
+                        _outstandingRequestsToClient.Remove((message.TargetGrain, message.Id));
                     }
                 }
 
@@ -490,8 +537,48 @@ namespace Orleans.Runtime.Messaging
 
             internal void OnClientResponse(Message message)
             {
-                _pendingToSend.Enqueue((WorkItemType.ReceivedResponseFromClient, message));
+                EnqueueIfActive(new(WorkItemType.ReceivedResponseFromClient, message));
+            }
+
+            internal void DropExpiredRequests()
+            {
+                EnqueueIfActive(new(WorkItemType.DropExpiredRequests, null));
+            }
+
+            private void EnqueueIfActive(WorkItem workItem)
+            {
+                lock (_lifecycleLock)
+                {
+                    if (IsDropped)
+                    {
+                        return;
+                    }
+
+                    _pendingToSend.Enqueue(workItem);
+                }
+
                 _signal.Signal();
+            }
+
+            private void RemoveExpiredRequests()
+            {
+                List<(GrainId, CorrelationId)>? expiredRequests = null;
+                foreach (var (key, message) in _outstandingRequestsToClient)
+                {
+                    if (message.IsExpired)
+                    {
+                        expiredRequests ??= [];
+                        expiredRequests.Add(key);
+                    }
+                }
+
+                if (expiredRequests is not null)
+                {
+                    foreach (var key in expiredRequests)
+                    {
+                        _outstandingRequestsToClient.Remove(key);
+                    }
+                }
             }
 
             private bool TrySend(GatewayInboundConnection connection, Message message)

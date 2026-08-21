@@ -8,7 +8,9 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Core.Internal;
 using Orleans.Runtime;
+using Orleans.Runtime.Placement;
 using Orleans.TestingHost.Utils;
 using Microsoft.Extensions.Configuration;
 using Orleans.Configuration;
@@ -40,10 +42,10 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     private readonly GrainDirectoryObserver _grainDirectoryObserver = new();
     private readonly InProcessGrainDirectory _grainDirectory;
     private readonly InProcessMembershipTable _membershipTable;
+    private readonly SemaphoreSlim _clientHostsSemaphore = new(1, 1);
     private bool _disposed;
     private int _startedInstances;
 
-    // Multi-client support
     private readonly Dictionary<string, IHost> _clientHosts = new();
 
     /// <summary>
@@ -75,18 +77,10 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     {
         get
         {
-            _clientHosts.TryGetValue("default", out var clientHost);
-            return clientHost;
-        }
-        set
-        {
-            if (value is null)
+            lock (_clientHosts)
             {
-                _clientHosts.Remove("default");
-            }
-            else
-            {
-                _clientHosts["default"] = value;
+                _clientHosts.TryGetValue("default", out var clientHost);
+                return clientHost;
             }
         }
     }
@@ -139,6 +133,90 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             return Silos[index].SiloHost.Services;
         }
     }
+
+    /// <summary>
+    /// Gets a <see cref="Task"/> that completes when the current activation of the specified grain
+    /// finishes deactivating. If the grain is not currently activated, returns <see cref="Task.CompletedTask"/>.
+    /// </summary>
+    /// <param name="grainId">The ID of the grain to observe.</param>
+    /// <returns>A task that completes when the grain's current activation has deactivated.</returns>
+    /// <remarks>
+    /// There may be scenarios where this task needs to be captured before calling DeactivateOnIdle/MigrateOnIdle in the test
+    /// to avoid a race where the grain deactivates and is reactivated before the returned task is obtained.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var deactivated = cluster.WaitForDeactivationAsync(grain.GetGrainId());
+    /// await grain.DoDeactivate();
+    /// await deactivated;
+    /// </code>
+    /// </example>
+    public Task WaitForDeactivationAsync(GrainId grainId)
+    {
+        if (TryGetGrainContext(grainId, out var grainContext))
+        {
+            return grainContext.Deactivated;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Deactivates the current activation of the specified grain and waits for deactivation to complete.
+    /// </summary>
+    /// <param name="grainId">The ID of the grain to deactivate.</param>
+    /// <returns>A task that completes when the grain has been deactivated.</returns>
+    /// <example>
+    /// <code>
+    /// await cluster.DeactivateAsync(grain.GetGrainId());
+    /// </code>
+    /// </example>
+    public async Task DeactivateAsync(GrainId grainId)
+    {
+        if (TryGetGrainContext(grainId, out var grainContext))
+        {
+            grainContext.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationRequested, $"{nameof(DeactivateAsync)} was called."));
+            await grainContext.Deactivated;
+        }
+    }
+
+    /// <summary>
+    /// Migrates the current activation of the specified grain to a different silo and waits for migration to complete.
+    /// If <paramref name="targetSilo"/> is specified, a placement hint is set to guide migration to that silo.
+    /// </summary>
+    /// <param name="grainId">The ID of the grain to migrate.</param>
+    /// <param name="targetSilo">The target silo address, or <see langword="null"/> to let the placement director choose.</param>
+    /// <returns>A task that completes when the grain has been migrated (deactivated on the source silo).</returns>
+    /// <example>
+    /// <code>
+    /// var targetSilo = cluster.GetActiveSilos().First(s => s.SiloAddress != originalHost).SiloAddress;
+    /// await cluster.MigrateAsync(grain.GetGrainId(), targetSilo);
+    /// </code>
+    /// </example>
+    public async Task MigrateAsync(GrainId grainId, SiloAddress? targetSilo = null)
+    {
+        var deactivated = WaitForDeactivationAsync(grainId);
+        if (targetSilo is not null)
+        {
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, targetSilo);
+        }
+
+        await Client.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle();
+        await deactivated;
+    }
+
+    /// <inheritdoc cref="WaitForDeactivationAsync(GrainId)"/>
+    /// <param name="grain">The grain to observe.</param>
+    public Task WaitForDeactivationAsync(IAddressable grain) => WaitForDeactivationAsync(grain.GetGrainId());
+
+    /// <inheritdoc cref="DeactivateAsync(GrainId)"/>
+    /// <param name="grain">The grain to deactivate.</param>
+    public Task DeactivateAsync(IAddressable grain) => DeactivateAsync(grain.GetGrainId());
+
+    /// <inheritdoc cref="MigrateAsync(GrainId, SiloAddress?)"/>
+    /// <param name="grain">The grain to migrate.</param>
+    /// <param name="targetSilo">The target silo address, or <see langword="null"/> to let the placement director choose.</param>
+    public Task MigrateAsync(IAddressable grain, SiloAddress? targetSilo = null) => MigrateAsync(grain.GetGrainId(), targetSilo);
 
     /// <summary>
     /// Deploys the cluster using the specified configuration and starts the client in-process.
@@ -457,22 +535,13 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
     public async Task StopClusterClientAsync()
     {
-        var client = ClientHost;
         try
         {
-            if (client is not null)
-            {
-                await client.StopAsync().ConfigureAwait(false);
-            }
+            await RemoveClientAsync("default");
         }
         catch (Exception exc)
         {
             WriteLog("Exception stopping client: {0}", exc);
-        }
-        finally
-        {
-            await DisposeAsync(client).ConfigureAwait(false);
-            ClientHost = null;
         }
     }
 
@@ -532,20 +601,32 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// </summary>
     public async Task KillClientAsync()
     {
-        var client = ClientHost;
-        if (client != null)
+        await _clientHostsSemaphore.WaitAsync();
+        try
         {
-            var cancelled = new CancellationTokenSource();
-            cancelled.Cancel();
-            try
+            IHost? client;
+            lock (_clientHosts)
             {
-                await client.StopAsync(cancelled.Token).ConfigureAwait(false);
+                _clientHosts.Remove("default", out client);
             }
-            finally
+
+            if (client is not null)
             {
-                await DisposeAsync(client);
-                ClientHost = null;
+                using var cancelled = new CancellationTokenSource();
+                cancelled.Cancel();
+                try
+                {
+                    await client.StopAsync(cancelled.Token).ConfigureAwait(false);
+                }
+                finally
+                {
+                    await DisposeAsync(client);
+                }
             }
+        }
+        finally
+        {
+            _clientHostsSemaphore.Release();
         }
     }
 
@@ -553,7 +634,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// Do a Stop or Kill of the specified silo, followed by a restart.
     /// </summary>
     /// <param name="instance">Silo to be restarted.</param>
-    public async Task<InProcessSiloHandle?> RestartSiloAsync(InProcessSiloHandle? instance)
+    public async Task<InProcessSiloHandle?> RestartSiloAsync(InProcessSiloHandle instance)
     {
         if (instance != null)
         {
@@ -599,17 +680,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             await StopClusterClientAsync();
         }
 
-        var clientHost = CreateClientHost("default");
-        try
-        {
-            await clientHost.StartAsync();
-            ClientHost = clientHost;
-        }
-        catch
-        {
-            await DisposeAsync(clientHost);
-            throw;
-        }
+        await GetClientAsync("default");
     }
 
     private IHost CreateClientHost(string name, Action<IHostApplicationBuilder>? configure = null)
@@ -654,12 +725,12 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// </summary>
     public IClusterClient? GetClient(string name)
     {
-        if (_clientHosts.TryGetValue(name, out var host))
+        lock (_clientHosts)
         {
-            return host.Services.GetRequiredService<IInternalClusterClient>();
+            return _clientHosts.TryGetValue(name, out var host)
+                ? host.Services.GetRequiredService<IInternalClusterClient>()
+                : null;
         }
-
-        return null;
     }
 
     /// <summary>
@@ -667,22 +738,39 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// </summary>
     public async Task<IClusterClient> GetClientAsync(string name, Action<IHostApplicationBuilder>? configure = null)
     {
-        if (!_clientHosts.TryGetValue(name, out var host))
+        await _clientHostsSemaphore.WaitAsync();
+        try
         {
-            host = CreateClientHost(name, configure);
-            try
+            IHost? host;
+            lock (_clientHosts)
             {
-                await host.StartAsync();
-                _clientHosts.Add(name, host);
+                _clientHosts.TryGetValue(name, out host);
             }
-            catch
-            {
-                await DisposeAsync(host);
-                throw;
-            }
-        }
 
-        return host.Services.GetRequiredService<IInternalClusterClient>();
+            if (host is null)
+            {
+                host = CreateClientHost(name, configure);
+                try
+                {
+                    await host.StartAsync();
+                    lock (_clientHosts)
+                    {
+                        _clientHosts.Add(name, host);
+                    }
+                }
+                catch
+                {
+                    await DisposeAsync(host);
+                    throw;
+                }
+            }
+
+            return host.Services.GetRequiredService<IInternalClusterClient>();
+        }
+        finally
+        {
+            _clientHostsSemaphore.Release();
+        }
     }
 
     /// <summary>
@@ -690,10 +778,30 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// </summary>
     public async Task RemoveClientAsync(string name)
     {
-        if (_clientHosts.Remove(name, out var host))
+        await _clientHostsSemaphore.WaitAsync();
+        try
         {
-            await host.StopAsync();
-            await DisposeAsync(host);
+            IHost? host;
+            lock (_clientHosts)
+            {
+                _clientHosts.Remove(name, out host);
+            }
+
+            if (host is not null)
+            {
+                try
+                {
+                    await host.StopAsync();
+                }
+                finally
+                {
+                    await DisposeAsync(host);
+                }
+            }
+        }
+        finally
+        {
+            _clientHostsSemaphore.Release();
         }
     }
 

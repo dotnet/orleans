@@ -11,6 +11,9 @@ using Xunit;
 namespace Tester.ClientConnectionTests;
 
 [TestCategory("BVT"), TestCategory("MultiClient"), TestCategory("Lifecycle")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) : IClassFixture<ClientDisconnectionTests.Fixture>
 {
     private readonly InProcessTestCluster _cluster = fixture.Cluster;

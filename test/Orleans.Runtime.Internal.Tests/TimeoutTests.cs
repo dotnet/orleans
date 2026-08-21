@@ -9,7 +9,8 @@ using Xunit;
 
 namespace UnitTests
 {
-    // if we parallelize tests, this should run in isolation 
+    // If we parallelize tests, this should run in isolation.
+    [TestArea("Runtime")]
     public class TimeoutTests : HostedTestClusterEnsureDefaultStarted, IDisposable
     {
         private readonly ITestOutputHelper output;
@@ -30,6 +31,8 @@ namespace UnitTests
             this.runtimeClient.SetResponseTimeout(originalTimeout);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional"), TestCategory("Timeout")]
         public async Task Timeout_LongMethod()
         {
