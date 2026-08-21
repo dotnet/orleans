@@ -7,9 +7,9 @@ ms.topic: concept-article
 
 # Host Orleans on Azure Container Apps
 
-Azure Container Apps can host Orleans, but the topology must preserve Orleans endpoint semantics. Orleans silos connect to the unique silo and gateway endpoint that each member advertises. Container Apps service discovery and TCP or HTTP ingress instead address a **container app or revision** and load-balance across its replicas. They don't provide a supported replica DNS name or replica IP address.
+Azure Container Apps hosts Orleans using a topology that preserves Orleans endpoint semantics. Orleans silos connect to the unique silo and gateway endpoint that each member advertises. Container Apps service discovery and TCP or HTTP ingress address a **container app or revision** and load-balance across its replicas. The maintained production topology therefore assigns each silo its own Container App and one replica.
 
-To build a cluster from documented Container Apps endpoints, use a virtual-network-integrated internal environment and its private static IP. Deploy each silo as a separate Container App with exactly one replica and assign each app a unique pair of TCP ingress ports on that private IP. Repeat that resource to add silos. You must still complete the production acceptance tests on this page. A single Container App scaled to multiple silo replicas can work in a particular environment, but direct replica addresses aren't part of the documented Container Apps networking contract.
+Use a virtual-network-integrated internal environment and its private static IP. Deploy each silo as a separate Container App with exactly one replica and assign each app a unique pair of TCP ingress ports on that private IP. Repeat that resource to add silos, then complete the production acceptance tests on this page. Multiple silo replicas in one Container App fall outside this maintained deployment shape because Container Apps publishes app and revision endpoints instead of a supported per-replica endpoint identity.
 
 Use the [Deploy and scale an Orleans app on Azure](../quickstarts/deploy-scale-orleans-on-azure.md) quickstart to learn the Azure Developer CLI deployment flow. The [Orleans cluster on Azure Container Apps sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureContainerApps) is also useful for studying a multi-component topology and the external-scaler contract. Review the [sample limitations](#understand-the-sample) before adapting either resource for production.
 
@@ -20,7 +20,7 @@ If the application uses Aspire, the [Aspire deployment flow for Azure Container 
 | Topology | Endpoint behavior | Guidance |
 | --- | --- | --- |
 | One silo replica per Container App | A unique silo and gateway port pair on the environment's private static IP routes to one app and one silo. | Use this topology when Container Apps is required. Set both minimum and maximum replicas to one, and deploy multiple silo apps. |
-| Multiple silo replicas in one Container App | The app and revision host names route through the platform proxy to any eligible replica. Container Apps doesn't publish a supported address for selecting one replica. | Use only after environment-specific qualification. Don't treat observed container IP reachability as a platform guarantee. |
+| Multiple silo replicas in one Container App | The app and revision host names route through the platform proxy to any eligible replica. Container Apps publishes no supported address for selecting one replica. | Use the maintained one-replica-per-app topology or select a direct-address platform such as AKS. |
 | Silos on Kubernetes or another direct-address platform | The orchestrator publishes a routable address for each pod or process. | Prefer this topology when automatic replica scaling and conventional rolling replacement are requirements. |
 
 The one-replica-per-app topology is operationally heavier because infrastructure as code must create a bounded set of silo apps and allocate environment-unique ports. It also requires a deliberate replacement procedure during upgrades. In exchange, it doesn't depend on undocumented pod networking.
@@ -197,8 +197,6 @@ Complete these acceptance tests before production and after platform or network 
 1. Exercise the compatible rolling and isolated blue-green procedures, including rollback.
 1. Verify that silo and gateway ports aren't publicly reachable and that runtime and deployment identities have only the intended roles.
 
-For the multiple-replica-in-one-app topology, add a blocking test that matches every active Orleans membership endpoint to one Container Apps replica and tests every advertised address from every peer. A successful test establishes evidence for that environment, but it doesn't turn the observed replica IP into a documented Container Apps contract.
-
 ## Understand the sample
 
 The [in-repo sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureContainerApps), imported from the [original Azure sample](https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-Container-Apps), demonstrates:
@@ -217,3 +215,18 @@ The sample bounds public grain identities. Its hello grain uses an integer key, 
 The sample is still an architecture demonstration rather than a production deployment manifest. The registry and storage data endpoints remain public, although they require Microsoft Entra authentication. All runtime apps share one identity. The simple readiness endpoints don't implement application-specific draining, and the workflow updates existing apps in place, which can temporarily overlap revisions that advertise the same endpoint. For production upgrades, use the replacement-app procedure on this page. The one-replica apps don't prove cross-zone or independent failure-domain placement, and the external scaler doesn't make a capacity recommendation.
 
 Use the sample to understand component relationships, Orleans membership-based gateway discovery, managed identity, workload generation, and explicit endpoint mapping. Complete the networking, failure, upgrade, security, state-recovery, and readiness acceptance tests on this page before using the topology in production.
+
+## Production checklist
+
+| Concern | Azure Container Apps outcome |
+| --- | --- |
+| Topology and networking | Every one-replica silo app owns a unique private silo and gateway port pair, and every membership endpoint maps to exactly one app. |
+| Dependencies and data | Production clustering, grain storage, reminders, and streams have explicit providers, namespaces, durability, quotas, backup, and recovery procedures. |
+| Identity and secrets | Runtime, image-publishing, routine deployment, and privileged bootstrap identities have separate least-privilege roles. Secrets use managed delivery and rotation. |
+| Health and lifecycle | Startup, readiness, and liveness probes represent distinct application states, and the termination grace period exceeds measured host shutdown time. |
+| Scaling and resilience | Scale changes add or remove one-replica silo apps, preserve the tested capacity floor, and recover successfully from one app or host loss. |
+| Upgrades and rollback | Compatible versions use replacement apps with new port pairs. Incompatible versions use an isolated cluster ID, endpoint set, state plan, and application-traffic cutover. |
+| Observability and incidents | Orleans telemetry, Container App app/revision/replica identity, membership, provider signals, and deployment metadata are centrally correlated. |
+| Infrastructure delivery | Versioned Bicep and a protected GitHub OIDC workflow reproduce the bounded app topology and deploy immutable image digests. |
+
+Compare this target with [AKS, App Service, Kubernetes, Service Fabric, and multi-host containers](choose-deployment-target.md), then complete the shared [production-readiness checklist](production-readiness.md).

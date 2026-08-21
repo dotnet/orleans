@@ -16,7 +16,7 @@ A production platform must provide:
 - Stable per-instance addresses or explicit advertised endpoint mapping.
 - Direct bidirectional TCP connectivity from every silo to every silo endpoint.
 - Reachability from Orleans clients to advertised gateway endpoints.
-- Multiple concurrently running instances across failure domains.
+- Multiple concurrently running instances and a documented failure-domain model that meets the application's availability objective.
 - Graceful termination notification and a configurable termination deadline.
 - Startup, readiness, and liveness checks with separate semantics.
 - Secure access to a supported clustering provider and all state providers.
@@ -28,10 +28,12 @@ An HTTP-only platform isn't sufficient unless Orleans silos can also establish d
 
 ## Platform guidance
 
+- [Choose a deployment target](choose-deployment-target.md) compares maintained topologies, endpoint models, scaling controls, failure-domain placement, operational ownership, and common provider choices.
+- [Azure Kubernetes Service](azure-kubernetes-service.md) applies Azure CNI networking, workload identity, availability zones, node pools, autoscaling, upgrades, and Azure Monitor to the platform-neutral Kubernetes baseline.
 - [Multi-host container deployments](containers.md) require either direct per-container private addresses or unique, peer-reachable host-port mappings for every silo.
 - [Kubernetes](kubernetes.md) provides direct pod networking. Explicit endpoint configuration is recommended; the Orleans hosting package is optional and limited to simple one-`Deployment`-per-cluster topologies.
 - [Service Fabric](service-fabric.md) uses an application-authored stateless Reliable Service integration with runtime-allocated endpoints and an external Orleans clustering provider.
-- Azure App Service requires validation of private per-instance address and port mapping on [Windows](deploy-to-azure-app-service.md) and [Linux](deploy-to-azure-app-service-linux.md).
+- [Azure App Service](azure-app-service.md) uses private per-instance address and port mapping on [Windows](deploy-to-azure-app-service.md) and [Linux](deploy-to-azure-app-service-linux.md).
 - [Azure Container Apps](deploy-to-azure-container-apps.md) can map unique TCP port pairs on an internal environment's private IP to one replica per silo app; scaling multiple silos as replicas of one app relies on per-replica networking that the platform doesn't publish as a supported contract.
 
 For another platform, prove the required capabilities with at least three silos under rolling replacement, scale-in, host restart, and network interruption. Record the exact endpoint mapping and shutdown behavior in the deployment runbook.

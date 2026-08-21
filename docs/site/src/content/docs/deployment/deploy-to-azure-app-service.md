@@ -8,7 +8,7 @@ ms.custom: devops
 
 # Deploy Orleans to Azure App Service on Windows
 
-This tutorial deploys the [Orleans shopping cart sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureAppService) as a multi-instance cluster on [Windows Azure App Service](https://learn.microsoft.com/azure/app-service/overview). For Linux plan, runtime, startup, and Easy Auth differences, see [Deploy Orleans to Azure App Service on Linux](deploy-to-azure-app-service-linux.md).
+This tutorial deploys the [Orleans shopping cart sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureAppService) as a multi-instance cluster on [Windows Azure App Service](https://learn.microsoft.com/azure/app-service/overview). Start with the shared [Azure App Service target overview](azure-app-service.md). For Linux plan, runtime, startup, and Easy Auth differences, see [Deploy Orleans to Azure App Service on Linux](deploy-to-azure-app-service-linux.md).
 
 The sample cohosts an ASP.NET Core Blazor app and an Orleans silo in each worker. It uses:
 
@@ -210,12 +210,19 @@ HTTPS protects the public web endpoint. The private Orleans silo connections are
 
 Application Insights receives request, dependency, exception, application, and Orleans logs. Monitor ready worker and silo counts, membership changes, latency, rejections, storage authorization/throttling, worker resources, restarts, and slot operations.
 
-## Production considerations
+## Production checklist
 
-- Keep at least three workers and spare capacity during upgrades.
-- Keep HTTP client affinity for the cohosted Blazor Server UI; Orleans doesn't require HTTP affinity.
-- Validate scale-out, scale-in, worker replacement, rollback, identity propagation, and private endpoint reachability under load.
-- Back up durable grain state independently from membership data.
-- Don't convert an existing App Service plan between Windows and Linux. Deploy a separate app and migrate traffic.
+| Concern | Windows App Service outcome |
+| --- | --- |
+| Topology and networking | Every worker advertises its private instance address and allocated silo port, and every worker can connect to every active membership endpoint. |
+| Dependencies and data | Azure Table clustering and grain state use separate production data with tested backup and restore. Applications configure reminder and stream providers explicitly when used. |
+| Identity and secrets | Runtime storage access uses managed identity. App Service Authentication, routine deployment, and privileged bootstrap credentials remain separate and rotate before expiry. |
+| Health and lifecycle | Health check, startup warm-up, slot warm-up, readiness removal, and bounded host shutdown reflect the application lifecycle. |
+| Scaling and resilience | The plan retains at least three workers and tested spare capacity. Scale-out, scale-in, worker replacement, dependency degradation, and abrupt loss are exercised under load. |
+| Upgrades and rollback | Compatible versions use a staging-slot swap with mixed-version validation. Incompatible versions use a separate app, cluster ID, state plan, and traffic cutover. |
+| Observability and incidents | Application Insights, Log Analytics, Orleans telemetry, worker identity, membership, provider signals, and slot operations are correlated. |
+| Infrastructure delivery | Bicep and the protected GitHub OIDC workflow reproduce infrastructure and deploy immutable application artifacts through staging. |
 
-For broader guidance, see [Production-readiness checklist](production-readiness.md), [Topology, networking, and clustering](networking.md), and [Graceful shutdown and upgrades](upgrades.md).
+Keep HTTP client affinity for the cohosted Blazor Server UI. Orleans transport uses the private silo endpoints independently from HTTP affinity. Migrate between Windows and Linux by deploying a separate app and moving traffic after validation.
+
+For broader guidance, see [Production-readiness checklist](production-readiness.md), [Topology, networking, and clustering](networking.md), [Graceful shutdown and upgrades](upgrades.md), and [Choose a deployment target](choose-deployment-target.md).

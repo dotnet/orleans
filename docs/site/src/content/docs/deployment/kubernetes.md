@@ -10,6 +10,8 @@ ms.custom: devops
 
 Kubernetes can host Orleans when pods have direct network connectivity and the application uses a production clustering provider. Orleans doesn't require a Kubernetes-specific hosting package. The recommended approach is to configure each silo explicitly from the pod name and pod IP supplied by the Kubernetes [downward API](https://kubernetes.io/docs/concepts/workloads/pods/downward-api/).
 
+For Azure networking, workload identity, availability zones, node pools, autoscaling, managed upgrades, and Azure Monitor guidance, see [Host Orleans on Azure Kubernetes Service](azure-kubernetes-service.md).
+
 ## Configure the silo
 
 Reference `Microsoft.Orleans.Server` and a production clustering provider package. Configure the pod IP as the advertised address, listen on all pod interfaces, and use the pod name as the silo name:
@@ -218,4 +220,4 @@ For explicit endpoint configuration, compare `POD_NAME`, `POD_IP`, service ID, c
 
 If the optional hosting package reports missing `KUBERNETES_SERVICE_HOST` or `KUBERNETES_SERVICE_PORT`, verify that the process is running in a pod and that service environment links haven't been disabled. If the API returns `403 Forbidden`, check the pod's service account, role binding namespace, and required pod verbs.
 
-For broader triage, see [Troubleshoot deployments](troubleshooting-deployments.md).
+For broader triage, see [Troubleshoot deployments](troubleshooting-deployments.md). For target comparisons and the shared production-coverage matrix, see [Choose a deployment target](choose-deployment-target.md).
