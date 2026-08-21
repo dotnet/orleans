@@ -75,6 +75,20 @@ public class GrainDurableExecutionContextTests
     }
 
     [Fact]
+    public async Task DisposeCancellationRegistration_ConcurrentWithCancel_DoesNotThrow()
+    {
+        for (var i = 0; i < 500; i++)
+        {
+            var (context, _) = CreateContext();
+            var registration = context.RegisterCancellationCallback(static _ => Task.CompletedTask);
+
+            await Task.WhenAll(
+                Task.Run(registration.Dispose),
+                context.CancelAsync(CancellationToken.None));
+        }
+    }
+
+    [Fact]
     public async Task ScheduleChildTaskAsync_NotAChildOfOwnTaskId_ThrowsInvalidOperationException()
     {
         var ownTaskId = TaskId.Create("root");

@@ -79,14 +79,9 @@ public abstract partial class DurableExecutionContext(TaskId id)
 
     private void UnregisterCancellationCallback(CancellationCallbackRegistrationBase registration)
     {
-        if (_cancellationCallbacks is null)
-        {
-            return;
-        }
-
         lock (_lockObj)
         {
-            _cancellationCallbacks.Remove(registration);
+            _cancellationCallbacks?.Remove(registration);
         }
     }
 }

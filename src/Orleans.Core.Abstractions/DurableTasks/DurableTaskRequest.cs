@@ -113,10 +113,12 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     public abstract void SetTarget(ITargetHolder holder);
 
     /// <inheritdoc/>
-    public virtual object GetArgument(int index) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
+    public virtual object GetArgument(int index) =>
+        throw new ArgumentOutOfRangeException(nameof(index), index, "The request has zero arguments.");
 
     /// <inheritdoc/>
-    public virtual void SetArgument(int index, object value) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
+    public virtual void SetArgument(int index, object value) =>
+        throw new ArgumentOutOfRangeException(nameof(index), index, "The request has zero arguments.");
 
     /// <inheritdoc/>
     public abstract void Dispose();
@@ -295,10 +297,12 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     public abstract void SetTarget(ITargetHolder holder);
 
     /// <inheritdoc/>
-    public virtual object GetArgument(int index) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
+    public virtual object GetArgument(int index) =>
+        throw new ArgumentOutOfRangeException(nameof(index), index, "The request has zero arguments.");
 
     /// <inheritdoc/>
-    public virtual void SetArgument(int index, object value) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
+    public virtual void SetArgument(int index, object value) =>
+        throw new ArgumentOutOfRangeException(nameof(index), index, "The request has zero arguments.");
 
     /// <inheritdoc/>
     public abstract void Dispose();

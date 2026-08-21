@@ -21,7 +21,9 @@ internal sealed class DurableTaskMessageHandler(
                     throw new InvalidOperationException("The durable task invocation payload could not be deserialized.");
                 }
 
-                invocation.Request.Context!.CallerId = context.Envelope.ReplyTo ?? context.Envelope.SenderId;
+                var requestContext = invocation.Request.Context
+                    ?? throw new InvalidOperationException("The durable task invocation request did not include a request context.");
+                requestContext.CallerId = context.Envelope.ReplyTo ?? context.Envelope.SenderId;
                 var response = await ((IDurableTaskServer)runtime).ScheduleAsync(
                     invocation.TaskId,
                     invocation.Request,
@@ -30,7 +32,7 @@ internal sealed class DurableTaskMessageHandler(
                 {
                     transport.SendCompletion(
                         context.GrainId,
-                        invocation.Request.Context.CallerId,
+                        requestContext.CallerId,
                         invocation.TaskId,
                         response);
                 }
