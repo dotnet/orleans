@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.GrainDirectory;
-using Orleans.Runtime.Scheduler;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Orleans.Diagnostics;
