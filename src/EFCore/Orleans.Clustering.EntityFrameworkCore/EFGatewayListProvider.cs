@@ -13,7 +13,7 @@ using Orleans.Clustering.EntityFrameworkCore.Data;
 
 namespace Orleans.Clustering.EntityFrameworkCore;
 
-internal class EFGatewayListProvider<TDbContext, TEtag> : IGatewayListProvider where TDbContext : ClusterDbContext<TDbContext, TEtag>
+internal class EFGatewayListProvider<TDbContext, TETag> : IGatewayListProvider where TDbContext : ClusterDbContext<TDbContext, TETag>
 {
     private readonly ILogger _logger;
     private readonly string _clusterId;
@@ -29,7 +29,7 @@ internal class EFGatewayListProvider<TDbContext, TEtag> : IGatewayListProvider w
         IOptions<GatewayOptions> gatewayOptions,
         IDbContextFactory<TDbContext> dbContextFactory)
     {
-        this._logger = loggerFactory.CreateLogger<EFGatewayListProvider<TDbContext, TEtag>>();
+        this._logger = loggerFactory.CreateLogger<EFGatewayListProvider<TDbContext, TETag>>();
         this._clusterId = clusterOptions.Value.ClusterId;
         this._dbContextFactory = dbContextFactory;
         this.MaxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
@@ -67,5 +67,5 @@ internal class EFGatewayListProvider<TDbContext, TEtag> : IGatewayListProvider w
         }
     }
 
-    private static Uri ConvertToGatewayUri(SiloRecord<TEtag> record) => SiloAddress.New(new IPEndPoint(IPAddress.Parse(record.Address), record.ProxyPort!.Value), record.Generation).ToGatewayUri();
+    private static Uri ConvertToGatewayUri(SiloRecord<TETag> record) => SiloAddress.New(new IPEndPoint(IPAddress.Parse(record.Address), record.ProxyPort!.Value), record.Generation).ToGatewayUri();
 }
