@@ -1,6 +1,7 @@
 using Orleans.Placement.Repartitioning;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
 
@@ -45,6 +46,29 @@ public abstract class RepartitioningTestBase<TFixture> : IAsyncLifetime where TF
         await Silo1Repartitioner.ResetCounters();
         await Silo2Repartitioner.ResetCounters();
     }
+
+    private protected async ValueTask TriggerExchangeRequestAfterFlushingBuffers(IActivationRepartitionerSystemTarget repartitioner)
+    {
+        await Silo1Repartitioner.FlushBuffers();
+        await Silo2Repartitioner.FlushBuffers();
+        await repartitioner.TriggerExchangeRequest();
+    }
+
+    private protected static Task WaitForConditionAsync(Func<Task<bool>> predicate, TimeSpan timeout, Func<string> timeoutMessage)
+        => TestingUtils.WaitUntilAsync(
+            async (lastTry, _) =>
+            {
+                var succeeded = await predicate();
+                if (lastTry)
+                {
+                    Assert.True(succeeded, timeoutMessage());
+                }
+
+                return succeeded;
+            },
+            timeout,
+            TimeSpan.FromMilliseconds(10),
+            TestContext.Current.CancellationToken);
 
     public async Task AdjustActivationCountOffsets()
     {
