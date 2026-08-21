@@ -24,6 +24,12 @@ A grain key identifies a logical grain, and <xref:Orleans.IGrainFactory.GetGrain
 
 Collection state usually stores grain keys and the minimum fields needed for routing, filtering, or ordering. Resolve typed [grain references](grain-references.md) from those keys when invoking members. Persist a grain reference when retaining its interface relationship is useful.
 
+## Choose grains or stored values
+
+Model each member as a grain when it has an independent identity, behavior, concurrency boundary, or lifecycle. The collection retains member keys and routes operations to those grains.
+
+Store ordinary serializable objects in an owning grain's state when they form a bounded aggregate whose operations run through that owner. This provides one activation and persistence boundary for the collection and its values. For large collections of data-oriented records, an external database provides scalable storage and query execution; grains can coordinate domain operations using the returned record identifiers.
+
 ## Keep bounded catalogs in one grain
 
 An owning grain or registry grain is a direct model for a collection with a known operational bound. A non-reentrant owner processes one request at a time, and one awaited persistent state write provides an optimistic-concurrency boundary.
