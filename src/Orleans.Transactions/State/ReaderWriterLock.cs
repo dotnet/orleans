@@ -192,7 +192,7 @@ namespace Orleans.Transactions.State
         {
             if (currentGroup == null || !currentGroup.TryGetValue(transactionId, out TransactionRecord<TState>? record))
             {
-                return (TransactionalStatus.BrokenLock, new TransactionRecord<TState>());
+                return (TransactionalStatus.BrokenLock, new TransactionRecord<TState> { TransactionId = transactionId });
             }
             else if (record.NumberReads != accessCount.Reads
                    || record.NumberWrites != accessCount.Writes)

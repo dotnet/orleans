@@ -63,7 +63,7 @@ public class TransactionRecoveryLatencyTests
     }
 
     [Fact]
-    public async Task CancelBeforePrepareReleasesPrePrepareLock()
+    public async Task CancelBeforePrepareCausesLatePrepareToRetainTransactionId()
     {
         var resource = CreateParticipant("resource", ParticipantId.Role.Resource);
         var queue = new GatedCancelTransactionQueue(resource, new TestActivationLifetime());
@@ -81,8 +81,9 @@ public class TransactionRecoveryLatencyTests
 
         await queue.NotifyOfCancel(transactionId, timeStamp, TransactionalStatus.CascadingAbort);
 
-        var (status, _) = await queue.RWLock.ValidateLock(transactionId, accessCount);
+        var (status, record) = await queue.RWLock.ValidateLock(transactionId, accessCount);
         Assert.Equal(TransactionalStatus.BrokenLock, status);
+        Assert.Equal(transactionId, record.TransactionId);
     }
 
     [Fact]
