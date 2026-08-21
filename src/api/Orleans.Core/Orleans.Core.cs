@@ -1720,7 +1720,8 @@ namespace Orleans.Runtime.Messaging
 
     public enum NetworkProtocolVersion : byte
     {
-        Version1 = 1
+        Version1 = 1,
+        Version2 = 2
     }
 }
 

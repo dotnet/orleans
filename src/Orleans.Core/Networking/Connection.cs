@@ -124,6 +124,11 @@ namespace Orleans.Runtime.Messaging
             return connection.RunInternal();
         }
 
+        protected NetworkProtocolVersion NetworkProtocolVersion { get; private set; } = NetworkProtocolVersion.Version1;
+
+        protected void NegotiateProtocolVersion(NetworkProtocolVersion offered, NetworkProtocolVersion remote)
+            => NetworkProtocolVersion = (NetworkProtocolVersion)Math.Min((byte)offered, (byte)remote);
+
         protected virtual async Task RunInternal()
         {
             _transport = this.Context.Transport;
@@ -293,6 +298,7 @@ namespace Orleans.Runtime.Messaging
             Exception? error = default;
             using var serializerScope = this.shared.ServiceProvider.CreateScope();
             var serializer = serializerScope.ServiceProvider.GetRequiredService<MessageSerializer>();
+            serializer.SetProtocolVersion(NetworkProtocolVersion);
             var prevBufferLength = 0L;
             try
             {
@@ -369,6 +375,7 @@ namespace Orleans.Runtime.Messaging
             Exception? error = default;
             using var serializerScope = this.shared.ServiceProvider.CreateScope();
             var serializer = serializerScope.ServiceProvider.GetRequiredService<MessageSerializer>();
+            serializer.SetProtocolVersion(NetworkProtocolVersion);
             var messageObserver = this.shared.MessageStatisticsSink.GetMessageObserver();
             try
             {
