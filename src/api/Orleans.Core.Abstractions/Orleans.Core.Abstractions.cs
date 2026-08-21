@@ -2579,12 +2579,14 @@ namespace Orleans.Runtime
         IWorkItemScheduler Scheduler { get; }
 
         void Activate(System.Collections.Generic.Dictionary<string, object>? requestContext, System.Threading.CancellationToken cancellationToken = default);
+        void Abort();
         void Deactivate(DeactivationReason deactivationReason, System.Threading.CancellationToken cancellationToken = default);
         void Migrate(System.Collections.Generic.Dictionary<string, object>? requestContext, System.Threading.CancellationToken cancellationToken = default);
         void ReceiveMessage(object message);
         void Rehydrate(IRehydrationContext context);
         void SetComponent<TComponent>(TComponent? value)
             where TComponent : class;
+        System.IDisposable? Start();
     }
 
     public partial interface IGrainContextAccessor
