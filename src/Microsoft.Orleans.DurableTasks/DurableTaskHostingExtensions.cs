@@ -8,7 +8,6 @@ using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Orleans.DurableMessaging;
 using Orleans.DurableTasks;
-using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization.Configuration;
