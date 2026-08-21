@@ -8,10 +8,6 @@ namespace Orleans.Reminders.Concurrency;
 /// Context passed to <see cref="IReminderDeliveryThrottle.AcquireAsync"/> describing the
 /// reminder tick that is about to be dispatched.
 /// </summary>
-/// <remarks>
-/// This is a readonly struct passed by <c>in</c> reference. Future fields may be added
-/// in additive, source-compatible ways.
-/// </remarks>
 public readonly struct ReminderDeliveryContext
 {
     /// <summary>

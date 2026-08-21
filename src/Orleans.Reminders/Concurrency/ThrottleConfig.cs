@@ -54,9 +54,9 @@ public sealed class ThrottleConfig
     public double? PermitsPerSecond => Rate?.PermitsPerSecond;
 
     /// <summary>
-    /// The maximum burst size for the token bucket. Auto-derived to roughly one second of
-    /// <see cref="PermitsPerSecond"/> when not explicitly set; <c>null</c> when only
-    /// <see cref="MaxConcurrent"/> is configured.
+    /// The token bucket capacity supplied to
+    /// <see cref="ReminderThrottleConfigBuilder.PermitsPerSecond(double, int, ThrottleBlockMode)"/>,
+    /// or <c>null</c> when no rate limit is configured.
     /// </summary>
     public int? BurstSize => Rate?.BurstSize;
 

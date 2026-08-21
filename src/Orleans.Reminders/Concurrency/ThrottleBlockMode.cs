@@ -47,11 +47,20 @@ public abstract record ThrottleBlockMode
     public static ThrottleBlockMode SkipImmediately { get; } = new SkipImmediatelyMode();
 
     /// <summary>Concrete representation of <see cref="Wait"/>.</summary>
-    internal sealed record WaitForever : ThrottleBlockMode;
+    internal sealed record WaitForever : ThrottleBlockMode
+    {
+        public override string ToString() => nameof(Wait);
+    }
 
     /// <summary>Concrete representation of <see cref="WaitUpTo"/>.</summary>
-    internal sealed record WaitWithTimeout(TimeSpan Timeout) : ThrottleBlockMode;
+    internal sealed record WaitWithTimeout(TimeSpan Timeout) : ThrottleBlockMode
+    {
+        public override string ToString() => $"{nameof(WaitUpTo)}({Timeout})";
+    }
 
     /// <summary>Concrete representation of <see cref="SkipImmediately"/>.</summary>
-    internal sealed record SkipImmediatelyMode : ThrottleBlockMode;
+    internal sealed record SkipImmediatelyMode : ThrottleBlockMode
+    {
+        public override string ToString() => nameof(SkipImmediately);
+    }
 }
