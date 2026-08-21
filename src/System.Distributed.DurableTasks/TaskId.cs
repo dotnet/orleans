@@ -79,4 +79,3 @@ public readonly struct TaskId : ISpanFormattable, IEquatable<TaskId>, IParsable<
     public static TaskId Create(string value) => new(HierarchicalKey.CreateEscaped(value));
     public static TaskId CreateRandom() => new(HierarchicalKey.CreateEscaped(Guid.NewGuid().ToString()));
 }
-
