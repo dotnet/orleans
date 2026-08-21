@@ -341,7 +341,7 @@ public static class HostingExamples
     // <distributed_grain_directory>
     public static void ConfigureDistributedDirectory(ISiloBuilder siloBuilder)
     {
-#pragma warning disable ORLEANSEXP003
+#pragma warning disable ORLEANSEXP003 // The released package used by snippets still marks this API experimental.
         siloBuilder.AddDistributedGrainDirectory();
 #pragma warning restore ORLEANSEXP003
     }
