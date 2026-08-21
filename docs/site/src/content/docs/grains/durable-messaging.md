@@ -88,14 +88,13 @@ explicitly null-capable and handlers which require a non-null body must validate
 ## Deployment requirements
 
 Configure Durable Jobs storage and Journaling storage before enabling Durable
-Messaging. The Journaling implementation must support
-<xref:Orleans.Journaling.IJournaledStateManager.RevertPendingChangesAsync*> and report
-<xref:Orleans.Journaling.IJournaledStateManager.SupportsObservers> so Durable Messaging
-can use <xref:Orleans.Journaling.IJournaledStateManager.RegisterObserver*> for commit and
-recovery notifications. Activation fails with a durable-messaging-specific diagnostic
-when either capability is absent. Use shared, production-grade storage for multi-silo
-deployments. In-memory Durable Jobs and journal storage are suitable only for development
-and tests.
+Messaging. The Journaling implementation must provide
+<xref:Orleans.Journaling.IJournaledStateManager.RevertPendingChangesAsync*> and accept
+<xref:Orleans.Journaling.IJournaledStateManager.RegisterObserver*> so Durable Messaging
+receives commit and recovery notifications. Activation reports a
+durable-messaging-specific diagnostic when observer registration is unsupported. Use
+shared, production-grade storage for multi-silo deployments. In-memory Durable Jobs and
+journal storage are suitable only for development and tests.
 
 Capacity and retention settings bound storage growth and define the effectively-once
 window. Monitor inbox depth, outbox depth, retry failures, dead letters, and oldest
