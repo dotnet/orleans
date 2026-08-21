@@ -1086,6 +1086,7 @@ jobs:
         --hangdump-type Full
         --report-trx --report-trx-filename "test_results_${{ matrix.suite }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
         --max-parallel-test-modules 1
+        ${{ github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0' && '--coverage --coverage-output-format coverage --coverage-settings .github/coverage.config.xml' || '' }}
     - name: Archive Test Results
       if: always()
       continue-on-error: true
@@ -1095,41 +1096,15 @@ jobs:
         retention-days: 1
         path: |
           **/TestResults/*
+          !**/*.coverage
           !**/*.cobertura.xml
           **/logs/*
-  coverage:
-    name: Code coverage (${{ matrix.suite }})
-    if: github.event_name == 'pull_request'
-    needs: test
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        suite: [BVT, SlowBVT, Functional]
-    steps:
-    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-    - name: Setup Node.js
-      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
-      with:
-        node-version: '24.x'
-    - name: Setup .NET
-      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-      with:
-        global-json-file: global.json
-    - name: Download test results
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-      with:
-        name: test_output_test_${{ matrix.suite }}_ubuntu-latest_net10.0
-        path: test-results
-    - name: Build
-      run: dotnet build
-    - name: Collect coverage
-      run: python .github/scripts/collect-coverage.py
-        --repository-root "${{ github.workspace }}"
-        --results-directory test-results
-        --suite "${{ matrix.suite }}"
     - name: Archive coverage data
-      if: always()
+      if: >-
+        always() &&
+        github.event_name == 'pull_request' &&
+        matrix.os == 'ubuntu-latest' &&
+        matrix.framework == 'net10.0'
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: coverage_data_${{ matrix.suite }}
@@ -1139,7 +1114,7 @@ jobs:
   coverage-merge:
     name: Merge code coverage
     if: github.event_name == 'pull_request'
-    needs: coverage
+    needs: test
     runs-on: ubuntu-latest
     steps:
     - name: Setup .NET
