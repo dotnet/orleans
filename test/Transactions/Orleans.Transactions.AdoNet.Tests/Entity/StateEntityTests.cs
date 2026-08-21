@@ -95,30 +95,27 @@ public sealed class StateEntityTests
     }
 
     [Fact]
-    public void Create_TransactionTimestamp_IsUtc()
+    public void Create_TransactionTimestampTicks_UsesUtcTicks()
     {
-        // TransactionTimestamp must be converted to UTC regardless of input.
         var localTime = new DateTime(2024, 6, 1, 12, 0, 0, DateTimeKind.Local);
         var pending = MakePending(timestamp: localTime);
         var settings = MakeSettings();
 
         var entity = StateEntity.Create(settings, "key", pending);
 
-        Assert.NotNull(entity.TransactionTimestamp);
-        Assert.Equal(TimeSpan.Zero, entity.TransactionTimestamp!.Value.Offset);
+        Assert.Equal(localTime.ToUniversalTime().Ticks, entity.TransactionTimestampTicks);
     }
 
     [Fact]
-    public void Create_TransactionTimestamp_UtcInputPreservedAsUtc()
+    public void Create_TransactionTimestampTicks_PreservesUtcTickPrecision()
     {
-        var utcTime = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var utcTime = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddTicks(1);
         var pending = MakePending(timestamp: utcTime);
         var settings = MakeSettings();
 
         var entity = StateEntity.Create(settings, "key", pending);
 
-        Assert.Equal(TimeSpan.Zero, entity.TransactionTimestamp!.Value.Offset);
-        Assert.Equal(utcTime, entity.TransactionTimestamp.Value.UtcDateTime);
+        Assert.Equal(utcTime.Ticks, entity.TransactionTimestampTicks);
     }
 
     [Fact]

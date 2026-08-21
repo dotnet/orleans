@@ -125,19 +125,19 @@ public sealed class TransactionalStateStorageTests
     }
 
     [Fact]
-    public void DatabaseStateRecord_MapsAllFieldsAndNormalizesTimestamp()
+    public void DatabaseStateRecord_MapsAllFieldsAndPreservesTimestampTicks()
     {
         var (sut, _, _) = StorageTestHarness.Create<SimpleState>();
-        var timestamp = new DateTime(2025, 3, 4, 5, 6, 7, DateTimeKind.Unspecified);
+        var timestamp = new DateTime(2025, 3, 4, 5, 6, 7, DateTimeKind.Utc).AddTicks(1);
         var table = new DataTable();
         table.Columns.Add(nameof(StateEntity.StateId), typeof(string));
         table.Columns.Add(nameof(StateEntity.SequenceId), typeof(long));
         table.Columns.Add(nameof(StateEntity.TransactionId), typeof(string));
-        table.Columns.Add(nameof(StateEntity.TransactionTimestamp), typeof(DateTime));
+        table.Columns.Add(nameof(StateEntity.TransactionTimestampTicks), typeof(long));
         table.Columns.Add(nameof(StateEntity.TransactionManager), typeof(byte[]));
         table.Columns.Add(nameof(StateEntity.StateData), typeof(byte[]));
         table.Columns.Add(nameof(StateEntity.ETag), typeof(string));
-        table.Rows.Add("state-1", 3L, "tx-3", timestamp, new byte[] { 9 }, new byte[] { 8 }, "etag-3");
+        table.Rows.Add("state-1", 3L, "tx-3", timestamp.Ticks, new byte[] { 9 }, new byte[] { 8 }, "etag-3");
 
         using var reader = table.CreateDataReader();
         Assert.True(reader.Read());
@@ -146,7 +146,7 @@ public sealed class TransactionalStateStorageTests
         Assert.Equal("state-1", entity.StateId);
         Assert.Equal(3L, entity.SequenceId);
         Assert.Equal("tx-3", entity.TransactionId);
-        Assert.Equal(new DateTimeOffset(timestamp, TimeSpan.Zero), entity.TransactionTimestamp);
+        Assert.Equal(timestamp.Ticks, entity.TransactionTimestampTicks);
         Assert.Equal(new byte[] { 9 }, entity.TransactionManager);
         Assert.Equal(new byte[] { 8 }, entity.StateData);
         Assert.Equal("etag-3", entity.ETag);
@@ -278,7 +278,7 @@ public sealed class TransactionalStateStorageTests
                 StateData   = Serialize(new SimpleState { Name = "B" }),
                 TransactionManager = Serialize(new { Name = "mgr", SupportedRoles = 0 }),
                 TransactionId = "tx-2",
-                TransactionTimestamp = secondTimestamp,
+                TransactionTimestampTicks = secondTimestamp.UtcTicks,
             },
             new StateEntity
             {
@@ -286,7 +286,7 @@ public sealed class TransactionalStateStorageTests
                 StateData   = Serialize(new SimpleState { Name = "C" }),
                 TransactionManager = Serialize(new { Name = "mgr", SupportedRoles = 0 }),
                 TransactionId = "tx-3",
-                TransactionTimestamp = thirdTimestamp,
+                TransactionTimestampTicks = thirdTimestamp.UtcTicks,
             },
         };
         SetupFakeRows(fake, opts, keyEntity, stateRows);
@@ -629,6 +629,7 @@ public sealed class TransactionalStateStorageTests
 
         var updateStateSql = opts.ExecuteSqlDictionary[Constants.UpdateStateSql];
         var ops = fake.TransactionCallLog.SelectMany(call => call).ToList();
+        Assert.Equal(opts.ExecuteSqlDictionary[Constants.UpdateKeySql], ops[0].Item1);
         Assert.Contains(ops, t => t.Item1 == updateStateSql);
         var tracked = Assert.Single(GetTrackedStates(sut));
         Assert.Equal("tx-1", tracked.Value.TransactionId);
@@ -839,8 +840,8 @@ public sealed class TransactionalStateStorageTests
         updateState.Item2(command);
         Assert.Equal(secondETag, command.Parameters[nameof(StateEntity.ETag)].Value);
         Assert.Equal(
-            DateTimeKind.Utc,
-            Assert.IsType<DateTime>(command.Parameters[nameof(StateEntity.TransactionTimestamp)].Value).Kind);
+            pending3[0].TimeStamp.Ticks,
+            Assert.IsType<long>(command.Parameters[nameof(StateEntity.TransactionTimestampTicks)].Value));
         Assert.DoesNotContain(ops2, t => t.Item1 == addStateSql);
         Assert.NotEqual(firstETag, secondETag);
     }
