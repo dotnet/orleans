@@ -1084,19 +1084,10 @@ jobs:
         --hangdump --hangdump-timeout 10m
         --crashdump --crashdump-type Full
         --hangdump-type Full
-        ${{ (github.event_name != 'pull_request' || matrix.os != 'ubuntu-latest' || matrix.framework != 'net10.0') && format('--report-trx --report-trx-filename test_results_{0}_{1}_{{asm}}_{{tfm}}_{{arch}}.trx', matrix.suite, matrix.framework) || '' }}
-        ${{ github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0' && format('--coverage --coverage-output-format cobertura --coverage-settings {0}/.github/coverage.config.xml', github.workspace) || '' }}
+        --report-trx --report-trx-filename "test_results_${{ matrix.suite }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
         --max-parallel-test-modules 1
-    - name: Archive coverage
-      if: always() && github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-      with:
-        name: coverage_output_${{ matrix.suite }}
-        if-no-files-found: error
-        retention-days: 1
-        path: "**/*.cobertura.xml"
     - name: Archive Test Results
-      if: always() && (github.event_name != 'pull_request' || matrix.os != 'ubuntu-latest' || matrix.framework != 'net10.0')
+      if: always()
       continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
@@ -1106,6 +1097,47 @@ jobs:
           **/TestResults/*
           !**/*.cobertura.xml
           **/logs/*
+  coverage:
+    name: Code coverage (${{ matrix.suite }})
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [BVT, SlowBVT, Functional]
+    steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Setup Node.js
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      with:
+        node-version: '24.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+      with:
+        global-json-file: global.json
+    - name: Build
+      run: dotnet build
+    - name: Collect coverage
+      run: dotnet test
+        --no-build
+        --framework net10.0
+        --filter-query "/[(Provider=None)&(Suite=${{ matrix.suite }})&(Area!=CodeGen)]"
+        --minimum-expected-tests 1
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --coverage
+        --coverage-output-format cobertura
+        --coverage-settings "${{ github.workspace }}/.github/coverage.config.xml"
+        --max-parallel-test-modules 1
+    - name: Archive coverage
+      if: always()
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      with:
+        name: coverage_output_${{ matrix.suite }}
+        if-no-files-found: error
+        retention-days: 1
+        path: "**/*.cobertura.xml"
   test-codegenerator:
     name: Test Code Generator
     runs-on: ${{ matrix.os }}
