@@ -40,9 +40,7 @@ public sealed class DistributedGrainDirectoryMembershipTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var builder = new InProcessTestClusterBuilder(1);
-#pragma warning disable ORLEANSEXP003
         builder.Options.UseDistributedGrainDirectory = true;
-#pragma warning restore ORLEANSEXP003
         builder.ConfigureSilo((_, siloBuilder) => siloBuilder.ConfigureServices(services =>
         {
             services.AddSingleton<ControlledMembershipService>();
