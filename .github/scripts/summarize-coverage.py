@@ -7,14 +7,12 @@ import xml.etree.ElementTree as ET
 
 
 MAX_REPORT_BYTES = 100 * 1024 * 1024
-MAX_TOTAL_BYTES = 1024 * 1024 * 1024
-SUITES = ("BVT", "SlowBVT", "Functional")
 DETERMINISTIC_SOURCE_PREFIX = "/_/src/"
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
-        description="Combine MTP Cobertura reports into repository line coverage."
+        description="Summarize merged MTP Cobertura repository line coverage."
     )
     parser.add_argument("report_directory", type=Path)
     parser.add_argument("--json-output", required=True, type=Path)
@@ -90,41 +88,22 @@ def read_report(coverage_report, source_root):
     return measured_lines
 
 
-def get_suite(coverage_report):
-    for path_part in coverage_report.parts:
-        if path_part.startswith("coverage_output_"):
-            return path_part.removeprefix("coverage_output_")
-
-    raise RuntimeError(f"{coverage_report} is not under a coverage artifact directory")
-
-
 def read_coverage(report_directory, source_root):
     reports = sorted(report_directory.rglob("*.cobertura.xml"))
     if not reports:
         raise RuntimeError(f"No Cobertura reports found under {report_directory}")
-
-    total_bytes = sum(report.stat().st_size for report in reports)
-    if total_bytes > MAX_TOTAL_BYTES:
-        raise RuntimeError("Coverage reports exceed the 1 GB parsing limit")
-
-    suite_lines = {suite: {} for suite in SUITES}
-    for report in reports:
-        suite = get_suite(report)
-        if suite not in suite_lines:
-            raise RuntimeError(f"Unexpected coverage suite: {suite}")
-
-        for line_key, covered in read_report(report, source_root).items():
-            suite_lines[suite][line_key] = (
-                suite_lines[suite].get(line_key, False) or covered
-            )
-
-    missing_suites = [suite for suite, lines in suite_lines.items() if not lines]
-    if missing_suites:
+    if len(reports) != 1:
         raise RuntimeError(
-            f"Coverage reports are missing for: {', '.join(missing_suites)}"
+            f"Expected one merged Cobertura report, found {len(reports)}"
         )
 
-    return reports, suite_lines
+    measured_lines = read_report(reports[0], source_root)
+    if not measured_lines:
+        raise RuntimeError(
+            "Merged coverage report contains no measured lines under the source root"
+        )
+
+    return measured_lines
 
 
 def get_statistics(measured_lines):
@@ -139,21 +118,14 @@ def get_statistics(measured_lines):
     }
 
 
-def write_outputs(reports, suite_lines, json_output, markdown_output):
-    combined_lines = {}
-    for measured_lines in suite_lines.values():
-        for line_key, covered in measured_lines.items():
-            combined_lines[line_key] = combined_lines.get(line_key, False) or covered
-
-    combined = get_statistics(combined_lines)
-    suites = {suite: get_statistics(lines) for suite, lines in suite_lines.items()}
-    source_files = len({path for path, _ in combined_lines})
+def write_outputs(measured_lines, json_output, markdown_output):
+    combined = get_statistics(measured_lines)
+    source_files = len({path for path, _ in measured_lines})
 
     summary = {
         **combined,
-        "reports": len(reports),
+        "reports": 1,
         "source_files": source_files,
-        "suites": suites,
     }
     json_output.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 
@@ -162,19 +134,13 @@ def write_outputs(reports, suite_lines, json_output, markdown_output):
             [
                 "## Code coverage",
                 "",
-                "| Test scope | Line coverage | Covered lines |",
-                "| --- | ---: | ---: |",
-                f"| **Combined** | **{combined['line_rate_display']}** | "
+                "| Line coverage | Covered lines |",
+                "| ---: | ---: |",
+                f"| **{combined['line_rate_display']}** | "
                 f"**{combined['covered_lines']:,} / {combined['total_lines']:,}** |",
-                *[
-                    f"| {suite} | {suites[suite]['line_rate_display']} | "
-                    f"{suites[suite]['covered_lines']:,} / "
-                    f"{suites[suite]['total_lines']:,} |"
-                    for suite in SUITES
-                ],
                 "",
-                f"Measured {source_files:,} source files across {len(reports):,} "
-                "coverage reports.",
+                f"Measured {source_files:,} source files from the merged coverage "
+                "report.",
                 "",
                 "Coverage combines the BVT, SlowBVT, and Functional suites on "
                 "Linux with .NET 10 and measures repository source under `src/`.",
@@ -187,12 +153,11 @@ def write_outputs(reports, suite_lines, json_output, markdown_output):
 
 def main():
     arguments = parse_arguments()
-    reports, suite_lines = read_coverage(
+    measured_lines = read_coverage(
         arguments.report_directory, arguments.source_root
     )
     write_outputs(
-        reports,
-        suite_lines,
+        measured_lines,
         arguments.json_output,
         arguments.markdown_output,
     )

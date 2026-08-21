@@ -63,6 +63,50 @@ class ReadReportTests(unittest.TestCase):
 
         self.assertIsNone(repository_path)
 
+    def test_read_coverage_accepts_one_merged_report(self):
+        report_directory = self.root / "reports"
+        report_directory.mkdir()
+        report = report_directory / "coverage.cobertura.xml"
+        report.write_text(
+            self._report_xml(self.source_root / "Example.cs"),
+            encoding="utf-8",
+        )
+
+        measured_lines = SUMMARIZE_COVERAGE.read_coverage(
+            report_directory, self.source_root
+        )
+
+        self.assertEqual(
+            {("src/Example.cs", 10): True, ("src/Example.cs", 11): False},
+            measured_lines,
+        )
+
+    def test_read_coverage_rejects_multiple_reports(self):
+        report_directory = self.root / "reports"
+        report_directory.mkdir()
+        for index in range(2):
+            (report_directory / f"{index}.cobertura.xml").write_text(
+                self._report_xml(self.source_root / "Example.cs"),
+                encoding="utf-8",
+            )
+
+        with self.assertRaisesRegex(
+            RuntimeError, "Expected one merged Cobertura report"
+        ):
+            SUMMARIZE_COVERAGE.read_coverage(report_directory, self.source_root)
+
+    def test_read_coverage_rejects_merged_report_without_source_lines(self):
+        report_directory = self.root / "reports"
+        report_directory.mkdir()
+        report = report_directory / "coverage.cobertura.xml"
+        report.write_text(
+            self._report_xml(self.root / "test" / "ExampleTests.cs"),
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "no measured lines"):
+            SUMMARIZE_COVERAGE.read_coverage(report_directory, self.source_root)
+
     def test_read_report_rejects_utf16_with_doctype(self):
         report = self.root / "coverage.cobertura.xml"
         report.write_text(

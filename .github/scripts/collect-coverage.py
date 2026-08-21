@@ -100,9 +100,7 @@ def collect_coverage(repository_root, results_directory, suite):
     settings_path = repository_root / ".github" / "coverage.config.xml"
 
     for index, module_path in enumerate(modules, start=1):
-        output_path = coverage_directory / (
-            f"{index:03d}-{module_path.stem}.cobertura.xml"
-        )
+        output_path = coverage_directory / f"{index:03d}-{module_path.stem}.coverage"
         subprocess.run(
             [
                 "dotnet",
@@ -124,7 +122,7 @@ def collect_coverage(repository_root, results_directory, suite):
                 "--coverage-output",
                 str(output_path),
                 "--coverage-output-format",
-                "cobertura",
+                "coverage",
                 "--coverage-settings",
                 str(settings_path),
             ],

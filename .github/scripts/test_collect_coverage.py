@@ -114,6 +114,10 @@ class GetSelectedModulesTests(unittest.TestCase):
         self.assertEqual(["dotnet", "exec", str(self.module)], command[:3])
         self.assertIn("--coverage", command)
         self.assertNotIn("--report-trx", command)
+        output_index = command.index("--coverage-output")
+        self.assertEqual(".coverage", Path(command[output_index + 1]).suffix)
+        format_index = command.index("--coverage-output-format")
+        self.assertEqual("coverage", command[format_index + 1])
         self.assertTrue(run.call_args.kwargs["check"])
 
     def _write_trx(self, filename, total, code_base):
