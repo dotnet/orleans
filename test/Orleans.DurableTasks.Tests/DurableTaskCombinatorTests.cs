@@ -1,5 +1,6 @@
 #nullable enable
 using System.Distributed.DurableTasks;
+using System.Runtime.CompilerServices;
 using NSubstitute;
 using NSubstitute.Core;
 using Orleans.Runtime.DurableTasks;
@@ -111,10 +112,30 @@ public class DurableTaskCombinatorTests
         Assert.Equal("generic failure", exception.Message);
     }
 
+    [Fact]
+    public void MethodBuilders_AcceptCompilerStateMachineRegistration()
+    {
+        var stateMachine = new TestStateMachine();
+
+        DurableTaskMethodBuilder.Create().SetStateMachine(stateMachine);
+        DurableTaskMethodBuilder<int>.Create().SetStateMachine(stateMachine);
+    }
+
     private static async DurableTask<int> ThrowingGenericMethod()
     {
         await Task.CompletedTask;
         throw new InvalidOperationException("generic failure");
+    }
+
+    private sealed class TestStateMachine : IAsyncStateMachine
+    {
+        public void MoveNext()
+        {
+        }
+
+        public void SetStateMachine(IAsyncStateMachine stateMachine)
+        {
+        }
     }
 
     private static Dictionary<string, IScheduledTaskHandle> CreateHandles(
