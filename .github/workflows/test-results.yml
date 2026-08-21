@@ -1,0 +1,32 @@
+name: .NET Test Results
+
+on:
+  workflow_run:
+    workflows:
+      - .NET CI
+    types:
+      - completed
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
+jobs:
+  report:
+    name: Report test results
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish test results
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
+        with:
+          artifact: /test_output_(.*)/
+          name: Test Results ($1)
+          path: "**/*.trx"
+          reporter: dotnet-trx
+          use-actions-summary: false
+          list-suites: failed
+          list-tests: failed
+          max-annotations: 50
+          fail-on-empty: true
