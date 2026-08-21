@@ -57,6 +57,7 @@ namespace Orleans.Streams
             Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver? receiver, int maxCacheAddCount);
             Task<bool> ReadFromQueueWithCancellation(QueueId myQueueId, IQueueAdapterReceiver? receiver, int maxCacheAddCount, CancellationToken cancellationToken);
             Task RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now);
+            Task<bool> DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken);
             Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> GetPubSubCache();
             Task AddSubscriber(StreamConsumerData consumerData);
             Task<bool> DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken);
@@ -135,6 +136,9 @@ namespace Orleans.Streams
 
                 return Task.CompletedTask;
             }).Unwrap();
+
+        Task<bool> ITestAccessor.DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken)
+            => this.RunOrQueueTaskResult(() => DoHandshakeWithConsumer(consumerData, cacheToken)).Unwrap();
 
         Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> ITestAccessor.GetPubSubCache()
             => this.RunOrQueueTaskResult(() => (IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>)new Dictionary<QualifiedStreamId, StreamConsumerCollection>(pubSubCache));
@@ -427,6 +431,7 @@ namespace Orleans.Streams
             StreamHandshakeToken? requestedHandshakeToken = null;
             StreamHandshakeToken? effectiveHandshakeToken = null;
             var providerDefaultRequest = false;
+            var effectiveStartToken = cacheToken ?? consumerData.PendingStartToken;
             // if not cache, then we can't get cursor and there is no reason to ask consumer for token.
             if (queueCache != null)
             {
@@ -471,6 +476,7 @@ namespace Orleans.Streams
                     else if (effectiveHandshakeToken is StartToken or DeliveryToken
                         && effectiveHandshakeToken.Token is { } requestedToken)
                     {
+                        effectiveStartToken = requestedToken;
                         consumerData.SafeDisposeCursor(logger);
                         if (effectiveHandshakeToken is DeliveryToken
                             || effectiveHandshakeToken is StartToken
@@ -486,6 +492,11 @@ namespace Orleans.Streams
                         else
                         {
                             var result = queueCache.TryGetCacheCursor(consumerData.StreamId, requestedToken);
+                            if (result.Kind == QueueCacheCursorResultKind.CacheMiss && cacheToken is not null)
+                            {
+                                effectiveStartToken = cacheToken;
+                            }
+
                             consumerData.Cursor = result.Kind switch
                             {
                                 QueueCacheCursorResultKind.Success => result.Cursor!,
@@ -552,13 +563,16 @@ namespace Orleans.Streams
                 try
                 {
                     var registrationToken = cacheToken ?? consumerData.PendingStartToken;
+                    effectiveStartToken = registrationToken;
                     consumerData.Cursor = GetCacheCursorOrThrow(consumerData.StreamId, registrationToken);
                 }
                 catch (Exception)
                 {
                     consumerData.Cursor = GetCacheCursorOrThrow(consumerData.StreamId, null);
+                    effectiveStartToken = null;
                 }
             }
+            consumerData.LastProcessedToken = effectiveStartToken ?? consumerData.LastProcessedToken;
             consumerData.HandshakeGeneration++;
             return true;
         }
