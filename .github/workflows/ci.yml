@@ -112,7 +112,6 @@ jobs:
         retention-days: 1
         path: |
           **/TestResults/*
-          !**/*.cobertura.xml
           **/logs/*
   test-cassandra:
     name: Cassandra provider tests
@@ -1105,6 +1104,7 @@ jobs:
         retention-days: 1
         path: |
           **/TestResults/*
+          !**/*.cobertura.xml
           **/logs/*
   test-codegenerator:
     name: Test Code Generator
