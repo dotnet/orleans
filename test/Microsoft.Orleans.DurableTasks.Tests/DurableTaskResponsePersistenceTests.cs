@@ -56,6 +56,31 @@ public sealed class DurableTaskResponsePersistenceTests
     }
 
     [Fact]
+    public async Task RemoteIdentityRoundTripsThroughVolatileStorage()
+    {
+        using var services = CreateSerializationServices();
+        var storage = new VolatileDurableTaskGrainStorage(
+            services.GetRequiredService<DeepCopier<Dictionary<TaskId, DurableTaskState>>>(),
+            services.GetRequiredService<DeepCopier<DurableTaskState>>(),
+            TimeProvider.System);
+        var taskId = TaskId.Parse("root/remote");
+        var target = GrainId.Create("target", "one");
+        var caller = GrainId.Create("caller", "one");
+        var state = storage.GetOrCreateTask(taskId, request: null);
+
+        storage.SetRemoteRequest(taskId, state, target, "fingerprint");
+        storage.SetCallerId(taskId, state, caller);
+        await storage.WriteAsync(default);
+        storage.Clear();
+        await storage.ReadAsync(default);
+
+        Assert.True(storage.TryGetTask(taskId, out var recoveredState));
+        Assert.Equal(target, recoveredState.RemoteTarget);
+        Assert.Equal("fingerprint", recoveredState.RemoteRequestFingerprint);
+        Assert.Equal(caller, recoveredState.CallerId);
+    }
+
+    [Fact]
     public void CanceledResponseRoundTripsThroughCompletionDelivery()
     {
         using var services = CreateSerializationServices();

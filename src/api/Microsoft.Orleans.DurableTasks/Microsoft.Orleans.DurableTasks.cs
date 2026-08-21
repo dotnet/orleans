@@ -195,6 +195,7 @@ namespace Orleans.DurableTasks.Protocol
         void RemoveCompletionDestination(TaskId taskId, IDurableTaskState state, Orleans.Runtime.GrainId destination);
         bool RemoveTask(TaskId taskId);
         void RequestCancellation(TaskId taskId, IDurableTaskState state);
+        void SetCallerId(TaskId taskId, IDurableTaskState state, Orleans.Runtime.GrainId callerId);
         void SetDelay(TaskId taskId, IDurableTaskState state, System.DateTimeOffset dueTime, long generation);
         void SetRemoteRequest(TaskId taskId, IDurableTaskState state, Orleans.Runtime.GrainId target, string fingerprint);
         void SetRequest(TaskId taskId, IDurableTaskState state, IDurableTaskRequest request);
@@ -236,6 +237,8 @@ namespace Orleans.DurableTasks.Protocol
 
     public partial interface IDurableTaskState
     {
+        Orleans.Runtime.GrainId CallerId { get; }
+
         System.DateTimeOffset? CancellationRequestedAt { get; }
 
         System.DateTimeOffset? CompletedAt { get; }
@@ -279,6 +282,9 @@ namespace Orleans.DurableTasks.Runtime
     [Alias("DurableTaskState")]
     public partial class DurableTaskState : Protocol.IDurableTaskState
     {
+        [Id(13)]
+        public Orleans.Runtime.GrainId CallerId { get { throw null; } set { } }
+
         [Id(5)]
         public System.DateTimeOffset? CancellationRequestedAt { get { throw null; } set { } }
 
@@ -352,6 +358,8 @@ namespace Orleans.DurableTasks.Runtime
         public bool RemoveTask(TaskId taskId) { throw null; }
 
         public void RequestCancellation(TaskId taskId, Protocol.IDurableTaskState state) { }
+
+        public void SetCallerId(TaskId taskId, Protocol.IDurableTaskState state, Orleans.Runtime.GrainId callerId) { }
 
         public void SetDelay(TaskId taskId, Protocol.IDurableTaskState state, System.DateTimeOffset dueTime, long generation) { }
 

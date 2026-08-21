@@ -16,10 +16,12 @@ internal sealed partial class DurableTaskGrainRuntime
         GrainId remoteTarget = default) : IScheduledTaskHandle
     {
         private readonly TaskCompletionSource<DurableTaskResponse> _responseTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly GrainId _remoteTarget = remoteTarget;
 
         public Task<DurableTaskResponse> ResponseTask => _responseTcs.Task;
 
         public TaskId TaskId { get; } = taskId;
+        public GrainId RemoteTarget => _remoteTarget;
 
         // If this is false, the task was rehydrated from storage but has not started running yet.
         // This will happen if the task is non-serializable, like a local method invocation.
@@ -27,13 +29,13 @@ internal sealed partial class DurableTaskGrainRuntime
 
         public async ValueTask CancelAsync(CancellationToken cancellationToken)
         {
-            if (remoteTarget.IsDefault)
+            if (RemoteTarget.IsDefault)
             {
                 await runtime.CancelScheduledTaskAsync(TaskId, cancellationToken);
             }
             else
             {
-                await runtime.CancelRemoteAsync(TaskId, remoteTarget, cancellationToken);
+                await runtime.CancelRemoteAsync(TaskId, RemoteTarget, cancellationToken);
             }
         }
 
