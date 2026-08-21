@@ -18,6 +18,7 @@ namespace Orleans.EventSourcing.CustomStorage
     {
         private readonly CustomStorageLogConsistencyOptions options;
         private readonly IServiceProvider? serviceProvider;
+        private readonly string? providerName;
 
         /// <summary>
         /// Specifies a cluster id of the primary cluster from which to access storage exclusively, null if
@@ -29,14 +30,15 @@ namespace Orleans.EventSourcing.CustomStorage
         public bool UsesStorageProvider => false;
 
         public LogConsistencyProvider(CustomStorageLogConsistencyOptions options)
-            : this(options, null)
         {
+            this.options = options;
         }
 
-        public LogConsistencyProvider(CustomStorageLogConsistencyOptions options, IServiceProvider? serviceProvider)
+        internal LogConsistencyProvider(CustomStorageLogConsistencyOptions options, IServiceProvider serviceProvider, string providerName)
         {
             this.options = options;
             this.serviceProvider = serviceProvider;
+            this.providerName = providerName;
         }
 
         /// <inheritdoc/>
@@ -44,7 +46,7 @@ namespace Orleans.EventSourcing.CustomStorage
             where TView : class, new()
             where TEntry : class
         {
-            var customStorage = CustomStorageHelpers.GetCustomStorage<TView, TEntry>(hostGrain, services.GrainId, serviceProvider);
+            var customStorage = CustomStorageHelpers.GetCustomStorage<TView, TEntry>(hostGrain, services.GrainId, serviceProvider, providerName);
             return new CustomStorageAdaptor<TView, TEntry>(hostGrain, initialState, services, PrimaryCluster, customStorage);
         }
     }
@@ -54,7 +56,9 @@ namespace Orleans.EventSourcing.CustomStorage
         public static ILogViewAdaptorFactory Create(IServiceProvider services, string? name)
         {
             var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CustomStorageLogConsistencyOptions>>();
-            return ActivatorUtilities.CreateInstance<LogConsistencyProvider>(services, optionsMonitor.Get(name));
+            return name is null
+                ? new LogConsistencyProvider(optionsMonitor.Get(name))
+                : new LogConsistencyProvider(optionsMonitor.Get(name), services, name);
         }
     }
 }

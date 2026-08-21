@@ -1,4 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.EventSourcing.CustomStorage;
 using Orleans.Storage;
@@ -28,7 +27,7 @@ namespace Tester.EventSourcingTests
                 hostBuilder
                     .AddLogStorageBasedLogConsistencyProvider("LogStorage")
                     .AddStateStorageBasedLogConsistencyProvider("StateStorage")
-                    .AddCustomStorageBasedLogConsistencyProvider("CustomStorage")
+                    .AddCustomStorageBasedLogConsistencyProvider<SeparateCustomStorageFactory>("CustomStorage")
                     .AddCustomStorageBasedLogConsistencyProvider("CustomStoragePrimaryCluster")
                     .ConfigureLogging(builder =>
                     {
@@ -39,8 +38,6 @@ namespace Tester.EventSourcingTests
                     .AddMemoryGrainStorage("AzureStore")
                     .AddMemoryGrainStorage("MemoryStore")
                     .AddFaultInjectionMemoryStorage("SlowMemoryStore", options=>options.NumStorageGrains = 10, faultyOptions => faultyOptions.Latency = TimeSpan.FromMilliseconds(15));
-
-                hostBuilder.Services.AddKeyedSingleton<ICustomStorageFactory, SeparateCustomStorageFactory>("SeparateCustomStorage");
             }
         }
     }
