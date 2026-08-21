@@ -115,7 +115,7 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
     public bool RemoveMessage(GrainId senderId, Guid messageId)
     {
         var key = (senderId, messageId);
-        
+
         // Get the envelope before removing to dispose its data
         if (_inbox.TryGetValue(key, out var envelope))
         {
@@ -128,7 +128,7 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
             }
             return removed;
         }
-        
+
         return false;
     }
 
@@ -165,7 +165,7 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
         ArgumentNullException.ThrowIfNull(handler);
 
         _handlers.Add(handler);
-        
+
         // Clear cache when new handler is registered
         _routeCache.Clear();
     }

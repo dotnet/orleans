@@ -58,7 +58,7 @@ public class DurableMessagingRecoveryTests : IClassFixture<DurableMessagingRecov
         // Deactivate the receiver
         var activationIdBefore = await receiverGrain.GetActivationId();
         await receiverGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
-        
+
         // Wait for grain to be reactivated with new activation id
         await TestHelpers.WaitUntilAsync(
             async () => await receiverGrain.GetActivationId() != activationIdBefore,
@@ -76,7 +76,7 @@ public class DurableMessagingRecoveryTests : IClassFixture<DurableMessagingRecov
 
         // Assert - Duplicate should be rejected, proving deduplication state survived
         Assert.Equal(DeliveryStatus.Duplicate, result2.Status);
-        
+
         // Verify we got a different activation
         var activationIdAfter = await receiverGrain.GetActivationId();
         Assert.NotEqual(activationIdBefore, activationIdAfter);
@@ -112,7 +112,7 @@ public class DurableMessagingRecoveryTests : IClassFixture<DurableMessagingRecov
         // Assert - Outbox should be empty after delivery
         var outboxCount = await senderGrain.GetOutboxCount();
         Assert.Equal(0, outboxCount);
-        
+
         // Verify message was received and processed (inbox should be empty after processing)
         var inboxCount = await receiverGrain.GetInboxCount();
         Assert.Equal(0, inboxCount);
@@ -146,7 +146,7 @@ public class DurableMessagingRecoveryTests : IClassFixture<DurableMessagingRecov
         // Deactivate the grain
         var activationIdBefore = await receiverGrain.GetActivationId();
         await receiverGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
-        
+
         // Wait for grain to be reactivated
         await TestHelpers.WaitUntilAsync(
             async () => await receiverGrain.GetActivationId() != activationIdBefore,

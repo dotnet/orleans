@@ -36,12 +36,12 @@ namespace Orleans.DurableMessaging;
 ///     public RpcPrefixHandler() : base("rpc/")
 ///     {
 ///     }
-///     
+///
 ///     protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken ct)
 ///     {
 ///         // Get the route suffix to determine the specific RPC operation
 ///         var suffix = GetRouteSuffix(context.Envelope.RouteKey);
-///         
+///
 ///         switch (suffix)
 ///         {
 ///             case "request":
@@ -54,7 +54,7 @@ namespace Orleans.DurableMessaging;
 ///                 throw new InvalidOperationException($"Unknown RPC operation: {suffix}");
 ///         }
 ///     }
-///     
+///
 ///     private async ValueTask HandleRequest(IInboxHandlerContext context, CancellationToken ct)
 ///     {
 ///         // Handle RPC request
@@ -62,10 +62,10 @@ namespace Orleans.DurableMessaging;
 ///         {
 ///             throw new InvalidOperationException("Failed to deserialize RpcRequest");
 ///         }
-///         
+///
 ///         // Process and send reply
 ///         var result = await ProcessRequest(request, ct);
-///         
+///
 ///         if (context.Envelope.ReplyTo is { } replyTo)
 ///         {
 ///             var response = context.CreateEnvelope()
@@ -73,18 +73,18 @@ namespace Orleans.DurableMessaging;
 ///                 .WithBody(result)
 ///                 .WithCorrelationKey(context.Envelope.CorrelationKey)
 ///                 .Build();
-///             
+///
 ///             context.Send(response);
 ///         }
 ///     }
-///     
+///
 ///     private async ValueTask HandleReply(IInboxHandlerContext context, CancellationToken ct)
 ///     {
 ///         // Handle RPC reply
 ///         // ...
 ///     }
 /// }
-/// 
+///
 /// // Registration
 /// inbox.RegisterHandler(new RpcPrefixHandler());
 /// </code>
@@ -154,7 +154,7 @@ public abstract class RoutePrefixHandler : IInboxHandler
     /// protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken ct)
     /// {
     ///     var operation = GetRouteSuffix(context.Envelope.RouteKey);
-    ///     
+    ///
     ///     switch (operation)
     ///     {
     ///         case "request":

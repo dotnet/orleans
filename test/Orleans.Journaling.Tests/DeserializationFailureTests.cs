@@ -36,7 +36,7 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
 
         // Act - Send message with string body, but handler expects int
         await senderGrain.SendTypeMismatchMessage(typeMismatchGrain.GetGrainId(), "this is a string, not an int");
-        
+
         // Wait for type mismatch to be detected
         await TestHelpers.WaitUntilAsync(
             async () => await typeMismatchGrain.GetTypeMismatchDetected(),
@@ -45,10 +45,10 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
         // Assert - Grain should have detected type mismatch and handled it gracefully
         var handled = await typeMismatchGrain.GetHandledSuccessfully();
         var typeMismatchDetected = await typeMismatchGrain.GetTypeMismatchDetected();
-        
+
         Assert.False(handled, "Message should not have been handled successfully due to type mismatch");
         Assert.True(typeMismatchDetected, "Handler should have detected the type mismatch");
-        
+
         // Verify grain is still responsive after type mismatch
         var isAlive = await typeMismatchGrain.Ping();
         Assert.True(isAlive, "Grain should still be alive after type mismatch");
@@ -67,11 +67,11 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
 
         // Act - Send message with string context value, but handler expects int
         await senderGrain.SendMessageWithBadContext(
-            contextMismatchGrain.GetGrainId(), 
+            contextMismatchGrain.GetGrainId(),
             new SimpleMessage { Value = "valid body" },
             contextKey: "userId",
             contextValue: "string-not-int");
-        
+
         // Wait for message to be processed
         await TestHelpers.WaitUntilAsync(
             async () => await contextMismatchGrain.GetBodyReceived(),
@@ -80,7 +80,7 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
         // Assert - Body should be accessible despite context type mismatch
         var bodyReceived = await contextMismatchGrain.GetBodyReceived();
         var contextMismatchDetected = await contextMismatchGrain.GetContextMismatchDetected();
-        
+
         Assert.True(bodyReceived, "Body should be accessible despite context type mismatch");
         Assert.True(contextMismatchDetected, "Handler should have detected context type mismatch");
         Assert.Equal("valid body", await contextMismatchGrain.GetReceivedValue());
@@ -99,13 +99,13 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
 
         // Act - Send ComplexMessage that handler tries to deserialize as SimpleMessage first (will fail)
         // Then handler tries ComplexMessage (will succeed)
-        await senderGrain.SendComplexMessage(unavailableTypeGrain.GetGrainId(), new ComplexMessage 
-        { 
-            Id = 123, 
-            Data = "test", 
-            Nested = new NestedData { Value = 456 } 
+        await senderGrain.SendComplexMessage(unavailableTypeGrain.GetGrainId(), new ComplexMessage
+        {
+            Id = 123,
+            Data = "test",
+            Nested = new NestedData { Value = 456 }
         });
-        
+
         // Wait for first message to be processed
         await TestHelpers.WaitUntilAsync(
             async () => await unavailableTypeGrain.GetSuccessfulMessageCount() >= 1,
@@ -113,7 +113,7 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
 
         // Send a valid SimpleMessage afterwards
         await senderGrain.SendSimpleMessage(unavailableTypeGrain.GetGrainId(), new SimpleMessage { Value = "valid" });
-        
+
         // Wait for second message to be processed
         await TestHelpers.WaitUntilAsync(
             async () => await unavailableTypeGrain.GetSuccessfulMessageCount() >= 2,
@@ -122,7 +122,7 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
         // Assert - Both messages should have been processed successfully
         // First as ComplexMessage (after SimpleMessage attempt failed), second as SimpleMessage
         var successCount = await unavailableTypeGrain.GetSuccessfulMessageCount();
-        
+
         Assert.Equal(2, successCount);
     }
 
@@ -139,7 +139,7 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
 
         // Act - Send message with wrong type
         await senderGrain.SendTypeMismatchMessage(fallbackGrain.GetGrainId(), "wrong type");
-        
+
         // Wait for fallback to be used
         await TestHelpers.WaitUntilAsync(
             async () => await fallbackGrain.GetUsedFallback(),
@@ -148,7 +148,7 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
         // Assert - Fallback handler should have used raw bytes
         var usedFallback = await fallbackGrain.GetUsedFallback();
         var rawBytesReceived = await fallbackGrain.GetRawBytesReceived();
-        
+
         Assert.True(usedFallback, "Handler should have used fallback logic");
         Assert.True(rawBytesReceived, "Handler should have accessed raw bytes");
     }
@@ -170,7 +170,7 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
         await senderGrain.SendSimpleMessage(mixedGrain.GetGrainId(), new SimpleMessage { Value = "valid2" });
         await senderGrain.SendTypeMismatchMessage(mixedGrain.GetGrainId(), true); // Wrong type
         await senderGrain.SendSimpleMessage(mixedGrain.GetGrainId(), new SimpleMessage { Value = "valid3" });
-        
+
         // Wait for all 5 messages to be processed (3 valid + 2 invalid)
         await TestHelpers.WaitUntilAsync(
             async () =>
@@ -185,7 +185,7 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
         var validCount = await mixedGrain.GetValidMessageCount();
         var invalidCount = await mixedGrain.GetInvalidMessageCount();
         var processedValues = await mixedGrain.GetProcessedValues();
-        
+
         Assert.Equal(3, validCount);
         Assert.Equal(2, invalidCount);
         Assert.Equal(3, processedValues.Count);
@@ -207,7 +207,7 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
 
         // Act - Send bad message, then deactivate, then send good message
         await senderGrain.SendTypeMismatchMessage(survivorGrain.GetGrainId(), 999); // Bad message
-        
+
         // Wait briefly for bad message to be processed (or skipped)
         await TestHelpers.TryWaitUntilAsync(
             async () => await survivorGrain.GetLastReceivedValue() is not null,
@@ -215,7 +215,7 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
 
         var activationBefore = await survivorGrain.GetActivationId();
         await survivorGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
-        
+
         // Wait for grain to be reactivated with new activation id
         await TestHelpers.WaitUntilAsync(
             async () => await survivorGrain.GetActivationId() != activationBefore,
@@ -223,14 +223,14 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
 
         // Send valid message to reactivate
         await senderGrain.SendSimpleMessage(survivorGrain.GetGrainId(), new SimpleMessage { Value = "after-reactivation" });
-        
+
         // Wait for valid message to be processed
         await TestHelpers.WaitUntilAsync(
             async () => await survivorGrain.GetLastReceivedValue() == "after-reactivation",
             message: "Valid message was not received after reactivation");
 
         var activationAfter = await survivorGrain.GetActivationId();
-        
+
         // Assert - Grain should have survived and reactivated
         Assert.NotEqual(activationBefore, activationAfter);
         var receivedAfterReactivation = await survivorGrain.GetLastReceivedValue();

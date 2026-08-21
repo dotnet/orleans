@@ -34,9 +34,9 @@ namespace Orleans.DurableMessaging;
 ///     .WithCorrelationKey("order-12345")
 ///     .WithReplyTo(context.GrainId)
 ///     .Build();
-/// 
+///
 /// context.Outbox.Send(envelope);
-/// 
+///
 /// // The message is now persisted and will be delivered by the outbox pump
 /// </code>
 /// </example>
@@ -83,7 +83,7 @@ public interface IDurableOutbox
     ///     .To(targetGrain, "order/confirm")
     ///     .WithBody(new OrderConfirmation { OrderId = "order-123" })
     ///     .Build();
-    /// 
+    ///
     /// outbox.Send(envelope);
     /// </code>
     /// </example>

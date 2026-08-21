@@ -604,7 +604,7 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
                 _remaining = GetElementCount(_current);
             }
 
-            // If there are no elements remaining 
+            // If there are no elements remaining
             if (_remaining == 0)
             {
                 return false;

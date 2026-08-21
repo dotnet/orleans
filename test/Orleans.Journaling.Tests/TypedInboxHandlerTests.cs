@@ -86,7 +86,7 @@ public class TypedInboxHandlerTests : IDisposable
         // Arrange
         var handler = new SelectiveTypedHandler();
         var message = new TestMessage { Data = "test", Value = 100 };
-        
+
         var contextMatch = CreateMockContext(message, routeKey: "payment/process");
         var contextNoMatch = CreateMockContext(message, routeKey: "order/process");
 
@@ -132,7 +132,7 @@ public class TypedInboxHandlerTests : IDisposable
         var message = new TestMessage { Data = "context-test", Value = 99 };
         var grainId = GrainId.Create("test-grain", Guid.NewGuid().ToString("N"));
         var correlationKey = HierarchicalKey.Create("workflow-456");
-        
+
         var context = CreateMockContext(
             message,
             routeKey: "test/route",
@@ -178,10 +178,10 @@ public class TypedInboxHandlerTests : IDisposable
         // Arrange
         var testHandler = new TestTypedHandler();
         var differentHandler = new DifferentTypedHandler();
-        
+
         var testMessage = new TestMessage { Data = "test", Value = 1 };
         var differentMessage = new DifferentMessage { Id = Guid.NewGuid() };
-        
+
         var testContext = CreateMockContext(testMessage);
         var differentContext = CreateMockContext(differentMessage);
 
@@ -192,7 +192,7 @@ public class TypedInboxHandlerTests : IDisposable
         // Assert
         Assert.True(testHandler.WasCalled);
         Assert.Equal("test", testHandler.ReceivedMessage?.Data);
-        
+
         Assert.True(differentHandler.WasCalled);
         Assert.NotEqual(Guid.Empty, differentHandler.ReceivedMessage?.Id);
     }

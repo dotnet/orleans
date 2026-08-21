@@ -30,13 +30,13 @@ namespace Orleans.DurableMessaging;
 /// public class OrderProcessingHandler : RouteKeyHandler
 /// {
 ///     private readonly IOrderService _orderService;
-///     
-///     public OrderProcessingHandler(IOrderService orderService) 
+///
+///     public OrderProcessingHandler(IOrderService orderService)
 ///         : base("order/process")
 ///     {
 ///         _orderService = orderService;
 ///     }
-///     
+///
 ///     protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken ct)
 ///     {
 ///         // Deserialize the message
@@ -44,10 +44,10 @@ namespace Orleans.DurableMessaging;
 ///         {
 ///             throw new InvalidOperationException("Failed to deserialize OrderRequest");
 ///         }
-///         
+///
 ///         // Process the order
 ///         var result = await _orderService.ProcessOrder(request, ct);
-///         
+///
 ///         // Send reply if requested
 ///         if (context.Envelope.ReplyTo is { } replyTo)
 ///         {
@@ -56,12 +56,12 @@ namespace Orleans.DurableMessaging;
 ///                 .WithBody(result)
 ///                 .WithCorrelationKey(context.Envelope.CorrelationKey)
 ///                 .Build();
-///             
+///
 ///             context.Send(response);
 ///         }
 ///     }
 /// }
-/// 
+///
 /// // Registration
 /// inbox.RegisterHandler("order/process", new OrderProcessingHandler(orderService));
 /// </code>

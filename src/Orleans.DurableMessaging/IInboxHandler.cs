@@ -25,7 +25,7 @@ namespace Orleans.DurableMessaging;
 ///     public async ValueTask HandleAsync(PaymentRequest request, IInboxHandlerContext context, CancellationToken ct)
 ///     {
 ///         var result = await ProcessPayment(request);
-///         
+///
 ///         // Send reply if requested
 ///         if (context.Envelope.ReplyTo is { } replyTo)
 ///         {
@@ -34,12 +34,12 @@ namespace Orleans.DurableMessaging;
 ///                 .WithBody(result)
 ///                 .WithCorrelationKey(context.Envelope.CorrelationKey)
 ///                 .Build();
-///             
+///
 ///             context.Send(response);
 ///         }
 ///     }
 /// }
-/// 
+///
 /// // Registration
 /// inbox.RegisterHandler("payment/process", new PaymentHandler());
 /// </code>
@@ -76,13 +76,13 @@ public interface IInboxHandler
     ///         // Match specific route key
     ///         return context.Envelope.RouteKey == "order/process";
     ///     }
-    ///     
+    ///
     ///     public async ValueTask HandleAsync(OrderRequest message, IInboxHandlerContext context, CancellationToken ct)
     ///     {
     ///         // Handle the order
     ///     }
     /// }
-    /// 
+    ///
     /// public class PrefixHandler : IInboxHandler
     /// {
     ///     public bool CanHandle(IInboxHandlerContext context)
@@ -90,7 +90,7 @@ public interface IInboxHandler
     ///         // Match route prefix
     ///         return context.Envelope.RouteKey?.StartsWith("rpc/") == true;
     ///     }
-    ///     
+    ///
     ///     public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken ct)
     ///     {
     ///         // Handle any RPC message using context.Envelope
@@ -143,21 +143,21 @@ public interface IInboxHandler
 ///     [Id(0)] public required decimal Amount { get; init; }
 ///     [Id(1)] public required string AccountId { get; init; }
 /// }
-/// 
+///
 /// public class PaymentHandler : IInboxHandler&lt;PaymentRequest&gt;
 /// {
 ///     private readonly IPaymentService _paymentService;
-///     
+///
 ///     public PaymentHandler(IPaymentService paymentService)
 ///     {
 ///         _paymentService = paymentService;
 ///     }
-///     
+///
 ///     public async ValueTask HandleAsync(PaymentRequest message, IInboxHandlerContext context, CancellationToken ct)
 ///     {
 ///         // Message is already deserialized and type-checked
 ///         var result = await _paymentService.ProcessPayment(message.AccountId, message.Amount, ct);
-///         
+///
 ///         // Send reply with result
 ///         if (context.Envelope.ReplyTo is { } replyTo)
 ///         {
@@ -166,7 +166,7 @@ public interface IInboxHandler
 ///                 .WithBody(new PaymentResult { Success = result, TransactionId = Guid.NewGuid() })
 ///                 .WithCorrelationKey(context.Envelope.CorrelationKey)
 ///                 .Build();
-///             
+///
 ///             context.Send(response);
 ///         }
 ///     }

@@ -95,7 +95,7 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
 
         // Assert - Receiver should have accepted up to capacity
         var receivedCount = await receiverGrain.GetReceivedCount();
-        Assert.True(receivedCount > 0 && receivedCount <= 100, 
+        Assert.True(receivedCount > 0 && receivedCount <= 100,
             $"Expected receiver to accept up to capacity (100), got {receivedCount}");
     }
 
@@ -155,7 +155,7 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
 
         // Act - Grain 1 sends to Grain 2
         await grain1.SendPing(grain2.GetGrainId(), "Ping from Grain 1");
-        
+
         // Wait for Grain 2 to receive the message
         await TestHelpers.WaitUntilAsync(
             async () => (await grain2.GetReceivedMessages()).Contains("Ping from Grain 1"),
@@ -167,7 +167,7 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
 
         // Act - Grain 2 sends back to Grain 1
         await grain2.SendPing(grain1.GetGrainId(), "Pong from Grain 2");
-        
+
         // Wait for Grain 1 to receive the response
         await TestHelpers.WaitUntilAsync(
             async () => (await grain1.GetReceivedMessages()).Contains("Pong from Grain 2"),
@@ -240,7 +240,7 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
         {
             RequestContext.Set(IPlacementDirector.PlacementHintKey, siloAddress);
             var grain = _fixture.Client.GetGrain<T>(Guid.NewGuid());
-            
+
             // Verify placement by checking silo address
             if (grain is IMultiSiloGrainBase baseGrain)
             {
@@ -266,7 +266,7 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
         public async ValueTask InitializeAsync()
         {
             var builder = new InProcessTestClusterBuilder();
-            
+
             // Configure 2 silos
             builder.Options.InitialSilosCount = 2;
 
@@ -279,7 +279,7 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
                 siloBuilder.UseInMemoryDurableJobs();
                 siloBuilder.Services.AddSingleton(storageProvider);
                 siloBuilder.Services.AddSingleton<IJournalStorageProvider>(storageProvider);
-                
+
                 siloBuilder.AddDurableMessaging(opts =>
                 {
                     opts.MaxCapacity = 100;
@@ -442,7 +442,7 @@ public class MultiSiloReceiverGrain : DurableGrain, IMultiSiloReceiverGrain
     }
 
     public Task<MultiSiloTestMessage?> GetLastReceivedMessage() => Task.FromResult(_lastReceivedMessage.Value);
-    
+
     public Task<int> GetReceivedCount() => Task.FromResult(_receivedCount.Value);
 
     private class ProcessHandler : IInboxHandler<MultiSiloTestMessage>
@@ -649,7 +649,7 @@ public class MultiSiloWorkerGrain : DurableGrain, IMultiSiloWorkerGrain
     }
 
     public Task<HierarchicalKey?> GetLastCorrelationKey() => Task.FromResult(_lastCorrelationKey.Value);
-    
+
     public Task<string?> GetLastTaskData() => Task.FromResult(_lastTaskData.Value);
 
     private class ExecuteTaskHandler : IInboxHandler<MultiSiloTestMessage>

@@ -10,14 +10,14 @@ namespace Orleans.Journaling.Tests;
 
 /// <summary>
 /// High-throughput backpressure scenario tests for durable inbox/outbox messaging.
-/// 
+///
 /// These tests verify the system's behavior under sustained load with backpressure:
 /// - Sender grain floods messages to receiver grain
 /// - Low inbox capacity triggers backpressure
 /// - All messages are eventually delivered (no message loss)
 /// - Steady-state throughput measurement under load
 /// - Multiple concurrent senders
-/// 
+///
 /// Backpressure is verified indirectly through observable effects:
 /// - Delivery timing (slower than theoretical maximum)
 /// - All messages eventually delivered despite capacity constraints
@@ -63,14 +63,14 @@ public class HighThroughputBackpressureTests : IClassFixture<HighThroughputBackp
         while (DateTimeOffset.UtcNow < deadline)
         {
             var stats = await sender.GetStats();
-            
+
             // If expectedSent is provided, first wait for TotalSent to reach that count
             if (expectedSent.HasValue && stats.TotalSent < expectedSent.Value)
             {
                 await Task.Delay(100);
                 continue;
             }
-            
+
             if (stats.PendingCount == 0)
             {
                 return;
@@ -91,7 +91,7 @@ public class HighThroughputBackpressureTests : IClassFixture<HighThroughputBackp
         var sender = _fixture.Client.GetGrain<IFloodSenderGrain>(Guid.NewGuid());
 
         var messageCount = 30;
-        
+
         // Configure receiver with moderate processing delay
         // With processing delay of 30ms and capacity=100, should process smoothly
         await receiver.ConfigureProcessing(processingDelayMs: 30, maxMessages: messageCount);
@@ -101,13 +101,13 @@ public class HighThroughputBackpressureTests : IClassFixture<HighThroughputBackp
 
         // Wait for sender's outbox to drain (all messages sent and delivered)
         await WaitForSenderOutboxToDrainAsync(sender, timeout: TimeSpan.FromSeconds(30), expectedSent: messageCount);
-        
+
         // Wait for all messages to be delivered (allow time for backpressure and retries)
         var receiverStats = await WaitForMessagesAsync(receiver, messageCount, timeout: TimeSpan.FromSeconds(30));
 
         // Assert - All messages should be delivered
         var senderStats = await sender.GetStats();
-        
+
         Assert.Equal(messageCount, senderStats.TotalSent);
         Assert.Equal(messageCount, receiverStats.ReceivedCount);
         Assert.Equal(0, senderStats.PendingCount);
@@ -125,7 +125,7 @@ public class HighThroughputBackpressureTests : IClassFixture<HighThroughputBackp
         var sender = _fixture.Client.GetGrain<IFloodSenderGrain>(Guid.NewGuid());
 
         var messageCount = 50;
-        
+
         // Configure with slow processing to create sustained backpressure
         await receiver.ConfigureProcessing(processingDelayMs: 40, maxMessages: messageCount);
 
@@ -134,7 +134,7 @@ public class HighThroughputBackpressureTests : IClassFixture<HighThroughputBackp
 
         // Wait for sender's outbox to drain (all messages sent and delivered)
         await WaitForSenderOutboxToDrainAsync(sender, timeout: TimeSpan.FromSeconds(30), expectedSent: messageCount);
-        
+
         // Wait for all messages to be processed (generous timeout to allow for retries)
         var receiverStats = await WaitForMessagesAsync(receiver, messageCount, timeout: TimeSpan.FromSeconds(30));
 
@@ -159,7 +159,7 @@ public class HighThroughputBackpressureTests : IClassFixture<HighThroughputBackp
         var sender = _fixture.Client.GetGrain<IFloodSenderGrain>(Guid.NewGuid());
 
         var messageCount = 60;
-        
+
         // Configure for sustained load
         // With 20ms processing delay, theoretical max is ~50 msg/s
         await receiver.ConfigureProcessing(processingDelayMs: 20, maxMessages: messageCount);
@@ -170,7 +170,7 @@ public class HighThroughputBackpressureTests : IClassFixture<HighThroughputBackp
 
         // Wait for sender's outbox to drain (all messages sent and delivered)
         await WaitForSenderOutboxToDrainAsync(sender, timeout: TimeSpan.FromSeconds(30), expectedSent: messageCount);
-        
+
         // Wait for all messages to be processed
         var receiverStats = await WaitForMessagesAsync(receiver, messageCount, timeout: TimeSpan.FromSeconds(30));
         var elapsed = DateTimeOffset.UtcNow - startTime;
@@ -180,7 +180,7 @@ public class HighThroughputBackpressureTests : IClassFixture<HighThroughputBackp
         Assert.Equal(messageCount, senderStats.TotalSent);
         Assert.Equal(messageCount, receiverStats.ReceivedCount);
         Assert.Equal(0, senderStats.PendingCount);
-        
+
         // Verify reasonable throughput (at least 5 msg/s with 20ms processing delay)
         var throughput = messageCount / elapsed.TotalSeconds;
         Assert.True(throughput >= 5.0, $"Expected at least 5 msg/s, got {throughput:F2} msg/s");
@@ -213,7 +213,7 @@ public class HighThroughputBackpressureTests : IClassFixture<HighThroughputBackp
             },
             timeout: TimeSpan.FromSeconds(10),
             message: "Some messages should be received during slow processing");
-            
+
         var statsDuringSlow = await receiver.GetStats();
         Assert.True(statsDuringSlow.ReceivedCount < messageCount, "Some messages should still be pending");
 
@@ -223,7 +223,7 @@ public class HighThroughputBackpressureTests : IClassFixture<HighThroughputBackp
 
         // Wait for sender's outbox to drain (all messages sent and delivered)
         await WaitForSenderOutboxToDrainAsync(sender, timeout: TimeSpan.FromSeconds(15), expectedSent: messageCount);
-        
+
         // Wait for recovery
         var statsAfterRelief = await WaitForMessagesAsync(receiver, messageCount, timeout: TimeSpan.FromSeconds(10));
         var recoveryTime = (DateTimeOffset.UtcNow - reliefTimestamp).TotalSeconds;
@@ -248,7 +248,7 @@ public class HighThroughputBackpressureTests : IClassFixture<HighThroughputBackp
 
         var messagesPerSender = 20;
         var totalMessages = messagesPerSender * 3;
-        
+
         await receiver.ConfigureProcessing(processingDelayMs: 30, maxMessages: totalMessages);
 
         // Act - Three senders flood the same receiver concurrently
@@ -304,13 +304,13 @@ public class HighThroughputBackpressureTests : IClassFixture<HighThroughputBackp
 
         // Assert - Verify all sequences received
         var receivedSequences = await receiver.GetReceivedSequences();
-        
+
         Assert.Equal(messageCount, receivedSequences.Count);
 
         // Verify all sequences were received (no duplicates, no gaps)
         var distinctSequences = receivedSequences.Distinct().OrderBy(x => x).ToList();
         Assert.Equal(messageCount, distinctSequences.Count);
-        
+
         // Verify range is correct (0 to messageCount-1)
         Assert.Equal(0, distinctSequences.First());
         Assert.Equal(messageCount - 1, distinctSequences.Last());
@@ -535,10 +535,10 @@ public class FloodReceiverGrain : DurableGrain, IFloodReceiverGrain
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
         _inbox.RegisterHandler("flood", new FloodHandler(this));
-        
+
         // Initialize sequences list if null
         _receivedSequences.Value ??= new List<int>();
-        
+
         return base.OnActivateAsync(cancellationToken);
     }
 
@@ -554,7 +554,7 @@ public class FloodReceiverGrain : DurableGrain, IFloodReceiverGrain
         public async ValueTask HandleAsync(FloodMessage message, IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             _grain._receivedCount.Value++;
-            
+
             // Create a new list to avoid concurrent modification
             var currentSequences = _grain._receivedSequences.Value ?? new List<int>();
             var newSequences = new List<int>(currentSequences) { message.Sequence };

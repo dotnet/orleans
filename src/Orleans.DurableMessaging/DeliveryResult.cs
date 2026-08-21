@@ -45,10 +45,10 @@ public readonly struct DeliveryResult
     /// <summary>
     /// Creates a result indicating no handler was found for the route key.
     /// </summary>
-    public static DeliveryResult RouteNotFound(string routeKey) => new() 
-    { 
-        Status = DeliveryStatus.RouteNotFound, 
-        Message = $"No handler for route '{routeKey}'" 
+    public static DeliveryResult RouteNotFound(string routeKey) => new()
+    {
+        Status = DeliveryStatus.RouteNotFound,
+        Message = $"No handler for route '{routeKey}'"
     };
 
     /// <summary>
@@ -59,10 +59,10 @@ public readonly struct DeliveryResult
     /// <summary>
     /// Creates a result indicating the message was processed, optionally with a response.
     /// </summary>
-    public static DeliveryResult Processed(DurableEnvelope? response = null) => new() 
-    { 
-        Status = DeliveryStatus.Processed, 
-        Response = response 
+    public static DeliveryResult Processed(DurableEnvelope? response = null) => new()
+    {
+        Status = DeliveryStatus.Processed,
+        Response = response
     };
 
     /// <summary>

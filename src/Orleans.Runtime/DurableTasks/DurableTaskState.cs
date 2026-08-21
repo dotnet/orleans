@@ -41,7 +41,7 @@ public class DurableTaskState : IDurableTaskState
     public DateTimeOffset CreatedAt { get; set; }
 
     /// <inheritdoc cref="IDurableTaskState.CancellationRequestedAt"/>
-    [Id(5)] 
+    [Id(5)]
     public DateTimeOffset? CancellationRequestedAt { get; set; }
 
     IReadOnlySet<GrainId> IDurableTaskState.CompletionDestinations => CompletionDestinations;

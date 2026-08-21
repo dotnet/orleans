@@ -296,7 +296,7 @@ public class ArcBufferCodecTests
         var copier = _serviceProvider.GetService<IDeepCopier<ArcBuffer>>();
         Assert.NotNull(copier);
         Assert.IsAssignableFrom<IOptionalDeepCopier>(copier);
-        
+
         var optionalCopier = (IOptionalDeepCopier)copier;
         Assert.True(optionalCopier.IsShallowCopyable());
     }

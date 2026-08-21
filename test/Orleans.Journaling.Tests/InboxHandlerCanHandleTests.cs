@@ -51,7 +51,7 @@ public class InboxHandlerCanHandleTests
     {
         var expectedKey = global::Orleans.HierarchicalKey.Create("workflow-123");
         var handler = new CorrelationFilteringHandler(expectedKey);
-        
+
         var contextMatch = CreateMockContext(correlationKey: expectedKey);
         var contextNoMatch = CreateMockContext(correlationKey: global::Orleans.HierarchicalKey.Create("workflow-456"));
 
@@ -66,7 +66,7 @@ public class InboxHandlerCanHandleTests
     public void CustomHandler_CanHandle_FiltersBasedOnPrefix()
     {
         var handler = new PrefixFilteringHandler("rpc/");
-        
+
         var contextMatch1 = CreateMockContext(routeKey: "rpc/request");
         var contextMatch2 = CreateMockContext(routeKey: "rpc/reply");
         var contextNoMatch = CreateMockContext(routeKey: "job/execute");
@@ -83,7 +83,7 @@ public class InboxHandlerCanHandleTests
     public void TypedHandlerWithCustomCanHandle_FiltersMessages()
     {
         var handler = new SelectiveTypedHandler();
-        
+
         var contextMatch = CreateMockContext(routeKey: "payment/process");
         var contextNoMatch = CreateMockContext(routeKey: "order/process");
 
@@ -102,7 +102,7 @@ public class InboxHandlerCanHandleTests
         var senderId = GrainId.Create("test-sender", Guid.NewGuid().ToString("N"));
         var receiverId = GrainId.Create("test-receiver", Guid.NewGuid().ToString("N"));
         var correlationKey = global::Orleans.HierarchicalKey.Create("test/correlation");
-        
+
         var context = CreateMockContext(
             routeKey: "test-route",
             senderId: senderId,

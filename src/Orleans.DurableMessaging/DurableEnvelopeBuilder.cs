@@ -137,7 +137,7 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
     /// <code>
     /// // Parent request
     /// builder.WithCorrelationKey(HierarchicalKey.Create("transfer-123"));
-    /// 
+    ///
     /// // Child request
     /// var parentKey = HierarchicalKey.Create("transfer-123");
     /// builder.WithCorrelationKey(parentKey.CreateChildKey("debit"));
@@ -180,7 +180,7 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
     ///     .To(workerGrain, "process")
     ///     .WithReplyTo(context.GrainId)
     ///     .WithBody(request);
-    /// 
+    ///
     /// // Reply in handler
     /// if (context.Envelope.ReplyTo is { } replyTo)
     /// {
@@ -272,7 +272,7 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
         // Create the envelope data from the accumulated buffer
         var buffer = _buffer.Length > 0 ? _buffer.ConsumeSlice(_buffer.Length) : default;
         var data = new DurableEnvelopeData(SessionPool);
-        
+
         // Use reflection to set private fields
         BufferField.SetValue(data, buffer);
         BodySliceField.SetValue(data, _bodySlice);

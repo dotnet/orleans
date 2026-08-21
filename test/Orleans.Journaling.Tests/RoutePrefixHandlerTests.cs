@@ -82,13 +82,13 @@ public class RoutePrefixHandlerTests
     public void RoutePrefixHandler_CanHandle_PreventsPartialWordMatches()
     {
         var handler = new TestRoutePrefixHandler("order");
-        
+
         // Should match "order/process" (normalized to "order/")
         Assert.True(handler.CanHandle(CreateMockContext(routeKey: "order/process")));
-        
+
         // Should NOT match "order-archive/process" (boundary protection)
         Assert.False(handler.CanHandle(CreateMockContext(routeKey: "order-archive/process")));
-        
+
         // Should NOT match exact "order" without slash
         Assert.False(handler.CanHandle(CreateMockContext(routeKey: "order")));
     }
@@ -100,10 +100,10 @@ public class RoutePrefixHandlerTests
     public void RoutePrefixHandler_CanHandle_MatchesPrefixItself()
     {
         var handler = new TestRoutePrefixHandler("rpc/");
-        
+
         // Should match exactly "rpc/"
         Assert.True(handler.CanHandle(CreateMockContext(routeKey: "rpc/")));
-        
+
         // Should also match longer routes
         Assert.True(handler.CanHandle(CreateMockContext(routeKey: "rpc/request")));
     }
@@ -201,7 +201,7 @@ public class RoutePrefixHandlerTests
         var context = CreateMockContext(routeKey: "rpc/request");
 
         Assert.True(handler.CanHandle(context));
-        
+
         // Call HandleAsync through the interface
         await ((IInboxHandler)handler).HandleAsync(context, CancellationToken.None);
 
@@ -284,7 +284,7 @@ public class RoutePrefixHandlerTests
     public void RoutePrefixHandler_CanHandle_MatchesRoutesWithAdditionalSlashes()
     {
         var handler = new TestRoutePrefixHandler("workflow/");
-        
+
         Assert.True(handler.CanHandle(CreateMockContext(routeKey: "workflow/start")));
         Assert.True(handler.CanHandle(CreateMockContext(routeKey: "workflow/task/execute")));
         Assert.True(handler.CanHandle(CreateMockContext(routeKey: "workflow/task/complete/success")));
@@ -297,13 +297,13 @@ public class RoutePrefixHandlerTests
     public void RoutePrefixHandler_GetRouteSuffix_EnablesOperationBasedRouting()
     {
         var handler = new TestRoutePrefixHandler("rpc/");
-        
+
         var requestContext = CreateMockContext(routeKey: "rpc/request");
         var replyContext = CreateMockContext(routeKey: "rpc/reply");
-        
+
         Assert.Equal("request", handler.GetRouteSuffix(requestContext.Envelope.RouteKey));
         Assert.Equal("reply", handler.GetRouteSuffix(replyContext.Envelope.RouteKey));
-        
+
         // Handler can use suffix for switch/case routing
         Assert.True(handler.CanHandle(requestContext));
         Assert.True(handler.CanHandle(replyContext));

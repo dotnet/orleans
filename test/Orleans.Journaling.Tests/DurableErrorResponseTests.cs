@@ -42,7 +42,7 @@ public class DurableErrorResponseTests : IDisposable
     private DurableErrorResponse RoundTrip(DurableErrorResponse original)
     {
         var buffer = new ArrayBufferWriter<byte>();
-        
+
         using (var session = _sessionPool.GetSession())
         {
             var writer = Writer.Create(buffer, session);

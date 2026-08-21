@@ -186,7 +186,7 @@ internal interface IDbService
 #if false
 // Example: ETL - load data from one database and store it into another.
 // This example uses a fake Database API for simplicity.
-// 
+//
 internal class CopyProcessorGrain : Grain, ICopyProcessorGrain
 {
     private readonly IDbServiceFactory _dbServiceFactory;
@@ -360,7 +360,7 @@ public class SubscriptionGrain : Grain<SubscriptionGrainState>, ISubscriptionGra
             await this.AsReference<ISubscriptionGrainInternal>()
               .ProcessSubscription()
               // The semantics of this must be that it reschedules the task with the specified id, clearing its state
-              // Should there be an API to differentiate 
+              // Should there be an API to differentiate
               .ScheduleAsync(SubscriptionTaskName, State.NextBillingCycle);
         }
         catch

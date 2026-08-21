@@ -10,7 +10,7 @@ namespace Orleans.Journaling.Tests;
 
 /// <summary>
 /// End-to-end integration tests for the canonical bank transfer workflow using durable inbox/outbox.
-/// 
+///
 /// This test suite demonstrates the fundamental use case for durable messaging: reliable money transfers
 /// with exactly-once semantics. The workflow involves:
 /// 1. TransferGrain initiates transfer and sends debit request to source account
@@ -18,7 +18,7 @@ namespace Orleans.Journaling.Tests;
 /// 3. TransferGrain sends credit request to destination account
 /// 4. AccountGrain processes credit and confirms to TransferGrain
 /// 5. TransferGrain marks transfer as complete
-/// 
+///
 /// The tests verify:
 /// - Exactly-once debit/credit via deduplication
 /// - Atomic persistence of transfer state
@@ -92,7 +92,7 @@ public class BankTransferWorkflowTests : IClassFixture<BankTransferWorkflowTests
         // Act - Initiate same transfer twice (simulates duplicate message)
         var transferId = Guid.NewGuid();
         await transferGrain.InitiateTransfer(transferId, sourceAccount.GetGrainId(), destinationAccount.GetGrainId(), 100m);
-        
+
         // Wait for first processing
         await TestHelpers.WaitUntilAsync(
             async () => await transferGrain.GetStatus() == TransferStatus.Completed,
@@ -259,7 +259,7 @@ public class BankTransferWorkflowTests : IClassFixture<BankTransferWorkflowTests
         await TestHelpers.WaitUntilAsync(
             async () => await transferGrain.GetStatus() != TransferStatus.Pending,
             message: "Transfer did not start processing");
-            
+
         // Deactivate all grains to force state reload
         await sourceAccount.Cast<IGrainManagementExtension>().DeactivateOnIdle();
         await destinationAccount.Cast<IGrainManagementExtension>().DeactivateOnIdle();
@@ -613,7 +613,7 @@ public class AccountGrain : DurableGrain, IAccountGrain
 /// 3. Send credit request to destination account
 /// 4. Wait for credit confirmation
 /// 5. Mark transfer as complete
-/// 
+///
 /// Uses inbox/outbox for reliable message delivery and deduplication.
 /// </summary>
 [GrainType("BankTransfer.TransferGrain")]

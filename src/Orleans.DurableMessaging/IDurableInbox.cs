@@ -63,8 +63,8 @@ public interface IDurableInbox
     /// <param name="handler">The handler implementation.</param>
     /// <remarks>
     /// <para>
-    /// This is the recommended registration method. Handlers are stored in a list and 
-    /// evaluated in registration order. The first handler whose CanHandle method returns 
+    /// This is the recommended registration method. Handlers are stored in a list and
+    /// evaluated in registration order. The first handler whose CanHandle method returns
     /// true will process the message.
     /// </para>
     /// <para>
@@ -100,8 +100,8 @@ public interface IDurableInbox
     /// <param name="handler">The handler implementation.</param>
     /// <remarks>
     /// <para>
-    /// This method is legacy and will be marked obsolete in a future release. 
-    /// Use RegisterHandler(IInboxHandler) instead and implement a handler with CanHandle logic, 
+    /// This method is legacy and will be marked obsolete in a future release.
+    /// Use RegisterHandler(IInboxHandler) instead and implement a handler with CanHandle logic,
     /// or use RouteKeyHandler as a base class for exact route matching.
     /// </para>
     /// <para>
