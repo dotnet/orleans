@@ -56,7 +56,7 @@ internal class RabbitMQConsumer
     private readonly ILogger<RabbitMQConsumer> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly QueueId _queueId;
-    
+
     private readonly RabbitMQQueueProvider _rabbitMqQueueProvider;
 
     private readonly Serializer<RabbitMqBatchContainer> _serializer;
