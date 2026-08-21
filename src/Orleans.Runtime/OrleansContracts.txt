@@ -18,6 +18,8 @@ class [GrainType("clustermanifestsystemtarget")] Orleans.Runtime.ClusterManifest
 
 class [GrainType("deploymentloadpublisher")] Orleans.Runtime.DeploymentLoadPublisher
 
+class [GrainType("dissemination")] Orleans.Runtime.Dissemination.DisseminationSystemTarget
+
 class [GrainType("developmentleaseprovider")] Orleans.Runtime.Development.DevelopmentLeaseProviderGrain
 
 interface [GrainInterfaceType("Orleans.Runtime.Development.IDevelopmentLeaseProviderGrain")] Orleans.Runtime.Development.IDevelopmentLeaseProviderGrain [Version(0)]

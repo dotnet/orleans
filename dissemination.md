@@ -765,8 +765,8 @@ Compatibility:
 Suggested commands:
 
 ```powershell
-dotnet test .\test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj --framework net8.0 --filter "Category=Dissemination" -- -parallel none -noshadow
-dotnet test .\test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj --framework net10.0 --filter "Category=Dissemination" -- -parallel none -noshadow
+dotnet test --project test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj --framework net8.0 --filter-trait "Category=Dissemination" --minimum-expected-tests 1 --max-parallel-test-modules 1
+dotnet test --project test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj --framework net10.0 --filter-trait "Category=Dissemination" --minimum-expected-tests 1 --max-parallel-test-modules 1
 dotnet build .\Orleans.slnx -bl
 ```
 
