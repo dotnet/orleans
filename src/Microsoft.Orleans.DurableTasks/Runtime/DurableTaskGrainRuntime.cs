@@ -1225,6 +1225,13 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         if (_storage.TryGetTask(taskId, out var taskState))
         {
+            if (_pendingHandleResponses.ContainsKey(taskId))
+            {
+                handle = new TaskHandle(taskId, this, taskState.RemoteTarget);
+                _taskHandles.Add(taskId, handle);
+                return true;
+            }
+
             // Rehydrate the task handle.
             if (taskState.Result is { } response)
             {

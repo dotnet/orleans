@@ -297,7 +297,6 @@ public sealed class DurableTaskRuntimeInvariantTests
         var target = GrainId.Create("target", "one");
         var state = storage.GetOrCreate(taskId);
         storage.SetRemoteRequest(taskId, state, target, "fingerprint");
-        var handle = runtime.GetScheduledTaskHandle(taskId);
 
         await runtime.AcceptResponseAsync(
             taskId,
@@ -305,6 +304,7 @@ public sealed class DurableTaskRuntimeInvariantTests
             target,
             default,
             persist: false);
+        var handle = runtime.GetScheduledTaskHandle(taskId);
         await manager.RevertPendingChangesAsync(default);
 
         Assert.False((await handle.PollAsync(new PollingOptions { PollTimeout = TimeSpan.Zero }, default)).IsCompleted);
