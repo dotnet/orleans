@@ -317,6 +317,10 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
 
         _committingMessageIds.Clear();
+        if (_pendingMessageIds.Count > 0 && !_jobScheduleConfirmed)
+        {
+            QueueEnsureJobScheduled(replaceExisting: false);
+        }
     }
 
     public void OnRecoveryCompleted()
@@ -649,7 +653,9 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                 try
                 {
                     if (Count - _pendingMessageIds.Count <= 0
-                        || (!replaceExisting && !string.IsNullOrEmpty(_jobId.Value)))
+                        || (!replaceExisting
+                            && !string.IsNullOrEmpty(_jobId.Value)
+                            && _jobScheduleConfirmed))
                     {
                         return;
                     }

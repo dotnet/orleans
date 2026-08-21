@@ -37,6 +37,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     private readonly ConcurrentDictionary<TaskId, IDurableTaskRequest> _committingStarts = [];
     private readonly ConcurrentDictionary<TaskId, DurableTaskResponse> _pendingHandleResponses = [];
     private readonly ConcurrentDictionary<TaskId, DurableTaskResponse> _committingHandleResponses = [];
+    private readonly ConcurrentDictionary<string, byte> _missingTaskStateRetries = [];
     private readonly ConcurrentDictionary<(TaskId TaskId, GrainId Target), byte> _preStagedCancellations = [];
     private readonly ConcurrentDictionary<long, Task> _backgroundTasks = [];
     private readonly Dictionary<TaskId, (List<GrainDurableExecutionContext> Contexts, List<IScheduledTaskHandle> Handles)> _inboxCancellationPropagations = [];
@@ -69,6 +70,12 @@ internal sealed partial class DurableTaskGrainRuntime(
         var fingerprint = GetCompletionDecisionFingerprint(candidates);
         if (_storage.TryGetTask(decisionId, out var decision))
         {
+            if (decision.TombstonedAt.HasValue)
+            {
+                throw new InvalidOperationException(
+                    $"Durable completion decision '{decisionId}' completed and its retained result has expired.");
+            }
+
             if (decision.Request is not null
                 || !decision.RemoteTarget.IsDefault
                 || decision.RemoteRequestFingerprint is not null
@@ -344,11 +351,17 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         if (!_storage.TryGetTask(taskId, out var state))
         {
-            return _stateManager.PendingWriteByteCount > 0
-                ? DurableJobRunResult.RescheduleAt(UtcNow + TimeSpan.FromMilliseconds(10))
-                : DurableJobRunResult.Completed;
+            if (_stateManager.PendingWriteByteCount == 0
+                || !_missingTaskStateRetries.TryAdd(context.Job.Id, 0))
+            {
+                _missingTaskStateRetries.TryRemove(context.Job.Id, out _);
+                return DurableJobRunResult.Completed;
+            }
+
+            return DurableJobRunResult.RescheduleAt(UtcNow + TimeSpan.FromMilliseconds(10));
         }
 
+        _missingTaskStateRetries.TryRemove(context.Job.Id, out _);
         if (state.Result is { IsCompleted: true })
         {
             return DurableJobRunResult.Completed;
