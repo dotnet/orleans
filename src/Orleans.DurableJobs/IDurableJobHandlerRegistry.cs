@@ -30,9 +30,10 @@ public interface IDurableJobHandlerRegistry
 /// Handles a framework-owned durable job for a grain activation.
 /// </summary>
 /// <remarks>
-/// Delivery is at least once. Duplicate deliveries of the same job attempt are suppressed by the receiving
-/// activation for the configured completed-attempt retention period, subject to its bounded cache.
-/// Application-specific durable state provides deduplication across activation failure or migration.
+/// Delivery is at least once. The receiving activation identifies an attempt by job ID, execution generation,
+/// and dequeue count, suppressing duplicate deliveries for the configured completed-attempt retention period,
+/// subject to its bounded cache. Application-specific durable state provides deduplication across activation
+/// failure or migration.
 /// </remarks>
 public interface IDurableJobFeatureHandler
 {
