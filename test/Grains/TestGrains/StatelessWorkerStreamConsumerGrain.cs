@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Linq;
 using Orleans.Concurrency;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;

@@ -152,7 +152,7 @@ namespace UnitTests.StreamingTests
                 new HashRingStreamQueueMapperOptions { TotalQueueCount = PartitionCount },
                 StreamProvider);
             var result = new Dictionary<QueueId, Guid>();
-            while (result.Count < PartitionCount)
+            for (var attempt = 0; attempt < 1_000 && result.Count < PartitionCount; attempt++)
             {
                 var streamId = Guid.NewGuid();
                 var queueId = mapper.GetQueueForStream(
@@ -160,6 +160,7 @@ namespace UnitTests.StreamingTests
                 result.TryAdd(queueId, streamId);
             }
 
+            Assert.Equal(PartitionCount, result.Count);
             return result.Values.ToArray();
         }
     }
