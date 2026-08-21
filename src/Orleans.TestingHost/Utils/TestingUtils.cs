@@ -79,11 +79,19 @@ namespace Orleans.TestingHost.Utils
         /// <returns>A task representing the operation.</returns>
         /// <exception cref="TimeoutException">The predicate did not succeed before the timeout elapsed.</exception>
         public static Task WaitUntilAsync(Func<bool,Task<bool>> predicate, TimeSpan timeout, TimeSpan? delayOnFail = null)
+            => WaitUntilAsync(predicate, timeout, delayOnFail, TimeProvider.System);
+
+        internal static Task WaitUntilAsync(
+            Func<bool, Task<bool>> predicate,
+            TimeSpan timeout,
+            TimeSpan? delayOnFail,
+            TimeProvider timeProvider)
         {
             ArgumentNullException.ThrowIfNull(predicate);
+            ArgumentNullException.ThrowIfNull(timeProvider);
 
             var predicateName = $"{predicate.Method.DeclaringType?.FullName ?? "<unknown>"}.{predicate.Method.Name}";
-            return WaitUntilAsync((lastTry, _) => predicate(lastTry), timeout, delayOnFail, default, predicateName);
+            return WaitUntilAsync((lastTry, _) => predicate(lastTry), timeout, delayOnFail, default, timeProvider, predicateName);
         }
 
         /// <summary>Run the predicate until it succeeds or times out.</summary>
@@ -97,16 +105,32 @@ namespace Orleans.TestingHost.Utils
         /// <param name="predicateExpression">The expression supplied for <paramref name="predicate"/>.</param>
         /// <returns>A task representing the operation.</returns>
         /// <exception cref="TimeoutException">The predicate did not succeed before the timeout elapsed.</exception>
-        public static async Task WaitUntilAsync(
+        public static Task WaitUntilAsync(
             Func<bool, CancellationToken, Task<bool>> predicate,
             TimeSpan timeout,
             TimeSpan? delayOnFail = null,
             CancellationToken cancellationToken = default,
             [CallerArgumentExpression(nameof(predicate))] string? predicateExpression = null)
+            => WaitUntilAsync(predicate, timeout, delayOnFail, cancellationToken, TimeProvider.System, predicateExpression);
+
+        internal static async Task WaitUntilAsync(
+            Func<bool, CancellationToken, Task<bool>> predicate,
+            TimeSpan timeout,
+            TimeSpan? delayOnFail,
+            CancellationToken cancellationToken,
+            TimeProvider timeProvider,
+            [CallerArgumentExpression(nameof(predicate))] string? predicateExpression = null)
         {
             ArgumentNullException.ThrowIfNull(predicate);
+            ArgumentNullException.ThrowIfNull(timeProvider);
 
-            if (!await WaitUntilSucceededAsync(predicate, timeout, delayOnFail, cancellationToken, invokeFinalAttempt: true))
+            if (!await WaitUntilSucceededAsync(
+                predicate,
+                timeout,
+                delayOnFail,
+                cancellationToken,
+                invokeFinalAttempt: true,
+                timeProvider))
             {
                 throw new TimeoutException(
                     $"The condition evaluated by '{predicateExpression ?? "<unknown>"}' was not satisfied within {timeout} "
@@ -128,7 +152,25 @@ namespace Orleans.TestingHost.Utils
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(predicate);
-            return await WaitUntilSucceededAsync((_, token) => predicate(token), timeout, delayOnFail, cancellationToken, invokeFinalAttempt: false);
+            return await WaitUntilSucceededAsync(predicate, timeout, delayOnFail, cancellationToken, TimeProvider.System);
+        }
+
+        internal static async Task<bool> WaitUntilSucceededAsync(
+            Func<CancellationToken, Task<bool>> predicate,
+            TimeSpan timeout,
+            TimeSpan? delayOnFail,
+            CancellationToken cancellationToken,
+            TimeProvider timeProvider)
+        {
+            ArgumentNullException.ThrowIfNull(predicate);
+            ArgumentNullException.ThrowIfNull(timeProvider);
+            return await WaitUntilSucceededAsync(
+                (_, token) => predicate(token),
+                timeout,
+                delayOnFail,
+                cancellationToken,
+                invokeFinalAttempt: false,
+                timeProvider);
         }
 
         private static async Task<bool> WaitUntilSucceededAsync(
@@ -136,7 +178,8 @@ namespace Orleans.TestingHost.Utils
             TimeSpan timeout,
             TimeSpan? delayOnFail,
             CancellationToken cancellationToken,
-            bool invokeFinalAttempt)
+            bool invokeFinalAttempt,
+            TimeProvider timeProvider)
         {
             ArgumentNullException.ThrowIfNull(predicate);
             ArgumentOutOfRangeException.ThrowIfLessThan(timeout, TimeSpan.Zero);
@@ -145,15 +188,15 @@ namespace Orleans.TestingHost.Utils
             ArgumentOutOfRangeException.ThrowIfLessThan(retryDelay, TimeSpan.Zero);
 
             cancellationToken.ThrowIfCancellationRequested();
-            var startedAt = Stopwatch.GetTimestamp();
-            using var deadlineCancellation = new CancellationTokenSource(timeout);
+            var startedAt = timeProvider.GetTimestamp();
+            using var deadlineCancellation = new CancellationTokenSource(timeout, timeProvider);
             using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadlineCancellation.Token);
             var finalAttempt = false;
             var finalAttemptWindow = retryDelay > TimeSpan.Zero ? retryDelay : TimeSpan.FromMilliseconds(10);
 
-            while (Stopwatch.GetElapsedTime(startedAt) < timeout)
+            while (timeProvider.GetElapsedTime(startedAt) < timeout)
             {
-                if (deadlineCancellation.IsCancellationRequested || Stopwatch.GetElapsedTime(startedAt) >= timeout)
+                if (deadlineCancellation.IsCancellationRequested || timeProvider.GetElapsedTime(startedAt) >= timeout)
                 {
                     return false;
                 }
@@ -169,7 +212,7 @@ namespace Orleans.TestingHost.Utils
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
-                var elapsed = Stopwatch.GetElapsedTime(startedAt);
+                var elapsed = timeProvider.GetElapsedTime(startedAt);
                 if (elapsed >= timeout)
                 {
                     return false;
@@ -185,7 +228,7 @@ namespace Orleans.TestingHost.Utils
                 {
                     try
                     {
-                        await Task.Delay(remaining, linkedCancellation.Token);
+                        await Task.Delay(remaining, timeProvider, linkedCancellation.Token);
                     }
                     catch (OperationCanceledException) when (deadlineCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
                     {
@@ -213,7 +256,7 @@ namespace Orleans.TestingHost.Utils
 
                 try
                 {
-                    await Task.Delay(delay, linkedCancellation.Token);
+                    await Task.Delay(delay, timeProvider, linkedCancellation.Token);
                 }
                 catch (OperationCanceledException) when (deadlineCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
                 {

@@ -28,5 +28,6 @@
     <InternalsVisibleTo Include="Orleans.Persistence.Firestore.Tests" />
     <InternalsVisibleTo Include="Orleans.Streaming.Tests" />
     <InternalsVisibleTo Include="Orleans.Streaming.Kinesis.Tests" />
+    <InternalsVisibleTo Include="Orleans.TestingHost.Tests" />
   </ItemGroup>
 </Project>
