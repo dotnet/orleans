@@ -304,7 +304,6 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
             }
         }
     }
-
     /// <summary>
     /// Returns <value>true</value> if this key is an ancestor (parent or earlier) of the provided key, <value>false</value> otherwise.
     /// </summary>
@@ -615,4 +614,3 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
         }
     }
 }
-
