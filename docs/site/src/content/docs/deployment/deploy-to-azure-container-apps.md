@@ -7,7 +7,7 @@ ms.topic: concept-article
 
 # Host Orleans on Azure Container Apps
 
-Azure Container Apps hosts Orleans using a topology which preserves Orleans endpoint semantics. Orleans silos connect to the unique silo and gateway endpoint that each member advertises. Container Apps service discovery and TCP or HTTP ingress address a **container app or revision** and load-balance across its replicas. The maintained production topology therefore assigns each silo its own Container App and one replica.
+Azure Container Apps hosts Orleans using a topology that preserves Orleans endpoint semantics. Orleans silos connect to the unique silo and gateway endpoint that each member advertises. Container Apps service discovery and TCP or HTTP ingress address a **container app or revision** and load-balance across its replicas. The maintained production topology therefore assigns each silo its own Container App and one replica.
 
 Use a virtual-network-integrated internal environment and its private static IP. Deploy each silo as a separate Container App with exactly one replica and assign each app a unique pair of TCP ingress ports on that private IP. Repeat that resource to add silos, then complete the production acceptance tests on this page. Multiple silo replicas in one Container App fall outside this maintained deployment shape because Container Apps publishes app and revision endpoints instead of a supported per-replica endpoint identity.
 
