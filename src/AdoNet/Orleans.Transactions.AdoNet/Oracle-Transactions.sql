@@ -14,7 +14,7 @@ CREATE TABLE OrleansTransactionStateTable (
   SequenceId NUMBER(19) NOT NULL,
   ETag VARCHAR2(36) NOT NULL,
   TransactionId VARCHAR2(36) NOT NULL,
-  TransactionTimestamp TIMESTAMP NOT NULL,
+  TransactionTimestampTicks NUMBER(19) NOT NULL,
   TransactionManager BLOB NOT NULL,
   StateData BLOB NULL,
   Timestamp TIMESTAMP (6) DEFAULT sys_extract_utc(systimestamp) NOT NULL ENABLE,

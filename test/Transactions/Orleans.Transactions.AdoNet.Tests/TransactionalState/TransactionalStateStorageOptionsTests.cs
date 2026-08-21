@@ -125,7 +125,7 @@ public sealed class TransactionalStateStorageOptionsTests
         var sql = opts.ExecuteSqlDictionary[Constants.QueryKeySql];
 
         Assert.Equal(
-            "SELECT StateId,CommittedSequenceId,Metadata,ETag FROM OrleansTransactionKeyTable WHERE StateId=@StateId;",
+            "SELECT StateId,CommittedSequenceId,Metadata,ETag FROM OrleansTransactionKeyTable WHERE StateId=@StateId",
             sql);
     }
 
@@ -136,7 +136,7 @@ public sealed class TransactionalStateStorageOptionsTests
         var sql = opts.ExecuteSqlDictionary[Constants.AddKeySql];
 
         Assert.Equal(
-            "INSERT INTO OrleansTransactionKeyTable (StateId,CommittedSequenceId,Metadata,Timestamp,ETag) VALUES (@StateId,@CommittedSequenceId,@Metadata,@Timestamp,@ETag);",
+            "INSERT INTO OrleansTransactionKeyTable (StateId,CommittedSequenceId,Metadata,Timestamp,ETag) VALUES (@StateId,@CommittedSequenceId,@Metadata,@Timestamp,@ETag)",
             sql);
     }
 
@@ -147,7 +147,7 @@ public sealed class TransactionalStateStorageOptionsTests
         var sql = opts.ExecuteSqlDictionary[Constants.UpdateKeySql];
 
         Assert.Equal(
-            "UPDATE OrleansTransactionKeyTable SET CommittedSequenceId=@CommittedSequenceId,Metadata=@Metadata,Timestamp=@Timestamp,ETag=@ETag WHERE StateId=@StateId AND ETag=@PreviousETag;",
+            "UPDATE OrleansTransactionKeyTable SET CommittedSequenceId=@CommittedSequenceId,Metadata=@Metadata,Timestamp=@Timestamp,ETag=@ETag WHERE StateId=@StateId AND ETag=@PreviousETag",
             sql);
     }
 
@@ -158,7 +158,7 @@ public sealed class TransactionalStateStorageOptionsTests
         var sql = opts.ExecuteSqlDictionary[Constants.DelKeySql];
 
         Assert.Equal(
-            "DELETE FROM OrleansTransactionKeyTable WHERE StateId=@StateId AND ETag=@ETag;",
+            "DELETE FROM OrleansTransactionKeyTable WHERE StateId=@StateId AND ETag=@ETag",
             sql);
     }
 
@@ -169,7 +169,7 @@ public sealed class TransactionalStateStorageOptionsTests
         var sql = opts.ExecuteSqlDictionary[Constants.QueryStateSql];
 
         Assert.Equal(
-            "SELECT StateId,SequenceId,TransactionId,TransactionTimestamp,TransactionManager,StateData,ETag FROM OrleansTransactionStateTable WHERE StateId=@StateId ORDER BY SequenceId ASC;",
+            "SELECT StateId,SequenceId,TransactionId,TransactionTimestampTicks,TransactionManager,StateData,ETag FROM OrleansTransactionStateTable WHERE StateId=@StateId ORDER BY SequenceId ASC",
             sql);
     }
 
@@ -180,7 +180,7 @@ public sealed class TransactionalStateStorageOptionsTests
         var sql = opts.ExecuteSqlDictionary[Constants.AddStateSql];
 
         Assert.Equal(
-            "INSERT INTO OrleansTransactionStateTable (StateId,SequenceId,TransactionId,TransactionTimestamp,TransactionManager,StateData,ETag,Timestamp) VALUES (@StateId,@SequenceId,@TransactionId,@TransactionTimestamp,@TransactionManager,@StateData,@ETag,@Timestamp);",
+            "INSERT INTO OrleansTransactionStateTable (StateId,SequenceId,TransactionId,TransactionTimestampTicks,TransactionManager,StateData,ETag,Timestamp) VALUES (@StateId,@SequenceId,@TransactionId,@TransactionTimestampTicks,@TransactionManager,@StateData,@ETag,@Timestamp)",
             sql);
     }
 
@@ -191,7 +191,7 @@ public sealed class TransactionalStateStorageOptionsTests
         var sql = opts.ExecuteSqlDictionary[Constants.UpdateStateSql];
 
         Assert.Equal(
-            "UPDATE OrleansTransactionStateTable SET TransactionId=@TransactionId,TransactionTimestamp=@TransactionTimestamp,TransactionManager=@TransactionManager,StateData=@StateData,Timestamp=@Timestamp,ETag=@ETag WHERE StateId=@StateId AND SequenceId=@SequenceId;",
+            "UPDATE OrleansTransactionStateTable SET TransactionId=@TransactionId,TransactionTimestampTicks=@TransactionTimestampTicks,TransactionManager=@TransactionManager,StateData=@StateData,Timestamp=@Timestamp,ETag=@ETag WHERE StateId=@StateId AND SequenceId=@SequenceId",
             sql);
     }
 
@@ -202,7 +202,7 @@ public sealed class TransactionalStateStorageOptionsTests
         var sql = opts.ExecuteSqlDictionary[Constants.DelStateSql];
 
         Assert.Equal(
-            "DELETE FROM OrleansTransactionStateTable WHERE StateId=@StateId AND SequenceId=@SequenceId AND ETag=@ETag;",
+            "DELETE FROM OrleansTransactionStateTable WHERE StateId=@StateId AND SequenceId=@SequenceId AND ETag=@ETag",
             sql);
     }
 
@@ -240,7 +240,7 @@ public sealed class TransactionalStateStorageOptionsTests
         var sql = opts.ExecuteSqlDictionary[Constants.QueryKeySql];
 
         Assert.Equal(
-            "SELECT StateId,CommittedSequenceId,Metadata,ETag FROM OrleansTransactionKeyTable WHERE StateId=:StateId;",
+            "SELECT StateId,CommittedSequenceId,Metadata,ETag FROM OrleansTransactionKeyTable WHERE StateId=:StateId",
             sql);
         Assert.DoesNotContain("@", sql);
     }
@@ -252,7 +252,7 @@ public sealed class TransactionalStateStorageOptionsTests
         var sql = opts.ExecuteSqlDictionary[Constants.AddKeySql];
 
         Assert.Equal(
-            "INSERT INTO OrleansTransactionKeyTable (StateId,CommittedSequenceId,Metadata,Timestamp,ETag) VALUES (:StateId,:CommittedSequenceId,:Metadata,:Timestamp,:ETag);",
+            "INSERT INTO OrleansTransactionKeyTable (StateId,CommittedSequenceId,Metadata,Timestamp,ETag) VALUES (:StateId,:CommittedSequenceId,:Metadata,:Timestamp,:ETag)",
             sql);
     }
 
@@ -263,7 +263,7 @@ public sealed class TransactionalStateStorageOptionsTests
         var sql = opts.ExecuteSqlDictionary[Constants.UpdateKeySql];
 
         Assert.Equal(
-            "UPDATE OrleansTransactionKeyTable SET CommittedSequenceId=:CommittedSequenceId,Metadata=:Metadata,Timestamp=:Timestamp,ETag=:ETag WHERE StateId=:StateId AND ETag=:PreviousETag;",
+            "UPDATE OrleansTransactionKeyTable SET CommittedSequenceId=:CommittedSequenceId,Metadata=:Metadata,Timestamp=:Timestamp,ETag=:ETag WHERE StateId=:StateId AND ETag=:PreviousETag",
             sql);
     }
 
@@ -274,7 +274,7 @@ public sealed class TransactionalStateStorageOptionsTests
         var sql = opts.ExecuteSqlDictionary[Constants.DelKeySql];
 
         Assert.Equal(
-            "DELETE FROM OrleansTransactionKeyTable WHERE StateId=:StateId AND ETag=:ETag;",
+            "DELETE FROM OrleansTransactionKeyTable WHERE StateId=:StateId AND ETag=:ETag",
             sql);
     }
 
@@ -285,7 +285,7 @@ public sealed class TransactionalStateStorageOptionsTests
         var sql = opts.ExecuteSqlDictionary[Constants.AddStateSql];
 
         Assert.Equal(
-            "INSERT INTO OrleansTransactionStateTable (StateId,SequenceId,TransactionId,TransactionTimestamp,TransactionManager,StateData,ETag,Timestamp) VALUES (:StateId,:SequenceId,:TransactionId,:TransactionTimestamp,:TransactionManager,:StateData,:ETag,:Timestamp);",
+            "INSERT INTO OrleansTransactionStateTable (StateId,SequenceId,TransactionId,TransactionTimestampTicks,TransactionManager,StateData,ETag,Timestamp) VALUES (:StateId,:SequenceId,:TransactionId,:TransactionTimestampTicks,:TransactionManager,:StateData,:ETag,:Timestamp)",
             sql);
     }
 
@@ -296,7 +296,7 @@ public sealed class TransactionalStateStorageOptionsTests
         var sql = opts.ExecuteSqlDictionary[Constants.UpdateStateSql];
 
         Assert.Equal(
-            "UPDATE OrleansTransactionStateTable SET TransactionId=:TransactionId,TransactionTimestamp=:TransactionTimestamp,TransactionManager=:TransactionManager,StateData=:StateData,Timestamp=:Timestamp,ETag=:ETag WHERE StateId=:StateId AND SequenceId=:SequenceId;",
+            "UPDATE OrleansTransactionStateTable SET TransactionId=:TransactionId,TransactionTimestampTicks=:TransactionTimestampTicks,TransactionManager=:TransactionManager,StateData=:StateData,Timestamp=:Timestamp,ETag=:ETag WHERE StateId=:StateId AND SequenceId=:SequenceId",
             sql);
     }
 
@@ -307,7 +307,7 @@ public sealed class TransactionalStateStorageOptionsTests
         var sql = opts.ExecuteSqlDictionary[Constants.DelStateSql];
 
         Assert.Equal(
-            "DELETE FROM OrleansTransactionStateTable WHERE StateId=:StateId AND SequenceId=:SequenceId AND ETag=:ETag;",
+            "DELETE FROM OrleansTransactionStateTable WHERE StateId=:StateId AND SequenceId=:SequenceId AND ETag=:ETag",
             sql);
     }
 
@@ -318,7 +318,7 @@ public sealed class TransactionalStateStorageOptionsTests
         var sql = opts.ExecuteSqlDictionary[Constants.QueryStateSql];
 
         Assert.Equal(
-            "SELECT StateId,SequenceId,TransactionId,TransactionTimestamp,TransactionManager,StateData,ETag FROM OrleansTransactionStateTable WHERE StateId=:StateId ORDER BY SequenceId ASC;",
+            "SELECT StateId,SequenceId,TransactionId,TransactionTimestampTicks,TransactionManager,StateData,ETag FROM OrleansTransactionStateTable WHERE StateId=:StateId ORDER BY SequenceId ASC",
             sql);
         Assert.DoesNotContain("@", sql);
     }

@@ -14,7 +14,7 @@ CREATE TABLE OrleansTransactionStateTable  (
   SequenceId bigint(20) NOT NULL,
   ETag varchar(36)  NOT NULL,
   TransactionId varchar(36) NOT NULL,
-  TransactionTimestamp DATETIME NOT NULL,
+  TransactionTimestampTicks BIGINT NOT NULL,
   TransactionManager LONGBLOB NOT NULL,
   StateData LONGBLOB NULL,
   Timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
