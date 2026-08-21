@@ -82,6 +82,7 @@ internal sealed class DurableTaskMessageHandler(
                     cancellation.TaskId,
                     context.Envelope.SenderId,
                     cancellationToken);
+                runtime.CompleteInboxCancellationHandling(cancellation.TaskId);
                 break;
             default:
                 throw new InvalidOperationException($"Unsupported durable task route '{context.Envelope.RouteKey}'.");

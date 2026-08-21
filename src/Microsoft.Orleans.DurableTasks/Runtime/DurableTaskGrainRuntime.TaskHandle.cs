@@ -17,6 +17,7 @@ internal sealed partial class DurableTaskGrainRuntime
     {
         private readonly TaskCompletionSource<DurableTaskResponse> _responseTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly GrainId _remoteTarget = remoteTarget;
+        private int _isRunning;
 
         public Task<DurableTaskResponse> ResponseTask => _responseTcs.Task;
 
@@ -25,7 +26,11 @@ internal sealed partial class DurableTaskGrainRuntime
 
         // If this is false, the task was rehydrated from storage but has not started running yet.
         // This will happen if the task is non-serializable, like a local method invocation.
-        public bool IsRunning { get; set; }
+        public bool IsRunning
+        {
+            get => Volatile.Read(ref _isRunning) != 0;
+            set => Volatile.Write(ref _isRunning, value ? 1 : 0);
+        }
 
         public async ValueTask CancelAsync(CancellationToken cancellationToken)
         {
