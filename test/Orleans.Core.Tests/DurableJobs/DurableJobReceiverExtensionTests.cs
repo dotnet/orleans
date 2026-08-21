@@ -235,7 +235,7 @@ public class DurableJobReceiverExtensionTests
     }
 
     [Fact]
-    public async Task HandleDurableJobAsync_FeaturePollAfterReinvokesAfterDelayWithoutConcurrentDuplicates()
+    public async Task HandleDurableJobAsync_FeatureInProgressReinvokesAfterDelayWithoutConcurrentDuplicates()
     {
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         var secondInvocationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -256,8 +256,8 @@ public class DurableJobReceiverExtensionTests
         var first = await extension.HandleDurableJobAsync(context, CancellationToken.None);
         var duplicateBeforeDue = await extension.HandleDurableJobAsync(context, CancellationToken.None);
 
-        Assert.Equal(DurableJobRunStatus.PollAfter, first.Status);
-        Assert.Equal(DurableJobRunStatus.PollAfter, duplicateBeforeDue.Status);
+        Assert.Equal(DurableJobRunStatus.InProgress, first.Status);
+        Assert.Equal(DurableJobRunStatus.InProgress, duplicateBeforeDue.Status);
         Assert.Equal(1, Volatile.Read(ref invocationCount));
 
         timeProvider.Advance(TimeSpan.FromSeconds(5));
@@ -265,7 +265,7 @@ public class DurableJobReceiverExtensionTests
         await secondInvocationStarted.Task;
         var concurrentDuplicate = await extension.HandleDurableJobAsync(context, CancellationToken.None);
 
-        Assert.True(concurrentDuplicate.IsPending);
+        Assert.True(concurrentDuplicate.IsInProgress);
         Assert.Equal(2, Volatile.Read(ref invocationCount));
 
         releaseSecondInvocation.SetResult();
@@ -276,7 +276,7 @@ public class DurableJobReceiverExtensionTests
         {
             if (Interlocked.Increment(ref invocationCount) == 1)
             {
-                return DurableJobRunResult.PollAfter(TimeSpan.FromSeconds(5));
+                return DurableJobRunResult.InProgress(TimeSpan.FromSeconds(5));
             }
 
             secondInvocationStarted.SetResult();
