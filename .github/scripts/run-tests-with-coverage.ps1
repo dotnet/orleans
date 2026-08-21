@@ -26,7 +26,11 @@ $maximumXmlBytes = 100MB
 function Read-XmlDocument {
     param([string] $Path)
 
-    $file = Get-Item -LiteralPath $Path
+    $file = Get-Item -LiteralPath $Path -Force
+    $linkType = $file.PSObject.Properties['LinkType']
+    if (($linkType -and $linkType.Value) -or ($file.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw "$Path must not be a symbolic link"
+    }
     if ($file.Length -gt $maximumXmlBytes) {
         throw "$Path exceeds the 100 MB parsing limit"
     }
@@ -39,7 +43,11 @@ function Read-XmlDocument {
     try {
         $document = [Xml.XmlDocument]::new()
         $document.XmlResolver = $null
-        $document.Load($reader)
+        try {
+            $document.Load($reader)
+        } catch [Xml.XmlException] {
+            throw "$Path contains invalid XML: $($_.Exception.Message)"
+        }
         return $document
     } finally {
         $reader.Dispose()
