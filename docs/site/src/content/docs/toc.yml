@@ -94,7 +94,7 @@ items:
             href: grains/event-sourcing/log-consistency-providers.md
           - name: Replicated instances
             href: grains/event-sourcing/replicated-instances.md
-      - name: Journaled state (experimental)
+      - name: Journaling (experimental)
         items:
           - name: Overview
             href: grains/journaling/index.md
