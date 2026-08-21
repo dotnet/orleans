@@ -146,7 +146,7 @@ namespace Orleans.AdvancedReminders
     {
         [System.Obsolete("Implement and use StartAsync instead")]
         System.Threading.Tasks.Task Init();
-        System.Threading.Tasks.Task<ReminderEntry> ReadRow(Orleans.Runtime.GrainId grainId, string reminderName);
+        System.Threading.Tasks.Task<ReminderEntry?> ReadRow(Orleans.Runtime.GrainId grainId, string reminderName);
         System.Threading.Tasks.Task<ReminderTableData> ReadRows(Orleans.Runtime.GrainId grainId);
         System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end);
         System.Threading.Tasks.Task<bool> RemoveRow(Orleans.Runtime.GrainId grainId, string reminderName, string eTag);

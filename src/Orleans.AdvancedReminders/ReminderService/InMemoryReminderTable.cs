@@ -30,7 +30,7 @@ namespace Orleans.AdvancedReminders.Runtime.ReminderService
             return Task.CompletedTask;
         }
 
-        public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+        public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
         {
             this.ThrowIfNotAvailable();
             return this.reminderTableGrain.ReadRow(grainId, reminderName);

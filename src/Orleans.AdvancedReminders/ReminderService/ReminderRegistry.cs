@@ -58,6 +58,7 @@ internal sealed class ReminderRegistry(
 
 internal static class ReminderValidation
 {
+    private const int MaxCronExpressionLength = 200;
     private const int MaxCronIntervalsToValidate = 10_000;
     internal const int MaxCronValidationCacheEntries = 1_024;
     private static readonly ConcurrentDictionary<CronValidationCacheKey, Lazy<bool>> CronValidationCache = new();
@@ -156,7 +157,16 @@ internal static class ReminderValidation
             throw new ArgumentException("Cannot use null or empty cron expression for the reminder", nameof(schedule));
         }
 
-        var precision = ReminderCronParser.DetectFormat(schedule.CronExpression) == CronFormat.IncludeSeconds
+        var expression = schedule.CronExpression.Trim();
+        if (expression.Length > MaxCronExpressionLength)
+        {
+            throw new ArgumentException(
+                $"Cannot register reminder {reminderName} because its cron expression exceeds {MaxCronExpressionLength} characters",
+                nameof(schedule));
+        }
+
+        var precision = expression.AsSpan() is ['@', ..]
+            || ReminderCronParser.DetectFormat(expression) == CronFormat.IncludeSeconds
             ? TimeSpan.FromSeconds(1)
             : TimeSpan.FromMinutes(1);
         if (options.MinimumReminderPeriod <= precision)
@@ -165,7 +175,7 @@ internal static class ReminderValidation
         }
 
         var cacheKey = new CronValidationCacheKey(
-            schedule.CronExpression.Trim(),
+            expression,
             string.IsNullOrWhiteSpace(schedule.CronTimeZoneId) ? null : schedule.CronTimeZoneId.Trim(),
             options.MinimumReminderPeriod,
             utcNow.Date);

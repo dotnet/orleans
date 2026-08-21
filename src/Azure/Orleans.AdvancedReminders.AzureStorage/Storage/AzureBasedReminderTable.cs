@@ -244,7 +244,7 @@ namespace Orleans.AdvancedReminders.AzureStorage
             }
         }
 
-        public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+        public async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
         {
             try
             {
@@ -252,7 +252,7 @@ namespace Orleans.AdvancedReminders.AzureStorage
 
                 LogDebugReadRow(grainId, reminderName);
                 var result = await this.remTableManager.FindReminderEntry(grainId, reminderName);
-                return result.Entity is null ? null! : ConvertFromTableEntry(result.Entity, result.ETag!);
+                return result.Entity is null ? null : ConvertFromTableEntry(result.Entity, result.ETag!);
             }
             catch (Exception exc)
             {

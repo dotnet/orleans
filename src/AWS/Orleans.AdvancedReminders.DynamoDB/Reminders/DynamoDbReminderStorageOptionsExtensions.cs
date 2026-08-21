@@ -9,6 +9,7 @@ namespace Orleans.AdvancedReminders.DynamoDB
     {
         private const string AccessKeyPropertyName = "AccessKey";
         private const string SecretKeyPropertyName = "SecretKey";
+        private const string TokenPropertyName = "Token";
         private const string ServicePropertyName = "Service";
         private const string ReadCapacityUnitsPropertyName = "ReadCapacityUnits";
         private const string WriteCapacityUnitsPropertyName = "WriteCapacityUnits";
@@ -45,6 +46,14 @@ namespace Orleans.AdvancedReminders.DynamoDB
                 var value = accessKeyConfig.Split(new[] { '=' }, 2, StringSplitOptions.RemoveEmptyEntries);
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     options.AccessKey = value[1];
+            }
+
+            var tokenConfig = Array.Find(parameters, p => p.StartsWith($"{TokenPropertyName}=", StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(tokenConfig))
+            {
+                var value = tokenConfig.Split(new[] { '=' }, 2, StringSplitOptions.RemoveEmptyEntries);
+                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
+                    options.Token = value[1];
             }
 
             var readCapacityUnitsConfig = Array.Find(parameters, p => p.StartsWith($"{ReadCapacityUnitsPropertyName}=", StringComparison.OrdinalIgnoreCase));

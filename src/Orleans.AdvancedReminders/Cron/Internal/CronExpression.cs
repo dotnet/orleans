@@ -429,7 +429,15 @@ namespace Orleans.AdvancedReminders.Cron.Internal
 
         private long FindOccurrence(long ticks, bool startInclusive)
         {
-            if (!startInclusive) ticks++;
+            if (!startInclusive)
+            {
+                if (ticks == DateTime.MaxValue.Ticks)
+                {
+                    return NotFound;
+                }
+
+                ticks++;
+            }
 
             CalendarHelper.FillDateTimeParts(
                 ticks,

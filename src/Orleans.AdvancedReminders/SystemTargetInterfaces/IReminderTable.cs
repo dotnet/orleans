@@ -51,8 +51,8 @@ namespace Orleans.AdvancedReminders
         /// </summary>
         /// <param name="grainId">The grain ID.</param>
         /// <param name="reminderName">Name of the reminder.</param>
-        /// <returns>The reminder table entry.</returns>
-        Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName);
+        /// <returns>The reminder table entry, or <see langword="null"/> when it does not exist.</returns>
+        Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName);
 
         /// <summary>
         /// Upserts the specified entry.
@@ -93,7 +93,7 @@ namespace Orleans.AdvancedReminders
 
         Task<ReminderTableData> ReadRows(uint begin, uint end);
 
-        Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName);
+        Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName);
 
         Task<string> UpsertRow(ReminderEntry entry);
 

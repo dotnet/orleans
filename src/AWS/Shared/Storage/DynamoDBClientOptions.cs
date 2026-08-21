@@ -37,6 +37,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <summary>
         /// Token for DynamoDB storage
         /// </summary>
+        [Redact]
         public string? Token { get; set; }
 
         /// <summary>

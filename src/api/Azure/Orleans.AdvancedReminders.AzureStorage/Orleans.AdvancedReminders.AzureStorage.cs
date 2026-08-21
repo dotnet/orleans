@@ -13,7 +13,7 @@ namespace Orleans.AdvancedReminders.AzureStorage
         public AzureBasedReminderTable(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Options.IOptions<AzureTableReminderStorageOptions> storageOptions) { }
 
         [System.Diagnostics.DebuggerStepThrough]
-        public System.Threading.Tasks.Task<ReminderEntry> ReadRow(Orleans.Runtime.GrainId grainId, string reminderName) { throw null; }
+        public System.Threading.Tasks.Task<ReminderEntry?> ReadRow(Orleans.Runtime.GrainId grainId, string reminderName) { throw null; }
 
         [System.Diagnostics.DebuggerStepThrough]
         public System.Threading.Tasks.Task<ReminderTableData> ReadRows(Orleans.Runtime.GrainId grainId) { throw null; }

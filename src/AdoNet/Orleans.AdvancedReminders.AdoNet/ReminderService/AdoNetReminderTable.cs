@@ -42,9 +42,9 @@ namespace Orleans.AdvancedReminders.Runtime.ReminderService
             return this.orleansQueries.ReadReminderRowsAsync(this.serviceId, beginHash, endHash);
         }
 
-        public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+        public async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
         {
-            return (await this.orleansQueries.ReadReminderRowAsync(this.serviceId, grainId, reminderName))!;
+            return await this.orleansQueries.ReadReminderRowAsync(this.serviceId, grainId, reminderName);
         }
 
         public Task<string> UpsertRow(ReminderEntry entry)

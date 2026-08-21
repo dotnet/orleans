@@ -34,7 +34,7 @@ internal sealed class AdvancedReminderTableGrain : Grain, IReminderTableGrain, I
         return Task.FromResult(new ReminderTableData(result));
     }
 
-    public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+    public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
     {
         ReminderEntry? result = null;
         if (_reminderTable.TryGetValue(grainId, out var reminders))
@@ -42,7 +42,7 @@ internal sealed class AdvancedReminderTableGrain : Grain, IReminderTableGrain, I
             reminders.TryGetValue(reminderName, out result);
         }
 
-        return Task.FromResult(result!);
+        return Task.FromResult(result);
     }
 
     public Task<string> UpsertRow(ReminderEntry entry)

@@ -152,7 +152,7 @@ internal partial class CosmosReminderTable : IReminderTable
         }
     }
 
-    public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+    public async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
     {
         try
         {
@@ -173,7 +173,7 @@ internal partial class CosmosReminderTable : IReminderTable
             },
             (this, id, pk)).ConfigureAwait(false);
 
-            return response != null ? FromEntity(response)! : default!;
+            return response != null ? FromEntity(response) : null;
         }
         catch (Exception exc)
         {
@@ -198,11 +198,11 @@ internal partial class CosmosReminderTable : IReminderTable
                 var result = hasETag
                     ? await self._container.ReplaceItemAsync(entity, entity.Id, pk, options).ConfigureAwait(false)
                     : await self._container.CreateItemAsync(entity, pk).ConfigureAwait(false);
-                return result.Resource;
+                return result.ETag;
             },
             (this, pk, entity, hasETag, options)).ConfigureAwait(false);
 
-            return response.ETag ?? string.Empty;
+            return response ?? string.Empty;
         }
         catch (CosmosException exception) when (exception.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed or HttpStatusCode.NotFound)
         {
