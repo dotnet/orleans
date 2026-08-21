@@ -1,22 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.DurableTasks.Abstractions</PackageId>
-    <Title>Microsoft Orleans Durable Task Abstractions</Title>
-    <Description>Programming model abstractions for durable asynchronous operations in Microsoft Orleans.</Description>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <IsPackable>false</IsPackable>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <OrleansBuildTimeCodeGen>false</OrleansBuildTimeCodeGen>
     <EnableOrleansContractsAnalyzer>false</EnableOrleansContractsAnalyzer>
-    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
-    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
     <GenAPITargetDirectory>$(SourceRoot)src\api\Orleans.DurableTasks.Abstractions\</GenAPITargetDirectory>
     <GenAPITargetPath>$(GenAPITargetDirectory)$(AssemblyName).cs</GenAPITargetPath>
   </PropertyGroup>
-
-  <ItemGroup>
-    <None Include="README.md" Pack="true" PackagePath="\" />
-  </ItemGroup>
 
   <ItemGroup>
     <AssemblyAttribute Remove="Orleans.Metadata.FrameworkPartAttribute" />
