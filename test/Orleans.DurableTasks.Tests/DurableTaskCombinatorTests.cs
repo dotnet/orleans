@@ -99,6 +99,24 @@ public class DurableTaskCombinatorTests
         Assert.False(firstCompletion.Task.IsCompleted);
     }
 
+    [Fact]
+    public async Task GenericMethodException_ReturnsDurableResponse()
+    {
+        var runtime = Substitute.For<IDurableTaskGrainRuntime>();
+        var context = new GrainDurableExecutionContext(TaskId.Create("root"), runtime);
+
+        var response = await RunAsync(ThrowingGenericMethod(), context);
+
+        var exception = Assert.IsType<InvalidOperationException>(response.Exception);
+        Assert.Equal("generic failure", exception.Message);
+    }
+
+    private static async DurableTask<int> ThrowingGenericMethod()
+    {
+        await Task.CompletedTask;
+        throw new InvalidOperationException("generic failure");
+    }
+
     private static Dictionary<string, IScheduledTaskHandle> CreateHandles(
         params (string Name, DurableTaskResponse Response)[] responses)
         => responses.ToDictionary(
