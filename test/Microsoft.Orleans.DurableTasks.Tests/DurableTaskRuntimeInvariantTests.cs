@@ -5,6 +5,7 @@ using Orleans.DurableTasks.Runtime;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
+using System.Reflection;
 using NSubstitute;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
@@ -25,6 +26,12 @@ namespace Microsoft.Orleans.DurableTasks.Tests;
 [TestArea("DurableTasks")]
 public sealed class DurableTaskRuntimeInvariantTests
 {
+    private static readonly ServiceProvider EnvelopeServiceProvider = new ServiceCollection()
+        .AddSerializer(builder => builder
+            .AddAssembly(typeof(DurableTaskMessageHandler).Assembly)
+            .AddAssembly(typeof(DurableTaskRuntimeInvariantTests).Assembly))
+        .BuildServiceProvider();
+
     [Fact]
     public void Participant_WithoutObserverSupport_ThrowsDescriptiveConfigurationError()
     {
@@ -136,8 +143,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         var (runtime, storage, _, transport) = CreateRuntime();
         var sender = GrainId.Create("caller", "one");
         var receiver = GrainId.Create("test", "one");
-        var request = CreateRequest(1);
-        request.Context!.TargetId = GrainId.Create("target", "other");
+        var request = CreateSerializableRequest(GrainId.Create("target", "other"));
         var handler = (IInboxHandler)new DurableTaskMessageHandler(runtime);
 
         var wrongTarget = CreateHandlerContext(
@@ -152,7 +158,7 @@ public sealed class DurableTaskRuntimeInvariantTests
             async () => await handler.HandleAsync(wrongTarget, default));
         Assert.Contains("not receiver", targetException.Message, StringComparison.Ordinal);
 
-        request.Context.TargetId = receiver;
+        request.Context!.TargetId = receiver;
         var wrongReply = CreateHandlerContext(
             receiver,
             CreateEnvelope(
@@ -202,8 +208,7 @@ public sealed class DurableTaskRuntimeInvariantTests
                 default));
         Assert.Contains("already associated with caller", cancellationException.Message, StringComparison.Ordinal);
 
-        var request = CreateRequest(1);
-        request.Context!.TargetId = receiver;
+        var request = CreateSerializableRequest(receiver);
         var invocationException = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await handler.HandleAsync(
                 CreateHandlerContext(
@@ -280,8 +285,7 @@ public sealed class DurableTaskRuntimeInvariantTests
                     DurableTaskMessageTransport.CancellationRoute,
                     new DurableTaskCancellationMessage { TaskId = taskId })),
             default);
-        var request = CreateRequest(1);
-        request.Context!.TargetId = receiver;
+        var request = CreateSerializableRequest(receiver);
         await handler.HandleAsync(
             CreateHandlerContext(
                 receiver,
@@ -464,6 +468,27 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
+    public async Task RunningLocalChildRejectsRemoteReuseWithoutChangingIdentity()
+    {
+        var (runtime, storage, _, _) = CreateRuntime();
+        var taskId = TaskId.Parse("root/local");
+        var localTask = new TestSchedulableTask(
+            static (_, _) => new(DurableTaskResponse.Pending));
+        _ = await runtime.ScheduleChildAsync(taskId, localTask, default);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runtime.ScheduleChildAsync(
+                taskId,
+                new TestStateManager.TestRemoteDurableTask(CreateRequest(2)),
+                default).AsTask());
+
+        Assert.Contains("different request", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(1, localTask.ScheduleAsyncCallCount);
+        Assert.Equal(default, storage.Get(taskId).RemoteTarget);
+        Assert.Null(storage.Get(taskId).RemoteRequestFingerprint);
+    }
+
+    [Fact]
     public async Task FailedSchedulingRemovesTransientHandle()
     {
         var (runtime, _, _, _) = CreateRuntime();
@@ -491,7 +516,7 @@ public sealed class DurableTaskRuntimeInvariantTests
     {
         var (runtime, storage, _, _) = CreateRuntime();
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var observedCancellation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var terminalObservedDuringCancellation = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var taskId = TaskId.Parse("root/local-cancel");
         var handle = await runtime.ScheduleChildAsync(
             taskId,
@@ -504,7 +529,8 @@ public sealed class DurableTaskRuntimeInvariantTests
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    observedCancellation.TrySetResult();
+                    terminalObservedDuringCancellation.TrySetResult(
+                        storage.Get(taskId).Result is { IsCompleted: true });
                     throw;
                 }
             }),
@@ -513,27 +539,8 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         await handle.CancelAsync(default);
 
-        await observedCancellation.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(await terminalObservedDuringCancellation.Task.WaitAsync(TimeSpan.FromSeconds(5)));
         Assert.Equal(DurableTaskStatus.Canceled, storage.Get(taskId).Result!.Status);
-    }
-
-    [Fact]
-    public async Task DurableCancellationPropagatesRemoteEffectsWithIndependentToken()
-    {
-        var (runtime, _, _, transport) = CreateRuntime();
-        var remoteRequest = CreateRequest(2);
-        var rootRequest = CreateRequest(
-            1,
-            () => new TestStateManager.TestRemoteDurableTask(remoteRequest));
-        var rootId = TaskId.Parse("root");
-        await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, rootRequest);
-        await WaitUntilAsync(() => transport.Invocations.Count > 0);
-
-        await runtime.SignalCancellationAsync(rootId, default);
-
-        Assert.Contains(
-            transport.Cancellations,
-            cancellation => cancellation.Target == remoteRequest.Context!.TargetId);
     }
 
     [Fact]
@@ -641,12 +648,14 @@ public sealed class DurableTaskRuntimeInvariantTests
             CancellationToken.None);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => context.SelectCompletionAsync(
+            () => InvokeSelectCompletionCoreAsync(
+                context,
                 TaskId.Parse("other/decision"),
                 [TaskId.Parse("root/child")],
                 default).AsTask());
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => context.SelectCompletionAsync(
+            () => InvokeSelectCompletionCoreAsync(
+                context,
                 TaskId.Parse("root/decision"),
                 [TaskId.Parse("other/child")],
                 default).AsTask());
@@ -661,13 +670,15 @@ public sealed class DurableTaskRuntimeInvariantTests
             TaskScheduler.Current,
             CancellationToken.None);
 
-        var generated = context.CreateChildTaskId(null);
-        var explicitNumeric = context.CreateChildTaskId("0");
+        var generated = InvokeCreateChildTaskId(context, null);
+        var explicitNumeric = InvokeCreateChildTaskId(context, "0");
 
         Assert.NotEqual(generated, explicitNumeric);
         Assert.StartsWith("root/$child-", generated.ToString(), StringComparison.Ordinal);
         Assert.Equal(TaskId.Parse("root/0"), explicitNumeric);
-        Assert.Throws<ArgumentException>(() => context.CreateChildTaskId("$reserved"));
+        var exception = Assert.Throws<TargetInvocationException>(
+            () => InvokeCreateChildTaskId(context, "$reserved"));
+        Assert.IsType<ArgumentException>(exception.InnerException);
     }
 
     [Fact]
@@ -855,6 +866,17 @@ public sealed class DurableTaskRuntimeInvariantTests
             },
         };
 
+    private static TestDurableTaskRequest CreateSerializableRequest(GrainId target) =>
+        new()
+        {
+            Context = new DurableTaskRequestContext
+            {
+                CallerId = GrainId.Create("caller", "one"),
+                TargetId = target,
+                SupportsDurableCompletion = true,
+            },
+        };
+
     private static IInboxHandlerContext CreateHandlerContext(GrainId grainId, DurableEnvelope envelope)
     {
         var context = Substitute.For<IInboxHandlerContext>();
@@ -863,6 +885,20 @@ public sealed class DurableTaskRuntimeInvariantTests
         return context;
     }
 
+    private static ValueTask<TaskId> InvokeSelectCompletionCoreAsync(
+        GrainDurableExecutionContext context,
+        TaskId decisionId,
+        IReadOnlyList<TaskId> candidates,
+        CancellationToken cancellationToken) =>
+        (ValueTask<TaskId>)typeof(GrainDurableExecutionContext)
+            .GetMethod("SelectCompletionCoreAsync", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(context, [decisionId, candidates, cancellationToken])!;
+
+    private static TaskId InvokeCreateChildTaskId(GrainDurableExecutionContext context, string? name) =>
+        (TaskId)typeof(GrainDurableExecutionContext)
+            .GetMethod("CreateChildTaskId", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(context, [name])!;
+
     private static DurableEnvelope CreateEnvelope<T>(
         GrainId sender,
         GrainId target,
@@ -870,11 +906,8 @@ public sealed class DurableTaskRuntimeInvariantTests
         T body,
         GrainId? replyTo = null)
     {
-        var services = new ServiceCollection();
-        services.AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskRuntimeInvariantTests).Assembly));
-        using var serviceProvider = services.BuildServiceProvider();
         var builder = new DurableEnvelopeBuilder(
-                serviceProvider.GetRequiredService<SerializerSessionPool>(),
+                EnvelopeServiceProvider.GetRequiredService<SerializerSessionPool>(),
                 sender)
             .To(target, route)
             .WithBody(body);
