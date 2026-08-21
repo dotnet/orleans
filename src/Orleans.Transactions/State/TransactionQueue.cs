@@ -588,6 +588,10 @@ namespace Orleans.Transactions.State
 
             if (pos == -1)
             {
+                // Cancel can overtake the one-way prepare message. Release the pre-prepare lock so a
+                // late prepare observes a broken lock and completes without persisting a remote commit.
+                this.RWLock.Rollback(transactionId);
+                this.RWLock.Notify();
                 TransactionDiagnosticEvents.EmitTransactionCancelCompleted(
                     resource,
                     transactionId,
