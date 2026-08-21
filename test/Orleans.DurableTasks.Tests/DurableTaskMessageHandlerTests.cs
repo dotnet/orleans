@@ -190,6 +190,25 @@ public class DurableTaskMessageHandlerTests
     }
 
     [Fact]
+    public async Task InvocationRoute_MissingRequestContext_ThrowsInvalidOperationException()
+    {
+        var (handler, _, _, _, grainId, sessionPool) = CreateHandler();
+        var sender = GrainId.Create("rpc-caller", "missing-context");
+        var request = new RpcTestDurableTaskRequest();
+        var context = CreateContext(
+            sessionPool,
+            sender,
+            grainId,
+            DurableTaskMessageTransport.InvocationRoute,
+            new DurableTaskInvocationMessage { TaskId = TaskId.CreateRandom(), Request = request });
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await ((IInboxHandler)handler).HandleAsync(context, CancellationToken.None));
+
+        Assert.Equal("The durable task invocation request did not include a request context.", exception.Message);
+    }
+
+    [Fact]
     public async Task CompletionRoute_DelegatesToRuntimeAcceptResponse()
     {
         var (handler, storage, _, _, grainId, sessionPool) = CreateHandler();

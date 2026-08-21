@@ -192,6 +192,22 @@ public class DurableTaskRequestTests
             new TestRequest(shared, "ITest", "Run", ["a", 2])));
     }
 
+    [Fact]
+    public void ZeroArgumentRequest_ReportsArgumentIndex()
+    {
+        var request = new TestRequest<int>(CreateShared(Substitute.For<IGrainFactory>()));
+
+        var getException = Assert.Throws<ArgumentOutOfRangeException>(() => request.GetArgument(3));
+        var setException = Assert.Throws<ArgumentOutOfRangeException>(() => request.SetArgument(4, "value"));
+
+        Assert.Equal("index", getException.ParamName);
+        Assert.Equal(3, getException.ActualValue);
+        Assert.Contains("The request has zero arguments.", getException.Message);
+        Assert.Equal("index", setException.ParamName);
+        Assert.Equal(4, setException.ActualValue);
+        Assert.Contains("The request has zero arguments.", setException.Message);
+    }
+
     private static TestRequest CreateRequest(IGrainFactory grainFactory, GrainId targetId)
     {
         var result = new TestRequest(CreateShared(grainFactory));
