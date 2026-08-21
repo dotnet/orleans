@@ -6,7 +6,9 @@ using Xunit;
 
 namespace Orleans.Journaling.Tests;
 
-[TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Journaling")]
 public sealed class DurableTaskStorageTests : JournalingTestBase
 {
     [Fact]
