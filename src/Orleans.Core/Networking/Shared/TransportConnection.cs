@@ -6,67 +6,66 @@ using System.Threading;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Http.Features;
 
-namespace Orleans.Networking.Shared
+namespace Orleans.Networking.Shared;
+
+internal abstract partial class TransportConnection : ConnectionContext
 {
-    internal abstract partial class TransportConnection : ConnectionContext
+    private IDictionary<object, object?>? _items;
+    private string? _connectionId;
+
+    public TransportConnection() => FastReset();
+
+    public override EndPoint? LocalEndPoint { get; set; }
+    public override EndPoint? RemoteEndPoint { get; set; }
+
+    public override string ConnectionId
     {
-        private IDictionary<object, object?>? _items;
-        private string? _connectionId;
-
-        public TransportConnection() => FastReset();
-
-        public override EndPoint? LocalEndPoint { get; set; }
-        public override EndPoint? RemoteEndPoint { get; set; }
-
-        public override string ConnectionId
+        get
         {
-            get
+            if (_connectionId == null)
             {
-                if (_connectionId == null)
-                {
-                    _connectionId = CorrelationIdGenerator.GetNextId();
-                }
+                _connectionId = CorrelationIdGenerator.GetNextId();
+            }
 
-                return _connectionId;
-            }
-            set
-            {
-                _connectionId = value;
-            }
+            return _connectionId;
         }
-
-        public override IFeatureCollection Features => this;
-
-        public virtual MemoryPool<byte> MemoryPool { get; } = null!;
-
-        public override IDuplexPipe Transport { get; set; } = null!;
-
-        public IDuplexPipe Application { get; set; } = null!;
-
-        public override IDictionary<object, object?> Items
+        set
         {
-            get
-            {
-                // Lazily allocate connection metadata
-                return _items ?? (_items = new ConnectionItems());
-            }
-            set
-            {
-                _items = value;
-            }
+            _connectionId = value;
         }
+    }
 
-        public override CancellationToken ConnectionClosed { get; set; }
+    public override IFeatureCollection Features => this;
 
-        // DO NOT remove this override to ConnectionContext.Abort. Doing so would cause
-        // any TransportConnection that does not override Abort or calls base.Abort
-        // to stack overflow when IConnectionLifetimeFeature.Abort() is called.
-        // That said, all derived types should override this method should override
-        // this implementation of Abort because canceling pending output reads is not
-        // sufficient to abort the connection if there is backpressure.
-        public override void Abort(ConnectionAbortedException abortReason)
+    public virtual MemoryPool<byte> MemoryPool { get; } = null!;
+
+    public override IDuplexPipe Transport { get; set; } = null!;
+
+    public IDuplexPipe Application { get; set; } = null!;
+
+    public override IDictionary<object, object?> Items
+    {
+        get
         {
-            Application.Input.CancelPendingRead();
+            // Lazily allocate connection metadata
+            return _items ?? (_items = new ConnectionItems());
         }
+        set
+        {
+            _items = value;
+        }
+    }
+
+    public override CancellationToken ConnectionClosed { get; set; }
+
+    // DO NOT remove this override to ConnectionContext.Abort. Doing so would cause
+    // any TransportConnection that does not override Abort or calls base.Abort
+    // to stack overflow when IConnectionLifetimeFeature.Abort() is called.
+    // That said, all derived types should override this method should override
+    // this implementation of Abort because canceling pending output reads is not
+    // sufficient to abort the connection if there is backpressure.
+    public override void Abort(ConnectionAbortedException abortReason)
+    {
+        Application.Input.CancelPendingRead();
     }
 }

@@ -3,81 +3,80 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Orleans.Runtime;
 
-namespace Orleans.Metadata
+namespace Orleans.Metadata;
+
+/// <summary>
+/// Responsible for resolving <see cref="GrainProperties"/> for <see cref="GrainType"/> values.
+/// </summary>
+/// <remarks>
+/// Initializes a new instance of the <see cref="GrainPropertiesResolver"/> class.
+/// </remarks>
+/// <param name="clusterManifestProvider">
+/// The cluster manifest provider.
+/// </param>
+public class GrainPropertiesResolver(IClusterManifestProvider clusterManifestProvider)
 {
+
     /// <summary>
-    /// Responsible for resolving <see cref="GrainProperties"/> for <see cref="GrainType"/> values.
+    /// Gets the grain properties for the provided type.
     /// </summary>
-    /// <remarks>
-    /// Initializes a new instance of the <see cref="GrainPropertiesResolver"/> class.
-    /// </remarks>
-    /// <param name="clusterManifestProvider">
-    /// The cluster manifest provider.
+    /// <param name="grainType">
+    /// The grain type.
     /// </param>
-    public class GrainPropertiesResolver(IClusterManifestProvider clusterManifestProvider)
+    /// <returns>
+    /// The grain properties.
+    /// </returns>
+    public GrainProperties GetGrainProperties(GrainType grainType)
     {
-
-        /// <summary>
-        /// Gets the grain properties for the provided type.
-        /// </summary>
-        /// <param name="grainType">
-        /// The grain type.
-        /// </param>
-        /// <returns>
-        /// The grain properties.
-        /// </returns>
-        public GrainProperties GetGrainProperties(GrainType grainType)
+        if (!TryGetGrainProperties(grainType, out var result))
         {
-            if (!TryGetGrainProperties(grainType, out var result))
-            {
-                //ThrowNotFoundException(grainType);
-                result = new GrainProperties(ImmutableDictionary<string, string>.Empty.WithComparers(StringComparer.Ordinal, StringComparer.Ordinal));
-            }
-
-            return result;
+            //ThrowNotFoundException(grainType);
+            result = new GrainProperties(ImmutableDictionary<string, string>.Empty.WithComparers(StringComparer.Ordinal, StringComparer.Ordinal));
         }
 
-        /// <summary>
-        /// Gets the grain properties for the provided type.
-        /// </summary>
-        /// <param name="grainType">
-        /// The grain type.
-        /// </param>
-        /// <param name="properties">
-        /// The grain properties.
-        /// </param>
-        /// <returns>
-        /// A value indicating whether grain properties could be found for the provided grain type.
-        /// </returns>
-        public bool TryGetGrainProperties(GrainType grainType, [NotNullWhen(true)] out GrainProperties? properties)
+        return result;
+    }
+
+    /// <summary>
+    /// Gets the grain properties for the provided type.
+    /// </summary>
+    /// <param name="grainType">
+    /// The grain type.
+    /// </param>
+    /// <param name="properties">
+    /// The grain properties.
+    /// </param>
+    /// <returns>
+    /// A value indicating whether grain properties could be found for the provided grain type.
+    /// </returns>
+    public bool TryGetGrainProperties(GrainType grainType, [NotNullWhen(true)] out GrainProperties? properties)
+    {
+        var clusterManifest = clusterManifestProvider.Current;
+        if (clusterManifest is null)
         {
-            var clusterManifest = clusterManifestProvider.Current;
-            if (clusterManifest is null)
-            {
-                properties = default;
-                return false;
-            }
-
-            GrainType lookupKey;
-            if (GenericGrainType.TryParse(grainType, out var generic))
-            {
-                lookupKey = generic.GetUnconstructedGrainType().GrainType;
-            }
-            else
-            {
-                lookupKey = grainType;
-            }
-
-            foreach (var manifest in clusterManifest.AllGrainManifests)
-            {
-                if (manifest.Grains.TryGetValue(lookupKey, out properties))
-                {
-                    return true;
-                }
-            }
-
             properties = default;
             return false;
         }
+
+        GrainType lookupKey;
+        if (GenericGrainType.TryParse(grainType, out var generic))
+        {
+            lookupKey = generic.GetUnconstructedGrainType().GrainType;
+        }
+        else
+        {
+            lookupKey = grainType;
+        }
+
+        foreach (var manifest in clusterManifest.AllGrainManifests)
+        {
+            if (manifest.Grains.TryGetValue(lookupKey, out properties))
+            {
+                return true;
+            }
+        }
+
+        properties = default;
+        return false;
     }
 }
