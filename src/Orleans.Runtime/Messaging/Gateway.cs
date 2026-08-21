@@ -73,15 +73,18 @@ namespace Orleans.Runtime.Messaging
             this.GatewayInstruments = new(orleansInstruments);
             this.gatewayMaintenanceTimer = timerFactory.Create(messagingOptions.ClientDropTimeout, nameof(PerformGatewayMaintenance), timeProvider);
             this.gatewayMaintenanceTask = Task.Run(PerformGatewayMaintenance);
-            var requestMaintenancePeriod = Max(
-                TimeSpan.FromMilliseconds(1),
-                Min(messagingOptions.ResponseTimeout, TimeSpan.FromSeconds(1)));
+            var requestMaintenancePeriod = GetRequestMaintenancePeriod(messagingOptions.ResponseTimeout);
             this.requestMaintenanceTimer = timerFactory.Create(requestMaintenancePeriod, nameof(PerformRequestMaintenance), timeProvider);
             this.requestMaintenanceTask = Task.Run(PerformRequestMaintenance);
             this.siloStatusOracle.SubscribeToSiloStatusEvents(this);
         }
 
         internal GatewayInstruments GatewayInstruments { get; }
+
+        internal int TrackedRequestClientCount => clientsWithTrackedRequests.Count;
+
+        internal static TimeSpan GetRequestMaintenancePeriod(TimeSpan responseTimeout) =>
+            responseTimeout > TimeSpan.Zero ? Min(responseTimeout, TimeSpan.FromSeconds(1)) : TimeSpan.FromSeconds(1);
 
         public static GrainAddress GetClientActivationAddress(GrainId clientId, SiloAddress siloAddress)
         {
@@ -496,6 +499,7 @@ namespace Orleans.Runtime.Messaging
                 lock (_requestLock)
                 {
                     _pendingRequests.TryComplete(message);
+                    UnregisterRequestTrackingIfEmptyCore();
                 }
 
                 SendSyntheticResponse(message);
@@ -538,6 +542,7 @@ namespace Orleans.Runtime.Messaging
                     if (_gateway.siloStatusOracle.IsDeadSilo(message.TargetSilo!))
                     {
                         _pendingRequests.TryRemove(message.Id, out requestToReject);
+                        UnregisterRequestTrackingIfEmptyCore();
                     }
                     else
                     {
@@ -563,7 +568,12 @@ namespace Orleans.Runtime.Messaging
             private void ClearPendingRequestsCore()
             {
                 _pendingRequests.Clear();
-                if (_isRequestTrackingRegistered)
+                UnregisterRequestTrackingIfEmptyCore();
+            }
+
+            private void UnregisterRequestTrackingIfEmptyCore()
+            {
+                if (_isRequestTrackingRegistered && _pendingRequests.Count == 0)
                 {
                     _gateway.clientsWithTrackedRequests.TryRemove(this, out _);
                     _isRequestTrackingRegistered = false;
@@ -575,6 +585,7 @@ namespace Orleans.Runtime.Messaging
                 lock (_requestLock)
                 {
                     _pendingRequests.RemoveExpired();
+                    UnregisterRequestTrackingIfEmptyCore();
                 }
             }
 
@@ -584,6 +595,7 @@ namespace Orleans.Runtime.Messaging
                 lock (_requestLock)
                 {
                     requests = _pendingRequests.RemoveForSilo(deadSilo);
+                    UnregisterRequestTrackingIfEmptyCore();
                 }
 
                 if (requests is not null)
