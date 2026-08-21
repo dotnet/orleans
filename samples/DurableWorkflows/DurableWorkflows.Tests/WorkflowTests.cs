@@ -1,4 +1,4 @@
-using System.Distributed.DurableTasks;
+using Orleans.DurableTasks;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -24,13 +24,13 @@ public sealed class WorkflowTests : IAsyncLifetime
     private InProcessTestCluster _cluster = null!;
     private IClusterClient Client => _cluster.Client;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _cluster = CreateCluster(1, _storage);
         await _cluster.DeployAsync();
     }
 
-    public Task DisposeAsync() => _cluster.DisposeAsync().AsTask();
+    public ValueTask DisposeAsync() => _cluster.DisposeAsync();
 
     [Fact]
     public async Task BasicWorkflowAndDuplicateReplayExecuteEffectsOnce()
@@ -234,7 +234,7 @@ public sealed class WorkflowEndpointTests : IAsyncLifetime
     private WebApplication _app = null!;
     private HttpClient _http = null!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _cluster = WorkflowTests.CreateCluster(1, _storage);
         await _cluster.DeployAsync();
@@ -251,7 +251,7 @@ public sealed class WorkflowEndpointTests : IAsyncLifetime
         _http = new HttpClient { BaseAddress = new Uri(address) };
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         _http.Dispose();
         await _app.DisposeAsync();

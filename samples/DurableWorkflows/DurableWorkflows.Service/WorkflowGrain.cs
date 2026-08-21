@@ -1,4 +1,4 @@
-using System.Distributed.DurableTasks;
+using Orleans.DurableTasks;
 using Orleans.Journaling;
 using Orleans.Runtime;
 

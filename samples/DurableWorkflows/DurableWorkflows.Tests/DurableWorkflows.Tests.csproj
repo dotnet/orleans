@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsTestProject>true</IsTestProject>
-    <NoWarn>$(NoWarn);ORLEANSEXP003;ORLEANSEXP005</NoWarn>
+    <NoWarn>$(NoWarn);ORLEANSEXP003;ORLEANSEXP005;xUnit1051</NoWarn>
     <OrleansDocumentationVersionException>
       This publication-gated sample requires the unreleased Durable Tasks and Journaling packages.
     </OrleansDocumentationVersionException>
@@ -16,7 +16,7 @@
     <PackageReference Include="Microsoft.Orleans.DurableTasks" />
     <PackageReference Include="Microsoft.Orleans.Journaling" />
     <PackageReference Include="Microsoft.Orleans.TestingHost" />
-    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.v3" />
     <PackageReference Include="xunit.runner.visualstudio">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

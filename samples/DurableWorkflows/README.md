@@ -61,7 +61,7 @@ For manual process failover, start an approval workflow, stop its active `servic
 
 ## Publication gate
 
-This sample is stacked on experimental source introduced by the dependent pull requests. `Microsoft.Orleans.DurableTasks` and `System.Distributed.DurableTasks` are both incubating and non-packable, so the sample cannot restore independently from public NuGet feeds. It has been validated locally against packages produced from the stacked source without adding source-project reference shims. Keep this PR draft and dependent while the packages remain unpublished; publication requires an explicit packaging decision and is not automatic when the dependent pull requests merge.
+This sample is stacked on experimental source introduced by the dependent pull requests. `Microsoft.Orleans.DurableTasks` and `Orleans.DurableTasks.Abstractions` are both incubating and non-packable, so the sample cannot restore independently from public NuGet feeds. It has been validated locally against packages produced from the stacked source without adding source-project reference shims. Keep this PR draft and dependent while the packages remain unpublished; publication requires an explicit packaging decision and is not automatic when the dependent pull requests merge.
 
 ## Test
 
