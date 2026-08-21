@@ -33,7 +33,7 @@
     <PackageReference Include="xunit.v3.mtp-v2" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0' and '$(IsOrleansTestApplication)' == 'true'">
     <PackageReference Include="System.Collections.Immutable" VersionOverride="10.0.0" PrivateAssets="all" />
     <PackageReference Include="System.IO.Pipelines" VersionOverride="10.0.5" PrivateAssets="all" />
     <PackageReference Include="System.Text.Json" VersionOverride="10.0.5" PrivateAssets="all" />
