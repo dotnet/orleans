@@ -526,13 +526,13 @@ public class StateManagerTests : JournalingTestBase
         dictionary.Add("second", 2);
 
         var conflictException = await Assert.ThrowsAsync<InconsistentStateException>(
-            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
         Assert.Same(conflict, conflictException);
 
         var secondRecoveryFailure = new IOException("Expected second recovery failure.");
         storage.NextReadException = secondRecoveryFailure;
         var recoveryException = await Assert.ThrowsAsync<IOException>(
-            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
         Assert.Same(secondRecoveryFailure, recoveryException);
 
         await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
