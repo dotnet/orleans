@@ -288,18 +288,16 @@ namespace Orleans.Runtime
         internal void AddToCacheInvalidationHeader(GrainAddress invalidAddress, GrainAddress? validAddress)
         {
             var grainAddressCacheUpdate = new GrainAddressCacheUpdate(invalidAddress, validAddress);
-            if (_cacheInvalidationHeader is null)
+            var cacheInvalidationHeader = _cacheInvalidationHeader;
+            if (cacheInvalidationHeader is null)
             {
                 var newList = new List<GrainAddressCacheUpdate> { grainAddressCacheUpdate };
-                if (Interlocked.CompareExchange(ref _cacheInvalidationHeader, newList, null) is not null)
+                if (Interlocked.CompareExchange(ref _cacheInvalidationHeader, newList, null) is { } existingCacheInvalidationHeader)
                 {
                     // Another thread initialized it, add to the existing list
-                    lock (_cacheInvalidationHeader)
+                    lock (existingCacheInvalidationHeader)
                     {
-                        if (_cacheInvalidationHeader.Count < MaxCacheInvalidationHeaderEntries)
-                        {
-                            _cacheInvalidationHeader.Add(grainAddressCacheUpdate);
-                        }
+                        AddCacheInvalidationHeaderEntry(existingCacheInvalidationHeader, grainAddressCacheUpdate);
                     }
                 }
                 else
@@ -309,14 +307,34 @@ namespace Orleans.Runtime
             }
             else
             {
-                lock (_cacheInvalidationHeader)
+                lock (cacheInvalidationHeader)
                 {
-                    if (_cacheInvalidationHeader.Count < MaxCacheInvalidationHeaderEntries)
-                    {
-                        _cacheInvalidationHeader.Add(grainAddressCacheUpdate);
-                    }
+                    AddCacheInvalidationHeaderEntry(cacheInvalidationHeader, grainAddressCacheUpdate);
                 }
             }
+        }
+
+        private static void AddCacheInvalidationHeaderEntry(List<GrainAddressCacheUpdate> cacheInvalidationHeader, GrainAddressCacheUpdate grainAddressCacheUpdate)
+        {
+            if (cacheInvalidationHeader.Count >= MaxCacheInvalidationHeaderEntries || ContainsCacheInvalidationHeaderEntry(cacheInvalidationHeader, grainAddressCacheUpdate.GrainId))
+            {
+                return;
+            }
+
+            cacheInvalidationHeader.Add(grainAddressCacheUpdate);
+        }
+
+        private static bool ContainsCacheInvalidationHeaderEntry(List<GrainAddressCacheUpdate> cacheInvalidationHeader, GrainId grainId)
+        {
+            foreach (var entry in cacheInvalidationHeader)
+            {
+                if (entry.GrainId.Equals(grainId))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         internal void InitializeRefCount()

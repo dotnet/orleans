@@ -37,6 +37,7 @@ namespace Orleans.Runtime
         private readonly SharedCallbackData sharedCallbackData;
         private readonly SharedCallbackData systemSharedCallbackData;
         private readonly PeriodicTimer callbackTimer;
+        private int _isStopping;
 
         private GrainLocator grainLocator;
         private MessageCenter messageCenter;
@@ -172,18 +173,40 @@ namespace Orleans.Runtime
             }
 
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
+            CallbackData callbackData = null;
             if (!oneWay)
             {
                 Debug.Assert(context is not null);
 
                 // Register a callback for the request.
-                var callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
+                callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
+                if (Volatile.Read(ref _isStopping) != 0)
+                {
+                    callbackData.OnHostShutdown();
+                    message.ReleaseDropped("SiloStoppingBeforeCallbackRegistration");
+                    return;
+                }
+
                 callbacks.TryAdd((message.SendingGrain, message.Id), callbackData);
                 callbackData.SubscribeForCancellation(cancellationToken);
             }
             else
             {
                 context?.Complete();
+                if (Volatile.Read(ref _isStopping) != 0)
+                {
+                    message.ReleaseDropped("SiloStoppingBeforeOneWaySend");
+                    return;
+                }
+            }
+
+            // Completing callbacks during shutdown can resume application code which issues follow-up
+            // calls. Reject those calls so that they cannot outlive the shutdown callback sweep.
+            if (Volatile.Read(ref _isStopping) != 0)
+            {
+                callbackData?.OnHostShutdown();
+                message.ReleaseDropped("SiloStoppingBeforeSend");
+                return;
             }
 
             this.messagingTrace.OnSendRequest(message);
@@ -510,15 +533,33 @@ namespace Orleans.Runtime
 
         private async Task OnRuntimeInitializeStop(CancellationToken tc)
         {
-            foreach (var callback in callbacks.Values)
-            {
-                callback.OnHostShutdown();
-            }
-
+            Volatile.Write(ref _isStopping, 1);
             this.callbackTimer.Dispose();
+            // Once the silo is shutting down it can no longer receive responses, so any requests which
+            // are still outstanding will never complete. Fault them now so that in-flight grain calls
+            // observe a terminal result instead of hanging forever, which would otherwise deadlock grain
+            // deactivation and host disposal during an ungraceful shutdown. This must happen before
+            // waiting for the timer task since that wait observes the shutdown cancellation token.
+            BreakOutstandingMessages();
+
             if (this.callbackTimerTask is { } task)
             {
                 await task.WaitAsync(tc);
+            }
+        }
+
+        private void BreakOutstandingMessages()
+        {
+            foreach (var (_, callback) in callbacks)
+            {
+                try
+                {
+                    callback.OnHostShutdown();
+                }
+                catch (Exception exception)
+                {
+                    LogWarningWhileProcessingCallbackExpiry(this.logger, exception);
+                }
             }
         }
 
