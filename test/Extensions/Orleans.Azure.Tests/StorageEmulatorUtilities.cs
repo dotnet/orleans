@@ -7,7 +7,12 @@ namespace Tester.AzureUtils
     {
         public static void EnsureEmulatorIsNotUsed()
         {
-            if (TestDefaultConfiguration.DataConnectionString is { Length: > 0 } connectionString
+            if (TestDefaultConfiguration.UseAadAuthentication)
+            {
+                return;
+            }
+
+            if (TestDefaultConfiguration.AzureStorageConnectionString is { Length: > 0 } connectionString
                 && (connectionString.Contains("UseDevelopmentStorage", StringComparison.OrdinalIgnoreCase)
                 || connectionString.Contains("devstoreaccount", StringComparison.OrdinalIgnoreCase)))
             {

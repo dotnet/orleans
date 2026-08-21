@@ -16,9 +16,9 @@
     <PackageReference Include="xunit.v3.extensibility.core" />
     <PackageReference Include="AwesomeAssertions" />
     <PackageReference Include="Azure.Identity" />
+    <PackageReference Include="Testcontainers" />
+    <PackageReference Include="Testcontainers.Azurite" />
   </ItemGroup>
-  
-
   <ItemGroup>
     <InternalsVisibleTo Include="GoogleUtils.Tests" />
     <InternalsVisibleTo Include="Orleans.AdoNet.Tests" />
