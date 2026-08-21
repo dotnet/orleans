@@ -8,7 +8,10 @@ using Xunit;
 
 namespace Orleans.Connections.Security.Tests;
 
-[Trait("Category", "BVT")]
+[TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Security")]
 public sealed class ClientConnectionAuthenticationTests
 {
     private const string CertificateConfigKey = "ClientAuthenticationCertificate";
