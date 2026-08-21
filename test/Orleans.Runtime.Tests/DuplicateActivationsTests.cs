@@ -88,7 +88,7 @@ namespace UnitTests.CatalogTests
 
                 Assert.True(
                     activationIds.Count == 1,
-                    $"Target grain {startingKey + targetIndex} was handled by {activationIds.Count} activations: {string.Join(", ", activationIds)}");
+                    $"Target grain {startingKey + targetIndex} was handled by {activationIds.Count} activations: {string.Join(", ", activationIds.Order())}");
             }
         }
     }

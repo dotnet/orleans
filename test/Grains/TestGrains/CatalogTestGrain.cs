@@ -37,6 +37,8 @@ namespace UnitTests.Grains
 
         public async Task<string[]> GetActivationIds(int nGrains, long startingKey)
         {
+            ArgumentOutOfRangeException.ThrowIfNegative(nGrains);
+
             if (Volatile.Read(ref _concurrentCallBarrier) is { } barrier)
             {
                 await barrier.SignalAndWaitAsync();
