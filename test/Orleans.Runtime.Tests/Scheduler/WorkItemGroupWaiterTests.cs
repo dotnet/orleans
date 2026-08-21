@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using Orleans.Configuration;
@@ -107,20 +108,55 @@ public class WorkItemGroupWaiterTests
         Assert.True(schedulerTask.CreationOptions.HasFlag(TaskCreationOptions.DenyChildAttach));
     }
 
-    private static ServiceProvider CreateServices() => new ServiceCollection()
-        .AddLogging()
-        .AddMetrics()
-        .AddSingleton<OrleansInstruments>()
-        .AddSingleton<SchedulerInstruments>()
-        .BuildServiceProvider();
+    [Fact]
+    public void DirectCallbackExceptionsAreLoggedAndDoNotInterruptQueueDrain()
+    {
+        var logger = Substitute.For<ILogger<WorkItemGroup>>();
+        logger.IsEnabled(LogLevel.Error).Returns(true);
+        using var services = CreateServices(logger);
+        var workItemGroup = CreateWorkItemGroup(
+            services,
+            new SchedulingOptions { ActivationSchedulingQuantum = TimeSpan.Zero });
+        var stateField = typeof(WorkItemGroup).GetField("_state", BindingFlags.Instance | BindingFlags.NonPublic);
+        stateField!.SetValue(workItemGroup, Enum.Parse(stateField.FieldType, "Running"));
+        var executingThread = Environment.CurrentManagedThreadId;
+        var subsequentCallbackRanOnExecutingThread = false;
 
-    private static WorkItemGroup CreateWorkItemGroup(ServiceProvider services)
+        workItemGroup.QueueAction(static () => throw new InvalidOperationException("Test exception"));
+        workItemGroup.QueueAction(() => subsequentCallbackRanOnExecutingThread = Environment.CurrentManagedThreadId == executingThread);
+        workItemGroup.Execute();
+
+        Assert.True(subsequentCallbackRanOnExecutingThread);
+        Assert.Contains(
+            logger.ReceivedCalls(),
+            call => call.GetMethodInfo().Name == nameof(ILogger.Log)
+                && (LogLevel)call.GetArguments()[0]! == LogLevel.Error
+                && call.GetArguments()[3] is InvalidOperationException);
+    }
+
+    private static ServiceProvider CreateServices(ILogger<WorkItemGroup>? logger = null)
+    {
+        var services = new ServiceCollection()
+            .AddLogging()
+            .AddMetrics()
+            .AddSingleton<OrleansInstruments>()
+            .AddSingleton<SchedulerInstruments>();
+
+        if (logger is not null)
+        {
+            services.AddSingleton(logger);
+        }
+
+        return services.BuildServiceProvider();
+    }
+
+    private static WorkItemGroup CreateWorkItemGroup(ServiceProvider services, SchedulingOptions? schedulingOptions = null)
     {
         var context = Substitute.For<IGrainContext>();
         context.ActivationServices.Returns(services);
         return new WorkItemGroup(
             context,
-            Options.Create(new SchedulingOptions()),
+            Options.Create(schedulingOptions ?? new SchedulingOptions()),
             services.GetRequiredService<SchedulerInstruments>());
     }
 }
