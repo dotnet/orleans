@@ -15,18 +15,31 @@ permissions:
 jobs:
   report:
     name: Report test results
-    if: github.event.workflow_run.event == 'pull_request'
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      (github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure')
     runs-on: ubuntu-latest
     steps:
-      - name: Publish test results
-        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
+      - name: Check out reporting scripts
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Download test results
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
-          artifact: /test_output_(.*)/
-          name: Test Results ($1)
-          path: "**/*.trx"
-          reporter: dotnet-trx
-          use-actions-summary: false
-          list-suites: failed
-          list-tests: failed
-          max-annotations: 50
-          fail-on-empty: true
+          pattern: test_output_*
+          path: test-results
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Publish test results
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TEST_COMMIT: ${{ github.event.workflow_run.head_sha }}
+          TEST_RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: >
+          ./.github/scripts/publish-test-results.ps1
+          -ResultsPath test-results
+          -Repository ${{ github.repository }}
+          -Sha $env:TEST_COMMIT
+          -DetailsUrl $env:TEST_RUN_URL
