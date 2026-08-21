@@ -107,15 +107,6 @@ namespace Orleans.Runtime
 
             var pauseDurationSinceLastTick = GC.GetTotalPauseDuration() - _cumulativeGCPauseDuration;
             var timeSinceLastTick = _timeProvider.GetElapsedTime(_platformWatchdogTimestamp);
-            if (pauseDurationSinceLastTick > TimeSpan.Zero)
-            {
-                _healthEventRecorder.RecordHealthEvent(
-                    LocalSiloHealthCheckKind.GarbageCollectionPause,
-                    score: 0,
-                    complaint: $"The .NET runtime paused for garbage collection for {pauseDurationSinceLastTick}.",
-                    duration: pauseDurationSinceLastTick);
-            }
-
             if (timeSinceLastTick > PlatformWatchdogHeartbeatPeriod.Multiply(2))
             {
                 var gc = new[] { GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2) };

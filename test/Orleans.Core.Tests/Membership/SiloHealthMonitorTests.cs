@@ -144,6 +144,8 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(0, probeResult.FailedProbeCount);
             Assert.True(probeResult.IsDirectProbe);
             Assert.Equal(0, probeResult.IntermediaryHealthDegradationScore);
+            _localSiloHealthMonitor.Received(1).CapturePauseTimestamp();
+            _localSiloHealthMonitor.Received(1).GetPauseStatus(default);
 
             await Shutdown();
         }
@@ -261,8 +263,10 @@ namespace NonSilo.Tests.Membership
                 _membershipService,
                 _localSiloDetails,
                 timeProvider);
-            var totalPauseDuration = TimeSpan.Zero;
-            _localSiloHealthMonitor.TotalPauseDuration.Returns(_ => totalPauseDuration);
+            _localSiloHealthMonitor.CapturePauseTimestamp().Returns(_ => timeProvider.GetTimestamp());
+            _localSiloHealthMonitor.GetPauseStatus(default).ReturnsForAnyArgs(new LocalSiloPauseStatus(
+                options.ProbeTimeout.Multiply(0.25),
+                [new(LocalSiloHealthCheckKind.GarbageCollectionPause, options.ProbeTimeout.Multiply(0.25))]));
 
             try
             {
@@ -271,7 +275,6 @@ namespace NonSilo.Tests.Membership
                 firstTick.Completion.SetResult(true);
                 var cancellationToken = await probeEntered.Task;
 
-                totalPauseDuration = options.ProbeTimeout.Multiply(0.25);
                 timeProvider.Advance(options.ProbeTimeout);
 
                 Assert.True(cancellationToken.IsCancellationRequested);
@@ -293,9 +296,9 @@ namespace NonSilo.Tests.Membership
         public async Task SiloHealthMonitor_FailedProbe_Exception()
         {
             _clusterMembershipOptions.ProbeTimeout = TimeSpan.FromSeconds(2);
-            var pauseSample = 0;
-            _localSiloHealthMonitor.TotalPauseDuration.Returns(_ =>
-                Interlocked.Increment(ref pauseSample) % 2 == 1 ? TimeSpan.Zero : _clusterMembershipOptions.ProbeTimeout);
+            _localSiloHealthMonitor.GetPauseStatus(default).ReturnsForAnyArgs(new LocalSiloPauseStatus(
+                _clusterMembershipOptions.ProbeTimeout,
+                [new(LocalSiloHealthCheckKind.RuntimeStall, _clusterMembershipOptions.ProbeTimeout)]));
 
             _prober.Probe(default!, default).ThrowsAsyncForAnyArgs(new Exception("nope"));
             _prober.ProbeIndirectly(default!, default!, default, default).ThrowsAsyncForAnyArgs(new InvalidOperationException("No"));

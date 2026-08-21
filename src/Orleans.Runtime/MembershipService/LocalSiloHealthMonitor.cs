@@ -51,12 +51,43 @@ namespace Orleans.Runtime.MembershipService
             => [.. Events.Where(static status => status.Complaint is not null).Select(static status => status.Complaint!)];
     }
 
+    internal readonly record struct LocalSiloPauseDuration(LocalSiloHealthCheckKind Kind, TimeSpan Duration);
+
+    internal readonly record struct LocalSiloPauseStatus(
+        TimeSpan TotalPauseDuration,
+        ImmutableArray<LocalSiloPauseDuration> Durations)
+    {
+        public TimeSpan GetDuration(LocalSiloHealthCheckKind kind)
+        {
+            if (!Durations.IsDefaultOrEmpty)
+            {
+                foreach (var item in Durations)
+                {
+                    if (item.Kind == kind)
+                    {
+                        return item.Duration;
+                    }
+                }
+            }
+
+            return TimeSpan.Zero;
+        }
+    }
+
     internal interface ILocalSiloHealthMonitor
     {
         /// <summary>
-        /// Gets the total duration of local runtime pauses since process start.
+        /// Captures the start of a pause aggregation interval.
         /// </summary>
-        TimeSpan TotalPauseDuration { get; }
+        /// <returns>The timestamp which begins the interval.</returns>
+        long CapturePauseTimestamp();
+
+        /// <summary>
+        /// Returns pause durations since the provided timestamp, aggregated by kind and as a deduplicated total.
+        /// </summary>
+        /// <param name="startTimestamp">The timestamp returned by <see cref="CapturePauseTimestamp"/>.</param>
+        /// <returns>The pause duration summary.</returns>
+        LocalSiloPauseStatus GetPauseStatus(long startTimestamp);
 
         /// <summary>
         /// Returns the aggregate local health status over the provided interval.
@@ -129,6 +160,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly IAsyncTimer _degradationCheckTimer;
         private readonly ThreadPoolMonitor _threadPoolMonitor;
         private readonly TimeProvider _timeProvider;
+        private TimeSpan _cumulativeGCPauseDuration;
 #if NET9_0_OR_GREATER
         private readonly Lock _historyLock = new();
         private readonly Lock _samplingLock = new();
@@ -166,6 +198,7 @@ namespace Orleans.Runtime.MembershipService
             _log = log;
             _clusterMembershipOptions = clusterMembershipOptions.Value;
             _timeProvider = timeProvider;
+            _cumulativeGCPauseDuration = GC.GetTotalPauseDuration();
             _healthHistory = new(timeProvider, HistoryDuration, MinimumCheckPeriod);
             _degradationCheckTimer = timerFactory.Create(
                 MinimumCheckPeriod,
@@ -178,7 +211,47 @@ namespace Orleans.Runtime.MembershipService
         public ImmutableArray<string> Complaints { get; private set; } = [];
 
         /// <inheritdoc />
-        public TimeSpan TotalPauseDuration => GC.GetTotalPauseDuration();
+        public long CapturePauseTimestamp()
+        {
+            lock (_historyLock)
+            {
+                var timestamp = _timeProvider.GetTimestamp();
+                RecordGarbageCollectionPause(timestamp, GC.GetTotalPauseDuration());
+                _healthHistory.BeginPauseCollection(timestamp);
+                return timestamp;
+            }
+        }
+
+        /// <inheritdoc />
+        public LocalSiloPauseStatus GetPauseStatus(long startTimestamp)
+        {
+            lock (_historyLock)
+            {
+                var cumulativePauseDuration = GC.GetTotalPauseDuration();
+                var endTimestamp = _timeProvider.GetTimestamp();
+                if (endTimestamp < startTimestamp)
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(startTimestamp),
+                        startTimestamp,
+                        "The interval start must not follow the current timestamp.");
+                }
+
+                RecordGarbageCollectionPause(endTimestamp, cumulativePauseDuration);
+                try
+                {
+                    return _healthHistory.AggregatePauses(
+                        startTimestamp,
+                        endTimestamp,
+                        endTimestamp,
+                        LocalSiloHealthCheckCategory.Local);
+                }
+                finally
+                {
+                    _healthHistory.EndPauseCollection(startTimestamp, endTimestamp);
+                }
+            }
+        }
 
         /// <inheritdoc />
         public LocalSiloHealthStatus GetLocalHealthStatus(
@@ -209,10 +282,13 @@ namespace Orleans.Runtime.MembershipService
 
             lock (_historyLock)
             {
+                var cumulativePauseDuration = GC.GetTotalPauseDuration();
+                var nowTimestamp = _timeProvider.GetTimestamp();
+                RecordGarbageCollectionPause(nowTimestamp, cumulativePauseDuration);
                 return _healthHistory.Aggregate(
                     startTimestamp,
                     endTimestamp,
-                    _timeProvider.GetTimestamp(),
+                    nowTimestamp,
                     categories,
                     MaxScore);
             }
@@ -356,6 +432,25 @@ namespace Orleans.Runtime.MembershipService
             {
                 _healthHistory.AddRange(events, timestamp);
             }
+        }
+
+        private void RecordGarbageCollectionPause(long timestamp, TimeSpan cumulativePauseDuration)
+        {
+            var pauseDuration = cumulativePauseDuration - _cumulativeGCPauseDuration;
+            _cumulativeGCPauseDuration = cumulativePauseDuration;
+            if (pauseDuration <= TimeSpan.Zero)
+            {
+                return;
+            }
+
+            _healthHistory.Add(new(
+                timestamp,
+                LocalSiloHealthCheckKind.GarbageCollectionPause,
+                LocalSiloHealthCheckCategory.Local,
+                Source: null,
+                Score: 0,
+                Complaint: $"The .NET runtime paused for garbage collection for {pauseDuration}.",
+                pauseDuration));
         }
 
         private void CheckThreadPoolQueueDelay(
@@ -573,6 +668,12 @@ namespace Orleans.Runtime.MembershipService
                     var networkHealthCheckVersion = Volatile.Read(ref _networkHealthCheckVersion);
                     lock (_samplingLock)
                     {
+                        lock (_historyLock)
+                        {
+                            var cumulativePauseDuration = GC.GetTotalPauseDuration();
+                            RecordGarbageCollectionPause(_timeProvider.GetTimestamp(), cumulativePauseDuration);
+                        }
+
                         status = EnsureHealthCheck(
                             _timeProvider.GetUtcNow(),
                             _timeProvider.GetTimestamp(),

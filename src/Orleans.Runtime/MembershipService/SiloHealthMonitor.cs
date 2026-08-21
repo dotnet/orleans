@@ -207,15 +207,15 @@ namespace Orleans.Runtime.MembershipService
                     localDegradationScore = GetLocalDegradationScore(previousProbePeriod);
                     var timeout = CalculateProbeTimeout(failureDetector, options, localDegradationScore, isDirectProbe, Debugger.IsAttached);
                     probeStartTimestamp = _timeProvider.GetTimestamp();
+                    var pauseStartTimestamp = isDirectProbe
+                        ? _localSiloHealthMonitor.CapturePauseTimestamp()
+                        : 0;
                     using var cancellation = new CancellationTokenSource(timeout, _timeProvider);
-                    var pauseDurationBefore = isDirectProbe
-                        ? _localSiloHealthMonitor.TotalPauseDuration
-                        : TimeSpan.Zero;
 
                     if (isDirectProbe)
                     {
                         // Probe the silo directly.
-                        probeResult = await this.ProbeDirectly(cancellation.Token, timeout, pauseDurationBefore).ConfigureAwait(false);
+                        probeResult = await this.ProbeDirectly(cancellation.Token, timeout, pauseStartTimestamp).ConfigureAwait(false);
                     }
                     else
                     {
@@ -325,9 +325,9 @@ namespace Orleans.Runtime.MembershipService
         /// </summary>
         /// <param name="cancellation">A token to cancel and fail the probe attempt.</param>
         /// <param name="probeTimeout">The timeout used for this probe, for local pause evaluation.</param>
-        /// <param name="pauseDurationBefore">The cumulative local pause duration when the probe timeout was armed.</param>
+        /// <param name="pauseStartTimestamp">The start of the local pause aggregation interval.</param>
         /// <returns>The number of failed probes since the last successful probe.</returns>
-        private async Task<ProbeResult> ProbeDirectly(CancellationToken cancellation, TimeSpan probeTimeout, TimeSpan pauseDurationBefore)
+        private async Task<ProbeResult> ProbeDirectly(CancellationToken cancellation, TimeSpan probeTimeout, long pauseStartTimestamp)
         {
             var id = ++_nextProbeId;
             LogTraceGoingToSendPing(_log, id, TargetSiloAddress);
@@ -353,6 +353,7 @@ namespace Orleans.Runtime.MembershipService
                 failureException = exception;
             }
             var roundTripTime = roundTripTimer.GetElapsedTime(out _);
+            var pauseStatus = _localSiloHealthMonitor.GetPauseStatus(pauseStartTimestamp);
 
             if (failureException is null)
             {
@@ -371,7 +372,7 @@ namespace Orleans.Runtime.MembershipService
                 // Check if a local pause consumed a significant portion of the probe timeout.
                 // If so, the local silo may have been unable to process the response in time,
                 // so we treat this as an inconclusive result rather than a failure.
-                var pauseDurationDuring = _localSiloHealthMonitor.TotalPauseDuration - pauseDurationBefore;
+                var pauseDurationDuring = pauseStatus.TotalPauseDuration;
                 if (probeTimedOut && pauseDurationDuring >= probeTimeout.Multiply(0.25))
                 {
                     LogWarningProbeFailureDuringLocalPause(_log, id, TargetSiloAddress, roundTripTime, pauseDurationDuring, _failedProbes);
