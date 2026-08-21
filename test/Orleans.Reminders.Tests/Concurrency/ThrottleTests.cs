@@ -20,6 +20,7 @@ public sealed class ThrottleBlockModeTests
     public void Wait_IsSingleton()
     {
         Assert.Same(ThrottleBlockMode.Wait, ThrottleBlockMode.Wait);
+        Assert.Equal("Wait", ThrottleBlockMode.Wait.ToString());
     }
 
     [TestSuite("BVT")]
@@ -28,6 +29,7 @@ public sealed class ThrottleBlockModeTests
     public void SkipImmediately_IsSingleton()
     {
         Assert.Same(ThrottleBlockMode.SkipImmediately, ThrottleBlockMode.SkipImmediately);
+        Assert.Equal("SkipImmediately", ThrottleBlockMode.SkipImmediately.ToString());
     }
 
     [TestSuite("BVT")]
@@ -52,6 +54,7 @@ public sealed class ThrottleBlockModeTests
     public void WaitUpTo_ProducesDistinctValuesForDistinctTimeouts()
     {
         Assert.NotEqual(ThrottleBlockMode.WaitUpTo(TimeSpan.FromSeconds(1)), ThrottleBlockMode.WaitUpTo(TimeSpan.FromSeconds(2)));
+        Assert.Equal("WaitUpTo(00:00:01)", ThrottleBlockMode.WaitUpTo(TimeSpan.FromSeconds(1)).ToString());
     }
 }
 
