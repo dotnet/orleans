@@ -111,12 +111,38 @@ function Add-SummaryLine {
     [void] $Builder.AppendLine($Value)
 }
 
+function Get-TrxFiles {
+    param([string] $RootPath)
+
+    $directories = [Collections.Generic.Stack[IO.DirectoryInfo]]::new()
+    $files = [Collections.Generic.List[IO.FileInfo]]::new()
+    $directories.Push([IO.DirectoryInfo]::new($RootPath))
+
+    while ($directories.Count -gt 0) {
+        $directory = $directories.Pop()
+        foreach ($item in Get-ChildItem -LiteralPath $directory.FullName -Force) {
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                continue
+            }
+
+            if ($item.PSIsContainer) {
+                $directories.Push([IO.DirectoryInfo] $item)
+            } elseif ($item.Extension.Equals('.trx', [StringComparison]::OrdinalIgnoreCase)) {
+                $files.Add([IO.FileInfo] $item)
+            }
+        }
+    }
+
+    return @($files | Sort-Object FullName)
+}
+
 $resolvedResultsPath = (Resolve-Path -LiteralPath $ResultsPath).Path
-$trxFiles = @(Get-ChildItem -LiteralPath $resolvedResultsPath -Recurse -File -Filter '*.trx' | Sort-Object FullName)
+$trxFiles = @(Get-TrxFiles -RootPath $resolvedResultsPath)
 if ($trxFiles.Count -eq 0) {
     throw "No TRX files were found under '$resolvedResultsPath'."
 }
 
+$maximumTrxFileBytes = 32MB
 $artifactResults = @{}
 $failures = [Collections.Generic.List[object]]::new()
 $runIssues = [Collections.Generic.List[object]]::new()
@@ -144,10 +170,18 @@ foreach ($trxFile in $trxFiles) {
     $artifactResult = $artifactResults[$artifactName]
     $artifactResult.Files++
 
+    if ($trxFile.Length -gt $maximumTrxFileBytes) {
+        $parseErrors.Add([pscustomobject]@{
+            File = $relativePath
+            Message = "The TRX file is $($trxFile.Length) bytes, exceeding the $maximumTrxFileBytes-byte limit."
+        })
+        continue
+    }
+
     $settings = [Xml.XmlReaderSettings]::new()
     $settings.DtdProcessing = [Xml.DtdProcessing]::Prohibit
     $settings.XmlResolver = $null
-    $settings.MaxCharactersInDocument = 256MB
+    $settings.MaxCharactersInDocument = $maximumTrxFileBytes
 
     try {
         $reader = [Xml.XmlReader]::Create($trxFile.FullName, $settings)
