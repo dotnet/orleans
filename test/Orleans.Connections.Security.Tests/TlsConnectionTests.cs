@@ -32,7 +32,6 @@ namespace Orleans.Connections.Security.Tests
     /// - Authenticating clients and silos
     /// </summary>
     [TestCategory("BVT")]
-    [Trait("Category", "BVT")]
     [TestSuite("BVT")]
     [TestProvider("None")]
     [TestArea("Security")]
