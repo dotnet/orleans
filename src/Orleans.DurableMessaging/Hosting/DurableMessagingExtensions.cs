@@ -63,8 +63,6 @@ public static class DurableMessagingExtensions
         services.TryAddScoped<DurableInboxExtension>(sp =>
         {
             var stateManager = sp.GetRequiredService<IJournaledStateManager>();
-            DurableMessagingStateManagerCapabilities.Validate(stateManager);
-
             var options = sp.GetRequiredService<IOptions<DurableInboxOptions>>().Value;
             return new DurableInboxExtension(
                 sp.GetRequiredService<IGrainContext>(),
