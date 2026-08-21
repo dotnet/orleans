@@ -75,7 +75,7 @@ public class RabbitMqQueueCacheCursorTest
         var message = cursor.GetCurrent(exception: out _);
         Assert.Equal(3, message?.SequenceToken?.SequenceNumber);
     }
-    
+
     [Theory]
     [InlineData(9)]
     [InlineData(1)]
