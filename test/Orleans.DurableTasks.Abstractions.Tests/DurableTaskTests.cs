@@ -5,7 +5,9 @@ using Xunit;
 
 namespace Orleans.DurableTasks.Abstractions.Tests;
 
-[Trait("Category", "BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableTasks")]
 public class DurableTaskTests
 {
     [Fact]
@@ -1176,7 +1178,9 @@ public class DurableTaskTests
     }
 }
 
-[Trait("Category", "BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableTasks")]
 public class SchedulingTests
 {
     [Fact]

@@ -17,7 +17,9 @@ using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.Tests;
 
-[TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableTasks")]
 public sealed class DurableRpcProtocolTests
 {
     [Fact]

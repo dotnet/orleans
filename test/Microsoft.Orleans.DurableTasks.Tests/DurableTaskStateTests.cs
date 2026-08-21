@@ -12,7 +12,9 @@ using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.Tests;
 
-[TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableTasks")]
 public class DurableTaskStateTests
 {
     [Fact]
