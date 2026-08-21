@@ -1,13 +1,13 @@
 ---
 title: Run Orleans Journaling samples
-description: Run maintained Azure Blob and Redis examples for experimental Orleans Journaling.
+description: Run Azure Blob and Redis examples for experimental Orleans Journaling.
 ms.date: 08/21/2026
 ms.topic: tutorial
 ---
 
 # Run Orleans Journaling samples
 
-The maintained [Journaling with Azure Blob JSON](https://github.com/dotnet/orleans/tree/main/samples/JournalingAzureBlobJson) sample exercises the experimental Journaling programming model end to end. It uses .NET Aspire and the Azure Storage emulator and runs with local emulator credentials.
+The [Journaling with Azure Blob JSON](https://github.com/dotnet/orleans/tree/main/samples/JournalingAzureBlobJson) sample exercises the experimental Journaling programming model end to end. It uses .NET Aspire and the Azure Storage emulator and runs with local emulator credentials.
 
 The sample demonstrates:
 
