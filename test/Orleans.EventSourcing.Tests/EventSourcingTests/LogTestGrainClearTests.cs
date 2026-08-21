@@ -27,6 +27,7 @@ namespace Tester.EventSourcingTests
         [InlineData("TestGrains.LogTestGrainDefaultStorage", 721001L)]
         [InlineData("TestGrains.LogTestGrainSharedLogStorage", 721002L)]
         [InlineData("TestGrains.LogTestGrainCustomStoragePrimaryCluster", 721003L)]
+        [InlineData("TestGrains.LogTestGrainSeparateCustomStorage", 721004L)]
         public async Task ClearLog_ResetDropsTentativeAndAllowsFurtherWrites(string grainClass, long grainId)
         {
             var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrain>(grainId, grainClass);
