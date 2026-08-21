@@ -103,7 +103,7 @@ internal class RabbitMqQueueCacheCursor : IQueueCacheCursor
 
         return _current?.NextBatch;
     }
-    
+
     public void Dispose() => _onDispose();
 
     public IBatchContainer GetCurrent(out Exception exception)
