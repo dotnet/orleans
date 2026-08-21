@@ -1,5 +1,6 @@
 #nullable enable
 
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
@@ -32,13 +33,15 @@ public abstract class StreamingResumeTests : TestClusterPerTest
         var managementGrain = this.Client.GetGrain<IManagementGrain>(0);
         var activeSilos = this.HostedCluster.GetActiveSilos().ToArray();
         var expectedSiloCount = activeSilos.Length;
-        var configuredQueueCounts = activeSilos
+        var providerQueueCounts = activeSilos
             .Select(silo => this.HostedCluster.GetSiloServiceProvider(silo.SiloAddress)
-                .GetOptionsByName<HashRingStreamQueueMapperOptions>(StreamProviderName)
-                .TotalQueueCount)
+                .GetRequiredKeyedService<IQueueAdapterFactory>(StreamProviderName)
+                .GetStreamQueueMapper()
+                .GetAllQueues()
+                .Count())
             .Distinct()
             .ToArray();
-        var expectedQueueCount = Assert.Single(configuredQueueCounts);
+        var expectedQueueCount = Assert.Single(providerQueueCounts);
         await managementGrain.SendControlCommandToProvider<PersistentStreamProvider>(
             StreamProviderName,
             (int)PersistentStreamProviderCommand.StartAgents);
