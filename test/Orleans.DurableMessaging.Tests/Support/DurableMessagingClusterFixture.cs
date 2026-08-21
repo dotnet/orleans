@@ -96,8 +96,8 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
         options.OutboxBatchSize = 8;
     }
 
-    public Task InitializeAsync() => Cluster.DeployAsync();
-    public async Task DisposeAsync()
+    public ValueTask InitializeAsync() => new(Cluster.DeployAsync());
+    public async ValueTask DisposeAsync()
     {
         await Cluster.DisposeAsync();
         Metrics.Dispose();
