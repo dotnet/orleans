@@ -488,6 +488,11 @@ namespace Orleans.Providers.Streams.Common
                 }
             }
 
+            if (messageBlocks.Count == 0)
+            {
+                throw new QueueCacheMissException();
+            }
+
             // has this message been purged
             CachedMessage oldestMessage = messageBlocks.Last!.Value.OldestMessage; // Cursor is Set, so the cache is non-empty.
             if (cursor.State == CursorStates.Set
