@@ -40,7 +40,7 @@ async function walkProjects(directory) {
   return projects;
 }
 
-export async function discoverMaintainedProjects(repoRoot) {
+export async function discoverProjects(repoRoot) {
   const projects = [
     ...(await walkProjects(path.join(repoRoot, 'docs'))),
     ...(await walkProjects(path.join(repoRoot, 'samples'))),
@@ -106,7 +106,7 @@ export function validateSolutionCoverage({
       issues.push({
         rule: 'PROJECT001',
         project,
-        message: `Maintained project is missing from ${solutionName}.`,
+        message: `Project is missing from ${solutionName}.`,
         remediation: `Add the project to ${solutionName} with dotnet sln and preserve its directory hierarchy.`,
       });
     }
@@ -127,8 +127,8 @@ export function validateSolutionCoverage({
         rule: 'PROJECT003',
         project,
         message: project.startsWith('docs/') || project.startsWith('samples/')
-          ? 'Solution entry is stale or does not name a maintained project.'
-          : 'Solution entry is outside the maintained docs and samples trees.',
+          ? 'Solution entry is stale or does not name a discovered project.'
+          : 'Solution entry is outside the docs and samples trees.',
         remediation: 'Remove the stale entry; referenced source projects build transitively.',
       });
     }
@@ -196,7 +196,7 @@ export function validateProjectEvaluations({
         rule: 'PROJECT004',
         project,
         message: `Project evaluates to target framework(s) '${frameworks.join(';') || '(missing)'}'.`,
-        remediation: `Target exactly ${targetFramework}; maintained docs and samples do not multi-target.`,
+        remediation: `Target exactly ${targetFramework}; docs and samples use a single target framework.`,
       });
     }
 
@@ -319,7 +319,7 @@ export async function auditProjectPolicy({
   evaluate = evaluateProject,
   concurrency = 8,
 }) {
-  const discoveredProjects = await discoverMaintainedProjects(repoRoot);
+  const discoveredProjects = await discoverProjects(repoRoot);
   const inventories = solutionFiles ?? [
     {
       solutionFile,

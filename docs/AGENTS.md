@@ -13,7 +13,7 @@ These rules apply recursively to documentation, snippets, and samples under
   declare builders, configuration, services, and values used by the displayed
   region.
 - Compile every affected snippet project. Don't publish pseudo-code as if it were a copyable example.
-- Maintained documentation and snippet projects target `net10.0`.
+- Documentation and snippet projects target `net10.0`.
 - Every `Microsoft.Orleans.*` package reference must use the approved version `10.2.2`. Keep the Orleans package family aligned and centralize versions where the project structure supports it.
 - Use an older Orleans package only for a narrow migration example whose purpose
   requires that version. Keep it under `migration` and document the reason in
@@ -128,7 +128,7 @@ tutorial into a reference or burying architecture detail inside a how-to.
   and snippet project policy changes. It builds ordinary snippet projects and
   runs projects marked with `IsTestProject=true`, so executable testing examples
   are validated behaviorally.
-- Run `samples/Validate-Samples.ps1` when maintained samples change.
+- Run `samples/Validate-Samples.ps1` when samples change.
 - When `docs/Docs.slnx` is present after integration, build it as the aggregate documentation project.
 - From `docs/site`, run `npm run validate`, including redirect and rendered
   output auditing.

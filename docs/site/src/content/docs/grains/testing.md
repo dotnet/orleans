@@ -93,7 +93,7 @@ Configure the production storage or reminder provider when the test covers its e
 
 ## Use OrleansTestKit for a basic single-activation test
 
-[OrleansTestKit](https://github.com/OrleansContrib/OrleansTestKit) is a community-maintained project in the OrleansContrib organization. It creates a fixture for one grain activation and supplies test implementations for activation identity, persistent state, grain references, timers, reminders, and streams. The test invokes grain code on its own execution context, so the test author controls sequencing and synchronization. This boundary suits basic arrange-act-assert tests of a single method whose result depends on injected values and recorded collaborator interactions. Match the OrleansTestKit major version to the Orleans major version used by the application.
+[OrleansTestKit](https://github.com/OrleansContrib/OrleansTestKit) is a community project in the OrleansContrib organization. It creates a fixture for one grain activation and supplies test implementations for activation identity, persistent state, grain references, timers, reminders, and streams. The test invokes grain code on its own execution context, so the test author controls sequencing and synchronization. This boundary suits basic arrange-act-assert tests of a single method whose result depends on injected values and recorded collaborator interactions. Match the OrleansTestKit major version to the Orleans major version used by the application.
 
 Install the package in the test project:
 

@@ -973,7 +973,7 @@ describe('documentation source quality', () => {
     expect(issues.map((issue) => issue.message)).toEqual(
       expect.arrayContaining([
         "Navigation target 'gone.md' does not exist.",
-        'Maintained conceptual page is missing from toc.yml.',
+        'Conceptual page is missing from toc.yml.',
         "Navigation target 'overview.md' appears 2 times.",
       ]),
     );

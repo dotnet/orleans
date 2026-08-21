@@ -117,7 +117,7 @@ The original deployment only deployed the minimal services necessary to host the
 
 ## Install NuGet packages
 
-Before adding shared providers, align the template with the maintained snippets:
+Before adding shared providers, align the template with the snippets:
 
 1. Change the working directory to _./src/web/_.
 

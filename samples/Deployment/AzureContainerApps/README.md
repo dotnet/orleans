@@ -1,7 +1,7 @@
 # Deploy an Orleans cluster on Azure Container Apps
 
 > [!NOTE]
-> This sample is maintained in the [`dotnet/orleans` repository](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureContainerApps). It was imported from [`Azure-Samples/Orleans-Cluster-on-Azure-Container-Apps`](https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-Container-Apps), whose MIT license is preserved in this directory.
+> This sample lives in the [`dotnet/orleans` repository](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureContainerApps). It was imported from [`Azure-Samples/Orleans-Cluster-on-Azure-Container-Apps`](https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-Container-Apps), whose MIT license is preserved in this directory.
 
 This sample demonstrates a multi-component Orleans application on Azure Container Apps:
 

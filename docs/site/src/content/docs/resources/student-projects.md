@@ -7,7 +7,7 @@ ms.topic: conceptual
 
 # Research and student projects
 
-The former project list described research ideas and Azure technologies from an earlier stage of Orleans. It is no longer maintained as a roadmap.
+The former project list describes research ideas and Azure technologies from an earlier stage of Orleans and serves as historical context.
 
 For project ideas:
 
@@ -16,4 +16,4 @@ For project ideas:
 - Read the [contributing guide](https://github.com/dotnet/orleans/blob/main/CONTRIBUTING.md) before proposing an implementation.
 - Explore the [Orleans research publications](https://www.microsoft.com/research/project/orleans-virtual-actors/publications/).
 
-Course projects can begin with a maintained [Orleans sample](https://github.com/dotnet/orleans/tree/main/samples) and evaluate a focused distributed-systems concern such as partitioning, consistency, failure recovery, observability, or load distribution.
+Course projects can begin with an [Orleans sample](https://github.com/dotnet/orleans/tree/main/samples) and evaluate a focused distributed-systems concern such as partitioning, consistency, failure recovery, observability, or load distribution.

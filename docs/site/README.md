@@ -1,6 +1,6 @@
 # Orleans documentation site
 
-This Astro + Starlight site is the maintained home for Orleans documentation.
+This Astro + Starlight site hosts the Orleans documentation.
 The conceptual Markdown sources live under `src/content/docs`;
 `npm run prepare:docs` emits ignored `.mdx` siblings under `/docs/` so Starlight
 can render the imported Microsoft Learn syntax.
@@ -44,7 +44,7 @@ npm run validate
 The source audit reports a rule ID, file, line, and remediation. It enforces:
 
 - Orleans 10 guidance outside migration pages and explicitly versioned compatibility zones.
-- Exactly one `toc.yml` entry per maintained conceptual page, with `includes`,
+- Exactly one `toc.yml` entry per conceptual page, with `includes`,
   snippet support files, and compatibility routes marked `navigation: hidden`
   excluded; Architecture and internals and Event Sourcing remain first-class
   navigation sections.

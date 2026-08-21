@@ -17,7 +17,7 @@ These boundaries preserve fast feedback and runtime fidelity.
 
 ## Run the first cluster test
 
-Clone the repository, then run the maintained test project:
+Clone the repository, then run the test project:
 
 ```powershell
 git clone https://github.com/dotnet/orleans.git

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  discoverMaintainedProjects,
+  discoverProjects,
   normalizeProjectPath,
   readSolutionProjects,
   validateProjectEvaluations,
@@ -234,7 +234,7 @@ describe('documentation project policy', () => {
   });
 
   test('checked-in solution exactly covers a clean project discovery', async () => {
-    const discoveredProjects = await discoverMaintainedProjects(repoRoot);
+    const discoveredProjects = await discoverProjects(repoRoot);
     const docsSolutionProjects = await readSolutionProjects({
       repoRoot,
       solutionFile: path.join(repoRoot, 'docs', 'Docs.slnx'),

@@ -1,6 +1,6 @@
 # Orleans Samples
 
-This directory is the canonical maintained home of the official Orleans samples.
+This directory is the canonical home of the official Orleans samples.
 
 <!-- Generated from gallery.json by Update-Readme.ps1. -->
 
