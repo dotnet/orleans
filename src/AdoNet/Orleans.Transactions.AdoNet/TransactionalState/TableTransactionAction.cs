@@ -5,29 +5,28 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans.Transactions.AdoNet.Entity;
 
-namespace Orleans.Transactions.AdoNet.TransactionalState
+namespace Orleans.Transactions.AdoNet.TransactionalState;
+
+internal enum TableTransactionActionType
 {
-    internal enum TableTransactionActionType
+
+    Add,
+
+    UpdateReplace,
+
+    Delete,
+}
+
+internal class TableTransactionAction
+{
+    public TableTransactionAction(TableTransactionActionType action, IEntity tableEntity)
     {
-
-        Add,
-
-        UpdateReplace,
-
-        Delete,
+        this.ActionType = action;
+        this.TableEntity = tableEntity;
     }
 
-    internal class TableTransactionAction
-    {
-        public TableTransactionAction(TableTransactionActionType action, IEntity tableEntity)
-        {
-            this.ActionType = action;
-            this.TableEntity = tableEntity;
-        }
 
+    public TableTransactionActionType ActionType { get; }
+    public IEntity TableEntity { get; }
 
-        public TableTransactionActionType ActionType { get; }
-        public IEntity TableEntity { get; }
-
-    }
 }

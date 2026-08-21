@@ -4,19 +4,18 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Orleans.Transactions.AdoNet.Entity
+namespace Orleans.Transactions.AdoNet.Entity;
+
+/// <summary>
+///
+/// </summary>
+internal class KeyEntity : IEntity
 {
-    /// <summary>
-    ///
-    /// </summary>
-    internal class KeyEntity : IEntity
-    {
-        public string StateId { get; set; } = null!;
+    public string StateId { get; set; } = null!;
 
-        public DateTimeOffset? Timestamp { get; set; }
+    public DateTimeOffset? Timestamp { get; set; }
 
-        public long CommittedSequenceId { get; set; }
-        public byte[]? Metadata { get; set; }
-        public string? ETag { get; set; }
-    }
+    public long CommittedSequenceId { get; set; }
+    public byte[]? Metadata { get; set; }
+    public string? ETag { get; set; }
 }
