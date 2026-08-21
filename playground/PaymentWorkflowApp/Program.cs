@@ -21,7 +21,7 @@ var jobScheduler = host.Services.GetRequiredService<JobScheduler>();
 // Cleanup completed jobs which completed at least a second ago.
 await jobScheduler.PruneCompletedTasksAsync(TimeSpan.FromMinutes(5));
 
-jobScheduler.AddHandler("stringJoin", args => new(string.Join(", ", args))); 
+jobScheduler.AddHandler("stringJoin", args => new(string.Join(", ", args)));
 
 // During program config. This could be ASP.NET route mapping
 jobScheduler.AddHandler("SayHello", async args =>

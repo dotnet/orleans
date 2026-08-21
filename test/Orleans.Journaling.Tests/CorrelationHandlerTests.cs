@@ -37,7 +37,7 @@ public class CorrelationHandlerTests
     {
         var parentKey = HierarchicalKey.Create("workflow/order-123");
         var handler = new TestCorrelationHandler(parentKey);
-        
+
         var childKey = HierarchicalKey.Create("workflow/order-123/payment");
         var contextChild = CreateMockContext(correlationKey: childKey);
 
@@ -52,7 +52,7 @@ public class CorrelationHandlerTests
     {
         var parentKey = HierarchicalKey.Create("workflow/order-123");
         var handler = new TestCorrelationHandler(parentKey);
-        
+
         var grandchildKey = HierarchicalKey.Create("workflow/order-123/payment/verify");
         var contextGrandchild = CreateMockContext(correlationKey: grandchildKey);
 
@@ -67,7 +67,7 @@ public class CorrelationHandlerTests
     {
         var childKey = HierarchicalKey.Create("workflow/order-123/payment");
         var handler = new TestCorrelationHandler(childKey);
-        
+
         var parentKey = HierarchicalKey.Create("workflow/order-123");
         var contextParent = CreateMockContext(correlationKey: parentKey);
 
@@ -82,7 +82,7 @@ public class CorrelationHandlerTests
     {
         var key1 = HierarchicalKey.Create("workflow/order-123");
         var handler = new TestCorrelationHandler(key1);
-        
+
         var key2 = HierarchicalKey.Create("workflow/payment-456");
         var contextUnrelated = CreateMockContext(correlationKey: key2);
 
@@ -120,7 +120,7 @@ public class CorrelationHandlerTests
     {
         var correlationKey = HierarchicalKey.Create("workflow/payment-789");
         var handler = new TestCorrelationHandler(correlationKey);
-        
+
         Assert.Equal(correlationKey, handler.ExposedCorrelationKey);
     }
 
@@ -135,7 +135,7 @@ public class CorrelationHandlerTests
         var context = CreateMockContext(correlationKey: correlationKey);
 
         Assert.True(handler.CanHandle(context));
-        
+
         // Call HandleAsync through the interface
         await ((IInboxHandler)handler).HandleAsync(context, CancellationToken.None);
 
@@ -169,7 +169,7 @@ public class CorrelationHandlerTests
     {
         var orderKey = HierarchicalKey.Create("workflow/order-123");
         var paymentKey = HierarchicalKey.Create("workflow/payment-456");
-        
+
         var orderHandler = new TestCorrelationHandler(orderKey);
         var paymentHandler = new TestCorrelationHandler(paymentKey);
 

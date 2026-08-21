@@ -122,7 +122,7 @@ public class RouteKeyHandlerTests
         var context = CreateMockContext(routeKey: "order/process");
 
         Assert.True(handler.CanHandle(context));
-        
+
         // Call HandleAsync through the interface
         await ((IInboxHandler)handler).HandleAsync(context, CancellationToken.None);
 

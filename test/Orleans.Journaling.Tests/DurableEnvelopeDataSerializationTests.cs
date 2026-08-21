@@ -36,8 +36,6 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
         _serviceProvider?.Dispose();
     }
 
-    #region Helper Methods
-
     /// <summary>
     /// Helper method to create a DurableEnvelopeData with a body using the same serialization
     /// pattern as DurableEnvelopeBuilder.
@@ -97,10 +95,6 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
             writer.Dispose();
         }
     }
-
-    #endregion
-
-    #region Primitive Type Tests
 
     [Fact]
     public void TryGetBody_Int32_Succeeds()
@@ -210,10 +204,6 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
         Assert.Equal(expected, value);
     }
 
-    #endregion
-
-    #region String Tests
-
     [Fact]
     public void TryGetBody_String_Succeeds()
     {
@@ -247,10 +237,6 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
         Assert.True(data.TryGetBody<string>(out var value));
         Assert.Equal(expected, value);
     }
-
-    #endregion
-
-    #region Complex Type Tests
 
     [Fact]
     public void TryGetBody_SimpleRecord_Succeeds()
@@ -326,10 +312,6 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
         Assert.Null(value.NullableInt);
         Assert.Null(value.NullableString);
     }
-
-    #endregion
-
-    #region Collection Type Tests
 
     [Fact]
     public void TryGetBody_IntArray_Succeeds()
@@ -428,10 +410,6 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
         Assert.Equal(expected, value);
     }
 
-    #endregion
-
-    #region Type Mismatch Tests
-
     [Fact]
     public void TryGetBody_IntAsString_ReturnsFalse()
     {
@@ -467,10 +445,6 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
         // We just verify it doesn't throw
         Assert.True(success || !success);
     }
-
-    #endregion
-
-    #region Context Value Tests
 
     [Fact]
     public void TryGetContextValue_MultipleTypesInContext_Succeeds()
@@ -517,10 +491,6 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
         Assert.True(data.TryGetContextValue<int>("int-key", out var intValue));
         Assert.Equal(42, intValue);
     }
-
-    #endregion
-
-    #region Round-Trip Serialization Tests
 
     [Fact]
     public void DurableEnvelopeData_RoundTripSerialization_PreservesData()
@@ -608,10 +578,6 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
         Assert.Equal(new List<string> { "tag1", "tag2", "tag3" }, body.Tags);
     }
 
-    #endregion
-
-    #region Edge Cases
-
     [Fact]
     public void TryGetBody_NullSessionPool_ReturnsFalse()
     {
@@ -698,10 +664,6 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
         data.Dispose();
     }
 
-    #endregion
-
-    #region Test Types
-
     [GenerateSerializer]
     public record SimpleRecord(
         [property: Id(0)] int Id,
@@ -730,6 +692,4 @@ public class DurableEnvelopeDataSerializationTests : IDisposable
         [Id(6)] public int? NullableInt { get; set; }
         [Id(7)] public string? NullableString { get; set; }
     }
-
-    #endregion
 }

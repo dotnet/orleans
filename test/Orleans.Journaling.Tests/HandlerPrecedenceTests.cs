@@ -162,7 +162,7 @@ public class HandlerPrecedenceTests : IClassFixture<HandlerPrecedenceTests.Fixtu
 }
 
 // ============================================================================
-// Test Message Types  
+// Test Message Types
 // ============================================================================
 // Note: TestMessage is defined in DurableMessagingRecoveryTests.cs and reused here
 

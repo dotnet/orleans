@@ -78,8 +78,6 @@ public class DurableTaskGrainRuntimeTests
     /// </summary>
     private static CancellationToken BoundedWait() => new CancellationTokenSource(TimeSpan.FromSeconds(15)).Token;
 
-    #region 1. IDurableTaskServer.ScheduleAsync
-
     [Fact]
     public async Task ScheduleAsync_NewTask_PersistsStateAndReturnsPending()
     {
@@ -276,10 +274,6 @@ public class DurableTaskGrainRuntimeTests
         Assert.Equal(1, fixture.Transport.CommitCount);
     }
 
-    #endregion
-
-    #region 2. AcceptResponse + ResumePendingTasksAsync (recovery)
-
     [Fact]
     public async Task AcceptResponse_DuplicateCompletion_DoesNotOverwritePersistedOrInMemoryResult()
     {
@@ -386,10 +380,6 @@ public class DurableTaskGrainRuntimeTests
         Assert.True(stateAfterRestart.Result!.IsCompleted);
         Assert.Equal(1, stateAfterRestart.Result.GetResult<int>());
     }
-
-    #endregion
-
-    #region 3. SetResponseAsync fan-out + PruneCompletedTasks retention
 
     [Fact]
     public async Task Completion_NotifiesAllRegisteredCompletionDestinations_ThenClearsThem()
@@ -543,10 +533,6 @@ public class DurableTaskGrainRuntimeTests
         Assert.False(fixture.Storage.TryGetTask(childId, out _));
     }
 
-    #endregion
-
-    #region 4. SignalCancellationAsync cascading cancellation
-
     [Fact]
     public async Task SignalCancellationAsync_CascadesToChildrenAndGrandchildren()
     {
@@ -652,10 +638,6 @@ public class DurableTaskGrainRuntimeTests
         Assert.Equal(8, afterCancellation.Result!.GetResult<int>());
     }
 
-    #endregion
-
-    #region 5. ScheduleChildAsync branches
-
     [Fact]
     public async Task ScheduleChildAsync_SchedulableTask_CompletesImmediately_ReturnsCompletedHandle()
     {
@@ -715,10 +697,6 @@ public class DurableTaskGrainRuntimeTests
         Assert.True(fixture.Storage.TryGetTask(taskId, out var state));
         Assert.Equal(5, state.Result!.GetResult<int>());
     }
-
-    #endregion
-
-    #region 6. ScheduleRemoteAsync / CancelRemoteAsync / ScheduleDelayAsync via the fake transport
 
     [Fact]
     public async Task ScheduleRemoteAsync_WithTransport_SendsInvocationAndCommits()
@@ -829,10 +807,6 @@ public class DurableTaskGrainRuntimeTests
         await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await fixture.Runtime.ScheduleDelayAsync(TaskId.Create("x"), DateTimeOffset.UtcNow, CancellationToken.None));
     }
-
-    #endregion
-
-    #region 7. GetTasksAsync / GetRunningTasksAsync / GetScheduledTaskHandle accessors
 
     [Fact]
     public async Task SubscribeOrPollAsync_RunningTaskReturnsPendingUntilCompletion()
@@ -1005,8 +979,6 @@ public class DurableTaskGrainRuntimeTests
 
         Assert.False(response.IsCompleted);
     }
-
-    #endregion
 
     private sealed class StubScheduledTaskHandle(TaskId taskId) : IScheduledTaskHandle
     {

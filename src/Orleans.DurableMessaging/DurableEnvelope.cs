@@ -33,7 +33,7 @@ namespace Orleans.DurableMessaging;
 ///     .WithCorrelationKey("order-12345/payment")
 ///     .WithReplyTo(context.GrainId)
 ///     .Build();
-/// 
+///
 /// context.Send(envelope);
 /// </code>
 /// </example>
@@ -97,7 +97,7 @@ public readonly struct DurableEnvelope
     /// inbox.RegisterHandler("payment/process", new PaymentHandler());
     /// inbox.RegisterHandler("order/confirm", new OrderConfirmationHandler());
     /// inbox.RegisterHandler("refund/initiate", new RefundHandler());
-    /// 
+    ///
     /// // Messages are routed based on RouteKey
     /// var envelope = builder.To(targetGrain, "payment/process").WithBody(request).Build();
     /// </code>
@@ -127,19 +127,19 @@ public readonly struct DurableEnvelope
     /// var envelope = builder
     ///     .WithCorrelationKey("order-12345")
     ///     .Build();
-    /// 
+    ///
     /// // Hierarchical correlation for orchestrated operations
     /// var transferKey = HierarchicalKey.Create("transfer-abc");
-    /// 
+    ///
     /// // Child operations inherit correlation hierarchy
     /// var debitEnvelope = builder
     ///     .WithCorrelationKey(transferKey.CreateChildKey("debit"))  // "transfer-abc/debit"
     ///     .Build();
-    /// 
+    ///
     /// var creditEnvelope = builder
     ///     .WithCorrelationKey(transferKey.CreateChildKey("credit")) // "transfer-abc/credit"
     ///     .Build();
-    /// 
+    ///
     /// // Handlers can check relationships
     /// if (envelope.CorrelationKey?.IsChildOf(transferKey) == true)
     /// {
@@ -175,14 +175,14 @@ public readonly struct DurableEnvelope
     ///     .WithCorrelationKey("order-12345")
     ///     .WithReplyTo(context.GrainId)  // Specify where to send response
     ///     .Build();
-    /// 
+    ///
     /// context.Send(request);
-    /// 
+    ///
     /// // Handler sends reply
     /// public async ValueTask HandleAsync(PaymentRequest request, IInboxHandlerContext context, CancellationToken ct)
     /// {
     ///     var result = await ProcessPayment(request);
-    ///     
+    ///
     ///     if (context.Envelope.ReplyTo is { } replyTo)
     ///     {
     ///         var response = context.CreateEnvelope()
@@ -190,7 +190,7 @@ public readonly struct DurableEnvelope
     ///             .WithBody(result)
     ///             .WithCorrelationKey(context.Envelope.CorrelationKey)  // Preserve correlation
     ///             .Build();
-    ///         
+    ///
     ///         context.Send(response);
     ///     }
     /// }
@@ -236,13 +236,13 @@ public readonly struct DurableEnvelope
     ///     // Grain doesn't crash - can log, skip, or dead-letter
     ///     _logger.LogWarning("Failed to deserialize message body");
     /// }
-    /// 
+    ///
     /// // Accessing specific context values
     /// if (envelope.Data.TryGetContextValue&lt;string&gt;("TraceId", out var traceId))
     /// {
     ///     // Use trace ID for distributed tracing
     /// }
-    /// 
+    ///
     /// // Forwarding without deserialization (zero-copy)
     /// var bodyBytes = envelope.Data.GetBodyBytes();
     /// ForwardToAnotherSystem(bodyBytes);

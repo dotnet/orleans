@@ -264,7 +264,7 @@ public class InboxHandlerContextTests : IClassFixture<DefaultClusterFixture>
         var senderId = GrainId.Create("test", "sender");
         var receiverId = GrainId.Create("test", "receiver");
         var sessionPool = _fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
-        
+
         var correlationKey = HierarchicalKey.Create("workflow-123");
         var builder = new DurableEnvelopeBuilder
         {

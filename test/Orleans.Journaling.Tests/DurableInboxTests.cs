@@ -321,7 +321,7 @@ public class DurableInboxTests
         var senderId = GrainId.Create("sender", "1");
         var messageId = Guid.NewGuid();
         var envelope = CreateTestEnvelope(senderId: senderId, messageId: messageId);
-        
+
         // Add message to inbox directly via the underlying dictionary
         inboxDict[(senderId, messageId)] = envelope;
 
@@ -331,7 +331,7 @@ public class DurableInboxTests
         // Assert
         Assert.True(result);
         Assert.Equal(0, inbox.Count);
-        
+
         // Verify envelope data was disposed by checking if accessing the buffer throws
         // Note: This is a best-effort test since DurableEnvelopeData with null SessionPool
         // won't have a real ArcBuffer to dispose, but the dispose path is still exercised
@@ -349,7 +349,7 @@ public class DurableInboxTests
         var senderId = GrainId.Create("sender", "1");
         var messageId = Guid.NewGuid();
         var envelope = CreateTestEnvelope(senderId: senderId, messageId: messageId);
-        
+
         // Add message to inbox
         inboxDict[(senderId, messageId)] = envelope;
 

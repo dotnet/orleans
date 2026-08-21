@@ -89,20 +89,20 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
     ///     .To(targetGrain, "order/confirm")
     ///     .WithBody(new OrderConfirmation { OrderId = orderId })
     ///     .Build();
-    /// 
+    ///
     /// context.Send(envelope);
-    /// 
+    ///
     /// // Create multiple messages with the same context
     /// var notification = context.CreateEnvelope()
     ///     .To(notificationGrain, "notification/send")
     ///     .WithBody(new Notification { Message = "Order confirmed" })
     ///     .Build();
-    /// 
+    ///
     /// var audit = context.CreateEnvelope()
     ///     .To(auditGrain, "audit/log")
     ///     .WithBody(new AuditEvent { Action = "OrderConfirmed", OrderId = orderId })
     ///     .Build();
-    /// 
+    ///
     /// context.Send(notification);
     /// context.Send(audit);
     /// </code>
@@ -136,20 +136,20 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
     /// {
     ///     // Process order (may throw exceptions)
     ///     var result = await ProcessOrder(request);
-    ///     
+    ///
     ///     // These messages are only persisted if ProcessOrder succeeds
     ///     var confirmation = context.CreateEnvelope()
     ///         .To(request.CustomerId, "order/confirmed")
     ///         .WithBody(result)
     ///         .Build();
     ///     context.Send(confirmation);
-    ///     
+    ///
     ///     var fulfillment = context.CreateEnvelope()
     ///         .To(fulfillmentGrain, "fulfillment/create")
     ///         .WithBody(result)
     ///         .Build();
     ///     context.Send(fulfillment);
-    ///     
+    ///
     ///     // If we reach here, both messages will be persisted atomically
     /// }
     /// </code>

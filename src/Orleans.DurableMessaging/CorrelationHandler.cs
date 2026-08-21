@@ -44,26 +44,26 @@ namespace Orleans.DurableMessaging;
 /// public class OrderWorkflowHandler : CorrelationHandler
 /// {
 ///     private readonly string _orderId;
-///     
-///     public OrderWorkflowHandler(string orderId) 
+///
+///     public OrderWorkflowHandler(string orderId)
 ///         : base(HierarchicalKey.Create($"workflow/order-{orderId}"))
 ///     {
 ///         _orderId = orderId;
 ///     }
-///     
+///
 ///     protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken ct)
 ///     {
 ///         // This handler receives messages from:
 ///         // - The main order workflow ("workflow/order-123")
 ///         // - Child workflows like payment ("workflow/order-123/payment")
 ///         // - Grandchild workflows like verification ("workflow/order-123/payment/verify")
-///         
+///
 ///         // Deserialize the message
 ///         if (!context.Envelope.Data.TryGetBody&lt;WorkflowEvent&gt;(out var workflowEvent))
 ///         {
 ///             throw new InvalidOperationException("Failed to deserialize WorkflowEvent");
 ///         }
-///         
+///
 ///         // Process based on correlation hierarchy
 ///         if (context.Envelope.CorrelationKey == CorrelationKey)
 ///         {
@@ -77,7 +77,7 @@ namespace Orleans.DurableMessaging;
 ///         }
 ///     }
 /// }
-/// 
+///
 /// // Registration
 /// var orderId = "123";
 /// var handler = new OrderWorkflowHandler(orderId);
