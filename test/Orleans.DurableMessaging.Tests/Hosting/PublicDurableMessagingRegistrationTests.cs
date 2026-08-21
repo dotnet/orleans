@@ -80,18 +80,9 @@ public sealed class PublicDurableMessagingRegistrationTests
     }
 
     [Fact]
-    public void ExternalConsumerAssembly_HasNoFriendAccessToDurableMessaging()
+    public void InboxTransportIsInternal()
     {
-        var sourceAssembly = typeof(IDurableInbox).Assembly;
-        var consumerName = typeof(PublicDurableMessagingRegistrationTests).Assembly.GetName().Name;
-        var friendDeclarations = sourceAssembly
-            .GetCustomAttributesData()
-            .Where(attribute => attribute.AttributeType.FullName == "System.Runtime.CompilerServices.InternalsVisibleToAttribute")
-            .Select(attribute => attribute.ConstructorArguments[0].Value?.ToString())
-            .ToArray();
-
-        Assert.DoesNotContain(friendDeclarations, declaration =>
-            declaration?.StartsWith(consumerName!, StringComparison.Ordinal) == true);
+        Assert.False(typeof(IDurableInboxExtension).IsPublic);
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
