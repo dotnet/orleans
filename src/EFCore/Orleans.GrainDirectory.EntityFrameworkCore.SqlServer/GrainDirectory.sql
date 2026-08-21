@@ -17,10 +17,10 @@ IF NOT EXISTS (
 )
 BEGIN
     CREATE TABLE [Activations] (
-        [ClusterId] nvarchar(450) COLLATE Latin1_General_100_BIN2 NOT NULL,
-        [GrainId] nvarchar(450) COLLATE Latin1_General_100_BIN2 NOT NULL,
-        [SiloAddress] nvarchar(450) COLLATE Latin1_General_100_BIN2 NOT NULL,
-        [ActivationId] nvarchar(450) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [ClusterId] nvarchar(150) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [GrainId] nvarchar(512) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [SiloAddress] nvarchar(256) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [ActivationId] nvarchar(64) COLLATE Latin1_General_100_BIN2 NOT NULL,
         [MembershipVersion] bigint NOT NULL,
         [ETag] rowversion NOT NULL,
         CONSTRAINT [PK_Activations] PRIMARY KEY NONCLUSTERED ([ClusterId], [GrainId])

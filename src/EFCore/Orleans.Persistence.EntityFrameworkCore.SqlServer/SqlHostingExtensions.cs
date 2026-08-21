@@ -86,8 +86,8 @@ public static class SqlHostingExtensions
         string name,
         Action<DbContextOptionsBuilder> configureDatabase)
     {
-        services.AddPooledDbContextFactory<SqlServerGrainStateDbContext>(configureDatabase);
-        return services.AddEntityFrameworkCoreSqlServerGrainStorage(name);
+        services.AddSingleton<IEFGrainStorageETagConverter<byte[]>, SqlServerGrainStateETagConverter>();
+        return services.AddEntityFrameworkCoreGrainStorage<SqlServerGrainStateDbContext, byte[]>(name, configureDatabase);
     }
 
     /// <summary>

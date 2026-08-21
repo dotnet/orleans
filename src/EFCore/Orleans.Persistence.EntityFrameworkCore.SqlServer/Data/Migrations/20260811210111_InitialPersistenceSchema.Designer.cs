@@ -27,27 +27,27 @@ namespace Orleans.Persistence.EntityFrameworkCore.SqlServer.Data.Migrations
             modelBuilder.Entity("Orleans.Persistence.EntityFrameworkCore.Data.GrainStateRecord<byte[]>", b =>
                 {
                     b.Property<string>("ServiceId")
-                        .HasMaxLength(280)
-                        .HasColumnType("nvarchar(280)")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)")
                         .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<string>("GrainType")
-                        .HasMaxLength(280)
-                        .HasColumnType("nvarchar(280)")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)")
                         .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<string>("StateType")
-                        .HasMaxLength(280)
-                        .HasColumnType("nvarchar(280)")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)")
                         .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<string>("GrainId")
-                        .HasMaxLength(280)
-                        .HasColumnType("nvarchar(280)")
+                        .HasMaxLength(299)
+                        .HasColumnType("nvarchar(299)")
                         .UseCollation("Latin1_General_100_BIN2");
 
-                    b.Property<string>("Data")
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<byte[]>("Data")
+                        .HasColumnType("varbinary(max)");
 
                     b.Property<byte[]>("ETag")
                         .IsConcurrencyToken()

@@ -30,4 +30,7 @@
     <ProjectReference Include="$(SourceRoot)src\EFCore\Orleans.GrainDirectory.EntityFrameworkCore\Orleans.GrainDirectory.EntityFrameworkCore.csproj"/>
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="GrainDirectory.sql" Pack="true" PackagePath="\" />
+  </ItemGroup>
 </Project>

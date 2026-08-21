@@ -19,7 +19,7 @@ namespace Orleans.Persistence.EntityFrameworkCore.PostgreSQL.Data.Migrations
                     GrainType = table.Column<string>(type: "character varying(280)", maxLength: 280, nullable: false),
                     StateType = table.Column<string>(type: "character varying(280)", maxLength: 280, nullable: false),
                     GrainId = table.Column<string>(type: "character varying(280)", maxLength: 280, nullable: false),
-                    Data = table.Column<string>(type: "text", nullable: true),
+                    Data = table.Column<byte[]>(type: "bytea", nullable: true),
                     ETag = table.Column<Guid>(type: "uuid", nullable: false)
                 },
                 constraints: table =>

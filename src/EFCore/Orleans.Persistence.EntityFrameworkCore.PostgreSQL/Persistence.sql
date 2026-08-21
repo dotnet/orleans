@@ -15,7 +15,7 @@ BEGIN
         "GrainType" character varying(280) NOT NULL,
         "StateType" character varying(280) NOT NULL,
         "GrainId" character varying(280) NOT NULL,
-        "Data" text,
+        "Data" bytea,
         "ETag" uuid NOT NULL,
         CONSTRAINT "PK_GrainState" PRIMARY KEY ("ServiceId", "GrainType", "StateType", "GrainId")
     );
@@ -30,4 +30,3 @@ BEGIN
     END IF;
 END $EF$;
 COMMIT;
-

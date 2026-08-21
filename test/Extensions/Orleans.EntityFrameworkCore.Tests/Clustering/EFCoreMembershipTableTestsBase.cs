@@ -93,6 +93,39 @@ public abstract class EFCoreMembershipTableTestsBase<TDbContext, TETag> :
         MembershipTable_UpdateIAmAlive();
 
     [Fact]
+    public async Task MembershipTable_UpdateIAmAlive_PreservesConcurrentMembershipChanges()
+    {
+        var table = CreateMembershipTable(clusterId);
+        var entry = CreateMembershipEntry(IPAddress.Parse("192.0.2.11"), 24104);
+        Assert.True(await Insert(table, entry));
+
+        await using (var context = await Factory.CreateDbContextAsync())
+        {
+            var record = await context.Silos.SingleAsync(record =>
+                record.ClusterId == clusterId &&
+                record.Address == entry.SiloAddress.Endpoint.Address.ToString() &&
+                record.Port == entry.SiloAddress.Endpoint.Port &&
+                record.Generation == entry.SiloAddress.Generation);
+            record.Status = SiloStatus.Active;
+            record.Name = "concurrent-winner";
+            await context.SaveChangesAsync();
+        }
+
+        entry.IAmAliveTime = entry.IAmAliveTime.AddMinutes(5);
+        await table.UpdateIAmAlive(entry);
+
+        await using var verification = await Factory.CreateDbContextAsync();
+        var stored = await verification.Silos.AsNoTracking().SingleAsync(record =>
+            record.ClusterId == clusterId &&
+            record.Address == entry.SiloAddress.Endpoint.Address.ToString() &&
+            record.Port == entry.SiloAddress.Endpoint.Port &&
+            record.Generation == entry.SiloAddress.Generation);
+        Assert.Equal(SiloStatus.Active, stored.Status);
+        Assert.Equal("concurrent-winner", stored.Name);
+        Assert.Equal(entry.IAmAliveTime, stored.IAmAliveTime);
+    }
+
+    [Fact]
     public Task MembershipTable_CleanupDefunctSilos_PreservesActiveAndRecentMembers() =>
         MembershipTable_CleanupDefunctSiloEntries();
 

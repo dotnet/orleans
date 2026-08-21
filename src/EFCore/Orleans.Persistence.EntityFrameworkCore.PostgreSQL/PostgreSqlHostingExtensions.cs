@@ -46,8 +46,8 @@ public static class PostgreSqlHostingExtensions
         string name,
         Action<DbContextOptionsBuilder> configureDatabase)
     {
-        services.AddPooledDbContextFactory<PostgreSqlGrainStateDbContext>(configureDatabase);
-        return services.AddEntityFrameworkCorePostgreSqlGrainStorage(name);
+        services.AddSingleton<IEFGrainStorageETagConverter<Guid>, GuidGrainStorageETagConverter>();
+        return services.AddEntityFrameworkCoreGrainStorage<PostgreSqlGrainStateDbContext, Guid>(name, configureDatabase);
     }
 
     public static IServiceCollection AddEntityFrameworkCorePostgreSqlGrainStorage(this IServiceCollection services, string name)

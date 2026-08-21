@@ -15,10 +15,10 @@ public class SqlServerReminderDbContext : ReminderDbContext<SqlServerReminderDbC
     {
         modelBuilder.Entity<ReminderRecord<byte[]>>(c =>
         {
-            c.HasKey(p => new {p.ServiceId, p.GrainId, p.Name}).HasName("PK_Reminders");
-            c.Property(p => p.ServiceId).UseCollation(IdentifierCollation).IsRequired();
-            c.Property(p => p.GrainId).UseCollation(IdentifierCollation).IsRequired();
-            c.Property(p => p.Name).UseCollation(IdentifierCollation).IsRequired();
+            c.HasKey(p => new {p.ServiceId, p.GrainId, p.Name}).IsClustered(false).HasName("PK_Reminders");
+            c.Property(p => p.ServiceId).HasMaxLength(150).UseCollation(IdentifierCollation).IsRequired();
+            c.Property(p => p.GrainId).HasMaxLength(512).UseCollation(IdentifierCollation).IsRequired();
+            c.Property(p => p.Name).HasMaxLength(150).UseCollation(IdentifierCollation).IsRequired();
             c.Property(p => p.StartAt).IsRequired();
             c.Property(p => p.Period)
                 .HasConversion(period => period.Ticks, ticks => TimeSpan.FromTicks(ticks))

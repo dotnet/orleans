@@ -16,10 +16,10 @@ public class SqlServerGrainDirectoryDbContext : GrainDirectoryDbContext<SqlServe
         modelBuilder.Entity<GrainActivationRecord<byte[]>>(c =>
         {
             c.HasKey(p => new {p.ClusterId, p.GrainId}).IsClustered(false).HasName("PK_Activations");
-            c.Property(p => p.ClusterId).UseCollation(IdentifierCollation).IsRequired();
-            c.Property(p => p.GrainId).UseCollation(IdentifierCollation).IsRequired();
-            c.Property(p => p.SiloAddress).UseCollation(IdentifierCollation).IsRequired();
-            c.Property(p => p.ActivationId).UseCollation(IdentifierCollation).IsRequired();
+            c.Property(p => p.ClusterId).HasMaxLength(150).UseCollation(IdentifierCollation).IsRequired();
+            c.Property(p => p.GrainId).HasMaxLength(512).UseCollation(IdentifierCollation).IsRequired();
+            c.Property(p => p.SiloAddress).HasMaxLength(256).UseCollation(IdentifierCollation).IsRequired();
+            c.Property(p => p.ActivationId).HasMaxLength(64).UseCollation(IdentifierCollation).IsRequired();
             c.Property(p => p.MembershipVersion).IsRequired();
             c.Property(p => p.ETag).IsRequired().IsRowVersion();
 

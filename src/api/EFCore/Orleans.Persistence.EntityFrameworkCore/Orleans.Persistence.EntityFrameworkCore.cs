@@ -59,7 +59,7 @@ namespace Orleans.Persistence.EntityFrameworkCore.Data
 
     public partial class GrainStateRecord<TETag>
     {
-        public string? Data { get { throw null; } set { } }
+        public byte[]? Data { get { throw null; } set { } }
 
         public TETag ETag { get { throw null; } set { } }
 

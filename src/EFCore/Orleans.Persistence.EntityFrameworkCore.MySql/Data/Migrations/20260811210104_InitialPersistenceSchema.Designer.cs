@@ -47,8 +47,8 @@ namespace Orleans.Persistence.EntityFrameworkCore.MySql.Data.Migrations
                         .HasColumnType("varchar(191)")
                         .UseCollation("utf8mb4_bin");
 
-                    b.Property<string>("Data")
-                        .HasColumnType("longtext");
+                    b.Property<byte[]>("Data")
+                        .HasColumnType("longblob");
 
                     b.Property<Guid>("ETag")
                         .IsConcurrencyToken()

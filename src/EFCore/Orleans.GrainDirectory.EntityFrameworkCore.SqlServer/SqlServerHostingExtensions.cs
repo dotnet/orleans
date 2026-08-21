@@ -43,11 +43,8 @@ public static class SqlServerHostingExtensions
         string name,
         Action<DbContextOptionsBuilder> configureDatabase)
     {
-        services
-            .AddPooledDbContextFactory<SqlServerGrainDirectoryDbContext>(configureDatabase)
-            .AddEntityFrameworkCoreSqlServerGrainDirectory(name);
-
-        return services;
+        services.AddSingleton<IEFGrainDirectoryETagConverter<byte[]>, SqlServerGrainDirectoryETagConverter>();
+        return services.AddEntityFrameworkCoreGrainDirectory<SqlServerGrainDirectoryDbContext, byte[]>(name, configureDatabase);
     }
 
     internal static IServiceCollection AddEntityFrameworkCoreSqlServerGrainDirectory(

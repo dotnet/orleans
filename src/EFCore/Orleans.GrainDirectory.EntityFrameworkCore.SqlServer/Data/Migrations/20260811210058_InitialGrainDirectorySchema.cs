@@ -14,10 +14,10 @@ namespace Orleans.GrainDirectory.EntityFrameworkCore.SqlServer.Data.Migrations
                 name: "Activations",
                 columns: table => new
                 {
-                    ClusterId = table.Column<string>(type: "nvarchar(450)", nullable: false, collation: "Latin1_General_100_BIN2"),
-                    GrainId = table.Column<string>(type: "nvarchar(450)", nullable: false, collation: "Latin1_General_100_BIN2"),
-                    SiloAddress = table.Column<string>(type: "nvarchar(450)", nullable: false, collation: "Latin1_General_100_BIN2"),
-                    ActivationId = table.Column<string>(type: "nvarchar(450)", nullable: false, collation: "Latin1_General_100_BIN2"),
+                    ClusterId = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false, collation: "Latin1_General_100_BIN2"),
+                    GrainId = table.Column<string>(type: "nvarchar(512)", maxLength: 512, nullable: false, collation: "Latin1_General_100_BIN2"),
+                    SiloAddress = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false, collation: "Latin1_General_100_BIN2"),
+                    ActivationId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false, collation: "Latin1_General_100_BIN2"),
                     MembershipVersion = table.Column<long>(type: "bigint", nullable: false),
                     ETag = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: false)
                 },
