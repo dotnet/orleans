@@ -37,6 +37,7 @@
     <PackageVersion Include="Grpc.Tools" Version="2.78.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="8.0.29" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.29" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.29" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.29" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.29" />
     <PackageVersion Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.3" />

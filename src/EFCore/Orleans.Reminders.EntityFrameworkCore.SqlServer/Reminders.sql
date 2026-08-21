@@ -17,14 +17,14 @@ IF NOT EXISTS (
 )
 BEGIN
     CREATE TABLE [Reminders] (
-        [ServiceId] nvarchar(450) COLLATE Latin1_General_100_BIN2 NOT NULL,
-        [GrainId] nvarchar(450) COLLATE Latin1_General_100_BIN2 NOT NULL,
-        [Name] nvarchar(450) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [ServiceId] nvarchar(150) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [GrainId] nvarchar(512) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [Name] nvarchar(150) COLLATE Latin1_General_100_BIN2 NOT NULL,
         [StartAt] datetimeoffset NOT NULL,
         [Period] bigint NOT NULL,
         [GrainHash] bigint NOT NULL,
         [ETag] rowversion NOT NULL,
-        CONSTRAINT [PK_Reminders] PRIMARY KEY ([ServiceId], [GrainId], [Name])
+        CONSTRAINT [PK_Reminders] PRIMARY KEY NONCLUSTERED ([ServiceId], [GrainId], [Name])
     );
 END;
 GO
@@ -59,4 +59,3 @@ GO
 
 COMMIT;
 GO
-

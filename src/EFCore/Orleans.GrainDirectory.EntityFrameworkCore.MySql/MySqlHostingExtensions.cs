@@ -32,8 +32,8 @@ public static class MySqlHostingExtensions
         string name,
         Action<DbContextOptionsBuilder> configureDatabase)
     {
-        services.AddPooledDbContextFactory<MySqlGrainDirectoryDbContext>(configureDatabase);
-        return services.AddEntityFrameworkCoreMySqlGrainDirectory(name);
+        services.AddSingleton<IEFGrainDirectoryETagConverter<Guid>, GuidGrainDirectoryETagConverter>();
+        return services.AddEntityFrameworkCoreGrainDirectory<MySqlGrainDirectoryDbContext, Guid>(name, configureDatabase);
     }
 
     internal static IServiceCollection AddEntityFrameworkCoreMySqlGrainDirectory(this IServiceCollection services, string name)

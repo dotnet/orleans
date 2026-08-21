@@ -26,8 +26,7 @@ namespace Orleans.Persistence.EntityFrameworkCore.MySql.Data.Migrations
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     GrainId = table.Column<string>(type: "varchar(191)", maxLength: 191, nullable: false, collation: "utf8mb4_bin")
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    Data = table.Column<string>(type: "longtext", nullable: true)
-                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Data = table.Column<byte[]>(type: "longblob", nullable: true),
                     ETag = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci")
                 },
                 constraints: table =>

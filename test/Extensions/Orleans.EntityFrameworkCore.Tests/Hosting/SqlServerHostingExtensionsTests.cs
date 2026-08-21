@@ -18,6 +18,7 @@ using Orleans.Reminders;
 using Orleans.Reminders.EntityFrameworkCore;
 using Orleans.Reminders.EntityFrameworkCore.SqlServer.Data;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Storage;
 using TestExtensions;
 
@@ -111,6 +112,7 @@ public sealed class SqlServerHostingExtensionsTests
             .UseOrleans(builder =>
             {
                 builder.Services.AddPooledDbContextFactory<SqlServerGrainStateDbContext>(ConfigureDatabase());
+                RegisterStorageSerializer(builder.Services);
 
                 var servicesResult = Orleans.Persistence.SqlHostingExtensions
                     .AddEntityFrameworkCoreSqlServerGrainStorage(builder.Services, serviceName);
@@ -130,6 +132,44 @@ public sealed class SqlServerHostingExtensionsTests
         Assert.IsType<SqlServerGrainStateETagConverter>(
             host.Services.GetRequiredService<IEFGrainStorageETagConverter<byte[]>>());
         Assert.NotNull(host.Services.GetRequiredService<IDbContextFactory<SqlServerGrainStateDbContext>>());
+    }
+
+    [Fact]
+    public async Task ConfiguredNamedProviders_UseIsolatedDbContextFactories()
+    {
+        const string firstStorage = "first-storage";
+        const string secondStorage = "second-storage";
+        const string firstDirectory = "first-directory";
+        const string secondDirectory = "second-directory";
+        using var host = new HostBuilder()
+            .UseOrleans(builder =>
+            {
+                RegisterStorageSerializer(builder.Services);
+                Orleans.Persistence.SqlHostingExtensions.AddEntityFrameworkCoreSqlServerGrainStorage(
+                    builder,
+                    firstStorage,
+                    ConfigureDatabase("storage_one"));
+                Orleans.Persistence.SqlHostingExtensions.AddEntityFrameworkCoreSqlServerGrainStorage(
+                    builder,
+                    secondStorage,
+                    ConfigureDatabase("storage_two"));
+                Orleans.GrainDirectory.SqlServerHostingExtensions.AddEntityFrameworkCoreSqlServerGrainDirectory(
+                    builder,
+                    firstDirectory,
+                    ConfigureDatabase("directory_one"));
+                Orleans.GrainDirectory.SqlServerHostingExtensions.AddEntityFrameworkCoreSqlServerGrainDirectory(
+                    builder,
+                    secondDirectory,
+                    ConfigureDatabase("directory_two"));
+            })
+            .Build();
+
+        Assert.Equal(
+            ["storage_one", "storage_two"],
+            await GetDatabaseNames<SqlServerGrainStateDbContext>(host.Services, firstStorage, secondStorage));
+        Assert.Equal(
+            ["directory_one", "directory_two"],
+            await GetDatabaseNames<SqlServerGrainDirectoryDbContext>(host.Services, firstDirectory, secondDirectory));
     }
 
     [Fact]
@@ -157,9 +197,32 @@ public sealed class SqlServerHostingExtensionsTests
         Assert.NotNull(host.Services.GetRequiredService<IDbContextFactory<SqlServerReminderDbContext>>());
     }
 
-    private static Action<DbContextOptionsBuilder> ConfigureDatabase() =>
+    private static Action<DbContextOptionsBuilder> ConfigureDatabase(string databaseName = "hosting") =>
         options => EFCoreTestDatabase.SqlServer.ConfigureOptions(
             options,
-            ConnectionString,
+            EFCoreTestDatabase.SqlServer.WithDatabase(ConnectionString, databaseName),
             typeof(SqlServerHostingExtensionsTests).Assembly.GetName().Name!);
+
+    private static async Task<string[]> GetDatabaseNames<TDbContext>(
+        IServiceProvider services,
+        params string[] names)
+        where TDbContext : DbContext
+    {
+        var result = new string[names.Length];
+        for (var i = 0; i < names.Length; i++)
+        {
+            await using var context = await services
+                .GetRequiredKeyedService<IDbContextFactory<TDbContext>>(names[i])
+                .CreateDbContextAsync();
+            result[i] = context.Database.GetDbConnection().Database;
+        }
+
+        return result;
+    }
+
+    private static void RegisterStorageSerializer(IServiceCollection services) =>
+        services.AddSingleton<IGrainStorageSerializer>(
+            new SystemTextJsonGrainStorageSerializer(
+                Microsoft.Extensions.Options.Options.Create(
+                    new SystemTextJsonGrainStorageSerializerOptions())));
 }

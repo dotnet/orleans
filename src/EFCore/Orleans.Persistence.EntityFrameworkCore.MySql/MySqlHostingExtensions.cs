@@ -46,8 +46,8 @@ public static class MySqlHostingExtensions
         string name,
         Action<DbContextOptionsBuilder> configureDatabase)
     {
-        services.AddPooledDbContextFactory<MySqlGrainStateDbContext>(configureDatabase);
-        return services.AddEntityFrameworkCoreMySqlGrainStorage(name);
+        services.AddSingleton<IEFGrainStorageETagConverter<Guid>, GuidGrainStorageETagConverter>();
+        return services.AddEntityFrameworkCoreGrainStorage<MySqlGrainStateDbContext, Guid>(name, configureDatabase);
     }
 
     public static IServiceCollection AddEntityFrameworkCoreMySqlGrainStorage(this IServiceCollection services, string name)

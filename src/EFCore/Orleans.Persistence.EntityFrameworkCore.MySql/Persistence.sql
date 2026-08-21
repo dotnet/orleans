@@ -31,7 +31,7 @@ BEGIN
         `GrainType` varchar(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
         `StateType` varchar(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
         `GrainId` varchar(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
-        `Data` longtext CHARACTER SET utf8mb4 NULL,
+        `Data` longblob NULL,
         `ETag` char(36) COLLATE ascii_general_ci NOT NULL,
         CONSTRAINT `PK_GrainState` PRIMARY KEY (`ServiceId`, `GrainType`, `StateType`, `GrainId`)
     ) CHARACTER SET=utf8mb4;
@@ -58,4 +58,3 @@ CALL MigrationsScript();
 DROP PROCEDURE MigrationsScript;
 
 COMMIT;
-

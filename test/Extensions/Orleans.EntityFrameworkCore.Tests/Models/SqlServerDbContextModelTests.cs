@@ -75,6 +75,12 @@ public sealed class SqlServerDbContextModelTests
             activation,
             ["ClusterId", "SiloAddress"],
             ["ClusterId", "GrainId", "ActivationId"]);
+        Assert.Equal(150, activation.FindProperty("ClusterId")!.GetMaxLength());
+        Assert.Equal(512, activation.FindProperty("GrainId")!.GetMaxLength());
+        Assert.Equal(256, activation.FindProperty("SiloAddress")!.GetMaxLength());
+        Assert.Equal(64, activation.FindProperty("ActivationId")!.GetMaxLength());
+        AssertKeyWithinNonclusteredLimit(activation);
+        Assert.Contains("PRIMARY KEY NONCLUSTERED", context.Database.GenerateCreateScript());
     }
 
     [Fact]
@@ -85,8 +91,14 @@ public sealed class SqlServerDbContextModelTests
         var keyNames = new[] { "ServiceId", "GrainType", "StateType", "GrainId" };
 
         Assert.Equal(keyNames, GetPropertyNames(state.FindPrimaryKey()!.Properties));
-        Assert.All(keyNames, name => Assert.Equal(280, state.FindProperty(name)!.GetMaxLength()));
+        Assert.Equal(150, state.FindProperty("ServiceId")!.GetMaxLength());
+        Assert.Equal(250, state.FindProperty("GrainType")!.GetMaxLength());
+        Assert.Equal(150, state.FindProperty("StateType")!.GetMaxLength());
+        Assert.Equal(299, state.FindProperty("GrainId")!.GetMaxLength());
+        Assert.Equal(typeof(byte[]), state.FindProperty("Data")!.ClrType);
         Assert.True(state.FindProperty("Data")!.IsNullable);
+        AssertKeyWithinNonclusteredLimit(state);
+        Assert.Contains("PRIMARY KEY NONCLUSTERED", context.Database.GenerateCreateScript());
     }
 
     [Fact]
@@ -100,6 +112,11 @@ public sealed class SqlServerDbContextModelTests
             reminder,
             ["ServiceId", "GrainHash"],
             ["ServiceId", "GrainId"]);
+        Assert.Equal(150, reminder.FindProperty("ServiceId")!.GetMaxLength());
+        Assert.Equal(512, reminder.FindProperty("GrainId")!.GetMaxLength());
+        Assert.Equal(150, reminder.FindProperty("Name")!.GetMaxLength());
+        AssertKeyWithinNonclusteredLimit(reminder);
+        Assert.Contains("PRIMARY KEY NONCLUSTERED", context.Database.GenerateCreateScript());
     }
 
     [Fact]
@@ -152,6 +169,15 @@ public sealed class SqlServerDbContextModelTests
             .ToArray();
 
         Assert.Equal(expected, actual);
+    }
+
+    private static void AssertKeyWithinNonclusteredLimit(IEntityType entity)
+    {
+        var key = entity.FindPrimaryKey()!;
+        Assert.InRange(
+            key.Properties.Sum(property => property.GetMaxLength()!.Value * sizeof(char)),
+            1,
+            1_700);
     }
 
     private static DbContext CreateContext(Feature feature) => feature switch

@@ -19,4 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\EFCore\Orleans.Persistence.EntityFrameworkCore\Orleans.Persistence.EntityFrameworkCore.csproj"/>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Persistence.sql" Pack="true" PackagePath="\" />
+  </ItemGroup>
 </Project>
