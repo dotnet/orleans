@@ -9,7 +9,9 @@ using TestExtensions;
 
 namespace Orleans.EntityFrameworkCore.Tests.GrainDirectory;
 
-[TestCategory(EFCoreTestCategories.Unit)]
+[TestArea("EFCore")]
+[TestProvider("None")]
+[TestSuite("BVT")]
 public sealed class EFCoreGrainDirectoryFailureTests
 {
     [Fact]

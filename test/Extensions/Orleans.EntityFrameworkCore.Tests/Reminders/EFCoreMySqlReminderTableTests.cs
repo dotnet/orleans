@@ -2,15 +2,11 @@ using Orleans.EntityFrameworkCore.Tests.Infrastructure;
 using Orleans.Reminders.EntityFrameworkCore.MySql.Data;
 using TestExtensions;
 using UnitTests;
-using Xunit.Abstractions;
 
 namespace Orleans.EntityFrameworkCore.Tests.Reminders;
 
 [Collection(TestEnvironmentFixture.DefaultCollection)]
-[TestCategory("Reminders")]
-[TestCategory("EFCore")]
-[TestCategory(EFCoreTestCategories.MySql)]
-[TestCategory(EFCoreTestCategories.MySqlProvider)]
+[TestArea("EFCore")]
 [TestSuite("Functional")]
 [TestProvider(EFCoreTestCategories.MySqlProvider)]
 [TestArea("Reminders")]

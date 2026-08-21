@@ -2,15 +2,11 @@ using Orleans.EntityFrameworkCore.Tests.Infrastructure;
 using Orleans.Reminders.EntityFrameworkCore.PostgreSQL.Data;
 using TestExtensions;
 using UnitTests;
-using Xunit.Abstractions;
 
 namespace Orleans.EntityFrameworkCore.Tests.Reminders;
 
 [Collection(TestEnvironmentFixture.DefaultCollection)]
-[TestCategory("Reminders")]
-[TestCategory("EFCore")]
-[TestCategory(EFCoreTestCategories.PostgreSql)]
-[TestCategory(EFCoreTestCategories.PostgreSqlProvider)]
+[TestArea("EFCore")]
 [TestSuite("Functional")]
 [TestProvider(EFCoreTestCategories.PostgreSqlProvider)]
 [TestArea("Reminders")]

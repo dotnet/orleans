@@ -4,10 +4,7 @@ using TestExtensions;
 
 namespace Orleans.EntityFrameworkCore.Tests.Reminders;
 
-[TestCategory("Reminders")]
-[TestCategory("EFCore")]
-[TestCategory(EFCoreTestCategories.PostgreSql)]
-[TestCategory(EFCoreTestCategories.PostgreSqlProvider)]
+[TestArea("EFCore")]
 [TestSuite("Functional")]
 [TestProvider(EFCoreTestCategories.PostgreSqlProvider)]
 [TestArea("Reminders")]

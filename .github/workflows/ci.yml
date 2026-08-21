@@ -261,7 +261,7 @@ jobs:
       uses: ./.github/actions/run-tests
       with:
         artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
-        filter-query: /[(Category=EFCore-Unit)]
+        filter-query: /[(Area=EFCore)&(Provider=None)&(Suite=BVT)]
         framework: ${{ matrix.framework }}
   test-sqlserver:
     name: Microsoft SQL Server provider tests

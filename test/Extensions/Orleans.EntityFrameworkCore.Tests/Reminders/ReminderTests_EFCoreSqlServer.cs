@@ -4,9 +4,7 @@ using TestExtensions;
 
 namespace Orleans.EntityFrameworkCore.Tests.Reminders;
 
-[TestCategory("Reminders")]
-[TestCategory("EFCore")]
-[TestCategory(EFCoreTestCategories.SqlServer)]
+[TestArea("EFCore")]
 [TestSuite("Functional")]
 [TestProvider(EFCoreTestCategories.SqlServer)]
 [TestArea("Reminders")]

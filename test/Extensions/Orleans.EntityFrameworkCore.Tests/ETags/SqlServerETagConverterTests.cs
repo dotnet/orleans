@@ -3,7 +3,9 @@ using TestExtensions;
 
 namespace Orleans.EntityFrameworkCore.Tests.ETags;
 
-[TestCategory(EFCoreTestCategories.Unit)]
+[TestArea("EFCore")]
+[TestProvider("None")]
+[TestSuite("BVT")]
 public sealed class SqlServerETagConverterTests
 {
     [Theory]

@@ -24,9 +24,12 @@ public sealed class EFCoreReminderServiceFixture<TDbContext, TETag, TProvider> :
     protected override void CheckPreconditionsOrThrow() =>
         new TProvider().Database.RequireConnectionString();
 
-    public override async Task InitializeAsync()
+    public override async ValueTask InitializeAsync()
     {
-        EnsurePreconditionsMet();
+        if (!PreconditionsMet)
+        {
+            return;
+        }
 
         var provider = new TProvider();
         _databaseFixture = new EFCoreDatabaseFixture<TDbContext>(
@@ -63,7 +66,7 @@ public sealed class EFCoreReminderServiceFixture<TDbContext, TETag, TProvider> :
                     typeof(TDbContext).Assembly.GetName().Name!)));
     }
 
-    public override async Task DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
         try
         {
@@ -103,23 +106,23 @@ public abstract class EFCoreReminderServiceTestsBase<TDbContext, TETag, TProvide
     {
     }
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public Task BasicStopByReference() =>
         Test_Reminders_Basic_StopByRef();
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public Task UpdateDoesNotRestartLocalReminder() =>
         Test_Reminders_UpdateReminder_DoesNotRestartLocalReminder();
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public Task BasicListOperations() =>
         Test_Reminders_Basic_ListOps();
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public Task MultipleGrainsAndReminders() =>
         Test_Reminders_1J_MultiGrainMultiReminders();
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public Task ReminderNotFound() =>
         Test_Reminders_ReminderNotFound();
 

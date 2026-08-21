@@ -5,11 +5,7 @@ using UnitTests;
 
 namespace Orleans.EntityFrameworkCore.Tests.Clustering;
 
-[TestCategory("Membership")]
-[TestCategory("EFCore")]
-[TestCategory(EFCoreTestCategories.MySql)]
-[TestCategory(EFCoreTestCategories.MySqlProvider)]
-[TestCategory(EFCoreTestCategories.Functional)]
+[TestArea("EFCore")]
 [TestSuite("Functional")]
 [TestProvider(EFCoreTestCategories.MySqlProvider)]
 [TestArea("Membership")]
