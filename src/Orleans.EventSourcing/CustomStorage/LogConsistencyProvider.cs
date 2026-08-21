@@ -3,22 +3,21 @@ using Orleans.Configuration;
 using System;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
-using OrleansEventSourcing.CustomStorage;
 
 namespace Orleans.EventSourcing.CustomStorage
 {
     /// <summary>
     /// A log-consistency provider that relies on grain-specific custom code for
     /// reading states from storage, and appending deltas to storage.
-    /// Grains that wish to use this provider must implement the <see cref="ICustomStorageInterface{TState, TDelta}"/>
-    /// interface, to define how state is read and how deltas are written.
+    /// The storage implementation is supplied by the grain through <see cref="ICustomStorageInterface{TState, TDelta}"/>
+    /// or created by a registered <see cref="ICustomStorageFactory"/>.
     /// If the provider attribute "PrimaryCluster" is supplied in the provider configuration, then only the specified cluster
     /// accesses storage, and other clusters may not issue updates.
     /// </summary>
     public class LogConsistencyProvider : ILogViewAdaptorFactory
     {
         private readonly CustomStorageLogConsistencyOptions options;
-        private readonly IServiceProvider serviceProvider;
+        private readonly IServiceProvider? serviceProvider;
 
         /// <summary>
         /// Specifies a cluster id of the primary cluster from which to access storage exclusively, null if
@@ -29,7 +28,12 @@ namespace Orleans.EventSourcing.CustomStorage
         /// <inheritdoc/>
         public bool UsesStorageProvider => false;
 
-        public LogConsistencyProvider(CustomStorageLogConsistencyOptions options, IServiceProvider serviceProvider)
+        public LogConsistencyProvider(CustomStorageLogConsistencyOptions options)
+            : this(options, null)
+        {
+        }
+
+        public LogConsistencyProvider(CustomStorageLogConsistencyOptions options, IServiceProvider? serviceProvider)
         {
             this.options = options;
             this.serviceProvider = serviceProvider;

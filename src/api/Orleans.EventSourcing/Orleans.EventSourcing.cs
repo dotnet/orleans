@@ -370,15 +370,29 @@ namespace Orleans.EventSourcing.Common
 
 namespace Orleans.EventSourcing.CustomStorage
 {
+    [System.AttributeUsage(System.AttributeTargets.Class)]
+    public sealed partial class CustomStorageProviderAttribute : System.Attribute
+    {
+        public string ProviderName { get { throw null; } set { } }
+    }
+
+    public partial interface ICustomStorageFactory
+    {
+        ICustomStorageInterface<TState, TDelta> CreateCustomStorage<TState, TDelta>(Runtime.GrainId grainId);
+    }
+
     public partial interface ICustomStorageInterface<TState, TDelta>
     {
         System.Threading.Tasks.Task<bool> ApplyUpdatesToStorage(System.Collections.Generic.IReadOnlyList<TDelta> updates, int expectedVersion);
         System.Threading.Tasks.Task ClearStoredState();
         System.Threading.Tasks.Task<System.Collections.Generic.KeyValuePair<int, TState>> ReadStateFromStorage();
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TDelta>> RetrieveLogSegment(int fromVersion, int toVersion);
     }
 
     public partial class LogConsistencyProvider : ILogViewAdaptorFactory
     {
+        public LogConsistencyProvider(Configuration.CustomStorageLogConsistencyOptions options, System.IServiceProvider? serviceProvider) { }
+
         public LogConsistencyProvider(Configuration.CustomStorageLogConsistencyOptions options) { }
 
         public string? PrimaryCluster { get { throw null; } }
