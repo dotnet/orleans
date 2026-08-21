@@ -17,6 +17,7 @@ using Orleans.Runtime.Placement.Filtering;
 using Orleans.Runtime.Versions;
 using Polly;
 using Polly.Registry;
+using Polly.Timeout;
 
 namespace Orleans.Runtime.Placement
 {
@@ -536,6 +537,10 @@ namespace Orleans.Runtime.Placement
                         new PlacementContext(firstMessage, target),
                         _placementService._shutdownCts.Token);
                 }
+                catch (TimeoutRejectedException exception)
+                {
+                    throw new TimeoutException($"Grain placement operation timed out for grain {firstMessage.TargetGrain}.", exception);
+                }
                 finally
                 {
                     Activity.Current = currentActivity;
@@ -558,7 +563,10 @@ namespace Orleans.Runtime.Placement
 
                 // Restore activity context on every attempt so retried lookups remain children of the request.
                 using var restoredActivity = TryRestoreActivityContext(firstMessage.RequestContextData, ActivityNames.PlaceGrain);
-                var result = await _placementService._grainLocator.Lookup(targetGrain);
+                var lookup = _placementService._grainLocator.Lookup(targetGrain);
+                var result = lookup.IsCompletedSuccessfully
+                    ? lookup.Result
+                    : await lookup.AsTask().WaitAsync(cancellationToken);
                 if (result is not null)
                 {
                     return result.SiloAddress!;
@@ -567,7 +575,7 @@ namespace Orleans.Runtime.Placement
                 _placementService.ThrowIfStopping();
                 var strategy = _placementService._strategyResolver.GetPlacementStrategy(target.GrainIdentity.Type);
                 var director = _placementService._directorResolver.GetPlacementDirector(strategy);
-                var siloAddress = await director.OnAddActivation(strategy, target, _placementService);
+                var siloAddress = await director.OnAddActivation(strategy, target, _placementService).WaitAsync(cancellationToken);
 
                 // Give the grain locator one last chance to tell us that the grain has already been placed
                 if (_placementService._grainLocator.TryLookupInCache(targetGrain, out result) && _placementService.CachedAddressIsValid(firstMessage, result))

@@ -32,18 +32,21 @@ internal static class OrleansRuntimeResiliencePolicies
         {
             var options = context.ServiceProvider.GetRequiredService<IOptions<SiloMessagingOptions>>().Value;
             var logger = context.ServiceProvider.GetRequiredService<ILogger<PlacementService>>();
+            builder.TimeProvider = context.ServiceProvider.GetRequiredService<TimeProvider>();
 
-            builder
-                .AddTimeout(new TimeoutStrategyOptions
+            builder.AddTimeout(new TimeoutStrategyOptions
+            {
+                Timeout = options.PlacementTimeout,
+                OnTimeout = args =>
                 {
-                    Timeout = options.PlacementTimeout,
-                    OnTimeout = args =>
-                    {
-                        logger.LogWarning("Grain placement operation timed out after {Timeout}.", options.PlacementTimeout);
-                        return default;
-                    }
-                })
-                .AddRetry(new RetryStrategyOptions
+                    logger.LogWarning("Grain placement operation timed out after {Timeout}.", options.PlacementTimeout);
+                    return default;
+                }
+            });
+
+            if (options.PlacementMaxRetries > 0)
+            {
+                builder.AddRetry(new RetryStrategyOptions
                 {
                     MaxRetryAttempts = options.PlacementMaxRetries,
                     BackoffType = DelayBackoffType.Exponential,
@@ -56,6 +59,7 @@ internal static class OrleansRuntimeResiliencePolicies
                         return default;
                     }
                 });
+            }
         });
 
         return services;

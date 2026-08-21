@@ -190,6 +190,9 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the maximum number of retry attempts for grain placement operations.
         /// </summary>
+        /// <remarks>
+        /// A value of <c>0</c> disables retries.
+        /// </remarks>
         public int PlacementMaxRetries { get; set; } = DEFAULT_PLACEMENT_MAX_RETRIES;
 
         /// <summary>
