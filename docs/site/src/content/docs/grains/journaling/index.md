@@ -65,4 +65,4 @@ Choose Journaling when evaluating operation-based persistence for built-in mutab
 - [Azure Storage providers](azure-storage.md)
 - [Redis journal storage](redis-journal-storage.md)
 - [Operate and troubleshoot Journaling](operations.md)
-- [Run the Journaling sample](samples.md)
+- [Run Journaling samples](samples.md)

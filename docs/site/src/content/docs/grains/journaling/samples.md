@@ -37,7 +37,7 @@ The [compiled Redis Journaling sample](https://github.com/dotnet/orleans/tree/ma
 Start a local Redis server, then run the sample from the repository root:
 
 ```powershell
-dotnet run --project docs/site/src/content/docs/grains/journaling/snippets/redis-journaling -- "host:6379"
+dotnet run --project docs/site/src/content/docs/grains/journaling/snippets/redis-journaling -- "localhost:6379"
 ```
 
 Pass a StackExchange.Redis connection string as the first argument when Redis is available at another endpoint. The sample uses the isolated key prefix `journaling-docs-sample`. Configure Redis persistence and replication before evaluating server-restart recovery.
