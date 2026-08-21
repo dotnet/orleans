@@ -458,7 +458,8 @@ public class StateManagerTests : JournalingTestBase
         Assert.False(failedWrite.IsCompleted);
 
         storage.AllowBlockedRead.SetResult();
-        var exception = await Assert.ThrowsAsync<InconsistentStateException>(() => failedWrite);
+        var exception = await Assert.ThrowsAsync<InconsistentStateException>(
+            () => failedWrite.WaitAsync(TimeSpan.FromSeconds(10)));
         Assert.Same(expected, exception);
 
         await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
