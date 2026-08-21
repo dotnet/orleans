@@ -39,7 +39,7 @@ namespace Orleans.Runtime.Placement
         private readonly PlacementFilterStrategyResolver _filterStrategyResolver;
         private readonly PlacementFilterDirectorResolver _placementFilterDirectoryResolver;
         private readonly CancellationTokenSource _shutdownCts = new();
-        private readonly ResiliencePipeline _resiliencePipeline;
+        private readonly ResiliencePipeline<SiloAddress> _resiliencePipeline;
 
         internal interface ITestAccessor
         {
@@ -76,7 +76,7 @@ namespace Orleans.Runtime.Placement
             _versionSelectorManager = versionSelectorManager;
             _siloStatusOracle = siloStatusOracle;
             _assumeHomogeneousSilosForTesting = siloMessagingOptions.CurrentValue.AssumeHomogenousSilosForTesting;
-            _resiliencePipeline = resiliencePipelineProvider.GetPipeline(OrleansRuntimeResiliencePolicies.PlacementResiliencePipelineKey);
+            _resiliencePipeline = resiliencePipelineProvider.GetPipeline<SiloAddress>(OrleansRuntimeResiliencePolicies.PlacementResiliencePipelineKey);
             _workers = new PlacementWorker[PlacementWorkerCount];
             for (var i = 0; i < PlacementWorkerCount; i++)
             {
@@ -332,7 +332,7 @@ namespace Orleans.Runtime.Placement
             private readonly object _lockObj = new();
 #endif
             private readonly PlacementService _placementService;
-            private readonly Func<PlacementContext, CancellationToken, ValueTask<SiloAddress>> _executePlacementDelegate;
+            private readonly Func<ResilienceContext, PlacementContext, ValueTask<Outcome<SiloAddress>>> _executePlacementDelegate;
             private readonly int _workerIndex;
             private List<(Message Message, TaskCompletionSource Completion)>? _messages = new();
 
@@ -341,7 +341,7 @@ namespace Orleans.Runtime.Placement
                 _logger = placementService._logger;
                 _placementService = placementService;
                 _workerIndex = workerIndex;
-                _executePlacementDelegate = ExecutePlacementAsync;
+                _executePlacementDelegate = ExecutePlacementOutcomeAsync;
 
                 using var _ = new ExecutionContextSuppressor();
                 _processLoopTask = Task.Run(ProcessLoop);
@@ -530,12 +530,15 @@ namespace Orleans.Runtime.Placement
                     firstMessage.InterfaceVersion);
 
                 var currentActivity = Activity.Current;
+                var resilienceContext = ResilienceContextPool.Shared.Get(_placementService._shutdownCts.Token);
                 try
                 {
-                    return await _placementService._resiliencePipeline.ExecuteAsync(
+                    var outcome = await _placementService._resiliencePipeline.ExecuteOutcomeAsync(
                         _executePlacementDelegate,
-                        new PlacementContext(firstMessage, target),
-                        _placementService._shutdownCts.Token);
+                        resilienceContext,
+                        new PlacementContext(firstMessage, target));
+                    outcome.ThrowIfException();
+                    return outcome.Result!;
                 }
                 catch (TimeoutRejectedException exception)
                 {
@@ -547,7 +550,35 @@ namespace Orleans.Runtime.Placement
                 }
                 finally
                 {
+                    ResilienceContextPool.Shared.Return(resilienceContext);
                     Activity.Current = currentActivity;
+                }
+            }
+
+            private ValueTask<Outcome<SiloAddress>> ExecutePlacementOutcomeAsync(ResilienceContext context, PlacementContext state)
+            {
+                try
+                {
+                    var pending = ExecutePlacementAsync(state, context.CancellationToken);
+                    return pending.IsCompletedSuccessfully
+                        ? Outcome.FromResultAsValueTask(pending.Result)
+                        : AwaitOutcome(pending);
+                }
+                catch (Exception exception)
+                {
+                    return Outcome.FromExceptionAsValueTask<SiloAddress>(exception);
+                }
+
+                static async ValueTask<Outcome<SiloAddress>> AwaitOutcome(ValueTask<SiloAddress> pending)
+                {
+                    try
+                    {
+                        return Outcome.FromResult(await pending);
+                    }
+                    catch (Exception exception)
+                    {
+                        return Outcome.FromException<SiloAddress>(exception);
+                    }
                 }
             }
 

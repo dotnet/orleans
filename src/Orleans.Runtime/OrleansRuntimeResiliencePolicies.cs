@@ -28,7 +28,7 @@ internal static class OrleansRuntimeResiliencePolicies
     internal static IServiceCollection AddOrleansRuntimeResiliencePolicies(IServiceCollection services)
     {
         // Placement resilience pipeline
-        services.AddResiliencePipeline(PlacementResiliencePipelineKey, static (builder, context) =>
+        services.AddResiliencePipeline<string, SiloAddress>(PlacementResiliencePipelineKey, static (builder, context) =>
         {
             var options = context.ServiceProvider.GetRequiredService<IOptions<SiloMessagingOptions>>().Value;
             var logger = context.ServiceProvider.GetRequiredService<ILogger<PlacementService>>();
@@ -46,13 +46,13 @@ internal static class OrleansRuntimeResiliencePolicies
 
             if (options.PlacementMaxRetries > 0)
             {
-                builder.AddRetry(new RetryStrategyOptions
+                builder.AddRetry(new RetryStrategyOptions<SiloAddress>
                 {
                     MaxRetryAttempts = options.PlacementMaxRetries,
                     BackoffType = DelayBackoffType.Exponential,
                     Delay = options.PlacementRetryBaseDelay,
                     UseJitter = true,
-                    ShouldHandle = new PredicateBuilder().Handle<Exception>(ex => IsTransientPlacementException(ex)),
+                    ShouldHandle = new PredicateBuilder<SiloAddress>().Handle<Exception>(ex => IsTransientPlacementException(ex)),
                     OnRetry = args =>
                     {
                         logger.LogDebug(args.Outcome.Exception, "Retrying grain placement operation. Attempt: {AttemptNumber}, Delay: {RetryDelay}.", args.AttemptNumber, args.RetryDelay);

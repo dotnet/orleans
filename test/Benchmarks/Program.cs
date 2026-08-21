@@ -3,6 +3,7 @@ using BenchmarkDotNet.Running;
 using Benchmarks.Journaling;
 using Benchmarks.MapReduce;
 using Benchmarks.Ping;
+using Benchmarks.Placement;
 using Benchmarks.Transactions;
 using Benchmarks.GrainStorage;
 
@@ -131,6 +132,10 @@ internal class Program
                 test.PingConcurrentHostedClient().GetAwaiter().GetResult();
                 test.Shutdown().GetAwaiter().GetResult();
             }
+        },
+        ["Placement.Resilience"] = args =>
+        {
+            BenchmarkRunner.Run<PlacementResilienceBenchmark>(args: args);
         },
         ["ConcurrentPing_OneSilo"] = _ =>
         {
