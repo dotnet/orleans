@@ -209,6 +209,17 @@
     "featured": false
   },
   {
+    "slug": "streaming-rabbitmq",
+    "title": "RabbitMQ Streams",
+    "description": "An Aspire-hosted Orleans persistent streaming sample backed by RabbitMQ Streams.",
+    "path": "Streaming/RabbitMQ",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "image": null,
+    "languages": ["C#"],
+    "tags": ["streaming", "rabbitmq", "aspire"],
+    "featured": false
+  },
+  {
     "slug": "streaming-simple",
     "title": "Simple Streaming",
     "description": "A compact producer and consumer example using Orleans Streams.",

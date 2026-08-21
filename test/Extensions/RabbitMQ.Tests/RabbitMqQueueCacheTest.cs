@@ -7,6 +7,7 @@ using Xunit;
 
 namespace RabbitMQ.Tests;
 
+[TestSuite("BVT"), TestProvider("None"), TestArea("Streaming")]
 public class RabbitMqQueueCacheTest
 {
     [Fact]
