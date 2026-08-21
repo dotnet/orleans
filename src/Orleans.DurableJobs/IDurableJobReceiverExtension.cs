@@ -217,7 +217,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         JobAttemptState state)
     {
         var result = state.Task.Result;
-        if (result.IsPending)
+        if (result.IsInProgress)
         {
             if (!state.PollRequested)
             {
