@@ -1,6 +1,6 @@
 ---
 title: Orleans tutorials and samples
-description: Learn Orleans through maintained tutorials, explanations, and repository-backed samples.
+description: Learn Orleans through tutorials, explanations, and repository-backed samples.
 ms.date: 08/02/2026
 ms.topic: sample
 ---
@@ -12,7 +12,7 @@ Use this page to choose the right kind of learning material:
 - **Quickstarts** lead you through a focused task.
 - **Tutorials** teach a capability step by step.
 - **Explanations** describe how a complete application is modeled.
-- **Samples** are maintained, buildable applications which you can inspect and run.
+- **Samples** are buildable applications which you can inspect and run.
 
 ## Start here
 
@@ -38,7 +38,7 @@ For a more typical project structure, [Build your first Orleans app](../quicksta
 | [Why Orleans](../benefits.md) | The benefits and tradeoffs of the virtual actor model. |
 | [Orleans architecture design principles](../resources/orleans-architecture-principles-and-approach.md) | The design goals which shape Orleans APIs and runtime behavior. |
 
-## Maintained samples
+## Samples
 
 The [`samples` directory](https://github.com/dotnet/orleans/tree/main/samples) contains the official Orleans samples. Its [sample catalog](https://github.com/dotnet/orleans/blob/main/samples/README.md) is generated from the repository manifest and is validated together with the sample projects.
 
@@ -66,12 +66,12 @@ The [`samples` directory](https://github.com/dotnet/orleans/tree/main/samples) c
 | Sample | Demonstrates |
 | --- | --- |
 | [Bank Account](https://github.com/dotnet/orleans/tree/main/samples/BankAccount) | ACID transactions across stateful grains. |
-| [Journaled Todo List](https://github.com/dotnet/orleans/tree/main/samples/JournaledTodoList) | Experimental Journaling APIs, Aspire, and durable journaled grain state. |
+| [Journaled Todo List](https://github.com/dotnet/orleans/tree/main/samples/JournaledTodoList) | Event Sourcing with `JournaledGrain`, log-consistency providers, and Aspire. |
 | [Journaling with Azure Blob JSON](https://github.com/dotnet/orleans/tree/main/samples/JournalingAzureBlobJson) | Experimental Journaling APIs with Azure Blob Storage. |
 | [Chat Room](https://github.com/dotnet/orleans/tree/main/samples/ChatRoom) | A terminal chat application using Orleans Streams. |
 | [Stocks](https://github.com/dotnet/orleans/tree/main/samples/Stocks) | Grain timers, HTTP calls, and temporary caching. |
 
-The Journaling samples use the experimental `Microsoft.Orleans.Journaling` package. They are separate from the supported [Orleans Event Sourcing](../grains/event-sourcing/index.md) model.
+The Azure Blob JSON sample uses the experimental `Microsoft.Orleans.Journaling` package. The Journaled Todo List uses the supported [Orleans Event Sourcing](../grains/event-sourcing/index.md) model. See the [Journaling sample guide](../grains/journaling/samples.md) to run the Azure Blob and Redis durable-state samples.
 
 ### Deployment and operations
 

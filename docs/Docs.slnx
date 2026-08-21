@@ -24,6 +24,9 @@
   </Folder>
   <Folder Name="/site/src/content/docs/grains/journaling/" />
   <Folder Name="/site/src/content/docs/grains/journaling/snippets/" />
+  <Folder Name="/site/src/content/docs/grains/journaling/snippets/journaling/">
+    <Project Path="site/src/content/docs/grains/journaling/snippets/journaling/Journaling.csproj" />
+  </Folder>
   <Folder Name="/site/src/content/docs/grains/journaling/snippets/redis-journaling/">
     <Project Path="site/src/content/docs/grains/journaling/snippets/redis-journaling/RedisJournaling.csproj" />
   </Folder>

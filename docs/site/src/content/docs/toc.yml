@@ -94,8 +94,24 @@ items:
             href: grains/event-sourcing/log-consistency-providers.md
           - name: Replicated instances
             href: grains/event-sourcing/replicated-instances.md
-      - name: Redis journal storage
-        href: grains/journaling/redis-journal-storage.md
+      - name: Journaling (experimental)
+        items:
+          - name: Overview
+            href: grains/journaling/index.md
+          - name: Use durable state
+            href: grains/journaling/durable-state.md
+          - name: Runtime behavior and consistency
+            href: grains/journaling/runtime-behavior.md
+          - name: Configuration and formats
+            href: grains/journaling/configuration.md
+          - name: Azure Storage providers
+            href: grains/journaling/azure-storage.md
+          - name: Redis journal storage
+            href: grains/journaling/redis-journal-storage.md
+          - name: Operations and troubleshooting
+            href: grains/journaling/operations.md
+          - name: Samples
+            href: grains/journaling/samples.md
       - name: Transactions
         href: grains/transactions.md
   - name: Serialization and code generation
