@@ -1084,7 +1084,7 @@ jobs:
         --hangdump --hangdump-timeout 10m
         --crashdump --crashdump-type Full
         --hangdump-type Full
-        --report-trx --report-trx-filename "test_results_${{ matrix.suite }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        ${{ (github.event_name != 'pull_request' || matrix.os != 'ubuntu-latest' || matrix.framework != 'net10.0') && format('--report-trx --report-trx-filename test_results_{0}_{1}_{{asm}}_{{tfm}}_{{arch}}.trx', matrix.suite, matrix.framework) || '' }}
         ${{ github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0' && format('--coverage --coverage-output-format cobertura --coverage-settings {0}/.github/coverage.config.xml', github.workspace) || '' }}
         --max-parallel-test-modules 1
     - name: Archive coverage
@@ -1096,7 +1096,7 @@ jobs:
         retention-days: 1
         path: "**/*.cobertura.xml"
     - name: Archive Test Results
-      if: always()
+      if: always() && (github.event_name != 'pull_request' || matrix.os != 'ubuntu-latest' || matrix.framework != 'net10.0')
       continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
