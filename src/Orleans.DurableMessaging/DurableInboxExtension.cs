@@ -419,17 +419,17 @@ internal sealed partial class DurableInboxExtension :
                 return DurableJobRunResult.Completed;
             }
 
-            return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
+            return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
         }
 
         if (!_recoveryCompleted)
         {
-            return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
+            return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
         }
 
         if (_localDrainJobIds.Contains(ownershipId))
         {
-            return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
+            return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
         }
 
         var key = new DurableMessagingPumpExecutionKey(JobName, context.Job.Id, context.RunId);
@@ -462,7 +462,7 @@ internal sealed partial class DurableInboxExtension :
                 }));
         }
 
-        return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
+        return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
     }
 
     private async Task RunPumpTimerAsync(
@@ -519,7 +519,7 @@ internal sealed partial class DurableInboxExtension :
         {
             if (!_recoveryCompleted)
             {
-                return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
+                return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
             }
 
             if (string.IsNullOrEmpty(_jobId.Value))
@@ -534,7 +534,7 @@ internal sealed partial class DurableInboxExtension :
                         return DurableJobRunResult.Completed;
                     }
 
-                    return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
+                    return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
                 }
                 else if (GetDurableInboxCount() == 0)
                 {
@@ -571,7 +571,7 @@ internal sealed partial class DurableInboxExtension :
             {
                 if (_inboxDict.Count > 0)
                 {
-                    return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
+                    return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
                 }
 
                 if (!clearOwnershipWhenEmpty)
@@ -589,13 +589,13 @@ internal sealed partial class DurableInboxExtension :
                 catch
                 {
                     await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
-                    return DurableJobRunResult.RetryAt(_jobTimeProvider.GetUtcNow() + _retryDelay);
+                    return DurableJobRunResult.RescheduleAt(_jobTimeProvider.GetUtcNow() + _retryDelay);
                 }
             }
 
             var nextAttempt = GetNextAttemptAt();
             var delay = nextAttempt - _timeProvider.GetUtcNow();
-            return DurableJobRunResult.RetryAt(
+            return DurableJobRunResult.RescheduleAt(
                 _jobTimeProvider.GetUtcNow() + (delay > TimeSpan.Zero ? delay : TimeSpan.Zero));
         }
         finally
