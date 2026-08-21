@@ -17,7 +17,9 @@ namespace Orleans.Transactions.AdoNet.Tests;
 /// <see cref="ExecuteSqlExtensions.InitExecuteSqlDic"/> SQL-generation logic.
 /// All assertions are pure string comparisons — no database, no silo, no network.
 /// </summary>
-[TestCategory("BVT"), TestCategory("Transactions")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Transactions")]
 public sealed class TransactionalStateStorageOptionsTests
 {
     // -----------------------------------------------------------------------

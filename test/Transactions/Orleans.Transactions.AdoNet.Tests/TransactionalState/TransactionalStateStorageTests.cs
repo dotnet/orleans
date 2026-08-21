@@ -20,7 +20,9 @@ namespace Orleans.Transactions.AdoNet.Tests;
 /// <see cref="DbBatchOperation"/> batching guards, and state transitions.
 /// All tests use <see cref="FakeRelationalStorage"/> — no real database required.
 /// </summary>
-[TestCategory("BVT"), TestCategory("Transactions")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Transactions")]
 public sealed class TransactionalStateStorageTests
 {
     // -----------------------------------------------------------------------

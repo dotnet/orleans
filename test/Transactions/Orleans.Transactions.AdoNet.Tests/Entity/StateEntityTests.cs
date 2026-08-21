@@ -15,7 +15,9 @@ namespace Orleans.Transactions.AdoNet.Tests;
 /// Unit tests for <see cref="StateEntity.Create{T}"/> and <see cref="KeyEntity"/>
 /// property defaults. No mocking, no database.
 /// </summary>
-[TestCategory("BVT"), TestCategory("Transactions")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Transactions")]
 public sealed class StateEntityTests
 {
     // -----------------------------------------------------------------------

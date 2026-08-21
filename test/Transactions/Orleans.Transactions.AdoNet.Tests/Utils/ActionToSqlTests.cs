@@ -11,7 +11,9 @@ namespace Orleans.Transactions.AdoNet.Tests;
 /// Unit tests for <see cref="ActionToSql"/> — pure static string-builder logic,
 /// zero external dependencies, no database.
 /// </summary>
-[TestCategory("BVT"), TestCategory("Transactions")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Transactions")]
 public sealed class ActionToSqlTests
 {
     // -----------------------------------------------------------------------

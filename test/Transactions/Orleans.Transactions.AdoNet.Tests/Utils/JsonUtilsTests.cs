@@ -14,7 +14,9 @@ namespace Orleans.Transactions.AdoNet.Tests;
 /// Unit tests for <see cref="JsonUtils"/> — pure static UTF-8 / Newtonsoft.Json wrappers.
 /// No external dependencies, no database.
 /// </summary>
-[TestCategory("BVT"), TestCategory("Transactions")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Transactions")]
 public sealed class JsonUtilsTests
 {
     // Helper state type used across tests.

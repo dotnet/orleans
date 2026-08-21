@@ -19,7 +19,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
 
     internal class TableTransactionAction
     {
-        public TableTransactionAction(TableTransactionActionType action, IEntity tableEntity) 
+        public TableTransactionAction(TableTransactionActionType action, IEntity tableEntity)
         {
             this.ActionType = action;
             this.TableEntity = tableEntity;
