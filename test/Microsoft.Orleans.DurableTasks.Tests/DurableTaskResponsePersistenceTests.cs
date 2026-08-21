@@ -81,6 +81,26 @@ public sealed class DurableTaskResponsePersistenceTests
     }
 
     [Fact]
+    public void VolatileCancellationPreservesNewerCompletedState()
+    {
+        using var services = CreateSerializationServices();
+        var storage = new VolatileDurableTaskGrainStorage(
+            services.GetRequiredService<DeepCopier<Dictionary<TaskId, DurableTaskState>>>(),
+            services.GetRequiredService<DeepCopier<DurableTaskState>>(),
+            TimeProvider.System);
+        var taskId = TaskId.Parse("root/completed");
+        var staleState = storage.GetOrCreateTask(taskId, request: null);
+        Assert.True(storage.TryGetTask(taskId, out var completionState));
+        storage.SetResponse(taskId, completionState, DurableTaskResponse.FromResult(42));
+
+        storage.RequestCancellation(taskId, staleState);
+
+        Assert.True(storage.TryGetTask(taskId, out var current));
+        Assert.Equal(42, current.Result!.GetResult<int>());
+        Assert.Null(current.CancellationRequestedAt);
+    }
+
+    [Fact]
     public void CanceledResponseRoundTripsThroughCompletionDelivery()
     {
         using var services = CreateSerializationServices();

@@ -35,8 +35,13 @@ internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessage
     public List<(GrainId Target, TaskId TaskId, DateTimeOffset DueTime)> ScheduledResumes { get; } = [];
     public int CommitCount { get; private set; }
     public Task ScheduledResume => _scheduledResume.Task;
+    public Action<GrainId, GrainId, TaskId, IDurableTaskRequest>? BeforeSendInvocation { get; set; }
 
-    public void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request) => Invocations.Add((sender, target, taskId, request));
+    public void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request)
+    {
+        BeforeSendInvocation?.Invoke(sender, target, taskId, request);
+        Invocations.Add((sender, target, taskId, request));
+    }
 
     public void SendCompletion(GrainId sender, GrainId target, TaskId taskId, DurableTaskResponse response) => Completions.Add((sender, target, taskId, response));
     public void SendCompletionAck(GrainId sender, GrainId target, TaskId taskId) =>

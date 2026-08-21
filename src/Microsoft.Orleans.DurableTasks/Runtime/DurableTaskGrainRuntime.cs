@@ -55,11 +55,14 @@ internal sealed partial class DurableTaskGrainRuntime(
     private readonly CancellationTokenSource _deactivationCts = new();
     private Task? _stopTask;
     private long _backgroundWriteId;
+    private int _initialized;
     private volatile bool _stopping;
 
     private GrainId GrainId => _shared.GrainContextAccessor.GrainContext.GrainId;
 
     public DateTimeOffset UtcNow => _shared.TimeProvider.GetUtcNow();
+
+    internal void InitializeForActivation() => Volatile.Write(ref _initialized, 1);
 
     public async ValueTask<TaskId> SelectCompletionAsync(
         TaskId decisionId,
@@ -255,6 +258,25 @@ internal sealed partial class DurableTaskGrainRuntime(
         var transport = _messageTransport ?? throw new InvalidOperationException(
             "Durable messaging is not configured. Call AddDurableTasks on the silo builder.");
         var context = request.Context ?? throw new InvalidOperationException("The durable task request has no context.");
+        var fingerprint = IDurableTaskRequest.GetFingerprint(request, _shared.Serializer);
+        var state = _storage.GetOrCreateTask(taskId, request: null);
+        if (state.Request is not null
+            || state.RequestFingerprint is not null
+            || !state.CallerId.IsDefault
+            || state.DueTime is not null
+            || (!state.RemoteTarget.IsDefault && state.RemoteTarget != context.TargetId)
+            || (state.RemoteRequestFingerprint is { } existing
+                && !string.Equals(existing, fingerprint, StringComparison.Ordinal)))
+        {
+            throw new InvalidOperationException(
+                $"Durable task '{taskId}' is already associated with a different request.");
+        }
+
+        if (state.RemoteTarget.IsDefault || state.RemoteRequestFingerprint is null)
+        {
+            _storage.SetRemoteRequest(taskId, state, context.TargetId, fingerprint);
+        }
+
         context.CallerId = GrainId;
         context.SupportsDurableCompletion = true;
         transport.SendInvocation(GrainId, context.TargetId, taskId, request);
@@ -719,7 +741,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             if (persist)
             {
                 await WriteStateAsync(cancellationToken);
-                StartRequest(taskId, request);
+                StartRequest(taskId);
             }
             else
             {
@@ -730,17 +752,37 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
     }
 
-    private void StartRequest(TaskId taskId, IDurableTaskRequest request)
+    private void StartRequest(TaskId taskId)
     {
         if (_stopping || IsRequestRunning(taskId))
         {
             return;
         }
 
+        if (!_storage.TryGetTask(taskId, out var state)
+            || state.TombstonedAt.HasValue
+            || state.Result is { IsCompleted: true })
+        {
+            return;
+        }
+
+        if (state.CancellationRequestedAt.HasValue)
+        {
+            TrackBackgroundTask(
+                SetResponseAsync(taskId, DurableTaskResponse.Canceled, CancellationToken.None),
+                "terminalizing a canceled deferred durable task");
+            return;
+        }
+
+        if (state.Request is not { } committedRequest)
+        {
+            return;
+        }
+
         var executionContext = CreateExecutionContext(taskId);
         _ = GetOrCreateRunningTaskHandle(taskId);
-        request.SetTarget(_shared.GrainContextAccessor.GrainContext);
-        StartInvocation(taskId, static value => value.CreateTask(), request, executionContext);
+        committedRequest.SetTarget(_shared.GrainContextAccessor.GrainContext);
+        StartInvocation(taskId, static value => value.CreateTask(), committedRequest, executionContext);
     }
 
     public void OnWriteStarted()
@@ -768,10 +810,10 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     public void OnWriteCompleted()
     {
-        foreach (var (taskId, request) in _committingStarts)
+        foreach (var taskId in _committingStarts.Keys)
         {
             _pendingStarts.TryRemove(taskId, out _);
-            StartRequest(taskId, request);
+            StartRequest(taskId);
         }
 
         _committingStarts.Clear();
@@ -1284,6 +1326,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <inheritdoc/>
     public async ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, SubscribeOrPollOptions options, CancellationToken cancellationToken)
     {
+        ThrowIfStopping();
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
         {
             _shared.Logger.LogTrace("{Id} received polling request for task {TaskId}", GrainId, taskId);
@@ -1301,6 +1344,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     async IAsyncEnumerable<(TaskId TaskId, DurableTaskDiagnosticState State)> IDurableTaskGrainExtension.GetTasksAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        ThrowIfStopping();
         await Task.CompletedTask;
 
         foreach (var (taskId, taskState) in _storage.Tasks)
@@ -1332,6 +1376,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     async IAsyncEnumerable<TaskId> IDurableTaskGrainExtension.GetRunningTasksAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        ThrowIfStopping();
         await Task.CompletedTask;
         var running = _runningRequests.Keys.ToList();
 
@@ -1532,6 +1577,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     public IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId)
     {
+        ThrowIfStopping();
         if (!TryGetScheduledTaskHandle(taskId, out var handle))
         {
             throw new KeyNotFoundException($"A task with the identifier '{taskId}' was not found.");
@@ -1597,6 +1643,12 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     private void ThrowIfStopping()
     {
+        if (Volatile.Read(ref _initialized) == 0)
+        {
+            throw new InvalidOperationException(
+                "Durable Tasks requires grain activations to derive from Orleans.Journaling.DurableGrain so journal participation is initialized.");
+        }
+
         if (_stopping)
         {
             throw new OperationCanceledException(
