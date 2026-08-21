@@ -390,6 +390,10 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
                 Unsafe.As<Action<object?>>(workItem.Callback)(workItem.State);
             }
         }
+        catch (Exception exception)
+        {
+            LogTaskLoopError(exception);
+        }
         finally
         {
             _currentWorkItem = default;
