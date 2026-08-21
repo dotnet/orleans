@@ -1,7 +1,7 @@
-using Orleans.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
+using UnitTests.Grains;
 using Xunit;
 
 namespace UnitTests.CatalogTests
@@ -14,7 +14,7 @@ namespace UnitTests.CatalogTests
     /// simultaneously make calls to the same set of target grains.
     /// 
     /// The catalog is responsible for ensuring that concurrent activation requests for the same grain
-    /// don't result in multiple activations within a single silo.
+    /// result in one activation across the cluster.
     /// </summary>
     [TestSuite("Functional")]
     [TestProvider("None")]
@@ -25,22 +25,7 @@ namespace UnitTests.CatalogTests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-            }
         }
-
-        public class SiloConfigurator : ISiloConfigurator
-        {
-            public void Configure(ISiloBuilder hostBuilder)
-            {
-                // Increase response timeout to accommodate the high load during stress testing
-                // This prevents timeouts that could interfere with duplicate activation detection
-                hostBuilder.Configure<SiloMessagingOptions>(options => options.ResponseTimeout = TimeSpan.FromMinutes(1));
-            }
-        }
-
 
         public DuplicateActivationsTests(Fixture fixture)
         {
@@ -49,20 +34,19 @@ namespace UnitTests.CatalogTests
 
         /// <summary>
         /// Stress test for duplicate activation prevention.
-        /// Creates 100 runner grains that each make 100 calls to 10 target grains.
-        /// This generates 10,000 concurrent requests to just 10 grains, creating
-        /// extreme contention that tests the catalog's synchronization mechanisms.
+        /// Creates 100 runner grains that concurrently call the same 10 target grains.
+        /// This generates 1,000 concurrent requests for previously inactive grains,
+        /// creating contention in the catalog's activation synchronization.
         /// 
-        /// If duplicate activations occur, the target grains will detect this and throw exceptions.
-        /// The test passes only if all calls complete without any duplicate activation errors.
+        /// Each activation returns its unique identifier so that the test can verify
+        /// that every request for a target grain was handled by the same activation.
         /// </summary>
-        [Fact, TestCategory("Catalog"), TestCategory("Functional")]
+        [Fact]
         public async Task DuplicateActivations()
         {
             const int nRunnerGrains = 100;    // Number of grains making concurrent calls
             const int nTargetGrain = 10;      // Number of target grains (high contention)
             const int startingKey = 1000;     // Starting grain ID for target grains
-            const int nCallsToEach = 100;     // Calls each runner makes to each target
 
             var runnerGrains = new ICatalogTestGrain[nRunnerGrains];
 
@@ -71,22 +55,41 @@ namespace UnitTests.CatalogTests
             var promises = new List<Task>(nRunnerGrains);
             for (int i = 0; i < nRunnerGrains; i++)
             {
-                runnerGrains[i] = this.fixture.GrainFactory.GetGrain<ICatalogTestGrain>(-i);
+                runnerGrains[i] = this.fixture.GrainFactory.GetGrain<ICatalogTestGrain>(-(i + 1));
                 promises.Add(runnerGrains[i].Initialize());
             }
 
             await Task.WhenAll(promises);
-            promises.Clear();
 
             // Phase 2: All runners simultaneously blast calls to the same target grains
-            // This creates massive concurrent activation pressure on the catalog
+            // This creates concurrent activation pressure on the catalog
+            using var callBarrier = CatalogTestGrain.ArmConcurrentCallBarrier(nRunnerGrains);
+            var participantsReady = callBarrier.WaitForParticipantsAsync(
+                TimeSpan.FromSeconds(30),
+                TestContext.Current.CancellationToken);
+            var activationIdPromises = new List<Task<string[]>>(nRunnerGrains);
             for (int i = 0; i < nRunnerGrains; i++)
             {
-                promises.Add(runnerGrains[i].BlastCallNewGrains(nTargetGrain, startingKey, nCallsToEach));
+                activationIdPromises.Add(runnerGrains[i].GetActivationIds(nTargetGrain, startingKey));
             }
 
-            // If any duplicate activations occur, the grains will detect and report them
-            await Task.WhenAll(promises);
+            await participantsReady;
+            callBarrier.Release();
+            var activationIdsByRunner = await Task.WhenAll(activationIdPromises);
+            Assert.All(activationIdsByRunner, activationIds => Assert.Equal(nTargetGrain, activationIds.Length));
+
+            for (int targetIndex = 0; targetIndex < nTargetGrain; targetIndex++)
+            {
+                var activationIds = new HashSet<string>();
+                foreach (var activationIdsForRunner in activationIdsByRunner)
+                {
+                    activationIds.Add(activationIdsForRunner[targetIndex]);
+                }
+
+                Assert.True(
+                    activationIds.Count == 1,
+                    $"Target grain {startingKey + targetIndex} was handled by {activationIds.Count} activations: {string.Join(", ", activationIds.Order())}");
+            }
         }
     }
 }

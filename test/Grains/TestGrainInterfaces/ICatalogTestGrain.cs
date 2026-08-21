@@ -3,6 +3,7 @@
     public interface ICatalogTestGrain : IGrainWithIntegerKey
     {
         Task Initialize();
-        Task BlastCallNewGrains(int nGrains, long startingKey, int nCallsToEach);
+        Task<string> GetActivationId();
+        Task<string[]> GetActivationIds(int nGrains, long startingKey);
     }
 }
