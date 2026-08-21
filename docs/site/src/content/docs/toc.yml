@@ -283,6 +283,8 @@ items:
     items:
       - name: Overview
         href: deployment/index.md
+      - name: Choose a deployment target
+        href: deployment/choose-deployment-target.md
       - name: Production-readiness checklist
         href: deployment/production-readiness.md
       - name: Operate a production cluster
@@ -291,18 +293,24 @@ items:
         href: deployment/networking.md
       - name: Run containers across multiple hosts
         href: deployment/containers.md
-      - name: Platform requirements
-        href: deployment/platform-guides.md
-      - name: Host on Kubernetes
-        href: deployment/kubernetes.md
-      - name: Host on Service Fabric
-        href: deployment/service-fabric.md
-      - name: Deploy to Azure App Service on Windows
-        href: deployment/deploy-to-azure-app-service.md
-      - name: Deploy to Azure App Service on Linux
-        href: deployment/deploy-to-azure-app-service-linux.md
-      - name: Host on Azure Container Apps
-        href: deployment/deploy-to-azure-container-apps.md
+      - name: Deployment targets
+        items:
+          - name: Platform requirements
+            href: deployment/platform-guides.md
+          - name: Azure Kubernetes Service
+            href: deployment/azure-kubernetes-service.md
+          - name: Kubernetes
+            href: deployment/kubernetes.md
+          - name: Azure Container Apps
+            href: deployment/deploy-to-azure-container-apps.md
+          - name: Azure App Service
+            href: deployment/azure-app-service.md
+          - name: Azure App Service on Windows
+            href: deployment/deploy-to-azure-app-service.md
+          - name: Azure App Service on Linux
+            href: deployment/deploy-to-azure-app-service-linux.md
+          - name: Service Fabric
+            href: deployment/service-fabric.md
       - name: Health and observability
         href: deployment/health-and-observability.md
       - name: Capacity planning

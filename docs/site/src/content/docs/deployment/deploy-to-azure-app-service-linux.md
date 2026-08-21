@@ -8,7 +8,7 @@ ms.custom: devops
 
 # Deploy Orleans to Azure App Service on Linux
 
-This tutorial deploys the [Orleans shopping cart sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureAppService) to the [built-in .NET stack on Linux Azure App Service](https://learn.microsoft.com/azure/app-service/configure-language-dotnetcore). The application, storage, identity, networking, health, and OIDC design are shared with the [Windows guide](deploy-to-azure-app-service.md), but Linux plan, runtime, startup, and Easy Auth behavior require separate validation.
+This tutorial deploys the [Orleans shopping cart sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureAppService) to the [built-in .NET stack on Linux Azure App Service](https://learn.microsoft.com/azure/app-service/configure-language-dotnetcore). Start with the shared [Azure App Service target overview](azure-app-service.md). The application, storage, identity, networking, health, and OIDC design are shared with the [Windows guide](deploy-to-azure-app-service.md), while Linux plan, runtime, startup, and Easy Auth behavior receive separate validation.
 
 ## Understand the Linux topology
 
@@ -179,4 +179,17 @@ HTTPS terminates at the App Service front end. The sample's private Orleans silo
 
 App Service can replace workers without delivering the full shutdown interval. Size integration subnets for planned scale plus replacement capacity, preserve at least three workers, and validate failure recovery and rolling upgrades under load. Back up durable grain state independently from membership data.
 
-For shared operational guidance, see [Production-readiness checklist](production-readiness.md), [Topology, networking, and clustering](networking.md), [Health and observability](health-and-observability.md), and [Graceful shutdown and upgrades](upgrades.md).
+## Production checklist
+
+| Concern | Linux App Service outcome |
+| --- | --- |
+| Topology and networking | Every worker advertises its private instance address and allocated silo port, and every worker can connect to every active membership endpoint. |
+| Dependencies and data | Azure Table clustering and grain state use separate production data with tested backup and restore. Applications configure reminder and stream providers explicitly when used. |
+| Identity and secrets | Runtime storage access uses managed identity. App Service Authentication, routine deployment, and privileged bootstrap credentials remain separate and rotate before expiry. |
+| Health and lifecycle | Container startup, health check, slot warm-up, readiness removal, and bounded host shutdown reflect the application lifecycle. |
+| Scaling and resilience | The plan retains at least three workers and tested spare capacity. Scale-out, scale-in, worker replacement, dependency degradation, and abrupt loss are exercised under load. |
+| Upgrades and rollback | Compatible versions use a staging-slot swap with mixed-version validation. Incompatible versions use a separate app, cluster ID, state plan, and traffic cutover. |
+| Observability and incidents | Application Insights, Log Analytics, Orleans telemetry, worker identity, membership, provider signals, container events, and slot operations are correlated. |
+| Infrastructure delivery | Bicep and the protected GitHub OIDC workflow reproduce infrastructure and deploy immutable application artifacts through staging. |
+
+For shared operational guidance, see [Production-readiness checklist](production-readiness.md), [Topology, networking, and clustering](networking.md), [Health and observability](health-and-observability.md), [Graceful shutdown and upgrades](upgrades.md), and [Choose a deployment target](choose-deployment-target.md).

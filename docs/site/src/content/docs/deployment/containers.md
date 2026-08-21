@@ -76,6 +76,19 @@ On Amazon ECS, [`awsvpc` task networking](https://docs.aws.amazon.com/AmazonECS/
 
 For orchestrated and managed platforms, also review [Platform requirements](platform-guides.md), [Host Orleans on Kubernetes](kubernetes.md), and [Host Orleans on Azure Container Apps](deploy-to-azure-container-apps.md).
 
+## Complete platform qualification
+
+This page establishes the endpoint and routing model for a container platform. The selected orchestrator or managed service also needs to provide the remaining production mechanisms:
+
+- Workload identity or managed secret and certificate delivery.
+- Startup, readiness, liveness, dependency health, and a measured termination deadline.
+- Resource policy, a tested minimum silo count, scaling controls, and failure-domain placement.
+- Bounded rolling replacement or an isolated blue-green cluster with compatible state handling.
+- Central logs, metrics, traces, deployment identity, provider telemetry, and incident access.
+- Versioned infrastructure and workload configuration with repeatable validation.
+
+Use [Choose a deployment target](choose-deployment-target.md) for maintained target guides. For another orchestrator, complete the [platform requirements](platform-guides.md) and [production-readiness checklist](production-readiness.md) before production traffic.
+
 ## Diagnose forwarding loops and timeouts
 
 Start with the exact endpoints, not only the membership-provider health:

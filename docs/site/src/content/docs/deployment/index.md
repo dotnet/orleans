@@ -53,14 +53,18 @@ Use these articles together:
 
 ## Choose a platform
 
-- [Azure Container Apps deployment walkthrough and sample](../tutorials-and-samples/production-application.md)
-- [Containers across multiple hosts](containers.md)
-- [Kubernetes](kubernetes.md)
-- [Service Fabric](service-fabric.md)
-- [Azure App Service on Windows](deploy-to-azure-app-service.md)
-- [Azure App Service on Linux](deploy-to-azure-app-service-linux.md)
-- [Azure Container Apps](deploy-to-azure-container-apps.md)
-- Other orchestrators, virtual machines, or bare-metal hosts that satisfy the [platform requirements](platform-guides.md)
+Use [Choose a deployment target](choose-deployment-target.md) to compare maintained hosting topologies, endpoint identity, client reachability, scaling, failure-domain controls, operational ownership, and common provider choices.
+
+The target guides cover:
+
+- [Azure Kubernetes Service](azure-kubernetes-service.md) and [platform-neutral Kubernetes](kubernetes.md).
+- [Azure Container Apps](deploy-to-azure-container-apps.md), including its one-silo-per-app endpoint model.
+- [Azure App Service](azure-app-service.md) on [Windows](deploy-to-azure-app-service.md) or [Linux](deploy-to-azure-app-service-linux.md).
+- [Service Fabric](service-fabric.md).
+- [Containers across multiple hosts](containers.md).
+- Other orchestrators, virtual machines, or bare-metal hosts that satisfy the [platform requirements](platform-guides.md).
+
+For a guided deployment with a maintained application and infrastructure sample, use [Deploy an Orleans application to Azure Container Apps](../tutorials-and-samples/production-application.md).
 
 For application configuration, see [Server configuration](../host/configuration-guide/server-configuration.md), [Client configuration](../host/configuration-guide/client-configuration.md), and [Typical configurations](../host/configuration-guide/typical-configurations.md).
 
