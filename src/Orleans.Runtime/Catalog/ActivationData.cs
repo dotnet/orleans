@@ -13,6 +13,7 @@ using Orleans.GrainDirectory;
 using Orleans.Internal;
 using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Internal;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
@@ -35,6 +36,7 @@ internal sealed partial class ActivationData :
     IGrainManagementExtension,
     IGrainCallCancellationExtension,
     ICallChainReentrantGrainContext,
+    IGrainContextStartup,
     IAsyncDisposable,
     IDisposable
 {
@@ -48,6 +50,7 @@ internal sealed partial class ActivationData :
     private readonly IGrainActivator _grainActivator;
     private readonly IServiceScope _serviceScope;
     private readonly WorkItemGroup _workItemGroup;
+    private WorkItemGroup.ActivationStartup? _startup;
     private readonly List<(Message Message, CoarseStopwatch QueuedTime)> _waitingRequests = new();
     private readonly Dictionary<Message, CoarseStopwatch> _runningRequests = new();
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
@@ -70,7 +73,7 @@ internal sealed partial class ActivationData :
 #pragma warning disable IDE0052 // Remove unread private members
     private Task? _messageLoopTask;
 #pragma warning restore IDE0052 // Remove unread private members
-    private int _messageLoopStarted;
+    private int _started;
 
     private Activity? _activationActivity;
 
@@ -109,7 +112,7 @@ internal sealed partial class ActivationData :
         Debug.Assert(_serviceScope != null, "_serviceScope must not be null.");
         _workItemGroup = createWorkItemGroup(this);
         Debug.Assert(_workItemGroup != null, "_workItemGroup must not be null.");
-        _workItemGroup.ReserveExecution();
+        _startup = _workItemGroup.BeginActivationStartup();
         _workItemGroup.QueueAction(
             static state =>
             {
@@ -133,22 +136,62 @@ internal sealed partial class ActivationData :
         return _activationActivity?.Context;
     }
 
-    internal void Start()
+    IDisposable IGrainContextStartup.Start()
     {
-        ExecutionContext.Run(
-            DefaultExecutionContext.Instance,
-            static state =>
-            {
-                var context = (ActivationData)state!;
-                var task = new Task(
-                    static state => ((ActivationData)state!).StartCore(),
-                    context,
+        if (Interlocked.Exchange(ref _started, 1) != 0 || _startup is not { } startup)
+        {
+            throw new InvalidOperationException("The activation has already been started.");
+        }
+
+        try
+        {
+            ExecutionContext.Run(
+                DefaultExecutionContext.Instance,
+                static state =>
+                {
+                    var context = (ActivationData)state!;
+                    var task = new Task(
+                        static state => ((ActivationData)state!).StartCore(),
+                        context,
+                        CancellationToken.None,
+                        TaskCreationOptions.DenyChildAttach);
+                    context._startup!.RunConstructor(task);
+                    task.GetAwaiter().GetResult();
+                },
+                this);
+            _startup = null;
+            return startup;
+        }
+        catch (Exception exception)
+        {
+            _startup = null;
+            Deactivate(
+                new DeactivationReason(
+                    DeactivationReasonCode.ActivationFailed,
+                    exception,
+                    "Error starting grain construction."),
+                CancellationToken.None);
+            startup.Dispose();
+            throw;
+        }
+    }
+
+    void IGrainContextStartup.Abort()
+    {
+        if (Interlocked.Exchange(ref _startup, null) is { } startup)
+        {
+            startup.Abort();
+            using var suppressExecutionContext = new ExecutionContextSuppressor();
+            Task.Factory.StartNew(
+                    static state => DisposeAsync(state!).AsTask(),
+                    _serviceScope,
                     CancellationToken.None,
-                    TaskCreationOptions.DenyChildAttach);
-                context._workItemGroup.RunTaskSynchronously(task);
-                task.GetAwaiter().GetResult();
-            },
-            this);
+                    TaskCreationOptions.DenyChildAttach,
+                    TaskScheduler.Default)
+                .Unwrap()
+                .GetAwaiter()
+                .GetResult();
+        }
     }
 
     private void StartCore()
@@ -177,16 +220,6 @@ internal sealed partial class ActivationData :
             }
 
         }
-    }
-
-    internal void StartMessageLoop()
-    {
-        if (Interlocked.Exchange(ref _messageLoopStarted, 1) != 0)
-        {
-            throw new InvalidOperationException("The activation message loop has already been started.");
-        }
-
-        _workItemGroup.ReleaseExecution();
     }
 
     public ActivationTaskScheduler ActivationTaskScheduler => _workItemGroup.TaskScheduler;

@@ -49,7 +49,7 @@ internal partial class ActivationDataActivatorProvider(
         return true;
     }
 
-    private partial class ActivationDataActivator : IDeferredGrainContextActivator
+    private partial class ActivationDataActivator : IPreparedGrainContextActivator
     {
         private readonly IOptions<SchedulingOptions> _schedulingOptions;
         private readonly IGrainActivator _grainActivator;
@@ -76,18 +76,12 @@ internal partial class ActivationDataActivatorProvider(
 
         public IGrainContext CreateContext(GrainAddress activationAddress, IConfigureGrainContext[] configureActions)
         {
-            var context = CreateDeferredContext(activationAddress, configureActions);
-            context.Start();
-            context.StartMessageLoop();
-            return context;
+            var preparedContext = CreatePreparedContext(activationAddress, configureActions);
+            using var startup = preparedContext.Start();
+            return preparedContext.Context;
         }
 
-        IGrainContext IDeferredGrainContextActivator.CreateDeferredContext(
-            GrainAddress activationAddress,
-            IConfigureGrainContext[] configureActions)
-            => CreateDeferredContext(activationAddress, configureActions);
-
-        private ActivationData CreateDeferredContext(
+        public PreparedGrainContext CreatePreparedContext(
             GrainAddress activationAddress,
             IConfigureGrainContext[] configureActions)
         {
@@ -98,12 +92,20 @@ internal partial class ActivationDataActivatorProvider(
                 _sharedComponents,
                 _grainActivator);
 
-            foreach (var configure in configureActions)
+            try
             {
-                configure.Configure(context);
-            }
+                foreach (var configure in configureActions)
+                {
+                    configure.Configure(context);
+                }
 
-            return context;
+                return new(context, (IGrainContextStartup)context);
+            }
+            catch
+            {
+                ((IGrainContextStartup)context).Abort();
+                throw;
+            }
         }
     }
 }
