@@ -194,6 +194,8 @@ items:
     items:
       - name: Recipe index
         href: how-to/index.md
+      - name: Implement long-running reminders
+        href: how-to/long-running-reminders.md
   - name: Host and configure
     items:
       - name: Hosting
