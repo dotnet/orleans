@@ -676,22 +676,22 @@ public class ReminderManagementGrainTests
         Assert.Equal("filter", exception.ParamName);
     }
 
-    public static TheoryData<ReminderQueryFilter> InvalidFilters => new()
-    {
-        new() { DueFromUtcInclusive = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Local) },
-        new() { DueToUtcInclusive = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
-        new()
+    public static TheoryData<ReminderQueryFilter> InvalidFilters =>
+    [
+        new ReminderQueryFilter { DueFromUtcInclusive = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Local) },
+        new ReminderQueryFilter { DueToUtcInclusive = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+        new ReminderQueryFilter
         {
             DueFromUtcInclusive = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc),
             DueToUtcInclusive = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
         },
-        new() { Priority = (DurableJobPriority)sbyte.MaxValue },
-        new() { Action = (MissedReminderAction)255 },
-        new() { ScheduleKind = (ReminderScheduleKind)255 },
-        new() { Status = (ReminderQueryStatus)128 },
-        new() { OverdueBy = TimeSpan.FromTicks(-1) },
-        new() { MissedBy = TimeSpan.FromTicks(-1) },
-    };
+        new ReminderQueryFilter { Priority = (DurableJobPriority)sbyte.MaxValue },
+        new ReminderQueryFilter { Action = (MissedReminderAction)255 },
+        new ReminderQueryFilter { ScheduleKind = (ReminderScheduleKind)255 },
+        new ReminderQueryFilter { Status = (ReminderQueryStatus)128 },
+        new ReminderQueryFilter { OverdueBy = TimeSpan.FromTicks(-1) },
+        new ReminderQueryFilter { MissedBy = TimeSpan.FromTicks(-1) },
+    ];
 
     [Fact]
     public async Task LargeTimeRanges_DoNotOverflow()

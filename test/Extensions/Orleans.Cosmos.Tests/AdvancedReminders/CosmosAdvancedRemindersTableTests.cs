@@ -41,13 +41,13 @@ public class CosmosAdvancedRemindersTableTests : AdvancedReminderTableTestsBase
         return Task.FromResult(TestDefaultConfiguration.CosmosDBAccountEndpoint!);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_Cosmos_DurableCronRoundTrip() => await ReminderCronRoundTrip();
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_Cosmos_DurableAdaptiveFieldsRoundTrip() => await ReminderAdaptiveFieldsRoundTrip();
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_Cosmos_DurableCronTimeZoneRoundTrip() => await ReminderCronTimeZoneRoundTrip();
 
     private static void ConfigureTestDefaults(CosmosReminderTableOptions options)

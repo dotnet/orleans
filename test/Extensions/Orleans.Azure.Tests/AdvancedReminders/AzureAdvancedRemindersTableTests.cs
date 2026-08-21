@@ -41,12 +41,12 @@ public class AzureAdvancedRemindersTableTests : AdvancedReminderTableTestsBase
         return Task.FromResult("not used");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_Azure_DurableCronRoundTrip() => await ReminderCronRoundTrip();
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_Azure_DurableAdaptiveFieldsRoundTrip() => await ReminderAdaptiveFieldsRoundTrip();
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_Azure_DurableCronTimeZoneRoundTrip() => await ReminderCronTimeZoneRoundTrip();
 }

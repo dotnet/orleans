@@ -41,13 +41,13 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         remindersTable = CreateRemindersTable();
     }
 
-    public virtual async Task InitializeAsync()
+    public virtual async ValueTask InitializeAsync()
     {
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
         await remindersTable.StartAsync(cancellation.Token);
     }
 
-    public virtual async Task DisposeAsync()
+    public virtual async ValueTask DisposeAsync()
     {
         if (SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
         {
@@ -60,22 +60,22 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
 
     protected virtual string? GetAdoInvariant() => null;
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_DurableSimpleRoundTrip() => await ReminderSimple();
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_DurableParallelUpsert() => await RemindersParallelUpsert();
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_DurableRangeQueries() => await RemindersRange(iterations: 128);
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_DurableAddUpdateDeleteRoundTrip() => await ReminderAddUpdateDeleteRoundTrip();
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_DurableDeleteMissingReturnsFalse() => await ReminderDeleteMissingReturnsFalse();
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_DurableRejectsStaleUpsert() => await ReminderRejectsStaleUpsert();
 
     protected async Task RemindersParallelUpsert()

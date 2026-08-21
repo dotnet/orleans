@@ -155,7 +155,7 @@ public sealed class RedisMultiplexerOwnershipTests
         await AssertSharedMultiplexerNotDisposed(connection, initialize, GetDispose(provider, useAsyncDispose));
     }
 
-    [SkippableTheory]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task RedisAdvancedReminderTable_Dispose_DisposesExclusiveMultiplexer(bool useAsyncDispose)
@@ -172,7 +172,7 @@ public sealed class RedisMultiplexerOwnershipTests
         await AssertExclusiveMultiplexerDisposed(() => connection!, initialize, GetDispose(provider, useAsyncDispose));
     }
 
-    [SkippableTheory]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task RedisGrainDirectory_Dispose_DoesNotDisposeSharedMultiplexer(bool useAsyncDispose)

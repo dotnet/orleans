@@ -46,15 +46,15 @@ public class PostgreSqlAdvancedRemindersTableTests : AdvancedReminderTableTestsB
         return instance.CurrentConnectionString;
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_PostgreSql_DurableCronRoundTrip() => await ReminderCronRoundTrip();
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_PostgreSql_DurableAdaptiveFieldsRoundTrip() => await ReminderAdaptiveFieldsRoundTrip();
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_PostgreSql_UnspecifiedTimestampsRoundTrip() => await ReminderUnspecifiedTimestampsRoundTrip();
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_PostgreSql_DurableCronTimeZoneRoundTrip() => await ReminderCronTimeZoneRoundTrip();
 }
