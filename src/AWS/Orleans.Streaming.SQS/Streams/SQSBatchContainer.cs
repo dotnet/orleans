@@ -39,7 +39,7 @@ namespace OrleansAWSUtils.Streams
         }
 
         [JsonConstructor]
-        public SQSBatchContainer(
+        internal SQSBatchContainer(
             StreamId streamId,
             List<object> events,
             Dictionary<string, object>? requestContext,
@@ -49,7 +49,7 @@ namespace OrleansAWSUtils.Streams
             this.sequenceToken = sequenceToken;
         }
 
-        public SQSBatchContainer(StreamId streamId, List<object> events, Dictionary<string, object>? requestContext)
+        private SQSBatchContainer(StreamId streamId, List<object> events, Dictionary<string, object>? requestContext)
         {
             if (events == null) throw new ArgumentNullException(nameof(events), "Message contains no events");
 
@@ -60,17 +60,17 @@ namespace OrleansAWSUtils.Streams
 
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
-            static StreamSequenceToken CreateStreamSequenceToken(StreamId streamId, StreamSequenceToken tok, int eventIndex)
+            static StreamSequenceToken CreateStreamSequenceToken(StreamSequenceToken token, int eventIndex)
             {
-                return tok switch
+                return token switch
                 {
                     EventSequenceTokenV2 v2Tok => v2Tok.CreateSequenceTokenForEvent(eventIndex),
                     SQSFIFOSequenceToken fifoTok => fifoTok.CreateSequenceTokenForEvent(eventIndex),
-                    _ => throw new NotSupportedException("Unknown SequenceToken provided.")
+                    _ => throw new NotSupportedException($"Unsupported sequence token type: {token.GetType().FullName}.")
                 };
             }
 
-            return events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, CreateStreamSequenceToken(StreamId, sequenceToken, i)));
+            return events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, CreateStreamSequenceToken(sequenceToken, i)));
         }
 
         internal static SQSMessage ToSQSMessage<T>(

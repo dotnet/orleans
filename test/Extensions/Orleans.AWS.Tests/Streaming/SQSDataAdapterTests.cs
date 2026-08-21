@@ -69,7 +69,7 @@ public class SQSDataAdapterTests : IAsyncLifetime
             ReceiveMessageAttributes = new[] { "StreamId" }.ToList()
         };
         var clusterOptions = new ClusterOptions { ServiceId = this.clusterId };
-        var dataAdapter = new StringOrIntSqlDataAdapter(fixture.Serializer);
+        var dataAdapter = new StringOrIntSqsDataAdapter(fixture.Serializer);
         var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), Options.Create(clusterOptions), dataAdapter, NullLoggerFactory.Instance);
         adapterFactory.Init();
         await SendAndReceiveFromQueueAdapter(adapterFactory);
@@ -119,8 +119,7 @@ public class SQSDataAdapterTests : IAsyncLifetime
                             id => new HashSet<StreamId> { message.StreamId },
                             (id, set) =>
                             {
-                                set.Add(message.StreamId);
-                                return set;
+                                return new HashSet<StreamId>(set) { message.StreamId };
                             });
                         output.WriteLine("Queue {0} received message on stream {1}", queueId,
                             message.StreamId);
@@ -216,13 +215,13 @@ public class SQSDataAdapterTests : IAsyncLifetime
     internal static string MakeClusterId()
     {
         const string DeploymentIdFormat = "cluster-{0}";
-        string now = DateTime.UtcNow.ToString("yyyy-MM-dd-hh-mm-ss-ffff");
-        return string.Format(DeploymentIdFormat, now);
+        string now = DateTime.UtcNow.ToString("yyyy-MM-dd-HH-mm-ss-ffff", CultureInfo.InvariantCulture);
+        return string.Format(CultureInfo.InvariantCulture, DeploymentIdFormat, now);
     }
 
-    private class StringOrIntSqlDataAdapter : SQSDataAdapter
+    private class StringOrIntSqsDataAdapter : SQSDataAdapter
     {
-        public StringOrIntSqlDataAdapter(Serializer serializer) : base(serializer)
+        public StringOrIntSqsDataAdapter(Serializer serializer) : base(serializer)
         {
         }
 

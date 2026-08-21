@@ -23,7 +23,7 @@ public class SQSFIFOSequenceToken : StreamSequenceToken
     public StreamId StreamId { get; set; }
 
     /// <summary>
-    /// Gets the number of event batches in stream prior to this event batch
+    /// Gets the Amazon SQS FIFO sequence number for this message within its message group.
     /// </summary>
     [Id(0)]
     [JsonProperty]
@@ -31,7 +31,7 @@ public class SQSFIFOSequenceToken : StreamSequenceToken
 
 
     /// <summary>
-    /// Gets the number of event batches in stream prior to this event batch
+    /// Gets the receiver-local sequence number used for queue cache ordering and progress.
     /// </summary>
     [Id(3)]
     [JsonProperty]
@@ -47,7 +47,9 @@ public class SQSFIFOSequenceToken : StreamSequenceToken
     /// <summary>
     /// Initializes a new instance of the <see cref="SQSFIFOSequenceToken"/> class.
     /// </summary>
+    /// <param name="streamId">The stream associated with the token.</param>
     /// <param name="seqNumber">The sequence number.</param>
+    /// <param name="sequenceNumber">The receiver-local sequence number.</param>
     public SQSFIFOSequenceToken(StreamId streamId, UInt128 seqNumber, long sequenceNumber)
     {
         StreamId = streamId;
@@ -61,6 +63,7 @@ public class SQSFIFOSequenceToken : StreamSequenceToken
     /// </summary>
     /// <param name="streamId">The stream id for which this token relates.</param>
     /// <param name="seqNumber">The sequence number.</param>
+    /// <param name="sequenceNumber">The receiver-local sequence number.</param>
     /// <param name="eventInd">The event index, for events which are part of a batch of events.</param>
     public SQSFIFOSequenceToken(StreamId streamId, UInt128 seqNumber, long sequenceNumber, int eventInd)
     {

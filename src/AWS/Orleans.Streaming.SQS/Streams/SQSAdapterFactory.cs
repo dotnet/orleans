@@ -122,7 +122,7 @@ namespace OrleansAWSUtils.Streams
             var dataAdapter = services.GetKeyedService<ISQSDataAdapter>(name)
                                ?? services.GetService<ISQSDataAdapter>()
                                ?? ActivatorUtilities.CreateInstance<SQSDataAdapter>(services);
-            var factory = ActivatorUtilities.CreateInstance<SQSAdapterFactory>(services, name, sqsOptions, cacheOptions, queueMapperOptions, clusterOptions, dataAdapter);
+            var factory = ActivatorUtilities.CreateInstance<SQSAdapterFactory>(services, name, sqsOptions, queueMapperOptions, cacheOptions, clusterOptions, dataAdapter);
             factory.Init();
             return factory;
         }

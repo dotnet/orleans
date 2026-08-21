@@ -236,7 +236,8 @@ namespace OrleansAWSUtils.Storage
                 var response = await sqsClient.SendMessageAsync(message);
                 if (response.HttpStatusCode != HttpStatusCode.OK)
                 {
-                    throw new Exception("Failed to send message into SQS. ");
+                    throw new InvalidOperationException(
+                        $"Amazon SQS returned HTTP status {response.HttpStatusCode} when sending a message to queue {QueueName}.");
                 }
             }
             catch (Exception exc)
@@ -300,7 +301,7 @@ namespace OrleansAWSUtils.Storage
                 if (string.IsNullOrWhiteSpace(queueUrl))
                     throw new InvalidOperationException("Queue not initialized");
 
-                var result = await sqsClient.DeleteMessageAsync(
+                await sqsClient.DeleteMessageAsync(
                     new DeleteMessageRequest { QueueUrl = queueUrl, ReceiptHandle = message.ReceiptHandle });
             }
             catch (Exception exc)
@@ -379,7 +380,7 @@ namespace OrleansAWSUtils.Storage
         private static string ConstructQueueName(string queueName, SqsOptions sqsOptions, string serviceId)
         {
             var queueNameBuilder = new StringBuilder();
-            if (!string.IsNullOrEmpty(serviceId))
+            if (!string.IsNullOrWhiteSpace(serviceId))
             {
                 queueNameBuilder.Append(serviceId);
                 queueNameBuilder.Append('-');

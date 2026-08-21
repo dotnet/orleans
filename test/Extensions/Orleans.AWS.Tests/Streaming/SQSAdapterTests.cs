@@ -118,8 +118,7 @@ namespace AWSUtils.Tests.Streaming
                                 id => new HashSet<StreamId> { message.StreamId },
                                 (id, set) =>
                                 {
-                                    set.Add(message.StreamId);
-                                    return set;
+                                    return new HashSet<StreamId>(set) { message.StreamId };
                                 });
                             output.WriteLine("Queue {0} received message on stream {1}", queueId,
                                 message.StreamId);
@@ -215,8 +214,8 @@ namespace AWSUtils.Tests.Streaming
         internal static string MakeClusterId()
         {
             const string DeploymentIdFormat = "cluster-{0}";
-            string now = DateTime.UtcNow.ToString("yyyy-MM-dd-hh-mm-ss-ffff");
-            return string.Format(DeploymentIdFormat, now);
+            string now = DateTime.UtcNow.ToString("yyyy-MM-dd-HH-mm-ss-ffff", CultureInfo.InvariantCulture);
+            return string.Format(CultureInfo.InvariantCulture, DeploymentIdFormat, now);
         }
     }
 }
