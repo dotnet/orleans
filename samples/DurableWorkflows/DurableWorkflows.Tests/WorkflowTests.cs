@@ -371,13 +371,25 @@ public sealed class WorkflowEndpointTests : IAsyncLifetime
         const string reservedId = "approval?fragment#";
         var encodedId = Uri.EscapeDataString(reservedId);
         using var reserved = await _http.PostAsync($"/workflows/approval/{encodedId}?subject=test", null);
+        using var completeReserved = await _http.PutAsJsonAsync(
+            $"/workflows/approval/{encodedId}",
+            new ApprovalSubmission("test", Approved: true, "completed"));
+        var nullSubjectId = UniqueId();
+        using var nullSubject = await _http.PutAsJsonAsync(
+            $"/workflows/approval/{nullSubjectId}",
+            new { Subject = (string?)null, Approved = true, Reason = "invalid" });
         using var invalidApproval = await _http.PostAsync("/workflows/approval/$invalid?subject=test", null);
         using var invalidCancellation = await _http.PostAsync("/workflows/cancellation/$invalid", null);
         using var missingApproval = await _http.GetAsync($"/workflows/approval/{UniqueId()}/status");
         using var missingCancellation = await _http.GetAsync($"/workflows/cancellation/{UniqueId()}/status");
+        using var nullSubjectStatus = await _http.GetAsync($"/workflows/approval/{nullSubjectId}/status");
 
         Assert.Equal(HttpStatusCode.Accepted, reserved.StatusCode);
         Assert.Equal($"/workflows/approval/{encodedId}/status", reserved.Headers.Location!.OriginalString);
+        Assert.Equal(HttpStatusCode.Accepted, completeReserved.StatusCode);
+        Assert.Equal("succeeded", (await WaitForStatusAsync($"/workflows/approval/{encodedId}/status", "succeeded")).Status);
+        Assert.Equal(HttpStatusCode.BadRequest, nullSubject.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, nullSubjectStatus.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, invalidApproval.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, invalidCancellation.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, missingApproval.StatusCode);

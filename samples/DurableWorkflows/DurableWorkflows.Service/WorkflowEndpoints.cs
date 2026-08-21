@@ -67,6 +67,11 @@ public static class WorkflowEndpoints
             return InvalidId();
         }
 
+        if (string.IsNullOrWhiteSpace(subject))
+        {
+            return InvalidSubject();
+        }
+
         try
         {
             var scheduled = await ScheduleApprovalAsync(client, correlationId, subject, cancellationToken);
@@ -87,6 +92,11 @@ public static class WorkflowEndpoints
         if (!IsValidId(correlationId))
         {
             return InvalidId();
+        }
+
+        if (string.IsNullOrWhiteSpace(submission.Subject))
+        {
+            return InvalidSubject();
         }
 
         try
@@ -276,6 +286,9 @@ public static class WorkflowEndpoints
 
     private static IResult InvalidId() =>
         Results.BadRequest(new WorkflowApiError("Workflow ids must be non-empty task-id segments without '/' and cannot begin with '$'."));
+
+    private static IResult InvalidSubject() =>
+        Results.BadRequest(new WorkflowApiError("Approval subjects must contain a non-whitespace value."));
 
     private static IResult Conflict() =>
         Results.Conflict(new WorkflowApiError("The workflow id is already associated with a different request."));
