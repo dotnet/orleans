@@ -20,14 +20,14 @@ public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) 
         private InProcessTestCluster? _cluster;
         public InProcessTestCluster Cluster => _cluster!;
 
-        public async Task InitializeAsync()
+        public async ValueTask InitializeAsync()
         {
             var builder = new InProcessTestClusterBuilder();
             _cluster = builder.Build();
             await _cluster.DeployAsync();
         }
 
-        public async Task DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             if (_cluster != null)
             {
