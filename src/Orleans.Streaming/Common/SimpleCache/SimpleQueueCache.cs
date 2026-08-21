@@ -169,7 +169,7 @@ namespace Orleans.Providers.Streams.Common
                 return;
             }
 
-            // If no token is provided, start at the newest item. The oldest token starts at the oldest item.
+            // Position default cursors at the newest item and cache-miss cursors at the oldest item.
             sequenceToken = sequenceToken is OldestInStreamToken
                 ? cachedMessages.Last!.Value.SequenceToken
                 : sequenceToken ?? cachedMessages.First!.Value.SequenceToken;

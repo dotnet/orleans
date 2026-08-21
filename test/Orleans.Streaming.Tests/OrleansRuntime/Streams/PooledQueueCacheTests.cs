@@ -708,8 +708,8 @@ namespace UnitTests.OrleansRuntime.Streams
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public void GetCursorAtOldestEntry()
+        [Fact, TestSuite("BVT"), TestArea("Streaming")]
+        public void PooledQueueCache_GetCursorAtOldestEntry()
         {
             var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
             var dataAdapter = new TestCacheDataAdapter();
@@ -722,19 +722,16 @@ namespace UnitTests.OrleansRuntime.Streams
             var streamKey = Guid.NewGuid();
             var stream = StreamId.Create(TestStreamNamespace, streamKey);
 
-            // Start by enqueuing messages for stream
-            EnqueueMessage(streamKey);
-            EnqueueMessage(streamKey);
+            var oldestSequenceNumber = EnqueueMessage(streamKey);
+            var newestSequenceNumber = EnqueueMessage(streamKey);
 
-            // Get a cursor at the oldest entry
             var cursor = cache.GetCursor(stream, OldestInStreamToken.Instance);
 
-            // Should have a cursor able to walk the two messages
-            Assert.NotNull(cursor);
-
-            Assert.True(cache.TryGetNextMessage(cursor, out var _));
-            Assert.True(cache.TryGetNextMessage(cursor, out var _));
-            Assert.False(cache.TryGetNextMessage(cursor, out var _));
+            Assert.True(cache.TryGetNextMessage(cursor, out var oldest));
+            Assert.Equal(oldestSequenceNumber, oldest.SequenceToken.SequenceNumber);
+            Assert.True(cache.TryGetNextMessage(cursor, out var newest));
+            Assert.Equal(newestSequenceNumber, newest.SequenceToken.SequenceNumber);
+            Assert.False(cache.TryGetNextMessage(cursor, out _));
 
             long EnqueueMessage(Guid streamId)
             {
@@ -750,7 +747,7 @@ namespace UnitTests.OrleansRuntime.Streams
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        [Fact, TestSuite("BVT"), TestArea("Streaming")]
         public void SimpleQueueCache_GetCursorAtOldestEntry()
         {
             var cache = new SimpleQueueCache(10, NullLogger.Instance);
@@ -768,8 +765,8 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.False(cursor.MoveNext());
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public void QueueCacheMissRecovery_DefaultsToNewestEntry()
+        [Fact, TestSuite("BVT"), TestArea("Streaming")]
+        public void QueueCacheMissRecovery_UsesDefaultCursorPositionForCustomCache()
         {
             IQueueCache cache = new DefaultRecoveryQueueCache();
 
@@ -778,13 +775,16 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.Null(((DefaultRecoveryQueueCache)cache).RequestedToken);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public void OldestInStreamToken_InstancesAreEqual()
+        [Fact, TestSuite("BVT"), TestArea("Streaming")]
+        public void OldestInStreamToken_RepresentsOldestPosition()
         {
-            var other = new OldestInStreamToken();
+            var token = OldestInStreamToken.Instance;
 
-            Assert.Equal(OldestInStreamToken.Instance, other);
-            Assert.Equal(OldestInStreamToken.Instance.GetHashCode(), other.GetHashCode());
+            Assert.Equal(-1, token.SequenceNumber);
+            Assert.Equal(0, token.EventIndex);
+            Assert.Equal(0, token.CompareTo(new OldestInStreamToken()));
+            Assert.True(token.CompareTo(new EventSequenceTokenV2(0)) < 0);
+            Assert.True(token.CompareTo(null) > 0);
         }
 
         private int RunGoldenPath(PooledQueueCache cache, CachedMessageConverter converter, int startOfCache)

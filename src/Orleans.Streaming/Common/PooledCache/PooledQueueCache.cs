@@ -223,7 +223,7 @@ namespace Orleans.Providers.Streams.Common
             }
             if (sequenceToken is OldestInStreamToken)
             {
-                // Start from the oldest message in cache
+                // Start from the oldest retained message.
                 var block = messageBlocks.Last!;
                 cursor.State = CursorStates.Set;
                 cursor.CurrentBlock = block;

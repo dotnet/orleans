@@ -33,8 +33,8 @@ namespace Orleans.Streams
         /// Acquires a stream message cursor after a cache miss.
         /// </summary>
         /// <remarks>
-        /// The default implementation preserves the historical behavior of resuming at the newest cached message.
-        /// Cache implementations which can resume at the oldest retained message should override this method.
+        /// The default implementation resumes from the cache's default cursor position.
+        /// Orleans-provided caches override this method to resume from the oldest retained message.
         /// </remarks>
         /// <param name="streamId">The stream identifier.</param>
         /// <returns>The queue cache cursor.</returns>
