@@ -21,15 +21,15 @@ public class DurableJobFeatureHandlerTests
     }
 
     [Fact]
-    public void RetryAt_CreatesDurableRescheduleResult()
+    public void RescheduleAt_CreatesDurableRescheduleResult()
     {
         var dueTime = DateTimeOffset.UtcNow.AddMinutes(1);
 
-        var result = DurableJobRunResult.RetryAt(dueTime);
+        var result = DurableJobRunResult.RescheduleAt(dueTime);
 
-        Assert.True(result.IsRetryRequested);
-        Assert.Equal(DurableJobRunStatus.RetryAt, result.Status);
-        Assert.Equal(dueTime, result.RetryAtTime);
+        Assert.True(result.IsRescheduleRequested);
+        Assert.Equal(DurableJobRunStatus.RescheduleRequested, result.Status);
+        Assert.Equal(dueTime, result.RescheduleTime);
     }
 
     [Theory]
@@ -82,16 +82,16 @@ public class DurableJobFeatureHandlerTests
     }
 
     [Fact]
-    public void PollAfter_ThrowsArgumentOutOfRangeException_ForZeroDelay()
+    public void InProgress_ThrowsArgumentOutOfRangeException_ForZeroDelay()
     {
-        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => DurableJobRunResult.PollAfter(TimeSpan.Zero));
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => DurableJobRunResult.InProgress(TimeSpan.Zero));
         Assert.Equal("delay", ex.ParamName);
     }
 
     [Fact]
-    public void PollAfter_ThrowsArgumentOutOfRangeException_ForNegativeDelay()
+    public void InProgress_ThrowsArgumentOutOfRangeException_ForNegativeDelay()
     {
-        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => DurableJobRunResult.PollAfter(TimeSpan.FromSeconds(-1)));
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => DurableJobRunResult.InProgress(TimeSpan.FromSeconds(-1)));
         Assert.Equal("delay", ex.ParamName);
     }
 
@@ -113,49 +113,49 @@ public class DurableJobFeatureHandlerTests
 
     [Theory]
     [InlineData(DurableJobRunStatus.Completed)]
-    [InlineData(DurableJobRunStatus.PollAfter)]
+    [InlineData(DurableJobRunStatus.InProgress)]
     [InlineData(DurableJobRunStatus.Failed)]
-    [InlineData(DurableJobRunStatus.RetryAt)]
+    [InlineData(DurableJobRunStatus.RescheduleRequested)]
     public void StatusFlags_AreMutuallyExclusive_AcrossAllStatuses(DurableJobRunStatus status)
     {
         var result = status switch
         {
             DurableJobRunStatus.Completed => DurableJobRunResult.Completed,
-            DurableJobRunStatus.PollAfter => DurableJobRunResult.PollAfter(TimeSpan.FromSeconds(30)),
+            DurableJobRunStatus.InProgress => DurableJobRunResult.InProgress(TimeSpan.FromSeconds(30)),
             DurableJobRunStatus.Failed => DurableJobRunResult.Failed(new InvalidOperationException("boom")),
-            DurableJobRunStatus.RetryAt => DurableJobRunResult.RetryAt(DateTimeOffset.UtcNow.AddMinutes(5)),
+            DurableJobRunStatus.RescheduleRequested => DurableJobRunResult.RescheduleAt(DateTimeOffset.UtcNow.AddMinutes(5)),
             _ => throw new ArgumentOutOfRangeException(nameof(status), status, "Unexpected status."),
         };
 
         Assert.Equal(status, result.Status);
 
-        var trueFlagCount = (result.IsFailed ? 1 : 0) + (result.IsPending ? 1 : 0) + (result.IsRetryRequested ? 1 : 0);
+        var trueFlagCount = (result.IsFailed ? 1 : 0) + (result.IsInProgress ? 1 : 0) + (result.IsRescheduleRequested ? 1 : 0);
 
         switch (status)
         {
             case DurableJobRunStatus.Completed:
                 Assert.Equal(0, trueFlagCount);
                 Assert.False(result.IsFailed);
-                Assert.False(result.IsPending);
-                Assert.False(result.IsRetryRequested);
+                Assert.False(result.IsInProgress);
+                Assert.False(result.IsRescheduleRequested);
                 break;
-            case DurableJobRunStatus.PollAfter:
+            case DurableJobRunStatus.InProgress:
                 Assert.Equal(1, trueFlagCount);
-                Assert.True(result.IsPending);
+                Assert.True(result.IsInProgress);
                 Assert.False(result.IsFailed);
-                Assert.False(result.IsRetryRequested);
+                Assert.False(result.IsRescheduleRequested);
                 break;
             case DurableJobRunStatus.Failed:
                 Assert.Equal(1, trueFlagCount);
                 Assert.True(result.IsFailed);
-                Assert.False(result.IsPending);
-                Assert.False(result.IsRetryRequested);
+                Assert.False(result.IsInProgress);
+                Assert.False(result.IsRescheduleRequested);
                 break;
-            case DurableJobRunStatus.RetryAt:
+            case DurableJobRunStatus.RescheduleRequested:
                 Assert.Equal(1, trueFlagCount);
-                Assert.True(result.IsRetryRequested);
+                Assert.True(result.IsRescheduleRequested);
                 Assert.False(result.IsFailed);
-                Assert.False(result.IsPending);
+                Assert.False(result.IsInProgress);
                 break;
         }
     }

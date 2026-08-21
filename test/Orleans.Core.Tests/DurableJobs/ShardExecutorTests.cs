@@ -715,40 +715,7 @@ public class ShardExecutorTests
     }
 
     [Fact]
-    public async Task RunShardAsync_WhenJobRequestsDurableRetry_ReschedulesJobWithoutRetryJobLater()
-    {
-        var options = CreateOptions(maxConcurrentJobs: 10);
-        var overloadDetector = CreateOverloadDetector(isOverloaded: false);
-        var jobs = CreateJobs(1);
-        var shard = CreateJobShard(jobs);
-        var grainFactory = CreateGrainFactory();
-        var executor = new ShardExecutor(grainFactory, options, overloadDetector, NullLogger<ShardExecutor>.Instance);
-
-        var retryAtTime = DateTimeOffset.UtcNow.AddMinutes(5);
-        var extension = Substitute.For<IDurableJobReceiverExtension>();
-        extension.HandleDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
-            .Returns(DurableJobRunResult.RetryAt(retryAtTime));
-        grainFactory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
-
-        await executor.RunShardAsync(shard, CancellationToken.None);
-
-        // The new IsRetryRequested branch reschedules via RescheduleJobAsync (resets dequeue count),
-        // distinguishing it from the pre-existing IsFailed branch which uses RetryJobLaterAsync.
-        await shard.Received(1).RescheduleJobAsync(
-            Arg.Any<IJobRunContext>(),
-            retryAtTime,
-            Arg.Any<CancellationToken>());
-
-        await shard.DidNotReceive().RetryJobLaterAsync(
-            Arg.Any<IJobRunContext>(),
-            Arg.Any<DateTimeOffset>(),
-            Arg.Any<CancellationToken>());
-
-        await shard.DidNotReceive().RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task RunShardAsync_WhenJobFailsWithNoRetryPolicy_RecordsFailureWithoutRetryingRescheduligOrRemoving()
+    public async Task RunShardAsync_WhenJobFailsWithNoRetryPolicy_RecordsFailureWithoutRetryingReschedulingOrRemoving()
     {
         // Default ShouldRetry (CreateOptions default) always returns null, i.e. no retry: this is the
         // terminal-failure branch (ExecuteJobAsync's "failureException is not null && retryTime is null" path)

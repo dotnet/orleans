@@ -514,7 +514,7 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
                 .Select(envelope => _messageStates.TryGetValue(envelope.MessageId, out var state) ? state.NextAttemptAt : null)
                 .Where(static value => value.HasValue)
                 .Min() ?? now;
-            return DurableJobRunResult.RetryAt(nextAttempt <= now ? now : nextAttempt);
+            return DurableJobRunResult.RescheduleAt(nextAttempt <= now ? now : nextAttempt);
         }
         finally
         {
