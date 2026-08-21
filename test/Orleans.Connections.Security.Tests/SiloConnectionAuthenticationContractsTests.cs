@@ -4,6 +4,10 @@ using Xunit;
 
 namespace Orleans.Connections.Security.Tests;
 
+[TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Security")]
 public class SiloConnectionAuthenticationContractsTests
 {
     [Theory]
@@ -78,6 +82,10 @@ public class SiloConnectionAuthenticationContractsTests
     }
 }
 
+[TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Security")]
 public class SiloConnectionAuthenticationOptionsTests
 {
     [Fact]
@@ -141,6 +149,10 @@ public class SiloConnectionAuthenticationOptionsTests
     }
 }
 
+[TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Security")]
 public class SiloConnectionAuthenticationProtocolTests
 {
     [Fact]
@@ -152,6 +164,10 @@ public class SiloConnectionAuthenticationProtocolTests
             StringComparer.Ordinal);
     }
 
+    [TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Security")]
     public class SiloConnectionAuthenticationContextTests
     {
         [Theory]
@@ -166,6 +182,10 @@ public class SiloConnectionAuthenticationProtocolTests
             Assert.Equal(target, validation.Target);
         }
 
+        [TestCategory("BVT")]
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Security")]
         public class SiloConnectionAuthenticationRegistrationTests
         {
             [Fact]
