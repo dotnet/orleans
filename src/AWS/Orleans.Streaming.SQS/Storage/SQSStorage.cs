@@ -105,7 +105,7 @@ namespace OrleansAWSUtils.Storage
             var sessionTokenConfig = parameters.Where(p => p.Contains(SessionTokenPropertyName)).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(sessionTokenConfig))
             {
-                var value = sessionTokenConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                var value = sessionTokenConfig.Split('=', 2, StringSplitOptions.RemoveEmptyEntries);
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     sessionToken = value[1];
             }
