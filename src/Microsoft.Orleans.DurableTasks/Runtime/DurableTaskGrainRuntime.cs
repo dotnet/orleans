@@ -196,6 +196,13 @@ internal sealed partial class DurableTaskGrainRuntime(
         transport.SendCompletion(GrainId, destination, taskId, response);
     }
 
+    private void StageCancellation(TaskId taskId, GrainId target)
+    {
+        var transport = _messageTransport ?? throw new InvalidOperationException(
+            "Durable messaging is not configured. Call AddDurableTasks on the silo builder.");
+        transport.SendCancellation(GrainId, target, taskId);
+    }
+
     public async ValueTask<DurableTaskResponse> ScheduleRemoteAsync(
         TaskId taskId,
         IDurableTaskRequest request,
@@ -423,6 +430,11 @@ internal sealed partial class DurableTaskGrainRuntime(
 
             if (state.CancellationRequestedAt.HasValue)
             {
+                if (!state.RemoteTarget.IsDefault)
+                {
+                    StageCancellation(taskId, state.RemoteTarget);
+                }
+
                 await SetResponseAsync(taskId, DurableTaskResponse.Canceled, cancellationToken);
                 continue;
             }
@@ -819,6 +831,11 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         // Otherwise, the task must be a local method invocation, so create an execution context for it and execute it.
+        if (!stateExisted)
+        {
+            await _storage.WriteAsync(cancellationToken);
+        }
+
         var executionContext = CreateExecutionContext(taskId);
         handle = new TaskHandle(taskId, this) { IsRunning = true };
         _taskHandles[taskId] = handle;
@@ -1201,13 +1218,6 @@ internal sealed partial class DurableTaskGrainRuntime(
             }
 
             return true;
-        }
-
-        void StageCancellation(TaskId canceledTaskId, GrainId target)
-        {
-            var transport = _messageTransport ?? throw new InvalidOperationException(
-                "Durable messaging is not configured. Call AddDurableTasks on the silo builder.");
-            transport.SendCancellation(GrainId, target, canceledTaskId);
         }
     }
 
