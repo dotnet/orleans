@@ -1,85 +1,63 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting.Clustering;
 using Orleans.Runtime;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace Orleans.Hosting.Kubernetes
+namespace Orleans.Hosting.Kubernetes;
+
+/// <summary>
+/// Reflects cluster configuration changes between Orleans and Kubernetes.
+/// </summary>
+public sealed partial class KubernetesClusterAgent : ILifecycleParticipant<ISiloLifecycle>
 {
-    /// <summary>
-    /// Reflects cluster configuration changes between Orleans and Kubernetes.
-    /// </summary>
-    public sealed partial class KubernetesClusterAgent : ILifecycleParticipant<ISiloLifecycle>
+    private readonly ClusterAgent _agent;
+
+    public KubernetesClusterAgent(
+        IClusterMembershipService clusterMembershipService,
+        ILogger<KubernetesClusterAgent> logger,
+        IOptionsMonitor<KubernetesHostingOptions> options,
+        IOptions<ClusterOptions> clusterOptions,
+        ILocalSiloDetails localSiloDetails)
     {
-        private readonly ClusterAgent _agent;
+        var provider = new KubernetesClusterProvider(
+            new LoggerAdapter<KubernetesClusterProvider>(logger),
+            options,
+            clusterOptions);
+        _agent = new ClusterAgent(
+            clusterMembershipService,
+            new LoggerAdapter<ClusterAgent>(logger),
+            new KubernetesClusterMonitoringOptions(options),
+            provider,
+            localSiloDetails);
+    }
 
-        public KubernetesClusterAgent(
-            IClusterMembershipService clusterMembershipService,
-            ILogger<KubernetesClusterAgent> logger,
-            IOptionsMonitor<KubernetesHostingOptions> options,
-            IOptions<ClusterOptions> clusterOptions,
-            ILocalSiloDetails localSiloDetails)
+    public void Participate(ISiloLifecycle lifecycle) => _agent.Participate(lifecycle);
+
+    public Task OnStop(CancellationToken cancellationToken) => _agent.OnStop(cancellationToken);
+
+    private sealed class LoggerAdapter<T> : ILogger<T>
+    {
+        private readonly ILogger _logger;
+
+        public LoggerAdapter(ILogger logger)
         {
-            var provider = new KubernetesClusterProvider(
-                new LoggerAdapter<KubernetesClusterProvider>(logger),
-                options,
-                clusterOptions);
-            _agent = new ClusterAgent(
-                clusterMembershipService,
-                new LoggerAdapter<ClusterAgent>(logger),
-                new KubernetesClusterMonitoringOptions(options),
-                provider,
-                localSiloDetails);
+            _logger = logger;
         }
 
-        public void Participate(ISiloLifecycle lifecycle) => _agent.Participate(lifecycle);
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => _logger.BeginScope(state);
 
-        public Task OnStop(CancellationToken cancellationToken) => _agent.OnStop(cancellationToken);
+        public bool IsEnabled(LogLevel logLevel) => _logger.IsEnabled(logLevel);
 
-        private sealed class KubernetesClusterMonitoringOptions : IOptionsMonitor<ClusterMonitoringOptions>
-        {
-            private readonly IOptionsMonitor<KubernetesHostingOptions> _options;
-
-            public KubernetesClusterMonitoringOptions(IOptionsMonitor<KubernetesHostingOptions> options)
-            {
-                _options = options;
-            }
-
-            public ClusterMonitoringOptions CurrentValue =>
-                ConfigureKubernetesHostingOptions.CreateClusterMonitoringOptions(_options.CurrentValue);
-
-            public ClusterMonitoringOptions Get(string? name) =>
-                ConfigureKubernetesHostingOptions.CreateClusterMonitoringOptions(_options.Get(name));
-
-            public IDisposable? OnChange(Action<ClusterMonitoringOptions, string?> listener) =>
-                _options.OnChange((options, name) => listener(
-                    ConfigureKubernetesHostingOptions.CreateClusterMonitoringOptions(options),
-                    name));
-        }
-
-        private sealed class LoggerAdapter<T> : ILogger<T>
-        {
-            private readonly ILogger _logger;
-
-            public LoggerAdapter(ILogger logger)
-            {
-                _logger = logger;
-            }
-
-            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => _logger.BeginScope(state);
-
-            public bool IsEnabled(LogLevel logLevel) => _logger.IsEnabled(logLevel);
-
-            public void Log<TState>(
-                LogLevel logLevel,
-                EventId eventId,
-                TState state,
-                Exception? exception,
-                Func<TState, Exception?, string> formatter) =>
-                _logger.Log(logLevel, eventId, state, exception, formatter);
-        }
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter) =>
+            _logger.Log(logLevel, eventId, state, exception, formatter);
     }
 }
