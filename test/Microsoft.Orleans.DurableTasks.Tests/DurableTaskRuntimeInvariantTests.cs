@@ -24,6 +24,25 @@ namespace Microsoft.Orleans.DurableTasks.Tests;
 public sealed class DurableTaskRuntimeInvariantTests
 {
     [Fact]
+    public void Participant_WithoutObserverSupport_ThrowsDescriptiveConfigurationError()
+    {
+        var (runtime, _, _, _) = CreateRuntime();
+        var grainContext = new TestGrainContext(GrainId.Create("test", "observer-support"));
+        var jobHandlers = Substitute.For<IDurableJobHandlerRegistry>();
+        var stateManager = Substitute.For<IJournaledStateManager>();
+        stateManager
+            .When(manager => manager.RegisterObserver(Arg.Any<IJournaledStateObserver>()))
+            .Do(_ => throw new NotSupportedException("Observers are not supported."));
+        var participant = new DurableTaskGrainParticipant(runtime, grainContext, jobHandlers, stateManager);
+
+        var exception = Assert.Throws<InvalidOperationException>(participant.Initialize);
+
+        Assert.Contains("Durable Tasks requires", exception.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(IJournaledStateManager.RegisterObserver), exception.Message, StringComparison.Ordinal);
+        Assert.IsType<NotSupportedException>(exception.InnerException);
+    }
+
+    [Fact]
     public async Task InboxSchedulingStartsOnlyAfterCommit()
     {
         var (runtime, _, manager, _) = CreateRuntime();

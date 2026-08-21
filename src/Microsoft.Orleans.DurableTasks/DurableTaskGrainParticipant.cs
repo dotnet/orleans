@@ -16,7 +16,17 @@ internal sealed class DurableTaskGrainParticipant(
     public void Initialize()
     {
         jobHandlers.Register(DurableTaskMessageTransport.ResumeJobName, runtime);
-        stateManager.RegisterObserver(runtime);
+        try
+        {
+            stateManager.RegisterObserver(runtime);
+        }
+        catch (NotSupportedException exception)
+        {
+            throw new InvalidOperationException(
+                "Durable Tasks requires IJournaledStateManager observer support through IJournaledStateManager.RegisterObserver.",
+                exception);
+        }
+
         grainContext.ObservableLifecycle.Subscribe(
             nameof(DurableTaskGrainParticipant),
             GrainLifecycleStage.Activate,
