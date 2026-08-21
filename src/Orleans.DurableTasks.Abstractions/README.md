@@ -1,8 +1,8 @@
 # Orleans.DurableTasks.Abstractions
 
 > [!IMPORTANT]
-> This assembly contains incubating Orleans abstractions under evaluation. Release packaging
-> remains disabled until incubation concludes.
+> This alpha package contains Orleans durable task abstractions under active evaluation. Its
+> programming model can evolve between alpha releases as hosting implementations provide feedback.
 
 This assembly defines the Orleans programming model for durable asynchronous operations under
 the `Orleans.DurableTasks` namespace. An Orleans host supplies scheduling, persistence,
