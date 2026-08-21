@@ -113,10 +113,9 @@ namespace Orleans.Runtime
                 DeploymentLoadPublisherEvents.EmitPublished(_siloDetails.SiloAddress, myStats);
 
                 // Inform other cluster members about our refreshed statistics.
-                var members = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToArray();
                 if (!await TryPublishStatisticsViaDissemination(myStats))
                 {
-                    await PublishStatisticsDirectly(myStats, members);
+                    await PublishStatisticsDirectly(myStats, _siloStatusOracle.GetApproximateSiloStatuses(true).Keys);
                 }
 
                 DeploymentLoadPublisherEvents.EmitClusterRefreshed(_siloDetails.SiloAddress, _periodicStats);

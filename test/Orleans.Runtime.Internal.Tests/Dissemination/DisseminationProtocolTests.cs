@@ -1655,6 +1655,34 @@ public class DisseminationProtocolTests
         Assert.Single(GetGossipValues(batch.Batch));
     }
 
+    [Fact]
+    public async Task PublishStatistics_DisseminationSuccessDoesNotReadFallbackMembership()
+    {
+        using var serializerProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serializerProvider.GetRequiredService<Serializer>();
+        var local = CreateSilo(21015);
+        var peer = CreateSilo(21016);
+        var statusOracle = new FakeSiloStatusOracle();
+        statusOracle.SetStatus(local, SiloStatus.Active);
+        statusOracle.SetStatus(peer, SiloStatus.Active);
+        var services = new MutableServiceProvider();
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle, serviceProvider: services);
+        var topic = CreateDeploymentLoadTopic(
+            publisher,
+            serializer,
+            options => options.Dissemination.Enabled = true);
+        var transport = new FakeTransport(local, peer);
+        var dissemination = CreateService(transport, [topic]);
+        services.Add(dissemination);
+        services.Add(topic);
+
+        await publisher.PublishStatistics();
+        await dissemination.StopAsync(CancellationToken.None);
+
+        Assert.Equal(0, statusOracle.ApproximateStatusesRequests);
+        Assert.Single(transport.GossipBatches);
+    }
+
     [Theory]
     [InlineData(false, true, true)]
     [InlineData(true, false, true)]
@@ -1782,6 +1810,7 @@ public class DisseminationProtocolTests
         Assert.Equal(local, update.Source);
         Assert.Equal(publisher.LocalRuntimeStatistics.DateTime, update.Statistics.DateTime);
         Assert.Equal(peer, Assert.Single(grainFactory.SystemTargetRequests).Destination);
+        Assert.Equal(1, statusOracle.ApproximateStatusesRequests);
     }
 
     [Fact]
@@ -3200,6 +3229,8 @@ public class DisseminationProtocolTests
     {
         private readonly Dictionary<SiloAddress, SiloStatus> _statuses = new();
 
+        public int ApproximateStatusesRequests { get; private set; }
+
         public SiloStatus CurrentStatus => SiloStatus.Active;
 
         public string SiloName => "local";
@@ -3214,10 +3245,13 @@ public class DisseminationProtocolTests
         public SiloStatus GetApproximateSiloStatus(SiloAddress siloAddress) =>
             _statuses.TryGetValue(siloAddress, out var status) ? status : SiloStatus.None;
 
-        public Dictionary<SiloAddress, SiloStatus> GetApproximateSiloStatuses(bool onlyActive = false) =>
-            _statuses
+        public Dictionary<SiloAddress, SiloStatus> GetApproximateSiloStatuses(bool onlyActive = false)
+        {
+            ApproximateStatusesRequests++;
+            return _statuses
                 .Where(kvp => !onlyActive || kvp.Value == SiloStatus.Active)
                 .ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value);
+        }
 
         public bool TryGetSiloName(SiloAddress siloAddress, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out string? siloName)
         {

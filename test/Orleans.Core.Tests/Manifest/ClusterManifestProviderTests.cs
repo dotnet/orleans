@@ -458,6 +458,144 @@ public class ClusterManifestProviderTests
     }
 
     [Fact]
+    public async Task Current_CachesPeerUpdateManifestsWhenConcurrentPublicationWins()
+    {
+        var localSilo = CreateSiloAddress(11141, 1);
+        var peer1 = CreateSiloAddress(11142, 1);
+        var peer2 = CreateSiloAddress(11143, 1);
+        var manifest1 = CreateGrainManifest("2");
+        var manifest2 = CreateGrainManifest("3");
+        var hash1 = ManifestHashCalculator.ComputeHash(manifest1);
+        var hash2 = ManifestHashCalculator.ComputeHash(manifest2);
+        var membership = new TestClusterMembershipService(CreateMembershipSnapshot(
+            1,
+            (localSilo, SiloStatus.Active)));
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        var summary = new ClusterManifestHashSummary(
+            new MajorMinorVersion(2, 0),
+            ImmutableDictionary<SiloAddress, ManifestHash>.Empty.Add(peer1, hash1).Add(peer2, hash2));
+        var update = new ClusterManifestUpdate(
+            new MajorMinorVersion(2, 0),
+            ImmutableDictionary<SiloAddress, GrainManifest>.Empty.Add(peer1, manifest1).Add(peer2, manifest2),
+            includesAllActiveServers: true);
+        var updateRequested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseUpdate = new TaskCompletionSource<ClusterManifestUpdate?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var peer1Target = new FakeClusterManifestSystemTarget(
+            summary,
+            getUpdate: _ =>
+            {
+                updateRequested.TrySetResult();
+                return new(releaseUpdate.Task);
+            });
+        grainFactory
+            .GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, peer1)
+            .Returns(peer1Target);
+        var services = new ServiceCollection().AddSingleton(grainFactory).BuildServiceProvider();
+        var localSiloDetails = Substitute.For<ILocalSiloDetails>();
+        localSiloDetails.SiloAddress.Returns(localSilo);
+        var provider = new ClusterManifestProvider(
+            localSiloDetails,
+            CreateSiloManifestProvider(),
+            membership,
+            Substitute.For<IFatalErrorHandler>(),
+            NullLogger<ClusterManifestProvider>.Instance,
+            services);
+
+        var lifecycle = await StartAsync(provider);
+        try
+        {
+            membership.Update(CreateMembershipSnapshot(
+                2,
+                (localSilo, SiloStatus.Active),
+                (peer1, SiloStatus.Active),
+                (peer2, SiloStatus.Active)));
+            await updateRequested.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            membership.Update(CreateMembershipSnapshot(
+                3,
+                (localSilo, SiloStatus.Active),
+                (peer1, SiloStatus.Active),
+                (peer2, SiloStatus.Active)));
+            Assert.Equal(new MajorMinorVersion(3, 0), provider.Current.Version);
+            releaseUpdate.SetResult(update);
+
+            await Until(() => provider.Current.Version == new MajorMinorVersion(3, 1));
+
+            Assert.Equal(1, peer1Target.UpdateRequests);
+            Assert.True(provider.IsManifestCached(hash1));
+            Assert.True(provider.IsManifestCached(hash2));
+        }
+        finally
+        {
+            await lifecycle.OnStop();
+            membership.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task Current_CachesHashFetchedManifestWhenConcurrentPublicationWins()
+    {
+        var localSilo = CreateSiloAddress(11144, 1);
+        var remoteSilo = CreateSiloAddress(11145, 1);
+        var remoteManifest = CreateGrainManifest("2");
+        var remoteHash = ManifestHashCalculator.ComputeHash(remoteManifest);
+        var membership = new TestClusterMembershipService(CreateMembershipSnapshot(
+            1,
+            (localSilo, SiloStatus.Active)));
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        var manifestRequested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseManifest = new TaskCompletionSource<GrainManifest?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var remoteTarget = new FakeHashOnlyClusterManifestSystemTarget(
+            remoteHash,
+            remoteManifest,
+            getManifest: _ =>
+            {
+                manifestRequested.TrySetResult();
+                return new(releaseManifest.Task);
+            });
+        grainFactory
+            .GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, remoteSilo)
+            .Returns(remoteTarget);
+        var services = new ServiceCollection().AddSingleton(grainFactory).BuildServiceProvider();
+        var localSiloDetails = Substitute.For<ILocalSiloDetails>();
+        localSiloDetails.SiloAddress.Returns(localSilo);
+        var provider = new ClusterManifestProvider(
+            localSiloDetails,
+            CreateSiloManifestProvider(),
+            membership,
+            Substitute.For<IFatalErrorHandler>(),
+            NullLogger<ClusterManifestProvider>.Instance,
+            services);
+
+        var lifecycle = await StartAsync(provider);
+        try
+        {
+            membership.Update(CreateMembershipSnapshot(
+                2,
+                (localSilo, SiloStatus.Active),
+                (remoteSilo, SiloStatus.Active)));
+            await manifestRequested.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            membership.Update(CreateMembershipSnapshot(
+                3,
+                (localSilo, SiloStatus.Active),
+                (remoteSilo, SiloStatus.Active)));
+            Assert.Equal(new MajorMinorVersion(3, 0), provider.Current.Version);
+            releaseManifest.SetResult(remoteManifest);
+
+            await Until(() => provider.Current.Version == new MajorMinorVersion(3, 1));
+
+            Assert.Equal(1, remoteTarget.ManifestRequests);
+            Assert.True(provider.IsManifestCached(remoteHash));
+        }
+        finally
+        {
+            await lifecycle.OnStop();
+            membership.Dispose();
+        }
+    }
+
+    [Fact]
     public async Task Current_FallsBackToLegacyManifestWhenHashResponseDoesNotMatch()
     {
         var localSilo = CreateSiloAddress(11139, 1);
@@ -770,7 +908,8 @@ public class ClusterManifestProviderTests
     /// </summary>
     private sealed class FakeClusterManifestSystemTarget(
         ClusterManifestHashSummary hashSummary,
-        ClusterManifestUpdate? update = null) : IClusterManifestSystemTarget
+        ClusterManifestUpdate? update = null,
+        Func<MajorMinorVersion, ValueTask<ClusterManifestUpdate?>>? getUpdate = null) : IClusterManifestSystemTarget
     {
         public int HashSummaryRequests { get; private set; }
 
@@ -781,7 +920,7 @@ public class ClusterManifestProviderTests
         public ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(MajorMinorVersion previousVersion)
         {
             UpdateRequests++;
-            return new(update);
+            return getUpdate?.Invoke(previousVersion) ?? new(update);
         }
 
         public ValueTask<ClusterManifestHashSummary> GetClusterManifestHashSummary()
@@ -799,8 +938,13 @@ public class ClusterManifestProviderTests
     /// Fake <see cref="IClusterManifestSystemTarget"/> that only supports the single-silo hash-based fetch path
     /// (<see cref="GetSiloManifestHash"/> + <see cref="GetSiloManifestByHash"/>).
     /// </summary>
-    private sealed class FakeHashOnlyClusterManifestSystemTarget(ManifestHash hash, GrainManifest manifest) : IClusterManifestSystemTarget
+    private sealed class FakeHashOnlyClusterManifestSystemTarget(
+        ManifestHash hash,
+        GrainManifest manifest,
+        Func<ManifestHash, ValueTask<GrainManifest?>>? getManifest = null) : IClusterManifestSystemTarget
     {
+        public int ManifestRequests { get; private set; }
+
         public ValueTask<ClusterManifest> GetClusterManifest() => throw new NotSupportedException();
 
         public ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(MajorMinorVersion previousVersion) => throw new NotSupportedException();
@@ -809,8 +953,11 @@ public class ClusterManifestProviderTests
 
         public ValueTask<ManifestHash> GetSiloManifestHash() => new(hash);
 
-        public ValueTask<GrainManifest?> GetSiloManifestByHash(ManifestHash requestedHash) =>
-            new(requestedHash == hash ? manifest : null);
+        public ValueTask<GrainManifest?> GetSiloManifestByHash(ManifestHash requestedHash)
+        {
+            ManifestRequests++;
+            return getManifest?.Invoke(requestedHash) ?? new(requestedHash == hash ? manifest : null);
+        }
     }
 
     /// <summary>
