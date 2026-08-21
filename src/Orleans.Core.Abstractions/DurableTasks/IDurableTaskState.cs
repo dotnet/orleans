@@ -23,10 +23,9 @@ public interface IDurableTaskState
     /// The set of grains which must receive the result of this task.
     /// </summary>
     /// <remarks>
-    /// This task cannot be retired until all clients have acknowledged the task's result.
-    /// If the task has a parent task (determined using the task's hierarchical identifier), then the result will not be retired until that
-    /// In the case of nested tasks (eg, defined by local methods), there will typically be no clients.
-    /// In that case, the result will not be 
+    /// Each entry identifies a grain awaiting the task result. The runtime removes entries as destinations acknowledge completion.
+    /// The task remains available while this set is non-empty and is retired only when the configured cleanup policy permits it.
+    /// Nested local tasks typically have no grain completion destinations because their continuations execute within the parent task.
     /// </remarks>
     public IReadOnlySet<GrainId> CompletionDestinations { get; }
 

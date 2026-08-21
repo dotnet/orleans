@@ -113,6 +113,19 @@ public class DurableMessagingHostingTests : IClassFixture<DurableMessagingHostin
         Assert.Contains("DefaultPollTimeout", ex.Message);
     }
 
+    [Fact, TestCategory("BVT"), TestCategory("Functional")]
+    public void AddDurableMessaging_PreservesValidationFailureDetails()
+    {
+        var services = new ServiceCollection();
+        services.AddDurableMessaging(options => options.MaxCapacity = 0);
+        using var serviceProvider = services.BuildServiceProvider();
+
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(
+            () => serviceProvider.GetRequiredService<IOptions<DurableInboxOptions>>().Value);
+
+        Assert.Contains("MaxCapacity must be greater than zero.", exception.Message);
+    }
+
     /// <summary>
     /// Test fixture that configures the cluster with AddDurableMessaging.
     /// </summary>

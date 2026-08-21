@@ -492,6 +492,8 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
             return ValueTask.CompletedTask;
         }
 
+        public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
 
     }

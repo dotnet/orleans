@@ -42,20 +42,11 @@ public static class DurableMessagingExtensions
             optionsBuilder.Configure(configureOptions);
         }
 
-        optionsBuilder.Validate(
-            options =>
-            {
-                try
-                {
-                    options.Validate();
-                    return true;
-                }
-                catch
-                {
-                    return false;
-                }
-            },
-            "DurableInboxOptions validation failed.");
+        optionsBuilder.Validate(static options =>
+        {
+            options.Validate();
+            return true;
+        });
 
         services.ConfigureNamedOptionForLogging<DurableInboxOptions>(Options.DefaultName);
         services.Configure<JournaledStateManagerOptions>(

@@ -77,12 +77,9 @@ public interface IRequestContextTestGrain : IGrainWithGuidKey
 /// Implementation that captures RequestContext when messages are received.
 /// </summary>
 [GrainType("journaling-requestcontexttest")]
-public class RequestContextTestGrain(
-    [FromKeyedServices("inbox")] IDurableInbox inbox,
-    [FromKeyedServices("outbox")] IDurableOutbox outbox) : DurableGrain, IRequestContextTestGrain
+public class RequestContextTestGrain([FromKeyedServices("inbox")] IDurableInbox inbox) : DurableGrain, IRequestContextTestGrain
 {
     private readonly IDurableInbox _inbox = inbox;
-    private readonly IDurableOutbox _outbox = outbox;
     private Dictionary<string, object>? _capturedContext;
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)

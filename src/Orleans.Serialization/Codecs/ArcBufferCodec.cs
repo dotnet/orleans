@@ -42,8 +42,7 @@ public sealed class ArcBufferCodec : IFieldCodec<ArcBuffer>
             return default;
         }
 
-        // Create a new ArcBufferWriter and read the data into it
-        var bufferWriter = new ArcBufferWriter();
+        using var bufferWriter = new ArcBufferWriter();
         const int MaxSpanLength = 4096;
         var remaining = length;
 
@@ -58,14 +57,8 @@ public sealed class ArcBufferCodec : IFieldCodec<ArcBuffer>
 
         Debug.Assert(remaining == 0);
 
-        // Consume the entire buffer as an ArcBuffer slice
-        // Note: We do NOT dispose the bufferWriter here because the returned ArcBuffer
-        // owns the pinned reference to the pages. The slice's Pin() call in ConsumeSlice
-        // ensures the pages stay alive. Disposing the writer would unpin the writer's
-        // reference, but more importantly, AdvanceReader in ConsumeSlice already unpins
-        // pages as they're consumed. The slice maintains its own pin.
-        var result = bufferWriter.ConsumeSlice(bufferWriter.Length);
-        return result;
+        // The returned slice owns its page references after the writer is disposed.
+        return bufferWriter.ConsumeSlice(bufferWriter.Length);
     }
 }
 

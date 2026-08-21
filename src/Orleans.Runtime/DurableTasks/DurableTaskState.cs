@@ -17,14 +17,14 @@ public class DurableTaskState : IDurableTaskState
     /// Gets or sets the set of clients which are interested in the result of this task.
     /// </summary>
     /// <remarks>
-    /// This task cannot be retired until all clients have acknowledged the task's result.
-    /// If the task has a parent task (determined using the task's hierarchical identifier), then the result will not be retired until that
-    /// In the case of nested tasks (eg, defined by local methods), there will typically be no clients.
-    /// In that case, the result will not be 
+    /// This legacy collection stores grain observers which are awaiting the task result.
+    /// During recovery, grain references are migrated to <see cref="CompletionDestinations"/> and this collection is cleared.
+    /// The task remains available until its completion destinations acknowledge the result and the cleanup policy permits retirement.
     /// </remarks>
     [Id(1)]
     public HashSet<IDurableTaskObserver> LegacyObservers { get; set; } = [];
 
+    /// <inheritdoc cref="IDurableTaskState.CompletionDestinations"/>
     [Id(6)]
     public HashSet<GrainId> CompletionDestinations { get; set; } = [];
 

@@ -91,7 +91,7 @@ internal sealed class DurableTaskMethodInvocation<TResult, TStateMachine> : Dura
     }
 
     public override void SetResult(TResult result) => _completion.SetResult(DurableTaskResponse.FromResult(result));
-    public override void SetException(Exception exception) => _completion.SetException(exception);
+    public override void SetException(Exception exception) => _completion.SetResult(DurableTaskResponse.FromException(exception));
 
     public DurableTaskResponse GetResult(short token) => _completion.GetResult(token);
     public ValueTaskSourceStatus GetStatus(short token) => _completion.GetStatus(token);
