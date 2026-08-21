@@ -5,7 +5,9 @@ using Xunit;
 
 namespace Orleans.DurableTasks.Abstractions.Tests;
 
-[Trait("Category", "BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableTasks")]
 public class DurableTaskTests
 {
     [Fact]
@@ -264,6 +266,323 @@ public class DurableTaskTests
     }
 
     [Fact]
+    public async Task CompilerLoweredTaskFlowsCancellationCausalityAcrossOrdinaryAwait()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var first = host.CreateContext(TaskId.CreateRoot("durable-await-first"));
+        var second = host.CreateContext(TaskId.CreateRoot("durable-await-second"));
+        await first.RegisterCancellationCallbackAsync(async _ =>
+        {
+            var response = await DurableTaskRuntimeHelper.RunAsync(RequestSecondCancellationAsync(), first);
+            Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
+        });
+        await second.RegisterCancellationCallbackAsync(_ =>
+        {
+            var cycleClosingRequest = DurableTaskRuntimeHelper.RequestCancellationAsync(first);
+            Assert.True(cycleClosingRequest.IsCompletedSuccessfully);
+            return new(cycleClosingRequest);
+        });
+
+        await DurableTaskRuntimeHelper.RequestCancellationAsync(first).WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.True(first.IsCancellationRequested);
+        Assert.True(second.IsCancellationRequested);
+
+        async DurableTask RequestSecondCancellationAsync()
+        {
+            await Task.Yield();
+            await DurableTaskRuntimeHelper.RequestCancellationAsync(second);
+        }
+    }
+
+    [Fact]
+    public async Task CompilerLoweredTasksFlowExecutionContextAcrossSafeAwaiter()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot("safe-awaiter"));
+        var ambient = new AsyncLocal<string>();
+        string? nonGenericObserved = null;
+        ambient.Value = "non-generic";
+
+        var nonGenericResponse = await DurableTaskRuntimeHelper.RunAsync(ObserveNonGenericAsync(), context);
+        ambient.Value = "generic";
+        var genericResponse = await DurableTaskRuntimeHelper.RunAsync(ObserveGenericAsync(), context);
+
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, nonGenericResponse.Status);
+        Assert.Equal("non-generic", nonGenericObserved);
+        Assert.Equal("generic", genericResponse.GetResult<string>());
+        Assert.Equal("generic", ambient.Value);
+
+        async DurableTask ObserveNonGenericAsync()
+        {
+            await NonCriticalYieldAwaitable.Instance;
+            Assert.Same(context, DurableExecutionContext.Current);
+            nonGenericObserved = ambient.Value;
+        }
+
+        async DurableTask<string?> ObserveGenericAsync()
+        {
+            await NonCriticalYieldAwaitable.Instance;
+            Assert.Same(context, DurableExecutionContext.Current);
+            return ambient.Value;
+        }
+    }
+
+    [Fact]
+    public async Task CompilerLoweredTaskHonorsSuppressedExecutionContextFlow()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot("suppressed-durable-await"));
+        var ambient = new AsyncLocal<string>();
+        string? observedBeforeAwait = null;
+        string? observedAfterAwait = null;
+        ambient.Value = "caller";
+        var task = ObserveAsync();
+        ValueTask<DurableTaskResponse> execution;
+
+        using (ExecutionContext.SuppressFlow())
+        {
+            execution = DurableTaskRuntimeHelper.RunAsync(task, context);
+        }
+
+        var response = await execution;
+
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
+        Assert.Equal("caller", observedBeforeAwait);
+        Assert.Null(observedAfterAwait);
+        Assert.Equal("caller", ambient.Value);
+
+        async DurableTask ObserveAsync()
+        {
+            observedBeforeAwait = ambient.Value;
+            await Task.Yield();
+            Assert.Same(context, DurableExecutionContext.Current);
+            observedAfterAwait = ambient.Value;
+        }
+    }
+
+    [Fact]
+    public async Task CompilerLoweredTasksFlowExecutionContextAcrossSuccessiveSafeAndUnsafeAwaits()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot("successive-awaits"));
+        var ambient = new AsyncLocal<string?> { Value = "caller" };
+        var safeObservations = new List<string?>();
+
+        var nonGenericResponse = await DurableTaskRuntimeHelper.RunAsync(ObserveSafeAsync(), context);
+        var genericResponse = await DurableTaskRuntimeHelper.RunAsync(ObserveUnsafeAsync(), context);
+
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, nonGenericResponse.Status);
+        Assert.Equal(["caller", "safe-second"], safeObservations);
+        Assert.Equal("unsafe-second", genericResponse.GetResult<string?>());
+        Assert.Equal("caller", ambient.Value);
+
+        async DurableTask ObserveSafeAsync()
+        {
+            await NonCriticalYieldAwaitable.Instance;
+            safeObservations.Add(ambient.Value);
+            ambient.Value = "safe-second";
+            await NonCriticalYieldAwaitable.Instance;
+            safeObservations.Add(ambient.Value);
+        }
+
+        async DurableTask<string?> ObserveUnsafeAsync()
+        {
+            await CriticalYieldAwaitable.Instance;
+            Assert.Equal("caller", ambient.Value);
+            ambient.Value = "unsafe-second";
+            await CriticalYieldAwaitable.Instance;
+            return ambient.Value;
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CompilerLoweredGenericTaskHonorsSuppressedExecutionContextFlow(bool safeAwaiter)
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot($"suppressed-generic-{safeAwaiter}"));
+        var ambient = new AsyncLocal<string?> { Value = "caller" };
+        ValueTask<DurableTaskResponse> execution;
+
+        using (ExecutionContext.SuppressFlow())
+        {
+            execution = DurableTaskRuntimeHelper.RunAsync(ObserveAsync(), context);
+        }
+
+        var response = await execution;
+
+        Assert.Null(response.GetResult<string?>());
+        Assert.Equal("caller", ambient.Value);
+
+        async DurableTask<string?> ObserveAsync()
+        {
+            if (safeAwaiter)
+            {
+                await NonCriticalYieldAwaitable.Instance;
+            }
+            else
+            {
+                await CriticalYieldAwaitable.Instance;
+            }
+
+            Assert.Same(context, DurableExecutionContext.Current);
+            return ambient.Value;
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public async Task CompilerLoweredTasksPreserveFaultAndCancellationBeforeAndAfterSuspension(
+        bool generic,
+        bool suspend,
+        bool canceled)
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot($"completion-{generic}-{suspend}-{canceled}"));
+        Exception expected = canceled
+            ? new OperationCanceledException("canceled")
+            : new InvalidOperationException("failed");
+
+        var response = await DurableTaskRuntimeHelper.RunAsync(
+            generic ? GenericAsync() : NonGenericAsync(),
+            context);
+
+        Assert.Equal(canceled ? DurableTaskStatus.Canceled : DurableTaskStatus.Failed, response.Status);
+        Assert.Same(expected, response.Exception);
+
+        async DurableTask NonGenericAsync()
+        {
+            if (suspend)
+            {
+                await CriticalYieldAwaitable.Instance;
+            }
+
+            throw expected;
+        }
+
+        async DurableTask<int> GenericAsync()
+        {
+            if (suspend)
+            {
+                await CriticalYieldAwaitable.Instance;
+            }
+
+            throw expected;
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CompilerLoweredTaskDefinitionCanExecuteOnlyOnce(bool generic)
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var task = generic ? GenericAsync() : NonGenericAsync();
+        var firstContext = host.CreateContext(TaskId.CreateRoot($"first-{generic}"));
+        var secondContext = host.CreateContext(TaskId.CreateRoot($"second-{generic}"));
+
+        var first = await DurableTaskRuntimeHelper.RunAsync(task, firstContext);
+        var second = await DurableTaskRuntimeHelper.RunAsync(task, secondContext);
+
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, first.Status);
+        var exception = Assert.IsType<InvalidOperationException>(second.Exception);
+        Assert.Equal("A deferred durable task definition can execute only once.", exception.Message);
+
+        async DurableTask NonGenericAsync()
+        {
+            await Task.CompletedTask;
+        }
+
+        async DurableTask<int> GenericAsync()
+        {
+            await Task.CompletedTask;
+            return 42;
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task CompilerLoweredTaskCompletionDoesNotRunAwaitContinuationInline(
+        bool generic,
+        bool faulted)
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot($"continuation-{generic}-{faulted}"));
+        var gate = new TaskCompletionSource();
+        var continuationRan = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var expected = new InvalidOperationException("failed");
+        var execution = DurableTaskRuntimeHelper.RunAsync(
+            generic ? GenericAsync() : NonGenericAsync(),
+            context).AsTask();
+        var completionThread = Environment.CurrentManagedThreadId;
+        var completing = false;
+        var ranInline = false;
+        execution.GetAwaiter().UnsafeOnCompleted(() =>
+        {
+            ranInline = completing && Environment.CurrentManagedThreadId == completionThread;
+            continuationRan.TrySetResult();
+        });
+
+        completing = true;
+        gate.SetResult();
+        completing = false;
+
+        await continuationRan.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var response = await execution;
+
+        Assert.False(ranInline);
+        Assert.Equal(faulted ? DurableTaskStatus.Failed : DurableTaskStatus.CompletedSuccessfully, response.Status);
+        Assert.Equal(faulted ? expected : null, response.Exception);
+
+        async DurableTask NonGenericAsync()
+        {
+            await gate.Task;
+            if (faulted)
+            {
+                throw expected;
+            }
+        }
+
+        async DurableTask<int> GenericAsync()
+        {
+            await gate.Task;
+            if (faulted)
+            {
+                throw expected;
+            }
+
+            return 42;
+        }
+    }
+
+    [Fact]
+    public void StartedBuildersRejectNullStateMachineAndException()
+    {
+        var stateMachine = default(NoopStateMachine);
+        var nonGeneric = DurableTaskMethodBuilder.Create();
+        nonGeneric.Start(ref stateMachine);
+        var generic = DurableTaskMethodBuilder<int>.Create();
+        generic.Start(ref stateMachine);
+
+        Assert.Throws<ArgumentNullException>(() => nonGeneric.SetStateMachine(null!));
+        Assert.Throws<ArgumentNullException>(() => nonGeneric.SetException(null!));
+        Assert.Throws<ArgumentNullException>(() => generic.SetStateMachine(null!));
+        Assert.Throws<ArgumentNullException>(() => generic.SetException(null!));
+    }
+
+    [Fact]
     public async Task SuppressedTaskRunDetachesCancellationDependency()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
@@ -293,6 +612,60 @@ public class DurableTaskTests
         Assert.False(reverseRequestCompletedSynchronously);
         Assert.True(first.IsCancellationRequested);
         Assert.True(second.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task CancellationRequestTokenAbandonsOnlyCallerWait()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot("caller-cancellation"));
+        var callbackStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCallback = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await context.RegisterCancellationCallbackAsync(async _ =>
+        {
+            callbackStarted.TrySetResult();
+            await releaseCallback.Task;
+        });
+        using var callerCancellation = new CancellationTokenSource();
+
+        var canceledObserver = DurableTaskRuntimeHelper.RequestCancellationAsync(context, callerCancellation.Token);
+        await callbackStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var completingObserver = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+        callerCancellation.Cancel();
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => canceledObserver.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Equal(callerCancellation.Token, exception.CancellationToken);
+        Assert.True(context.IsCancellationRequested);
+        Assert.False(completingObserver.IsCompleted);
+
+        releaseCallback.TrySetResult();
+        await completingObserver.WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task RegisterCancellationCallbackValidatesCallbackAndCallerToken()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot("registration-validation"));
+        var invoked = false;
+        using var callerCancellation = new CancellationTokenSource();
+        callerCancellation.Cancel();
+
+        Assert.Throws<ArgumentNullException>(
+            () => context.RegisterCancellationCallbackAsync(null!));
+        var exception = Assert.Throws<OperationCanceledException>(
+            () => context.RegisterCancellationCallbackAsync(
+                _ =>
+                {
+                    invoked = true;
+                    return ValueTask.CompletedTask;
+                },
+                callerCancellation.Token));
+        Assert.Equal(callerCancellation.Token, exception.CancellationToken);
+
+        await DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+        Assert.False(invoked);
     }
 
     [Fact]
@@ -1018,6 +1391,21 @@ public class DurableTaskTests
         Assert.Throws<InvalidCastException>(() => nullableResult.GetResult<long?>());
     }
 
+    [Fact]
+    public void ResponseFactoriesRejectNullExceptionsAndPreserveExactException()
+    {
+        var failure = new InvalidOperationException("failed");
+        var cancellation = new OperationCanceledException("canceled");
+
+        Assert.Same(failure, DurableTaskResponse.FromException(failure).Exception);
+        Assert.Same(cancellation, DurableTaskResponse.FromCanceled(cancellation).Exception);
+        Assert.Same(cancellation, DurableTaskResponse.FromException(cancellation).Exception);
+        Assert.Throws<ArgumentNullException>(() => DurableTaskResponse.FromException(null!));
+        Assert.Throws<ArgumentNullException>(() => DurableTaskResponse.FromCanceled(null!));
+        Assert.Throws<ArgumentNullException>(() => new ExceptionDurableTaskResponse(null!));
+        Assert.Throws<ArgumentNullException>(() => new CanceledDurableTaskResponse(null!));
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
@@ -1083,6 +1471,40 @@ public class DurableTaskTests
         Assert.Equal(0, charsWritten);
     }
 
+    [Theory]
+    [InlineData(@"\")]
+    [InlineData(@"\x")]
+    [InlineData("/root")]
+    [InlineData("root/")]
+    [InlineData("root//child")]
+    public void TaskIdRejectsMalformedEscapedPathsAcrossStringAndSpanApis(string value)
+    {
+        Assert.False(TaskId.TryParse(value, out _));
+        Assert.False(TaskId.TryParse(value.AsSpan(), out _));
+        Assert.Throws<FormatException>(() => TaskId.Parse(value));
+        Assert.Throws<FormatException>(() => ParseSpan(value));
+
+        static TaskId ParseSpan(string input) => TaskId.Parse(input.AsSpan());
+    }
+
+    [Fact]
+    public void TaskIdTryFormatHonorsExactAndOneShortBuffersIncludingEscapes()
+    {
+        var taskId = TaskId.CreateRoot(@"tenant/workflow").Child(@"step\one");
+        var expected = taskId.ToString();
+        var exact = new char[expected.Length];
+
+        Assert.True(taskId.TryFormat(exact, out var exactCharsWritten, default, provider: null));
+        Assert.Equal(expected.Length, exactCharsWritten);
+        Assert.Equal(expected, new string(exact));
+        for (var length = 0; length < expected.Length; length++)
+        {
+            var shortBuffer = new char[length];
+            Assert.False(taskId.TryFormat(shortBuffer, out var shortCharsWritten, default, provider: null));
+            Assert.Equal(0, shortCharsWritten);
+        }
+    }
+
     [Fact]
     public void PublicFactoriesValidateDelegatesAndTaskCollections()
     {
@@ -1094,15 +1516,161 @@ public class DurableTaskTests
             () => DurableTask.Run<object?>((Action<object?, CancellationToken>)null!, state: null));
         Assert.Throws<ArgumentNullException>(
             () => DurableTask.Run<object?, int>((Func<object?, CancellationToken, int>)null!, state: null));
+        Assert.Throws<ArgumentNullException>(
+            () => DurableTask.Run<object?>((Func<object?, CancellationToken, Task>)null!, state: null));
+        Assert.Throws<ArgumentNullException>(
+            () => DurableTask.Run<object?, int>((Func<object?, CancellationToken, Task<int>>)null!, state: null));
         Assert.Throws<ArgumentNullException>(() => DurableTask.WhenAll((IReadOnlyList<DurableTask>)null!));
         Assert.Throws<ArgumentNullException>(() => DurableTask.WhenAll((IReadOnlyList<DurableTask<int>>)null!));
         Assert.Throws<ArgumentNullException>(() => DurableTask.WhenAny((IReadOnlyList<DurableTask>)null!));
+        Assert.Throws<ArgumentNullException>(() => DurableTask.WhenAny((IReadOnlyList<DurableTask<int>>)null!));
         Assert.Throws<ArgumentOutOfRangeException>(() => DurableTask.WhenAny([]));
+        Assert.Throws<ArgumentOutOfRangeException>(() => DurableTask.WhenAny<int>([]));
     }
 
     [Fact]
     public void DefaultPollingOptionsUsesDocumentedTimeout()
         => Assert.Equal(PollingOptions.DefaultPollTimeout, default(PollingOptions).PollTimeout);
+
+    [Fact]
+    public void DelayRejectsNegativeButAcceptsZeroDuration()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => DurableTask.Delay(TimeSpan.FromTicks(-1)));
+        Assert.NotNull(DurableTask.Delay(TimeSpan.Zero));
+    }
+
+    [Fact]
+    public void PollingOptionsRejectNegativeAndAcceptZeroTimeout()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => _ = new PollingOptions { PollTimeout = TimeSpan.FromTicks(-1) });
+
+        var options = new PollingOptions { PollTimeout = TimeSpan.Zero };
+        Assert.Equal(TimeSpan.Zero, options.PollTimeout);
+    }
+
+    [Fact]
+    public void TaskIdSelfHierarchyIsReflexive()
+    {
+        var root = TaskId.CreateRoot("root");
+        var child = root.Child("child");
+
+        Assert.True(root.IsAncestorOf(root));
+        Assert.True(root.IsDescendantOf(root));
+        Assert.False(root.IsParentOf(root));
+        Assert.False(root.IsChildOf(root));
+        Assert.True(child.IsAncestorOf(child));
+        Assert.True(child.IsDescendantOf(child));
+        Assert.False(child.IsParentOf(child));
+        Assert.False(child.IsChildOf(child));
+    }
+
+    [Fact]
+    public void TaskIdRootParentIsNone()
+    {
+        var root = TaskId.CreateRoot("root");
+
+        Assert.Equal(TaskId.None, root.Parent());
+    }
+
+    [Fact]
+    public void TaskIdNoneCannotCreateChild()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() => TaskId.None.Child("child"));
+
+        Assert.Equal("A child identifier requires a non-empty parent.", exception.Message);
+    }
+
+    [Fact]
+    public void CompletedResponseTypedGetResultThrows()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() => DurableTaskResponse.Completed.GetResult<int>());
+
+        Assert.Equal("The completed task has no result value.", exception.Message);
+    }
+
+    [Fact]
+    public async Task RuntimeHelperNullGuardsReportParameterNames()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot("runtime-helper-guards"));
+        var task = DurableTask.Delay(TimeSpan.Zero);
+
+        var taskException = await Assert.ThrowsAsync<ArgumentNullException>(
+            async () => await DurableTaskRuntimeHelper.RunAsync(null!, context));
+        var contextException = await Assert.ThrowsAsync<ArgumentNullException>(
+            async () => await DurableTaskRuntimeHelper.RunAsync(task, null!));
+        var cancellationContextException = await Assert.ThrowsAsync<ArgumentNullException>(
+            () => DurableTaskRuntimeHelper.RequestCancellationAsync(null!));
+
+        Assert.Equal("task", taskException.ParamName);
+        Assert.Equal("context", contextException.ParamName);
+        Assert.Equal("context", cancellationContextException.ParamName);
+    }
+
+    [Fact]
+    public async Task NestedCancellationCallbackCanDisposeAncestorRegistrationWithoutBlocking()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var outer = host.CreateContext(TaskId.CreateRoot("outer-dispose"));
+        var inner = host.CreateContext(TaskId.CreateRoot("inner-dispose"));
+        var outerCallbackStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var ancestorDisposalCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var outerCallbackCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        IAsyncDisposable? outerRegistration = null;
+        outerRegistration = await outer.RegisterCancellationCallbackAsync(async _ =>
+        {
+            outerCallbackStarted.SetResult();
+            await DurableTaskRuntimeHelper.RequestCancellationAsync(inner);
+            outerCallbackCompleted.SetResult();
+        });
+        await inner.RegisterCancellationCallbackAsync(async _ =>
+        {
+            var disposal = outerRegistration.DisposeAsync();
+            Assert.True(disposal.IsCompletedSuccessfully);
+            await disposal;
+            ancestorDisposalCompleted.SetResult();
+        });
+        var outerStartedWait = WaitForPhaseAsync(outerCallbackStarted.Task, "outer callback start");
+        var ancestorDisposalWait = WaitForPhaseAsync(ancestorDisposalCompleted.Task, "ancestor registration disposal");
+        var outerCompletedWait = WaitForPhaseAsync(outerCallbackCompleted.Task, "outer callback completion");
+
+        var cancellation = DurableTaskRuntimeHelper.RequestCancellationAsync(outer);
+        var cancellationWait = WaitForPhaseAsync(cancellation, "outer cancellation completion");
+        await Task.WhenAll(outerStartedWait, ancestorDisposalWait, outerCompletedWait, cancellationWait);
+
+        Assert.True(outer.IsCancellationRequested);
+        Assert.True(inner.IsCancellationRequested);
+        Assert.True(cancellation.IsCompletedSuccessfully);
+
+        async Task WaitForPhaseAsync(Task task, string phase)
+        {
+            try
+            {
+                await task.WaitAsync(TimeSpan.FromSeconds(10));
+            }
+            catch (TimeoutException exception)
+            {
+                throw new TimeoutException(
+                    $"Timed out waiting for {phase}; outer cancellation requested: {outer.IsCancellationRequested}; inner cancellation requested: {inner.IsCancellationRequested}.",
+                    exception);
+            }
+        }
+    }
+
+    [Fact]
+    public void DurableExecutionContextRejectsNoneTaskId()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => new TestContext(host, TaskId.None, DateTimeOffset.UnixEpoch));
+
+        Assert.Equal("taskId", exception.ParamName);
+        Assert.Equal(
+            "A durable execution requires an explicit task identifier. (Parameter 'taskId')",
+            exception.Message);
+    }
 
     private static void AssertResponse(
         DurableTaskResponse response,
@@ -1155,6 +1723,43 @@ public class DurableTaskTests
         public void SetStateMachine(IAsyncStateMachine stateMachine) { }
     }
 
+    private readonly struct NonCriticalYieldAwaitable
+    {
+        public static NonCriticalYieldAwaitable Instance => default;
+        public Awaiter GetAwaiter() => default;
+
+        public readonly struct Awaiter : INotifyCompletion
+        {
+            public bool IsCompleted => false;
+            public void GetResult() { }
+
+            public void OnCompleted(Action continuation)
+                => ThreadPool.UnsafeQueueUserWorkItem(
+                    static (Action callback) => callback(),
+                    continuation,
+                    preferLocal: false);
+        }
+    }
+
+    private readonly struct CriticalYieldAwaitable
+    {
+        public static CriticalYieldAwaitable Instance => default;
+        public Awaiter GetAwaiter() => default;
+
+        public readonly struct Awaiter : ICriticalNotifyCompletion
+        {
+            public bool IsCompleted => false;
+            public void GetResult() { }
+            public void OnCompleted(Action continuation) => UnsafeOnCompleted(continuation);
+
+            public void UnsafeOnCompleted(Action continuation)
+                => ThreadPool.UnsafeQueueUserWorkItem(
+                    static (Action callback) => callback(),
+                    continuation,
+                    preferLocal: false);
+        }
+    }
+
     private sealed class RecordingSynchronizationContext : SynchronizationContext
     {
         public int SendCount { get; private set; }
@@ -1176,7 +1781,9 @@ public class DurableTaskTests
     }
 }
 
-[Trait("Category", "BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableTasks")]
 public class SchedulingTests
 {
     [Fact]
@@ -1197,6 +1804,29 @@ public class SchedulingTests
         Assert.Equal(1, host.ExecutionCount);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ImmediatelyCompletedScheduledTaskCancellationIsNoOp(bool generic)
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        ScheduledTask scheduled = generic
+            ? await host.CreateRootDefinition<int>(
+                _ => ValueTask.FromResult<DurableTaskResponse>(DurableTaskResponse.FromResult(42)))
+                .ScheduleAsync($"completed-cancellation-{generic}")
+            : await host.CreateRootDefinition<object?>(
+                _ => ValueTask.FromResult(DurableTaskResponse.Completed))
+                .ScheduleAsync($"completed-cancellation-{generic}");
+
+        await scheduled.CancelAsync();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        await scheduled.CancelAsync(cancellation.Token);
+
+        Assert.False(host.IsCancellationRequested(scheduled.Id));
+        Assert.True(await scheduled.IsCompletedAsync());
+    }
+
     [Fact]
     public async Task RootSchedulingRequiresAnExplicitId()
     {
@@ -1206,6 +1836,46 @@ public class SchedulingTests
         await Assert.ThrowsAsync<InvalidOperationException>(AwaitWithoutIdAsync);
 
         async Task AwaitWithoutIdAsync() => _ = await definition;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ConfiguredTaskRejectsSecondExplicitId(bool generic)
+    {
+        if (generic)
+        {
+            var configured = DurableTask.FromResult(42).WithId("first");
+            var exception = Assert.Throws<InvalidOperationException>(() => configured.WithId("second"));
+            Assert.Equal("The durable task identifier has already been specified.", exception.Message);
+        }
+        else
+        {
+            var configured = DurableTask.Run(static _ => { }).WithId("first");
+            var exception = Assert.Throws<InvalidOperationException>(() => configured.WithId("second"));
+            Assert.Equal("The durable task identifier has already been specified.", exception.Message);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OrdinaryDurableTaskCannotBeScheduledAsRootEvenWithExplicitId(bool generic)
+    {
+        if (generic)
+        {
+            var configured = DurableTask.FromResult(42).WithId("ordinary-generic");
+            await Assert.ThrowsAsync<InvalidOperationException>(() => configured.ScheduleAsync());
+            await Assert.ThrowsAsync<InvalidOperationException>(async () => await configured.CancelAsync());
+            await Assert.ThrowsAsync<InvalidOperationException>(() => configured.PollAsync());
+        }
+        else
+        {
+            var configured = DurableTask.Run(static _ => { }).WithId("ordinary");
+            await Assert.ThrowsAsync<InvalidOperationException>(() => configured.ScheduleAsync());
+            await Assert.ThrowsAsync<InvalidOperationException>(async () => await configured.CancelAsync());
+            await Assert.ThrowsAsync<InvalidOperationException>(() => configured.PollAsync());
+        }
     }
 
     [Fact]
@@ -1486,6 +2156,62 @@ public class SchedulingTests
         completion.SetResult();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ScheduledWhenAllPropagatesFailedAndCanceledResponses(bool canceled)
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        Exception expected = canceled
+            ? new OperationCanceledException("durable cancellation")
+            : new InvalidOperationException("durable failure");
+        var nonGenericDefinition = host.CreateRootDefinition<object?>(
+            _ => ValueTask.FromResult(DurableTaskResponse.FromException(expected)));
+        var genericDefinition = host.CreateRootDefinition<int>(
+            _ => ValueTask.FromResult(DurableTaskResponse.FromException(expected)));
+        ScheduledTask nonGeneric = await nonGenericDefinition.ScheduleAsync($"all-non-generic-{canceled}");
+        var generic = await genericDefinition.ScheduleAsync($"all-generic-{canceled}");
+
+        if (canceled)
+        {
+            var nonGenericException = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => ScheduledTask.WhenAll([nonGeneric]));
+            var genericException = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => ScheduledTask.WhenAll([generic]));
+            Assert.Same(expected, nonGenericException);
+            Assert.Same(expected, genericException);
+        }
+        else
+        {
+            var nonGenericException = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => ScheduledTask.WhenAll([nonGeneric]));
+            var genericException = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => ScheduledTask.WhenAll([generic]));
+            Assert.Same(expected, nonGenericException);
+            Assert.Same(expected, genericException);
+        }
+    }
+
+    [Fact]
+    public async Task ScheduledCombinatorsValidateCollections()
+    {
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => ScheduledTask.WhenAll((IReadOnlyList<ScheduledTask>)null!));
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => ScheduledTask.WhenAll((IReadOnlyList<ScheduledTask<int>>)null!));
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => ScheduledTask.WhenAny((IReadOnlyList<ScheduledTask>)null!));
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => ScheduledTask.WhenAny((IReadOnlyList<ScheduledTask<int>>)null!));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => ScheduledTask.WhenAny(Array.Empty<ScheduledTask>()));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => ScheduledTask.WhenAny(Array.Empty<ScheduledTask<int>>()));
+
+        await ScheduledTask.WhenAll(Array.Empty<ScheduledTask>());
+        await ScheduledTask.WhenAll(Array.Empty<ScheduledTask<int>>());
+    }
+
     [Fact]
     public async Task ScheduledWhenAnyHonorsExternalCancellationAndDrainsLosingWaits()
     {
@@ -1523,6 +2249,35 @@ public class SchedulingTests
 
         firstCompletion.SetResult();
         secondCompletion.SetResult();
+    }
+
+    [Fact]
+    public async Task ScheduledWhenAnyWaitsForLosingWaitCancellationToDrain()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var loserCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var winnerDefinition = host.CreateRootDefinition<object?>(
+            _ => ValueTask.FromResult(DurableTaskResponse.Completed));
+        var loserDefinition = host.CreateRootDefinition<object?>(async _ =>
+        {
+            await loserCompletion.Task;
+            return DurableTaskResponse.Completed;
+        });
+        ScheduledTask winner = await winnerDefinition.ScheduleAsync("drain-winner");
+        ScheduledTask loser = await loserDefinition.ScheduleAsync("drain-loser");
+        var loserEntry = host.GetEntry(loser.Id);
+        loserEntry.DelayWaitCancellationCompletion = true;
+
+        var whenAny = ScheduledTask.WhenAny([winner, loser]);
+        await loserEntry.WaitCancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.False(whenAny.IsCompleted);
+        loserEntry.WaitCancellationRelease.TrySetResult();
+        Assert.Same(winner, await whenAny.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Equal(0, host.ActiveWaitCount);
+        Assert.False(host.IsCancellationRequested(loser.Id));
+
+        loserCompletion.TrySetResult();
     }
 
     [Theory]
@@ -1708,12 +2463,131 @@ public class SchedulingTests
         Assert.NotEqual(TaskId.Parse("tenant/workflow"), scheduled.Id);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ScheduledWhenAnyReturnsSecondWinnerAndDrainsFirstLoser(bool generic)
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var loserCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var loserDefinition = host.CreateRootDefinition<int>(async _ =>
+        {
+            await loserCompletion.Task;
+            return DurableTaskResponse.FromResult(17);
+        });
+        var winnerDefinition = host.CreateRootDefinition<int>(
+            _ => ValueTask.FromResult<DurableTaskResponse>(DurableTaskResponse.FromResult(42)));
+        var loser = await loserDefinition.ScheduleAsync($"second-winner-loser-{generic}");
+        var expectedWinner = await winnerDefinition.ScheduleAsync($"second-winner-winner-{generic}");
+        var loserEntry = host.GetEntry(loser.Id);
+        loserEntry.DelayWaitCancellationCompletion = true;
+        Assert.Equal(42, (await expectedWinner.GetResponseAsync()).GetResult<int>());
+
+        Task<ScheduledTask> whenAny = generic
+            ? AwaitGenericWinnerAsync([loser, expectedWinner])
+            : ScheduledTask.WhenAny([(ScheduledTask)loser, expectedWinner]);
+        await loserEntry.WaitCancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.False(whenAny.IsCompleted);
+        loserEntry.WaitCancellationRelease.TrySetResult();
+        Assert.Same(expectedWinner, await whenAny.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Equal(0, host.ActiveWaitCount);
+        Assert.False(host.IsCancellationRequested(loser.Id));
+        Assert.False(host.IsCancellationRequested(expectedWinner.Id));
+
+        loserCompletion.TrySetResult();
+
+        static async Task<ScheduledTask> AwaitGenericWinnerAsync(IReadOnlyList<ScheduledTask<int>> tasks)
+            => await ScheduledTask.WhenAny(tasks);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task WhenAnyReplayUsesStableOperationDecisionIdThroughPublicApi(bool generic)
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var firstCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var rootId = TaskId.CreateRoot("replay");
+
+        var firstWinner = await ExecuteAsync();
+        firstCompletion.TrySetResult();
+        _ = await host.GetEntry(TaskId.Parse("replay/$when-any-1/0")).WaitAsync(default);
+        var replayedWinner = await ExecuteAsync();
+
+        var expectedWinner = TaskId.Parse("replay/$when-any-1/1");
+        var expectedDecisionId = TaskId.Parse("replay/$when-any-1/$winner");
+        Assert.Equal(expectedWinner, firstWinner);
+        Assert.Equal(expectedWinner, replayedWinner);
+        Assert.Equal([expectedDecisionId, expectedDecisionId], host.DecisionIds);
+
+        async Task<TaskId> ExecuteAsync()
+        {
+            DurableTask<TaskId> definition = generic
+                ? DurableTask.WhenAny(
+                [
+                    DurableTask.Run(async _ =>
+                    {
+                        await firstCompletion.Task;
+                        return 17;
+                    }),
+                    DurableTask.Run(static _ => 42),
+                ])
+                : DurableTask.WhenAny(
+                [
+                    DurableTask.Run(async _ => await firstCompletion.Task),
+                    DurableTask.Run(static _ => { }),
+                ]);
+            var response = await DurableTaskRuntimeHelper.RunAsync(definition, host.CreateContext(rootId));
+            return response.GetResult<TaskId>();
+        }
+    }
+
+    [Fact]
+    public async Task IsCompletedAsyncReportsPendingAndTerminalAndForwardsOptions()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var definition = host.CreateRootDefinition<object?>(async _ =>
+        {
+            await completion.Task;
+            return DurableTaskResponse.Completed;
+        });
+        ScheduledTask scheduled = await definition.ScheduleAsync("completion-state");
+        var options = new PollingOptions { PollTimeout = TimeSpan.FromMilliseconds(137) };
+
+        Assert.False(await scheduled.IsCompletedAsync(options));
+        Assert.Equal(options.PollTimeout, host.LastPollTimeout);
+        completion.TrySetResult();
+        var terminal = await scheduled.GetResponseAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, terminal.Status);
+        Assert.True(await scheduled.IsCompletedAsync(options));
+        Assert.Equal(options.PollTimeout, host.LastPollTimeout);
+    }
+
+    [Fact]
+    public async Task ScheduledWaitRejectsIncompleteHostResponse()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var definition = host.CreateRootDefinition<object?>(
+            _ => ValueTask.FromResult(DurableTaskResponse.Pending));
+        ScheduledTask scheduled = await definition.ScheduleAsync("incomplete-wait");
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await scheduled.WaitAsync());
+
+        Assert.Equal("The durable task has not completed.", exception.Message);
+        Assert.Same(DurableTaskResponse.Pending, await scheduled.GetResponseAsync());
+        Assert.Equal(0, host.ActiveWaitCount);
+    }
+
 }
 
 internal sealed class TestHost(DateTimeOffset utcNow)
 {
     private readonly ConcurrentDictionary<TaskId, Entry> _entries = new();
     private readonly ConcurrentDictionary<TaskId, TaskId> _decisions = new();
+    private readonly ConcurrentQueue<TaskId> _decisionIds = new();
     private int _activeWaitCount;
     public int ExecutionCount;
     public DateTimeOffset? LastDelayDueTime { get; private set; }
@@ -1727,6 +2601,7 @@ internal sealed class TestHost(DateTimeOffset utcNow)
     public bool Contains(TaskId id) => _entries.ContainsKey(id);
     public bool IsCancellationRequested(TaskId id) => _entries.TryGetValue(id, out var entry) && entry.CancellationRequested;
     public IReadOnlyList<TaskId> EntryIds => _entries.Keys.OrderBy(id => id.ToString(), StringComparer.Ordinal).ToArray();
+    public IReadOnlyList<TaskId> DecisionIds => _decisionIds.ToArray();
     public int ActiveWaitCount => Volatile.Read(ref _activeWaitCount);
 
     public async Task RunWithAmbientAsync(
@@ -1782,6 +2657,7 @@ internal sealed class TestHost(DateTimeOffset utcNow)
         IReadOnlyList<TaskId> candidates,
         CancellationToken cancellationToken)
     {
+        _decisionIds.Enqueue(decisionId);
         if (_decisions.TryGetValue(decisionId, out var recorded))
         {
             return recorded;
@@ -1803,7 +2679,10 @@ internal sealed class TestHost(DateTimeOffset utcNow)
         public bool CancellationRequested { get; private set; }
         public Exception? WaitException { get; set; }
         public bool WaitExceptionIsSynchronous { get; set; }
+        public bool DelayWaitCancellationCompletion { get; set; }
         public TaskCompletionSource WaitStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource WaitCancellationObserved { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource WaitCancellationRelease { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public void StartOnce(Func<Task<DurableTaskResponse>> start)
         {
@@ -1835,6 +2714,12 @@ internal sealed class TestHost(DateTimeOffset utcNow)
                 }
 
                 return await (_response ?? Task.FromResult(DurableTaskResponse.Pending)).WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) when (DelayWaitCancellationCompletion && cancellationToken.IsCancellationRequested)
+            {
+                WaitCancellationObserved.TrySetResult();
+                await WaitCancellationRelease.Task;
+                throw;
             }
             finally
             {

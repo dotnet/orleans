@@ -7,9 +7,31 @@ internal abstract class DeferredMethodInvocation : DurableTask
     private readonly TaskCompletionSource<DurableTaskResponse> _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private DurableExecutionContext? _context;
+    private ExecutionContext? _executionContext;
+    private Action? _moveNextAction;
     private int _started;
 
-    public void MoveNext()
+    public Action MoveNextAction => _moveNextAction ??= MoveNext;
+    public void CaptureExecutionContext() => _executionContext = ExecutionContext.Capture();
+
+    private void MoveNext()
+    {
+        var executionContext = _executionContext;
+        _executionContext = null;
+        if (executionContext is null)
+        {
+            MoveNextInContext();
+        }
+        else
+        {
+            ExecutionContext.Run(
+                executionContext,
+                static state => ((DeferredMethodInvocation)state!).MoveNextInContext(),
+                this);
+        }
+    }
+
+    private void MoveNextInContext()
     {
         using var scope = DurableExecutionContext.Enter(_context
             ?? throw new InvalidOperationException("The deferred durable task has not started."));
@@ -17,7 +39,11 @@ internal abstract class DeferredMethodInvocation : DurableTask
     }
 
     protected abstract void MoveNextCore();
-    protected void Complete(DurableTaskResponse response) => _completion.TrySetResult(response);
+    protected void Complete(DurableTaskResponse response)
+    {
+        _executionContext = null;
+        _completion.TrySetResult(response);
+    }
 
     protected internal sealed override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
     {
@@ -28,7 +54,7 @@ internal abstract class DeferredMethodInvocation : DurableTask
         }
 
         _context = context;
-        MoveNext();
+        MoveNextInContext();
         return new(_completion.Task);
     }
 }
@@ -54,9 +80,31 @@ internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResu
     private readonly TaskCompletionSource<DurableTaskResponse> _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private DurableExecutionContext? _context;
+    private ExecutionContext? _executionContext;
+    private Action? _moveNextAction;
     private int _started;
 
-    public void MoveNext()
+    public Action MoveNextAction => _moveNextAction ??= MoveNext;
+    public void CaptureExecutionContext() => _executionContext = ExecutionContext.Capture();
+
+    private void MoveNext()
+    {
+        var executionContext = _executionContext;
+        _executionContext = null;
+        if (executionContext is null)
+        {
+            MoveNextInContext();
+        }
+        else
+        {
+            ExecutionContext.Run(
+                executionContext,
+                static state => ((DurableTaskMethodInvocation<TResult>)state!).MoveNextInContext(),
+                this);
+        }
+    }
+
+    private void MoveNextInContext()
     {
         using var scope = DurableExecutionContext.Enter(_context
             ?? throw new InvalidOperationException("The deferred durable task has not started."));
@@ -66,7 +114,11 @@ internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResu
     protected abstract void MoveNextCore();
     public abstract void SetResult(TResult result);
     public abstract void SetException(Exception exception);
-    protected void Complete(DurableTaskResponse response) => _completion.TrySetResult(response);
+    protected void Complete(DurableTaskResponse response)
+    {
+        _executionContext = null;
+        _completion.TrySetResult(response);
+    }
 
     protected internal sealed override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
     {
@@ -77,7 +129,7 @@ internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResu
         }
 
         _context = context;
-        MoveNext();
+        MoveNextInContext();
         return new(_completion.Task);
     }
 }
