@@ -1,6 +1,22 @@
 {
   "description": "Generated API assemblies which are not currently published as standalone NuGet packages.",
   "packages": {
-    "Microsoft.Orleans.Journaling.S3": "The new provider is awaiting its first NuGet publication."
+    "Microsoft.Orleans.Journaling.S3": "The new provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.Clustering.EntityFrameworkCore": "The new provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.Clustering.EntityFrameworkCore.MySql": "The new provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.Clustering.EntityFrameworkCore.PostgreSQL": "The new provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.Clustering.EntityFrameworkCore.SqlServer": "The new provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.GrainDirectory.EntityFrameworkCore": "The new provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.GrainDirectory.EntityFrameworkCore.MySql": "The new provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.GrainDirectory.EntityFrameworkCore.PostgreSQL": "The new provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.GrainDirectory.EntityFrameworkCore.SqlServer": "The new provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.Persistence.EntityFrameworkCore": "The new provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.Persistence.EntityFrameworkCore.MySql": "The new provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.Persistence.EntityFrameworkCore.PostgreSQL": "The new provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.Persistence.EntityFrameworkCore.SqlServer": "The new provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.Reminders.EntityFrameworkCore": "The new provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.Reminders.EntityFrameworkCore.MySql": "The new provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.Reminders.EntityFrameworkCore.PostgreSQL": "The new provider is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.Reminders.EntityFrameworkCore.SqlServer": "The new provider is awaiting its first NuGet publication."
   }
 }

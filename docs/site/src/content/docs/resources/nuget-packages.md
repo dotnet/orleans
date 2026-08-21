@@ -44,6 +44,10 @@ Every multi-silo production cluster needs a shared membership provider.
 | [Microsoft.Orleans.Clustering.Consul](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.Consul) | HashiCorp Consul |
 | [Microsoft.Orleans.Clustering.Cosmos](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.Cosmos) | Azure Cosmos DB |
 | [Microsoft.Orleans.Clustering.DynamoDB](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.DynamoDB) | Amazon DynamoDB |
+| [Microsoft.Orleans.Clustering.EntityFrameworkCore](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.EntityFrameworkCore) | Shared Entity Framework Core clustering infrastructure |
+| [Microsoft.Orleans.Clustering.EntityFrameworkCore.MySql](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.EntityFrameworkCore.MySql) | MySQL and MariaDB through Entity Framework Core |
+| [Microsoft.Orleans.Clustering.EntityFrameworkCore.PostgreSQL](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.EntityFrameworkCore.PostgreSQL) | PostgreSQL through Entity Framework Core |
+| [Microsoft.Orleans.Clustering.EntityFrameworkCore.SqlServer](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.EntityFrameworkCore.SqlServer) | Microsoft SQL Server through Entity Framework Core |
 | [Microsoft.Orleans.Clustering.Firestore](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.Firestore) | Google Cloud Firestore |
 | [Microsoft.Orleans.Clustering.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.Redis) | Redis |
 | [Microsoft.Orleans.Clustering.ZooKeeper](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.ZooKeeper) | Apache ZooKeeper |
@@ -56,6 +60,10 @@ Every multi-silo production cluster needs a shared membership provider.
 | [Microsoft.Orleans.Persistence.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AzureStorage) | Azure Table and Blob Storage |
 | [Microsoft.Orleans.Persistence.Cosmos](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Cosmos) | Azure Cosmos DB |
 | [Microsoft.Orleans.Persistence.DynamoDB](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.DynamoDB) | Amazon DynamoDB |
+| [Microsoft.Orleans.Persistence.EntityFrameworkCore](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.EntityFrameworkCore) | Shared Entity Framework Core grain persistence infrastructure |
+| [Microsoft.Orleans.Persistence.EntityFrameworkCore.MySql](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.EntityFrameworkCore.MySql) | MySQL and MariaDB through Entity Framework Core |
+| [Microsoft.Orleans.Persistence.EntityFrameworkCore.PostgreSQL](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.EntityFrameworkCore.PostgreSQL) | PostgreSQL through Entity Framework Core |
+| [Microsoft.Orleans.Persistence.EntityFrameworkCore.SqlServer](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.EntityFrameworkCore.SqlServer) | Microsoft SQL Server through Entity Framework Core |
 | [Microsoft.Orleans.Persistence.Firestore](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Firestore) | Google Cloud Firestore |
 | [Microsoft.Orleans.Persistence.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Redis) | Redis |
 | [Microsoft.Orleans.Persistence.Memory](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Memory) | Process memory for development and testing |
@@ -73,6 +81,10 @@ Memory persistence distributes records across cluster storage grains but isn't d
 | [Microsoft.Orleans.Reminders.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.AzureStorage) | Azure Table Storage reminders. |
 | [Microsoft.Orleans.Reminders.Cosmos](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Cosmos) | Azure Cosmos DB reminders. |
 | [Microsoft.Orleans.Reminders.DynamoDB](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.DynamoDB) | Amazon DynamoDB reminders. |
+| [Microsoft.Orleans.Reminders.EntityFrameworkCore](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.EntityFrameworkCore) | Shared Entity Framework Core reminder storage infrastructure. |
+| [Microsoft.Orleans.Reminders.EntityFrameworkCore.MySql](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.EntityFrameworkCore.MySql) | MySQL and MariaDB reminder storage through Entity Framework Core. |
+| [Microsoft.Orleans.Reminders.EntityFrameworkCore.PostgreSQL](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.EntityFrameworkCore.PostgreSQL) | PostgreSQL reminder storage through Entity Framework Core. |
+| [Microsoft.Orleans.Reminders.EntityFrameworkCore.SqlServer](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.EntityFrameworkCore.SqlServer) | Microsoft SQL Server reminder storage through Entity Framework Core. |
 | [Microsoft.Orleans.Reminders.Firestore](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Firestore) | Google Cloud Firestore reminders. |
 | [Microsoft.Orleans.Reminders.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Redis) | Redis reminders. |
 | [Microsoft.Orleans.DurableJobs](https://www.nuget.org/packages/Microsoft.Orleans.DurableJobs) | Distributed scheduling for durable one-time jobs. |
@@ -102,6 +114,10 @@ Custom grain directory providers store grain registration information for select
 | --- | --- |
 | [Microsoft.Orleans.GrainDirectory.AdoNet](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.AdoNet) | ADO.NET-compatible relational databases |
 | [Microsoft.Orleans.GrainDirectory.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.AzureStorage) | Azure Table Storage |
+| [Microsoft.Orleans.GrainDirectory.EntityFrameworkCore](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.EntityFrameworkCore) | Shared Entity Framework Core grain directory infrastructure |
+| [Microsoft.Orleans.GrainDirectory.EntityFrameworkCore.MySql](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.EntityFrameworkCore.MySql) | MySQL and MariaDB through Entity Framework Core |
+| [Microsoft.Orleans.GrainDirectory.EntityFrameworkCore.PostgreSQL](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.EntityFrameworkCore.PostgreSQL) | PostgreSQL through Entity Framework Core |
+| [Microsoft.Orleans.GrainDirectory.EntityFrameworkCore.SqlServer](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.EntityFrameworkCore.SqlServer) | Microsoft SQL Server through Entity Framework Core |
 | [Microsoft.Orleans.GrainDirectory.Firestore](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.Firestore) | Google Cloud Firestore |
 | [Microsoft.Orleans.GrainDirectory.Redis](https://www.nuget.org/packages/Microsoft.Orleans.GrainDirectory.Redis) | Redis |
 
