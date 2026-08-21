@@ -7,7 +7,11 @@ namespace Orleans.EventSourcing.CustomStorage;
 
 internal static class CustomStorageHelpers
 {
-    public static ICustomStorageInterface<TState, TDelta> GetCustomStorage<TState, TDelta>(object hostGrain, GrainId grainId, IServiceProvider? services)
+    public static ICustomStorageInterface<TState, TDelta> GetCustomStorage<TState, TDelta>(
+        object hostGrain,
+        GrainId grainId,
+        IServiceProvider? services,
+        string? providerName)
         where TState : class, new()
         where TDelta : class
     {
@@ -17,34 +21,25 @@ internal static class CustomStorageHelpers
         }
 
         var grainType = hostGrain.GetType();
-        if (services is null)
+        if (services is null || string.IsNullOrEmpty(providerName))
         {
             throw new BadProviderConfigException(
-                $"Construct {nameof(LogConsistencyProvider)} through dependency injection to configure an {nameof(ICustomStorageFactory)} for grain type {grainType.FullName}.");
+                $"Configure grain type {grainType.FullName} with an {nameof(ICustomStorageInterface<object, object>)} implementation or select a named custom storage log-consistency provider.");
         }
 
-        var attr = grainType.GetCustomAttributes(typeof(CustomStorageProviderAttribute), true)
-            .OfType<CustomStorageProviderAttribute>()
-            .FirstOrDefault();
-        var storageFactory = attr != null
-            ? services.GetKeyedService<ICustomStorageFactory>(attr.ProviderName)
-            : services.GetService<ICustomStorageFactory>();
-
-        if (storageFactory == null)
+        var storageFactory = services.GetKeyedService<ICustomStorageFactory>(providerName);
+        if (storageFactory is null)
         {
-            ThrowMissingProviderException(grainType, attr?.ProviderName);
+            ThrowMissingProviderException(grainType, providerName);
         }
 
         return storageFactory.CreateCustomStorage<TState, TDelta>(grainId);
     }
 
     [DoesNotReturn]
-    private static void ThrowMissingProviderException(Type grainType, string? name)
+    private static void ThrowMissingProviderException(Type grainType, string providerName)
     {
-        var grainTypeName = grainType.FullName;
-        var errMsg = string.IsNullOrEmpty(name)
-            ? $"Configure grain type {grainTypeName} with an {nameof(ICustomStorageInterface<object, object>)} implementation or register a default {nameof(ICustomStorageFactory)}."
-            : $"Register an {nameof(ICustomStorageFactory)} named \"{name}\" for grain type {grainTypeName}.";
-        throw new BadProviderConfigException(errMsg);
+        throw new BadProviderConfigException(
+            $"Custom storage log-consistency provider \"{providerName}\" requires a keyed {nameof(ICustomStorageFactory)} registration for grain type {grainType.FullName}.");
     }
 }
