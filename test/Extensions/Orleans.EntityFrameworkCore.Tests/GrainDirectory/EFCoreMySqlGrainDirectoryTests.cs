@@ -1,16 +1,11 @@
 using Orleans.EntityFrameworkCore.Tests.Infrastructure;
 using Orleans.GrainDirectory.EntityFrameworkCore.MySql.Data;
 using TestExtensions;
-using Xunit.Abstractions;
 
 namespace Orleans.EntityFrameworkCore.Tests.GrainDirectory;
 
 [Collection(TestEnvironmentFixture.DefaultCollection)]
-[TestCategory("GrainDirectory")]
-[TestCategory("EFCore")]
-[TestCategory(EFCoreTestCategories.MySql)]
-[TestCategory(EFCoreTestCategories.MySqlProvider)]
-[TestCategory(EFCoreTestCategories.Functional)]
+[TestArea("EFCore")]
 [TestSuite("Functional")]
 [TestProvider(EFCoreTestCategories.MySqlProvider)]
 [TestArea("GrainDirectory")]

@@ -8,7 +8,6 @@ using Orleans.Reminders.EntityFrameworkCore.Data;
 using TestExtensions;
 using UnitTests;
 using UnitTests.RemindersTest;
-using Xunit.Abstractions;
 
 namespace Orleans.EntityFrameworkCore.Tests.Reminders;
 
@@ -48,7 +47,7 @@ public abstract class EFCoreReminderTableTestsBase<TDbContext, TETag> :
         return Task.FromResult(_isolatedConnectionString);
     }
 
-    public override async Task DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
         try
         {
@@ -71,19 +70,19 @@ public abstract class EFCoreReminderTableTestsBase<TDbContext, TETag> :
         }
     }
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public Task RemindersTable_ParallelUpsertsReturnDistinctETags() =>
         RemindersParallelUpsert();
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public Task RemindersTable_ReadUpdateAndConditionalRemove() =>
         ReminderSimple();
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public Task RemindersTable_RangeQueriesIncludeWrapAround() =>
         RemindersRange(iterations: 30);
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public async Task TestOnlyClearTable_ClearsCurrentServiceOnly()
     {
         var primaryGrain = NewGrainId("primary");
@@ -106,7 +105,7 @@ public abstract class EFCoreReminderTableTestsBase<TDbContext, TETag> :
         Assert.Equal(secondary.ETag, retained.ETag);
     }
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public async Task ReadRows_ByGrain_ReturnsOnlyRequestedGrain()
     {
         var requestedGrain = NewGrainId("requested");
@@ -130,7 +129,7 @@ public abstract class EFCoreReminderTableTestsBase<TDbContext, TETag> :
             await RemindersTable.ReadRow(other.GrainId, other.ReminderName)));
     }
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public async Task RemoveRow_MissingOrStaleETag_ReturnsFalseAndPreservesWinner()
     {
         var grainId = NewGrainId("conditional-remove");
@@ -149,7 +148,7 @@ public abstract class EFCoreReminderTableTestsBase<TDbContext, TETag> :
             staleETag!));
     }
 
-    [SkippableTheory, TestCategory(EFCoreTestCategories.Functional)]
+    [Theory, TestSuite(EFCoreTestCategories.Functional)]
     [InlineData(25)]
     [InlineData(24 * 36)]
     public async Task PeriodsBeyondOneDay_RoundTrip(long hours)

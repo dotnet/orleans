@@ -23,7 +23,9 @@ using TestExtensions;
 
 namespace Orleans.EntityFrameworkCore.Tests.Hosting;
 
-[TestCategory(EFCoreTestCategories.Unit)]
+[TestArea("EFCore")]
+[TestProvider("None")]
+[TestSuite("BVT")]
 public sealed class SqlServerHostingExtensionsTests
 {
     private const string ConnectionString =
@@ -161,4 +163,3 @@ public sealed class SqlServerHostingExtensionsTests
             ConnectionString,
             typeof(SqlServerHostingExtensionsTests).Assembly.GetName().Name!);
 }
-

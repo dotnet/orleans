@@ -2,14 +2,11 @@ using Orleans.EntityFrameworkCore.Tests.Infrastructure;
 using Orleans.Reminders.EntityFrameworkCore.SqlServer.Data;
 using TestExtensions;
 using UnitTests;
-using Xunit.Abstractions;
 
 namespace Orleans.EntityFrameworkCore.Tests.Reminders;
 
 [Collection(TestEnvironmentFixture.DefaultCollection)]
-[TestCategory("Reminders")]
-[TestCategory("EFCore")]
-[TestCategory(EFCoreTestCategories.SqlServer)]
+[TestArea("EFCore")]
 [TestSuite("Functional")]
 [TestProvider(EFCoreTestCategories.SqlServer)]
 [TestArea("Reminders")]

@@ -6,10 +6,7 @@ using UnitTests;
 
 namespace Orleans.EntityFrameworkCore.Tests.Clustering;
 
-[TestCategory("Membership")]
-[TestCategory("EFCore")]
-[TestCategory(EFCoreTestCategories.SqlServer)]
-[TestCategory(EFCoreTestCategories.Functional)]
+[TestArea("EFCore")]
 [TestSuite("Functional")]
 [TestProvider(EFCoreTestCategories.SqlServer)]
 [TestArea("Membership")]

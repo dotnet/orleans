@@ -9,7 +9,9 @@ using TestExtensions;
 
 namespace Orleans.EntityFrameworkCore.Tests.ETags;
 
-[TestCategory(EFCoreTestCategories.Unit)]
+[TestArea("EFCore")]
+[TestProvider("None")]
+[TestSuite("BVT")]
 public sealed class GuidDbContextETagTests
 {
     private static readonly Guid InitialETag = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");

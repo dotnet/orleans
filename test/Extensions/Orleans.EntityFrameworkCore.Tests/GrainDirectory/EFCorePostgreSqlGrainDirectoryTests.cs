@@ -1,16 +1,11 @@
 using Orleans.EntityFrameworkCore.Tests.Infrastructure;
 using Orleans.GrainDirectory.EntityFrameworkCore.PostgreSQL.Data;
 using TestExtensions;
-using Xunit.Abstractions;
 
 namespace Orleans.EntityFrameworkCore.Tests.GrainDirectory;
 
 [Collection(TestEnvironmentFixture.DefaultCollection)]
-[TestCategory("GrainDirectory")]
-[TestCategory("EFCore")]
-[TestCategory(EFCoreTestCategories.PostgreSql)]
-[TestCategory(EFCoreTestCategories.PostgreSqlProvider)]
-[TestCategory(EFCoreTestCategories.Functional)]
+[TestArea("EFCore")]
 [TestSuite("Functional")]
 [TestProvider(EFCoreTestCategories.PostgreSqlProvider)]
 [TestArea("GrainDirectory")]

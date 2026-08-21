@@ -14,7 +14,9 @@ using TestExtensions;
 
 namespace Orleans.EntityFrameworkCore.Tests.Models;
 
-[TestCategory(EFCoreTestCategories.Unit)]
+[TestArea("EFCore")]
+[TestProvider("None")]
+[TestSuite("BVT")]
 public sealed class SqlServerDbContextModelTests
 {
     [Theory]

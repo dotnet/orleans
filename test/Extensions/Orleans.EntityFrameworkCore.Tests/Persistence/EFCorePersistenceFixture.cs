@@ -20,9 +20,12 @@ public sealed class EFCorePersistenceFixture<TDbContext, TETag, TProvider> : Bas
     protected override void CheckPreconditionsOrThrow() =>
         new TProvider().Database.RequireConnectionString();
 
-    public override async Task InitializeAsync()
+    public override async ValueTask InitializeAsync()
     {
-        EnsurePreconditionsMet();
+        if (!PreconditionsMet)
+        {
+            return;
+        }
 
         var provider = new TProvider();
         _databaseFixture = new EFCoreDatabaseFixture<TDbContext>(
@@ -46,7 +49,7 @@ public sealed class EFCorePersistenceFixture<TDbContext, TETag, TProvider> : Bas
         builder.AddSiloBuilderConfigurator<SiloConfigurator>();
     }
 
-    public override async Task DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
         try
         {
