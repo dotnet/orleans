@@ -41,7 +41,8 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// <summary>
     /// Discards uncommitted mutations and reloads the last durable state.
     /// </summary>
-    ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+    ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) =>
+        throw new NotSupportedException($"{nameof(RevertPendingChangesAsync)} is not supported by this state manager.");
 
     /// <summary>
     /// Resets this instance, removing any persistent state.

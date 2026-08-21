@@ -33,7 +33,6 @@
   <Folder Name="/playground/WorkflowsApp/">
     <Project Path="playground/WorkflowsApp/WorkflowsApp.AppHost/WorkflowsApp.AppHost.csproj" />
     <Project Path="playground/WorkflowsApp/WorkflowsApp.Service/WorkflowsApp.Service.csproj" />
-    <Project Path="playground/WorkflowsApp/WorkflowsApp.Service.Tests/WorkflowsApp.Service.Tests.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
@@ -146,6 +145,7 @@
     <Project Path="test/Orleans.DurableTasks.Tests/Orleans.DurableTasks.Tests.csproj" />
     <Project Path="test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj" />
     <Project Path="test/Orleans.Journaling.Json.Tests/Orleans.Journaling.Json.Tests.csproj" />
+    <Project Path="test/WorkflowsApp.Service.Tests/WorkflowsApp.Service.Tests.csproj" />
     <Project Path="test/Orleans.Serialization.FSharp.Tests/Orleans.Serialization.FSharp.Tests.fsproj" />
     <Project Path="test/Orleans.Serialization.UnitTests/Orleans.Serialization.UnitTests.csproj" />
     <Project Path="test/Orleans.Runtime.Tests/Orleans.Runtime.Tests.csproj" />
