@@ -19,6 +19,7 @@ The built-in providers expose these data-adapter extension points:
 |---|---|---|---|
 | Azure Queue Storage | <xref:Orleans.Streams.IQueueDataAdapter`2> with `string` queue messages and <xref:Orleans.Streams.IBatchContainer> batches | <xref:Orleans.Hosting.AzureQueueStreamConfiguratorExtensions.ConfigureQueueDataAdapter*> | Replaces encoding and decoding while retaining Azure Queue mapping, visibility, deletion, and non-rewindable delivery |
 | Azure Event Hubs | <xref:Orleans.Streaming.EventHubs.IEventHubDataAdapter> | <xref:Orleans.Hosting.EventHubStreamConfiguratorExtensions.UseDataAdapter*> | Replaces wire-format, stream-mapping, and cache conversion behavior while retaining Event Hubs partition reading, checkpointing, and rewindable delivery |
+| Amazon SQS | <xref:Orleans.Streaming.SQS.Streams.ISQSDataAdapter> | <xref:Orleans.Hosting.SiloSqsStreamConfigurator.UseDataAdapter*> and <xref:Orleans.Hosting.ClusterClientSqsStreamConfigurator.UseDataAdapter*> | Replaces the message body, application attributes, and batch decoding while retaining SQS queue mapping, FIFO transport fields, deletion, and non-rewindable delivery |
 
 <xref:Orleans.Streams.IQueueDataAdapter`1> defines conversion from an Orleans batch to a native queue message. <xref:Orleans.Streams.IQueueDataAdapter`2> adds conversion from a native message to the batch container delivered by Orleans. Provider-specific contracts can add the position and cache operations required by their transport.
 
@@ -69,6 +70,12 @@ Register the adapter and Event Hubs connection under the same provider name on s
 
 The [custom data adapter sample](https://github.com/dotnet/orleans/tree/main/samples/Streaming/CustomDataAdapter) demonstrates a read-side Event Hubs adapter for JSON messages from an external producer. See [Integrate external stream producers and consumers](external-streams.md) for the end-to-end interoperability workflow.
 
+## Implement an Amazon SQS data adapter
+
+Implement <xref:Orleans.Streaming.SQS.Streams.ISQSDataAdapter> to convert between `Amazon.SQS.Model.Message` and <xref:Orleans.Streams.IBatchContainer>. The outbound conversion supplies the message body and application-defined message attributes. The provider assigns the physical queue and, in FIFO mode, the message group and deduplication ID. The inbound conversion receives the SQS message together with a receiver-local sequence number.
+
+Register the same adapter under the same provider name on every silo and publishing client. Configure <xref:Orleans.Configuration.SqsOptions.ReceiveMessageAttributes> and <xref:Orleans.Configuration.SqsOptions.ReceiveMessageSystemAttributes> for every attribute required by the decoder. See [Stream with Amazon SQS](sqs-streaming.md#use-an-application-wire-format) for compiled registration and operational guidance.
+
 ## Evolve the wire contract
 
 Use an expand-and-contract rollout:
@@ -78,7 +85,7 @@ Use an expand-and-contract rollout:
 1. Keep the old reader until the queue or event-log retention window no longer contains the old version.
 1. Remove the old version after verifying queue depth, oldest-message age, and checkpoint position.
 
-Keep provider name, stream identity encoding, partition mapping, and sequence interpretation stable during a payload-only migration. A change to any of those values is a stream-topology or recovery migration and needs a separate cutover plan.
+Keep provider name, stream identity encoding, partition mapping, queue mode, and sequence interpretation stable during a payload-only migration. A change to any of those values is a stream-topology or recovery migration and needs a separate cutover plan.
 
 Conversion failures surface as stream-delivery failures. Throw a descriptive exception for malformed payloads, unsupported versions, and missing routing metadata so the provider retains or replays the source message according to its delivery semantics. Monitor conversion failures and quarantine poison messages through the transport's operational process before they exhaust retention or block partition progress.
 
