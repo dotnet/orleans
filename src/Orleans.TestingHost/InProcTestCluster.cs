@@ -8,7 +8,9 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Core.Internal;
 using Orleans.Runtime;
+using Orleans.Runtime.Placement;
 using Orleans.TestingHost.Utils;
 using Microsoft.Extensions.Configuration;
 using Orleans.Configuration;
@@ -42,10 +44,10 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     private readonly GrainDirectoryObserver _grainDirectoryObserver = new();
     private readonly InProcessGrainDirectory _grainDirectory;
     private readonly InProcessMembershipTable _membershipTable;
+    private readonly SemaphoreSlim _clientHostsSemaphore = new(1, 1);
     private bool _disposed;
     private int _startedInstances;
 
-    // Multi-client support
     private readonly Dictionary<string, IHost> _clientHosts = new();
 
     /// <summary>
@@ -77,18 +79,10 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     {
         get
         {
-            _clientHosts.TryGetValue("default", out var clientHost);
-            return clientHost;
-        }
-        set
-        {
-            if (value is null)
+            lock (_clientHosts)
             {
-                _clientHosts.Remove("default");
-            }
-            else
-            {
-                _clientHosts["default"] = value;
+                _clientHosts.TryGetValue("default", out var clientHost);
+                return clientHost;
             }
         }
     }
@@ -664,13 +658,9 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
     public async Task StopClusterClientAsync(CancellationToken cancellationToken)
     {
-        var client = ClientHost;
         try
         {
-            if (client is not null)
-            {
-                await client.StopAsync(cancellationToken).ConfigureAwait(false);
-            }
+            await RemoveClientAsync("default", cancellationToken);
         }
         catch (Exception exc)
         {
@@ -679,11 +669,6 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             {
                 throw;
             }
-        }
-        finally
-        {
-            await DisposeAsync(client).ConfigureAwait(false);
-            ClientHost = null;
         }
     }
 
@@ -782,20 +767,32 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// </summary>
     public async Task KillClientAsync()
     {
-        var client = ClientHost;
-        if (client != null)
+        await _clientHostsSemaphore.WaitAsync();
+        try
         {
-            var cancelled = new CancellationTokenSource();
-            cancelled.Cancel();
-            try
+            IHost? client;
+            lock (_clientHosts)
             {
-                await client.StopAsync(cancelled.Token).ConfigureAwait(false);
+                _clientHosts.Remove("default", out client);
             }
-            finally
+
+            if (client is not null)
             {
-                await DisposeAsync(client);
-                ClientHost = null;
+                using var cancelled = new CancellationTokenSource();
+                cancelled.Cancel();
+                try
+                {
+                    await client.StopAsync(cancelled.Token).ConfigureAwait(false);
+                }
+                finally
+                {
+                    await DisposeAsync(client);
+                }
             }
+        }
+        finally
+        {
+            _clientHostsSemaphore.Release();
         }
     }
 
@@ -803,7 +800,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// Do a Stop or Kill of the specified silo, followed by a restart.
     /// </summary>
     /// <param name="instance">Silo to be restarted.</param>
-    public async Task<InProcessSiloHandle?> RestartSiloAsync(InProcessSiloHandle? instance)
+    public async Task<InProcessSiloHandle?> RestartSiloAsync(InProcessSiloHandle instance)
     {
         if (instance != null)
         {
@@ -855,17 +852,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             await StopClusterClientAsync(cancellationToken);
         }
 
-        var clientHost = CreateClientHost("default");
-        try
-        {
-            await clientHost.StartAsync();
-            ClientHost = clientHost;
-        }
-        catch
-        {
-            await DisposeAsync(clientHost);
-            throw;
-        }
+        await GetClientAsync("default");
     }
 
     private IHost CreateClientHost(string name, Action<IHostApplicationBuilder>? configure = null)
@@ -910,12 +897,12 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// </summary>
     public IClusterClient? GetClient(string name)
     {
-        if (_clientHosts.TryGetValue(name, out var host))
+        lock (_clientHosts)
         {
-            return host.Services.GetRequiredService<IInternalClusterClient>();
+            return _clientHosts.TryGetValue(name, out var host)
+                ? host.Services.GetRequiredService<IInternalClusterClient>()
+                : null;
         }
-
-        return null;
     }
 
     /// <summary>
@@ -923,33 +910,72 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// </summary>
     public async Task<IClusterClient> GetClientAsync(string name, Action<IHostApplicationBuilder>? configure = null)
     {
-        if (!_clientHosts.TryGetValue(name, out var host))
+        await _clientHostsSemaphore.WaitAsync();
+        try
         {
-            host = CreateClientHost(name, configure);
-            try
+            IHost? host;
+            lock (_clientHosts)
             {
-                await host.StartAsync();
-                _clientHosts.Add(name, host);
+                _clientHosts.TryGetValue(name, out host);
             }
-            catch
-            {
-                await DisposeAsync(host);
-                throw;
-            }
-        }
 
-        return host.Services.GetRequiredService<IInternalClusterClient>();
+            if (host is null)
+            {
+                host = CreateClientHost(name, configure);
+                try
+                {
+                    await host.StartAsync();
+                    lock (_clientHosts)
+                    {
+                        _clientHosts.Add(name, host);
+                    }
+                }
+                catch
+                {
+                    await DisposeAsync(host);
+                    throw;
+                }
+            }
+
+            return host.Services.GetRequiredService<IInternalClusterClient>();
+        }
+        finally
+        {
+            _clientHostsSemaphore.Release();
+        }
     }
 
     /// <summary>
     /// Removes and disposes a client by name.
     /// </summary>
-    public async Task RemoveClientAsync(string name)
+    public Task RemoveClientAsync(string name) => RemoveClientAsync(name, CancellationToken.None);
+
+    private async Task RemoveClientAsync(string name, CancellationToken cancellationToken)
     {
-        if (_clientHosts.Remove(name, out var host))
+        await _clientHostsSemaphore.WaitAsync(cancellationToken);
+        try
         {
-            await host.StopAsync();
-            await DisposeAsync(host);
+            IHost? host;
+            lock (_clientHosts)
+            {
+                _clientHosts.Remove(name, out host);
+            }
+
+            if (host is not null)
+            {
+                try
+                {
+                    await host.StopAsync(cancellationToken);
+                }
+                finally
+                {
+                    await DisposeAsync(host);
+                }
+            }
+        }
+        finally
+        {
+            _clientHostsSemaphore.Release();
         }
     }
 

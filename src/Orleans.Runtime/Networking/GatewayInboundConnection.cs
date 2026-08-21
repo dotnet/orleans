@@ -60,6 +60,8 @@ namespace Orleans.Runtime.Messaging
 
         protected override void OnReceivedMessage(Message msg)
         {
+            this.gateway.RecordClientResponse(msg);
+
             // Don't process messages that have already timed out
             if (msg.IsExpired)
             {

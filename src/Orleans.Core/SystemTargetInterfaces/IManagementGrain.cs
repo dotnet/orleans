@@ -274,13 +274,13 @@ namespace Orleans.Runtime
         /// The source host.
         /// </summary>
         [Id(2)]
-        public SiloAddress SourceHost { get; set; }
+        public SiloAddress? SourceHost { get; set; }
 
         /// <summary>
         /// The target host.
         /// </summary>
         [Id(3)]
-        public SiloAddress TargetHost { get; set; }
+        public SiloAddress? TargetHost { get; set; }
 
         /// <summary>
         /// The estimated number of calls made.

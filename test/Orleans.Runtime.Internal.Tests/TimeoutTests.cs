@@ -46,6 +46,8 @@ namespace UnitTests
             this.runtimeClient.SetResponseTimeout(originalTimeout);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional"), TestCategory("Timeout")]
         public async Task Timeout_LongMethod()
         {
