@@ -186,6 +186,10 @@ items:
         href: tutorials-and-samples/custom-grain-storage.md
       - name: Deploy an Orleans application to Azure Container Apps
         href: tutorials-and-samples/production-application.md
+      - name: Deploy Orleans to Azure App Service on Windows
+        href: deployment/deploy-to-azure-app-service.md
+      - name: Deploy Orleans to Azure App Service on Linux
+        href: deployment/deploy-to-azure-app-service-linux.md
       - name: Test an Orleans application end to end
         href: tutorials-and-samples/testing-walkthrough.md
       - name: Build and recover a streaming application
@@ -305,10 +309,6 @@ items:
             href: deployment/deploy-to-azure-container-apps.md
           - name: Azure App Service
             href: deployment/azure-app-service.md
-          - name: Azure App Service on Windows
-            href: deployment/deploy-to-azure-app-service.md
-          - name: Azure App Service on Linux
-            href: deployment/deploy-to-azure-app-service-linux.md
           - name: Service Fabric
             href: deployment/service-fabric.md
       - name: Health and observability
