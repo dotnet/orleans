@@ -201,6 +201,27 @@ public class GatewayInFlightRequestTrackerTests
         Assert.Equal(0, tracker.Count);
     }
 
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(0)]
+    public void NonPositiveResponseTimeoutUsesOneSecondMaintenancePeriod(int responseTimeoutMilliseconds)
+    {
+        var period = Gateway.GetRequestMaintenancePeriod(TimeSpan.FromMilliseconds(responseTimeoutMilliseconds));
+
+        Assert.Equal(TimeSpan.FromSeconds(1), period);
+    }
+
+    [Fact]
+    public void PositiveResponseTimeoutControlsMaintenancePeriodUpToOneSecond()
+    {
+        Assert.Equal(
+            TimeSpan.FromMilliseconds(250),
+            Gateway.GetRequestMaintenancePeriod(TimeSpan.FromMilliseconds(250)));
+        Assert.Equal(
+            TimeSpan.FromSeconds(1),
+            Gateway.GetRequestMaintenancePeriod(TimeSpan.FromSeconds(30)));
+    }
+
     private static GatewayInFlightRequestTracker CreateTracker(
         TimeProvider? timeProvider = null,
         TimeSpan? responseTimeout = null) =>
