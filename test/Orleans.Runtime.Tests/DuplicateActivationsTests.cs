@@ -41,7 +41,7 @@ namespace UnitTests.CatalogTests
         /// Each activation returns its unique identifier so that the test can verify
         /// that every request for a target grain was handled by the same activation.
         /// </summary>
-        [Fact, TestCategory("Catalog"), TestCategory("Functional")]
+        [Fact]
         public async Task DuplicateActivations()
         {
             const int nRunnerGrains = 100;    // Number of grains making concurrent calls
@@ -55,7 +55,7 @@ namespace UnitTests.CatalogTests
             var promises = new List<Task>(nRunnerGrains);
             for (int i = 0; i < nRunnerGrains; i++)
             {
-                runnerGrains[i] = this.fixture.GrainFactory.GetGrain<ICatalogTestGrain>(-i);
+                runnerGrains[i] = this.fixture.GrainFactory.GetGrain<ICatalogTestGrain>(-(i + 1));
                 promises.Add(runnerGrains[i].Initialize());
             }
 
