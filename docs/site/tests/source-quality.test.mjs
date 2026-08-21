@@ -8,6 +8,7 @@ import {
   collectPackageProjects,
   collectCsharpFences,
   findReleaseVersionIssues,
+  isNavigationHidden,
   parseDocumentedPackageTable,
   validateCsharpFences,
   validatePackageInventory,
@@ -976,6 +977,15 @@ describe('documentation source quality', () => {
         "Navigation target 'overview.md' appears 2 times.",
       ]),
     );
+  });
+
+  test('recognizes pages retained outside navigation', () => {
+    expect(
+      isNavigationHidden(
+        '---\ntitle: Compatibility page\nnavigation: hidden\n---\n\n# Compatibility page\n',
+      ),
+    ).toBe(true);
+    expect(isNavigationHidden('---\ntitle: Current page\n---\n\n# Current page\n')).toBe(false);
   });
 
   test('requires durable architecture and Event Sourcing navigation sections', () => {

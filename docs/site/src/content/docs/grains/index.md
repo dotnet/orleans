@@ -1,7 +1,7 @@
 ---
 title: Develop Orleans grains
 description: Define grain contracts, implement grains, and call them in Orleans.
-ms.date: 08/20/2026
+ms.date: 08/21/2026
 ms.topic: article
 ---
 
@@ -88,7 +88,8 @@ Most grains only need a contract, an implementation, a stable key, and regular r
 
 - [Request scheduling and reentrancy](request-scheduling.md)
 - [Response streaming with IAsyncEnumerable](response-streaming.md)
-- [Timers and reminders](timers-and-reminders.md)
+- [Grain timers](timers.md)
+- [Reminders](reminders.md)
 - [Observers](observers.md)
 - [Grain placement](grain-placement.md)
 - [Stateless worker grains](stateless-worker-grains.md)

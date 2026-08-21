@@ -109,8 +109,9 @@ tutorial into a reference or burying architecture detail inside a how-to.
 ## Sources and generated output
 
 - Register every new page in `docs/site/src/content/docs/toc.yml` under the
-  section that matches its documentation type. An unlisted page is effectively
-  unpublished.
+  section that matches its documentation type. A compatibility page retained
+  only for stable inbound routes can set `navigation: hidden`; link it to the
+  current focused pages.
 - Keep recursive includes within the documentation source tree. Missing,
   circular, traversal, absolute, drive-relative, or symlink-escaping includes
   are invalid. Edit the include source and ensure active includes participate in

@@ -1,7 +1,7 @@
 ---
 title: Reminder implementation
 description: Explain reminder ownership, durable table reconciliation, scheduling, and delivery behavior inside Orleans.
-ms.date: 08/11/2026
+ms.date: 08/21/2026
 ms.topic: concept-article
 ---
 
@@ -31,6 +31,6 @@ The provider durably stores the schedule, while owners generate individual ticks
 
 The in-memory table is suitable for development only. Production tables provide the durability and concurrency behavior required for ownership changes, but their consistency and availability characteristics remain provider-specific. Table startup is part of silo lifecycle initialization; failure to open the configured table prevents normal reminder service startup.
 
-The [timers and reminders guide](../grains/timers-and-reminders.md) covers registration usage. Reminder persistence, ring movement, refresh intervals, and callback failures determine observed scheduling behavior.
+The [reminders guide](../grains/reminders.md) covers registration and application behavior. Reminder persistence, ring movement, refresh intervals, and callback failures determine observed scheduling behavior.
 
 Source: [`LocalReminderService`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Reminders/ReminderService/LocalReminderService.cs), [`ReminderRegistry`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Reminders/ReminderService/ReminderRegistry.cs), and [`IReminderTable`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Reminders/SystemTargetInterfaces/IReminderTable.cs).

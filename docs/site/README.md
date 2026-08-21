@@ -44,9 +44,10 @@ npm run validate
 The source audit reports a rule ID, file, line, and remediation. It enforces:
 
 - Orleans 10 guidance outside migration pages and explicitly versioned compatibility zones.
-- Exactly one `toc.yml` entry per maintained conceptual page, with `includes` and
-  snippet support files excluded; Architecture and internals and Event Sourcing
-  remain first-class navigation sections.
+- Exactly one `toc.yml` entry per maintained conceptual page, with `includes`,
+  snippet support files, and compatibility routes marked `navigation: hidden`
+  excluded; Architecture and internals and Event Sourcing remain first-class
+  navigation sections.
 - Package and stream-provider inventories against source project metadata,
   activity sources and lifecycle stages against source/API constants, documented
   metric names against `InstrumentNames.cs`, and sample paths against
