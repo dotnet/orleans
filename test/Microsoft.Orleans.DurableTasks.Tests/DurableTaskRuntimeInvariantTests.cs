@@ -434,6 +434,9 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.NotNull(fingerprint);
 
         var (recovered, _, _, recoveredTransport) = CreateRuntime(storage, manager);
+        manager.BeforeWrite = () => Assert.Contains(
+            recoveredTransport.Cancellations,
+            cancellation => cancellation.TaskId == childId && cancellation.Target == target);
         await recovered.SignalCancellationAsync(rootId, default);
 
         var cancellation = Assert.Single(recoveredTransport.Cancellations);
@@ -465,6 +468,15 @@ public sealed class DurableTaskRuntimeInvariantTests
             () => runtime.ScheduleFromInboxAsync(remoteTaskId, CreateRequest(4), default).AsTask());
         Assert.Contains("remote child request", topLevelException.Message, StringComparison.Ordinal);
         Assert.NotNull(storage.Get(remoteTaskId).RemoteRequestFingerprint);
+
+        var delayTaskId = TaskId.Parse("delay-identity");
+        await runtime.ScheduleDelayAsync(delayTaskId, runtime.UtcNow.AddMinutes(1), default);
+        var delayException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runtime.ScheduleChildAsync(
+                delayTaskId,
+                new TestStateManager.TestRemoteDurableTask(CreateRequest(5)),
+                default).AsTask());
+        Assert.Contains("different request", delayException.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -514,9 +526,10 @@ public sealed class DurableTaskRuntimeInvariantTests
     [Fact]
     public async Task CancelingLocalChildSignalsActiveDurableContext()
     {
-        var (runtime, storage, _, _) = CreateRuntime();
+        var (runtime, storage, stateManager, _) = CreateRuntime();
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var terminalObservedDuringCancellation = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var writeCountObservedDuringCancellation = new TaskCompletionSource<int>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         var taskId = TaskId.Parse("root/local-cancel");
         var handle = await runtime.ScheduleChildAsync(
             taskId,
@@ -529,17 +542,18 @@ public sealed class DurableTaskRuntimeInvariantTests
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    terminalObservedDuringCancellation.TrySetResult(
-                        storage.Get(taskId).Result is { IsCompleted: true });
+                    writeCountObservedDuringCancellation.TrySetResult(stateManager.WriteCount);
                     throw;
                 }
             }),
             default);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var writesBeforeCancellation = stateManager.WriteCount;
 
         await handle.CancelAsync(default);
 
-        Assert.False(await terminalObservedDuringCancellation.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+        var observedWriteCount = await writeCountObservedDuringCancellation.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(observedWriteCount > writesBeforeCancellation);
         Assert.Equal(DurableTaskStatus.Canceled, storage.Get(taskId).Result!.Status);
     }
 
@@ -672,13 +686,35 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         var generated = InvokeCreateChildTaskId(context, null);
         var explicitNumeric = InvokeCreateChildTaskId(context, "0");
+        var explicitSuffix = InvokeCreateChildTaskId(context, "job.1");
+        _ = InvokeCreateChildTaskId(context, "job");
+        var repeatedName = InvokeCreateChildTaskId(context, "job");
 
         Assert.NotEqual(generated, explicitNumeric);
+        Assert.NotEqual(explicitSuffix, repeatedName);
         Assert.StartsWith("root/$child-", generated.ToString(), StringComparison.Ordinal);
+        Assert.StartsWith("root/$child-", repeatedName.ToString(), StringComparison.Ordinal);
         Assert.Equal(TaskId.Parse("root/0"), explicitNumeric);
         var exception = Assert.Throws<TargetInvocationException>(
             () => InvokeCreateChildTaskId(context, "$reserved"));
         Assert.IsType<ArgumentException>(exception.InnerException);
+    }
+
+    [Fact]
+    public async Task RecordedCompletionDecisionMustBelongToCandidateSet()
+    {
+        var (runtime, storage, _, _) = CreateRuntime();
+        var decisionId = TaskId.Parse("root/decision");
+        var recordedWinner = TaskId.Parse("root/one");
+        storage.GetOrCreate(decisionId).Result = DurableTaskResponse.FromResult(recordedWinner);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runtime.SelectCompletionAsync(
+                decisionId,
+                [TaskId.Parse("root/two")],
+                default).AsTask());
+
+        Assert.Contains("not in the supplied candidate set", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1207,6 +1243,7 @@ public sealed class DurableTaskRuntimeInvariantTests
     {
         private readonly List<IJournaledStateObserver> _observers = [];
         public int WriteCount { get; private set; }
+        public Action? BeforeWrite { get; set; }
         public bool SupportsRollback => true;
         public void RegisterObserver(IJournaledStateObserver observer) => _observers.Add(observer);
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
@@ -1220,6 +1257,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         public async ValueTask WriteStateAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            BeforeWrite?.Invoke();
             foreach (var observer in _observers)
             {
                 await observer.OnWritePreparingAsync(cancellationToken);

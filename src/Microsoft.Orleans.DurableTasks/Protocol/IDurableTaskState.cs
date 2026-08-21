@@ -60,5 +60,8 @@ public interface IDurableTaskState
 
     public string? RemoteRequestFingerprint { get; }
 
+    /// <summary>
+    /// Gets the grain which created this task through durable messaging.
+    /// </summary>
     public GrainId CallerId { get; }
 }

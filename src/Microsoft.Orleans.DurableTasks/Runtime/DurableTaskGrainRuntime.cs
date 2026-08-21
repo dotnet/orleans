@@ -33,6 +33,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     private readonly Dictionary<TaskId, IScheduledTaskHandle> _taskHandles = [];
     private readonly Dictionary<TaskId, IDurableTaskRequest> _pendingStarts = [];
     private readonly Dictionary<TaskId, IDurableTaskRequest> _committingStarts = [];
+    private readonly HashSet<(TaskId TaskId, GrainId Target)> _preStagedCancellations = [];
     private readonly DurableTaskGrainRuntimeShared _shared = shared;
     private readonly IDurableTaskGrainStorage _storage = storage;
     private readonly IDurableTaskMessageTransport? _messageTransport = messageTransports.SingleOrDefault();
@@ -54,7 +55,14 @@ internal sealed partial class DurableTaskGrainRuntime(
         if (_storage.TryGetTask(decisionId, out var decision)
             && decision.Result is { IsCompleted: true } recorded)
         {
-            return recorded.GetResult<TaskId>();
+            var winner = recorded.GetResult<TaskId>();
+            if (!candidates.Contains(winner))
+            {
+                throw new InvalidOperationException(
+                    $"Durable completion decision '{decisionId}' was recorded for candidate '{winner}', which is not in the supplied candidate set.");
+            }
+
+            return winner;
         }
 
         while (true)
@@ -162,6 +170,11 @@ internal sealed partial class DurableTaskGrainRuntime(
     public async ValueTask CancelRemoteAsync(TaskId taskId, GrainId target, CancellationToken cancellationToken)
     {
         ThrowIfStopping();
+        if (_preStagedCancellations.Remove((taskId, target)))
+        {
+            return;
+        }
+
         var transport = _messageTransport ?? throw new InvalidOperationException(
             "Durable messaging is not configured. Call AddDurableTasks on the silo builder.");
         transport.SendCancellation(GrainId, target, taskId);
@@ -178,6 +191,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         TryGetExecutionContext(taskId, out var executionContext);
         _storage.RequestCancellation(taskId, state);
+        await _storage.WriteAsync(cancellationToken);
         if (executionContext is not null)
         {
             var cancellation = DurableTaskRuntimeHelper.RequestCancellationAsync(
@@ -432,6 +446,16 @@ internal sealed partial class DurableTaskGrainRuntime(
             }
 
             ValidateOrSetCaller(taskId, identifiedState, requestContext.CallerId);
+            if (identifiedState.Request is null
+                && identifiedState.RequestFingerprint is null
+                && identifiedState.CancellationRequestedAt is null
+                && (identifiedState.DueTime is not null
+                    || TryGetScheduledTaskHandle(taskId, out _)))
+            {
+                throw new InvalidOperationException(
+                    $"Durable task '{taskId}' is already associated with a non-request operation.");
+            }
+
             if (identifiedState.RequestFingerprint is { } existingFingerprint
                 && !string.Equals(existingFingerprint, fingerprint, StringComparison.Ordinal))
             {
@@ -603,6 +627,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     {
         _pendingStarts.Clear();
         _committingStarts.Clear();
+        _preStagedCancellations.Clear();
     }
 
     public async ValueTask<IScheduledTaskHandle> ScheduleChildAsync(TaskId taskId, DurableTask durableTask, CancellationToken cancellationToken)
@@ -613,12 +638,17 @@ internal sealed partial class DurableTaskGrainRuntime(
             _shared.Logger.LogTrace("{Id} evaluating task {TaskId}", GrainId, taskId);
         }
 
-        var state = _storage.GetOrCreateTask(taskId, null);
+        var stateExisted = _storage.TryGetTask(taskId, out var state);
+        state ??= _storage.GetOrCreateTask(taskId, null);
         IScheduledTaskHandle? handle = null;
-        if (TryGetScheduledTaskHandle(taskId, out var existingHandle)
-            && (existingHandle is not TaskHandle localHandle || localHandle.IsRunning))
+        IScheduledTaskHandle? existingScheduledHandle = null;
+        if (stateExisted && TryGetScheduledTaskHandle(taskId, out var existingHandle))
         {
-            handle = existingHandle;
+            existingScheduledHandle = existingHandle;
+            if (existingHandle is not TaskHandle localHandle || localHandle.IsRunning)
+            {
+                handle = existingHandle;
+            }
         }
 
         if (durableTask is IDurableTaskRequest remoteRequest)
@@ -629,6 +659,9 @@ internal sealed partial class DurableTaskGrainRuntime(
             if (state.Request is not null
                 || state.RequestFingerprint is not null
                 || !state.CallerId.IsDefault
+                || state.DueTime is not null
+                || (existingScheduledHandle is TaskHandle existingTaskHandle
+                    && existingTaskHandle.RemoteTarget.IsDefault)
                 || (!state.RemoteTarget.IsDefault && state.RemoteTarget != target)
                 || (state.RemoteRequestFingerprint is { } existing
                     && !string.Equals(existing, fingerprint, StringComparison.Ordinal))
@@ -1046,7 +1079,11 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         await Task.WhenAll(tasks).WaitAsync(cancellationToken);
 
-        bool RequestCancellationCore(TaskId taskId, IDurableTaskState taskState, List<GrainDurableExecutionContext> canceledContexts, List<IScheduledTaskHandle> canceledHandles)
+        bool RequestCancellationCore(
+            TaskId taskId,
+            IDurableTaskState taskState,
+            List<GrainDurableExecutionContext> canceledContexts,
+            List<IScheduledTaskHandle> canceledHandles)
         {
             if (taskState.CompletedAt.HasValue)
             {
@@ -1071,7 +1108,19 @@ internal sealed partial class DurableTaskGrainRuntime(
             _storage.RequestCancellation(taskId, taskState);
             if (TryGetExecutionContext(taskId, out var context))
             {
+                if (taskState.Request is IDurableTaskRequest request
+                    && request.Context is { } requestContext
+                    && requestContext.TargetId != GrainId)
+                {
+                    StageCancellation(taskId, requestContext.TargetId);
+                    _preStagedCancellations.Add((taskId, requestContext.TargetId));
+                }
+
                 canceledContexts.Add(context);
+            }
+            else if (!taskState.RemoteTarget.IsDefault)
+            {
+                StageCancellation(taskId, taskState.RemoteTarget);
             }
             else if (TryGetScheduledTaskHandle(taskId, out var handle))
             {
@@ -1079,6 +1128,13 @@ internal sealed partial class DurableTaskGrainRuntime(
             }
 
             return true;
+        }
+
+        void StageCancellation(TaskId canceledTaskId, GrainId target)
+        {
+            var transport = _messageTransport ?? throw new InvalidOperationException(
+                "Durable messaging is not configured. Call AddDurableTasks on the silo builder.");
+            transport.SendCancellation(GrainId, target, canceledTaskId);
         }
     }
 
