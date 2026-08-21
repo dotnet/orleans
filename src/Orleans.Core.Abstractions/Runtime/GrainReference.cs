@@ -259,7 +259,7 @@ namespace Orleans.Runtime
         /// The grain reference functionality which is shared by all grain references of a given type.
         /// </summary>
         [NonSerialized]
-        private GrainReferenceShared _shared;
+        private readonly GrainReferenceShared _shared;
 
         /// <summary>
         /// The underlying grain id key.
@@ -270,11 +270,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the grain reference functionality which is shared by all grain references of a given type.
         /// </summary>
-        internal GrainReferenceShared Shared
-        {
-            get => _shared ?? throw new GrainReferenceNotBoundException(this);
-            set => _shared = value;
-        }
+        internal GrainReferenceShared Shared => _shared ?? throw new GrainReferenceNotBoundException(this);
 
         /// <summary>
         /// Gets the grain reference runtime.
