@@ -213,21 +213,10 @@ namespace Orleans
 
             var grainInterfaceType = this.interfaceTypeResolver.GetGrainInterfaceType(interfaceType);
 
-            bool success;
-            GrainType grainType = default;
-            try
+            if (!interfaceTypeToGrainTypeResolver.TryGetGrainType(grainInterfaceType, grainClassNamePrefix, out var grainType))
             {
-                success = interfaceTypeToGrainTypeResolver.TryGetGrainType(grainInterfaceType, grainClassNamePrefix, out grainType);
-            }
-            catch (ArgumentException)
-            {
-                success = false;
-            }
-
-            if (!success)
-            {
-                // Not found in the type map. Maybe it's not available yet ? (heterogeneous case)
-                grainType = GrainTypePrefix.CreateStubGrainType(grainClassNamePrefix);
+                // A compatible implementation can become available as the cluster manifest changes.
+                grainType = GrainTypePrefix.CreateStubGrainType(grainInterfaceType, grainClassNamePrefix);
             }
 
             Debug.Assert(!grainType.IsDefault);

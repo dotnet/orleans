@@ -195,6 +195,21 @@ namespace UnitTests.General
             Assert.Equal(grainId, deserialized);
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void StubGrainIdRoundTripsThroughStringAndJson()
+        {
+            var grainType = GrainTypePrefix.CreateStubGrainType(GrainInterfaceType.Create("ab?"), "TestGrain");
+            var grainId = GrainId.Create(grainType, IdSpan.Create("key"));
+
+            Assert.Equal(grainId, GrainId.Parse(grainId.ToString()));
+            Assert.Equal(grainId, JsonSerializer.Deserialize<GrainId>(JsonSerializer.Serialize(grainId)));
+            Assert.True(GrainTypePrefix.TryGetStubGrainType(grainId.Type, out var interfaceType, out var grainClassPrefix));
+            Assert.Equal(GrainInterfaceType.Create("ab?"), interfaceType);
+            Assert.Equal("TestGrain", grainClassPrefix);
+        }
+
         private const string TestGuid = "83582e92-76a6-4c2d-b0f0-f266875ecf83";
         private const long TestInteger = 0x1234_5678_90AB_CDEF;
 
