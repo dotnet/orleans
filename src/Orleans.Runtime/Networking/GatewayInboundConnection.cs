@@ -170,7 +170,7 @@ namespace Orleans.Runtime.Messaging
                     msg,
                     Message.RejectionTypes.Transient,
                     $"Silo {this.myAddress} is rejecting message: {msg}. Reason = {reason}",
-                    new ClientNotAvailableException(reason ?? "Connection terminated."));
+                    new ClientNotAvailableException($"Target client {msg.TargetGrain} is unavailable. {reason ?? "Connection terminated."}"));
             }
             else
             {

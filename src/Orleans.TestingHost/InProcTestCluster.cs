@@ -107,7 +107,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <summary>
     /// The port allocator.
     /// </summary>
-    public ITestClusterPortAllocator? PortAllocator { get; }
+    public ITestClusterPortAllocator PortAllocator { get; }
 
     /// <summary>
     /// Returns whether the address belongs to this cluster.
@@ -1252,7 +1252,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             }
             _clientHosts.Clear();
 
-            PortAllocator?.Dispose();
+            PortAllocator.Dispose();
             _grainDirectoryObserver.Dispose();
         });
 
@@ -1278,7 +1278,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         }
         _clientHosts.Clear();
 
-        PortAllocator?.Dispose();
+        PortAllocator.Dispose();
         _grainDirectoryObserver.Dispose();
 
         _disposed = true;

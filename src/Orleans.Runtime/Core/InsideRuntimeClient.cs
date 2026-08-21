@@ -647,12 +647,7 @@ namespace Orleans.Runtime
 
         public void Dispose()
         {
-            foreach (var callback in callbacks)
-            {
-                var message = callback.Value.Message;
-                var response = messageFactory.CreateRejectionResponse(message, Message.RejectionTypes.Unrecoverable, "Host is shutting down.", null);
-                callback.Value.OnResponse(response);
-            }
+            BreakOutstandingMessages();
         }
 
         [LoggerMessage(
