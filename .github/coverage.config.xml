@@ -11,8 +11,7 @@
         <Source>.*[\\/](bin|obj)[\\/].*</Source>
       </Exclude>
     </Sources>
-    <EnableDynamicManagedInstrumentation>False</EnableDynamicManagedInstrumentation>
-    <EnableStaticManagedInstrumentation>True</EnableStaticManagedInstrumentation>
-    <EnableStaticManagedInstrumentationRestore>True</EnableStaticManagedInstrumentationRestore>
+    <EnableDynamicManagedInstrumentation>True</EnableDynamicManagedInstrumentation>
+    <EnableStaticManagedInstrumentation>False</EnableStaticManagedInstrumentation>
   </CodeCoverage>
 </Configuration>
