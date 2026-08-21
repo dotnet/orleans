@@ -112,7 +112,7 @@ namespace UnitTests.General
             Assert.True(state.WasConfiguredAtConstruction);
         }
 
-        [Fact, TestCategory("BVT")]
+        [Fact]
         public async Task ContextCreationStartsActivationSynchronouslyOnActivationSchedulerWithCleanExecutionContext()
         {
             var state = ActivationOrderingState.Instance;
@@ -151,8 +151,8 @@ namespace UnitTests.General
             }
         }
 
-        [Fact, TestCategory("BVT")]
-        public async Task BuiltInActivatorCreateContextStartsContext()
+        [Fact]
+        public async Task BuiltInActivatorCreateContextReturnsUnstartedContext()
         {
             var primary = Assert.IsType<InProcessSiloHandle>(fixture.HostedCluster.Primary);
             var services = primary.ServiceProvider;
@@ -173,7 +173,11 @@ namespace UnitTests.General
             var context = Assert.IsType<ActivationData>(activator.CreateContext(address, []));
             try
             {
-                Assert.NotNull(context.GrainInstance);
+                Assert.Null(context.GrainInstance);
+                using (context.Start())
+                {
+                    Assert.NotNull(context.GrainInstance);
+                }
             }
             finally
             {

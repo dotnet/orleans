@@ -70,6 +70,25 @@ namespace Orleans.Runtime
         void ReceiveMessage(object message);
 
         /// <summary>
+        /// Starts this context.
+        /// </summary>
+        /// <returns>
+        /// A token which releases queued work when disposed, or <see langword="null"/> if the context starts eagerly.
+        /// </returns>
+        /// <remarks>
+        /// This method is called at most once. Implementations which throw from this method are responsible for
+        /// releasing any startup resources which they acquired.
+        /// </remarks>
+        IDisposable? Start() => null;
+
+        /// <summary>
+        /// Aborts this context before startup begins.
+        /// </summary>
+        void Abort()
+        {
+        }
+
+        /// <summary>
         /// Start activating this instance.
         /// </summary>
         /// <param name="requestContext">The request context of the request which is causing this instance to be activated, if any.</param>
