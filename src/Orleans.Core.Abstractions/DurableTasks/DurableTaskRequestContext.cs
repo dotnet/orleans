@@ -99,4 +99,3 @@ internal readonly struct TaskIdSurrogate(string value)
     [Id(0)]
     public string Value { get; } = value;
 }
-
