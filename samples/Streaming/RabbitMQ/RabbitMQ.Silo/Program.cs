@@ -21,7 +21,7 @@ builder.UseOrleans(siloBuilder =>
         {
             stream.ConfigureRabbitMQ(optionsBuilder => optionsBuilder.Configure(options =>
             {
-                var endpoint = new IPEndPoint(settings.Address, settings.Port);
+                var endpoint = new DnsEndPoint(settings.Host, settings.Port);
                 options.StreamSystemConfig = new StreamSystemConfig
                 {
                     UserName = settings.UserName,
@@ -45,7 +45,7 @@ builder.Services.AddHostedService<SamplePublisher>();
 await builder.Build().RunAsync();
 
 internal sealed record RabbitMQSampleSettings(
-    IPAddress Address,
+    string Host,
     int Port,
     string UserName,
     string Password,
@@ -53,8 +53,7 @@ internal sealed record RabbitMQSampleSettings(
 {
     public static RabbitMQSampleSettings FromEnvironment() =>
         new(
-            Address: IPAddress.Parse(
-                Environment.GetEnvironmentVariable("RABBITMQ_STREAM_ADDRESS") ?? "127.0.0.1"),
+            Host: Environment.GetEnvironmentVariable("RABBITMQ_STREAM_ADDRESS") ?? "127.0.0.1",
             Port: ParseInt32("RABBITMQ_STREAM_PORT", 5552),
             UserName: Environment.GetEnvironmentVariable("RABBITMQ_STREAM_USER") ?? "guest",
             Password: Environment.GetEnvironmentVariable("RABBITMQ_STREAM_PASSWORD") ?? "guest",

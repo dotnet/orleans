@@ -1,3 +1,4 @@
+using Orleans.Configuration;
 using RabbitMQ.Stream.Client;
 
 namespace Orleans.Streaming.RabbitMQ.RabbitMQ;
@@ -53,4 +54,18 @@ public record RabbitMqQueueCacheOptions
     /// </summary>
     /// <value>The size of the cache.</value>
     public int CacheSize { get; set; } = DEFAULT_CACHE_SIZE;
+}
+
+internal sealed class RabbitMQStreamOptionsValidator(StreamPullingAgentOptions options, string name)
+    : IConfigurationValidator
+{
+    public void ValidateConfiguration()
+    {
+        if (options.BatchContainerBatchSize != 1)
+        {
+            throw new OrleansConfigurationException(
+                $"The RabbitMQ stream provider '{name}' requires " +
+                $"{nameof(StreamPullingAgentOptions.BatchContainerBatchSize)} to be 1.");
+        }
+    }
 }

@@ -48,8 +48,8 @@ Use event version numbers or domain sequence numbers when business logic require
 A rewindable provider can start or resume a subscription from a provider sequence token while the corresponding event remains in that provider's retention window. Rewindability isn't the same as durability:
 
 - Memory streams are rewindable only over their transient in-memory cache.
-- Event Hubs, RabbitMQ Streams, and Redis Streams are rewindable over retained external data.
-- Azure Queue, Amazon SQS, ADO.NET, and NATS JetStream providers aren't rewindable.
+- Event Hubs and Redis Streams are rewindable over retained external data.
+- Azure Queue, Amazon SQS, ADO.NET, NATS JetStream, and RabbitMQ Streams providers aren't rewindable.
 
 See the [provider matrix](stream-providers.md#provider-matrix) for provider capabilities.
 

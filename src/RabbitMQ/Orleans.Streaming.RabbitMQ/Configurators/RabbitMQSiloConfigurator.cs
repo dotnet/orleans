@@ -6,6 +6,7 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streaming.RabbitMQ.Adapters;
 using Orleans.Streaming.RabbitMQ.RabbitMQ;
+using Orleans.Streams;
 
 namespace Orleans.Streaming.RabbitMQ.Configurators;
 
@@ -16,16 +17,31 @@ public class RabbitMQSiloConfigurator : SiloPersistentStreamConfigurator
     {
         ConfigureDelegate(services =>
         {
-            services.AddSingleton(sp => new RabbitMQQueueProvider(sp.GetService<RabbitMQStreamSystemProvider>(),
-                providerName, sp.GetOptionsByName<RabbitMQClientOptions>(providerName)));
-            services.AddSingleton(sp => new RabbitMQAdapterReceiverFactory(sp.GetService<ILoggerFactory>(),
-                    sp.GetService<Serializer>(), sp.GetOptionsByName<RabbitMQClientOptions>(providerName),
-                    sp.GetService<OrleansInstruments>()))
-                .AddSingleton(sp =>
-                    new RabbitMQStreamSystemProvider(sp.GetOptionsByName<RabbitMQClientOptions>(providerName),
-                        sp.GetService<ILogger<RabbitMQStreamSystemProvider>>()))
+            services
+                .AddKeyedSingleton<RabbitMQStreamSystemProvider>(providerName, (sp, _) =>
+                    new RabbitMQStreamSystemProvider(
+                        sp.GetOptionsByName<RabbitMQClientOptions>(providerName),
+                        sp.GetRequiredService<ILogger<RabbitMQStreamSystemProvider>>()))
+                .AddKeyedSingleton<RabbitMQQueueProvider>(providerName, (sp, _) =>
+                    new RabbitMQQueueProvider(
+                        sp.GetRequiredKeyedService<RabbitMQStreamSystemProvider>(providerName),
+                        providerName,
+                        sp.GetOptionsByName<RabbitMQClientOptions>(providerName)))
+                .AddKeyedSingleton<RabbitMQAdapterReceiverFactory>(providerName, (sp, _) =>
+                    new RabbitMQAdapterReceiverFactory(
+                        sp.GetRequiredService<ILoggerFactory>(),
+                        sp.GetRequiredService<Serializer>(),
+                        sp.GetOptionsByName<RabbitMQClientOptions>(providerName),
+                        sp.GetRequiredService<OrleansInstruments>()))
+                .AddTransient<IConfigurationValidator>(sp =>
+                    new RabbitMQStreamOptionsValidator(
+                        sp.GetOptionsByName<StreamPullingAgentOptions>(providerName),
+                        providerName))
+                .ConfigureFormatterResolver<RabbitMQClientOptions, RabbitMQClientOptionsFormatterResolver>()
                 .ConfigureNamedOptionForLogging<RabbitMQClientOptions>(providerName)
                 .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(providerName);
+            services.AddSingleton(sp =>
+                (ILifecycleParticipant<ISiloLifecycle>)sp.GetRequiredKeyedService<IQueueAdapterFactory>(providerName));
         });
     }
 

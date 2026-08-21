@@ -1,12 +1,10 @@
-using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
-using Orleans.Streams;
 using RabbitMQ.Stream.Client;
 
 namespace Orleans.Streaming.RabbitMQ.RabbitMQ;
 
-internal class RabbitMQStreamSystemProvider : IAsyncDisposable
+internal sealed class RabbitMQStreamSystemProvider : IAsyncDisposable
 {
     private readonly object _producerLock = new();
     private readonly object _consumerLock = new();
@@ -16,71 +14,95 @@ internal class RabbitMQStreamSystemProvider : IAsyncDisposable
     private StreamSystem _consumerStreamSystem;
     private Task<StreamSystem> _createConsumerStreamTask;
     private StreamSystem _producerStreamSystem;
+    private volatile bool _disposed;
 
-    public RabbitMQStreamSystemProvider(RabbitMQClientOptions options,
+    public RabbitMQStreamSystemProvider(
+        RabbitMQClientOptions options,
         ILogger<RabbitMQStreamSystemProvider> logger)
     {
         _logger = logger;
         _rabbitMqClientOptions = options;
     }
 
-    public async ValueTask<StreamSystem> GetConsumerStream()
-    {
-        if (_consumerStreamSystem is not null)
-        {
-            return _consumerStreamSystem;
-        }
+    public ValueTask<StreamSystem> GetConsumerStream() =>
+        GetStreamSystem(
+            _consumerLock,
+            () => _consumerStreamSystem,
+            value => _consumerStreamSystem = value,
+            () => _createConsumerStreamTask,
+            value => _createConsumerStreamTask = value);
 
-        lock (_consumerLock)
+    public ValueTask<StreamSystem> GetProducerStream() =>
+        GetStreamSystem(
+            _producerLock,
+            () => _producerStreamSystem,
+            value => _producerStreamSystem = value,
+            () => _createProducerStreamTask,
+            value => _createProducerStreamTask = value);
+
+    private async ValueTask<StreamSystem> GetStreamSystem(
+        object sync,
+        Func<StreamSystem> getStreamSystem,
+        Action<StreamSystem> setStreamSystem,
+        Func<Task<StreamSystem>> getCreationTask,
+        Action<Task<StreamSystem>> setCreationTask)
+    {
+        Task<StreamSystem> creationTask;
+        lock (sync)
         {
-            _createConsumerStreamTask ??= CreateConsumerStreamSystem();
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            var current = getStreamSystem();
+            if (current is { IsClosed: false })
+            {
+                return current;
+            }
+
+            if (current is not null)
+            {
+                setStreamSystem(null);
+                setCreationTask(null);
+            }
+
+            creationTask = getCreationTask();
+            if (creationTask is null)
+            {
+                setCreationTask(creationTask = CreateStreamSystem());
+            }
         }
 
         try
         {
-            return await _createConsumerStreamTask.ConfigureAwait(false);
+            var streamSystem = await creationTask.ConfigureAwait(false);
+            var accepted = false;
+            lock (sync)
+            {
+                if (!_disposed && ReferenceEquals(getCreationTask(), creationTask))
+                {
+                    setStreamSystem(streamSystem);
+                    accepted = true;
+                }
+            }
+
+            if (!accepted)
+            {
+                await streamSystem.Close().ConfigureAwait(false);
+                throw new ObjectDisposedException(nameof(RabbitMQStreamSystemProvider));
+            }
+
+            return streamSystem;
         }
-        catch (Exception e)
+        catch
         {
-            _logger.LogError(e, "Failed to create consumer stream provider");
+            lock (sync)
+            {
+                if (ReferenceEquals(getCreationTask(), creationTask))
+                {
+                    setCreationTask(null);
+                }
+            }
+
             throw;
         }
-    }
-
-    public async ValueTask<StreamSystem> GetProducerStream()
-    {
-        if (_producerStreamSystem is not null)
-        {
-            return _producerStreamSystem;
-        }
-
-        lock (_producerLock)
-        {
-            _createProducerStreamTask ??= CreateProducerStreamSystem();
-        }
-
-        try
-        {
-            return await _createProducerStreamTask.ConfigureAwait(false);
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Failed to create producer stream provider");
-            throw;
-        }
-    }
-
-    private async Task<StreamSystem> CreateProducerStreamSystem()
-    {
-        _producerStreamSystem = await CreateStreamSystem().ConfigureAwait(false);
-
-        return _producerStreamSystem;
-    }
-
-    private async Task<StreamSystem> CreateConsumerStreamSystem()
-    {
-        _consumerStreamSystem = await CreateStreamSystem().ConfigureAwait(false);
-        return _consumerStreamSystem;
     }
 
     private async Task<StreamSystem> CreateStreamSystem()
@@ -95,8 +117,9 @@ internal class RabbitMQStreamSystemProvider : IAsyncDisposable
             retryOptions.MaxAttempts,
             (exception, attempt) =>
             {
-                LogFailedToConnectToRabbitStream(
+                _logger.LogError(
                     exception,
+                    "RabbitMQ connection attempt {Attempt} of {MaxAttempts} failed, retrying in {Delay}",
                     attempt + 1,
                     retryOptions.MaxAttempts,
                     retryOptions.Delay);
@@ -105,35 +128,36 @@ internal class RabbitMQStreamSystemProvider : IAsyncDisposable
             Timeout.InfiniteTimeSpan,
             new FixedBackoff(retryOptions.Delay)).ConfigureAwait(false);
         _logger.LogInformation("RabbitMQ stream system created");
-
         return streamSystem;
     }
 
-    private void LogFailedToConnectToRabbitStream(
-        Exception exception,
-        int attempt,
-        int maxAttempts,
-        TimeSpan delay) =>
-        _logger.LogError(exception,
-            "RabbitMQ connection attempt {Attempt} of {MaxAttempts} failed, retrying in {Delay}",
-            attempt,
-            maxAttempts,
-            delay);
-
     public async ValueTask DisposeAsync()
-
     {
-        _createConsumerStreamTask?.Dispose();
-        _createProducerStreamTask?.Dispose();
-
-        if (_producerStreamSystem is not null)
+        _disposed = true;
+        StreamSystem producer;
+        StreamSystem consumer;
+        lock (_producerLock)
         {
-            await _producerStreamSystem.Close().ConfigureAwait(false);
+            producer = _producerStreamSystem;
+            _producerStreamSystem = null;
+            _createProducerStreamTask = null;
         }
 
-        if (_consumerStreamSystem is not null)
+        lock (_consumerLock)
         {
-            await _consumerStreamSystem.Close().ConfigureAwait(false);
+            consumer = _consumerStreamSystem;
+            _consumerStreamSystem = null;
+            _createConsumerStreamTask = null;
+        }
+
+        if (producer is not null)
+        {
+            await producer.Close().ConfigureAwait(false);
+        }
+
+        if (consumer is not null && !ReferenceEquals(consumer, producer))
+        {
+            await consumer.Close().ConfigureAwait(false);
         }
     }
 }

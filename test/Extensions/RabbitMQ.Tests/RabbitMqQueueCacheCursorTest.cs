@@ -1,8 +1,9 @@
-using System.Collections.Concurrent;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streaming.RabbitMQ.Adapters;
 using Orleans.Streaming.RabbitMQ.Adapters.Cache;
+using Orleans.Streaming.RabbitMQ.RabbitMQ;
+using Orleans.Streams;
 using Xunit;
 
 namespace RabbitMQ.Tests;
@@ -11,148 +12,76 @@ namespace RabbitMQ.Tests;
 public class RabbitMqQueueCacheCursorTest
 {
     [Fact]
-    public void WhenInitializing_WithNonExistingMessage_ShouldNotMoveCursor()
+    public void NullTokenStartsAtEarliestAvailableBatch()
     {
-        var (cursor, _) = InitializeNewCursor(sequenceToken: 20);
+        var streamId = StreamId.Create("test", Guid.NewGuid());
+        var cache = CreateCache();
+        cache.AddToCache([CreateBatch(streamId, 4), CreateBatch(streamId, 5)]);
 
-        Assert.Null(cursor.GetCurrent(out _));
+        using var cursor = cache.GetCacheCursor(streamId, null);
+
+        Assert.True(cursor.MoveNext());
+        var current = cursor.GetCurrent(out _);
+        Assert.NotNull(current);
+        Assert.Equal(4, current.SequenceToken.SequenceNumber);
+    }
+
+    [Fact]
+    public void TokenOlderThanCachedRangeThrowsQueueCacheMiss()
+    {
+        var streamId = StreamId.Create("test", Guid.NewGuid());
+        var cache = CreateCache();
+        cache.AddToCache([CreateBatch(streamId, 4), CreateBatch(streamId, 5)]);
+
+        var requested = new EventSequenceTokenV2(3);
+        var exception = Assert.Throws<QueueCacheMissException>(
+            () => cache.GetCacheCursor(streamId, requested));
+
+        Assert.Equal(requested.ToString(), exception.Requested);
+        Assert.Equal(new EventSequenceTokenV2(4).ToString(), exception.Low);
+        Assert.Equal(new EventSequenceTokenV2(5).ToString(), exception.High);
+    }
+
+    [Fact]
+    public void FutureTokenWaitsForRequestedBatch()
+    {
+        var streamId = StreamId.Create("test", Guid.NewGuid());
+        var cache = CreateCache();
+        cache.AddToCache([CreateBatch(streamId, 4)]);
+        using var cursor = cache.GetCacheCursor(streamId, new EventSequenceTokenV2(6));
+
         Assert.False(cursor.MoveNext());
+        cache.AddToCache([CreateBatch(streamId, 5), CreateBatch(streamId, 6)]);
+
+        Assert.True(cursor.MoveNext());
+        var current = cursor.GetCurrent(out _);
+        Assert.NotNull(current);
+        Assert.Equal(6, current.SequenceToken.SequenceNumber);
     }
 
     [Fact]
-    public void WhenRecordDeliveryFailed_IsCalled_ShouldSetDeliveryFailed()
+    public void DeliveryFailureRetriesCurrentBatch()
     {
-        var (cursor, _) = InitializeNewCursor();
-        cursor.MoveNext();
-        var currentMessage = cursor.GetCurrent(out _);
-        cursor.RecordDeliveryFailure();
+        var streamId = StreamId.Create("test", Guid.NewGuid());
+        var cache = CreateCache();
+        cache.AddToCache([CreateBatch(streamId, 0), CreateBatch(streamId, 1)]);
+        using var cursor = cache.GetCacheCursor(streamId, null);
+        Assert.True(cursor.MoveNext());
+        var failed = cursor.GetCurrent(out _);
 
-        Assert.True(((RabbitMqBatchContainer)currentMessage).DeliveryFailed);
-    }
-
-    [Theory]
-    [InlineData(9)]
-    [InlineData(1)]
-    [InlineData(2)]
-    [InlineData(0)]
-    public void WhenDeliveryFailed_ShouldRetrySameMessage(int initialToken)
-    {
-        var (cursor, _) = InitializeNewCursor(sequenceToken: initialToken);
-        cursor.MoveNext();
-        var failedMessage = cursor.GetCurrent(out _);
         cursor.RecordDeliveryFailure();
 
         Assert.True(cursor.MoveNext());
-        var currentMessage = cursor.GetCurrent(out _);
-
-        Assert.Same(failedMessage, currentMessage);
-        Assert.False(((RabbitMqBatchContainer)currentMessage).DeliveryFailed);
-    }
-
-    [Fact]
-    public void WhenRetrySucceeds_ShouldAdvanceToNextMessage()
-    {
-        var (cursor, _) = InitializeNewCursor();
-        cursor.MoveNext();
-        var failedMessage = cursor.GetCurrent(out _);
-        cursor.RecordDeliveryFailure();
-
+        Assert.Same(failed, cursor.GetCurrent(out _));
         Assert.True(cursor.MoveNext());
-        Assert.Same(failedMessage, cursor.GetCurrent(out _));
-        Assert.True(cursor.MoveNext());
-        Assert.NotSame(failedMessage, cursor.GetCurrent(out _));
+        var current = cursor.GetCurrent(out _);
+        Assert.NotNull(current);
+        Assert.Equal(1, current.SequenceToken.SequenceNumber);
     }
 
-    [Fact]
-    public void WhenInitializing_FromDequeuedMessageToken_ShouldReturnNextMessage()
-    {
-        var (cursor, _) = InitializeNewCursor(messagesSize: 10, sequenceToken: 2, 3);
+    private static RabbitMqQueueCache CreateCache() =>
+        new(new RabbitMqQueueCacheOptions { CacheSize = 10 });
 
-        //First MoveNext to move from consumed but already dequeued message
-        cursor.MoveNext();
-        //Second MoveNext to move into the message the consumer should read
-        cursor.MoveNext();
-        var message = cursor.GetCurrent(exception: out _);
-        Assert.Equal(3, message?.SequenceToken?.SequenceNumber);
-    }
-
-    [Theory]
-    [InlineData(9)]
-    [InlineData(1)]
-    [InlineData(2)]
-    [InlineData(0)]
-    public void WhenInitializing_ShouldMoveToOneMessageBeforeToken(int initialToken)
-    {
-        var (cursor, _) = InitializeNewCursor(messagesSize: 10, sequenceToken: initialToken);
-
-        var message = cursor.GetCurrent(exception: out _);
-        Assert.Equal(initialToken > 0 ? initialToken - 1 : initialToken, message?.SequenceToken?.SequenceNumber ?? 0);
-    }
-
-    [Theory]
-    [InlineData(9)]
-    [InlineData(1)]
-    [InlineData(2)]
-    [InlineData(0)]
-    [InlineData(5)]
-    public void WhenRefreshing_ShouldSeturrentMessageToHandshakeToken(int initialToken)
-    {
-        //Create cursor with 3 messages in queue
-        var (cursor, processingMessages) = InitializeNewCursor(messagesSize: 10, sequenceToken: initialToken);
-
-        var streamId = StreamId.Create("TestName", Guid.NewGuid());
-        var events = new List<object> { new { Message = "hello" } };
-
-        //3 new messages just arrived
-        var newMessages = Enumerable.Range(3, 3);
-        foreach (var messageSequenceToken in newMessages)
-        {
-            var newBatch = new RabbitMqBatchContainer(streamId, events, new EventSequenceTokenV2(messageSequenceToken));
-            newBatch.NextBatch =
-                messageSequenceToken < initialToken ? new RabbitMqBatchContainer(streamId, events, new EventSequenceTokenV2(messageSequenceToken + 1)) : null;
-            processingMessages.Enqueue(newBatch);
-        }
-
-        cursor.Refresh(new EventSequenceTokenV2(0));
-        var currentMessage = cursor.GetCurrent(exception: out _);
-        Assert.Equal(initialToken, currentMessage.SequenceToken.SequenceNumber);
-    }
-
-    [Fact]
-    public void WhenMovingNext_ShouldSetCurrentMessageToTokenAfterLastMessage()
-    {
-        var (cursor, _) = InitializeNewCursor(messagesSize: 10, sequenceToken: 9);
-
-        var lastMessage = cursor.GetCurrent(exception: out _);
-        cursor.MoveNext();
-        var currentMessage = cursor.GetCurrent(out _);
-        Assert.True(lastMessage.SequenceToken.SequenceNumber < currentMessage.SequenceToken.SequenceNumber);
-    }
-
-    private (RabbitMqQueueCacheCursor, ConcurrentQueue<RabbitMqBatchContainer>) InitializeNewCursor(int messagesSize = 10, long sequenceToken = 0, int startMessagesFrom = 0)
-    {
-        var processingMessages = CreateProcessingMessages(messagesSize, startMessagesFrom);
-
-        var cursor = CreateCacheCursor(processingMessages, new EventSequenceTokenV2(sequenceToken));
-        return (cursor, processingMessages);
-    }
-
-    private static ConcurrentQueue<RabbitMqBatchContainer> CreateProcessingMessages(int messagesSize = 10, int startFrom = 0)
-        => CreateProcessingMessages(StreamId.Create("TestName", Guid.NewGuid()), messagesSize, startFrom);
-
-    private static ConcurrentQueue<RabbitMqBatchContainer> CreateProcessingMessages(StreamId streamId, int messagesSize = 10, int startFrom = 0)
-    {
-        var events = new List<object> { new { Message = "hello" } };
-
-        var processingMessages = new ConcurrentQueue<RabbitMqBatchContainer>(Enumerable.Range(startFrom, messagesSize).Select(i =>
-        {
-            var newBatch = new RabbitMqBatchContainer(streamId, events, new EventSequenceTokenV2(i));
-            newBatch.NextBatch =
-                i < (messagesSize - 1) ? new RabbitMqBatchContainer(streamId, events, new EventSequenceTokenV2(i + 1)) : null;
-            return newBatch;
-        }));
-        return processingMessages;
-    }
-    private static RabbitMqQueueCacheCursor CreateCacheCursor(ConcurrentQueue<RabbitMqBatchContainer> processingMessages, EventSequenceTokenV2 handshakeToken)
-        => new(handshakeToken, processingMessages, _ => { }, () => processingMessages, () => { });
+    private static RabbitMqBatchContainer CreateBatch(StreamId streamId, long sequenceNumber) =>
+        new(streamId, [new object()], new EventSequenceTokenV2(sequenceNumber));
 }
