@@ -25,6 +25,7 @@ public class AzureStorageDurableJobsConfigurationTests
 
         Assert.Equal("durablejobs-tests-service-a", first);
         Assert.Equal("durablejobs-tests-service-b", second);
+        Assert.Equal("durablejobs-tests-service-a", AzureStorageBlobDurableJobsTests.GetContainerName("Service-A"));
         Assert.NotEqual(first, second);
     }
 

@@ -54,7 +54,7 @@ public class AzureStorageBlobDurableJobsTests : TestClusterPerTest
         }
     }
 
-    internal static string GetContainerName(string serviceId) => $"durablejobs-tests-{serviceId}";
+    internal static string GetContainerName(string serviceId) => $"durablejobs-tests-{serviceId.ToLowerInvariant()}";
 
     private static BlobContainerClient CreateContainerClient(string containerName)
     {
