@@ -55,6 +55,8 @@ internal readonly struct WorkItem
 [DebuggerDisplay("WorkItemGroup Context={GrainContext} State={_state}")]
 internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoolWorkItem, IWorkItemScheduler
 {
+    private static readonly ContextCallback ExecuteCallback = static state => ((WorkItemGroup)state!).ExecuteCurrentWorkItem();
+
     private enum WorkGroupStatus : byte
     {
         Waiting = 0,
@@ -77,6 +79,7 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
 
     private WorkGroupStatus _state;
     private Task? _currentTask;
+    private WorkItem _currentWorkItem;
     private long _currentTaskStarted;
 
     // Dummy task used to make TaskScheduler.Current return our scheduler
@@ -112,7 +115,7 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
 
         // Create a dummy task associated with our scheduler (never actually runs)
         // We set m_taskScheduler directly so TaskScheduler.Current returns our scheduler
-        _schedulerTask = new Task(() => { }, TaskCreationOptions.None);
+        _schedulerTask = new Task(() => { }, TaskCreationOptions.DenyChildAttach);
         GetTaskSchedulerRef(_schedulerTask) = TaskScheduler;
     }
 
@@ -246,10 +249,9 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
                             }
                             break;
                         case WorkItem.WorkItemType.SendOrPostCallback:
-                            Unsafe.As<SendOrPostCallback>(workItem.Callback)(workItem.State);
-                            break;
                         case WorkItem.WorkItemType.ActionOfObject:
-                            Unsafe.As<Action<object?>>(workItem.Callback)(workItem.State);
+                            _currentWorkItem = workItem;
+                            ExecutionContext.Run(ExecutionContext.Capture()!, ExecuteCallback, this);
                             break;
                     }
                 }
@@ -262,10 +264,7 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
                     if (taskDurationMs > turnWarningDurationMs)
                     {
                         _schedulerInstruments.OnLongRunningTurn();
-                        if (workItem.Type == WorkItem.WorkItemType.Task)
-                        {
-                            LogLongRunningTurn(Unsafe.As<Task>(workItem.Callback), taskDurationMs);
-                        }
+                        LogLongRunningTurn(workItem, taskDurationMs);
                     }
 
                     _currentTask = null;
@@ -317,7 +316,7 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private void LogLongRunningTurn(Task task, long taskDurationMs)
+    private void LogLongRunningTurn(WorkItem workItem, long taskDurationMs)
     {
         if (Debugger.IsAttached)
         {
@@ -325,9 +324,12 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
         }
 
         var taskDuration = TimeSpan.FromMilliseconds(taskDurationMs);
+        var description = workItem.Callback is Task task
+            ? task.AsyncState ?? task
+            : workItem.State ?? workItem.Callback;
         LogWarningLongRunningTurn(
             Logger,
-            task.AsyncState ?? task,
+            description,
             GrainContext?.ToString() ?? "Unknown",
             taskDuration.ToString("g"),
             _schedulingOptions.TurnWarningLengthThreshold,
@@ -370,8 +372,29 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
     public static void ScheduleExecution(WorkItemGroup workItem) => ThreadPool.UnsafeQueueUserWorkItem(workItem, preferLocal: true);
 
     public void QueueAction(Action action) => EnqueueWorkItem(new WorkItem((Action<object?>)(static state => ((Action)state!)()), action));
-    public void QueueAction(Action<object?> action, object? state) => EnqueueWorkItem(new WorkItem(action, state));
+    public void QueueAction(Action<object> action, object state) => EnqueueWorkItem(new WorkItem(Unsafe.As<Action<object?>>(action), state));
+    internal void QueueNullableAction(Action<object?> action, object? state) => EnqueueWorkItem(new WorkItem(action, state));
     public void QueueTask(Task task) => task.Start(TaskScheduler);
+
+    private void ExecuteCurrentWorkItem()
+    {
+        try
+        {
+            var workItem = _currentWorkItem;
+            if (workItem.Type == WorkItem.WorkItemType.SendOrPostCallback)
+            {
+                Unsafe.As<SendOrPostCallback>(workItem.Callback)(workItem.State);
+            }
+            else
+            {
+                Unsafe.As<Action<object?>>(workItem.Callback)(workItem.State);
+            }
+        }
+        finally
+        {
+            _currentWorkItem = default;
+        }
+    }
 
     [LoggerMessage(
         Level = LogLevel.Trace,
@@ -412,8 +435,6 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
     )]
     private static partial void LogWarningLongRunningTurn(ILogger logger, object task, string grainContext, string duration, TimeSpan turnWarningLengthThreshold, string thread);
 
-    #region SynchronizationContext overrides
-
     /// <summary>
     /// Asynchronously posts a callback to be executed on this WorkItemGroup.
     /// </summary>
@@ -429,10 +450,6 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
     /// Creates a copy (returns same instance for single-threaded behavior).
     /// </summary>
     public override SynchronizationContext CreateCopy() => this;
-
-    #endregion
-
-    #region UnsafeAccessor methods for Task internals
 
     /// <summary>
     /// Gets a reference to the thread-static Task.t_currentTask field.
@@ -451,6 +468,4 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
     /// </summary>
     [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "m_taskScheduler")]
     private static extern ref TaskScheduler? GetTaskSchedulerRef(Task task);
-
-    #endregion
 }
