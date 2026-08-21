@@ -374,9 +374,9 @@ public class DurableOutboxTests : JournalingTestBase
 
         var result = await h.Outbox.ExecuteJobAsync(context, CancellationToken.None);
 
-        Assert.Equal(DurableJobRunStatus.RetryAt, result.Status);
+        Assert.Equal(DurableJobRunStatus.RescheduleRequested, result.Status);
         h.MessageStates.TryGetValue(envelope.MessageId, out var state);
-        Assert.Equal(state!.NextAttemptAt, result.RetryAtTime);
+        Assert.Equal(state!.NextAttemptAt, result.RescheduleTime);
         Assert.Equal("job-42", h.JobId.Value);
         Assert.Single(h.Extension.DeliveredEnvelopes);
     }

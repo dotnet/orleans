@@ -588,7 +588,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
                     return;
                 }
 
-                if (result.RetryAtTime is { } retryAt)
+                if (result.RescheduleTime is { } retryAt)
                 {
                     var delay = retryAt - DateTimeOffset.UtcNow;
                     if (delay > TimeSpan.Zero)

@@ -367,7 +367,7 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
             }
 
             var nextAttempt = GetNextAttemptAt();
-            return DurableJobRunResult.RetryAt(nextAttempt <= _timeProvider.GetUtcNow() ? _timeProvider.GetUtcNow() : nextAttempt);
+            return DurableJobRunResult.RescheduleAt(nextAttempt <= _timeProvider.GetUtcNow() ? _timeProvider.GetUtcNow() : nextAttempt);
         }
         finally
         {
