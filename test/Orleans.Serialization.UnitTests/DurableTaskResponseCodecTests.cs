@@ -7,7 +7,6 @@ using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TestKit;
 using System.Distributed.DurableTasks;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Serialization.UnitTests;
 
