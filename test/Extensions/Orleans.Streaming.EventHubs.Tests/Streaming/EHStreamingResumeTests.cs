@@ -70,6 +70,17 @@ namespace ServiceBus.Tests.Streaming
 
         protected override void CheckPreconditionsOrThrow() => TestUtils.CheckForEventHub();
 
+        public override async ValueTask InitializeAsync()
+        {
+            await base.InitializeAsync();
+            if (!PreconditionsMet)
+            {
+                return;
+            }
+
+            await WaitForStreamProviderReadyAsync();
+        }
+
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForEventHub();
