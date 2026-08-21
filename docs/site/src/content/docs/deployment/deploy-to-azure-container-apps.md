@@ -11,7 +11,7 @@ Azure Container Apps can host Orleans, but the topology must preserve Orleans en
 
 To build a cluster from documented Container Apps endpoints, use a virtual-network-integrated internal environment and its private static IP. Deploy each silo as a separate Container App with exactly one replica and assign each app a unique pair of TCP ingress ports on that private IP. Repeat that resource to add silos. You must still complete the production acceptance tests on this page. A single Container App scaled to multiple silo replicas can work in a particular environment, but direct replica addresses aren't part of the documented Container Apps networking contract.
 
-Use the [Deploy and scale an Orleans app on Azure](../quickstarts/deploy-scale-orleans-on-azure.md) quickstart to learn the Azure Developer CLI deployment flow. The maintained [Orleans cluster on Azure Container Apps sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureContainerApps) is also useful for studying a multi-component topology and the external-scaler contract. Review the [sample limitations](#understand-the-maintained-sample) before adapting either resource for production.
+Use the [Deploy and scale an Orleans app on Azure](../quickstarts/deploy-scale-orleans-on-azure.md) quickstart to learn the Azure Developer CLI deployment flow. The [Orleans cluster on Azure Container Apps sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureContainerApps) is also useful for studying a multi-component topology and the external-scaler contract. Review the [sample limitations](#understand-the-sample) before adapting either resource for production.
 
 If the application uses Aspire, the [Aspire deployment flow for Azure Container Apps](https://aspire.dev/deployment/azure/container-apps/) can provision and publish platform resources. It doesn't remove the Orleans endpoint requirements on this page: review the generated topology, keep one replica per advertised silo endpoint, configure external clustering and durable state, and add the required health, identity, upgrade, and capacity controls before production.
 
@@ -199,7 +199,7 @@ Complete these acceptance tests before production and after platform or network 
 
 For the multiple-replica-in-one-app topology, add a blocking test that matches every active Orleans membership endpoint to one Container Apps replica and tests every advertised address from every peer. A successful test establishes evidence for that environment, but it doesn't turn the observed replica IP into a documented Container Apps contract.
 
-## Understand the maintained sample
+## Understand the sample
 
 The [in-repo sample](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureContainerApps), imported from the [original Azure sample](https://github.com/Azure-Samples/Orleans-Cluster-on-Azure-Container-Apps), demonstrates:
 
@@ -212,7 +212,7 @@ The [in-repo sample](https://github.com/dotnet/orleans/tree/main/samples/Deploym
 - Clients that discover individual gateways through Orleans membership rather than using HTTP ingress as an Orleans transport.
 - The external-scaler gRPC service as a study component. It isn't attached to a silo scaling rule because scaling one app to multiple silo replicas would reintroduce the unsupported endpoint assumption.
 
-The maintained sample bounds public grain identities. Its hello grain uses an integer key, the public route accepts only keys from 0 through 255 before calling Orleans, the provider endpoint returns numeric keys, and inactive hello grains have a two-minute collection age. Preserve that bounded-input pattern when adapting the API. A collection age alone doesn't make an unbounded key space safe.
+The sample bounds public grain identities. Its hello grain uses an integer key, the public route accepts only keys from 0 through 255 before calling Orleans, the provider endpoint returns numeric keys, and inactive hello grains have a two-minute collection age. Preserve that bounded-input pattern when adapting the API. A collection age alone doesn't make an unbounded key space safe.
 
 The sample is still an architecture demonstration rather than a production deployment manifest. The registry and storage data endpoints remain public, although they require Microsoft Entra authentication. All runtime apps share one identity. The simple readiness endpoints don't implement application-specific draining, and the workflow updates existing apps in place, which can temporarily overlap revisions that advertise the same endpoint. For production upgrades, use the replacement-app procedure on this page. The one-replica apps don't prove cross-zone or independent failure-domain placement, and the external scaler doesn't make a capacity recommendation.
 

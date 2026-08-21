@@ -13,7 +13,7 @@ Persistence is intentionally a record-oriented abstraction, not an object-relati
 
 ## Choose a provider
 
-Officially maintained providers are available from [NuGet](https://www.nuget.org/packages?q=Orleans+Persistence) and include:
+Official providers are available from [NuGet](https://www.nuget.org/packages?q=Orleans+Persistence) and include:
 
 | Provider | Package | Typical use |
 |---|---|---|

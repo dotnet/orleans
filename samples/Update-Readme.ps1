@@ -12,7 +12,7 @@ $lines = [System.Collections.Generic.List[string]]::new()
 
 $lines.Add('# Orleans Samples')
 $lines.Add('')
-$lines.Add('This directory is the canonical maintained home of the official Orleans samples.')
+$lines.Add('This directory is the canonical home of the official Orleans samples.')
 $lines.Add('')
 $lines.Add('<!-- Generated from gallery.json by Update-Readme.ps1. -->')
 $lines.Add('')

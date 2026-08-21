@@ -7,7 +7,7 @@ ms.topic: tutorial
 
 # Build and recover an Orleans streaming application
 
-This walkthrough uses the maintained [Simple Streaming sample](https://github.com/dotnet/orleans/tree/main/samples/Streaming/Simple) to follow an event from a producer grain to an implicit consumer. You first run with an in-memory provider, then switch to Azure Event Hubs and verify recovery.
+This walkthrough uses the [Simple Streaming sample](https://github.com/dotnet/orleans/tree/main/samples/Streaming/Simple) to follow an event from a producer grain to an implicit consumer. You first run with an in-memory provider, then switch to Azure Event Hubs and verify recovery.
 
 ## Run the local path
 

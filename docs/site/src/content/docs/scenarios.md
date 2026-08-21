@@ -67,7 +67,7 @@ Players, game sessions, rooms, parties, matches, tournaments, and leaderboards h
 
 Use Orleans for authoritative game and social state, matchmaking coordination, presence, progression, and session lifecycle. Real-time simulation, rendering, and other CPU-intensive loops can run in specialized compute services while grains coordinate durable and interactive state.
 
-See the [Adventure game](tutorials-and-samples/adventure.md) explanation and the maintained [Presence Service sample](https://github.com/dotnet/orleans/tree/main/samples/Presence).
+See the [Adventure game](tutorials-and-samples/adventure.md) explanation and the [Presence Service sample](https://github.com/dotnet/orleans/tree/main/samples/Presence).
 
 ### Commerce, reservations, and customer services
 

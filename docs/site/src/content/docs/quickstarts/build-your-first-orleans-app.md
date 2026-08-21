@@ -141,4 +141,4 @@ Stop the silo by pressing <kbd>Ctrl</kbd>+<kbd>C</kbd> in its terminal.
 - [Choose between a co-hosted and external client](../host/client.md)
 - [Configure Orleans for production](../host/configuration-guide/index.md)
 - [Learn more about grain identity](../grains/grain-identity.md)
-- [Browse maintained samples](../tutorials-and-samples/index.md)
+- [Browse samples](../tutorials-and-samples/index.md)

@@ -13,7 +13,7 @@ description: "A canonical shopping cart sample application, built using Microsof
 # Orleans: Shopping Cart App sample
 
 > [!NOTE]
-> This sample is maintained in the [`dotnet/orleans` repository](https://github.com/dotnet/orleans/tree/main/samples/ShoppingCart). It was imported from [`dotnet/samples`](https://github.com/dotnet/samples/tree/main/orleans/ShoppingCart).
+> This sample lives in the [`dotnet/orleans` repository](https://github.com/dotnet/orleans/tree/main/samples/ShoppingCart). It was imported from [`dotnet/samples`](https://github.com/dotnet/samples/tree/main/orleans/ShoppingCart).
 
 A canonical shopping cart sample application, built using Microsoft Orleans. This app shows the following features:
 

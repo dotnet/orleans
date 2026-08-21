@@ -68,4 +68,4 @@ Hello, Hi friend!
 
 - [Build your first Orleans app](../quickstarts/build-your-first-orleans-app.md) using a typical multi-project structure.
 - [Understand Orleans concepts](../overview.md).
-- [Browse maintained samples](index.md).
+- [Browse samples](index.md).

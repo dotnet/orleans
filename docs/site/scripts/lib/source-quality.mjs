@@ -365,7 +365,7 @@ export function validateNavigation({
           'DOCS002',
           page,
           1,
-          'Maintained conceptual page is missing from toc.yml.',
+          'Conceptual page is missing from toc.yml.',
           'Add this page to toc.yml exactly once, or make it an explicit include/snippet support file.',
         ),
       );
@@ -376,7 +376,7 @@ export function validateNavigation({
           tocFile,
           hrefLine(tocSource, page),
           `Navigation target '${page}' appears ${count} times.`,
-          'Keep exactly one toc.yml entry for every maintained conceptual page.',
+          'Keep exactly one toc.yml entry for every conceptual page.',
         ),
       );
     }

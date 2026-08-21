@@ -273,7 +273,7 @@ public class MemoryStorageTests : GrainStorageTestRunner, IClassFixture<MemorySt
 
 ## Contributing
 
-This project is maintained in the [Orleans repository](https://github.com/dotnet/orleans).
+The source for this project is in the [Orleans repository](https://github.com/dotnet/orleans).
 
 ## License
 

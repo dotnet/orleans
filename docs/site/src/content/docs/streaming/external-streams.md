@@ -22,7 +22,7 @@ The built-in Azure Event Hubs provider supports a custom <xref:Orleans.Streaming
 
 Register the adapter with <xref:Orleans.Hosting.EventHubStreamConfiguratorExtensions.UseDataAdapter*>. Configure the same adapter for every silo and Orleans client that uses the provider. A silo needs it to read Event Hubs messages and to publish through Orleans streams; an Orleans client needs it when the client publishes.
 
-The maintained [custom data adapter sample](https://github.com/dotnet/orleans/tree/main/samples/Streaming/CustomDataAdapter) demonstrates an external Event Hubs producer that writes JSON and an Orleans grain that consumes the resulting stream.
+The [custom data adapter sample](https://github.com/dotnet/orleans/tree/main/samples/Streaming/CustomDataAdapter) demonstrates an external Event Hubs producer that writes JSON and an Orleans grain that consumes the resulting stream.
 
 ## Accept events from an external producer
 

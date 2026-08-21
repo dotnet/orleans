@@ -11,7 +11,7 @@ Orleans generates the proxy and request types which implement grain calls. Advan
 
 Use this extension point when a library needs a calling abstraction with explicit semantics beyond <xref:System.Threading.Tasks.Task>, <xref:System.Threading.Tasks.ValueTask>, or <xref:System.Collections.Generic.IAsyncEnumerable`1>. The library owns the abstraction's completion, cancellation, failure, lifetime, allocation, and concurrency contract.
 
-For a complete application, see the custom grain-call return type entry in the [maintained samples catalog](https://github.com/dotnet/orleans/blob/main/samples/README.md).
+For a complete application, see the custom grain-call return type entry in the [samples catalog](https://github.com/dotnet/orleans/blob/main/samples/README.md).
 
 ## Define an awaitable return type
 
