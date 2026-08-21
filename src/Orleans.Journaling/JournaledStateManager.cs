@@ -164,6 +164,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
         var needsRecovery = true;
+        WorkItem? recoveryTrigger = null;
+        Exception? recoveryTriggerException = null;
         while (!_shutdownCancellation.Token.IsCancellationRequested)
         {
             try
@@ -177,6 +179,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                     {
                         await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
                         needsRecovery = false;
+                        CompleteRecoveryTrigger();
                     }
 
                     WorkItem workItem;
@@ -520,10 +523,16 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             }
                         }
 
-                        workItem.SetException(exception);
                         if (IsRecoverySignal(exception))
                         {
+                            Debug.Assert(recoveryTrigger is null);
+                            recoveryTrigger = workItem;
+                            recoveryTriggerException = exception;
                             needsRecovery = true;
+                        }
+                        else
+                        {
+                            workItem.SetException(exception);
                         }
                     }
                     finally
@@ -537,12 +546,32 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                 needsRecovery = true;
                 if (_shutdownCancellation.Token.IsCancellationRequested)
                 {
+                    CompleteRecoveryTrigger();
                     return;
                 }
 
-                FaultQueuedWorkItems(exception);
-                LogErrorProcessingWorkItems(_shared.Logger, exception);
+                try
+                {
+                    FaultQueuedWorkItems(exception);
+                    LogErrorProcessingWorkItems(_shared.Logger, exception);
+                }
+                finally
+                {
+                    CompleteRecoveryTrigger();
+                }
             }
+        }
+
+        void CompleteRecoveryTrigger()
+        {
+            if (recoveryTrigger is not { } trigger)
+            {
+                return;
+            }
+
+            trigger.SetException(recoveryTriggerException!);
+            recoveryTrigger = null;
+            recoveryTriggerException = null;
         }
     }
 
