@@ -207,7 +207,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         if (!_storage.TryGetTask(taskId, out var state))
         {
             return _stateManager.PendingWriteByteCount > 0
-                ? DurableJobRunResult.RetryAt(UtcNow + TimeSpan.FromMilliseconds(10))
+                ? DurableJobRunResult.RescheduleAt(UtcNow + TimeSpan.FromMilliseconds(10))
                 : DurableJobRunResult.Completed;
         }
 
@@ -229,7 +229,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         if (state.DueTime is { } dueTime && dueTime > UtcNow)
         {
-            return DurableJobRunResult.RetryAt(dueTime);
+            return DurableJobRunResult.RescheduleAt(dueTime);
         }
 
         await SetResponseAsync(taskId, DurableTaskResponse.Completed, cancellationToken);
