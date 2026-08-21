@@ -644,7 +644,6 @@ public class StateManagerTests : JournalingTestBase
         second["value"] = 1;
         await sut.Manager.WriteStateAsync(CancellationToken.None);
 
-        Assert.Equal(1, observer.RecoveryStartedCount);
         Assert.Equal(1, observer.RecoveryCompletedCount);
         Assert.Equal(1, observer.WritePreparingCount);
         Assert.Equal(1, observer.WriteStartedCount);
@@ -686,7 +685,6 @@ public class StateManagerTests : JournalingTestBase
         await sut.Manager.RevertPendingChangesAsync(CancellationToken.None);
 
         Assert.Equal(1, value.Value);
-        Assert.Equal(2, observer.RecoveryStartedCount);
         Assert.Equal(2, observer.RecoveryCompletedCount);
         Assert.Equal(2, observer.WriteStartedCount);
         Assert.Equal(1, observer.WriteCompletedCount);
@@ -1614,7 +1612,6 @@ public class StateManagerTests : JournalingTestBase
         public int WritePreparingCount { get; private set; }
         public int WriteStartedCount { get; private set; }
         public int WriteCompletedCount { get; private set; }
-        public int RecoveryStartedCount { get; private set; }
         public int RecoveryCompletedCount { get; private set; }
 
         public ValueTask OnWritePreparingAsync(CancellationToken cancellationToken)
@@ -1636,7 +1633,6 @@ public class StateManagerTests : JournalingTestBase
             WriteCompletedCount++;
         }
 
-        public void OnRecoveryStarted() => RecoveryStartedCount++;
         public void OnRecoveryCompleted() => RecoveryCompletedCount++;
     }
 
@@ -1661,7 +1657,6 @@ public class StateManagerTests : JournalingTestBase
     {
         public void OnWriteStarted() => throw new InvalidOperationException("Expected observer failure.");
         public void OnWriteCompleted() => throw new InvalidOperationException("Expected observer failure.");
-        public void OnRecoveryStarted() => throw new InvalidOperationException("Expected observer failure.");
         public void OnRecoveryCompleted() => throw new InvalidOperationException("Expected observer failure.");
     }
 

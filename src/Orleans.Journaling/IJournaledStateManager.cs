@@ -7,16 +7,6 @@ namespace Orleans.Journaling;
 /// </summary>
 public interface IJournaledStateManager : IAsyncDisposable
 {
-    /// <summary>
-    /// Gets a value indicating whether failed turns can be rolled back to the last durable state.
-    /// </summary>
-    bool SupportsRollback => false;
-
-    /// <summary>
-    /// Gets a value indicating whether durable write and recovery observers can be registered.
-    /// </summary>
-    bool SupportsObservers => false;
-
     /// <inheritdoc/>
     ValueTask IAsyncDisposable.DisposeAsync() => default;
 
