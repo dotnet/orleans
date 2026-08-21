@@ -75,14 +75,19 @@ function Get-SourceLocation {
 
     foreach ($match in [regex]::Matches($StackTrace, '(?m)\s+in\s+(?<path>.+?):line\s+(?<line>\d+)\s*$')) {
         $path = $match.Groups['path'].Value.Replace('\', '/')
-        $repositoryMarker = '/orleans/'
-        $repositoryIndex = $path.LastIndexOf($repositoryMarker, [StringComparison]::OrdinalIgnoreCase)
-        if ($repositoryIndex -ge 0) {
-            $path = $path.Substring($repositoryIndex + $repositoryMarker.Length)
+        $workspacePath = if ($env:GITHUB_WORKSPACE) { $env:GITHUB_WORKSPACE.Replace('\', '/').TrimEnd('/') + '/' } else { $null }
+        if ($workspacePath -and $path.StartsWith($workspacePath, [StringComparison]::OrdinalIgnoreCase)) {
+            $path = $path.Substring($workspacePath.Length)
         } elseif ($path.StartsWith('/_/', [StringComparison]::Ordinal)) {
             $path = $path.Substring(3)
-        } elseif ([IO.Path]::IsPathRooted($path)) {
-            continue
+        } else {
+            $repositoryMarker = '/orleans/'
+            $repositoryIndex = $path.LastIndexOf($repositoryMarker, [StringComparison]::OrdinalIgnoreCase)
+            if ($repositoryIndex -ge 0) {
+                $path = $path.Substring($repositoryIndex + $repositoryMarker.Length)
+            } elseif ([IO.Path]::IsPathRooted($path)) {
+                continue
+            }
         }
 
         $path = $path.TrimStart('.', '/')
