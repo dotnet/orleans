@@ -77,7 +77,8 @@ namespace Orleans.Runtime.Messaging
                     });
 
                 var preamble = await connectionPreambleHelper.Read(this.Context);
-                LogInformationEstablishedConnection(this.Log, preamble.SiloAddress, preamble.NetworkProtocolVersion.ToString());
+                NegotiateProtocolVersion(this.connectionOptions.ProtocolVersion, preamble.NetworkProtocolVersion);
+                LogInformationEstablishedConnection(this.Log, preamble.SiloAddress, NetworkProtocolVersion.ToString());
 
                 if (preamble.ClusterId != myClusterId)
                 {
