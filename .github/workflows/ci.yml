@@ -1128,7 +1128,7 @@ jobs:
         name: coverage_data_${{ matrix.suite }}
         if-no-files-found: error
         retention-days: 1
-        path: "**/*.coverage"
+        path: TestResults/coverage-${{ matrix.suite }}/*.coverage
   coverage-merge:
     name: Merge code coverage
     if: github.event_name == 'pull_request' && needs.test.result == 'success'
@@ -1159,9 +1159,20 @@ jobs:
           --remove-input-files `
           --nologo
 
-        [xml] $coverage = Get-Content -LiteralPath TestResults/coverage.cobertura.xml -Raw
-        if (-not $coverage.SelectSingleNode('//*[local-name()="line"]')) {
-          throw 'Merged coverage report contains no measured lines'
+        $settings = [Xml.XmlReaderSettings]::new()
+        $settings.DtdProcessing = [Xml.DtdProcessing]::Prohibit
+        $settings.XmlResolver = $null
+        $settings.MaxCharactersInDocument = 100MB
+        $reader = [Xml.XmlReader]::Create('TestResults/coverage.cobertura.xml', $settings)
+        try {
+          $coverage = [Xml.XmlDocument]::new()
+          $coverage.XmlResolver = $null
+          $coverage.Load($reader)
+          if (-not $coverage.SelectSingleNode('//*[local-name()="line"]')) {
+            throw 'Merged coverage report contains no measured lines'
+          }
+        } finally {
+          $reader.Dispose()
         }
     - name: Archive coverage
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6

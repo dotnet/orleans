@@ -55,6 +55,7 @@ jobs:
       contents: read
       actions: read
       checks: write
+      issues: write
       pull-requests: write
     runs-on: ubuntu-latest
     steps:

@@ -21,8 +21,32 @@ $solutionPath = Join-Path $resolvedRepositoryRoot 'Orleans.slnx'
 $coverageSettings = Join-Path $resolvedRepositoryRoot '.github/coverage.config.xml'
 $coverageDirectory = Join-Path $resolvedRepositoryRoot "TestResults/coverage-$Suite"
 $filterQuery = "/[(Provider=None)&(Suite=$Suite)&(Area!=CodeGen)]"
+$maximumXmlBytes = 100MB
 
-[xml] $solution = Get-Content -LiteralPath $solutionPath -Raw
+function Read-XmlDocument {
+    param([string] $Path)
+
+    $file = Get-Item -LiteralPath $Path
+    if ($file.Length -gt $maximumXmlBytes) {
+        throw "$Path exceeds the 100 MB parsing limit"
+    }
+
+    $settings = [Xml.XmlReaderSettings]::new()
+    $settings.DtdProcessing = [Xml.DtdProcessing]::Prohibit
+    $settings.XmlResolver = $null
+    $settings.MaxCharactersInDocument = $maximumXmlBytes
+    $reader = [Xml.XmlReader]::Create($file.FullName, $settings)
+    try {
+        $document = [Xml.XmlDocument]::new()
+        $document.XmlResolver = $null
+        $document.Load($reader)
+        return $document
+    } finally {
+        $reader.Dispose()
+    }
+}
+
+$solution = Read-XmlDocument -Path $solutionPath
 $projectPaths = @(
     $solution.SelectNodes('//Project[@Path]') |
         ForEach-Object { $_.GetAttribute('Path') } |
@@ -98,7 +122,7 @@ foreach ($modulePath in $modules) {
     }
 
     $report = $reports[0]
-    [xml] $document = Get-Content -LiteralPath $report.FullName -Raw
+    $document = Read-XmlDocument -Path $report.FullName
     $namespaceManager = [Xml.XmlNamespaceManager]::new($document.NameTable)
     $namespaceManager.AddNamespace('trx', 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010')
     $counters = $document.SelectSingleNode('/trx:TestRun/trx:ResultSummary/trx:Counters', $namespaceManager)
