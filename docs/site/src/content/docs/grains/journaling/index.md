@@ -66,4 +66,3 @@ Choose Journaling when evaluating operation-based persistence for built-in mutab
 - [Redis journal storage](redis-journal-storage.md)
 - [Operate and troubleshoot Journaling](operations.md)
 - [Run the Journaling sample](samples.md)
-
