@@ -19,4 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\EFCore\Orleans.Clustering.EntityFrameworkCore\Orleans.Clustering.EntityFrameworkCore.csproj"/>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Clustering.sql" Pack="true" PackagePath="\" />
+  </ItemGroup>
 </Project>

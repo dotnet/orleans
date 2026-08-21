@@ -18,7 +18,6 @@ internal class EFMembershipTable<TDbContext, TETag> : IMembershipTable where TDb
     private readonly string _clusterId;
     private readonly IDbContextFactory<TDbContext> _dbContextFactory;
     private readonly IEFClusterETagConverter<TETag> _etagConverter;
-    private SiloRecord<TETag>? _self;
 
     public EFMembershipTable(
         ILoggerFactory loggerFactory,
@@ -276,36 +275,26 @@ internal class EFMembershipTable<TDbContext, TETag> : IMembershipTable where TDb
     {
         await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
-        if (this._self is not { } selfRow)
+        try
         {
-            var record = await ctx.Silos.AsNoTracking()
-                .SingleOrDefaultAsync(s =>
+            var updated = await ctx.Silos
+                .Where(s =>
                     s.ClusterId == this._clusterId &&
                     s.Address == entry.SiloAddress.Endpoint.Address.ToString() &&
                     s.Port == entry.SiloAddress.Endpoint.Port &&
                     s.Generation == entry.SiloAddress.Generation)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(s => s.IAmAliveTime, entry.IAmAliveTime))
                 .ConfigureAwait(false);
 
-            if (record is null)
+            if (updated == 0)
             {
                 this._logger.LogWarning((int)ErrorCode.MembershipBase, "Unable to query silo {Silo}", entry.ToFullString());
                 throw new OrleansException($"Unable to query silo {entry.ToFullString()}");
             }
-
-            this._self = selfRow = record;
-        }
-
-        selfRow.IAmAliveTime = entry.IAmAliveTime;
-
-        try
-        {
-            ctx.Silos.Update(selfRow);
-            await ctx.SaveChangesAsync().ConfigureAwait(false);
-            _self = selfRow;
         }
         catch (Exception exc)
         {
-            _self = null;
             this._logger.LogWarning("Unable to update IAmAlive for Silo {Silo}", entry.ToFullString());
             WrappedException.CreateAndRethrow(exc);
             throw;

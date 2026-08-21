@@ -43,8 +43,8 @@ namespace Orleans.Persistence.EntityFrameworkCore.PostgreSQL.Data.Migrations
                         .HasMaxLength(280)
                         .HasColumnType("character varying(280)");
 
-                    b.Property<string>("Data")
-                        .HasColumnType("text");
+                    b.Property<byte[]>("Data")
+                        .HasColumnType("bytea");
 
                     b.Property<Guid>("ETag")
                         .IsConcurrencyToken()

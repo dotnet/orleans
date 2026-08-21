@@ -24,16 +24,19 @@ namespace Orleans.GrainDirectory.EntityFrameworkCore.SqlServer.Data.Migrations
             modelBuilder.Entity("Orleans.GrainDirectory.EntityFrameworkCore.Data.GrainActivationRecord<byte[]>", b =>
                 {
                     b.Property<string>("ClusterId")
-                        .HasColumnType("nvarchar(450)")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)")
                         .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<string>("GrainId")
-                        .HasColumnType("nvarchar(450)")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)")
                         .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<string>("ActivationId")
                         .IsRequired()
-                        .HasColumnType("nvarchar(450)")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
                         .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<byte[]>("ETag")
@@ -47,7 +50,8 @@ namespace Orleans.GrainDirectory.EntityFrameworkCore.SqlServer.Data.Migrations
 
                     b.Property<string>("SiloAddress")
                         .IsRequired()
-                        .HasColumnType("nvarchar(450)")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)")
                         .UseCollation("Latin1_General_100_BIN2");
 
                     b.HasKey("ClusterId", "GrainId")

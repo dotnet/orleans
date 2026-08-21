@@ -1,7 +1,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Hosting;
@@ -70,7 +70,15 @@ public static class EFGrainStorageHostingExtensions
         string name,
         Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : GrainStateDbContext<TDbContext, TETag>
     {
-        services.AddPooledDbContextFactory<TDbContext>(configureDatabase);
+        services.AddKeyedSingleton<IDbContextFactory<TDbContext>>(
+            name,
+            (_, _) =>
+            {
+                var options = new DbContextOptionsBuilder<TDbContext>();
+                configureDatabase(options);
+                return new PooledDbContextFactory<TDbContext>(options.Options);
+            });
+
         return services.AddEntityFrameworkCoreGrainStorage<TDbContext, TETag>(name);
     }
 

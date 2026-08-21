@@ -1,5 +1,6 @@
 using System;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Runtime.Hosting;
@@ -44,9 +45,15 @@ public static class EFGrainDirectoryHostingExtension
         string name,
         Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : GrainDirectoryDbContext<TDbContext, TETag>
     {
-        services
-            .AddPooledDbContextFactory<TDbContext>(configureDatabase)
-            .AddEntityFrameworkCoreGrainDirectory<TDbContext, TETag>(name);
+        services.AddKeyedSingleton<IDbContextFactory<TDbContext>>(
+            name,
+            (_, _) =>
+            {
+                var options = new DbContextOptionsBuilder<TDbContext>();
+                configureDatabase(options);
+                return new PooledDbContextFactory<TDbContext>(options.Options);
+            });
+        services.AddEntityFrameworkCoreGrainDirectory<TDbContext, TETag>(name);
 
         return services;
     }
@@ -55,6 +62,15 @@ public static class EFGrainDirectoryHostingExtension
         this IServiceCollection services,
         string name) where TDbContext : GrainDirectoryDbContext<TDbContext, TETag>
     {
-        return services.AddGrainDirectory(name, (sp, _) => ActivatorUtilities.CreateInstance<EFCoreGrainDirectory<TDbContext, TETag>>(sp));
+        return services.AddGrainDirectory(name, Create);
+
+        static EFCoreGrainDirectory<TDbContext, TETag> Create(IServiceProvider services, string name)
+        {
+            var dbContextFactory = services.GetKeyedService<IDbContextFactory<TDbContext>>(name)
+                ?? services.GetRequiredService<IDbContextFactory<TDbContext>>();
+            return ActivatorUtilities.CreateInstance<EFCoreGrainDirectory<TDbContext, TETag>>(
+                services,
+                dbContextFactory);
+        }
     }
 }

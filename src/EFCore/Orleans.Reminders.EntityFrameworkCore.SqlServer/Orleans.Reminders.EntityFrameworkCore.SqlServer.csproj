@@ -30,4 +30,7 @@
     <ProjectReference Include="$(SourceRoot)src\EFCore\Orleans.Reminders.EntityFrameworkCore\Orleans.Reminders.EntityFrameworkCore.csproj"/>
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="Reminders.sql" Pack="true" PackagePath="\" />
+  </ItemGroup>
 </Project>

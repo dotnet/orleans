@@ -19,6 +19,7 @@ using Orleans.Reminders.EntityFrameworkCore;
 using Orleans.Reminders.EntityFrameworkCore.MySql.Data;
 using Orleans.Reminders.EntityFrameworkCore.PostgreSQL.Data;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Storage;
 using TestExtensions;
 
@@ -141,6 +142,7 @@ public sealed class EFCoreHostingExtensionsTests
             .UseOrleans(builder =>
             {
                 RegisterGrainStateFactory(builder.Services, provider, GetDatabaseConfiguration(provider));
+                RegisterStorageSerializer(builder.Services);
 
                 var servicesResult = AddGrainStorage(builder.Services, provider, serviceName);
                 var builderResult = AddGrainStorage(
@@ -162,6 +164,46 @@ public sealed class EFCoreHostingExtensionsTests
         Assert.IsType<GuidGrainStorageETagConverter>(
             host.Services.GetRequiredService<IEFGrainStorageETagConverter<Guid>>());
         AssertGrainStateFactoryRegistered(host.Services, provider);
+    }
+
+    [Theory]
+    [InlineData(GuidProvider.MySql)]
+    [InlineData(GuidProvider.PostgreSql)]
+    public async Task ConfiguredNamedProviders_UseIsolatedDbContextFactories(GuidProvider provider)
+    {
+        const string firstStorage = "first-storage";
+        const string secondStorage = "second-storage";
+        const string firstDirectory = "first-directory";
+        const string secondDirectory = "second-directory";
+        using var host = new HostBuilder()
+            .UseOrleans(builder =>
+            {
+                RegisterStorageSerializer(builder.Services);
+                AddGrainStorage(builder, provider, firstStorage, GetDatabaseConfiguration(provider, "storage_one"));
+                AddGrainStorage(builder, provider, secondStorage, GetDatabaseConfiguration(provider, "storage_two"));
+                AddGrainDirectory(builder, provider, firstDirectory, GetDatabaseConfiguration(provider, "directory_one"));
+                AddGrainDirectory(builder, provider, secondDirectory, GetDatabaseConfiguration(provider, "directory_two"));
+            })
+            .Build();
+
+        if (provider is GuidProvider.MySql)
+        {
+            Assert.Equal(
+                ["storage_one", "storage_two"],
+                await GetDatabaseNames<MySqlGrainStateDbContext>(host.Services, firstStorage, secondStorage));
+            Assert.Equal(
+                ["directory_one", "directory_two"],
+                await GetDatabaseNames<MySqlGrainDirectoryDbContext>(host.Services, firstDirectory, secondDirectory));
+        }
+        else
+        {
+            Assert.Equal(
+                ["storage_one", "storage_two"],
+                await GetDatabaseNames<PostgreSqlGrainStateDbContext>(host.Services, firstStorage, secondStorage));
+            Assert.Equal(
+                ["directory_one", "directory_two"],
+                await GetDatabaseNames<PostgreSqlGrainDirectoryDbContext>(host.Services, firstDirectory, secondDirectory));
+        }
     }
 
     [Theory]
@@ -190,7 +232,9 @@ public sealed class EFCoreHostingExtensionsTests
         AssertReminderFactoryRegistered(host.Services, provider);
     }
 
-    private static Action<DbContextOptionsBuilder> GetDatabaseConfiguration(GuidProvider provider) =>
+    private static Action<DbContextOptionsBuilder> GetDatabaseConfiguration(
+        GuidProvider provider,
+        string databaseName = "hosting") =>
         options =>
         {
             var database = provider is GuidProvider.MySql
@@ -199,8 +243,34 @@ public sealed class EFCoreHostingExtensionsTests
             var connectionString = provider is GuidProvider.MySql
                 ? "Server=localhost;Database=hosting;User ID=test;Password=test"
                 : "Host=localhost;Database=hosting;Username=test;Password=test";
-            database.ConfigureOptions(options, connectionString, typeof(EFCoreHostingExtensionsTests).Assembly.GetName().Name!);
+            database.ConfigureOptions(
+                options,
+                database.WithDatabase(connectionString, databaseName),
+                typeof(EFCoreHostingExtensionsTests).Assembly.GetName().Name!);
         };
+
+    private static async Task<string[]> GetDatabaseNames<TDbContext>(
+        IServiceProvider services,
+        params string[] names)
+        where TDbContext : DbContext
+    {
+        var result = new string[names.Length];
+        for (var i = 0; i < names.Length; i++)
+        {
+            await using var context = await services
+                .GetRequiredKeyedService<IDbContextFactory<TDbContext>>(names[i])
+                .CreateDbContextAsync();
+            result[i] = context.Database.GetDbConnection().Database;
+        }
+
+        return result;
+    }
+
+    private static void RegisterStorageSerializer(IServiceCollection services) =>
+        services.AddSingleton<IGrainStorageSerializer>(
+            new SystemTextJsonGrainStorageSerializer(
+                Microsoft.Extensions.Options.Options.Create(
+                    new SystemTextJsonGrainStorageSerializerOptions())));
 
     private static ISiloBuilder UseClustering(
         ISiloBuilder builder,
