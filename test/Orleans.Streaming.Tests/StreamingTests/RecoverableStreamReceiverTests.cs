@@ -171,6 +171,37 @@ public sealed class RecoverableStreamReceiverTests
     }
 
     [Fact]
+    public void Cache_DisposeDrainsMessagesReturnsBuffersAndAllocatesFreshBufferIfReused()
+    {
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var bufferPool = new TrackingBufferPool();
+        var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
+            100,
+            bufferPool,
+            new TestDataAdapter(),
+            new ChronologicalEvictionStrategy(
+                NullLogger.Instance,
+                new TimePurgePredicate(TimeSpan.MaxValue, TimeSpan.MaxValue),
+                cacheMonitor: null,
+                monitorWriteInterval: null),
+            NullLogger.Instance);
+        _ = cache.Add([new TestQueueMessage(streamId, 11, "payload")], DateTime.UnixEpoch);
+
+        cache.Dispose();
+
+        Assert.Equal(0, cache.ItemCount);
+        Assert.Equal(1, bufferPool.AllocateCount);
+        Assert.Equal(1, bufferPool.FreeCount);
+
+        _ = cache.Add([new TestQueueMessage(streamId, 12, "next")], DateTime.UnixEpoch);
+
+        Assert.Equal(1, cache.ItemCount);
+        Assert.Equal(2, bufferPool.AllocateCount);
+        cache.Dispose();
+        Assert.Equal(2, bufferPool.FreeCount);
+    }
+
+    [Fact]
     public void Cache_AddsRawRecordsInOrderAndDecodesLazily()
     {
         var streamA = StreamId.Create("namespace", Guid.NewGuid());
@@ -504,9 +535,15 @@ public sealed class RecoverableStreamReceiverTests
 
     private sealed class TrackingBufferPool : IObjectPool<FixedSizeBuffer>
     {
+        public int AllocateCount { get; private set; }
+
         public int FreeCount { get; private set; }
 
-        public FixedSizeBuffer Allocate() => new(4 * 1024) { Pool = this };
+        public FixedSizeBuffer Allocate()
+        {
+            AllocateCount++;
+            return new(4 * 1024) { Pool = this };
+        }
 
         public void Free(FixedSizeBuffer resource)
         {
