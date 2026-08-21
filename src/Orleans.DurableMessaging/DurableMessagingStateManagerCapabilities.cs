@@ -4,18 +4,17 @@ namespace Orleans.DurableMessaging;
 
 internal static class DurableMessagingStateManagerCapabilities
 {
-    public static void Validate(IJournaledStateManager stateManager)
+    public static void RegisterObserver(IJournaledStateManager stateManager, IJournaledStateObserver observer)
     {
-        if (!stateManager.SupportsRollback)
+        try
         {
-            throw new InvalidOperationException(
-                "Durable messaging requires an IJournaledStateManager implementation with rollback support.");
+            stateManager.RegisterObserver(observer);
         }
-
-        if (!stateManager.SupportsObservers)
+        catch (NotSupportedException exception)
         {
             throw new InvalidOperationException(
-                "Durable messaging requires IJournaledStateManager observer support: SupportsObservers must be true so IJournaledStateManager.RegisterObserver can be used.");
+                "Durable messaging requires IJournaledStateManager observer support through IJournaledStateManager.RegisterObserver.",
+                exception);
         }
     }
 }
