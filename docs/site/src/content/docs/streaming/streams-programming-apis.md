@@ -103,11 +103,11 @@ Clients can produce and explicitly consume streams after the provider is configu
 
 ## Stateless worker grains
 
-Grains marked with <xref:Orleans.Concurrency.StatelessWorkerAttribute> can publish and consume streams. A stateless worker stream consumer implements <xref:Orleans.Streams.Core.IStreamSubscriptionObserver>. Orleans installs a separate stream consumer extension on every activation and calls `OnSubscribed` when a selected activation first receives a delivery for a subscription. The grain calls `ResumeAsync` from that callback to attach the activation's observer.
+Grains marked with <xref:Orleans.Concurrency.StatelessWorkerAttribute> can publish and consume streams. A stateless worker stream consumer implements <xref:Orleans.Streams.Core.IStreamSubscriptionObserver>. Orleans installs a separate stream consumer extension on every activation. A delivery uses the activation's existing observer for its subscription. When no observer is attached, Orleans calls `OnSubscribed`, and the grain calls `ResumeAsync` from that callback to attach one.
 
 The subscription belongs to the stateless worker grain identity. For persistent streams, each pulling agent delivers through that identity from its silo, and normal stateless-worker placement selects one local activation for each delivery attempt. Concurrent pulling agents can therefore process items on different activations and silos. Each delivery attempt runs on one activation, providing competing-consumer execution for stateless transformations such as decoding, validation, enrichment, filtering, and forwarding.
 
-Implicit subscriptions establish the grain-level subscription from grain metadata. Explicit `SubscribeAsync` calls establish the grain-level subscription at runtime; later activations attach their local observers through `OnSubscribed`, and `UnsubscribeAsync` removes that grain-level subscription.
+Implicit subscriptions establish the grain-level subscription from grain metadata. Explicit `SubscribeAsync` calls establish the grain-level subscription at runtime and attach the calling activation's observer. A later activation attaches its local observer through `OnSubscribed` when a delivery first reaches it, and `UnsubscribeAsync` removes the grain-level subscription.
 
 Ordering is scoped to the selected activation and provider delivery path. Concurrent deliveries can complete in any order across activations. A provider retry can select a different activation, so handlers use stateless or idempotent processing and follow the provider's delivery guarantee. A stateless worker which subscribes without implementing <xref:Orleans.Streams.Core.IStreamSubscriptionObserver> receives an <xref:System.InvalidOperationException>.
 
