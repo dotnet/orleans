@@ -81,9 +81,9 @@ internal sealed class DurableTaskMessageTransport(
         // pre-empt the more specific ArgumentException below, since WithBody() executes eagerly.
         var correlationKey = taskId.ToHierarchicalKey() ?? throw new ArgumentException("The task id must not be empty.", nameof(taskId));
         var builder = new DurableEnvelopeBuilder(sessionPool, sender)
-        .To(target, route)
-        .WithCorrelationKey(correlationKey)
-        .WithBody(body);
+            .To(target, route)
+            .WithCorrelationKey(correlationKey)
+            .WithBody(body);
 
         if (replyTo is { } address)
         {
