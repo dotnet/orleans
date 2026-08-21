@@ -33,12 +33,10 @@ public abstract class StreamingResumeTests : TestClusterPerTest
         var managementGrain = this.Client.GetGrain<IManagementGrain>(0);
         var activeSilos = this.HostedCluster.GetActiveSilos().ToArray();
         var expectedSiloCount = activeSilos.Length;
-        var providerQueueCounts = activeSilos
-            .Select(silo => this.HostedCluster.GetSiloServiceProvider(silo.SiloAddress)
-                .GetRequiredKeyedService<IQueueAdapterFactory>(StreamProviderName)
-                .GetStreamQueueMapper()
-                .GetAllQueues()
-                .Count())
+        var providerQueueCounts = (await Task.WhenAll(activeSilos.Select(
+            silo => GetProviderQueueCountAsync(
+                this.HostedCluster.GetSiloServiceProvider(silo.SiloAddress),
+                StreamProviderName))))
             .Distinct()
             .ToArray();
         var expectedQueueCount = Assert.Single(providerQueueCounts);
@@ -80,6 +78,13 @@ public abstract class StreamingResumeTests : TestClusterPerTest
             },
             WaitTimeout,
             delayOnFail: PollInterval);
+    }
+
+    internal static async Task<int> GetProviderQueueCountAsync(IServiceProvider services, string streamProviderName)
+    {
+        var adapterFactory = services.GetRequiredKeyedService<IQueueAdapterFactory>(streamProviderName);
+        await adapterFactory.CreateAdapter(CancellationToken.None);
+        return adapterFactory.GetStreamQueueMapper().GetAllQueues().Count();
     }
 
     [Fact]
