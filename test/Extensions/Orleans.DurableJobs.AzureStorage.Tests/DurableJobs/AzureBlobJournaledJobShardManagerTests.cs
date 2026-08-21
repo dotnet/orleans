@@ -54,7 +54,7 @@ public sealed class AzureBlobJournaledJobShardManagerTestFixture : IJobShardMana
     {
         return TestDefaultConfiguration.UseAadAuthentication
             ? new BlobContainerClient(new Uri(TestDefaultConfiguration.DataBlobUri, containerName), TestDefaultConfiguration.TokenCredential)
-            : new BlobContainerClient(TestDefaultConfiguration.DataConnectionString, containerName);
+            : new BlobContainerClient(TestDefaultConfiguration.AzureStorageConnectionString, containerName);
     }
 
     private sealed class AzureBlobJournaledJobShardManagerTestScope(
