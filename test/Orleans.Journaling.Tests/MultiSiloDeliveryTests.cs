@@ -263,7 +263,7 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
         public InProcessTestCluster HostedCluster { get; private set; } = null!;
         public IClusterClient Client => HostedCluster.Client;
 
-        public async Task InitializeAsync()
+        public async ValueTask InitializeAsync()
         {
             var builder = new InProcessTestClusterBuilder();
             
@@ -293,7 +293,7 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
             await HostedCluster.DeployAsync();
         }
 
-        public async Task DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             if (HostedCluster != null)
             {
