@@ -14,6 +14,7 @@ using Orleans.Configuration;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime.Placement;
+using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Session;
 
@@ -57,9 +58,13 @@ namespace Orleans.Runtime
         /// <param name="address">The grain address.</param>
         /// <returns>The grain context.</returns>
         public IGrainContext CreateInstance(GrainAddress address)
-            => CreateInstance(address, deferActivation: false);
+        {
+            var preparedContext = CreatePreparedContext(address);
+            using var lease = preparedContext.Start();
+            return preparedContext.Context;
+        }
 
-        internal IGrainContext CreateInstance(GrainAddress address, bool deferActivation)
+        internal PreparedGrainContext CreatePreparedContext(GrainAddress address)
         {
             var grainId = address.GrainId;
             if (!_activators.TryGetValue(grainId.Type, out var activator))
@@ -67,12 +72,9 @@ namespace Orleans.Runtime
                 activator = this.CreateActivator(grainId.Type);
             }
 
-            if (deferActivation && activator.Activator is IDeferredGrainContextActivator deferredActivator)
-            {
-                return deferredActivator.CreateDeferredContext(address, activator.ConfigureActions);
-            }
-
-            return activator.Activator.CreateContext(address, activator.ConfigureActions);
+            return activator.Activator is IPreparedGrainContextActivator preparedActivator
+                ? preparedActivator.CreatePreparedContext(address, activator.ConfigureActions)
+                : new(activator.Activator.CreateContext(address, activator.ConfigureActions), startup: null);
         }
 
         private (IGrainContextActivator, IConfigureGrainContext[]) CreateActivator(GrainType grainType)
@@ -139,12 +141,48 @@ namespace Orleans.Runtime
         /// <param name="address">The grain address.</param>
         /// <param name="configureActions">The actions which must be used to configure the context before grain construction begins.</param>
         /// <returns>The newly created grain context.</returns>
+        /// <remarks>
+        /// Use <see cref="GrainContextActivator.CreateInstance(GrainAddress)"/> to create and start a context.
+        /// This method only performs activator-specific context creation. Custom activators remain responsible
+        /// for any custom startup behavior which their context requires.
+        /// </remarks>
         public IGrainContext CreateContext(GrainAddress address, IConfigureGrainContext[] configureActions);
     }
 
-    internal interface IDeferredGrainContextActivator : IGrainContextActivator
+    internal interface IPreparedGrainContextActivator : IGrainContextActivator
     {
-        IGrainContext CreateDeferredContext(GrainAddress address, IConfigureGrainContext[] configureActions);
+        PreparedGrainContext CreatePreparedContext(
+            GrainAddress address,
+            IConfigureGrainContext[] configureActions);
+    }
+
+    internal readonly struct PreparedGrainContext(IGrainContext context, IGrainContextStartup? startup)
+    {
+        private readonly IGrainContext? _context = context;
+        private readonly IGrainContextStartup? _startup = startup;
+
+        public IGrainContext Context
+            => _context ?? throw new InvalidOperationException("The grain context activation is not initialized.");
+
+        public IDisposable Start() => _startup?.Start() ?? NoopDisposable.Instance;
+
+        public void Abort() => _startup?.Abort();
+
+        private sealed class NoopDisposable : IDisposable
+        {
+            public static NoopDisposable Instance { get; } = new();
+
+            public void Dispose()
+            {
+            }
+        }
+    }
+
+    internal interface IGrainContextStartup
+    {
+        IDisposable Start();
+
+        void Abort();
     }
 
     /// <summary>
