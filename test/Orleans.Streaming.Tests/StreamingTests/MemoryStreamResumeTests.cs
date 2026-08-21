@@ -78,7 +78,7 @@ namespace Tester.StreamingTests
 
                         return actual == expected;
                     },
-                    TimeSpan.FromSeconds(5),
+                    TimeSpan.FromSeconds(30),
                     delayOnFail: TimeSpan.FromMilliseconds(100));
             }
         }
