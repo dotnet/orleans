@@ -80,6 +80,27 @@ public class SiloConnectionAuthenticationContractsTests
         Assert.Null(nonExpiring.ExpiresAt);
         Assert.NotEqual(finite, nonExpiring);
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Token_ToString_RedactsValue(bool hasExpiration)
+    {
+        const string tokenValue = "secret-bearer-token";
+        DateTimeOffset? expiration = hasExpiration
+            ? new DateTimeOffset(2032, 8, 9, 10, 11, 12, TimeSpan.Zero)
+            : null;
+        var token = new SiloConnectionToken(tokenValue, expiration);
+
+        var result = token.ToString();
+
+        Assert.DoesNotContain(tokenValue, result, StringComparison.Ordinal);
+        Assert.Equal(
+            hasExpiration
+                ? "SiloConnectionToken { Value = [REDACTED], ExpiresAt = 2032-08-09T10:11:12.0000000+00:00 }"
+                : "SiloConnectionToken { Value = [REDACTED], ExpiresAt = null }",
+            result);
+    }
 }
 
 [TestCategory("BVT")]

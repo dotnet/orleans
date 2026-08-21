@@ -76,7 +76,15 @@ public enum SiloConnectionAuthenticationFailure
 /// </summary>
 /// <param name="Value">The token value.</param>
 /// <param name="ExpiresAt">The token expiration time.</param>
-public readonly record struct SiloConnectionToken(string Value, DateTimeOffset? ExpiresAt);
+public readonly record struct SiloConnectionToken(string Value, DateTimeOffset? ExpiresAt)
+{
+    /// <inheritdoc />
+    public override string ToString()
+    {
+        var expiration = ExpiresAt?.ToString("O", System.Globalization.CultureInfo.InvariantCulture) ?? "null";
+        return $"{nameof(SiloConnectionToken)} {{ Value = [REDACTED], ExpiresAt = {expiration} }}";
+    }
+}
 
 /// <summary>
 /// Supplies bearer tokens for outbound Orleans connections.
