@@ -2,7 +2,6 @@ using Orleans.EventSourcing.CustomStorage;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using OrleansEventSourcing.CustomStorage;
 using UnitTests.GrainInterfaces;
 
 namespace TestGrains
@@ -137,79 +136,81 @@ namespace TestGrains
 
     // use the explicitly specified "CustomStorage" log-consistency provider with a separate ICustomStorageInterface implementation
     [LogConsistencyProvider(ProviderName = "CustomStorage")]
+    [CustomStorageProvider(ProviderName = "SeparateCustomStorage")]
     public class LogTestGrainSeparateCustomStorage : LogTestGrain
     {
-        public class SeparateCustomStorageFactory : ICustomStorageFactory
+    }
+
+    public sealed class SeparateCustomStorageFactory : ICustomStorageFactory
+    {
+        private readonly DeepCopier deepCopier;
+
+        public SeparateCustomStorageFactory(DeepCopier deepCopier)
         {
-            private readonly DeepCopier deepCopier;
-
-            public SeparateCustomStorageFactory(DeepCopier deepCopier)
-            {
-                this.deepCopier = deepCopier;
-            }
-
-            public ICustomStorageInterface<TState, TDelta> CreateCustomStorage<TState, TDelta>(GrainId grainId)
-            {
-                return new SeparateCustomStorage<TState, TDelta>(deepCopier);
-            }
+            this.deepCopier = deepCopier;
         }
 
-        public class SeparateCustomStorage<TState, TDelta> : ICustomStorageInterface<TState, TDelta>
+        public ICustomStorageInterface<TState, TDelta> CreateCustomStorage<TState, TDelta>(GrainId grainId)
         {
-            private readonly DeepCopier copier;
+            return new SeparateCustomStorage<TState, TDelta>(deepCopier);
+        }
+    }
 
-            // we use fake in-memory state as the storage
-            private TState? state;
-            private int version;
+    public sealed class SeparateCustomStorage<TState, TDelta> : ICustomStorageInterface<TState, TDelta>
+    {
+        private readonly DeepCopier copier;
 
-            public SeparateCustomStorage(DeepCopier copier)
+        // We use fake in-memory state as the storage.
+        private TState? state;
+        private int version;
+
+        public SeparateCustomStorage(DeepCopier copier)
+        {
+            this.copier = copier;
+        }
+
+        public Task<KeyValuePair<int, TState>> ReadStateFromStorage()
+        {
+            if (state == null)
             {
-                this.copier = copier;
-            }
-
-            public Task<KeyValuePair<int, TState>> ReadStateFromStorage()
-            {
-                if (state == null)
-                {
-                    state = Activator.CreateInstance<TState>();
-                    version = 0;
-                }
-                return Task.FromResult(new KeyValuePair<int, TState>(version, this.copier.Copy(state)!));
-            }
-
-            public Task<bool> ApplyUpdatesToStorage(IReadOnlyList<TDelta> updates, int expectedversion)
-            {
-                if (state == null)
-                {
-                    state = Activator.CreateInstance<TState>();
-                    version = 0;
-                }
-
-                if (expectedversion != version)
-                    return Task.FromResult(false);
-
-                foreach (var u in updates)
-                {
-                    this.TransitionState(state, u);
-                    version++;
-                }
-
-                return Task.FromResult(true);
-            }
-
-            public Task ClearStoredState()
-            {
-                state = default;
+                state = Activator.CreateInstance<TState>();
                 version = 0;
-                return Task.CompletedTask;
+            }
+            return Task.FromResult(new KeyValuePair<int, TState>(version, this.copier.Copy(state)!));
+        }
+
+        public Task<bool> ApplyUpdatesToStorage(IReadOnlyList<TDelta> updates, int expectedVersion)
+        {
+            if (state == null)
+            {
+                state = Activator.CreateInstance<TState>();
+                version = 0;
             }
 
-            protected virtual void TransitionState(TState state, object @event)
+            if (expectedVersion != version)
+                return Task.FromResult(false);
+
+            foreach (var update in updates)
             {
-                dynamic s = state;
-                dynamic e = @event;
-                s.Apply(e);
+                TransitionState(state, update);
+                version++;
             }
+
+            return Task.FromResult(true);
+        }
+
+        public Task ClearStoredState()
+        {
+            state = default;
+            version = 0;
+            return Task.CompletedTask;
+        }
+
+        private static void TransitionState(TState state, TDelta @event)
+        {
+            dynamic dynamicState = state!;
+            dynamic dynamicEvent = @event!;
+            dynamicState.Apply(dynamicEvent);
         }
     }
 

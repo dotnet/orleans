@@ -3,22 +3,21 @@ using Orleans.Configuration;
 using System;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
-using OrleansEventSourcing.CustomStorage;
 
 namespace Orleans.EventSourcing.CustomStorage
 {
     /// <summary>
     /// A log-consistency provider that relies on grain-specific custom code for
     /// reading states from storage, and appending deltas to storage.
-    /// Grains that wish to use this provider must implement the <see cref="ICustomStorageInterface{TState, TDelta}"/>
-    /// interface, to define how state is read and how deltas are written.
+    /// The storage implementation is supplied by the grain through <see cref="ICustomStorageInterface{TState, TDelta}"/>
+    /// or created by a registered <see cref="ICustomStorageFactory"/>.
     /// The configured primary cluster identifier is passed to each custom-storage adaptor.
     /// Custom-storage adaptors accept submissions from every cluster.
     /// </summary>
     public class LogConsistencyProvider : ILogViewAdaptorFactory
     {
         private readonly CustomStorageLogConsistencyOptions options;
-        private readonly IServiceProvider serviceProvider;
+        private readonly IServiceProvider? serviceProvider;
 
         /// <summary>
         /// Gets the cluster identifier passed to each custom-storage adaptor.
@@ -32,8 +31,17 @@ namespace Orleans.EventSourcing.CustomStorage
         /// Initializes a new instance of the <see cref="LogConsistencyProvider"/> class.
         /// </summary>
         /// <param name="options">The provider configuration.</param>
+        public LogConsistencyProvider(CustomStorageLogConsistencyOptions options)
+            : this(options, null)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="LogConsistencyProvider"/> class.
+        /// </summary>
+        /// <param name="options">The provider configuration.</param>
         /// <param name="serviceProvider">The service provider used to resolve custom storage implementations.</param>
-        public LogConsistencyProvider(CustomStorageLogConsistencyOptions options, IServiceProvider serviceProvider)
+        public LogConsistencyProvider(CustomStorageLogConsistencyOptions options, IServiceProvider? serviceProvider)
         {
             this.options = options;
             this.serviceProvider = serviceProvider;
