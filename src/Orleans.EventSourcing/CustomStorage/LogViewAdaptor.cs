@@ -10,7 +10,6 @@ namespace Orleans.EventSourcing.CustomStorage
 {
     /// <summary>
     /// A log consistency adaptor that uses the user-provided storage interface <see cref="ICustomStorageInterface{T,E}"/>.
-    /// This interface must be implemented by any grain that uses this log view adaptor.
     /// </summary>
     /// <typeparam name="TLogView">log view type</typeparam>
     /// <typeparam name="TLogEntry">log entry type</typeparam>
