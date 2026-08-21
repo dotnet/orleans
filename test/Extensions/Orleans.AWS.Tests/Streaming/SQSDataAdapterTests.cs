@@ -21,6 +21,9 @@ namespace AWSUtils.Tests.Streaming;
 
 [TestCategory("AWS"), TestCategory("SQS")]
 [Collection(TestEnvironmentFixture.DefaultCollection)]
+[TestSuite("Functional")]
+[TestProvider("SQS")]
+[TestArea("Streaming")]
 public class SQSDataAdapterTests : IAsyncLifetime
 {
     private readonly ITestOutputHelper output;
