@@ -17,7 +17,9 @@ The reminder service is a grain service attached to the consistent ring. Ownersh
 
 ## Refresh and reconciliation
 
-After the reminder table starts successfully, the service refreshes the ring range periodically. Reads are staggered and retried during initialization. Each refresh reads the range, compares the table sequence with local mutations, starts or updates entries which are now owned, and stops entries which disappeared or moved elsewhere. A local sequence prevents a concurrent registration or removal from being overwritten by an older refresh result.
+After the reminder table starts successfully, the service refreshes the ring range periodically. Reads are staggered and retried during initialization. Each refresh reads the range, compares the table sequence with local mutations, starts or updates owned entries whose next tick is within <xref:Orleans.Hosting.ReminderOptions.ReminderLoadingWindow>, and stops entries which disappeared, moved elsewhere, or no longer fall within the loading window. A local sequence prevents a concurrent registration or removal from being overwritten by an older refresh result.
+
+The reminder table contract returns every row in the owner's consistent-hash range. A refresh therefore transfers and materializes all owned rows before applying the loading window. Resident schedules scale with reminders due within the window, while refresh I/O, deserialization, and peak allocations scale with all reminders owned by the silo.
 
 Reminder ownership uses periodic reconciliation. A brief ownership overlap during membership convergence is possible; ETags, responsibility checks, and the service's delivery state converge the overlap toward the current owner.
 
