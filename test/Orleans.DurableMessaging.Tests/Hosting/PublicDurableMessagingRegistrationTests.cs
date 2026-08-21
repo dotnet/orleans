@@ -9,7 +9,9 @@ using Xunit;
 
 namespace Orleans.DurableMessaging.Tests.Hosting;
 
-[TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableMessaging")]
 public sealed class PublicDurableMessagingRegistrationTests
 {
     [Fact]
