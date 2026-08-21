@@ -395,41 +395,49 @@ internal sealed partial class DurableInboxExtension :
         var hasStableOwnership = DurableMessagingJobOwnership.TryGetOwnershipId(
             context.Job,
             out var ownershipId);
-        if (!string.Equals(_jobId.Value, ownershipId, StringComparison.Ordinal))
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        try
         {
-            if (!hasStableOwnership)
+            if (!string.Equals(_jobId.Value, ownershipId, StringComparison.Ordinal))
             {
-                return DurableJobRunResult.Completed;
+                if (!hasStableOwnership)
+                {
+                    return DurableJobRunResult.Completed;
+                }
+
+                var disposition = DurableMessagingJobOwnership.ResolveMismatch(
+                    _recoveryCompleted,
+                    !string.IsNullOrEmpty(_jobId.Value),
+                    DurableMessagingJobOwnership.IsCompleted(_completedJobId.Value, ownershipId),
+                    _inboxDict.Count > 0);
+                if (disposition == OwnershipMismatchDisposition.ReclaimOrphan)
+                {
+                    LogOrphanedJobReclaimed(_logger, ownershipId, _grainContext.GrainId);
+                    _instruments.OnOrphanedJobReclaimed(_grainContext.GrainId.Type.ToString(), JobName);
+                    return DurableJobRunResult.Completed;
+                }
+
+                if (disposition == OwnershipMismatchDisposition.CompleteStale)
+                {
+                    return DurableJobRunResult.Completed;
+                }
+
+                return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
             }
 
-            var disposition = DurableMessagingJobOwnership.ResolveMismatch(
-                _recoveryCompleted,
-                !string.IsNullOrEmpty(_jobId.Value),
-                DurableMessagingJobOwnership.IsCompleted(_completedJobId.Value, ownershipId),
-                _inboxDict.Count > 0);
-            if (disposition == OwnershipMismatchDisposition.ReclaimOrphan)
+            if (!_recoveryCompleted)
             {
-                LogOrphanedJobReclaimed(_logger, ownershipId, _grainContext.GrainId);
-                _instruments.OnOrphanedJobReclaimed(_grainContext.GrainId.Type.ToString(), JobName);
-                return DurableJobRunResult.Completed;
+                return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
             }
 
-            if (disposition == OwnershipMismatchDisposition.CompleteStale)
+            if (_localDrainJobIds.Contains(ownershipId))
             {
-                return DurableJobRunResult.Completed;
+                return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
             }
-
-            return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
         }
-
-        if (!_recoveryCompleted)
+        finally
         {
-            return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
-        }
-
-        if (_localDrainJobIds.Contains(ownershipId))
-        {
-            return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
+            _gate.Release();
         }
 
         var key = new DurableMessagingPumpExecutionKey(JobName, context.Job.Id, context.RunId);

@@ -12,6 +12,8 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
     private readonly ConcurrentDictionary<JournalId, WritePlan> _readPlans = new();
     private readonly ConcurrentDictionary<JournalId, WritePlan> _writePlans = new();
     private readonly ConcurrentDictionary<JournalId, int> _successfulWrites = new();
+    private readonly object _writeCountLock = new();
+    private TaskCompletionSource _writeCountChanged = CreateSignal();
 
     public IJournalStorage CreateStorage(JournalId journalId) =>
         new ControlledJournalStorage(this, journalId, _inner.CreateStorage(journalId));
@@ -57,6 +59,38 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
     public int GetSuccessfulWriteCount(JournalId journalId) =>
         _successfulWrites.TryGetValue(journalId, out var count) ? count : 0;
 
+    public async Task WaitForSuccessfulWriteCountAsync(
+        JournalId journalId,
+        int expected,
+        CancellationToken cancellationToken = default)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        try
+        {
+            while (GetSuccessfulWriteCount(journalId) < expected)
+            {
+                Task changed;
+                lock (_writeCountLock)
+                {
+                    if (GetSuccessfulWriteCount(journalId) >= expected)
+                    {
+                        return;
+                    }
+
+                    changed = _writeCountChanged.Task;
+                }
+
+                await changed.WaitAsync(timeout.Token);
+            }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                $"Journal '{journalId}' completed {GetSuccessfulWriteCount(journalId)} successful writes; expected {expected}.");
+        }
+    }
+
     private async ValueTask BeforeWriteAsync(JournalId journalId, CancellationToken cancellationToken)
     {
         if (!_writePlans.TryGetValue(journalId, out var plan)
@@ -88,8 +122,18 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
         await plan.Release.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private void OnWriteSucceeded(JournalId journalId) =>
+    private void OnWriteSucceeded(JournalId journalId)
+    {
         _successfulWrites.AddOrUpdate(journalId, 1, static (_, count) => count + 1);
+        lock (_writeCountLock)
+        {
+            _writeCountChanged.TrySetResult();
+            _writeCountChanged = CreateSignal();
+        }
+    }
+
+    private static TaskCompletionSource CreateSignal() =>
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     internal sealed class WritePlan(int target, bool fail)
     {
