@@ -23,6 +23,22 @@
     <OutputType Condition="'$(IsOrleansTestApplication)' == 'true'">Exe</OutputType>
     <UseMicrosoftTestingPlatformRunner Condition="'$(IsOrleansTestApplication)' == 'true'">true</UseMicrosoftTestingPlatformRunner>
     <TestingPlatformCommandLineArguments Condition="'$(IsOrleansTestApplication)' == 'true'">$(TestingPlatformCommandLineArguments) --ignore-exit-code 8</TestingPlatformCommandLineArguments>
+    <!-- Microsoft.Accordant currently requires System.Text.Json 10: https://github.com/microsoft/accordant/issues/38 -->
+    <UsesAccordantTestKit Condition="
+      '$(MSBuildProjectName)' == 'Benchmarks.AdoNet' or
+      '$(MSBuildProjectName)' == 'Orleans.AdoNet.Tests' or
+      '$(MSBuildProjectName)' == 'Orleans.AWS.Tests' or
+      '$(MSBuildProjectName)' == 'Orleans.Azure.Tests' or
+      '$(MSBuildProjectName)' == 'Orleans.Cosmos.Tests' or
+      '$(MSBuildProjectName)' == 'Orleans.DurableTasks.Abstractions.Tests' or
+      '$(MSBuildProjectName)' == 'Orleans.Journaling.Json.Tests' or
+      '$(MSBuildProjectName)' == 'Orleans.Journaling.Tests' or
+      '$(MSBuildProjectName)' == 'Orleans.Persistence.Firestore.Tests' or
+      '$(MSBuildProjectName)' == 'Orleans.Persistence.TestKit.Tests' or
+      '$(MSBuildProjectName)' == 'Orleans.Redis.Tests' or
+      '$(MSBuildProjectName)' == 'Orleans.Streaming.EventHubs.Tests' or
+      '$(MSBuildProjectName)' == 'Orleans.Transactions.Azure.Test' or
+      '$(MSBuildProjectName)' == 'Orleans.Transactions.DynamoDB.Test'">true</UsesAccordantTestKit>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(IsOrleansTestApplication)' == 'true'">
