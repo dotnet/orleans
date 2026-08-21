@@ -65,16 +65,25 @@ if (Test-Path -LiteralPath $coverageDirectory) {
 }
 [void] (New-Item -ItemType Directory -Force -Path $coverageDirectory)
 $index = 0
+$totalTests = 0
 foreach ($modulePath in $modules) {
     $index++
     $moduleName = [IO.Path]::GetFileNameWithoutExtension($modulePath)
     $coverageOutput = Join-Path $coverageDirectory ('{0:D3}-{1}.coverage' -f $index, $moduleName)
+    $reportDirectory = Join-Path ([IO.Path]::GetDirectoryName($modulePath)) 'TestResults'
+    $reportPattern = "test_results_${Suite}_${Framework}_${moduleName}_${Framework}_*.trx"
+    if (Test-Path -LiteralPath $reportDirectory) {
+        Get-ChildItem -LiteralPath $reportDirectory -File -Filter $reportPattern |
+            Remove-Item -Force
+    }
+
     & dotnet exec $modulePath `
         --filter-query $filterQuery `
         --hangdump --hangdump-timeout 10m `
         --crashdump --crashdump-type Full `
         --hangdump-type Full `
         --report-trx --report-trx-filename "test_results_${Suite}_${Framework}_{asm}_{tfm}_{arch}.trx" `
+        --ignore-exit-code 8 `
         --coverage `
         --coverage-output $coverageOutput `
         --coverage-output-format coverage `
@@ -82,19 +91,25 @@ foreach ($modulePath in $modules) {
     if ($LASTEXITCODE -ne 0) {
         throw "Tests failed for $modulePath with exit code $LASTEXITCODE"
     }
-}
 
-$reports = @(
-    Get-ChildItem -LiteralPath $resolvedRepositoryRoot -Recurse -File -Filter "test_results_${Suite}_${Framework}_*.trx"
-)
-$totalTests = 0
-foreach ($report in $reports) {
+    $reports = @(Get-ChildItem -LiteralPath $reportDirectory -File -Filter $reportPattern)
+    if ($reports.Count -ne 1) {
+        throw "Expected one TRX report for $modulePath, found $($reports.Count)"
+    }
+
+    $report = $reports[0]
     [xml] $document = Get-Content -LiteralPath $report.FullName -Raw
     $namespaceManager = [Xml.XmlNamespaceManager]::new($document.NameTable)
     $namespaceManager.AddNamespace('trx', 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010')
     $counters = $document.SelectSingleNode('/trx:TestRun/trx:ResultSummary/trx:Counters', $namespaceManager)
-    if ($counters) {
-        $totalTests += [int] $counters.GetAttribute('total')
+    if (-not $counters) {
+        throw "$($report.FullName) contains no test counters"
+    }
+
+    $moduleTestCount = [int] $counters.GetAttribute('total')
+    $totalTests += $moduleTestCount
+    if ($moduleTestCount -eq 0 -and (Test-Path -LiteralPath $coverageOutput)) {
+        Remove-Item -LiteralPath $coverageOutput -Force
     }
 }
 
