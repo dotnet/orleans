@@ -20,8 +20,8 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
 {
     private readonly DurableMessagingClusterFixture fixture = new();
 
-    public Task InitializeAsync() => fixture.InitializeAsync();
-    public Task DisposeAsync() => fixture.DisposeAsync();
+    public ValueTask InitializeAsync() => fixture.InitializeAsync();
+    public ValueTask DisposeAsync() => fixture.DisposeAsync();
 
     [Fact]
     public async Task Deliver_AcceptedOnlyAfterInboxAndStableJobOwnershipAreDurable()

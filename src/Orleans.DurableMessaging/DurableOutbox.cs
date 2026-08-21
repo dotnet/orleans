@@ -729,12 +729,12 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                 return DurableJobRunResult.Completed;
             }
 
-            return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
+            return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
         }
 
         if (!_recoveryCompleted)
         {
-            return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
+            return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
         }
 
         var key = new DurableMessagingPumpExecutionKey(JobName, context.Job.Id, context.RunId);
@@ -767,7 +767,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                 }));
         }
 
-        return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
+        return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
     }
 
     private async Task RunPumpTimerAsync(
@@ -822,7 +822,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         {
             if (!_recoveryCompleted)
             {
-                return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
+                return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
             }
 
             if (string.IsNullOrEmpty(_jobId.Value))
@@ -837,7 +837,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                         return DurableJobRunResult.Completed;
                     }
 
-                    return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
+                    return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
                 }
                 else if (Count == 0)
                 {
@@ -849,7 +849,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                     await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
                 }
 
-                return DurableJobRunResult.RetryAt(_jobTimeProvider.GetUtcNow() + TimeSpan.FromMilliseconds(10));
+                return DurableJobRunResult.RescheduleAt(_jobTimeProvider.GetUtcNow() + TimeSpan.FromMilliseconds(10));
             }
             else if (!string.Equals(_jobId.Value, jobId, StringComparison.Ordinal))
             {
@@ -884,13 +884,13 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                 catch
                 {
                     await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
-                    return DurableJobRunResult.RetryAt(_jobTimeProvider.GetUtcNow() + _backpressureRetryDelay);
+                    return DurableJobRunResult.RescheduleAt(_jobTimeProvider.GetUtcNow() + _backpressureRetryDelay);
                 }
             }
 
             if (_pendingMessageIds.Count > 0)
             {
-                return DurableJobRunResult.PollAfter(TimeSpan.FromMilliseconds(10));
+                return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
             }
 
             var now = _jobTimeProvider.GetUtcNow();
@@ -900,7 +900,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             var nextAttempt = attempts.Any(value => value is null || value <= now)
                 ? now
                 : attempts.Min()!.Value;
-            return DurableJobRunResult.RetryAt(nextAttempt <= now ? now : nextAttempt);
+            return DurableJobRunResult.RescheduleAt(nextAttempt <= now ? now : nextAttempt);
         }
 
         finally
