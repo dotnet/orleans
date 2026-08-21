@@ -327,9 +327,8 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
     {
         Debug.Assert(!_terminated, "CreateWorker must not be called on a terminated stateless worker context.");
         var address = GrainAddress.GetAddress(Address.SiloAddress, Address.GrainId, ActivationId.NewId());
-        var preparedContext = ((IPreparedGrainContextActivator)_innerActivator).CreatePreparedContext(address, []);
-        var newWorker = (ActivationData)preparedContext.Context;
-        IDisposable activationStartup;
+        var newWorker = (ActivationData)_innerActivator.CreateContext(address, []);
+        IDisposable? activationStartup;
         var startAttempted = false;
         try
         {
@@ -337,13 +336,13 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
             newWorker.SetComponent<IActivationLifecycleObserver>(this);
             _workers.Add(newWorker);
             startAttempted = true;
-            activationStartup = preparedContext.Start();
+            activationStartup = newWorker.Start();
         }
         catch
         {
             if (!startAttempted)
             {
-                preparedContext.Abort();
+                newWorker.Abort();
                 _workers.Remove(newWorker);
             }
 

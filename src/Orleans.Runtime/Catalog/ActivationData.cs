@@ -38,7 +38,6 @@ internal sealed partial class ActivationData :
     IGrainManagementExtension,
     IGrainCallCancellationExtension,
     ICallChainReentrantGrainContext,
-    IGrainContextStartup,
     IAsyncDisposable,
     IDisposable
 {
@@ -132,7 +131,7 @@ internal sealed partial class ActivationData :
         return _activationActivity?.Context;
     }
 
-    IDisposable IGrainContextStartup.Start()
+    public IDisposable? Start()
     {
         if (Interlocked.Exchange(ref _started, 1) != 0 || _startup is not { } startup)
         {
@@ -161,18 +160,25 @@ internal sealed partial class ActivationData :
         catch (Exception exception)
         {
             _startup = null;
-            Deactivate(
-                new DeactivationReason(
-                    DeactivationReasonCode.ActivationFailed,
-                    exception,
-                    "Error starting grain construction."),
-                CancellationToken.None);
-            startup.Dispose();
+            try
+            {
+                Deactivate(
+                    new DeactivationReason(
+                        DeactivationReasonCode.ActivationFailed,
+                        exception,
+                        "Error starting grain construction."),
+                    CancellationToken.None);
+            }
+            finally
+            {
+                startup.Dispose();
+            }
+
             throw;
         }
     }
 
-    void IGrainContextStartup.Abort()
+    public void Abort()
     {
         if (Interlocked.Exchange(ref _startup, null) is { } startup)
         {
