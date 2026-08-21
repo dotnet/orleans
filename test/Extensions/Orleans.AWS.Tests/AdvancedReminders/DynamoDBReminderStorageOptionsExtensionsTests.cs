@@ -13,6 +13,7 @@ public class DynamoDBReminderStorageOptionsExtensionsTests
             "Ignored=Service;service=eu-west-1;" +
             "Ignored=SecretKey;secretkey=secret;" +
             "Ignored=AccessKey;accesskey=access;" +
+            "Ignored=Token;token=session-token;" +
             "Ignored=ReadCapacityUnits;readcapacityunits=7;" +
             "Ignored=WriteCapacityUnits;writecapacityunits=9;" +
             "Ignored=UseProvisionedThroughput;useprovisionedthroughput=false;" +
@@ -25,6 +26,7 @@ public class DynamoDBReminderStorageOptionsExtensionsTests
         Assert.Equal("eu-west-1", options.Service);
         Assert.Equal("secret", options.SecretKey);
         Assert.Equal("access", options.AccessKey);
+        Assert.Equal("session-token", options.Token);
         Assert.Equal(7, options.ReadCapacityUnits);
         Assert.Equal(9, options.WriteCapacityUnits);
         Assert.False(options.UseProvisionedThroughput);
@@ -37,11 +39,13 @@ public class DynamoDBReminderStorageOptionsExtensionsTests
     {
         const string secretKey = "c2VjcmV0PT0=";
         const string accessKey = "YWNjZXNzPQ==";
+        const string token = "dG9rZW49PQ==";
         var options = new DynamoDBReminderStorageOptions();
 
-        options.ParseConnectionString($"SecretKey={secretKey};AccessKey={accessKey}");
+        options.ParseConnectionString($"SecretKey={secretKey};AccessKey={accessKey};Token={token}");
 
         Assert.Equal(secretKey, options.SecretKey);
         Assert.Equal(accessKey, options.AccessKey);
+        Assert.Equal(token, options.Token);
     }
 }

@@ -324,7 +324,7 @@ public sealed class DashboardRemindersGrainTests
 
         public Task<AdvancedReminderTableData> ReadRows(GrainId grainId) => throw new NotSupportedException();
 
-        public Task<AdvancedReminderEntry> ReadRow(GrainId grainId, string reminderName) => throw new NotSupportedException();
+        public Task<AdvancedReminderEntry?> ReadRow(GrainId grainId, string reminderName) => throw new NotSupportedException();
 
         public Task<string> UpsertRow(AdvancedReminderEntry entry) => throw new NotSupportedException();
 

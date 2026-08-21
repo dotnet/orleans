@@ -257,7 +257,9 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
         var isMissed = overdueBy > _options.MissedReminderGracePeriod;
 
         var shouldFire = true;
-        if (isMissed && entry.Action != Runtime.MissedReminderAction.FireImmediately)
+        if (durableJobDequeueCount <= 1
+            && isMissed
+            && entry.Action != Runtime.MissedReminderAction.FireImmediately)
         {
             shouldFire = false;
             if (entry.Action == Runtime.MissedReminderAction.Notify)

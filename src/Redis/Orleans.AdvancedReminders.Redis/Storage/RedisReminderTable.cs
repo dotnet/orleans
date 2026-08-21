@@ -92,7 +92,7 @@ namespace Orleans.AdvancedReminders.Redis
         public async Task StopAsync(CancellationToken cancellationToken)
             => await DisposeAsync().AsTask().WaitAsync(cancellationToken);
 
-        public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+        public async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
         {
             try
             {
@@ -100,7 +100,7 @@ namespace Orleans.AdvancedReminders.Redis
                 RedisValue[] values = await _db.SortedSetRangeByValueAsync(_hashSetKey, from, to);
                 if (values.Length == 0)
                 {
-                    return null!;
+                    return null;
                 }
                 else
                 {

@@ -564,6 +564,7 @@ public class ReminderManagementGrainTests
         await grain.RepairAsync(grainId, "r");
 
         var repaired = await table.ReadRow(grainId, "r");
+        Assert.NotNull(repaired);
         Assert.Equal(DurableJobPriority.High, repaired.Priority);
         Assert.Equal(MissedReminderAction.Notify, repaired.Action);
         Assert.True(repaired.NextDueUtc > DateTime.UtcNow);
@@ -591,9 +592,9 @@ public class ReminderManagementGrainTests
 
         var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
         reminderTable.ReadRow(grainId, "r").Returns(
-            Task.FromResult(CloneEntry(entry)),
-            Task.FromResult(CloneEntry(entry)),
-            Task.FromResult(CloneEntry(entry)));
+            Task.FromResult<ReminderEntry?>(CloneEntry(entry)),
+            Task.FromResult<ReminderEntry?>(CloneEntry(entry)),
+            Task.FromResult<ReminderEntry?>(CloneEntry(entry)));
         reminderTable.UpsertRow(Arg.Any<ReminderEntry>()).Returns("etag-2", "etag-3", "etag-4");
 
         var grainFactory = Substitute.For<IGrainFactory>();
@@ -766,6 +767,7 @@ public class ReminderManagementGrainTests
 
         var afterRepair = DateTime.UtcNow;
         var repaired = await table.ReadRow(grainId, "cron");
+        Assert.NotNull(repaired);
         var expectedLowerBound = builder.GetNextOccurrence(beforeRepair);
         var expectedUpperBound = builder.GetNextOccurrence(afterRepair);
 
@@ -813,10 +815,10 @@ public class ReminderManagementGrainTests
                 _entries.Values.Where(entry => range.InRange(entry.GrainId)).Select(CloneEntry).ToList()));
         }
 
-        public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+        public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
         {
             _entries.TryGetValue((grainId, reminderName), out var entry);
-            return Task.FromResult(entry is null ? null! : CloneEntry(entry));
+            return Task.FromResult(entry is null ? null : CloneEntry(entry));
         }
 
         public Task<string> UpsertRow(ReminderEntry entry)
@@ -995,7 +997,7 @@ public class ReminderStressTests
             return Task.FromResult(new ReminderTableData(reminders.Where(entry => range.InRange(entry.GrainId)).ToList()));
         }
 
-        public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName) => throw new NotSupportedException();
+        public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName) => throw new NotSupportedException();
 
         public Task<string> UpsertRow(ReminderEntry entry) => throw new NotSupportedException();
 

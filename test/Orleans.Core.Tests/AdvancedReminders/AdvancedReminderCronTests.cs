@@ -1221,6 +1221,14 @@ public class ReminderCronExpressionBehaviorTests
     }
 
     [Fact]
+    public void GetNextOccurrence_AfterMaximumDate_ReturnsNull()
+    {
+        var expression = ReminderCronExpression.Parse("* * * * *");
+
+        Assert.Null(expression.GetNextOccurrence(DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc)));
+    }
+
+    [Fact]
     public void GetOccurrences_WithNonUtcRange_Throws()
     {
         var expression = ReminderCronExpression.Parse("0 9 * * *");

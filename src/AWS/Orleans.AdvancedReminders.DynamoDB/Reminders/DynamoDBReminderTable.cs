@@ -125,7 +125,7 @@ namespace Orleans.AdvancedReminders.DynamoDB
         /// <param name="grainId"> grain ref to locate the row </param>
         /// <param name="reminderName"> reminder name to locate the row </param>
         /// <returns> Return the ReminderTableData if the rows were read successfully </returns>
-        public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+        public async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
         {
             var reminderId = ConstructReminderId(this.serviceId, grainId, reminderName);
 
@@ -137,7 +137,7 @@ namespace Orleans.AdvancedReminders.DynamoDB
 
             try
             {
-                return (await this.storage.ReadSingleEntryAsync(this.options.TableName, keys, this.Resolve).ConfigureAwait(false))!;
+                return await this.storage.ReadSingleEntryAsync(this.options.TableName, keys, this.Resolve).ConfigureAwait(false);
             }
             catch (Exception exc)
             {
