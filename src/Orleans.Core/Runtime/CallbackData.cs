@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Invocation;
@@ -20,45 +21,23 @@ namespace Orleans.Runtime
         private StatusResponse? lastKnownStatus;
         private ValueStopwatch stopwatch;
         private CancellationTokenRegistration _cancellationTokenRegistration;
-        private CorrelationId _correlationId;
         private int _refCount;
         private long _generation;
 
-        /// <summary>
-        /// Parameterless constructor for object pooling.
-        /// </summary>
         internal CallbackData()
         {
         }
 
-        public CallbackData(
-            SharedCallbackData shared,
-            IResponseCompletionSource ctx,
-            Message msg,
-            ApplicationRequestInstruments applicationRequestInstruments)
-        {
-            Initialize(shared, ctx, msg, applicationRequestInstruments);
-        }
-
-        /// <summary>
-        /// Initializes the callback data for use. Called after retrieving from the pool.
-        /// Does NOT set ref count - that is done by <see cref="CallbackDataOwner"/> constructor.
-        /// </summary>
-        public void Initialize(SharedCallbackData shared, IResponseCompletionSource ctx, Message msg, ApplicationRequestInstruments applicationRequestInstruments)
+        internal void Initialize(SharedCallbackData shared, IResponseCompletionSource ctx, Message msg, ApplicationRequestInstruments applicationRequestInstruments)
         {
             Debug.Assert(_refCount == 0, "CallbackData ref count should be 0 before initialization");
             this.shared = shared;
             this.context = ctx;
             this.Message = msg;
             _applicationRequestInstruments = applicationRequestInstruments;
-            this._correlationId = msg.Id;
             this.stopwatch = ValueStopwatch.StartNew();
-            _generation++;
         }
 
-        /// <summary>
-        /// Resets the callback data for return to the pool.
-        /// </summary>
         internal void Reset()
         {
             Debug.Assert(_refCount == 0, "CallbackData ref count should be 0 before reset");
@@ -70,29 +49,22 @@ namespace Orleans.Runtime
             stopwatch = default;
             _cancellationTokenRegistration.Dispose();
             _cancellationTokenRegistration = default;
-            _correlationId = default;
             Message = null!;
         }
 
-        /// <summary>
-        /// Acquires the initial owner reference. Must only be called once after initialization.
-        /// </summary>
-        /// <returns>The previous ref count (should be 0).</returns>
-        internal int AcquireOwnerReference()
+        internal long AcquireOwnerReference()
         {
-            return Interlocked.Increment(ref _refCount) - 1;
+            var generation = Interlocked.Increment(ref _generation);
+            if (Interlocked.CompareExchange(ref _refCount, 1, 0) != 0)
+            {
+                throw new InvalidOperationException("CallbackData already has an owner.");
+            }
+
+            return generation;
         }
 
-        internal long Generation => Volatile.Read(ref _generation);
-
-        /// <summary>
-        /// Attempts to acquire a borrowed lease on this callback, incrementing the ref count.
-        /// Returns true only if the ref count is positive (object is still owned).
-        /// </summary>
-        /// <returns>True if the lease was acquired, false if the object is being/has been returned to pool.</returns>
         internal bool TryAcquireLease(long generation)
         {
-            // Spin until we either successfully increment or detect ref count is 0
             while (true)
             {
                 if (generation != Volatile.Read(ref _generation))
@@ -102,13 +74,11 @@ namespace Orleans.Runtime
 
                 var currentRefCount = Volatile.Read(ref _refCount);
 
-                // If ref count is 0 or negative, the object is being returned to pool or already pooled
                 if (currentRefCount <= 0)
                 {
                     return false;
                 }
 
-                // Try to increment the ref count
                 if (Interlocked.CompareExchange(ref _refCount, currentRefCount + 1, currentRefCount) == currentRefCount)
                 {
                     if (generation == Volatile.Read(ref _generation))
@@ -119,15 +89,9 @@ namespace Orleans.Runtime
                     ReleaseReference();
                     return false;
                 }
-
-                // CAS failed, spin and retry
             }
         }
 
-        /// <summary>
-        /// Releases a lease on this callback, decrementing the ref count.
-        /// If the ref count reaches zero, returns the callback to the pool.
-        /// </summary>
         internal void ReleaseLease(long generation)
         {
             if (generation != Volatile.Read(ref _generation))
@@ -147,9 +111,8 @@ namespace Orleans.Runtime
             }
             else if (newRefCount < 0)
             {
-                // This should never happen - indicates a bug
                 Debug.Fail("CallbackData ref count went negative");
-                throw new InvalidOperationException("CallbackData ref count went negative - indicates a double release bug");
+                throw new InvalidOperationException("CallbackData was released more than once.");
             }
         }
 
@@ -199,18 +162,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public void OnStatusUpdate(CorrelationId messageId, StatusResponse status)
-        {
-            // Validate that the status update is for this callback instance.
-            // This is necessary because the callback may have been returned to the pool
-            // and reused for a different message between TryGetValue and OnStatusUpdate.
-            if (_correlationId != messageId)
-            {
-                return;
-            }
-
-            this.lastKnownStatus = status;
-        }
+        public void OnStatusUpdate(StatusResponse status) => this.lastKnownStatus = status;
 
         public bool IsExpired(long currentTimestamp)
         {
@@ -239,6 +191,24 @@ namespace Orleans.Runtime
 
         private void OnCancellation(CancellationToken cancellationToken)
         {
+            var generation = Volatile.Read(ref _generation);
+            if (!TryAcquireLease(generation))
+            {
+                throw new InvalidOperationException("Cancellation ran after CallbackData ownership ended.");
+            }
+
+            try
+            {
+                OnCancellationCore(cancellationToken);
+            }
+            finally
+            {
+                ReleaseLease(generation);
+            }
+        }
+
+        private void OnCancellationCore(CancellationToken cancellationToken)
+        {
             // If waiting for acknowledgement is enabled, simply signal to the remote grain that cancellation
             // is requested and return.
             if (shared.WaitForCancellationAcknowledgement)
@@ -256,21 +226,12 @@ namespace Orleans.Runtime
 
             stopwatch.Stop();
             SignalCancellation();
-            // Capture locals before Unregister, which may return this to the pool
-            var elapsedMs = (long)stopwatch.Elapsed.TotalMilliseconds;
-            var msg = Message;
-            var ctx = context;
-            var instruments = _applicationRequestInstruments;
-            var targetGrainType = GetTargetGrainType();
+            shared.Unregister(Message);
             DisposeCancellationRegistration();
-
-            // Unregister last - this may return the callback to the pool
-            shared.Unregister(msg);
-
-            instruments.OnAppRequestsEnd(elapsedMs);
-            instruments.OnAppRequestsCanceled(targetGrainType);
-            OrleansCallBackDataEvent.Instance.OnCanceled(msg);
-            ctx.Complete(Response.FromException(new OperationCanceledException(cancellationToken)));
+            _applicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
+            _applicationRequestInstruments.OnAppRequestsCanceled(GetTargetGrainType());
+            OrleansCallBackDataEvent.Instance.OnCanceled(Message);
+            context.Complete(Response.FromException(new OperationCanceledException(cancellationToken)));
         }
 
         public void OnTimeout()
@@ -286,29 +247,18 @@ namespace Orleans.Runtime
                 SignalCancellation();
             }
 
-            // Capture locals before Unregister, which may return this to the pool
+            this.shared.Unregister(this.Message);
             DisposeCancellationRegistration();
-            var elapsedMs = (long)this.stopwatch.Elapsed.TotalMilliseconds;
+            _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
+            _applicationRequestInstruments.OnAppRequestsTimedOut(GetTargetGrainType());
+
+            OrleansCallBackDataEvent.Instance.OnTimeout(this.Message);
             var msg = this.Message;
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
             var timeout = GetResponseTimeout();
-            var logger = this.shared.Logger;
-            var ctx = this.context;
-            var instruments = _applicationRequestInstruments;
-            var targetGrainType = GetTargetGrainType();
-
-            // Unregister last - this may return the callback to the pool
-            this.shared.Unregister(msg);
-
-            instruments.OnAppRequestsEnd(elapsedMs);
-            instruments.OnAppRequestsTimedOut(targetGrainType);
-
-            OrleansCallBackDataEvent.Instance.OnTimeout(msg);
-
-            LogTimeout(logger, timeout, msg, statusMessage);
-
+            LogTimeout(this.shared.Logger, timeout, msg, statusMessage);
             var exception = new TimeoutException($"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage}");
-            ctx.Complete(Response.FromException(exception));
+            context.Complete(Response.FromException(exception));
         }
 
         public void OnTargetSiloFail()
@@ -319,23 +269,16 @@ namespace Orleans.Runtime
             }
 
             this.stopwatch.Stop();
-            // Capture locals before Unregister, which may return this to the pool
+            this.shared.Unregister(this.Message);
             DisposeCancellationRegistration();
-            var elapsedMs = (long)this.stopwatch.Elapsed.TotalMilliseconds;
+            _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
+
+            OrleansCallBackDataEvent.Instance.OnTargetSiloFail(this.Message);
             var msg = this.Message;
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
-            var logger = this.shared.Logger;
-            var ctx = this.context;
-            var instruments = _applicationRequestInstruments;
-
-            // Unregister last - this may return the callback to the pool
-            this.shared.Unregister(msg);
-            instruments.OnAppRequestsEnd(elapsedMs);
-
-            OrleansCallBackDataEvent.Instance.OnTargetSiloFail(msg);
-            LogTargetSiloFail(logger, msg, statusMessage, Constants.TroubleshootingHelpLink);
+            LogTargetSiloFail(this.shared.Logger, msg, statusMessage, Constants.TroubleshootingHelpLink);
             var exception = new SiloUnavailableException($"The target silo became unavailable for message: {msg}. {statusMessage}See {Constants.TroubleshootingHelpLink} for troubleshooting help.");
-            ctx.Complete(Response.FromException(exception));
+            this.context.Complete(Response.FromException(exception));
         }
 
         public void OnHostShutdown()
@@ -346,19 +289,13 @@ namespace Orleans.Runtime
             }
 
             this.stopwatch.Stop();
+            this.shared.Unregister(this.Message);
             DisposeCancellationRegistration();
+            _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
-            var elapsedMs = (long)this.stopwatch.Elapsed.TotalMilliseconds;
             var msg = this.Message;
-            var shared = this.shared;
-            var context = this.context;
-            var instruments = _applicationRequestInstruments;
-
-            shared.Unregister(msg);
-            instruments.OnAppRequestsEnd(elapsedMs);
-
             var exception = new SiloUnavailableException($"The local Orleans host is shutting down and can no longer process the request: {msg}.");
-            context.Complete(Response.FromException(exception));
+            this.context.Complete(Response.FromException(exception));
         }
 
         public void DoCallback(Message response)
@@ -441,57 +378,39 @@ namespace Orleans.Runtime
     }
 
     /// <summary>
-    /// Owns a pooled <see cref="CallbackData"/> instance and manages its lifecycle.
-    /// This represents the "owner" - the code that creates this and stores it in the callbacks dictionary.
-    /// When the owner is done with the callback, it should call <see cref="Release"/> to return it to the pool.
-    /// The owner increments the ref count to 1 on construction.
+    /// Holds the dictionary-owned reference to a pooled <see cref="CallbackData"/> instance.
     /// </summary>
     internal readonly struct CallbackDataOwner
     {
-        private readonly CallbackData _callback;
+        private readonly CallbackData? _callback;
         private readonly long _generation;
 
         public CallbackDataOwner(CallbackData callback)
         {
-            Debug.Assert(callback is not null, "CallbackDataOwner requires a non-null callback");
             _callback = callback;
-            _generation = callback.Generation;
-            var previousRefCount = callback.AcquireOwnerReference();
-            Debug.Assert(previousRefCount == 0, $"CallbackData ref count should have been 0 when creating owner, but was {previousRefCount}");
+            _generation = callback.AcquireOwnerReference();
         }
 
-        /// <summary>
-        /// Attempts to acquire a borrowed lease on the callback.
-        /// The returned lease MUST be disposed when done to release the reference count.
-        /// Use <see cref="CallbackDataLease.TryGetValue"/> to check if the lease is valid and get the callback.
-        /// </summary>
-        /// <returns>A lease that must be disposed. Check <see cref="CallbackDataLease.TryGetValue"/> to see if it's valid.</returns>
         public CallbackDataLease Acquire()
         {
-            Debug.Assert(_callback is not null, "CallbackDataOwner.Acquire called on default struct");
-            if (_callback.TryAcquireLease(_generation))
+            var callback = _callback ?? throw new InvalidOperationException("CallbackDataOwner is not initialized.");
+            if (callback.TryAcquireLease(_generation))
             {
-                return new CallbackDataLease(_callback, _generation);
+                return new CallbackDataLease(callback, _generation);
             }
 
             return default;
         }
 
-        /// <summary>
-        /// Releases the owner's reference to the callback, potentially returning it to the pool.
-        /// This should be called when the callback is removed from the dictionary and is no longer needed.
-        /// </summary>
         public void Release()
         {
-            Debug.Assert(_callback is not null, "CallbackDataOwner.Release called on default struct");
-            _callback.ReleaseLease(_generation);
+            var callback = _callback ?? throw new InvalidOperationException("CallbackDataOwner is not initialized.");
+            callback.ReleaseLease(_generation);
         }
     }
 
     /// <summary>
-    /// A borrowed lease on a <see cref="CallbackData"/> instance.
-    /// This is a ref struct to ensure it cannot escape the current scope without being disposed.
-    /// Disposing the lease releases the reference count, potentially allowing the callback to be returned to the pool.
+    /// Holds a scoped reference to a pooled <see cref="CallbackData"/> instance.
     /// </summary>
     internal ref struct CallbackDataLease
     {
@@ -504,26 +423,15 @@ namespace Orleans.Runtime
             _generation = generation;
         }
 
-        /// <summary>
-        /// Gets whether this lease is valid (successfully acquired a reference).
-        /// </summary>
-        public readonly bool IsValid => _callback is not null;
+        public readonly CallbackData Value =>
+            _callback ?? throw new InvalidOperationException("CallbackDataLease is not initialized.");
 
-        /// <summary>
-        /// Attempts to get the callback data if the lease is valid.
-        /// </summary>
-        /// <param name="callback">The callback data if valid, otherwise null.</param>
-        /// <returns>True if the lease is valid and the callback was returned.</returns>
-        public readonly bool TryGetValue([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out CallbackData? callback)
+        public readonly bool TryGetValue([NotNullWhen(true)] out CallbackData? callback)
         {
             callback = _callback;
             return callback is not null;
         }
 
-        /// <summary>
-        /// Releases the lease, decrementing the reference count.
-        /// If this was the last reference, the callback will be returned to the pool.
-        /// </summary>
         public void Dispose()
         {
             if (_callback is { } callback)

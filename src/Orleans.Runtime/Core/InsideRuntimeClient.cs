@@ -183,61 +183,71 @@ namespace Orleans.Runtime
 
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
             CallbackData? callbackData = null;
-            if (!oneWay)
+            CallbackDataLease callbackLease = default;
+            try
             {
-                Debug.Assert(context is not null);
-
-                // Register a callback for the request.
-                callbackData = CallbackDataPool.Get();
-                callbackData.Initialize(sharedData, context!, message, _applicationRequestInstruments);
-                var owner = new CallbackDataOwner(callbackData);
-                var callbackKey = (message.SendingGrain, message.Id);
-                if (!callbacks.TryAdd(callbackKey, owner))
+                if (!oneWay)
                 {
-                    CallbackDataPool.Return(owner);
-                    throw new InvalidOperationException($"Duplicate callback registration for message {message}.");
+                    Debug.Assert(context is not null);
+
+                    // Register a callback for the request.
+                    var owner = CallbackDataPool.Rent(sharedData, context!, message, _applicationRequestInstruments);
+                    callbackLease = owner.Acquire();
+                    callbackData = callbackLease.Value;
+                    var callbackKey = (message.SendingGrain, message.Id);
+                    if (!callbacks.TryAdd(callbackKey, owner))
+                    {
+                        CallbackDataPool.Return(owner);
+                        throw new InvalidOperationException($"Duplicate callback registration for message {message}.");
+                    }
+
+                    // Cancellation can run synchronously during registration.
+                    if (Volatile.Read(ref _isStopping) != 0)
+                    {
+                        callbackData.OnHostShutdown();
+                        return;
+                    }
+
+                    try
+                    {
+                        callbackData.SubscribeForCancellation(cancellationToken);
+                    }
+                    catch
+                    {
+                        UnregisterCallback(message.SendingGrain, message.Id);
+                        throw;
+                    }
+
+                    if (Volatile.Read(ref _isStopping) != 0)
+                    {
+                        callbackData.OnHostShutdown();
+                        return;
+                    }
+                }
+                else
+                {
+                    context?.Complete();
+                    if (Volatile.Read(ref _isStopping) != 0)
+                    {
+                        return;
+                    }
                 }
 
-                // Cancellation can run synchronously during registration.
-                using var lease = owner.Acquire();
-                if (!lease.TryGetValue(out callbackData))
-                {
-                    return;
-                }
-
+                // Completing callbacks during shutdown can resume application code which issues follow-up
+                // calls. Reject those calls so that they cannot outlive the shutdown callback sweep.
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
-                    callbackData.OnHostShutdown();
+                    callbackData?.OnHostShutdown();
                     return;
                 }
 
-                try
-                {
-                    callbackData.SubscribeForCancellation(cancellationToken);
-                }
-                catch
-                {
-                    UnregisterCallback(message.SendingGrain, message.Id);
-                    throw;
-                }
-
-                if (Volatile.Read(ref _isStopping) != 0)
-                {
-                    callbackData.OnHostShutdown();
-                    return;
-                }
+                this.messagingTrace.OnSendRequest(message);
+                this.MessageCenter.AddressAndSendMessage(message);
             }
-            else
+            finally
             {
-                context?.Complete();
-                if (Volatile.Read(ref _isStopping) != 0)
-                {
-                    return;
-                }
+                callbackLease.Dispose();
             }
-
-            this.messagingTrace.OnSendRequest(message);
-            this.MessageCenter.AddressAndSendMessage(message);
         }
 
         public void SendResponse(Message request, Response response)
@@ -261,7 +271,6 @@ namespace Orleans.Runtime
         {
             if (callbacks.TryRemove((grainId, correlationId), out var owner))
             {
-                // Release the owner's reference - this will return to pool when all leases are released
                 CallbackDataPool.Return(owner);
             }
         }
@@ -349,7 +358,7 @@ namespace Orleans.Runtime
                                     response = this.responseCopier.Copy(response)!;
                                 }
 
-                                // Note: invokable disposal happens at the end of Invoke to return it to its pool
+                                invokable.Dispose();
                                 break;
                             }
                         default:
@@ -493,23 +502,19 @@ namespace Orleans.Runtime
 
         private void ProcessResponseCallback(Message message)
         {
-            bool found = callbacks.TryRemove((message.TargetGrain, message.Id), out var removedOwner);
-            if (found)
+            if (callbacks.TryRemove((message.TargetGrain, message.Id), out var removedOwner))
             {
                 using var removedLease = removedOwner.Acquire();
-                if (removedLease.TryGetValue(out var callbackData))
+                try
                 {
                     // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
                     // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
-                    callbackData.DoCallback(message);
+                    removedLease.Value.DoCallback(message);
                 }
-                else
+                finally
                 {
-                    LogDebugNoCallbackForResponse(this.logger, message);
+                    CallbackDataPool.Return(removedOwner);
                 }
-
-                // Release the owner's reference - this will return to pool when all leases are released
-                CallbackDataPool.Return(removedOwner);
             }
             else
             {
@@ -526,7 +531,7 @@ namespace Orleans.Runtime
                 if (lease.TryGetValue(out var callback))
                 {
                     var request = callback.Message;
-                    callback.OnStatusUpdate(message.Id, status);
+                    callback.OnStatusUpdate(status);
                     if (status.Diagnostics is { Count: > 0 })
                     {
                         LogInformationReceivedStatusUpdate(this.logger, request, status.Diagnostics);
