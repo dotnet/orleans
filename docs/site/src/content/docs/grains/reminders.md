@@ -19,6 +19,8 @@ A grain receiving reminders implements <xref:Orleans.IRemindable>:
 
 Orleans invokes <xref:Orleans.IRemindable.ReceiveReminder*> with the reminder name and <xref:Orleans.Runtime.TickStatus>. The callback executes as a grain request and follows the grain's scheduling and reentrancy rules.
 
+When reminder work can run longer than a grain call timeout, use the [long-running reminder recipe](../how-to/long-running-reminders.md) to start a restartable worker and return promptly.
+
 ## Register or update a reminder
 
 Register a named reminder from the grain:
