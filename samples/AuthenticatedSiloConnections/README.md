@@ -20,9 +20,11 @@ default ports, then start another with
    deployment environment, for example `contoso-prod-westus`.
 3. Define the application roles `Orleans.Silo.Connect` and
    `Orleans.Client.Connect`, and allow applications as members.
-4. Assign only the matching role to each authorized silo or client workload
+4. Configure `idtyp` as an optional access-token claim so that application
+   tokens include `idtyp: "app"`.
+5. Assign only the matching role to each authorized silo or client workload
    identity.
-5. Configure a federated identity credential for each workload and place its
+6. Configure a federated identity credential for each workload and place its
    application ID in the matching silo or external-client allowlist.
 
 The exact audience, tenant, application-token classification, caller

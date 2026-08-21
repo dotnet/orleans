@@ -115,14 +115,16 @@ Create the identity boundary in this order:
    `api://<resource-application-id>/contoso-prod-westus`.
 3. Define application roles `Orleans.Silo.Connect` and
    `Orleans.Client.Connect`, with applications as allowed member types.
-4. Create or select one workload identity for each independently deployable
+4. Configure `idtyp` as an optional access-token claim so that application
+   tokens include `idtyp: "app"`.
+5. Create or select one workload identity for each independently deployable
    silo and client workload. Don't share a client secret or exported
    certificate across the fleet.
-5. Assign only the matching application role. A client identity doesn't need
+6. Assign only the matching application role. A client identity doesn't need
    the silo role.
-6. Put each application ID in the matching caller allowlist. Role assignment
+7. Put each application ID in the matching caller allowlist. Role assignment
    and allowlisting are separate checks; require both.
-7. Configure a managed identity, workload identity federation, or another
+8. Configure a managed identity, workload identity federation, or another
    non-interactive credential. Grant no Microsoft Graph permission merely to
    establish an Orleans connection.
 
@@ -336,9 +338,9 @@ Alert on rates and latency for these instruments:
 
 | Instrument | Operational use |
 |---|---|
-| `orleans.connections.authentication.attempts` | Count outcomes by fixed result category. |
+| `orleans.connections.authentication.attempts` | Count outcomes by fixed result category; `result=overload` identifies authentication capacity exhaustion after both the concurrency and pending-queue limits are reached. |
 | `orleans.connections.authentication.duration` | Detect token-provider, metadata, validation, or network latency. |
-| `orleans.connections.authentication.active` | Detect handshake concurrency saturation. |
+| `orleans.connections.authentication.active` | Track established authenticated connections by connection type and direction. |
 | `orleans.connections.authentication.protocol_fallbacks` | Identify peers which haven't negotiated authentication in `Audit`. |
 
 Keep dimensions bounded to direction, mode, protocol version, and fixed result
