@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Orleans.Configuration;
 using Orleans.Networking.Shared;
+using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
@@ -37,6 +38,7 @@ namespace Orleans.Runtime.Messaging
         private readonly DictionaryCodec<string, object> _requestContextCodec;
         private readonly PrefixingBufferWriter _bufferWriter;
         private bool _disposed;
+        private bool _isolateBodyScope;
 
         public MessageSerializer(
             SerializerSessionPool sessionPool,
@@ -65,6 +67,8 @@ namespace Orleans.Runtime.Messaging
             _serializationSession.Dispose();
             _deserializationSession.Dispose();
         }
+
+        public void SetProtocolVersion(NetworkProtocolVersion version) => _isolateBodyScope = version >= NetworkProtocolVersion.Version2;
 
         public (int RequiredBytes, int HeaderLength, int BodyLength) TryRead(ref ReadOnlySequence<byte> input, out Message? message)
         {
@@ -113,19 +117,35 @@ namespace Orleans.Runtime.Messaging
 
                 if (bodyLength != 0)
                 {
-                    _deserializationSession.PartialReset();
+                    ResetForBody(_deserializationSession);
 
                     // Body deserialization is more likely to fail than header deserialization.
                     // Separating the two allows for these kinds of errors to be propagated back to the caller.
-                    if (body.IsSingleSegment)
+                    try
                     {
-                        var reader = Reader.Create(body.First.Span, _deserializationSession);
-                        ReadBodyObject(message, ref reader);
+                        if (body.IsSingleSegment)
+                        {
+                            var reader = Reader.Create(body.First.Span, _deserializationSession);
+                            ReadBodyObject(message, ref reader);
+                        }
+                        else
+                        {
+                            var reader = Reader.Create(body, _deserializationSession);
+                            ReadBodyObject(message, ref reader);
+                        }
                     }
-                    else
+                    catch (UnresolvedInvokableAliasException exception) when (message.Direction is Directions.Request or Directions.OneWay)
                     {
-                        var reader = Reader.Create(body, _deserializationSession);
-                        ReadBodyObject(message, ref reader);
+                        if (_isolateBodyScope)
+                        {
+                            // Preserve the request for version compatibility and placement to route.
+                            message.BodyObject = new UndecodedRequestBody(body.ToArray(), exception.Alias);
+                        }
+                        else
+                        {
+                            // Version1 retains the previous failure behavior using a wire-serializable exception.
+                            throw new TypeLoadException(exception.Message, exception);
+                        }
                     }
                 }
 
@@ -170,7 +190,9 @@ namespace Orleans.Runtime.Messaging
             var headers = message.Headers;
             IFieldCodec? bodyCodec = null;
             ResponseCodec? rawCodec = null;
-            if (message.BodyObject is not null)
+
+            var undecodedBody = message.BodyObject as UndecodedRequestBody;
+            if (undecodedBody is null && message.BodyObject is not null)
             {
                 bodyCodec = _codecProvider.GetCodec(message.BodyObject.GetType());
                 if (headers.ResponseType is ResponseTypes.None && bodyCodec is ResponseCodec responseCodec)
@@ -193,9 +215,20 @@ namespace Orleans.Runtime.Messaging
 
                 var headerLength = bufferWriter.CommittedBytes;
 
-                _serializationSession.PartialReset();
+                ResetForBody(_serializationSession);
 
-                if (bodyCodec is not null)
+                if (undecodedBody is not null)
+                {
+                    if (!_isolateBodyScope)
+                    {
+                        ThrowCannotForwardUndecodedBody(undecodedBody);
+                    }
+
+                    innerWriter = Writer.Create(new MessageBufferWriter(bufferWriter), _serializationSession);
+                    innerWriter.Write(undecodedBody.Body);
+                    innerWriter.Commit();
+                }
+                else if (bodyCodec is not null)
                 {
                     innerWriter = Writer.Create(new MessageBufferWriter(bufferWriter), _serializationSession);
                     if (rawCodec != null) rawCodec.WriteRaw(ref innerWriter, message.BodyObject!);
@@ -232,6 +265,21 @@ namespace Orleans.Runtime.Messaging
             if (headerLength <= 0 || headerLength > _maxHeaderLength) ThrowInvalidHeaderLength(headerLength);
             if ((uint)bodyLength > (uint)_maxBodyLength) ThrowInvalidBodyLength(bodyLength);
         }
+
+        private void ResetForBody(SerializerSession session)
+        {
+            if (_isolateBodyScope)
+            {
+                session.Reset();
+            }
+            else
+            {
+                session.PartialReset();
+            }
+        }
+
+        private static void ThrowCannotForwardUndecodedBody(UndecodedRequestBody body)
+            => throw new InvalidOperationException($"Cannot forward a request this host could not decode over a {nameof(NetworkProtocolVersion.Version1)} connection: {body}");
 
         private void ThrowInvalidHeaderLength(int headerLength) => throw new InvalidMessageFrameException($"Invalid header size: {headerLength} (max configured value is {_maxHeaderLength}, see {nameof(MessagingOptions.MaxMessageHeaderSize)})");
         private void ThrowInvalidBodyLength(int bodyLength) => throw new InvalidMessageFrameException($"Invalid body size: {bodyLength} (max configured value is {_maxBodyLength}, see {nameof(MessagingOptions.MaxMessageBodySize)})");

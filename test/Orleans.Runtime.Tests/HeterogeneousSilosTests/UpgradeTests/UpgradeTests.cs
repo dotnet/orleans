@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Metadata;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 using TestVersionGrainInterfaces;
@@ -87,6 +89,91 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             // v2 -> v1 call should provoke grain activation upgrade because they are compatible
             // The grain is already processing a request when receiving the message
             return ProxyCallWithPendingRequest(expectedVersion: 1);
+        }
+    }
+
+    /// <summary>
+    /// Tests requests for methods introduced during rolling upgrades.
+    /// </summary>
+    [TestSuite("SlowBVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
+    [TestArea("Versioning")]
+    public class UndecodableRequestUpgradeTests : UpgradeTestsBase
+    {
+        protected override Type VersionSelectorStrategy => typeof(LatestVersion);
+        protected override Type CompatibilityStrategy => typeof(BackwardCompatible);
+
+        [Fact]
+        public async Task IncompatibleOldSiloForwardsVersion2Request()
+        {
+            await StartSiloV1();
+
+            var target = Client.GetGrain<IVersionUpgradeTestGrain>(0);
+            Assert.Equal(1, await target.GetVersion());
+
+            await StartSiloV2();
+
+            var caller = Client.GetGrain<IVersionUpgradeTestGrain>(1);
+            Assert.Equal(2, await caller.GetVersion());
+
+            var resolver = Client.ServiceProvider.GetRequiredService<GrainInterfaceTypeResolver>();
+            var interfaceType = resolver.GetGrainInterfaceType(typeof(IVersionUpgradeTestGrain));
+
+            var barrier = new UpgradeBarrier();
+            var observer = Client.CreateObjectReference<IVersionUpgradeTestObserver>(barrier);
+            try
+            {
+                var call = caller.ProxyCallVersion2MethodAfterBarrier(target, observer);
+                await barrier.Entered.WaitAsync(TimeSpan.FromSeconds(30));
+
+                await ManagementGrain.SetCompatibilityStrategy(interfaceType, StrictVersionCompatible.Singleton);
+                barrier.Release();
+
+                Assert.Equal(2, await call);
+            }
+            finally
+            {
+                barrier.Release();
+                Client.DeleteObjectReference<IVersionUpgradeTestObserver>(observer);
+            }
+        }
+
+        [Fact]
+        public async Task CompatibleOldSiloRejectsUndecodableVersion2RequestAtDispatch()
+        {
+            await StartSiloV1();
+
+            var target = Client.GetGrain<IVersionUpgradeTestGrain>(0);
+            Assert.Equal(1, await target.GetVersion());
+
+            await StartSiloV2();
+
+            var caller = Client.GetGrain<IVersionUpgradeTestGrain>(1);
+            Assert.Equal(2, await caller.GetVersion());
+
+            var resolver = Client.ServiceProvider.GetRequiredService<GrainInterfaceTypeResolver>();
+            var interfaceType = resolver.GetGrainInterfaceType(typeof(IVersionUpgradeTestGrain));
+            await ManagementGrain.SetCompatibilityStrategy(interfaceType, AllVersionsCompatible.Singleton);
+
+            var exception = await Assert.ThrowsAsync<NotSupportedException>(() => caller.ProxyCallVersion2Method(target));
+            Assert.Contains("undecoded request with unavailable invokable alias", exception.Message);
+        }
+
+        private sealed class UpgradeBarrier : IVersionUpgradeTestObserver
+        {
+            private readonly TaskCompletionSource _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public Task Entered => _entered.Task;
+
+            public Task WaitForRelease()
+            {
+                _entered.TrySetResult();
+                return _release.Task;
+            }
+
+            public void Release() => _release.TrySetResult();
         }
     }
 
