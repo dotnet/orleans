@@ -37,21 +37,23 @@ def get_repository_path(filename, source_root):
 
 
 def read_report(coverage_report, source_root):
+    if coverage_report.is_symlink():
+        raise RuntimeError(f"{coverage_report} must not be a symbolic link")
+
     report_size = coverage_report.stat().st_size
     if report_size > MAX_REPORT_BYTES:
         raise RuntimeError(f"{coverage_report} exceeds the 100 MB parsing limit")
 
-    previous_chunk_end = b""
-    with coverage_report.open("rb") as report_stream:
-        while report_chunk := report_stream.read(64 * 1024):
-            uppercase_chunk = (previous_chunk_end + report_chunk).upper()
-            if b"<!DOCTYPE" in uppercase_chunk or b"<!ENTITY" in uppercase_chunk:
-                raise RuntimeError(
-                    "Coverage report contains unsupported XML declarations"
-                )
-            previous_chunk_end = report_chunk[-16:]
+    try:
+        report_text = coverage_report.read_bytes().decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise RuntimeError(f"{coverage_report} must contain valid UTF-8") from None
 
-    root = ET.parse(coverage_report).getroot()
+    uppercase_report = report_text.upper()
+    if "<!DOCTYPE" in uppercase_report or "<!ENTITY" in uppercase_report:
+        raise RuntimeError("Coverage report contains unsupported XML declarations")
+
+    root = ET.fromstring(report_text)
     measured_lines = {}
 
     for class_element in root.iter("class"):
