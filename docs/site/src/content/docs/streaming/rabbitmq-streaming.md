@@ -15,7 +15,7 @@ The package is in alpha. Validate delivery, recovery, retention, and throughput 
 
 Enable the RabbitMQ stream plugin and expose the stream protocol port, which defaults to `5552`. The regular AMQP port `5672` isn't used by this provider.
 
-For local development, the [RabbitMQ streaming sample](https://github.com/dotnet/orleans/tree/main/samples/Streaming/RabbitMQ) uses an [Aspire AppHost](https://aspire.dev/get-started/app-host/) to run RabbitMQ, enable its stream and management plugins, inject generated credentials, and start the Orleans silo:
+For local development, the RabbitMQ streaming sample in `samples/Streaming/RabbitMQ` uses an [Aspire AppHost](https://aspire.dev/get-started/app-host/) to run RabbitMQ, enable its stream and management plugins, inject generated credentials, and start the Orleans silo:
 
 ```shell
 dotnet run --project samples/Streaming/RabbitMQ/RabbitMQ.AppHost
@@ -43,9 +43,11 @@ Set `RabbitMQClientOptions.QueueNames` only when infrastructure owns the RabbitM
 
 The provider advances a RabbitMQ consumer offset after all active Orleans cursors have processed the corresponding cached messages. `IntervalToUpdateOffset` limits how frequently offsets are stored. A shorter interval reduces replay after an unclean shutdown but increases offset writes.
 
+The pulling agent uses `BatchContainerBatchSize = 1` so each delivery result protects one cache entry and checkpoint. Configuration validation enforces this value.
+
 Delivery is at least once across failures. A silo can stop after delivering an event but before persisting the new offset, causing the event to be replayed. Consumers must be idempotent.
 
-Rewind is limited by RabbitMQ stream retention. Configure maximum age or length in RabbitMQ according to the required recovery window, and monitor disk capacity, stream growth, consumer lag, connection failures, and Orleans streaming metrics.
+Receiver recovery resumes from the last stored RabbitMQ offset while the corresponding entries remain within RabbitMQ retention. The provider doesn't support subscription rewind from an application-supplied sequence token. Configure maximum age or length in RabbitMQ according to the required receiver recovery window, and monitor disk capacity, stream growth, consumer lag, connection failures, and Orleans streaming metrics.
 
 ## Run the sample
 
