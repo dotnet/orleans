@@ -27,18 +27,18 @@ public class SqlServerAdoNetStreamPartitionTests() : AdoNetStreamPartitionTests(
     /// Concurrent appends to the same partition must be serialized by the partition-row lock, and a
     /// rolled-back append must not permanently burn its allocated message identifier.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public Task AppendStreamMessage_ConcurrentAppends_AreSerializedAndRollbackDoesNotBurnIds() =>
         VerifySqlServerConcurrentAppendsAreSerializedAndRollbackDoesNotBurnIds();
 
     /// <summary>
     /// A reader must never observe a message allocated by a transaction that has not yet committed.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public Task ReadStreamMessages_ExcludesUncommittedInFlightAppend() =>
         VerifySqlServerReadExcludesUncommittedInFlightAppend();
 
-    [SkippableFact]
+    [Fact]
     public Task AppendStreamMessage_DifferentPartitionsDoNotShareTheAllocationLock() =>
         VerifySqlServerPartitionsAreIndependent();
 }
@@ -56,7 +56,7 @@ public class MySqlAdoNetStreamPartitionTests : AdoNetStreamPartitionTests
         MySqlConnection.ClearAllPools();
     }
 
-    [SkippableFact]
+    [Fact]
     public Task AppendStreamMessage_RollbackRestoresAllocation() => VerifyMySqlRollbackRestoresAllocation();
 }
 
@@ -73,7 +73,7 @@ public class PostgreSqlAdoNetStreamPartitionTests : AdoNetStreamPartitionTests
         NpgsqlConnection.ClearAllPools();
     }
 
-    [SkippableFact]
+    [Fact]
     public Task AppendStreamMessage_RollbackRestoresAllocation() => VerifyPostgreSqlRollbackRestoresAllocation();
 }
 
@@ -93,16 +93,16 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
     private IRelationalStorage _storage = null!;
     private RelationalOrleansQueries _queries = null!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var testing = await RelationalStorageForTesting.SetupInstance(invariant, TestDatabaseName);
-        Skip.If(IsNullOrEmpty(testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
+        Assert.SkipWhen(IsNullOrEmpty(testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
         _storage = RelationalStorage.CreateInstance(invariant, testing.CurrentConnectionString);
         _queries = await RelationalOrleansQueries.CreateInstance(invariant, testing.CurrentConnectionString);
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     #region Helpers
 
@@ -175,7 +175,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
 
     #region Append: sequential allocation and partition independence
 
-    [SkippableFact]
+    [Fact]
     public async Task AppendStreamMessage_AllocatesSequentialMessageIdsPerPartition()
     {
         var serviceId = RandomServiceId();
@@ -191,7 +191,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Equal(3, third.MessageId);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AppendStreamMessage_ConcurrentAppendsAreGapFree()
     {
         var serviceId = RandomServiceId();
@@ -204,7 +204,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Equal(Enumerable.Range(1, count).Select(static value => (long)value), results.Select(static result => result.MessageId).Order());
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AppendStreamMessage_PartitionsAreIndependent()
     {
         var serviceId = RandomServiceId();
@@ -228,7 +228,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Equal(1, boundsB.EarliestMessageId);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AppendStreamMessage_ValidatesStreamNamespaceBoundary()
     {
         var serviceId = RandomServiceId();
@@ -264,7 +264,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Equal(2, maxNamespaceAck.MessageId);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AppendStreamMessage_PersistsCanonicalStreamIdFullKeyAndNamespaceBoundary()
     {
         var serviceId = RandomServiceId();
@@ -290,7 +290,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
 
     #region Acquire: ownership, epoch, and checkpoint initialization
 
-    [SkippableFact]
+    [Fact]
     public async Task AcquireStreamPartition_InitializesCheckpointBeforeEarliestWhenNotStartingFromNow()
     {
         var serviceId = RandomServiceId();
@@ -308,7 +308,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Equal(2, state.TailMessageId);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AcquireStreamPartition_InitializesCheckpointAtTailWhenStartingFromNow()
     {
         var serviceId = RandomServiceId();
@@ -324,7 +324,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Equal(last.MessageId, state.TailMessageId);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AcquireStreamPartition_OnNeverAppendedPartitionHasNoBounds()
     {
         var serviceId = RandomServiceId();
@@ -339,7 +339,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Null(state.TailMessageId);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AcquireStreamPartition_ReacquisitionIncrementsOwnerEpochAndPreservesCheckpoint()
     {
         var serviceId = RandomServiceId();
@@ -357,7 +357,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Equal(1, second.Checkpoint); // preserved from the prior owner, not re-initialized
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AcquireStreamPartition_OwnerEpochAndCheckpointArePerPartition()
     {
         var serviceId = RandomServiceId();
@@ -383,7 +383,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
 
     #region Read: exclusive ordered ranges
 
-    [SkippableFact]
+    [Fact]
     public async Task ReadStreamMessages_ReturnsExclusiveOrderedRangeRespectingMaxCount()
     {
         var serviceId = RandomServiceId();
@@ -402,7 +402,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Equal(page.OrderBy(m => m.MessageId).Select(m => m.MessageId), page.Select(m => m.MessageId));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task ReadStreamMessages_EmptyWhenAfterMessageIdIsAtOrBeyondTail()
     {
         var serviceId = RandomServiceId();
@@ -418,7 +418,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Empty(beyondTail);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task ReadStreamMessages_ValidatesArgumentBounds()
     {
         var serviceId = RandomServiceId();
@@ -446,7 +446,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
 
     #region Checkpoint: monotonicity, non-regression, and epoch fencing
 
-    [SkippableFact]
+    [Fact]
     public async Task AdvanceStreamCheckpoint_AdvancesMonotonicallyAndRejectsRegression()
     {
         var serviceId = RandomServiceId();
@@ -479,7 +479,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Equal(3, advanceTo3.Checkpoint);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AdvanceStreamCheckpoint_RejectsCheckpointAtOrBeyondTail()
     {
         var serviceId = RandomServiceId();
@@ -497,7 +497,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.False(result!.Updated);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AdvanceStreamCheckpoint_FencesStaleOwnerEpochAfterReacquisition()
     {
         var serviceId = RandomServiceId();
@@ -523,7 +523,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Equal(2, currentAttempt.Checkpoint);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task RecoverableStreamUpdate_ReturnsPersistedStateWhenExpectedVersionConflicts()
     {
         var serviceId = RandomServiceId();
@@ -554,7 +554,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Equal(loaded.Version, updated.Version);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task RecoverableStreamUpdate_ThrowsWhenPartitionOwnershipIsLost()
     {
         var serviceId = RandomServiceId();
@@ -581,7 +581,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Contains("ownership was lost", exception.Message);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AdvanceStreamCheckpoint_ReturnsNullForUnknownPartition()
     {
         var result = await _queries.AdvanceStreamCheckpointAsync(RandomServiceId(), RandomProviderId(), RandomQueueId(), ownerEpoch: 1, checkpoint: 1);
@@ -589,7 +589,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Null(result);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task AdvanceStreamCheckpoint_ValidatesArgumentBounds()
     {
         var serviceId = RandomServiceId();
@@ -617,7 +617,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
 
     #region Bounds: partition state reporting
 
-    [SkippableFact]
+    [Fact]
     public async Task GetStreamPartitionBounds_ReflectsCurrentState()
     {
         var serviceId = RandomServiceId();
@@ -644,7 +644,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
 
     #region Cleanup: retention, hard ceiling diagnostics, batching, and throttling
 
-    [SkippableFact]
+    [Fact]
     public async Task CleanupStreamMessages_RemovesCheckpointedMessagesAfterRetentionElapses()
     {
         var serviceId = RandomServiceId();
@@ -682,7 +682,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Empty(remaining);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task CleanupStreamMessages_AppliesHardCeilingAndReportsDiagnostics()
     {
         var serviceId = RandomServiceId();
@@ -715,7 +715,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Null(result.Checkpoint);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task CleanupStreamMessages_RespectsBatchSizeAcrossMultipleRuns()
     {
         var serviceId = RandomServiceId();
@@ -753,7 +753,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Empty(remaining);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task CleanupStreamMessages_ThrottlesRepeatedRunsWithinInterval()
     {
         var serviceId = RandomServiceId();
@@ -774,7 +774,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Equal(0, second.DeletedCount);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task CleanupStreamMessages_ValidatesArgumentBounds()
     {
         var serviceId = RandomServiceId();
@@ -809,7 +809,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
     /// An old or partially-migrated schema that is missing stream partition query keys must fail
     /// explicitly and name the missing keys, rather than fail lazily or silently on first use.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public async Task CreateInstance_MissingStreamPartitionQueryKeys_FailsExplicitly()
     {
         await _storage.ExecuteAsync(
@@ -823,7 +823,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Contains("StreamSchemaVersionKey", exception.Message, StringComparison.Ordinal);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task CreateInstance_MixedLegacyAndStreamPartitionQueryKeys_FailsExplicitly()
     {
         await _storage.ExecuteAsync(
