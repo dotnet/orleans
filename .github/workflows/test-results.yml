@@ -64,13 +64,15 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
       - name: Summarize coverage
         id: coverage
+        shell: pwsh
         run: |
-          python .github/scripts/summarize-coverage.py coverage \
-           --source-root "$GITHUB_WORKSPACE/src" \
-           --markdown-output coverage-summary.md \
-           --json-output coverage-summary.json
-          cat coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
-          echo "line-rate=$(jq -r .line_rate_display coverage-summary.json)" >> "$GITHUB_OUTPUT"
+          ./.github/scripts/summarize-coverage.ps1 `
+            -ReportDirectory coverage `
+            -SourceRoot "$env:GITHUB_WORKSPACE/src" `
+            -MarkdownOutput coverage-summary.md `
+            -JsonOutput coverage-summary.json
+          Get-Content -Raw coverage-summary.md >> $env:GITHUB_STEP_SUMMARY
+          "line-rate=$((Get-Content -Raw coverage-summary.json | ConvertFrom-Json).line_rate_display)" >> $env:GITHUB_OUTPUT
       - name: Publish coverage check
         env:
           DETAILS_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
