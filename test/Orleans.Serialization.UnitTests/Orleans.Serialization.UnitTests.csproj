@@ -12,7 +12,6 @@
 
   <ItemGroup>
     <PackageReference Include="CsCheck" />
-    <PackageReference Include="xunit.v3.core.mtp-v2" />
     <PackageReference Include="xunit.v3.extensibility.core" />
     <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="FSharp.Core" />
