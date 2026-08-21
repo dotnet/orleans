@@ -1,6 +1,16 @@
 IF COL_LENGTH(N'OrleansMembershipTable', N'MetadataJson') IS NULL
 BEGIN
-    ALTER TABLE OrleansMembershipTable ADD MetadataJson NVARCHAR(4000) NULL;
+    ALTER TABLE OrleansMembershipTable ADD MetadataJson NVARCHAR(MAX) NULL;
+END;
+ELSE IF EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'OrleansMembershipTable')
+      AND name = N'MetadataJson'
+      AND max_length <> -1
+)
+BEGIN
+    ALTER TABLE OrleansMembershipTable ALTER COLUMN MetadataJson NVARCHAR(MAX) NULL;
 END;
 
 UPDATE OrleansQuery

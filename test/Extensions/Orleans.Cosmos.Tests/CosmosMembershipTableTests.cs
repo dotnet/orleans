@@ -99,6 +99,12 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     }
 
     [Fact, TestCategory("Functional")]
+    public async Task MembershipTable_Cosmos_MetadataRoundTrips()
+    {
+        await MembershipTable_MetadataRoundTrips();
+    }
+
+    [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_ReadRow_Insert_Read()
     {
         CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorTransactionalBatchConditionSkipReason);

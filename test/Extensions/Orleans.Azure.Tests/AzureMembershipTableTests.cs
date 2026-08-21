@@ -104,6 +104,12 @@ namespace Tester.AzureUtils
         }
 
         [Fact, TestCategory("Functional")]
+        public async Task MembershipTable_Azure_MetadataRoundTrips()
+        {
+            await MembershipTable_MetadataRoundTrips();
+        }
+
+        [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Azure_ReadRow_Insert_Read()
         {
             await MembershipTable_ReadRow_Insert_Read();

@@ -73,6 +73,7 @@ namespace Orleans.Runtime
             {
                 var entry = item;
                 entry = PreserveIAmAliveTime(previousSnapshot, entry);
+                entry = PreserveMetadata(previousSnapshot, entry);
                 entries.Add(entry.SiloAddress, entry);
             }
 
@@ -87,6 +88,21 @@ namespace Orleans.Runtime
                 && previousEntry.IAmAliveTime > entry.IAmAliveTime)
             {
                 entry = entry.WithIAmAliveTime(previousEntry.IAmAliveTime);
+            }
+
+            return entry;
+        }
+
+        private static MembershipEntry PreserveMetadata(MembershipTableSnapshot previousSnapshot, MembershipEntry entry)
+        {
+            // Metadata is immutable for the lifetime of a silo instance. Once it has been observed,
+            // retain it across snapshots from older silos and legacy membership table schemas.
+            if (previousSnapshot.Entries.TryGetValue(entry.SiloAddress, out var previousEntry)
+                && previousEntry.Metadata is { } previousMetadata
+                && !MetadataEquals(previousMetadata, entry.Metadata))
+            {
+                entry = entry.Copy();
+                entry.Metadata = previousMetadata;
             }
 
             return entry;
@@ -190,7 +206,7 @@ namespace Orleans.Runtime
 
             foreach (var entry in Entries)
             {
-                if (MetadataChanged(entry.Value, other.Entries[entry.Key]))
+                if (MetadataIsSuccessor(entry.Value, other.Entries[entry.Key]))
                 {
                     return true;
                 }
@@ -199,29 +215,32 @@ namespace Orleans.Runtime
             return false;
         }
 
-        private static bool MetadataChanged(MembershipEntry entry, MembershipEntry otherEntry)
-        {
-            var metadata = entry.Metadata;
-            var otherMetadata = otherEntry.Metadata;
-            if (ReferenceEquals(metadata, otherMetadata))
-            {
-                return false;
-            }
+        private static bool MetadataIsSuccessor(MembershipEntry entry, MembershipEntry otherEntry)
+            => entry.Metadata is not null && otherEntry.Metadata is null;
 
-            if (metadata is null || otherMetadata is null || metadata.Count != otherMetadata.Count)
+        private static bool MetadataEquals(
+            ImmutableDictionary<string, string> left,
+            ImmutableDictionary<string, string>? right)
+        {
+            if (ReferenceEquals(left, right))
             {
                 return true;
             }
 
-            foreach (var (key, value) in metadata)
+            if (right is null || left.Count != right.Count)
             {
-                if (!otherMetadata.TryGetValue(key, out var otherValue) || !string.Equals(value, otherValue, StringComparison.Ordinal))
+                return false;
+            }
+
+            foreach (var (key, value) in left)
+            {
+                if (!right.TryGetValue(key, out var otherValue) || !string.Equals(value, otherValue, StringComparison.Ordinal))
                 {
-                    return true;
+                    return false;
                 }
             }
 
-            return false;
+            return true;
         }
 
         public override string ToString()

@@ -53,7 +53,6 @@ internal sealed class OrleansQueries
             try
             {
                 await MakeTableAsync(ttl);
-                MetadataColumnAvailable = true;
             }
             catch (WriteTimeoutException) // If there's contention on table creation, backoff a bit and try once more
             {
@@ -64,7 +63,6 @@ internal sealed class OrleansQueries
                 if (!await DoesTableAlreadyExistAsync())
                 {
                     await MakeTableAsync(ttl);
-                    MetadataColumnAvailable = true;
                 }
             }
         }

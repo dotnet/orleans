@@ -22,7 +22,7 @@ CREATE TABLE OrleansMembershipTable
 	Status INT NOT NULL,
 	ProxyPort INT NULL,
 	SuspectTimes VARCHAR(8000) NULL,
-	MetadataJson NVARCHAR(4000) NULL,
+	MetadataJson NVARCHAR(MAX) NULL,
 	StartTime DATETIME2(3) NOT NULL,
 	IAmAliveTime DATETIME2(3) NOT NULL,
 
