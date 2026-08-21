@@ -24,8 +24,8 @@ public static class TaskIdExtensions
     /// </returns>
     /// <example>
     /// <code>
-    /// TaskId taskId = TaskId.Create("workflow/task-123");
-    /// HierarchicalKey key = taskId.ToHierarchicalKey();
+    /// TaskId taskId = TaskId.Parse("workflow/task-123");
+    /// Orleans.DurableMessaging.HierarchicalKey key = taskId.ToHierarchicalKey();
     /// // key.ToString() == "workflow/task-123"
     /// </code>
     /// </example>
@@ -42,7 +42,8 @@ public static class TaskIdExtensions
     /// </returns>
     /// <example>
     /// <code>
-    /// HierarchicalKey key = HierarchicalKey.Create("workflow/task-123");
+    /// Orleans.DurableMessaging.HierarchicalKey key =
+    ///     Orleans.DurableMessaging.HierarchicalKey.Parse("workflow/task-123");
     /// TaskId taskId = key.ToTaskId();
     /// // taskId.ToString() == "workflow/task-123"
     /// </code>

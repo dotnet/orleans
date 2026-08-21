@@ -641,7 +641,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                         }
                         else
                         {
-                            workItem.SetException(exception);
                             if (workItem is RevertPendingChangesWorkItem)
                             {
                                 lock (_lock)
@@ -650,6 +649,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                 }
                             }
                         }
+
+                        workItem.SetException(exception);
                     }
                     finally
                     {

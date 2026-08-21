@@ -183,10 +183,10 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         {
             using var durableCts = new CancellationTokenSource();
             await using var durableRegistration = await executionContext.RegisterCancellationCallbackAsync(
-                async cancellationToken =>
+                async _ =>
                 {
                     await durableCts.CancelAsync();
-                    await runtime.CancelRemoteAsync(executionContext.TaskId, Context.TargetId, cancellationToken);
+                    await runtime.CancelRemoteAsync(executionContext.TaskId, Context.TargetId, CancellationToken.None);
                 });
             var durableResponse = await runtime.ScheduleRemoteAsync(executionContext.TaskId, this, durableCts.Token);
             return durableResponse.IsCompleted
@@ -200,10 +200,10 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         using var cts = new CancellationTokenSource();
         await using var registration = await executionContext.RegisterCancellationCallbackAsync(
-            async cancellationToken =>
+            async _ =>
             {
                 await cts.CancelAsync();
-                await remote.CancelAsync(executionContext.TaskId, cancellationToken);
+                await remote.CancelAsync(executionContext.TaskId, CancellationToken.None);
             });
         var response = await remote.ScheduleAsync(executionContext.TaskId, this, cts.Token);
         var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };
@@ -363,10 +363,10 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
         {
             using var durableCts = new CancellationTokenSource();
             await using var durableRegistration = await executionContext.RegisterCancellationCallbackAsync(
-                async cancellationToken =>
+                async _ =>
                 {
                     await durableCts.CancelAsync();
-                    await runtime.CancelRemoteAsync(executionContext.TaskId, Context.TargetId, cancellationToken);
+                    await runtime.CancelRemoteAsync(executionContext.TaskId, Context.TargetId, CancellationToken.None);
                 });
             var durableResponse = await runtime.ScheduleRemoteAsync(executionContext.TaskId, this, durableCts.Token);
             return durableResponse.IsCompleted
@@ -380,10 +380,10 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
         var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         using var cts = new CancellationTokenSource();
         await using var registration = await executionContext.RegisterCancellationCallbackAsync(
-            async cancellationToken =>
+            async _ =>
             {
                 await cts.CancelAsync();
-                await remote.CancelAsync(executionContext.TaskId, cancellationToken);
+                await remote.CancelAsync(executionContext.TaskId, CancellationToken.None);
             });
         var response = await remote.ScheduleAsync(executionContext.TaskId, this, cts.Token);
         var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };

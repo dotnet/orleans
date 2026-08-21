@@ -90,6 +90,14 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _items[taskId] = typedState;
     }
 
+    public void SetCallerId(TaskId taskId, IDurableTaskState state, GrainId callerId)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(callerId, default);
+        var typedState = GetState(taskId, state);
+        typedState.CallerId = callerId;
+        _items[taskId] = typedState;
+    }
+
     public void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
     {
         ArgumentNullException.ThrowIfNull(response);
