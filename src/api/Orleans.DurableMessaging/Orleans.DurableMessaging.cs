@@ -218,13 +218,6 @@ namespace Orleans.DurableMessaging
         bool TryGetMessage(Runtime.GrainId senderId, System.Guid messageId, out DurableEnvelope envelope);
     }
 
-    [Alias("IDurableInboxExtension")]
-    public partial interface IDurableInboxExtension : Runtime.IGrainExtension, Runtime.IAddressable
-    {
-        [Alias("DeliverAsync")]
-        System.Threading.Tasks.ValueTask<DeliveryResult> DeliverAsync(DurableEnvelope envelope, System.Threading.CancellationToken cancellationToken = default);
-    }
-
     public partial interface IDurableMessagingDiagnostics
     {
         System.Collections.Generic.IReadOnlyList<DurableDeadLetter> InboxDeadLetters { get; }
@@ -405,24 +398,6 @@ namespace OrleansCodeGen.Orleans.DurableMessaging
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_Invokable_IDurableInboxExtension_GrainReference_Ext_03DB806B : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IDurableInboxExtension_GrainReference_Ext_03DB806B>, global::Orleans.Serialization.Codecs.IFieldCodec
-    {
-        public Codec_Invokable_IDurableInboxExtension_GrainReference_Ext_03DB806B(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IDurableInboxExtension_GrainReference_Ext_03DB806B instance) { }
-
-        public Invokable_IDurableInboxExtension_GrainReference_Ext_03DB806B ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IDurableInboxExtension_GrainReference_Ext_03DB806B instance)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IDurableInboxExtension_GrainReference_Ext_03DB806B value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_DurableEnvelope : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.DurableMessaging.DurableEnvelope>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_DurableEnvelope(global::Orleans.Serialization.Activators.IActivator<global::Orleans.DurableMessaging.DurableEnvelope> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -438,55 +413,5 @@ namespace OrleansCodeGen.Orleans.DurableMessaging
         public Copier_DurableEnvelopeData(global::Orleans.Serialization.Activators.IActivator<global::Orleans.DurableMessaging.DurableEnvelopeData> _activator) { }
 
         public global::Orleans.DurableMessaging.DurableEnvelopeData DeepCopy(global::Orleans.DurableMessaging.DurableEnvelopeData original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Copier_Invokable_IDurableInboxExtension_GrainReference_Ext_03DB806B : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IDurableInboxExtension_GrainReference_Ext_03DB806B>, global::Orleans.Serialization.Cloning.IDeepCopier
-    {
-        public Copier_Invokable_IDurableInboxExtension_GrainReference_Ext_03DB806B(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public Invokable_IDurableInboxExtension_GrainReference_Ext_03DB806B DeepCopy(Invokable_IDurableInboxExtension_GrainReference_Ext_03DB806B original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableMessaging.IDurableInboxExtension), typeof(global::Orleans.DurableMessaging.IDurableInboxExtension), "DeliverAsync" })]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableMessaging.IDurableInboxExtension), typeof(global::Orleans.DurableMessaging.IDurableInboxExtension), "03DB806B" })]
-    public sealed partial class Invokable_IDurableInboxExtension_GrainReference_Ext_03DB806B : global::Orleans.Runtime.Request<global::Orleans.DurableMessaging.DeliveryResult>
-    {
-        public global::Orleans.DurableMessaging.DurableEnvelope arg0;
-        public System.Threading.CancellationToken arg1;
-        public override bool IsCancellable { get { throw null; } }
-
-        public override void Dispose() { }
-
-        public override string GetActivityName() { throw null; }
-
-        public override object GetArgument(int index) { throw null; }
-
-        public override int GetArgumentCount() { throw null; }
-
-        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
-
-        public override string GetInterfaceName() { throw null; }
-
-        public override System.Type GetInterfaceType() { throw null; }
-
-        public override System.Reflection.MethodInfo GetMethod() { throw null; }
-
-        public override string GetMethodName() { throw null; }
-
-        public override object GetTarget() { throw null; }
-
-        protected override System.Threading.Tasks.ValueTask<global::Orleans.DurableMessaging.DeliveryResult> InvokeInner() { throw null; }
-
-        public override void SetArgument(int index, object value) { }
-
-        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
-
-        public override bool TryCancel() { throw null; }
     }
 }
