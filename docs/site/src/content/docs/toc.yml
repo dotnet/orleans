@@ -110,7 +110,7 @@ items:
             href: grains/journaling/redis-journal-storage.md
           - name: Operations and troubleshooting
             href: grains/journaling/operations.md
-          - name: Sample
+          - name: Samples
             href: grains/journaling/samples.md
       - name: Transactions
         href: grains/transactions.md
