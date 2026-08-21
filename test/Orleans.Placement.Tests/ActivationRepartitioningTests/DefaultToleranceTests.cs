@@ -22,6 +22,8 @@ namespace UnitTests.ActivationRepartitioningTests;
 [TestCategory("Functional"), TestCategory("ActivationRepartitioning")]
 public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : RepartitioningTestBase<DefaultToleranceTests.Fixture>(fixture), IClassFixture<DefaultToleranceTests.Fixture>
 {
+    private static readonly TimeSpan MigrationTimeout = TimeSpan.FromSeconds(10);
+
     [Fact]
     public async Task A_ShouldMoveToSilo2__B_And_C_ShouldStayOnSilo2()
     {
@@ -49,13 +51,12 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         Assert.Equal(Silo2, b_host);
         Assert.Equal(Silo2, c_host);
 
-        await Silo1Repartitioner.TriggerExchangeRequest();
+        await TriggerExchangeRequestAfterFlushingBuffers(Silo1Repartitioner);
 
-        do
-        {
-            a_host = await a.GetAddress();
-        }
-        while (a_host == Silo1);
+        await WaitForConditionAsync(
+            async () => (a_host = await a.GetAddress()) != Silo1,
+            MigrationTimeout,
+            () => $"Expected A to move from {Silo1}, but it remained on {a_host}.");
 
         // refresh
         a_host = await a.GetAddress();
@@ -99,13 +100,12 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         Assert.Equal(Silo1, b_host);
         Assert.Equal(Silo2, c_host);
 
-        await Silo1Repartitioner.TriggerExchangeRequest();
+        await TriggerExchangeRequestAfterFlushingBuffers(Silo1Repartitioner);
 
-        do
-        {
-            c_host = await c.GetAddress();
-        }
-        while (c_host == Silo2);
+        await WaitForConditionAsync(
+            async () => (c_host = await c.GetAddress()) != Silo2,
+            MigrationTimeout,
+            () => $"Expected C to move from {Silo2}, but it remained on {c_host}.");
 
         // refresh
         a_host = await a.GetAddress();
@@ -149,14 +149,17 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         Assert.Equal(Silo1, b_host);
         Assert.Equal(Silo2, c_host);
 
-        await Silo1Repartitioner.TriggerExchangeRequest();
+        await TriggerExchangeRequestAfterFlushingBuffers(Silo1Repartitioner);
 
-        do
-        {
-            a_host = await a.GetAddress();
-            b_host = await b.GetAddress();
-        }
-        while (a_host == Silo1 || b_host == Silo1);
+        await WaitForConditionAsync(
+            async () =>
+            {
+                a_host = await a.GetAddress();
+                b_host = await b.GetAddress();
+                return a_host != Silo1 && b_host != Silo1;
+            },
+            MigrationTimeout,
+            () => $"Expected A and B to move from {Silo1}, but A was on {a_host} and B was on {b_host}.");
 
         // refresh
         a_host = await a.GetAddress();
@@ -201,14 +204,17 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         Assert.Equal(Silo2, c_host);
         Assert.Equal(Silo2, d_host);
 
-        await Silo1Repartitioner.TriggerExchangeRequest();
+        await TriggerExchangeRequestAfterFlushingBuffers(Silo1Repartitioner);
 
-        do
-        {
-            a_host = await a.GetAddress();
-            c_host = await c.GetAddress();
-        }
-        while (a_host == Silo1 && c_host == Silo2);
+        await WaitForConditionAsync(
+            async () =>
+            {
+                a_host = await a.GetAddress();
+                c_host = await c.GetAddress();
+                return a_host != Silo1 || c_host != Silo2;
+            },
+            MigrationTimeout,
+            () => $"Expected A to move from {Silo1} or C to move from {Silo2}, but A was on {a_host} and C was on {c_host}.");
 
         // refresh
         a_host = await a.GetAddress();
@@ -352,9 +358,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         Assert.Equal(receiverSilo, sr2_host);
         Assert.Equal(pullingAgentSilo, sr3_host);
 
-        await receiverRepartitioner.FlushBuffers();
-        await pullingAgentRepartitioner.FlushBuffers();
-        await receiverRepartitioner.TriggerExchangeRequest();
+        await TriggerExchangeRequestAfterFlushingBuffers(receiverRepartitioner);
 
         stopwatch.Restart();
 

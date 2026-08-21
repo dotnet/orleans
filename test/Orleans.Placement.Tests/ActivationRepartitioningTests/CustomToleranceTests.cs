@@ -73,7 +73,7 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOut
 
         Assert.Equal(Silo2, await x.GetAddress()); // X remains in silo 2
 
-        await Silo1Repartitioner.TriggerExchangeRequest();
+        await TriggerExchangeRequestAfterFlushingBuffers(Silo1Repartitioner);
 
         // At this point the layout is like follows:
 
@@ -99,7 +99,7 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOut
 
         await LogEdgesAsync(Silo1Repartitioner);
         await LogEdgesAsync(Silo2Repartitioner);
-        await Silo1Repartitioner.TriggerExchangeRequest();
+        await TriggerExchangeRequestAfterFlushingBuffers(Silo1Repartitioner);
         await Test();
 
         // To make extra sure, we now trigger 's2_rebalancer', which again should yield to no further migrations.
@@ -113,7 +113,7 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOut
             i++;
         }
 
-        await Silo2Repartitioner.TriggerExchangeRequest();
+        await TriggerExchangeRequestAfterFlushingBuffers(Silo2Repartitioner);
 
         await Test();
 
