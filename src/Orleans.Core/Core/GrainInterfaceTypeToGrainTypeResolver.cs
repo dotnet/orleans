@@ -22,7 +22,6 @@ namespace Orleans
 #else
         private readonly object _lockObj = new();
 #endif
-        private readonly ConcurrentDictionary<GrainInterfaceType, GrainType> _genericMapping = new ConcurrentDictionary<GrainInterfaceType, GrainType>();
         private readonly IClusterManifestProvider _clusterManifestProvider;
         private Cache? _cache;
 
@@ -40,7 +39,7 @@ namespace Orleans
         /// </summary>
         public GrainType GetGrainType(GrainInterfaceType interfaceType, string prefix)
         {
-            if (string.IsNullOrEmpty(prefix))
+            if (string.IsNullOrWhiteSpace(prefix))
             {
                 return GetGrainType(interfaceType);
             }
@@ -60,9 +59,9 @@ namespace Orleans
         /// <param name="prefix">A prefix of the grain implementation class name to search for.</param>
         /// <param name="result">The resolved grain type.</param>
         /// <returns><see langword="true"/> if an implementation was found; otherwise <see langword="false"/>.</returns>
-        public bool TryGetGrainType(GrainInterfaceType interfaceType, string prefix, out GrainType result)
+        public bool TryGetGrainType(GrainInterfaceType interfaceType, string? prefix, out GrainType result)
         {
-            if (string.IsNullOrEmpty(prefix))
+            if (string.IsNullOrWhiteSpace(prefix))
             {
                 return TryGetGrainType(interfaceType, out result);
             }
@@ -133,21 +132,23 @@ namespace Orleans
         /// <param name="result">The resolved grain type.</param>
         /// <returns><see langword="true"/> if an implementation was found; otherwise <see langword="false"/>.</returns>
         public bool TryGetGrainType(GrainInterfaceType interfaceType, out GrainType result)
+            => TryGetGrainType(GetCache(), interfaceType, out result);
+
+        private bool TryGetGrainType(Cache cache, GrainInterfaceType interfaceType, out GrainType result)
         {
             result = default;
-            var cache = GetCache();
             if (cache.Map.TryGetValue(interfaceType, out var entry))
             {
                 TryFind(interfaceType, entry, out result);
             }
-            else if (_genericMapping.TryGetValue(interfaceType, out result))
+            else if (cache.GenericMapping.TryGetValue(interfaceType, out result))
             {
                 // Nothing needed here.
             }
             else if (GenericGrainInterfaceType.TryParse(interfaceType, out var genericInterface) && genericInterface.IsConstructed)
             {
                 var unconstructedInterface = genericInterface.GetGenericGrainType();
-                if (TryGetGrainType(unconstructedInterface.Value, out var unconstructed))
+                if (TryGetGrainType(cache, unconstructedInterface.Value, out var unconstructed))
                 {
                     if (GenericGrainType.TryParse(unconstructed, out var genericGrainType))
                     {
@@ -166,7 +167,10 @@ namespace Orleans
                     }
                 }
 
-                _genericMapping[interfaceType] = result;
+                if (!result.IsDefault)
+                {
+                    cache.GenericMapping[interfaceType] = result;
+                }
             }
 
             return !result.IsDefault;
@@ -297,6 +301,7 @@ namespace Orleans
             {
                 this.Version = version;
                 this.Map = map;
+                this.GenericMapping = new();
             }
 
             /// <summary>
@@ -308,6 +313,11 @@ namespace Orleans
             /// Gets the mapping from grain interface type to implementations.
             /// </summary>
             public Dictionary<GrainInterfaceType, CacheEntry> Map { get; }
+
+            /// <summary>
+            /// Gets constructed generic mappings derived from this manifest version.
+            /// </summary>
+            public ConcurrentDictionary<GrainInterfaceType, GrainType> GenericMapping { get; }
         }
 
         /// <summary>
