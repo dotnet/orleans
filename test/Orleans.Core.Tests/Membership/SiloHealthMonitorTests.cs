@@ -224,7 +224,7 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
-        public async Task SiloHealthMonitor_TimeoutDuringGcPause_IsInconclusive()
+        public async Task SiloHealthMonitor_TimeoutDuringLocalPause_IsInconclusive()
         {
             var timeProvider = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(
                 new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero));
@@ -262,7 +262,7 @@ namespace NonSilo.Tests.Membership
                 _localSiloDetails,
                 timeProvider);
             var totalPauseDuration = TimeSpan.Zero;
-            _localSiloHealthMonitor.TotalGarbageCollectionPauseDuration.Returns(_ => totalPauseDuration);
+            _localSiloHealthMonitor.TotalPauseDuration.Returns(_ => totalPauseDuration);
 
             try
             {
@@ -294,7 +294,7 @@ namespace NonSilo.Tests.Membership
         {
             _clusterMembershipOptions.ProbeTimeout = TimeSpan.FromSeconds(2);
             var pauseSample = 0;
-            _localSiloHealthMonitor.TotalGarbageCollectionPauseDuration.Returns(_ =>
+            _localSiloHealthMonitor.TotalPauseDuration.Returns(_ =>
                 Interlocked.Increment(ref pauseSample) % 2 == 1 ? TimeSpan.Zero : _clusterMembershipOptions.ProbeTimeout);
 
             _prober.Probe(default!, default).ThrowsAsyncForAnyArgs(new Exception("nope"));

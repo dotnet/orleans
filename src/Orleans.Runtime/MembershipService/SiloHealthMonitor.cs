@@ -208,14 +208,14 @@ namespace Orleans.Runtime.MembershipService
                     var timeout = CalculateProbeTimeout(failureDetector, options, localDegradationScore, isDirectProbe, Debugger.IsAttached);
                     probeStartTimestamp = _timeProvider.GetTimestamp();
                     using var cancellation = new CancellationTokenSource(timeout, _timeProvider);
-                    var gcPauseBefore = isDirectProbe
-                        ? _localSiloHealthMonitor.TotalGarbageCollectionPauseDuration
+                    var pauseDurationBefore = isDirectProbe
+                        ? _localSiloHealthMonitor.TotalPauseDuration
                         : TimeSpan.Zero;
 
                     if (isDirectProbe)
                     {
                         // Probe the silo directly.
-                        probeResult = await this.ProbeDirectly(cancellation.Token, timeout, gcPauseBefore).ConfigureAwait(false);
+                        probeResult = await this.ProbeDirectly(cancellation.Token, timeout, pauseDurationBefore).ConfigureAwait(false);
                     }
                     else
                     {
@@ -324,10 +324,10 @@ namespace Orleans.Runtime.MembershipService
         /// Probes the remote silo.
         /// </summary>
         /// <param name="cancellation">A token to cancel and fail the probe attempt.</param>
-        /// <param name="probeTimeout">The timeout used for this probe, for GC pause evaluation.</param>
-        /// <param name="gcPauseBefore">The cumulative GC pause duration when the probe timeout was armed.</param>
+        /// <param name="probeTimeout">The timeout used for this probe, for local pause evaluation.</param>
+        /// <param name="pauseDurationBefore">The cumulative local pause duration when the probe timeout was armed.</param>
         /// <returns>The number of failed probes since the last successful probe.</returns>
-        private async Task<ProbeResult> ProbeDirectly(CancellationToken cancellation, TimeSpan probeTimeout, TimeSpan gcPauseBefore)
+        private async Task<ProbeResult> ProbeDirectly(CancellationToken cancellation, TimeSpan probeTimeout, TimeSpan pauseDurationBefore)
         {
             var id = ++_nextProbeId;
             LogTraceGoingToSendPing(_log, id, TargetSiloAddress);
@@ -368,13 +368,13 @@ namespace Orleans.Runtime.MembershipService
             }
             else
             {
-                // Check if a GC pause consumed a significant portion of the probe timeout.
+                // Check if a local pause consumed a significant portion of the probe timeout.
                 // If so, the local silo may have been unable to process the response in time,
                 // so we treat this as an inconclusive result rather than a failure.
-                var gcPauseDuring = _localSiloHealthMonitor.TotalGarbageCollectionPauseDuration - gcPauseBefore;
-                if (probeTimedOut && gcPauseDuring >= probeTimeout.Multiply(0.25))
+                var pauseDurationDuring = _localSiloHealthMonitor.TotalPauseDuration - pauseDurationBefore;
+                if (probeTimedOut && pauseDurationDuring >= probeTimeout.Multiply(0.25))
                 {
-                    LogWarningProbeFailureDuringGcPause(_log, id, TargetSiloAddress, roundTripTime, gcPauseDuring, _failedProbes);
+                    LogWarningProbeFailureDuringLocalPause(_log, id, TargetSiloAddress, roundTripTime, pauseDurationDuring, _failedProbes);
                     probeResult = ProbeResult.CreateDirect(_failedProbes, ProbeResultStatus.Unknown);
                 }
                 else
@@ -557,8 +557,8 @@ namespace Orleans.Runtime.MembershipService
 
         [LoggerMessage(
             Level = LogLevel.Warning,
-            Message = "Probe #{Id} to silo {SiloAddress} failed after {Elapsed}, but a GC pause of {GcPauseDuration} was detected during the probe. Treating as inconclusive. Consecutive failed probe count remains at {FailedProbeCount}."
+            Message = "Probe #{Id} to silo {SiloAddress} failed after {Elapsed}, but a local pause of {PauseDuration} was detected during the probe. Treating as inconclusive. Consecutive failed probe count remains at {FailedProbeCount}."
         )]
-        private static partial void LogWarningProbeFailureDuringGcPause(ILogger logger, int id, SiloAddress siloAddress, TimeSpan elapsed, TimeSpan gcPauseDuration, int failedProbeCount);
+        private static partial void LogWarningProbeFailureDuringLocalPause(ILogger logger, int id, SiloAddress siloAddress, TimeSpan elapsed, TimeSpan pauseDuration, int failedProbeCount);
     }
 }
