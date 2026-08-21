@@ -148,17 +148,24 @@ namespace Orleans.Runtime.Messaging
 
         public void FailMessage(Message msg, string reason)
         {
-            MessagingMetrics.OnFailedSentMessage(msg);
-            if (msg.Direction == Message.Directions.Request)
+            try
             {
-                LogDebugClientIsRejectingMessage(this.Log, msg, reason);
-                // Done retrying, send back an error instead
-                this.SendRejection(msg, Message.RejectionTypes.Transient, $"Client is rejecting message: {msg}. Reason = {reason}");
+                MessagingMetrics.OnFailedSentMessage(msg);
+                if (msg.Direction == Message.Directions.Request)
+                {
+                    LogDebugClientIsRejectingMessage(this.Log, msg, reason);
+                    // Done retrying, send back an error instead
+                    this.SendRejection(msg, Message.RejectionTypes.Transient, $"Client is rejecting message: {msg}. Reason = {reason}");
+                }
+                else
+                {
+                    LogInformationClientIsDroppingMessage(this.Log, msg, reason);
+                    MessagingMetrics.OnDroppedSentMessage(msg);
+                }
             }
-            else
+            finally
             {
-                LogInformationClientIsDroppingMessage(this.Log, msg, reason);
-                MessagingMetrics.OnDroppedSentMessage(msg);
+                msg.ReleaseDropped("ClientOutboundConnection.FailMessage");
             }
         }
 

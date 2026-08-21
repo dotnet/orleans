@@ -20,7 +20,6 @@ using Orleans.Serialization.Invocation;
 using Orleans.Storage;
 using static Orleans.Internal.StandardExtensions;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -39,18 +38,18 @@ namespace Orleans.Runtime
         private readonly PeriodicTimer callbackTimer;
         private int _isStopping;
 
-        private GrainLocator grainLocator;
-        private MessageCenter messageCenter;
-        private List<IIncomingGrainCallFilter> grainCallFilters;
+        private GrainLocator grainLocator = null!;
+        private MessageCenter messageCenter = null!;
+        private List<IIncomingGrainCallFilter> grainCallFilters = null!;
         private readonly DeepCopier _deepCopier;
         private readonly ApplicationRequestInstruments _applicationRequestInstruments;
-        private IGrainCallCancellationManager _cancellationManager;
-        private HostedClient hostedClient;
+        private IGrainCallCancellationManager _cancellationManager = null!;
+        private HostedClient hostedClient = null!;
 
         private HostedClient HostedClient => this.hostedClient ??= this.ServiceProvider.GetRequiredService<HostedClient>();
         private readonly MessageFactory messageFactory;
-        private IGrainReferenceRuntime grainReferenceRuntime;
-        private Task callbackTimerTask;
+        private IGrainReferenceRuntime grainReferenceRuntime = null!;
+        private Task? callbackTimerTask;
         private readonly MessagingTrace messagingTrace;
         private readonly DeepCopier<Response> responseCopier;
 
@@ -65,7 +64,7 @@ namespace Orleans.Runtime
             GrainInterfaceTypeResolver interfaceIdResolver,
             GrainInterfaceTypeToGrainTypeResolver interfaceToTypeResolver,
             DeepCopier deepCopier,
-            TimeProvider timeProvider,
+            [FromKeyedServices(TimeProviderNames.Messaging)] TimeProvider timeProvider,
             InterfaceToImplementationMappingCache interfaceToImplementationMapping,
             OrleansInstruments orleansInstruments)
         {
@@ -94,7 +93,7 @@ namespace Orleans.Runtime
                 this.messagingOptions.ResponseTimeout,
                 this.messagingOptions.CancelRequestOnTimeout,
                 this.messagingOptions.WaitForCancellationAcknowledgement,
-                cancellationManager: null);
+                cancellationManager: null!);
 
             this.systemSharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
@@ -102,7 +101,7 @@ namespace Orleans.Runtime
                 this.messagingOptions.SystemResponseTimeout,
                 cancelOnTimeout: false,
                 waitForCancellationAcknowledgement: this.messagingOptions.WaitForCancellationAcknowledgement,
-                cancellationManager: null);
+                cancellationManager: null!);
         }
 
         public IServiceProvider ServiceProvider { get; }
@@ -126,7 +125,7 @@ namespace Orleans.Runtime
         public void SendRequest(
             GrainReference target,
             IInvokable request,
-            IResponseCompletionSource context,
+            IResponseCompletionSource? context,
             InvokeMethodOptions options)
         {
             var cancellationToken = request.GetCancellationToken();
@@ -140,7 +139,7 @@ namespace Orleans.Runtime
             if (message.SendingSilo == null)
                 message.SendingSilo = MySilo;
 
-            IGrainContext sendingActivation = RuntimeContext.Current;
+            IGrainContext? sendingActivation = RuntimeContext.Current;
 
             if (sendingActivation == null)
             {
@@ -173,13 +172,13 @@ namespace Orleans.Runtime
             }
 
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
-            CallbackData callbackData = null;
+            CallbackData? callbackData = null;
             if (!oneWay)
             {
                 Debug.Assert(context is not null);
 
                 // Register a callback for the request.
-                callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
+                callbackData = new CallbackData(sharedData, context!, message, _applicationRequestInstruments);
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
@@ -313,12 +312,12 @@ namespace Orleans.Runtime
                                 {
                                     var invoker = new GrainMethodInvoker(message, target, invokable, GrainCallFilters, this.interfaceToImplementationMapping, this.responseCopier);
                                     await invoker.Invoke();
-                                    response = invoker.Response;
+                                    response = invoker.Response!;
                                 }
                                 else
                                 {
                                     response = await invokable.Invoke();
-                                    response = this.responseCopier.Copy(response);
+                                    response = this.responseCopier.Copy(response)!;
                                 }
 
                                 invokable.Dispose();
@@ -379,7 +378,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                SendResponse(message, (Response)this._deepCopier.Copy(response));
+                SendResponse(message, (Response)this._deepCopier.Copy(response)!);
             }
             catch (Exception exc)
             {
@@ -413,7 +412,7 @@ namespace Orleans.Runtime
             OrleansInsideRuntimeClientEvent.Instance.ReceiveResponse(message);
             if (message.Result is Message.ResponseTypes.Rejection)
             {
-                if (!message.TargetSilo.Matches(this.MySilo))
+                if (!message.TargetSilo!.Matches(this.MySilo))
                 {
                     // gatewayed message - gateway back to sender
                     LogTraceNoCallbackForRejection(this.logger, message);
@@ -422,7 +421,7 @@ namespace Orleans.Runtime
                 }
 
                 LogHandleMessage(this.logger, message);
-                var rejection = (RejectionResponse)message.BodyObject;
+                var rejection = (RejectionResponse)message.BodyObject!;
                 switch (rejection.RejectionType)
                 {
                     case Message.RejectionTypes.Overloaded:
@@ -449,12 +448,12 @@ namespace Orleans.Runtime
             }
             else if (message.Result == Message.ResponseTypes.Status)
             {
-                var status = (StatusResponse)message.BodyObject;
+                var status = (StatusResponse)message.BodyObject!;
                 callbacks.TryGetValue((message.TargetGrain, message.Id), out var callback);
                 var request = callback?.Message;
                 if (request is not null)
                 {
-                    callback.OnStatusUpdate(status);
+                    callback!.OnStatusUpdate(status);
                     if (status.Diagnostics != null && status.Diagnostics.Count > 0)
                     {
                         LogInformationReceivedStatusUpdate(this.logger, request, status.Diagnostics);
@@ -484,13 +483,13 @@ namespace Orleans.Runtime
                 return;
             }
 
-            CallbackData callbackData;
+            CallbackData? callbackData;
             bool found = callbacks.TryRemove((message.TargetGrain, message.Id), out callbackData);
             if (found)
             {
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
                 // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
-                callbackData.DoCallback(message);
+                callbackData!.DoCallback(message);
                 message.MarkTransferred("InsideRuntimeClient.ReceiveResponse:AfterDoCallback");
                 message.Release();
             }

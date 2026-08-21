@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Messaging;
 
-#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     internal sealed partial class GatewayInboundConnection : Connection
@@ -81,7 +80,7 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            SiloAddress targetAddress = this.gateway.TryToReroute(msg);
+            SiloAddress? targetAddress = this.gateway.TryToReroute(msg);
             msg.SendingSilo = this.myAddress;
             if (targetAddress is null)
             {
@@ -185,7 +184,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        protected override void RetryMessage(Message msg, Exception ex = null)
+        protected override void RetryMessage(Message msg, Exception? ex = null)
         {
             if (msg == null) return;
 
