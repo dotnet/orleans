@@ -204,7 +204,7 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
 
         return true;
     }
-    
+
     // Schedules a durable task without waiting for the task to complete
     public async Task<ScheduledTask> ScheduleAsync(CancellationToken cancellationToken = default)
     {

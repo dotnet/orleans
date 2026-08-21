@@ -43,7 +43,7 @@
 * Workflows can access and update the state of the grain which defines them.
 * Updates to grain state and workflow state are guaranteed to occur atomically
   * If the developer specifies that both are to be updated simultaneously, there is no possibility for only one or the other to be updated.
-* 
+*
 
 * A grain is a unit of atomicity: developers should be able to read & modify the state of a grain and the state of a workflow atomically. This includes:
   * Enqueuing requests to be sent (outbox)
@@ -62,7 +62,7 @@ class UserGrain : Grain, IUserGrain
   public async DurableTask SoftDelete()
   {
     if (_userState.Value is null) return;
-    
+
     _userState.Value.IsSoftDelete = true;
 
     // Schedule hard deletion.
@@ -89,7 +89,7 @@ class UserGrain : Grain, IUserGrain
 // Using the Step API
     var id = await Step("id", () => Guid.NewGuid().ToString("N"));
     await Step("issuePayment", () => _paymentGateway.CreatePaymentAsync(id, details));
-    
+
 // Using the .AsStep() API
 // Benefits: looks cleaner. Can clear up intermediate state ("id") once it's no longer needed, easier to nest.
     await IssuePayment(orderDetails).AsStep("issuePayment");
@@ -133,7 +133,7 @@ class UserGrain : Grain, IUserGrain
      * `await grain.MyDurableTaskMethod().ScheduleAsync("my-task-id");`
        * Schedules a durable task method with an id.
        * If a task was previously scheduled with this id and has not been cleaned up, this is equivalent to no operation.
-       * If the task has not been scheduled, this will schedule it and the 
+       * If the task has not been scheduled, this will schedule it and the
      * `await grain.MyDurableTaskMethod().ScheduleAsync("my-task-id", options);`
        * Schedules a durable task method with a specified id and options.
        * If a task was previously scheduled with this id and has not been cleaned up, this is equivalent to no operation.
@@ -161,7 +161,7 @@ Thoughts:
   * You have a task and can configure it
   * Why? Because it seems that we cannot apply the semantics everywhere:
     * Retries, specifically are difficult with method calls, because (I think) we would need to create an in-memory copy of the state machine.
-    * Delayed scheduling are ok, but delays are well served by `await Task.Delay(...)` and delayed scheduling is usually meant for delays in the order of minutes to years, not seconds, so they may not be 
+    * Delayed scheduling are ok, but delays are well served by `await Task.Delay(...)` and delayed scheduling is usually meant for delays in the order of minutes to years, not seconds, so they may not be
 * Outside of a `DurableTask` method, should awaiting the result of a `DurableTask` be blocked?
   * Allowing it may result in unresponsive programs
   * It may be too easy to accidentally do.
@@ -171,7 +171,7 @@ Flow:
 * Call a DurableTask method on a grain:
   * Internally, the generated proxy constructs a `DurableTaskGrainMethodInvocation` instance and returns it.
     * This is a special implementation of `DurableTask` which synchronously captures the `IInvokable` which represents the grain call but does not submit it to the runtime immediately.
-    * Instead, it allows `DurableTask` extension methods to be invoked first, to configure the `DurableTask`/`IInvokable` 
+    * Instead, it allows `DurableTask` extension methods to be invoked first, to configure the `DurableTask`/`IInvokable`
   * Upon awaiting the `DurableTask`, the corresponding `IInvokable` is submitted to the runtime (along with its configuration)
     * Note: Why not use the regular `DurableTaskMethodInvocation` implementation? Because, if we did, it would not synchronously copy the method arguments, so they might mutate by the time the task is submitted. Maybe this is fine, but it's better to be safe than sorry.
   * The generated `IInvokable` uses a base class: `DurableTaskRequestBase`, which is responsible for invoking the request on the target grain instance.
@@ -239,7 +239,7 @@ Flow:
 
   * The `DurableTask` methods which allow specifying a task id modify the `DurableTaskGrainMethodInvocation` instance so that when it is submitted to the runtime, the id, etc, are carried with it.
   * When awaited, the `IInvokable` is submitted to the runtime to send to the remote grain.
-  * The 
+  * The
 
 
 Questions:
@@ -279,7 +279,7 @@ TODO:
 * How can external services integrate with this pattern?
   * Send "idempotency-key" to external service
 * How can we support the idempotency-key pattern so that we can create Web services which others can integrate with?
-  * Schedule a DurableTask with the specified 
+  * Schedule a DurableTask with the specified
 
 Stepwise Task APIs for use within `DurableTask` methods:
 * `await (DurableTask).AsStepAsync("foo")` - invoke some durable task as a named step in the workflow, skipping the invocation if a step with that name has already been completed and had its result (if any) stored.
@@ -306,7 +306,7 @@ Stepwise Task APIs for use within `DurableTask` methods:
     * `DurableTask<T> DurableTask.Run(Func<T>)`
   * Usage:
     ```csharp
-    var id = await DurableTask.Run(() => Guid.NewGuid()).AsStep("generate-id")` 
+    var id = await DurableTask.Run(() => Guid.NewGuid()).AsStep("generate-id")`
     ```
     Equivalent to:
     ``` csharp
@@ -342,7 +342,7 @@ Stepwise Task APIs for use within `DurableTask` methods:
 
   * `DurableTaskCompletionSource` (DTCS)
     * Overview:
-      * When integrating with external systems, 
+      * When integrating with external systems,
       * `DurableTaskCompletionSource`/`DurableTaskCompletionSource<T>` instances can be used within grains to create globally identifiable, named, distributed, fault-tolerant, awaitable tasks.
     * Uses:
       * To implement the *idempotency key* pattern, a new DTCS can be created with either an automatically generated identifier (Eg, `Guid.NewGuid().ToString("N")`) or a specified identifier.
@@ -387,10 +387,10 @@ Stepwise Task APIs for use within `DurableTask` methods:
       ```csharp
       // In an ASP.NET Controller method:
       var completion = DurableTaskCompletionSource.Create<MyResponse>(idempotencyId);
-      
+
       // Optimization: if the task has already been completed, there is no need to issue the operation again.
       var (isCompleted, result) await completion.Task.TryGetResultAsync();
-      if (isCompleted) 
+      if (isCompleted)
       {
         return result;
       }
@@ -407,7 +407,7 @@ Stepwise Task APIs for use within `DurableTask` methods:
       * How should storage for DTCS work? Should the default DTCS id point to the grain which created it and use it for storage?
         * DTCS could be implemented as a grain extension and there could be two main cases:
           * DTCS created with an explicit identifier
-            * This would be a global DTCS and would implicitly be 
+            * This would be a global DTCS and would implicitly be
           * DTCS created with no explicit identifier
             * If the DTCS is created within a grain, the DTCS.Id would point to the grain, eg:
               * `grain:` + *GrainId* + `:` + *RandomId*

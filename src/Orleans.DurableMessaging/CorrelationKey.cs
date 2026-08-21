@@ -21,7 +21,7 @@ namespace Orleans.DurableMessaging;
 /// var transferKey = CorrelationKey.Create("transfer-123");
 /// var debitKey = transferKey.CreateChildKey("debit");
 /// var creditKey = transferKey.CreateChildKey("credit");
-/// 
+///
 /// // Results in keys: "transfer-123/debit" and "transfer-123/credit"
 /// </code>
 /// </para>
@@ -30,7 +30,7 @@ namespace Orleans.DurableMessaging;
 /// <code>
 /// // Old code:
 /// CorrelationKey key = CorrelationKey.Create("transfer-123");
-/// 
+///
 /// // New code:
 /// HierarchicalKey key = HierarchicalKey.Create("transfer-123");
 /// </code>

@@ -36,7 +36,7 @@ public class JobTaskState
     public DateTime CreatedAt { get; set; }
 
     /// <summary>
-    /// Gets or sets the tasks which 
+    /// Gets or sets the tasks which
     /// </summary>
     [Id(5)]
     public TaskId[]? CanceledAfter { get; set; }

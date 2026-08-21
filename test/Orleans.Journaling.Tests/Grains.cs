@@ -94,13 +94,13 @@ public class RequestContextTestGrain([FromKeyedServices("inbox")] IDurableInbox 
         // Send message to self to trigger handler
         var inboxExtension = this.AsReference<IDurableInboxExtension>();
         var sessionPool = ServiceProvider.GetRequiredService<SerializerSessionPool>();
-        
+
         var builder = new DurableEnvelopeBuilder
         {
             SessionPool = sessionPool,
             SenderId = this.GetGrainId()
         };
-        
+
         var envelope = builder
             .To(this.GetGrainId(), "test-message")
             .WithBody(message)

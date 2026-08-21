@@ -56,7 +56,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
 
         inbox ??= new Dictionary<(GrainId, Guid), DurableEnvelope>();
         processed ??= new Dictionary<(GrainId, Guid), DateTimeOffset>();
-        
+
         // Create a test DurableInbox for handler registration
         var durableInbox = new TestDurableInbox();
         var outbox = new TestOutbox();
@@ -170,10 +170,10 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
 
         // Act - deliver twice
         var result1 = await extension.DeliverAsync(envelope, new DeliveryOptions(), CancellationToken.None);
-        
+
         // The message should have been accepted or processed
         Assert.Equal(DeliveryStatus.Accepted, result1.Status);
-        
+
         var result2 = await extension.DeliverAsync(envelope, new DeliveryOptions(), CancellationToken.None);
 
         // Assert
@@ -232,7 +232,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         var extension = CreateInboxExtension(maxCapacity: 1);
         var slowHandler = new SlowMessageHandler(delayMs: 10000); // 10 seconds - won't complete during test
         extension.RegisterHandler("test.route", slowHandler);
-        
+
         var senderId = GrainId.Create("test", "sender");
         var receiverId = GrainId.Create("test", "receiver");
 

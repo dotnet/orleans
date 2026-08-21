@@ -26,30 +26,30 @@ namespace Orleans.DurableMessaging;
 ///     {
 ///         // Process the order
 ///         var result = await ProcessOrder(message);
-///         
+///
 ///         // Send confirmation to requester
 ///         if (context.Envelope.ReplyTo is { } replyTo)
 ///         {
 ///             var response = context.CreateEnvelope()
 ///                 .To(replyTo, "order/confirmation")
-///                 .WithBody(new OrderConfirmation 
-///                 { 
-///                     OrderId = message.OrderId, 
-///                     Status = result.Status 
+///                 .WithBody(new OrderConfirmation
+///                 {
+///                     OrderId = message.OrderId,
+///                     Status = result.Status
 ///                 })
 ///                 .WithCorrelationKey(context.Envelope.CorrelationKey)
 ///                 .Build();
-///             
+///
 ///             context.Send(response);
 ///         }
-///         
+///
 ///         // Send notification to fulfillment service
 ///         var fulfillmentMessage = context.CreateEnvelope()
 ///             .To(fulfillmentGrain, "fulfillment/create")
 ///             .WithBody(new FulfillmentRequest { OrderId = message.OrderId })
 ///             .WithContextValue("priority", message.Priority)
 ///             .Build();
-///         
+///
 ///         context.Send(fulfillmentMessage);
 ///     }
 /// }
@@ -72,13 +72,13 @@ public interface IInboxHandlerContext
     /// {
     ///     _logger.LogInformation("Processing message with correlation key: {Key}", key);
     /// }
-    /// 
+    ///
     /// // Access request context values
     /// if (context.Envelope.Data.TryGetContextValue&lt;string&gt;("trace-id", out var traceId))
     /// {
     ///     Activity.Current?.SetTag("trace-id", traceId);
     /// }
-    /// 
+    ///
     /// // Check reply-to for request/response pattern
     /// if (context.Envelope.ReplyTo is { } replyTo)
     /// {
@@ -103,7 +103,7 @@ public interface IInboxHandlerContext
     ///     .WithBody(workItem)
     ///     .WithReplyTo(context.GrainId)  // Responses come back to this grain
     ///     .Build();
-    /// 
+    ///
     /// context.Send(request);
     /// </code>
     /// </example>
@@ -139,7 +139,7 @@ public interface IInboxHandlerContext
     ///     .WithBody(new NotificationMessage { Text = "Order complete" })
     ///     .Build();
     /// context.Send(envelope);
-    /// 
+    ///
     /// // Request with correlation and reply-to
     /// var request = context.CreateEnvelope()
     ///     .To(paymentGrain, "payment/authorize")
@@ -177,7 +177,7 @@ public interface IInboxHandlerContext
     ///     .To(targetGrain, "order/process")
     ///     .WithBody(orderData)
     ///     .Build();
-    /// 
+    ///
     /// context.Send(envelope);
     /// // Message is now in the outbox and will be delivered asynchronously
     /// </code>
@@ -199,7 +199,7 @@ public interface IInboxHandlerContext
     /// {
     ///     _logger.LogWarning("High outbox backlog: {Count} messages", context.Outbox.Count);
     /// }
-    /// 
+    ///
     /// // Inspect pending messages (advanced)
     /// foreach (var pending in context.Outbox.Messages)
     /// {
@@ -257,7 +257,7 @@ public interface IInboxHandlerContext
     ///                 isRetriable: false);
     ///             return;  // Stop processing
     ///         }
-    ///         
+    ///
     ///         try
     ///         {
     ///             await ProcessPayment(message, ct);

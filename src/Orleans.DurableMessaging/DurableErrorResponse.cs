@@ -48,13 +48,13 @@ namespace Orleans.DurableMessaging;
 ///                     ExceptionDetails = ex.ToString(),
 ///                     IsRetriable = false  // Business rule violation, no retry
 ///                 };
-///                 
+///
 ///                 var envelope = context.CreateEnvelope()
 ///                     .To(replyTo, "order/reply")
 ///                     .WithBody(errorResponse)
 ///                     .WithCorrelationKey(context.Envelope.CorrelationKey)
 ///                     .Build();
-///                 
+///
 ///                 context.Send(envelope);
 ///             }
 ///             throw;  // Rethrow to mark processing as failed
@@ -71,13 +71,13 @@ namespace Orleans.DurableMessaging;
 ///                     ExceptionDetails = ex.ToString(),
 ///                     IsRetriable = true  // Transient error, safe to retry
 ///                 };
-///                 
+///
 ///                 var envelope = context.CreateEnvelope()
 ///                     .To(replyTo, "order/reply")
 ///                     .WithBody(errorResponse)
 ///                     .WithCorrelationKey(context.Envelope.CorrelationKey)
 ///                     .Build();
-///                 
+///
 ///                 context.Send(envelope);
 ///             }
 ///             throw;
@@ -112,7 +112,7 @@ public readonly struct DurableErrorResponse
     ///     ErrorCode = StandardErrorCodes.HandlerNotFound,
     ///     Message = "No handler registered for route 'payment/process'"
     /// };
-    /// 
+    ///
     /// // Using custom error codes
     /// var error = new DurableErrorResponse
     /// {
@@ -143,7 +143,7 @@ public readonly struct DurableErrorResponse
     /// <code>
     /// // Good: Descriptive without sensitive details
     /// Message = "Failed to process payment: card declined by issuer"
-    /// 
+    ///
     /// // Bad: Exposes internal details
     /// Message = "SQL query failed: SELECT * FROM payments WHERE card_number='4111-1111-1111-1111'"
     /// </code>
@@ -171,10 +171,10 @@ public readonly struct DurableErrorResponse
     /// <code>
     /// // Development: Full exception details
     /// ExceptionDetails = exception.ToString()
-    /// 
+    ///
     /// // Production: Omit or redact sensitive details
     /// ExceptionDetails = Environment.IsDevelopment() ? exception.ToString() : null
-    /// 
+    ///
     /// // Structured exception details
     /// ExceptionDetails = $"Type: {exception.GetType().FullName}\nMessage: {exception.Message}"
     /// </code>
@@ -201,7 +201,7 @@ public readonly struct DurableErrorResponse
     /// <code>
     /// // Transient error - safe to retry
     /// IsRetriable = true   // Network timeout, database connection failure, rate limit exceeded
-    /// 
+    ///
     /// // Permanent error - do not retry
     /// IsRetriable = false  // Validation error, authorization failure, resource not found
     /// </code>
