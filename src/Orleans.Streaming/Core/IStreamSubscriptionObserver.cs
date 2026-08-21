@@ -4,6 +4,7 @@ namespace Orleans.Streams.Core
 {
     /// <summary>
     /// When implemented by a grain, notifies the grain of any new or resuming subscriptions.
+    /// Stateless worker grains receive this notification on each activation so that every activation can attach its own observer.
     /// </summary>
     public interface IStreamSubscriptionObserver
     {

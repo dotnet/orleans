@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Streams.Core;
@@ -242,7 +243,10 @@ namespace Orleans.Streams
                     if (myExtension == null)
                     {
                         LogDebugBindExtensionLazy(providerRuntime);
-                        (myExtension, myGrainReference) = providerRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(() => new StreamConsumerExtension(providerRuntime));
+                        (myExtension, myGrainReference) = providerRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
+                            () => new StreamConsumerExtension(
+                                providerRuntime,
+                                providerRuntime.ServiceProvider.GetRequiredService<IGrainContextAccessor>().GrainContext));
                         LogDebugBindExtension(myExtension, myGrainReference);
                     }
                 }

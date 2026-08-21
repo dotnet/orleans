@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Streams.Filtering;
+using Orleans.Streams.Core;
 using Orleans.Internal;
 
 namespace Orleans.Runtime.Providers
@@ -149,12 +150,20 @@ namespace Orleans.Runtime.Providers
             where TExtension : class, TExtensionInterface
             where TExtensionInterface : class, IGrainExtension
         {
-            if (this.grainContextAccessor.GrainContext is ActivationData activationData && activationData.IsStatelessWorker)
+            var grainContext = this.grainContextAccessor.GrainContext;
+            if (grainContext is ActivationData { IsStatelessWorker: true } activationData)
             {
-                throw new InvalidOperationException($"The extension { typeof(TExtension) } cannot be bound to a Stateless Worker.");
+                if (typeof(TExtension) != typeof(StreamConsumerExtension)
+                    || typeof(TExtensionInterface) != typeof(IStreamConsumerExtension)
+                    || activationData.GrainInstance is not IStreamSubscriptionObserver)
+                {
+                    throw new InvalidOperationException(
+                        $"The extension {typeof(TExtension)} cannot be bound to stateless worker grain '{activationData.GrainId}'. "
+                        + $"Stateless worker stream consumers must implement {typeof(IStreamSubscriptionObserver).FullName}.");
+                }
             }
 
-            return this.grainContextAccessor.GrainContext.GetComponent<IGrainExtensionBinder>()! // Grain contexts expose an extension binder.
+            return grainContext.GetComponent<IGrainExtensionBinder>()! // Grain contexts expose an extension binder.
                 .GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
         }
 

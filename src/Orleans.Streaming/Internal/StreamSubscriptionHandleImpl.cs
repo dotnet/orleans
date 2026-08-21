@@ -56,14 +56,15 @@ namespace Orleans.Streams
             IAsyncBatchObserver<T>? batchObserver,
             StreamImpl<T> streamImpl,
             StreamSequenceToken? token,
-            string? filterData)
+            string? filterData,
+            bool disableHandshake = false)
         {
             this.subscriptionId = subscriptionId ?? throw new ArgumentNullException(nameof(subscriptionId));
             this.observer = observer;
             this.batchObserver = batchObserver;
             this.streamImpl = streamImpl ?? throw new ArgumentNullException(nameof(streamImpl));
             this.filterData = filterData;
-            this.isRewindable = streamImpl.IsRewindable;
+            this.isRewindable = streamImpl.IsRewindable && !disableHandshake;
             if (IsRewindable)
             {
                 expectedToken = StreamHandshakeToken.CreateStartToken(token);
@@ -79,7 +80,7 @@ namespace Orleans.Streams
 
         public StreamHandshakeToken? GetSequenceToken()
         {
-            return this.expectedToken;
+            return expectedToken;
         }
 
         public override Task UnsubscribeAsync()

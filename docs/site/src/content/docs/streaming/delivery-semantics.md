@@ -1,7 +1,7 @@
 ---
 title: Stream delivery, ordering, replay, and recovery
 description: Design Orleans streaming consumers for provider-specific delivery, ordering, replay, and failure behavior.
-ms.date: 08/02/2026
+ms.date: 08/18/2026
 ms.topic: concept-article
 ---
 
@@ -39,6 +39,7 @@ Treat ordering as scoped, not global:
 - Physical partitions and queues order independently.
 - Retries, visibility timeouts, consumer failures, and rebalancing can reorder delivery.
 - A grain processes its own turns serially unless its concurrency configuration says otherwise, but that doesn't impose a total order across grains or subscriptions.
+- A stateless worker stream subscription assigns each delivery attempt to one selected activation. Concurrent deliveries and retries can run on different activations, so completion order across the worker pool is unspecified.
 
 Use event version numbers or domain sequence numbers when business logic requires ordering. A <xref:Orleans.Streams.StreamSequenceToken> represents provider position; it isn't a universal business sequence and not every provider accepts application-supplied tokens.
 

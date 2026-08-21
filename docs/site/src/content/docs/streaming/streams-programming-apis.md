@@ -103,11 +103,15 @@ Clients can produce and explicitly consume streams after the provider is configu
 
 ## Stateless worker grains
 
-Grains marked with <xref:Orleans.Concurrency.StatelessWorkerAttribute> can publish stream events. Orleans rejects stateless worker grain subscription attempts with an <xref:System.InvalidOperationException> because a stream consumer uses a grain extension which must bind to one activation, while a stateless worker grain identity can have multiple, replaceable activations.
+Grains marked with <xref:Orleans.Concurrency.StatelessWorkerAttribute> can publish and consume streams. A stateless worker stream consumer implements <xref:Orleans.Streams.Core.IStreamSubscriptionObserver>. Orleans installs a separate stream consumer extension on every activation. A delivery uses the activation's existing observer for its subscription. When no observer is attached, Orleans calls `OnSubscribed`, and the grain calls `ResumeAsync` from that callback to attach one.
 
-Use a regular grain as the stream consumer so that the stream-to-grain binding has a stable virtual identity which can own state and the subscription lifecycle. If processing after delivery is stateless and parallelizable, have that grain call stateless worker grains and await the required work before its consumer task completes. This keeps stream acknowledgment and recovery at the regular grain boundary instead of treating a multicast subscription as a competing-consumer work queue.
+The subscription belongs to the stateless worker grain identity. For persistent streams, each pulling agent delivers through that identity from its silo, and normal stateless-worker placement selects one local activation for each delivery attempt. Concurrent pulling agents can therefore process items on different activations and silos. Each delivery attempt runs on one activation, providing competing-consumer execution for stateless transformations such as decoding, validation, enrichment, filtering, and forwarding.
 
-Support for subscribing directly from stateless worker grains is tracked by [dotnet/orleans#433](https://github.com/dotnet/orleans/issues/433).
+Implicit subscriptions establish the grain-level subscription from grain metadata. Explicit `SubscribeAsync` calls establish the grain-level subscription at runtime and attach the calling activation's observer. A later activation attaches its local observer through `OnSubscribed` when a delivery first reaches it, and `UnsubscribeAsync` removes the grain-level subscription.
+
+Ordering is scoped to the selected activation and provider delivery path. Concurrent deliveries can complete in any order across activations. A provider retry can select a different activation, so handlers use stateless or idempotent processing and follow the provider's delivery guarantee. A stateless worker which subscribes without implementing <xref:Orleans.Streams.Core.IStreamSubscriptionObserver> receives an <xref:System.InvalidOperationException>.
+
+Stateless worker observers attach with a null sequence token. The pulling agent owns progress for the live subscription as deliveries move between activations. Passing a non-null sequence token to `SubscribeAsync` or `ResumeAsync` produces an <xref:System.InvalidOperationException>. Use a regular grain consumer when application-managed rewind or checkpoint resume is required.
 
 <a id="stream-order-and-sequence-tokens"></a>
 <a id="rewindable-streams"></a>
