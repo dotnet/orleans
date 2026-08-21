@@ -502,7 +502,7 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        private bool HandleSendMessageFailure(Message? message, Exception exception)
+        protected bool HandleSendMessageFailure(Message? message, Exception exception)
         {
             // We get here if we failed to serialize the msg (or any other catastrophic failure).
             // Request msg fails to serialize on the sender, so we just enqueue a rejection msg.
@@ -523,7 +523,14 @@ namespace Orleans.Runtime.Messaging
                 response.Result = Message.ResponseTypes.Error;
                 response.BodyObject = Response.FromException(exception);
 
-                this.MessageCenter.DispatchLocalMessage(response);
+                if (response.TargetSilo is null)
+                {
+                    this.MessageCenter.DispatchLocalMessage(response);
+                }
+                else
+                {
+                    this.MessageCenter.SendMessage(response);
+                }
             }
             else if (message.Direction == Message.Directions.Response && message.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
