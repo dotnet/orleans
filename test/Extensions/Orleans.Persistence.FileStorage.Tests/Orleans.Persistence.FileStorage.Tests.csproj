@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)test\Extensions\Orleans.Persistence.FileStorage.LockWorker\Orleans.Persistence.FileStorage.LockWorker.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="$(SourceRoot)src\File\Orleans.Persistence.FileStorage\Orleans.Persistence.FileStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Persistence.TestKit\Orleans.Persistence.TestKit.csproj" PrivateAssets="all" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+  </ItemGroup>
+</Project>

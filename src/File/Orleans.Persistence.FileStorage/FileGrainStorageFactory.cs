@@ -8,7 +8,7 @@ namespace Orleans.Persistence.FileStorage;
 
 internal static class FileGrainStorageFactory
 {
-    internal static IGrainStorage Create(IServiceProvider services, string name)
+    internal static FileGrainStorage Create(IServiceProvider services, string name)
     {
         var optionsMonitor = services.GetRequiredService<IOptionsMonitor<FileGrainStorageOptions>>();
 

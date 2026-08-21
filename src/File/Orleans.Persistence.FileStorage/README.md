@@ -1,86 +1,64 @@
-# Microsoft Orleans Persistence for File Storage
+# Microsoft Orleans persistence for file storage
 
-## Introduction
-Microsoft Orleans Persistence for File Storage provides grain persistence for Microsoft Orleans using a file based storage approach. This provider allows your grains to persist their state in on hdd.
+This package stores Orleans grain state as files in a configured directory. Each record uses atomic replacement, persisted ETags for optimistic concurrency, and filesystem locks which coordinate silos that share the same storage volume.
 
-## Getting Started
-To use this package, install it via NuGet:
+## Install
 
 ```shell
 dotnet add package Microsoft.Orleans.Persistence.FileStorage
 ```
 
-
-## Example - Configuring File Storage Persistence
+## Configure the provider
 
 ```csharp
 using Microsoft.Extensions.Hosting;
-using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Persistence.FileStorage;
 
-var builder = Host.CreateApplicationBuilder(args)
-    .UseOrleans(siloBuilder =>
-    {
-        siloBuilder
-            .UseLocalhostClustering()
-            // Configure File Storage as grain storage
-            .AddFileGrainStorage(
-		        providerName: "File",
-		        options => options.RootDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Orleans/GrainState/v1"));
-    });
+var builder = Host.CreateApplicationBuilder(args);
 
-// Run the host
-await builder.RunAsync();
+builder.UseOrleans(siloBuilder =>
+{
+    siloBuilder
+        .UseLocalhostClustering()
+        .AddFileGrainStorage(
+            providerName: "FileStorage",
+            options => options.RootDirectory = Path.Combine(
+                AppContext.BaseDirectory,
+                "Orleans",
+                "GrainState"));
+});
+
+await builder.Build().RunAsync();
 ```
 
-## Example - Using Grain Storage in a Grain
+Use the same provider name when injecting persistent state:
 
 ```csharp
-using System;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 
-// Define grain state class
-public class MyGrainState
+public sealed class MyGrain(
+    [PersistentState("state", "FileStorage")]
+    IPersistentState<MyGrainState> state) : Grain, IMyGrain
 {
-    public string Data { get; set; }
-    public int Version { get; set; }
-}
-
-// Grain implementation that uses the File Storage storage
-public class MyGrain : Grain, IMyGrain, IGrainWithStringKey
-{
-    private readonly IPersistentState<MyGrainState> _state;
-
-    public MyGrain([PersistentState("state", "FileStorageStore")] IPersistentState<MyGrainState> state)
-    {
-        _state = state;
-    }
-
     public async Task SetData(string data)
     {
-        _state.State.Data = data;
-        _state.State.Version++;
-        await _state.WriteStateAsync();
+        state.State.Data = data;
+        state.State.Version++;
+        await state.WriteStateAsync();
     }
 
-    public Task<string> GetData()
-    {
-        return Task.FromResult(_state.State.Data);
-    }
+    public Task<string> GetData() => Task.FromResult(state.State.Data);
+}
+
+public sealed class MyGrainState
+{
+    public string Data { get; set; } = string.Empty;
+
+    public int Version { get; set; }
 }
 ```
 
+The configured directory defines the storage boundary for the provider. Provider instances sharing that directory use deterministic record names and coordinate updates through the filesystem.
 
-## Documentation
-For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Grain Persistence](https://learn.microsoft.com/en-us/dotnet/orleans/grains/grain-persistence)
-
-## Feedback & Contributing
-- If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)
-- Join our community on [Discord](https://aka.ms/orleans-discord)
-- Follow the [@msftorleans](https://twitter.com/msftorleans) Twitter account for Orleans announcements
-- Contributions are welcome! Please review our [contribution guidelines](https://github.com/dotnet/orleans/blob/main/CONTRIBUTING.md)
-- This project is licensed under the [MIT license](https://github.com/dotnet/orleans/blob/main/LICENSE)
+For Orleans persistence concepts, see [Grain persistence](https://learn.microsoft.com/dotnet/orleans/grains/grain-persistence).
