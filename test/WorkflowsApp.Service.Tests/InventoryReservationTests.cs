@@ -33,6 +33,12 @@ public sealed class InventoryReservationTests : IClassFixture<InventoryReservati
         Assert.Single(result);
     }
 
+    [Fact]
+    public void ShoppingCartContract_UsesStringGrainKey()
+    {
+        Assert.True(typeof(IGrainWithStringKey).IsAssignableFrom(typeof(IShoppingCartGrain)));
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]

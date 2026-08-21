@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 namespace System.Distributed.DurableTasks;
@@ -57,11 +56,6 @@ public struct DurableTaskMethodBuilder
     internal static void SetStateMachineCore(IAsyncStateMachine stateMachine)
     {
         ArgumentNullException.ThrowIfNull(stateMachine);
-
-        // SetStateMachine was originally needed in order to store the boxed state machine reference into
-        // the boxed copy.  Now that a normal box is no longer used, SetStateMachine is also legacy.  We need not
-        // do anything here, and thus assert to ensure we're not calling this from our own implementations.
-        Debug.Fail("SetStateMachine should not be used.");
     }
 }
 
