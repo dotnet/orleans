@@ -1,5 +1,4 @@
 using System;
-using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
 namespace Orleans.Hosting
@@ -28,21 +27,6 @@ namespace Orleans.Hosting
         {
             builder.AddEventHubStreams(name, b=>b.ConfigureEventHub(ob => ob.Configure(configureEventHub)));
             return builder;
-        }
-
-        /// <summary>
-        /// Configure cluster client to use event hub persistent streams with default settings.
-        /// </summary>
-        public static IClientBuilder AddEventHubsStreams(
-            this IClientBuilder builder,
-            string name,
-            Action<OptionsBuilder<EventHubOptions>> configureOptions)
-        {
-
-            return builder.AddEventHubStreams(name, b =>
-            {
-                b.ConfigureEventHub(configureOptions);
-            });
         }
     }
 }

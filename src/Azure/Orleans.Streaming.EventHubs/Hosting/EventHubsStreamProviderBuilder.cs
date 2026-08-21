@@ -1,5 +1,8 @@
 using System;
+using System.Text;
 using Azure.Data.Tables;
+using Azure.Identity;
+using Azure.Messaging.EventHubs.Consumer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -11,6 +14,10 @@ using Orleans.Runtime;
 
 [assembly: RegisterProvider("EventHubs", "Streaming", "Silo", typeof(EventHubsStreamProviderBuilder))]
 [assembly: RegisterProvider("EventHubs", "Streaming", "Client", typeof(EventHubsStreamProviderBuilder))]
+[assembly: RegisterProvider("AzureEventHub", "Streaming", "Silo", typeof(EventHubsStreamProviderBuilder))]
+[assembly: RegisterProvider("AzureEventHub", "Streaming", "Client", typeof(EventHubsStreamProviderBuilder))]
+[assembly: RegisterProvider("AzureEventHubConsumerGroup", "Streaming", "Silo", typeof(EventHubsStreamProviderBuilder))]
+[assembly: RegisterProvider("AzureEventHubConsumerGroup", "Streaming", "Client", typeof(EventHubsStreamProviderBuilder))]
 
 namespace Orleans.Hosting;
 
@@ -18,95 +25,180 @@ public sealed class EventHubsStreamProviderBuilder : IProviderBuilder<ISiloBuild
 {
     private const string EventHubNameConfigurationKey = "EventHubName";
     private const string ConsumerGroupConfigurationKey = "ConsumerGroup";
+    private const string ConsumerGroupNameConfigurationKey = "ConsumerGroupName";
 
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.AddEventHubsStreams(
-            name,
-            GetEventHubOptionsBuilder(name, configurationSection),
-            GetEventHubCheckpointerOptionsBuilder(name, configurationSection)
-        );
+        builder.AddEventHubStreams(name!, configurator =>
+        {
+            configurator.ConfigureEventHub(GetEventHubOptionsBuilder(configurationSection));
+            configurator.UseAzureTableCheckpointer(GetEventHubCheckpointerOptionsBuilder(name!, configurationSection));
+        });
     }
 
-    public void Configure(IClientBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(IClientBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.AddEventHubsStreams(name, GetEventHubOptionsBuilder(name, configurationSection));
+        builder.AddEventHubStreams(name!, configurator =>
+            configurator.ConfigureEventHub(GetEventHubOptionsBuilder(configurationSection)));
     }
 
-    private static Action<OptionsBuilder<EventHubOptions>> GetEventHubOptionsBuilder(string name, IConfigurationSection configurationSection)
+    private static Action<OptionsBuilder<EventHubOptions>> GetEventHubOptionsBuilder(IConfigurationSection configurationSection)
     {
-        return (OptionsBuilder<EventHubOptions> optionsBuilder) =>
+        return optionsBuilder =>
         {
             optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {
-                var serviceKey = configurationSection["ServiceKey"];
                 var configuration = services.GetRequiredService<IConfiguration>();
+                var serviceKey = configurationSection["ServiceKey"];
+                var connectionName = configurationSection["ConnectionName"];
+                var connectionString = configurationSection["ConnectionString"];
+                var referenceName = !string.IsNullOrEmpty(serviceKey) ? serviceKey : connectionName;
 
-                    if (string.IsNullOrEmpty(serviceKey))
-                    {
-                        throw new OrleansConfigurationException("Missing service key. No connection string has been configured for Azure EventHub Streaming");
-                    }
+                if (string.IsNullOrEmpty(connectionString) && !string.IsNullOrEmpty(referenceName))
+                {
+                    connectionString = configuration.GetConnectionString(referenceName);
+                }
 
-                    var connectionString = configuration.GetConnectionString(serviceKey);
+                if (string.IsNullOrWhiteSpace(connectionString))
+                {
+                    throw new OrleansConfigurationException(
+                        "Event Hubs streaming requires a connection string. Configure ServiceKey, ConnectionName, or ConnectionString.");
+                }
 
-                    // Load from the root named options, then by aspire options
-                    // E.g. [name]__EventHubName, then Orleans__Streaming__[name]__EventHubName
-                    var namedSection = configuration.GetSection(name);
-                    var eventHubName = namedSection[EventHubNameConfigurationKey] ?? configurationSection[EventHubNameConfigurationKey];
-                    var consumerGroup = namedSection[ConsumerGroupConfigurationKey] ?? configurationSection[ConsumerGroupConfigurationKey];
+                var eventHubName = configurationSection[EventHubNameConfigurationKey]
+                    ?? GetAspireReferenceProperty(configuration, referenceName, EventHubNameConfigurationKey)
+                    ?? GetConnectionProperty(connectionString, "EntityPath");
+                if (string.IsNullOrWhiteSpace(eventHubName))
+                {
+                    throw new OrleansConfigurationException(
+                        "Event Hubs streaming requires EventHubName in the provider or referenced Aspire resource configuration.");
+                }
 
-                    if(eventHubName is null)
-                    {
-                        throw new OrleansConfigurationException("No event hub name has been specified. Please provide the Event Hub Name via a root service named EventHubOptions configuration or as part of the Aspire resource configuration.");
-                    }
+                var consumerGroup = configurationSection[ConsumerGroupConfigurationKey]
+                    ?? configurationSection[ConsumerGroupNameConfigurationKey]
+                    ?? GetAspireReferenceProperty(configuration, referenceName, ConsumerGroupConfigurationKey)
+                    ?? GetAspireReferenceProperty(configuration, referenceName, ConsumerGroupNameConfigurationKey)
+                    ?? GetConnectionProperty(connectionString, ConsumerGroupConfigurationKey)
+                    ?? EventHubConsumerClient.DefaultConsumerGroupName;
 
-                    if(consumerGroup is null)
-                    {
-                        throw new OrleansConfigurationException("No consumer group has been specified. Please provide the Consumer Group via a root service named EventHubOptions configuration or as part of the Aspire resource configuration.");
-                    }
-
+                var normalizedConnectionString = RemoveConnectionProperty(
+                    RemoveConnectionProperty(connectionString, ConsumerGroupConfigurationKey),
+                    "EntityPath");
+                var fullyQualifiedNamespace = configurationSection["FullyQualifiedNamespace"]
+                    ?? GetAspireReferenceProperty(configuration, referenceName, "Host")
+                    ?? GetConnectionHost(connectionString);
+                if (!HasSharedAccessCredential(normalizedConnectionString)
+                    && !string.IsNullOrWhiteSpace(fullyQualifiedNamespace))
+                {
                     options.ConfigureEventHubConnection(
-                        connectionString,
+                        fullyQualifiedNamespace,
                         eventHubName,
-                        consumerGroup
-                    );
+                        consumerGroup,
+                        new DefaultAzureCredential());
+                }
+                else
+                {
+                    options.ConfigureEventHubConnection(normalizedConnectionString, eventHubName, consumerGroup);
+                }
             });
         };
     }
 
     private static Action<OptionsBuilder<AzureTableStreamCheckpointerOptions>> GetEventHubCheckpointerOptionsBuilder(string name, IConfigurationSection configurationSection)
     {
-        return (OptionsBuilder<AzureTableStreamCheckpointerOptions> optionsBuilder) =>
+        return optionsBuilder =>
         {
             optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {
-                var configuration = services.GetRequiredService<IConfiguration>();
-
-                var serviceKey = configurationSection["ServiceKey"];
+                var serviceKey = configurationSection["CheckpointerServiceKey"];
                 if (!string.IsNullOrEmpty(serviceKey))
                 {
-                    // Get a client by name.
                     options.TableServiceClient = services.GetRequiredKeyedService<TableServiceClient>(serviceKey);
+                    return;
+                }
+
+                var connectionName = configurationSection["CheckpointerConnectionName"];
+                var connectionString = configurationSection["CheckpointerConnectionString"];
+                if (!string.IsNullOrEmpty(connectionName) && string.IsNullOrEmpty(connectionString))
+                {
+                    connectionString = services.GetRequiredService<IConfiguration>().GetConnectionString(connectionName);
+                }
+
+                if (string.IsNullOrWhiteSpace(connectionString))
+                {
+                    throw new OrleansConfigurationException(
+                        $"Event Hubs stream provider '{name}' requires CheckpointerServiceKey, CheckpointerConnectionName, or CheckpointerConnectionString.");
+                }
+
+                if (Uri.TryCreate(connectionString, UriKind.Absolute, out var uri))
+                {
+                    options.TableServiceClient = string.IsNullOrEmpty(uri.Query)
+                        ? new TableServiceClient(uri, new DefaultAzureCredential())
+                        : new TableServiceClient(uri);
                 }
                 else
                 {
-
-                    // TODO: Grab the keyed table service client
-                    var connectionName = configurationSection["CheckpointerConnectionName"];
-                    var connectionString = configurationSection["CheckpointerConnectionString"];
-                    if (!string.IsNullOrEmpty(connectionName) && string.IsNullOrEmpty(connectionString))
-                    {
-                        var rootConfiguration = services.GetRequiredService<IConfiguration>();
-                        connectionString = rootConfiguration.GetConnectionString(connectionName);
-                    }
-                    if (!string.IsNullOrEmpty(connectionString))
-                    {
-                        options.TableServiceClient = Uri.TryCreate(connectionString, UriKind.Absolute, out var uri)
-                            ? new TableServiceClient(uri)
-                            : new TableServiceClient(connectionString);
-                    }
+                    options.TableServiceClient = new TableServiceClient(connectionString);
                 }
             });
         };
+    }
+
+    private static bool HasSharedAccessCredential(string connectionString)
+        => connectionString.Contains("SharedAccessKey=", StringComparison.OrdinalIgnoreCase)
+            || connectionString.Contains("SharedAccessSignature=", StringComparison.OrdinalIgnoreCase);
+
+    private static string? GetAspireReferenceProperty(
+        IConfiguration configuration,
+        string? referenceName,
+        string propertyName)
+    {
+        if (string.IsNullOrEmpty(referenceName))
+        {
+            return null;
+        }
+
+        return configuration[$"{EncodeEnvironmentVariableName(referenceName)}_{propertyName.ToUpperInvariant()}"];
+    }
+
+    private static string EncodeEnvironmentVariableName(string name)
+    {
+        var builder = new StringBuilder(name.Length + 1);
+        if (char.IsAsciiDigit(name[0]))
+        {
+            builder.Append('_');
+        }
+
+        foreach (var character in name)
+        {
+            builder.Append(char.IsAsciiLetterOrDigit(character)
+                ? char.ToUpperInvariant(character)
+                : '_');
+        }
+
+        return builder.ToString();
+    }
+
+    private static string? GetConnectionHost(string connectionString)
+    {
+        var endpoint = GetConnectionProperty(connectionString, "Endpoint");
+        return Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) ? uri.Host : null;
+    }
+
+    private static string? GetConnectionProperty(string connectionString, string propertyName)
+    {
+        var prefix = propertyName + "=";
+        return connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries)
+            .Select(segment => segment.Trim())
+            .FirstOrDefault(segment => segment.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))?[prefix.Length..];
+    }
+
+    private static string RemoveConnectionProperty(string connectionString, string propertyName)
+    {
+        var prefix = propertyName + "=";
+        return string.Join(
+            ';',
+            connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries)
+                .Where(segment => !segment.TrimStart().StartsWith(prefix, StringComparison.OrdinalIgnoreCase)));
     }
 }
