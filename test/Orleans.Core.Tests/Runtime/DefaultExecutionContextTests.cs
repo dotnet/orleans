@@ -6,15 +6,18 @@ using Xunit;
 
 namespace UnitTests.Runtime;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public class DefaultExecutionContextTests
 {
-    [Fact, TestCategory("BVT")]
+    [Fact]
     public void InstanceDoesNotContainAmbientState() => AssertDoesNotContainAmbientState(DefaultExecutionContext.Instance);
 
-    [Fact, TestCategory("BVT")]
+    [Fact]
     public void FallbackDoesNotContainAmbientState() => AssertDoesNotContainAmbientState(DefaultExecutionContext.CaptureDefault());
 
-    [Fact, TestCategory("BVT")]
+    [Fact]
     public async Task InstanceSupportsConcurrentExecution()
     {
         var tasks = new Task[Math.Max(4, Environment.ProcessorCount)];

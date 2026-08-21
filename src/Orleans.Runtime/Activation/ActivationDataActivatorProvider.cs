@@ -49,7 +49,7 @@ internal partial class ActivationDataActivatorProvider(
         return true;
     }
 
-    private partial class ActivationDataActivator : IPreparedGrainContextActivator
+    private partial class ActivationDataActivator : IGrainContextActivator
     {
         private readonly IOptions<SchedulingOptions> _schedulingOptions;
         private readonly IGrainActivator _grainActivator;
@@ -76,15 +76,6 @@ internal partial class ActivationDataActivatorProvider(
 
         public IGrainContext CreateContext(GrainAddress activationAddress, IConfigureGrainContext[] configureActions)
         {
-            var preparedContext = CreatePreparedContext(activationAddress, configureActions);
-            using var startup = preparedContext.Start();
-            return preparedContext.Context;
-        }
-
-        public PreparedGrainContext CreatePreparedContext(
-            GrainAddress activationAddress,
-            IConfigureGrainContext[] configureActions)
-        {
             var context = new ActivationData(
                 activationAddress,
                 _createWorkItemGroup,
@@ -99,11 +90,11 @@ internal partial class ActivationDataActivatorProvider(
                     configure.Configure(context);
                 }
 
-                return new(context, (IGrainContextStartup)context);
+                return context;
             }
             catch
             {
-                ((IGrainContextStartup)context).Abort();
+                context.Abort();
                 throw;
             }
         }
