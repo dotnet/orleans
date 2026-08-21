@@ -178,10 +178,6 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         TryGetExecutionContext(taskId, out var executionContext);
         _storage.RequestCancellation(taskId, state);
-        await SetResponseAsync(
-            taskId,
-            DurableTaskResponse.FromException(new OperationCanceledException()),
-            cancellationToken);
         if (executionContext is not null)
         {
             var cancellation = DurableTaskRuntimeHelper.RequestCancellationAsync(
@@ -189,6 +185,11 @@ internal sealed partial class DurableTaskGrainRuntime(
                 CancellationToken.None);
             await cancellation.WaitAsync(cancellationToken);
         }
+
+        await SetResponseAsync(
+            taskId,
+            DurableTaskResponse.FromException(new OperationCanceledException()),
+            cancellationToken);
     }
 
     public async ValueTask<DurableTaskResponse> ScheduleDelayAsync(
@@ -613,6 +614,13 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         var state = _storage.GetOrCreateTask(taskId, null);
+        IScheduledTaskHandle? handle = null;
+        if (TryGetScheduledTaskHandle(taskId, out var existingHandle)
+            && (existingHandle is not TaskHandle localHandle || localHandle.IsRunning))
+        {
+            handle = existingHandle;
+        }
+
         if (durableTask is IDurableTaskRequest remoteRequest)
         {
             var target = remoteRequest.Context?.TargetId
@@ -623,10 +631,17 @@ internal sealed partial class DurableTaskGrainRuntime(
                 || !state.CallerId.IsDefault
                 || (!state.RemoteTarget.IsDefault && state.RemoteTarget != target)
                 || (state.RemoteRequestFingerprint is { } existing
-                    && !string.Equals(existing, fingerprint, StringComparison.Ordinal)))
+                    && !string.Equals(existing, fingerprint, StringComparison.Ordinal))
+                || (handle is not null
+                    && (state.RemoteTarget.IsDefault || state.RemoteRequestFingerprint is null)))
             {
                 throw new InvalidOperationException(
                     $"Durable child task '{taskId}' is already associated with a different request.");
+            }
+
+            if (handle is not null)
+            {
+                return handle;
             }
 
             if (state.RemoteTarget.IsDefault || state.RemoteRequestFingerprint is null)
@@ -634,11 +649,22 @@ internal sealed partial class DurableTaskGrainRuntime(
                 _storage.SetRemoteRequest(taskId, state, target, fingerprint);
             }
         }
-
-        // If the task is currently running, return the existing handle after validating replay identity.
-        if (TryGetScheduledTaskHandle(taskId, out var handle) && (handle is not TaskHandle localHandle || localHandle.IsRunning))
+        else
         {
-            return handle;
+            if (state.Request is not null
+                || state.RequestFingerprint is not null
+                || !state.CallerId.IsDefault
+                || !state.RemoteTarget.IsDefault
+                || state.RemoteRequestFingerprint is not null)
+            {
+                throw new InvalidOperationException(
+                    $"Durable child task '{taskId}' is already associated with a different request.");
+            }
+
+            if (handle is not null)
+            {
+                return handle;
+            }
         }
 
         // If the task is schedulable, schedule it.
