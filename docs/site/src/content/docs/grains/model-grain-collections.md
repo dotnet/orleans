@@ -78,7 +78,7 @@ Use continuation tokens for resumable paging. A token can carry the routing vers
 
 [Response streaming](response-streaming.md) progressively delivers one live query result with pull-based flow control. A page with a continuation token provides a durable resume boundary when a caller must continue after cancellation, timeout, grain deactivation, or process failure.
 
-## Maintained examples
+## Examples
 
 - The [Journaled Todo List registry grain](https://github.com/dotnet/orleans/blob/main/samples/JournaledTodoList/JournaledTodoList.WebApp/Grains/TodoListRegistryGrain.cs) maintains a bounded catalog of list identities and display names.
 - The [Shopping Cart inventory grains](https://github.com/dotnet/orleans/blob/main/samples/ShoppingCart/Grains/InventoryGrain.cs) partition product membership by category, and the [inventory service](https://github.com/dotnet/orleans/blob/main/samples/ShoppingCart/Silo/Services/InventoryService.cs) merges the known partitions.
