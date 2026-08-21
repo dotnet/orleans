@@ -112,7 +112,10 @@ function Add-SummaryLine {
 }
 
 function Get-TrxFiles {
-    param([string] $RootPath)
+    param(
+        [string] $RootPath,
+        [Collections.Generic.List[object]] $Errors
+    )
 
     $directories = [Collections.Generic.Stack[IO.DirectoryInfo]]::new()
     $files = [Collections.Generic.List[IO.FileInfo]]::new()
@@ -120,7 +123,18 @@ function Get-TrxFiles {
 
     while ($directories.Count -gt 0) {
         $directory = $directories.Pop()
-        foreach ($item in Get-ChildItem -LiteralPath $directory.FullName -Force) {
+        try {
+            $items = @(Get-ChildItem -LiteralPath $directory.FullName -Force -ErrorAction Stop)
+        } catch [UnauthorizedAccessException], [IO.IOException], [Security.SecurityException] {
+            $relativeDirectory = [IO.Path]::GetRelativePath($RootPath, $directory.FullName).Replace('\', '/')
+            $Errors.Add([pscustomobject]@{
+                File = if ($relativeDirectory -eq '.') { 'test-results' } else { $relativeDirectory }
+                Message = "Unable to enumerate result directory: $($_.Exception.Message)"
+            })
+            continue
+        }
+
+        foreach ($item in $items) {
             if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
                 continue
             }
@@ -137,8 +151,9 @@ function Get-TrxFiles {
 }
 
 $resolvedResultsPath = (Resolve-Path -LiteralPath $ResultsPath).Path
-$trxFiles = @(Get-TrxFiles -RootPath $resolvedResultsPath)
-if ($trxFiles.Count -eq 0) {
+$parseErrors = [Collections.Generic.List[object]]::new()
+$trxFiles = @(Get-TrxFiles -RootPath $resolvedResultsPath -Errors $parseErrors)
+if ($trxFiles.Count -eq 0 -and $parseErrors.Count -eq 0) {
     throw "No TRX files were found under '$resolvedResultsPath'."
 }
 
@@ -146,7 +161,6 @@ $maximumTrxFileBytes = 32MB
 $artifactResults = @{}
 $failures = [Collections.Generic.List[object]]::new()
 $runIssues = [Collections.Generic.List[object]]::new()
-$parseErrors = [Collections.Generic.List[object]]::new()
 $annotations = [Collections.Generic.List[object]]::new()
 $utf8Encoding = [Text.UTF8Encoding]::new($false)
 $passed = 0
