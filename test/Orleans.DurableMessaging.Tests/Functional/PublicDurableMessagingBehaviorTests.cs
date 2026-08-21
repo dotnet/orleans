@@ -15,7 +15,9 @@ public sealed class DurableMessagingClusterCollection
 }
 
 [Collection(DurableMessagingClusterCollection.Name)]
-[TestCategory("BVT"), TestCategory("Journaling")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableMessaging")]
 public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
 {
     private readonly DurableMessagingClusterFixture fixture = new();

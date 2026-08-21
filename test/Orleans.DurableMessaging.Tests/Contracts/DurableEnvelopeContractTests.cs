@@ -6,7 +6,9 @@ using Xunit;
 
 namespace Orleans.DurableMessaging.Tests.Contracts;
 
-[TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableMessaging")]
 public sealed class DurableEnvelopeContractTests : IDisposable
 {
     private readonly ServiceProvider _services;

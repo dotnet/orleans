@@ -13,7 +13,9 @@ public sealed class InboxCapacityCollection : ICollectionFixture<InboxCapacityCl
 }
 
 [Collection(InboxCapacityCollection.Name)]
-[TestCategory("BVT"), TestCategory("Journaling")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableMessaging")]
 public sealed class InboxCapacityBehaviorTests(InboxCapacityClusterFixture fixture)
 {
     [Fact]

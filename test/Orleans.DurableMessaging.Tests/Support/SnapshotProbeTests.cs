@@ -3,6 +3,9 @@ using Xunit;
 
 namespace Orleans.DurableMessaging.Tests.Support;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableMessaging")]
 public class SnapshotProbeTests
 {
     [Fact]

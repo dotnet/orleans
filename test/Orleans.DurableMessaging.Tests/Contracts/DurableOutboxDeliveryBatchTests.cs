@@ -15,7 +15,9 @@ using Xunit;
 
 namespace Orleans.DurableMessaging.Tests.Contracts;
 
-[TestCategory("BVT"), TestCategory("Journaling")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableMessaging")]
 public sealed class DurableOutboxDeliveryBatchTests
 {
     [Fact]

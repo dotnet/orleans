@@ -3,7 +3,9 @@ using Xunit;
 
 namespace Orleans.DurableMessaging.Tests.Contracts;
 
-[TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableMessaging")]
 public sealed class DeliveryAndOptionsContractTests
 {
     [Fact]

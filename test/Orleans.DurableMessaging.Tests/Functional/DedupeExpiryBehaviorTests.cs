@@ -14,7 +14,9 @@ public sealed class DedupeExpiryClusterCollection : ICollectionFixture<DedupeExp
 }
 
 [Collection(DedupeExpiryClusterCollection.Name)]
-[TestCategory("BVT"), TestCategory("Journaling")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableMessaging")]
 public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture)
 {
     [Fact]
