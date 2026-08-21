@@ -26,6 +26,8 @@ items:
         href: grains/grain-references.md
       - name: Grain identity
         href: grains/grain-identity.md
+      - name: Model collections of grains
+        href: grains/model-grain-collections.md
       - name: Grain activation and lifecycle
         href: grains/grain-lifecycle.md
       - name: Grain extensions
