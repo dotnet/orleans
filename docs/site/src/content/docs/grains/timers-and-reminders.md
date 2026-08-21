@@ -3,6 +3,7 @@ title: Grain timers and reminders
 description: Choose between activation-scoped grain timers and durable reminders in Orleans.
 ms.date: 08/21/2026
 ms.topic: concept-article
+navigation: hidden
 ---
 
 # Grain timers and reminders

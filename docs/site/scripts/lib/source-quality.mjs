@@ -9,6 +9,7 @@ import {
   collectIncludeTargets,
   isDocumentationFragmentMarkdown,
   readTocItems,
+  splitFrontmatter,
 } from './docfx.mjs';
 
 const renderedOrleansReleasePatterns = [
@@ -22,6 +23,10 @@ const execFileAsync = promisify(execFile);
 
 function toPosix(value) {
   return value.split(path.sep).join('/');
+}
+
+export function isNavigationHidden(source) {
+  return splitFrontmatter(source).metadata.navigation === 'hidden';
 }
 
 async function walk(directory, predicate = () => true) {
@@ -948,10 +953,14 @@ export async function auditDocumentationSources({
   const { includeTargets, auditedMarkdown } = contentAudit;
   const pages = [];
   const allMarkdownPaths = [];
+  const navigationExcludedPaths = [];
   for (const file of markdownFiles) {
     const relativePath = toPosix(path.relative(sourceRoot, file));
     allMarkdownPaths.push(relativePath);
     const page = auditedMarkdown.find((item) => item.file === path.resolve(file));
+    if (isNavigationHidden(page.source)) {
+      navigationExcludedPaths.push(relativePath);
+    }
     if (
       includeTargets.has(path.resolve(file)) ||
       isDocumentationFragmentMarkdown(relativePath)
@@ -973,7 +982,8 @@ export async function auditDocumentationSources({
             includeTargets.has(path.resolve(file)) ||
             isDocumentationFragmentMarkdown(toPosix(path.relative(sourceRoot, file))),
         )
-        .map((file) => toPosix(path.relative(sourceRoot, file))),
+        .map((file) => toPosix(path.relative(sourceRoot, file)))
+        .concat(navigationExcludedPaths),
       tocItems,
       tocSource,
     }),
