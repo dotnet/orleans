@@ -214,7 +214,7 @@ public class DurableJobReceiverExtensionTests
         Assert.Equal(DurableJobRunStatus.Completed, redeliveryAfterCompletion.Status);
         await handler.Received(2).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
 
-        var nextAttempt = CreateJobContext("run-2", jobId: "job-1", dequeueCount: 1);
+        var nextAttempt = CreateJobContext("run-2", jobId: "job-1", dequeueCount: 1, executionGeneration: 1);
         var retryResult = await extension.HandleDurableJobAsync(nextAttempt, CancellationToken.None);
         Assert.Equal(DurableJobRunStatus.Completed, retryResult.Status);
         await handler.Received(3).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
