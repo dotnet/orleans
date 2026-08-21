@@ -63,7 +63,7 @@ public class TransactionRecoveryLatencyTests
     }
 
     [Fact]
-    public async Task CancelBeforePrepareCausesLatePrepareToRetainTransactionId()
+    public async Task CancelBeforePrepareBreaksPrePrepareLockAndRetainsTransactionId()
     {
         var resource = CreateParticipant("resource", ParticipantId.Role.Resource);
         var queue = new GatedCancelTransactionQueue(resource, new TestActivationLifetime());
