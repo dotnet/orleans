@@ -489,6 +489,30 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
+    public async Task RecoveryCommitsRemoteChildCancellationWithTerminalResponse()
+    {
+        var (_, storage, manager, _) = CreateRuntime();
+        var childId = TaskId.Parse("root/remote");
+        var target = GrainId.Create("target", "one");
+        var child = storage.GetOrCreate(childId);
+        storage.SetRemoteRequest(childId, child, target, "fingerprint");
+        storage.RequestCancellation(childId, child);
+        var (recovered, _, _, transport) = CreateRuntime(storage, manager);
+        manager.BeforeWrite = () =>
+        {
+            Assert.Equal(DurableTaskStatus.Canceled, storage.Get(childId).Result!.Status);
+            var cancellation = Assert.Single(transport.Cancellations);
+            Assert.Equal(childId, cancellation.TaskId);
+            Assert.Equal(target, cancellation.Target);
+        };
+
+        await recovered.ResumePendingTasksAsync(default);
+
+        Assert.Equal(1, manager.WriteCount);
+        Assert.Equal(DurableTaskStatus.Canceled, storage.Get(childId).Result!.Status);
+    }
+
+    [Fact]
     public async Task LocalAndRemoteRequestIdentitiesCannotShareTaskId()
     {
         var (runtime, storage, _, _) = CreateRuntime();
@@ -915,6 +939,42 @@ public sealed class DurableTaskRuntimeInvariantTests
             default);
 
         Assert.Equal(taskId, handle.TaskId);
+    }
+
+    [Fact]
+    public async Task NewLocalChildCommitsBeforeUserInvocation()
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var invoked = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var taskId = TaskId.Parse("root/local");
+        manager.BeforeWrite = () => Assert.False(invoked.Task.IsCompleted);
+
+        _ = await runtime.ScheduleChildAsync(
+            taskId,
+            DurableTask.Run(_ => invoked.TrySetResult(manager.WriteCount)),
+            default);
+
+        Assert.True(storage.Contains(taskId));
+        Assert.Equal(1, await invoked.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
+    public async Task FailedLocalChildCommitPreventsUserInvocation()
+    {
+        var (runtime, _, manager, _) = CreateRuntime();
+        var invoked = false;
+        var taskId = TaskId.Parse("root/local");
+        manager.BeforeWrite = () => throw new InvalidOperationException("Expected write failure.");
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runtime.ScheduleChildAsync(
+                taskId,
+                DurableTask.Run(_ => invoked = true),
+                default).AsTask());
+
+        Assert.Equal("Expected write failure.", exception.Message);
+        Assert.False(invoked);
+        Assert.Equal(0, manager.WriteCount);
     }
 
     [Fact]
