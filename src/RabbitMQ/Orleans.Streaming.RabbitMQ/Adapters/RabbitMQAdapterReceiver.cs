@@ -15,22 +15,30 @@ internal class RabbitMQAdapterReceiver : IQueueAdapterReceiver
     private readonly IQueueAdapterReceiverMonitor _monitor;
     private readonly RabbitMQConsumer _rabbitConsumer;
     private readonly RabbitMQClientOptions _rabbitMqClientOptions;
+    private readonly Func<Task> _closeConsumer;
+    private readonly Func<ulong, Task> _updateOffset;
+    private readonly object _checkpointLock = new();
+    private readonly SemaphoreSlim _checkpointWriteLock = new(1, 1);
+    private readonly CancellationTokenSource _checkpointCancellation = new();
     private DateTime _initializationTime;
-    private DateTime? _lastOffsetUpdate;
-    private int _messagesConsumedCount;
-
-    private int _messagesDeliveredCount;
-
+    private ulong? _pendingOffset;
+    private Task _checkpointTask;
     private int _receiverState = ReceiverShutdown;
+    private readonly object _initializationLock = new();
+    private Task _initializationTask;
 
     public RabbitMQAdapterReceiver(RabbitMQConsumer rabbitConsumer,
         IQueueAdapterReceiverMonitor monitor, ILogger<RabbitMQAdapterReceiver> logger,
-        RabbitMQClientOptions rabbitMqClientOptions)
+        RabbitMQClientOptions rabbitMqClientOptions,
+        Func<ulong, Task> updateOffset = null,
+        Func<Task> closeConsumer = null)
     {
         _rabbitConsumer = rabbitConsumer;
         _monitor = monitor;
         _logger = logger;
         _rabbitMqClientOptions = rabbitMqClientOptions;
+        _updateOffset = updateOffset ?? (offset => rabbitConsumer.UpdateOffset(offset));
+        _closeConsumer = closeConsumer ?? (() => rabbitConsumer.CloseConsumer());
     }
 
 
@@ -38,25 +46,18 @@ internal class RabbitMQAdapterReceiver : IQueueAdapterReceiver
     {
         _logger.LogInformation("Initializing RabbitMQ Receiver");
 
-        if (ReceiverRunning == Interlocked.Exchange(ref _receiverState, ReceiverRunning))
-        {
-            _logger.LogInformation(
-                "Another initialization for this receiver instance is already in progress, cancelling");
-            return;
-        }
-
-        await Initialize().ConfigureAwait(false);
+        Interlocked.Exchange(ref _receiverState, ReceiverRunning);
+        await EnsureInitialized().ConfigureAwait(false);
     }
 
     public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
     {
-        //return Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>());
-
         if (_receiverState == ReceiverShutdown)
         {
             return new List<IBatchContainer>();
         }
 
+        await EnsureInitialized().ConfigureAwait(false);
         var messages = await DequeueRabbitMessages(maxCount).ConfigureAwait(false);
 
         TrackMessagesReceived(messages);
@@ -64,73 +65,123 @@ internal class RabbitMQAdapterReceiver : IQueueAdapterReceiver
         return messages.Cast<IBatchContainer>().ToList();
     }
 
-    //public Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
-    //{
-    //    return Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>());
-
-    //    //if (_receiverState == ReceiverShutdown)
-    //    //{
-    //    //    return new List<IBatchContainer>();
-    //    //}
-
-    //    //var messages = await DequeueRabbitMessages(maxCount).ConfigureAwait(false);
-
-    //    //TrackMessagesReceived(messages);
-
-    //    //return messages.Cast<IBatchContainer>().ToList();
-    //}
-
     public async Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
     {
-        Interlocked.Add(ref _messagesDeliveredCount, messages.Count);
-        var messagesDeliveredCountAux = _messagesDeliveredCount;
-        var messagesConsumedCountAux = _messagesConsumedCount;
-
-        _logger.LogInformation($"Removing {messages.Count} messages from the queue these were already processed");
-
-        if (messagesDeliveredCountAux >= messagesConsumedCountAux && IsTimeToUpdateOffset())
+        if (messages.Count == 0)
         {
-            //RabbitMQ starts reading messages from the provided offset, different from Orleans streams, which start reading after the provided offset.
-            //To skip the last message read, we need to update the offset to offset + 1
-            var newOffset = (ulong)messages.Max(m => m.SequenceToken.SequenceNumber) + 1;
-            await _rabbitConsumer.UpdateOffset(newOffset).ConfigureAwait(false);
-            _lastOffsetUpdate = DateTime.UtcNow;
-            Interlocked.Exchange(ref _messagesDeliveredCount, _messagesDeliveredCount - messagesDeliveredCountAux);
-            Interlocked.Exchange(ref _messagesConsumedCount, _messagesConsumedCount - messagesConsumedCountAux);
+            return;
+        }
+
+        var newOffset = (ulong)messages.Max(m => m.SequenceToken.SequenceNumber) + 1;
+        lock (_checkpointLock)
+        {
+            if (_pendingOffset is null || newOffset > _pendingOffset)
+            {
+                _pendingOffset = newOffset;
+            }
+        }
+
+        if (_rabbitMqClientOptions.IntervalToUpdateOffset <= TimeSpan.Zero)
+        {
+            await FlushPendingCheckpoint().ConfigureAwait(false);
         }
     }
 
     public async Task Shutdown(TimeSpan timeout)
     {
         var watch = Stopwatch.StartNew();
+        Exception failure = null;
         try
         {
-            // if receiver was already shutdown, we can just leave
-            if (ReceiverShutdown == Interlocked.Exchange(ref _receiverState, ReceiverShutdown))
+            _checkpointCancellation.Cancel();
+            if (_checkpointTask is not null)
+            {
+                await _checkpointTask.ConfigureAwait(false);
+            }
+
+            await FlushPendingCheckpoint().ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            failure = exception;
+        }
+
+        Interlocked.Exchange(ref _receiverState, ReceiverShutdown);
+        try
+        {
+            await _closeConsumer().ConfigureAwait(false);
+            lock (_initializationLock)
+            {
+                _initializationTask = null;
+            }
+        }
+        catch (Exception exception)
+        {
+            failure = failure is null ? exception : new AggregateException(failure, exception);
+        }
+
+        watch.Stop();
+        _monitor?.TrackShutdown(failure is null, watch.Elapsed, failure);
+        if (failure is not null)
+        {
+            _logger.LogError(failure, "Failed to stop consumer");
+            throw failure;
+        }
+    }
+
+    private async Task RunCheckpointLoop()
+    {
+        using var timer = new PeriodicTimer(_rabbitMqClientOptions.IntervalToUpdateOffset);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_checkpointCancellation.Token).ConfigureAwait(false))
+            {
+                try
+                {
+                    await FlushPendingCheckpoint().ConfigureAwait(false);
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to store the RabbitMQ consumer offset");
+                }
+            }
+        }
+        catch (OperationCanceledException) when (_checkpointCancellation.IsCancellationRequested)
+        {
+        }
+    }
+
+    internal async Task FlushPendingCheckpoint()
+    {
+        await _checkpointWriteLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            ulong? offset;
+            lock (_checkpointLock)
+            {
+                offset = _pendingOffset;
+            }
+
+            if (offset is null)
             {
                 return;
             }
 
-            await _rabbitConsumer.CloseConsumer().ConfigureAwait(false);
+            _logger.LogInformation("Checkpointing RabbitMQ message offset {Offset}", offset);
+            await _updateOffset(offset.Value).ConfigureAwait(false);
 
-            watch.Stop();
-            _monitor?.TrackShutdown(true, watch.Elapsed, null);
+            lock (_checkpointLock)
+            {
+                if (_pendingOffset <= offset)
+                {
+                    _pendingOffset = null;
+                }
+            }
         }
-        catch (Exception ex)
+        finally
         {
-            _logger.LogError(ex, "Failed to stop consumer");
-            watch.Stop();
-            _monitor?.TrackShutdown(false, watch.Elapsed, ex);
-            throw;
+            _checkpointWriteLock.Release();
         }
-    }
-
-    private bool IsTimeToUpdateOffset()
-    {
-        var lastOffsetUpdate = _lastOffsetUpdate ?? _initializationTime;
-
-        return (DateTime.UtcNow - lastOffsetUpdate).TotalMilliseconds >=
-               _rabbitMqClientOptions.IntervalToUpdateOffset.TotalMilliseconds;
     }
 
     private void TrackMessagesReceived(IReadOnlyList<RabbitMqBatchContainer> messages)
@@ -157,12 +208,19 @@ internal class RabbitMQAdapterReceiver : IQueueAdapterReceiver
     {
         var watch = Stopwatch.StartNew();
 
-        var messages = await _rabbitConsumer.DequeueMessages(maxCount).ConfigureAwait(false);
-        Interlocked.Add(ref _messagesConsumedCount, messages.Count);
-        watch.Stop();
-
-        _monitor?.TrackRead(true, watch.Elapsed, null);
-        return messages;
+        try
+        {
+            var messages = await _rabbitConsumer.DequeueMessages(maxCount).ConfigureAwait(false);
+            watch.Stop();
+            _monitor?.TrackRead(true, watch.Elapsed, null);
+            return messages;
+        }
+        catch (Exception exception)
+        {
+            watch.Stop();
+            _monitor?.TrackRead(false, watch.Elapsed, exception);
+            throw;
+        }
     }
 
     /// <summary>
@@ -170,7 +228,33 @@ internal class RabbitMQAdapterReceiver : IQueueAdapterReceiver
     ///     saved.
     ///     If the initialization fails, it will be retried on the next <see cref="GetQueueMessagesAsync(int)" /> call.
     /// </summary>
-    private async Task Initialize()
+    private async Task EnsureInitialized()
+    {
+        Task initializationTask;
+        lock (_initializationLock)
+        {
+            initializationTask = _initializationTask ??= InitializeCore();
+        }
+
+        try
+        {
+            await initializationTask.ConfigureAwait(false);
+        }
+        catch
+        {
+            lock (_initializationLock)
+            {
+                if (ReferenceEquals(_initializationTask, initializationTask))
+                {
+                    _initializationTask = null;
+                }
+            }
+
+            throw;
+        }
+    }
+
+    private async Task InitializeCore()
     {
         var watch = Stopwatch.StartNew();
 
@@ -178,8 +262,13 @@ internal class RabbitMQAdapterReceiver : IQueueAdapterReceiver
         {
             await _rabbitConsumer.StartConsumingMessages().ConfigureAwait(false);
             _initializationTime = DateTime.UtcNow;
+            if (_rabbitMqClientOptions.IntervalToUpdateOffset > TimeSpan.Zero)
+            {
+                _checkpointTask = RunCheckpointLoop();
+            }
+
             watch.Stop();
-            _monitor.TrackInitialization(false, watch.Elapsed, null);
+            _monitor.TrackInitialization(true, watch.Elapsed, null);
         }
         catch (Exception ex)
         {

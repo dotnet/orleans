@@ -8,20 +8,24 @@ using Orleans.Streams;
 
 namespace Orleans.Streaming.RabbitMQ.Adapters;
 
-internal class RabbitMQAdapter : IQueueAdapter
+internal class RabbitMQAdapter : IQueueAdapter, IAsyncDisposable
 {
     private readonly ILoggerFactory _loggerFactory;
     private readonly ConcurrentDictionary<QueueId, RabbitMQProducer> _producers = new();
+    private readonly object _producerLock = new();
     private readonly HashRingBasedStreamQueueMapper _streamQueueMapper;
     private readonly RabbitMQQueueProvider _rabbitMqQueueProvider;
     private readonly Serializer<RabbitMqBatchContainer> _rabbitMqContainerSerializer;
     private readonly RabbitMQAdapterReceiverFactory _receiverFactory;
     private readonly RabbitMQStreamSystemProvider _streamSystemProvider;
+    private readonly RabbitMqQueueCacheOptions _cacheOptions;
+    private bool _disposed;
 
     public RabbitMQAdapter(HashRingBasedStreamQueueMapper streamQueueMapper,
         RabbitMQQueueProvider rabbitMqQueueProvider,
         RabbitMQStreamSystemProvider streamSystemProvider, ILoggerFactory loggerFactory,
-        RabbitMQAdapterReceiverFactory receiverFactory, Serializer serializer, string providerName)
+        RabbitMQAdapterReceiverFactory receiverFactory, Serializer serializer, string providerName,
+        RabbitMqQueueCacheOptions cacheOptions)
     {
         Name = providerName;
         _streamQueueMapper = streamQueueMapper;
@@ -29,6 +33,7 @@ internal class RabbitMQAdapter : IQueueAdapter
         _streamSystemProvider = streamSystemProvider;
         _loggerFactory = loggerFactory;
         _receiverFactory = receiverFactory;
+        _cacheOptions = cacheOptions;
         _rabbitMqContainerSerializer = serializer.GetSerializer<RabbitMqBatchContainer>();
     }
 
@@ -36,8 +41,13 @@ internal class RabbitMQAdapter : IQueueAdapter
         Dictionary<string, object> requestContext)
     {
         var queueId = _streamQueueMapper.GetQueueForStream(streamId);
-        var producer = _producers.GetOrAdd(queueId,
-            _ => new RabbitMQProducer(_streamSystemProvider, _rabbitMqQueueProvider, queueId));
+        RabbitMQProducer producer;
+        lock (_producerLock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            producer = _producers.GetOrAdd(queueId,
+                _ => new RabbitMQProducer(_streamSystemProvider, _rabbitMqQueueProvider, queueId, _loggerFactory));
+        }
 
         await producer.SendMessage(RabbitMqBatchContainer.ToRabbitMqMessage(_rabbitMqContainerSerializer,
             streamId,
@@ -48,9 +58,27 @@ internal class RabbitMQAdapter : IQueueAdapter
     public IQueueAdapterReceiver CreateReceiver(QueueId queueId) =>
         _receiverFactory.Create(new RabbitMQConsumer(_rabbitMqQueueProvider, _streamSystemProvider,
             _loggerFactory, queueId,
-            _rabbitMqContainerSerializer), queueId);
+            _rabbitMqContainerSerializer, _cacheOptions), queueId);
 
     public string Name { get; }
-    public bool IsRewindable => true;
+    public bool IsRewindable => false;
     public StreamProviderDirection Direction => StreamProviderDirection.ReadWrite;
+
+    public async ValueTask DisposeAsync()
+    {
+        RabbitMQProducer[] producers;
+        lock (_producerLock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            producers = _producers.Values.ToArray();
+            _producers.Clear();
+        }
+
+        await Task.WhenAll(producers.Select(producer => producer.DisposeAsync().AsTask())).ConfigureAwait(false);
+    }
 }

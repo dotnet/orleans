@@ -9,8 +9,9 @@ using Orleans.Streams;
 
 namespace Orleans.Streaming.RabbitMQ.Adapters;
 
-internal class RabbitMQAdapterFactory : IQueueAdapterFactory
+internal class RabbitMQAdapterFactory : IQueueAdapterFactory, ILifecycleParticipant<ISiloLifecycle>, IAsyncDisposable
 {
+    private readonly object _adapterLock = new();
     private readonly ILoggerFactory _loggerFactory;
     private readonly string _providerName;
     private readonly RabbitMqQueueCacheOptions _rabbitMqQueueCacheOptions;
@@ -19,6 +20,8 @@ internal class RabbitMQAdapterFactory : IQueueAdapterFactory
     private readonly HashRingBasedStreamQueueMapper _streamQueueMapper;
     private readonly RabbitMQStreamSystemProvider _streamSystemProvider;
     private readonly RabbitMQQueueProvider _rabbitMqQueueProvider;
+    private RabbitMQAdapter _adapter;
+    private bool _disposed;
 
     public RabbitMQAdapterFactory(ILoggerFactory loggerFactory, string providerName,
         RabbitMqQueueCacheOptions rabbitMqQueueCacheOptions,
@@ -38,12 +41,24 @@ internal class RabbitMQAdapterFactory : IQueueAdapterFactory
     }
 
     public Task<IQueueAdapter> CreateAdapter()
-        => Task.FromResult<IQueueAdapter>(
-            new RabbitMQAdapter(_streamQueueMapper, _rabbitMqQueueProvider, _streamSystemProvider, _loggerFactory,
-                _receiverFactory, _serializer, _providerName));
+    {
+        lock (_adapterLock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return Task.FromResult<IQueueAdapter>(
+                _adapter ??= new RabbitMQAdapter(
+                    _streamQueueMapper,
+                    _rabbitMqQueueProvider,
+                    _streamSystemProvider,
+                    _loggerFactory,
+                    _receiverFactory,
+                    _serializer,
+                    _providerName,
+                    _rabbitMqQueueCacheOptions));
+        }
+    }
 
     public IQueueAdapterCache GetQueueAdapterCache() => new RabbitMqQueueCacheAdapter(_rabbitMqQueueCacheOptions);
-    //public IQueueAdapterCache GetQueueAdapterCache() => new SimpleQueueAdapterCache(new SimpleQueueCacheOptions(), "RabbitMQ", _loggerFactory);
 
     public IStreamQueueMapper GetStreamQueueMapper() => _streamQueueMapper;
 
@@ -55,13 +70,41 @@ internal class RabbitMQAdapterFactory : IQueueAdapterFactory
         var loggerFactory = serviceProvider.GetService<ILoggerFactory>();
         var rabbitMqClientOptions = serviceProvider.GetOptionsByName<RabbitMQClientOptions>(providerName);
         var rabbitMqQueueCacheOptions = serviceProvider.GetOptionsByName<RabbitMqQueueCacheOptions>(providerName);
-        var receiverFactory = serviceProvider.GetService<RabbitMQAdapterReceiverFactory>();
+        var receiverFactory = serviceProvider.GetRequiredKeyedService<RabbitMQAdapterReceiverFactory>(providerName);
         var serializer = serviceProvider.GetService<Serializer>();
-        var streamProvider = serviceProvider.GetService<RabbitMQStreamSystemProvider>();
-        var rabbitMqQueueProvider = serviceProvider.GetService<RabbitMQQueueProvider>();
+        var streamProvider = serviceProvider.GetRequiredKeyedService<RabbitMQStreamSystemProvider>(providerName);
+        var rabbitMqQueueProvider = serviceProvider.GetRequiredKeyedService<RabbitMQQueueProvider>(providerName);
         var hashRingStreamQueueMapperOptions = serviceProvider.GetOptionsByName<HashRingStreamQueueMapperOptions>(providerName);
 
         return new RabbitMQAdapterFactory(loggerFactory, providerName,
             rabbitMqQueueCacheOptions, rabbitMqClientOptions, receiverFactory, serializer, streamProvider, rabbitMqQueueProvider, hashRingStreamQueueMapperOptions);
+    }
+
+    public void Participate(ISiloLifecycle lifecycle) =>
+        lifecycle.Subscribe(
+            $"{nameof(RabbitMQAdapterFactory)}-{_providerName}",
+            ServiceLifecycleStage.ApplicationServices,
+            _ => Task.CompletedTask,
+            _ => DisposeAsync().AsTask());
+
+    public async ValueTask DisposeAsync()
+    {
+        RabbitMQAdapter adapter;
+        lock (_adapterLock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            adapter = _adapter;
+            _adapter = null;
+        }
+
+        if (adapter is not null)
+        {
+            await adapter.DisposeAsync().ConfigureAwait(false);
+        }
     }
 }
