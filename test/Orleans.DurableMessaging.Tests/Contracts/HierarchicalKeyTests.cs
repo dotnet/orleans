@@ -5,7 +5,9 @@ namespace Orleans.DurableMessaging.Tests.Contracts;
 /// <summary>
 /// Tests for hierarchical message correlation keys.
 /// </summary>
-[TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableMessaging")]
 public class HierarchicalKeyTests
 {
     [Fact]
