@@ -26,7 +26,7 @@ public abstract class EFCoreTestDatabase
         var connectionString = GetConfiguredConnectionString();
         if (string.IsNullOrWhiteSpace(connectionString))
         {
-            throw new SkipException(
+            throw Xunit.Sdk.SkipException.ForSkip(
                 $"{Name} connection string is not configured. Set {ConfigurationVariable}.");
         }
 

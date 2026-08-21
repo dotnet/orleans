@@ -5,14 +5,11 @@ using Orleans.Configuration;
 using Orleans.EntityFrameworkCore.Tests.Infrastructure;
 using Orleans.Reminders.EntityFrameworkCore.SqlServer.Data;
 using TestExtensions;
-using Xunit.Abstractions;
 
 namespace Orleans.EntityFrameworkCore.Tests.Reminders;
 
 [Collection(TestEnvironmentFixture.DefaultCollection)]
-[TestCategory("Reminders")]
-[TestCategory("EFCore")]
-[TestCategory(EFCoreTestCategories.SqlServer)]
+[TestArea("EFCore")]
 [TestSuite("Functional")]
 [TestProvider(EFCoreTestCategories.SqlServer)]
 [TestArea("Reminders")]
@@ -26,7 +23,7 @@ public sealed class EFCoreSqlServerReminderStandaloneTests : IAsyncLifetime
         _testOutput = testOutput;
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _databaseFixture = new EFCoreDatabaseFixture<SqlServerReminderDbContext>(
             EFCoreTestDatabase.SqlServer,
@@ -36,7 +33,7 @@ public sealed class EFCoreSqlServerReminderStandaloneTests : IAsyncLifetime
         await _databaseFixture.InitializeAsync();
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_databaseFixture is not null)
         {
@@ -44,7 +41,7 @@ public sealed class EFCoreSqlServerReminderStandaloneTests : IAsyncLifetime
         }
     }
 
-    [SkippableFact, TestCategory("Performance")]
+    [Fact, TestCategory("Performance")]
     public async Task Reminders_EFCoreSqlServer_InsertThroughputCompletesAndPersistsEveryRow()
     {
         var table = CreateReminderTable();
@@ -63,7 +60,7 @@ public sealed class EFCoreSqlServerReminderStandaloneTests : IAsyncLifetime
             $"Inserted {allETags.Length} SQL Server EF reminder rows in {stopwatch.Elapsed}.");
     }
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public async Task Reminders_EFCoreSqlServer_InsertAndReadBackPreservesFieldsAndReturnsETag()
     {
         var table = CreateReminderTable();

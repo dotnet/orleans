@@ -3,14 +3,11 @@ using Orleans.Persistence.EntityFrameworkCore.MySql.Data;
 using Orleans.Persistence.EntityFrameworkCore.PostgreSQL.Data;
 using Orleans.Persistence.EntityFrameworkCore.SqlServer.Data;
 using TestExtensions;
-using Xunit.Abstractions;
 
 namespace Orleans.EntityFrameworkCore.Tests.Persistence;
 
 [Collection(TestEnvironmentFixture.DefaultCollection)]
-[TestCategory("Persistence")]
-[TestCategory("EFCore")]
-[TestCategory(EFCoreTestCategories.SqlServer)]
+[TestArea("EFCore")]
 [TestSuite("Functional")]
 [TestProvider(EFCoreTestCategories.SqlServer)]
 [TestArea("Persistence")]
@@ -27,10 +24,7 @@ public sealed class EFCoreSqlServerPersistenceProviderTests :
 }
 
 [Collection(TestEnvironmentFixture.DefaultCollection)]
-[TestCategory("Persistence")]
-[TestCategory("EFCore")]
-[TestCategory(EFCoreTestCategories.MySql)]
-[TestCategory(EFCoreTestCategories.MySqlProvider)]
+[TestArea("EFCore")]
 [TestSuite("Functional")]
 [TestProvider(EFCoreTestCategories.MySqlProvider)]
 [TestArea("Persistence")]
@@ -47,10 +41,7 @@ public sealed class EFCoreMySqlPersistenceProviderTests :
 }
 
 [Collection(TestEnvironmentFixture.DefaultCollection)]
-[TestCategory("Persistence")]
-[TestCategory("EFCore")]
-[TestCategory(EFCoreTestCategories.PostgreSql)]
-[TestCategory(EFCoreTestCategories.PostgreSqlProvider)]
+[TestArea("EFCore")]
 [TestSuite("Functional")]
 [TestProvider(EFCoreTestCategories.PostgreSqlProvider)]
 [TestArea("Persistence")]

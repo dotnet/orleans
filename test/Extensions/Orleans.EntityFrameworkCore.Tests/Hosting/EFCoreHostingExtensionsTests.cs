@@ -24,7 +24,9 @@ using TestExtensions;
 
 namespace Orleans.EntityFrameworkCore.Tests.Hosting;
 
-[TestCategory(EFCoreTestCategories.Unit)]
+[TestArea("EFCore")]
+[TestProvider("None")]
+[TestSuite("BVT")]
 public sealed class EFCoreHostingExtensionsTests
 {
     [Fact]

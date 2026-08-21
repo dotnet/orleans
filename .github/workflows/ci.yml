@@ -330,13 +330,13 @@ jobs:
     - name: Test
       run: dotnet test test/Extensions/Orleans.EntityFrameworkCore.Tests/Orleans.EntityFrameworkCore.Tests.csproj
         --framework ${{ matrix.framework }}
-        --filter "Category=EFCore-Unit"
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_EFCore-Unit_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+        --filter-query "/[(Area=EFCore)&(Provider=None)&(Suite=BVT)]"
+        --minimum-expected-tests 1
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --report-trx --report-trx-filename "test_results_EFCore-Unit_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        --max-parallel-test-modules 1
     - name: Archive Test Results
       if: always()
       continue-on-error: true
