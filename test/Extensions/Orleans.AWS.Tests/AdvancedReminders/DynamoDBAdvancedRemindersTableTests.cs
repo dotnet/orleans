@@ -25,7 +25,7 @@ public class DynamoDBAdvancedRemindersTableTests : AdvancedReminderTableTestsBas
     {
         if (!AWSTestConstants.IsDynamoDbAvailable)
         {
-            throw new SkipException("Unable to connect to AWS DynamoDB simulator");
+            throw Xunit.Sdk.SkipException.ForSkip("Unable to connect to AWS DynamoDB simulator");
         }
 
         var options = new DynamoDBReminderStorageOptions();
@@ -40,12 +40,12 @@ public class DynamoDBAdvancedRemindersTableTests : AdvancedReminderTableTestsBas
     protected override Task<string> GetConnectionString()
         => Task.FromResult(AWSTestConstants.IsDynamoDbAvailable ? $"Service={AWSTestConstants.DynamoDbService}" : null!);
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_AWS_DurableCronRoundTrip() => await ReminderCronRoundTrip();
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_AWS_DurableAdaptiveFieldsRoundTrip() => await ReminderAdaptiveFieldsRoundTrip();
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_AWS_DurableCronTimeZoneRoundTrip() => await ReminderCronTimeZoneRoundTrip();
 }

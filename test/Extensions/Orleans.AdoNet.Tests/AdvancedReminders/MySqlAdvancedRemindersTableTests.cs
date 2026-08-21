@@ -46,12 +46,12 @@ public class MySqlAdvancedRemindersTableTests : AdvancedReminderTableTestsBase
         return instance.CurrentConnectionString;
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_MySql_DurableCronRoundTrip() => await ReminderCronRoundTrip();
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_MySql_DurableAdaptiveFieldsRoundTrip() => await ReminderAdaptiveFieldsRoundTrip();
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_MySql_DurableCronTimeZoneRoundTrip() => await ReminderCronTimeZoneRoundTrip();
 }

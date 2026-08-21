@@ -45,16 +45,16 @@ public class RedisAdvancedRemindersTableTests : AdvancedReminderTableTestsBase
 
     protected override Task<string> GetConnectionString() => Task.FromResult(TestDefaultConfiguration.RedisConnectionString!);
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_Redis_DurableCronRoundTrip() => await ReminderCronRoundTrip();
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_Redis_DurableAdaptiveFieldsRoundTrip() => await ReminderAdaptiveFieldsRoundTrip();
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_Redis_DurableCronTimeZoneRoundTrip() => await ReminderCronTimeZoneRoundTrip();
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_Redis_UpsertAppliesEntryExpiryWhenKeyIsCreated()
     {
         TestUtils.CheckForRedis();

@@ -104,7 +104,7 @@ public sealed class AdvancedReminderInMemoryTests(AdvancedReminderInMemoryTests.
     {
         public TestCluster Cluster { get; private set; } = null!;
 
-        public async Task InitializeAsync()
+        public async ValueTask InitializeAsync()
         {
             var builder = new TestClusterBuilder(1);
             TestDefaultConfiguration.ConfigureTestCluster(builder);
@@ -113,7 +113,7 @@ public sealed class AdvancedReminderInMemoryTests(AdvancedReminderInMemoryTests.
             await Cluster.DeployAsync();
         }
 
-        public async Task DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             try
             {

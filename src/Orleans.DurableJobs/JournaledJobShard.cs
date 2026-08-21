@@ -186,7 +186,7 @@ internal sealed class JournaledJobShard : IJobShard
         var operation = new RetryJobLaterOperation(jobContext, newDueTime, resetDequeueCount: false, cancellationToken);
         try
         {
-            EnqueueOperation(operation);
+            await EnqueueOperationAsync(operation).ConfigureAwait(false);
             await operation.Task.ConfigureAwait(false);
         }
         finally

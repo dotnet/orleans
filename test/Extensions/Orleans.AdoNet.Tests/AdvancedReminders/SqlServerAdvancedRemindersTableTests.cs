@@ -47,12 +47,12 @@ public class SqlServerAdvancedRemindersTableTests : AdvancedReminderTableTestsBa
         return instance.CurrentConnectionString;
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_SqlServer_DurableCronRoundTrip() => await ReminderCronRoundTrip();
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_SqlServer_DurableAdaptiveFieldsRoundTrip() => await ReminderAdaptiveFieldsRoundTrip();
 
-    [SkippableFact]
+    [Fact]
     public async Task RemindersTable_SqlServer_DurableCronTimeZoneRoundTrip() => await ReminderCronTimeZoneRoundTrip();
 }
