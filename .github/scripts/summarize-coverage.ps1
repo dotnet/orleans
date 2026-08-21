@@ -83,7 +83,11 @@ function Read-CoverageReport {
     try {
         $document = [Xml.XmlDocument]::new()
         $document.XmlResolver = $null
-        $document.Load($reader)
+        try {
+            $document.Load($reader)
+        } catch [Xml.XmlException] {
+            throw "$ReportPath contains invalid XML: $($_.Exception.Message)"
+        }
     } finally {
         $reader.Dispose()
         $stringReader.Dispose()
@@ -92,7 +96,7 @@ function Read-CoverageReport {
     $measuredFiles = [Collections.Generic.Dictionary[string, Collections.Generic.Dictionary[int, bool]]]::new(
         [StringComparer]::Ordinal
     )
-    foreach ($classElement in $document.SelectNodes('//class')) {
+    foreach ($classElement in $document.SelectNodes('//*[local-name()="class"]')) {
         $filename = $classElement.GetAttribute('filename')
         if (-not $filename) {
             continue
@@ -103,7 +107,7 @@ function Read-CoverageReport {
             continue
         }
 
-        $linesElement = $classElement.SelectSingleNode('lines')
+        $linesElement = $classElement.SelectSingleNode('./*[local-name()="lines"]')
         if (-not $linesElement) {
             continue
         }
@@ -114,7 +118,7 @@ function Read-CoverageReport {
             $measuredFiles.Add($repositoryPath, $fileLines)
         }
 
-        foreach ($lineElement in $linesElement.SelectNodes('line')) {
+        foreach ($lineElement in $linesElement.SelectNodes('./*[local-name()="line"]')) {
             $lineNumber = 0
             $hits = 0
             if (-not [int]::TryParse($lineElement.GetAttribute('number'), [Globalization.NumberStyles]::Integer, $invariantCulture, [ref] $lineNumber) -or
@@ -128,7 +132,7 @@ function Read-CoverageReport {
         }
     }
 
-    return ,$measuredFiles
+    return [pscustomobject]@{ Files = $measuredFiles }
 }
 
 $resolvedReportDirectory = (Resolve-Path -LiteralPath $ReportDirectory).Path
@@ -141,7 +145,8 @@ if ($reports.Count -ne 1) {
     throw "Expected one merged Cobertura report, found $($reports.Count)"
 }
 
-$measuredFiles = Read-CoverageReport -ReportPath $reports[0].FullName -ResolvedSourceRoot $resolvedSourceRoot
+$coverageReport = Read-CoverageReport -ReportPath $reports[0].FullName -ResolvedSourceRoot $resolvedSourceRoot
+$measuredFiles = $coverageReport.Files
 $totalLines = 0
 $coveredLines = 0
 foreach ($fileLines in $measuredFiles.Values) {

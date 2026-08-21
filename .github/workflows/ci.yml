@@ -47,6 +47,10 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Test coverage reporting
+      if: matrix.os == 'ubuntu-latest'
+      shell: pwsh
+      run: ./.github/scripts/test-summarize-coverage.ps1
     - name: Build
       run: dotnet build -bl
     - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6

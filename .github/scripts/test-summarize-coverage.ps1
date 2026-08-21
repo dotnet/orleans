@@ -63,7 +63,7 @@ function Get-ReportXml {
 
     $encodedSourceFile = [Security.SecurityElement]::Escape($SourceFile)
     return @"
-<coverage>
+<coverage xmlns="http://cobertura.sourceforge.net/xml/coverage">
   <packages>
     <package>
       <classes>
@@ -161,6 +161,25 @@ try {
         Assert-Equal 1 $summary.total_lines 'Duplicate total lines differ.'
     }
 
+    Invoke-Test 'counts distinct source files' {
+        $testCase = New-TestCase
+        $firstSourceFile = [Security.SecurityElement]::Escape((Join-Path $testCase.SourceRoot 'First.cs'))
+        $secondSourceFile = [Security.SecurityElement]::Escape((Join-Path $testCase.SourceRoot 'Second.cs'))
+        $xml = @"
+<coverage xmlns="http://cobertura.sourceforge.net/xml/coverage">
+  <packages><package><classes>
+    <class filename="$firstSourceFile"><lines><line number="10" hits="1" /></lines></class>
+    <class filename="$secondSourceFile"><lines><line number="20" hits="0" /></lines></class>
+  </classes></package></packages>
+</coverage>
+"@
+        [void] (Write-Report $testCase $xml)
+        Invoke-Summarizer $testCase
+        $summary = Get-Content -Raw $testCase.JsonOutput | ConvertFrom-Json
+        Assert-Equal 2 $summary.source_files 'Distinct source file count differs.'
+        Assert-Equal 2 $summary.total_lines 'Distinct source line count differs.'
+    }
+
     Invoke-Test 'rejects multiple reports' {
         $testCase = New-TestCase
         $xml = Get-ReportXml (Join-Path $testCase.SourceRoot 'Example.cs')
@@ -200,6 +219,12 @@ try {
             [void] (Write-Report $testCase "$declaration<coverage />")
             Assert-Throws { Invoke-Summarizer $testCase } 'unsupported XML declarations'
         }
+    }
+
+    Invoke-Test 'reports invalid XML path' {
+        $testCase = New-TestCase
+        $report = Write-Report $testCase '<coverage>'
+        Assert-Throws { Invoke-Summarizer $testCase } ([regex]::Escape("$report contains invalid XML"))
     }
 
     Invoke-Test 'rejects UTF-16 reports' {
