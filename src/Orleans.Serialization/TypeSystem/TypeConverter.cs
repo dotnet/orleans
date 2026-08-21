@@ -668,6 +668,8 @@ public class TypeConverter
 
     private TypeSpec ResolveCompoundAliasType<TState>(TupleTypeSpec input, ref TState state)
     {
+        var isInvokableAlias = input.Elements is [LiteralTypeSpec { Value: "inv" }, ..];
+
         var resolvedElements = new object[input.Elements.Length];
         for (var i = 0; i < input.Elements.Length; i++)
         {
@@ -680,6 +682,11 @@ public class TypeConverter
             {
                 if (!ParseInternal(inputElement, out var type))
                 {
+                    if (isInvokableAlias)
+                    {
+                        throw new UnresolvedInvokableAliasException(input.Format());
+                    }
+
                     throw new TypeLoadException($"Unable to parse or load type \"{inputElement.Format()}\".");
                 }
 
@@ -697,6 +704,11 @@ public class TypeConverter
         var resultType = tree?.Value;
         if (resultType is null)
         {
+            if (isInvokableAlias)
+            {
+                throw new UnresolvedInvokableAliasException(input.Format());
+            }
+
             throw new TypeLoadException($"Unable to resolve type alias \"{input.Format()}\".");
         }
 

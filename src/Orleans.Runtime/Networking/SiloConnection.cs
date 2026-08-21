@@ -217,6 +217,7 @@ namespace Orleans.Runtime.Messaging
             async Task ReadPreamble()
             {
                 var preamble = await connectionPreambleHelper.Read(this.Context);
+                NegotiateProtocolVersion(this.connectionOptions.ProtocolVersion, preamble.NetworkProtocolVersion);
 
                 if (!preamble.NodeIdentity.Equals(Constants.SiloDirectConnectionId))
                 {
