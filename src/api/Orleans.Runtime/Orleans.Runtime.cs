@@ -388,6 +388,15 @@ namespace Orleans.Hosting
             where TRule : class, Placement.Repartitioning.IImbalanceToleranceRule { throw null; }
     }
 
+    public sealed partial class ClusterMonitoringOptions
+    {
+        public bool DeleteDefunctClusterMembers { get { throw null; } set { } }
+
+        public int MaxAgents { get { throw null; } set { } }
+
+        public int MaxInitializationAttempts { get { throw null; } set { } }
+    }
+
     public static partial class CoreHostingExtensions
     {
         public static ISiloBuilder AddActivityPropagation(this ISiloBuilder builder) { throw null; }
@@ -503,6 +512,18 @@ namespace Orleans.Hosting
     public static partial class SystemTextJsonSerializerExtensions
     {
         public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder) { throw null; }
+    }
+}
+
+namespace Orleans.Hosting.Clustering
+{
+    public sealed partial class ClusterAgent : ILifecycleParticipant<Runtime.ISiloLifecycle>
+    {
+        public ClusterAgent(Runtime.IClusterMembershipService clusterMembershipService, Microsoft.Extensions.Logging.ILogger<ClusterAgent> logger, Microsoft.Extensions.Options.IOptionsMonitor<ClusterMonitoringOptions> options, Runtime.Hosting.Clustering.IClusterProvider clusterProvider, Runtime.ILocalSiloDetails localSiloDetails) { }
+
+        public System.Threading.Tasks.Task OnStop(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public void Participate(Runtime.ISiloLifecycle lifecycle) { }
     }
 }
 
@@ -1252,6 +1273,11 @@ namespace Orleans.Runtime.GrainDirectory
 
 namespace Orleans.Runtime.Hosting
 {
+    public static partial class ClusterMonitoringExtensions
+    {
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseClusterMonitoring(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) { throw null; }
+    }
+
     public static partial class DirectorySiloBuilderExtensions
     {
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddGrainDirectory<T>(this Microsoft.Extensions.DependencyInjection.IServiceCollection collection, string name, System.Func<System.IServiceProvider, string, T> implementationFactory)
@@ -1265,6 +1291,42 @@ namespace Orleans.Runtime.Hosting
     {
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddGrainStorage<T>(this Microsoft.Extensions.DependencyInjection.IServiceCollection collection, string name, System.Func<System.IServiceProvider, string, T> implementationFactory)
             where T : Storage.IGrainStorage { throw null; }
+    }
+}
+
+namespace Orleans.Runtime.Hosting.Clustering
+{
+    public abstract partial class ClusterEvent
+    {
+        protected ClusterEvent(ExternalClusterMember member) { }
+
+        public ExternalClusterMember Member { get { throw null; } }
+    }
+
+    public sealed partial class ClusterMemberDeleted : ClusterEvent
+    {
+        public ClusterMemberDeleted(ExternalClusterMember member) : base(default!) { }
+    }
+
+    public partial class ExternalClusterMember
+    {
+        public ExternalClusterMember(string name, string description) { }
+
+        public string Description { get { throw null; } }
+
+        public bool IsCurrentSilo { get { throw null; } init { } }
+
+        public string Name { get { throw null; } }
+
+        public override string ToString() { throw null; }
+    }
+
+    public partial interface IClusterProvider
+    {
+        System.Threading.Tasks.Task DeleteAsync(string name, System.Threading.CancellationToken cancellation);
+        string Describe(string name);
+        System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<ExternalClusterMember>> ListMembersAsync(System.Threading.CancellationToken cancellation);
+        System.Collections.Generic.IAsyncEnumerable<ClusterEvent> MonitorChangesAsync(System.Threading.CancellationToken cancellation);
     }
 }
 

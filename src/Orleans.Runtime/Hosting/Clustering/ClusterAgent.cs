@@ -122,7 +122,7 @@ namespace Orleans.Hosting.Clustering
                 null);
         }
 
-        private async Task OnStop(CancellationToken cancellationToken)
+        public async Task OnStop(CancellationToken cancellationToken)
         {
             _shutdownToken.Cancel();
             _enableMonitoring = false;

@@ -36,10 +36,19 @@ namespace Orleans.Hosting.Kubernetes
         public void Configure(ClusterMonitoringOptions options)
         {
             var hostingOptions = _serviceProvider.GetRequiredService<IOptions<KubernetesHostingOptions>>().Value;
-            options.MaxAgents = hostingOptions.MaxAgents;
-            options.MaxInitializationAttempts = hostingOptions.MaxKubernetesApiRetryAttempts;
-            options.DeleteDefunctClusterMembers = hostingOptions.DeleteDefunctSiloPods;
+            var clusterMonitoringOptions = CreateClusterMonitoringOptions(hostingOptions);
+            options.MaxAgents = clusterMonitoringOptions.MaxAgents;
+            options.MaxInitializationAttempts = clusterMonitoringOptions.MaxInitializationAttempts;
+            options.DeleteDefunctClusterMembers = clusterMonitoringOptions.DeleteDefunctClusterMembers;
         }
+
+        internal static ClusterMonitoringOptions CreateClusterMonitoringOptions(KubernetesHostingOptions options) =>
+            new()
+            {
+                MaxAgents = options.MaxAgents,
+                MaxInitializationAttempts = options.MaxKubernetesApiRetryAttempts,
+                DeleteDefunctClusterMembers = options.DeleteDefunctSiloPods
+            };
 
         public void Configure(ClusterOptions options)
         {
