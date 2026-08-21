@@ -1081,6 +1081,10 @@ jobs:
     - name: Build
       run: dotnet build
     - name: Test
+      if: >-
+        github.event_name != 'pull_request' ||
+        matrix.os != 'ubuntu-latest' ||
+        matrix.framework != 'net10.0'
       run: dotnet test
         --framework ${{ matrix.framework }}
         --filter-query "/[(Provider=None)&(Suite=${{ matrix.suite }})&(Area!=CodeGen)]"
@@ -1090,9 +1094,17 @@ jobs:
         --hangdump-type Full
         --report-trx --report-trx-filename "test_results_${{ matrix.suite }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
         --max-parallel-test-modules 1
-        ${{ github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0' && '--coverage' || '' }}
-        ${{ github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0' && '--coverage-output-format coverage' || '' }}
-        ${{ github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0' && '--coverage-settings .github/coverage.config.xml' || '' }}
+    - name: Test with coverage
+      if: >-
+        github.event_name == 'pull_request' &&
+        matrix.os == 'ubuntu-latest' &&
+        matrix.framework == 'net10.0'
+      shell: pwsh
+      run: >
+        ./.github/scripts/run-tests-with-coverage.ps1
+        -RepositoryRoot $env:GITHUB_WORKSPACE
+        -Framework ${{ matrix.framework }}
+        -Suite ${{ matrix.suite }}
     - name: Archive Test Results
       if: always()
       continue-on-error: true
@@ -1146,6 +1158,11 @@ jobs:
           --output-format cobertura `
           --remove-input-files `
           --nologo
+
+        [xml] $coverage = Get-Content -LiteralPath TestResults/coverage.cobertura.xml -Raw
+        if (-not $coverage.SelectSingleNode('//*[local-name()="line"]')) {
+          throw 'Merged coverage report contains no measured lines'
+        }
     - name: Archive coverage
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
