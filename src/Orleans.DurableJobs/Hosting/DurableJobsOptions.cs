@@ -44,8 +44,9 @@ public sealed class DurableJobsOptions
     public TimeSpan JobStatusPollInterval { get; set; } = TimeSpan.FromSeconds(1);
 
     /// <summary>
-    /// Gets or sets how long a grain activation retains completed durable job execution identities
-    /// to suppress delayed duplicate deliveries. Default: 10 minutes.
+    /// Gets or sets how long a grain activation retains completed durable job attempt identities
+    /// to suppress delayed duplicate deliveries. An attempt is identified by job ID, execution generation,
+    /// and dequeue count. Default: 10 minutes.
     /// </summary>
     /// <remarks>
     /// Deduplication is also bounded to the most recent 65,536 completed executions per activation.

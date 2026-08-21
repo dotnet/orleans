@@ -33,6 +33,16 @@ public class DurableJobReceiverExtensionTests
     }
 
     [Fact]
+    public void HandleDurableJobAsync_WhenHandlerResolutionFails_DoesNotPoisonAttemptCache()
+    {
+        var extension = CreateExtension(new object());
+        var context = CreateJobContext("run-1");
+
+        Assert.Throws<InvalidOperationException>(() => extension.HandleDurableJobAsync(context, CancellationToken.None));
+        Assert.Throws<InvalidOperationException>(() => extension.HandleDurableJobAsync(context, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task HandleDurableJobAsync_WhenTokenIsCanceledButExecutionIsStillRunning_RemainsRunning()
     {
         var executionTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -286,7 +296,7 @@ public class DurableJobReceiverExtensionTests
     }
 
     private static DurableJobReceiverExtension CreateExtension(
-        IDurableJobHandler handler,
+        object handler,
         TimeSpan? jobStatusPollInterval = null,
         TimeProvider? timeProvider = null,
         TimeSpan? completedAttemptRetentionPeriod = null,

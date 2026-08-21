@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 
@@ -52,22 +51,21 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         PruneCompletedJobAttempts();
 
         var key = GetExecutionKey(context);
-        JobAttemptState state;
-        ref var stateRef = ref CollectionsMarshal.GetValueRefOrAddDefault(_jobAttempts, key, out var exists);
-        var newJob = !exists;
-        if (!exists)
+        var newJob = false;
+        if (!_jobAttempts.TryGetValue(key, out var state))
         {
-            Debug.Assert(stateRef is null);
-            stateRef = new JobAttemptState(StartJob(context, cancellationToken));
+            state = new JobAttemptState(StartJob(context, cancellationToken));
+            _jobAttempts.Add(key, state);
+            newJob = true;
         }
-        else if (stateRef is { } existingState && IsReadyToPoll(existingState))
+        else if (IsReadyToPoll(state))
         {
-            stateRef = new JobAttemptState(StartJob(context, cancellationToken));
+            state = new JobAttemptState(StartJob(context, cancellationToken));
+            _jobAttempts[key] = state;
             newJob = true;
         }
 
-        Debug.Assert(stateRef is not null);
-        state = stateRef;
+        Debug.Assert(state is not null);
         return GetJobStatusAsync(key, context, state, newJob);
     }
 
