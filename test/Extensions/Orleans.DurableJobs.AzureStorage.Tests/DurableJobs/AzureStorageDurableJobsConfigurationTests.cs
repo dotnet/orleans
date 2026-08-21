@@ -18,6 +18,17 @@ namespace Tester.AzureUtils.DurableJobs;
 public class AzureStorageDurableJobsConfigurationTests
 {
     [Fact]
+    public void DurableJobsTestContainerNamesAreScopedByServiceId()
+    {
+        var first = AzureStorageBlobDurableJobsTests.GetContainerName("service-a");
+        var second = AzureStorageBlobDurableJobsTests.GetContainerName("service-b");
+
+        Assert.Equal("durablejobs-tests-service-a", first);
+        Assert.Equal("durablejobs-tests-service-b", second);
+        Assert.NotEqual(first, second);
+    }
+
+    [Fact]
     public void UseAzureBlobDurableJobs_ConfiguresDurableJobsJsonMetadata()
     {
         var builder = new TestSiloBuilder();

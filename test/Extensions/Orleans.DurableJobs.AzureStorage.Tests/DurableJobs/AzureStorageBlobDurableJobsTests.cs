@@ -1,4 +1,6 @@
+using Azure.Storage.Blobs;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Journaling;
@@ -16,6 +18,7 @@ namespace Tester.AzureUtils.DurableJobs;
 public class AzureStorageBlobDurableJobsTests : TestClusterPerTest
 {
     private DurableJobTestsRunner _runner = null!;
+    private string? _containerName;
 
     protected override void CheckPreconditionsOrThrow() => TestUtils.CheckForAzureStorage();
 
@@ -31,7 +34,33 @@ public class AzureStorageBlobDurableJobsTests : TestClusterPerTest
 
     protected override void ConfigureTestCluster(TestClusterBuilder builder)
     {
+        _containerName = GetContainerName(builder.Options.ServiceId);
         builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await base.DisposeAsync();
+        }
+        finally
+        {
+            if (_containerName is not null)
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+                await CreateContainerClient(_containerName).DeleteIfExistsAsync(cancellationToken: cts.Token);
+            }
+        }
+    }
+
+    internal static string GetContainerName(string serviceId) => $"durablejobs-tests-{serviceId}";
+
+    private static BlobContainerClient CreateContainerClient(string containerName)
+    {
+        return TestDefaultConfiguration.UseAadAuthentication
+            ? new BlobContainerClient(new Uri(TestDefaultConfiguration.DataBlobUri, containerName), TestDefaultConfiguration.TokenCredential)
+            : new BlobContainerClient(TestDefaultConfiguration.DataConnectionString, containerName);
     }
 
     public class SiloHostConfigurator : ISiloConfigurator
@@ -41,6 +70,11 @@ public class AzureStorageBlobDurableJobsTests : TestClusterPerTest
             hostBuilder
                 .UseAzureBlobDurableJobs(options => options.ConfigureTestDefaults())
                 .AddMemoryGrainStorageAsDefault();
+
+            hostBuilder.Services
+                .AddOptions<AzureBlobJournalStorageOptions>()
+                .Configure<IOptions<ClusterOptions>>(
+                    static (options, clusterOptions) => options.ContainerName = GetContainerName(clusterOptions.Value.ServiceId));
         }
     }
 
