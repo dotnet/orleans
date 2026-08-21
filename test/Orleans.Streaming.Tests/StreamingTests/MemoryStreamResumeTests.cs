@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.TestingHost;
 
@@ -13,6 +14,8 @@ namespace Tester.StreamingTests
     [TestCategory("SlowBVT"), TestCategory("Streaming"), TestCategory("StreamingResume")]
     public class MemoryStreamResumeTests : StreamingResumeTests
     {
+        private const int TotalQueueCount = 6;
+
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
@@ -50,6 +53,7 @@ namespace Tester.StreamingTests
                             options.DataMaxAgeInCache = DataMaxAgeInCache;
                             options.DataMinTimeInCache = DataMinTimeInCache;
                         }));
+                        b.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = TotalQueueCount));
                     });
             }
         }
@@ -59,7 +63,10 @@ namespace Tester.StreamingTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName);
+                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b =>
+                    {
+                        b.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = TotalQueueCount));
+                    });
             }
         }
 

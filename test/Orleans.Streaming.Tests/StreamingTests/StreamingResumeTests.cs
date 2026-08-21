@@ -30,7 +30,15 @@ public abstract class StreamingResumeTests : TestClusterPerTest
         await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
         var managementGrain = this.Client.GetGrain<IManagementGrain>(0);
-        var expectedSiloCount = this.HostedCluster.GetActiveSilos().Count();
+        var activeSilos = this.HostedCluster.GetActiveSilos().ToArray();
+        var expectedSiloCount = activeSilos.Length;
+        var configuredQueueCounts = activeSilos
+            .Select(silo => this.HostedCluster.GetSiloServiceProvider(silo.SiloAddress)
+                .GetOptionsByName<HashRingStreamQueueMapperOptions>(StreamProviderName)
+                .TotalQueueCount)
+            .Distinct()
+            .ToArray();
+        var expectedQueueCount = Assert.Single(configuredQueueCounts);
         await managementGrain.SendControlCommandToProvider<PersistentStreamProvider>(
             StreamProviderName,
             (int)PersistentStreamProviderCommand.StartAgents);
@@ -51,7 +59,7 @@ public abstract class StreamingResumeTests : TestClusterPerTest
                 var ready = states.Length == expectedSiloCount
                     && runningAgentCounts.Length == expectedSiloCount
                     && states.All(state => Convert.ToInt32(state) == (int)StreamLifecycleOptions.RunState.AgentsStarted)
-                    && runningAgentCounts.Sum() == HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES;
+                    && runningAgentCounts.Sum() == expectedQueueCount;
                 consecutiveReadyObservations = ready ? consecutiveReadyObservations + 1 : 0;
 
                 if (lastTry)
@@ -59,7 +67,7 @@ public abstract class StreamingResumeTests : TestClusterPerTest
                     Assert.Equal(expectedSiloCount, states.Length);
                     Assert.Equal(expectedSiloCount, runningAgentCounts.Length);
                     Assert.All(states, state => Assert.Equal((int)StreamLifecycleOptions.RunState.AgentsStarted, Convert.ToInt32(state)));
-                    Assert.Equal(HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES, runningAgentCounts.Sum());
+                    Assert.Equal(expectedQueueCount, runningAgentCounts.Sum());
                     Assert.True(
                         consecutiveReadyObservations >= requiredReadyObservations,
                         $"Stream provider readiness was observed {consecutiveReadyObservations} consecutive time(s), but {requiredReadyObservations} were required.");
