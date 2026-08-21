@@ -1,7 +1,7 @@
 ---
 title: Grain directory architecture
-description: Compare the default LocalGrainDirectory DHT with the experimental distributed directory.
-ms.date: 08/02/2026
+description: Compare the default LocalGrainDirectory DHT with the view-synchronous distributed directory.
+ms.date: 08/21/2026
 ms.topic: concept-article
 ---
 
@@ -9,7 +9,7 @@ ms.topic: concept-article
 
 The grain directory maps a grain identity to an activation address. It is on the critical path when a caller has no usable cached address and when the runtime creates, moves, or removes an activation. Placement chooses a silo; the directory coordinates which activation address is authoritative.
 
-Orleans uses `LocalGrainDirectory` by default. `DistributedGrainDirectory` is experimental and must be enabled explicitly.
+Orleans uses `LocalGrainDirectory` by default. Configure `DistributedGrainDirectory` for versioned range ownership and coordinated membership-view transitions.
 
 ## Default: `LocalGrainDirectory` <a name="overview-and-architecture"></a>
 
@@ -51,11 +51,9 @@ The runtime resolves a directory per grain type. The unnamed default resolves to
 
 Custom directories own their consistency, availability, and cleanup behavior. They should define what concurrent registration means, how failed silos are removed, and whether stale reads are possible. The surrounding message router cannot turn an eventually consistent custom directory into a strongly consistent one.
 
-## Experimental: `DistributedGrainDirectory` <a name="distributed-grain-directory"></a>
+## `DistributedGrainDirectory` <a name="distributed-grain-directory"></a>
 
-<xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?displayProperty=nameWithType> opts into a view-synchronous directory marked with compiler warning **`ORLEANSEXP003`**:
-
-It is not the default. The experimental status allows its API and protocol to evolve.
+<xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?displayProperty=nameWithType> configures a view-synchronous directory with versioned range ownership and coordinated membership-view transitions.
 
 <a name="partitioning-strategy"></a>
 The implementation divides the hash ring into configurable ranges, analogous to the virtual-node partitioning described by [Dynamo](https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf). <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType> defaults to **1**, not 30. A partition normally serves requests locally. During a membership view change, old and new owners coordinate range locks, snapshots, and ownership transfer. The design applies the [virtually synchronous methodology for dynamic service replication](https://www.microsoft.com/en-us/research/publication/virtually-synchronous-methodology-for-dynamic-service-replication/) and has similarities to [Vertical Paxos and primary-backup replication](https://www.microsoft.com/en-us/research/publication/vertical-paxos-and-primary-backup-replication/).
@@ -84,13 +82,13 @@ API: <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?d
 
 ## Tradeoffs
 
-| Property | Default `LocalGrainDirectory` | Experimental `DistributedGrainDirectory` |
+| Property | Default `LocalGrainDirectory` | `DistributedGrainDirectory` |
 | --- | --- | --- |
-| Status | Default | Opt-in, `ORLEANSEXP003` |
+| Selection | Runtime default | Configured with <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?displayProperty=nameWithType> |
 | Ownership | Membership consistent-hash ring | Versioned ranges over membership views |
 | Normal lookup | Owner partition plus per-silo cache | Owner partition plus view coordination |
 | View change | Partition split/merge and cache repair | Sealed ranges and snapshot transfer |
 | Recovery emphasis | Duplicate detection and invalidation | Explicit range recovery |
 | Configuration | Existing default behavior | <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType>, default 1 |
 
-More partitions can improve ownership granularity but increase transfer and coordination work. This page documents the mechanism; any production rollout of an experimental component should include compatibility, failure, and load testing.
+More partitions can improve ownership granularity but increase transfer and coordination work. Production rollouts should include compatibility, failure, and load testing.

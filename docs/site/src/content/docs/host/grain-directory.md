@@ -72,14 +72,13 @@ Named directories can also be configured under `Orleans:GrainDirectory:{name}` w
 
 <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*> adds a strongly consistent in-cluster directory based on partitioned ranges and membership views.
 
-> [!CAUTION]
-> <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*> is experimental and emits diagnostic `ORLEANSEXP003`. Its API and behavior can change or be removed. It is not the default grain directory.
+Configure it consistently on every silo in the cluster so all members use the same directory implementation.
 
 :::code language="csharp" source="snippets/hosting/HostingExamples.cs" id="distributed_grain_directory":::
 
-The experimental directory defaults to one partition per silo (<xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo> = `1`). Change this only after testing with the expected cluster size and workload.
+The distributed directory defaults to one partition per silo (<xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo> = `1`). Change this only after testing with the expected cluster size and workload.
 
-Evaluate it when stronger coordination during membership changes is worth adopting an experimental feature. Keep a rollout and rollback plan, and don't describe it as a drop-in production default.
+Use it when membership changes require stronger coordination. Validate rollout, rollback, and mixed-version behavior with the expected cluster size and workload.
 
 ## Operational guidance
 
