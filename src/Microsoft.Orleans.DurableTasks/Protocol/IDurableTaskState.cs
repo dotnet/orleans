@@ -59,4 +59,6 @@ public interface IDurableTaskState
     public GrainId RemoteTarget { get; }
 
     public string? RemoteRequestFingerprint { get; }
+
+    public GrainId CallerId { get; }
 }

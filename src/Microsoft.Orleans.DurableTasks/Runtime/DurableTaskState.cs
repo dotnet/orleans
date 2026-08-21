@@ -61,6 +61,9 @@ public class DurableTaskState : IDurableTaskState
     [Id(12)]
     public string? RemoteRequestFingerprint { get; set; }
 
+    [Id(13)]
+    public GrainId CallerId { get; set; }
+
     IReadOnlySet<GrainId> IDurableTaskState.CompletionDestinations => CompletionDestinations;
     IDurableTaskRequest? IDurableTaskState.Request => Request;
     DateTimeOffset? IDurableTaskState.CompletedAt => CompletedAt;

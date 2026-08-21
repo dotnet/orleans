@@ -97,6 +97,14 @@ public class VolatileDurableTaskGrainStorage(
         var typedState = GetState(state);
         typedState.RemoteTarget = target;
         typedState.RemoteRequestFingerprint = fingerprint;
+    }
+
+    public void SetCallerId(TaskId taskId, IDurableTaskState state, GrainId callerId)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(callerId, default);
+        var typedState = GetState(state);
+        typedState.CallerId = callerId;
+        AddOrUpdateTask(taskId, typedState);
         AddOrUpdateTask(taskId, typedState);
     }
 

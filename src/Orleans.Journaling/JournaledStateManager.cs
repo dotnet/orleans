@@ -605,15 +605,34 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             }
                         }
 
-                        workItem.SetException(exception);
                         if (IsRecoverySignal(exception))
                         {
                             lock (_lock)
                             {
-                                _state = ManagerState.Fenced;
+                                _state = ManagerState.Recovering;
                             }
 
-                            needsRecovery = true;
+                            try
+                            {
+                                await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                                lock (_lock)
+                                {
+                                    _state = ManagerState.Ready;
+                                }
+
+                                needsRecovery = false;
+                            }
+                            catch
+                            {
+                                lock (_lock)
+                                {
+                                    _state = ManagerState.Fenced;
+                                }
+
+                                workItem.SetException(exception);
+                                needsRecovery = true;
+                                throw;
+                            }
                         }
                         else if (workItem is RevertPendingChangesWorkItem)
                         {
@@ -622,6 +641,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                 _state = ManagerState.Fenced;
                             }
                         }
+
+                        workItem.SetException(exception);
                     }
                     finally
                     {

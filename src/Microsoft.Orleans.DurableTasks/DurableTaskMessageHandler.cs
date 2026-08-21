@@ -7,8 +7,7 @@ using Orleans.DurableTasks.Protocol;
 namespace Orleans.DurableTasks.Runtime;
 
 internal sealed class DurableTaskMessageHandler(
-    DurableTaskGrainRuntime runtime,
-    IDurableTaskMessageTransport transport) : RoutePrefixHandler("durable-rpc/")
+    DurableTaskGrainRuntime runtime) : RoutePrefixHandler("durable-rpc/")
 {
     protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
@@ -25,20 +24,25 @@ internal sealed class DurableTaskMessageHandler(
                     ?? throw new InvalidOperationException("The durable task invocation request is missing.");
                 var requestContext = request.Context
                     ?? throw new InvalidOperationException("The durable task invocation request has no context.");
-                requestContext.CallerId = context.Envelope.ReplyTo ?? context.Envelope.SenderId;
+                if (requestContext.TargetId != context.GrainId)
+                {
+                    throw new InvalidOperationException(
+                        $"The durable task invocation targets grain '{requestContext.TargetId}', not receiver '{context.GrainId}'.");
+                }
+
+                var sender = context.Envelope.SenderId;
+                if (context.Envelope.ReplyTo is { } replyTo && replyTo != sender)
+                {
+                    throw new InvalidOperationException(
+                        $"The durable task invocation reply address '{replyTo}' does not match sender '{sender}'.");
+                }
+
+                requestContext.CallerId = sender;
                 requestContext.SupportsDurableCompletion = true;
-                var response = await runtime.ScheduleFromInboxAsync(
+                await runtime.ScheduleFromInboxAsync(
                     invocation.TaskId,
                     request,
                     cancellationToken);
-                if (response.IsCompleted)
-                {
-                    transport.SendCompletion(
-                        context.GrainId,
-                        requestContext.CallerId,
-                        invocation.TaskId,
-                        response);
-                }
                 break;
             case DurableTaskMessageTransport.CompletionRoute:
                 if (!context.Envelope.Data.TryGetBody<DurableTaskCompletionMessage>(out var completion)
@@ -74,7 +78,10 @@ internal sealed class DurableTaskMessageHandler(
                     throw new InvalidOperationException("The durable task cancellation payload could not be deserialized.");
                 }
 
-                await runtime.SignalCancellationAsync(cancellation.TaskId, cancellationToken);
+                await runtime.SignalCancellationFromInboxAsync(
+                    cancellation.TaskId,
+                    context.Envelope.SenderId,
+                    cancellationToken);
                 break;
             default:
                 throw new InvalidOperationException($"Unsupported durable task route '{context.Envelope.RouteKey}'.");
