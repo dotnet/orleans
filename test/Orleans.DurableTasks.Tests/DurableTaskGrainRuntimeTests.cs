@@ -948,6 +948,31 @@ public class DurableTaskGrainRuntimeTests
     }
 
     [Fact]
+    public async Task TaskHandle_PollAsync_UsesInjectedTimeProviderForTimeout()
+    {
+        var fixture = CreateFixture();
+        var taskId = TaskId.Create("poll-timeout");
+        var completion = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = new RuntimeTestDurableTaskRequest(() => DurableTask.Run<int>(_ => completion.Task))
+        {
+            Context = new DurableTaskRequestContext { CallerId = default, TargetId = fixture.GrainId },
+        };
+        await ((IDurableTaskServer)fixture.Runtime).ScheduleAsync(taskId, request, CancellationToken.None);
+        var handle = fixture.Runtime.GetScheduledTaskHandle(taskId);
+
+        var poll = handle.PollAsync(
+            new PollingOptions { PollTimeout = TimeSpan.FromMinutes(1) },
+            CancellationToken.None).AsTask();
+        Assert.False(poll.IsCompleted);
+
+        fixture.TimeProvider.Advance(TimeSpan.FromMinutes(1));
+
+        Assert.Same(DurableTaskResponse.Pending, await poll.WaitAsync(BoundedWait()));
+        completion.SetResult(4);
+        Assert.Equal(4, (await handle.WaitAsync(BoundedWait())).GetResult<int>());
+    }
+
+    [Fact]
     public async Task GetScheduledTaskHandle_RehydratesCompletedTaskFromStorage_WhenNoLocalHandleExists()
     {
         var fixture = CreateFixture();
