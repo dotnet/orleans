@@ -79,8 +79,9 @@ namespace Orleans.Streams
 
         public bool RemoveObserver(GuidId subscriptionId)
         {
+            var result = allStreamObservers.TryRemove(subscriptionId, out _);
             streamProducers.TryRemove(subscriptionId, out _);
-            return allStreamObservers.TryRemove(subscriptionId, out _);
+            return result;
         }
 
         internal void RestoreObserver(GuidId subscriptionId, IStreamSubscriptionHandle observer)
@@ -122,6 +123,7 @@ namespace Orleans.Streams
             LogTraceDeliverItem(new(item), subscriptionId);
             if (allStreamObservers.TryGetValue(subscriptionId, out var observer))
             {
+                RecordStreamProducer(subscriptionId);
                 return await observer.DeliverItem(item, currentToken, handshakeToken);
             }
             else if(this.streamSubscriptionObserver != null)
@@ -134,6 +136,7 @@ namespace Orleans.Streams
                     //check if an observer were attached after handling the new subscription, deliver on it if attached
                     if (allStreamObservers.TryGetValue(subscriptionId, out observer))
                     {
+                        RecordStreamProducer(subscriptionId);
                         return await observer.DeliverItem(item, currentToken, handshakeToken);
                     }
                 }
@@ -154,6 +157,7 @@ namespace Orleans.Streams
 
             if (allStreamObservers.TryGetValue(subscriptionId, out var observer))
             {
+                RecordStreamProducer(subscriptionId);
                 return await observer.DeliverBatch(batch, handshakeToken);
             }
             else if(this.streamSubscriptionObserver != null)
@@ -166,6 +170,7 @@ namespace Orleans.Streams
                     // check if an observer were attached after handling the new subscription, deliver on it if attached
                     if (allStreamObservers.TryGetValue(subscriptionId, out observer))
                     {
+                        RecordStreamProducer(subscriptionId);
                         return await observer.DeliverBatch(batch, handshakeToken);
                     }
                 }
@@ -215,12 +220,22 @@ namespace Orleans.Streams
 
         public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId)
         {
+            if (allStreamObservers.TryGetValue(subscriptionId, out var observer))
+            {
+                RecordStreamProducer(subscriptionId);
+                return Task.FromResult(observer.GetSequenceToken());
+            }
+
+            streamProducers.TryRemove(subscriptionId, out _);
+            return Task.FromResult<StreamHandshakeToken?>(null);
+        }
+
+        private void RecordStreamProducer(GuidId subscriptionId)
+        {
             if (RequestContext.Get(StreamRequestContextKeys.StreamProducer) is GrainId streamProducer)
             {
                 streamProducers[subscriptionId] = streamProducer;
             }
-
-            return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out var observer) ? observer.GetSequenceToken() : null);
         }
 
         internal int DiagCountStreamObservers<T>(QualifiedStreamId streamId)

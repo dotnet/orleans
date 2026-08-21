@@ -1166,15 +1166,17 @@ namespace Orleans.Streams
         /// <summary>
         /// Add call context for batch delivery call, then clear context immediately, without giving up turn.
         /// </summary>
-        private static Task<StreamHandshakeToken?> ContextualizedDeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
+        private Task<StreamHandshakeToken?> ContextualizedDeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
         {
             bool isRequestContextSet = batch.ImportRequestContext();
+            RequestContext.Set(StreamRequestContextKeys.StreamProducer, GrainId);
             try
             {
                 return consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, consumerData.StreamId, batch, consumerData.LastToken);
             }
             finally
             {
+                RequestContext.Remove(StreamRequestContextKeys.StreamProducer);
                 if (isRequestContextSet)
                 {
                     // clear RequestContext before await!
