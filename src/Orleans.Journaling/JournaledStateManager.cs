@@ -177,20 +177,9 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                 {
                     if (needsRecovery)
                     {
-                        try
-                        {
-                            await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
-                            needsRecovery = false;
-                        }
-                        finally
-                        {
-                            if (recoveryTrigger is { } trigger)
-                            {
-                                trigger.SetException(recoveryTriggerException!);
-                                recoveryTrigger = null;
-                                recoveryTriggerException = null;
-                            }
-                        }
+                        await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                        needsRecovery = false;
+                        CompleteRecoveryTrigger();
                     }
 
                     WorkItem workItem;
@@ -557,12 +546,32 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                 needsRecovery = true;
                 if (_shutdownCancellation.Token.IsCancellationRequested)
                 {
+                    CompleteRecoveryTrigger();
                     return;
                 }
 
-                FaultQueuedWorkItems(exception);
-                LogErrorProcessingWorkItems(_shared.Logger, exception);
+                try
+                {
+                    FaultQueuedWorkItems(exception);
+                    LogErrorProcessingWorkItems(_shared.Logger, exception);
+                }
+                finally
+                {
+                    CompleteRecoveryTrigger();
+                }
             }
+        }
+
+        void CompleteRecoveryTrigger()
+        {
+            if (recoveryTrigger is not { } trigger)
+            {
+                return;
+            }
+
+            trigger.SetException(recoveryTriggerException!);
+            recoveryTrigger = null;
+            recoveryTriggerException = null;
         }
     }
 

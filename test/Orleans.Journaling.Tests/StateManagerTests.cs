@@ -508,6 +508,39 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task StateManager_WriteStateAsync_RetriesRecoveryAfterRepeatedFailures()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+
+        await sut.Lifecycle.OnStart();
+        dictionary.Add("first", 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var conflict = new InconsistentStateException("Expected storage write conflict.");
+        var firstRecoveryFailure = new IOException("Expected first recovery failure.");
+        storage.NextAppendException = conflict;
+        storage.NextReadException = firstRecoveryFailure;
+        dictionary.Add("second", 2);
+
+        var conflictException = await Assert.ThrowsAsync<InconsistentStateException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        Assert.Same(conflict, conflictException);
+
+        var secondRecoveryFailure = new IOException("Expected second recovery failure.");
+        storage.NextReadException = secondRecoveryFailure;
+        var recoveryException = await Assert.ThrowsAsync<IOException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        Assert.Same(secondRecoveryFailure, recoveryException);
+
+        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.True(dictionary.ContainsKey("first"));
+        Assert.False(dictionary.ContainsKey("second"));
+    }
+
+    [Fact]
     public async Task StateManager_WriteStateAsync_CoalescesQueuedWrites()
     {
         var storage = new CapturingStorage();
@@ -1520,6 +1553,8 @@ public class StateManagerTests : JournalingTestBase
 
         public Exception? NextAppendException { get; set; }
 
+        public Exception? NextReadException { get; set; }
+
         public bool BlockNextRead { get; set; }
 
         public TaskCompletionSource BlockedReadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1541,6 +1576,12 @@ public class StateManagerTests : JournalingTestBase
         public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(consumer);
+
+            if (NextReadException is { } exception)
+            {
+                NextReadException = null;
+                throw exception;
+            }
 
             if (BlockNextRead)
             {
