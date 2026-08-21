@@ -1104,9 +1104,12 @@ jobs:
           **/logs/*
   coverage:
     name: Code coverage (${{ matrix.suite }})
-    if: always() && github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && needs.test.result == 'success'
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -1148,6 +1151,9 @@ jobs:
     if: github.event_name == 'pull_request'
     needs: coverage
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
     steps:
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
