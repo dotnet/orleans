@@ -541,6 +541,10 @@ namespace Orleans.Runtime.Placement
                 {
                     throw new TimeoutException($"Grain placement operation timed out for grain {firstMessage.TargetGrain}.", exception);
                 }
+                catch (OperationCanceledException) when (_placementService.IsStopping)
+                {
+                    throw _placementService.CreateStoppingException();
+                }
                 finally
                 {
                     Activity.Current = currentActivity;

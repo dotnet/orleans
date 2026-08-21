@@ -149,13 +149,43 @@ namespace UnitTests.Runtime
             await lookupStarted.Task;
             timeProvider.Advance(messagingOptions.PlacementTimeout);
 
-            var completedTask = await Task.WhenAny(placementTask, Task.Delay(TimeSpan.FromSeconds(10)));
+            var completedTask = await Task.WhenAny(placementTask, Task.Delay(TimeSpan.FromSeconds(1)));
             Assert.Same(placementTask, completedTask);
             var exception = await Assert.ThrowsAsync<TimeoutException>(() => placementTask);
             Assert.IsType<Polly.Timeout.TimeoutRejectedException>(exception.InnerException);
 
             lookupCompletion.TrySetResult(default);
             await StopAsync(fixture.Target);
+        }
+
+        [Fact]
+        public async Task GetOrPlaceActivationAsync_WhenShutdownCancelsLookup_ThrowsSiloUnavailableException()
+        {
+            var lookupStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var lookupCompletion = new TaskCompletionSource<AddressAndTag>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var localGrainDirectory = Substitute.For<ILocalGrainDirectory>();
+            localGrainDirectory.LookupAsync(Arg.Any<GrainId>(), Arg.Any<int>()).Returns(_ =>
+            {
+                lookupStarted.TrySetResult();
+                return lookupCompletion.Task;
+            });
+
+            var fixture = new PlacementServiceFixture(
+                messagingOptions: new SiloMessagingOptions { PlacementMaxRetries = 0 },
+                localGrainDirectory: localGrainDirectory);
+            var message = new Message
+            {
+                TargetGrain = GrainId.Create("test", "grain-1"),
+                InterfaceType = GrainInterfaceType.Create("test.interface"),
+                InterfaceVersion = 1,
+            };
+
+            var placementTask = GetTestAccessor(fixture.Target).GetOrPlaceActivationAsync(message);
+            await lookupStarted.Task;
+            await StopAsync(fixture.Target);
+
+            await Assert.ThrowsAsync<SiloUnavailableException>(() => placementTask);
+            lookupCompletion.TrySetResult(default);
         }
 
         [Fact]
