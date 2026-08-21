@@ -283,26 +283,13 @@ namespace Orleans.Transactions.State
 
         public void Rollback(Guid guid)
         {
-            var group = currentGroup;
-            while (group != null)
-            {
-                if (group.Remove(guid))
-                {
-                    if (group != currentGroup)
-                    {
-                        AbortPendingOperations(group, guid);
-                    }
-                    return;
-                }
-
-                group = group.Next;
-            }
+            TryRemove(guid, out _);
         }
 
         public Task Rollback(Guid guid, bool notify, TransactionDiagnosticEvents.LockBreakReason reason)
         {
             // no-op if the transaction never happened or already rolled back
-            if (currentGroup == null || !currentGroup.Remove(guid, out var record))
+            if (!TryRemove(guid, out var record))
             {
                 return Task.CompletedTask;
             }
@@ -319,6 +306,28 @@ namespace Orleans.Transactions.State
                 reason,
                 queue.DiagnosticIdentity);
             return queue.NotifyOfAbort(record, TransactionalStatus.BrokenLock, exception: null);
+        }
+
+        private bool TryRemove(Guid transactionId, [NotNullWhen(true)] out TransactionRecord<TState>? record)
+        {
+            var group = currentGroup;
+            while (group != null)
+            {
+                if (group.Remove(transactionId, out record))
+                {
+                    if (group != currentGroup)
+                    {
+                        AbortPendingOperations(group, transactionId);
+                    }
+
+                    return true;
+                }
+
+                group = group.Next;
+            }
+
+            record = null;
+            return false;
         }
 
         private async Task LockWork()

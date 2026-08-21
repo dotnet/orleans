@@ -244,6 +244,61 @@ public class TransactionRecoveryLatencyTests
     }
 
     [Fact]
+    public async Task QueuedWriteUpgradeAbortsConflictingTransactionOperations()
+    {
+        var queue = new GatedCancelTransactionQueue(
+            CreateParticipant("resource", ParticipantId.Role.Resource),
+            new TestActivationLifetime());
+        var currentTransactionId = Guid.NewGuid();
+        var upgradingTransactionId = Guid.NewGuid();
+        var conflictingTransactionId = Guid.NewGuid();
+        var priority = new DateTime(2026, 8, 21, 12, 0, 0, DateTimeKind.Utc);
+        var conflictingOperationCount = 0;
+
+        await queue.RWLock.EnterLock(
+            currentTransactionId,
+            priority,
+            new AccessCounter(),
+            isRead: false,
+            exclusiveLock: false,
+            static () => 0);
+        var queuedRead = queue.RWLock.EnterLock(
+            upgradingTransactionId,
+            priority,
+            new AccessCounter(),
+            isRead: true,
+            exclusiveLock: false,
+            static () => 1);
+        var conflictingRead = queue.RWLock.EnterLock(
+            conflictingTransactionId,
+            priority,
+            new AccessCounter(),
+            isRead: true,
+            exclusiveLock: false,
+            () => ++conflictingOperationCount);
+        var queuedWrite = queue.RWLock.EnterLock(
+            upgradingTransactionId,
+            priority,
+            new AccessCounter { Reads = 1 },
+            isRead: false,
+            exclusiveLock: false,
+            static () => 2);
+
+        await Assert.ThrowsAsync<OrleansCascadingAbortException>(
+            () => conflictingRead.WaitAsync(TimeSpan.FromSeconds(1)));
+        Assert.Equal(0, conflictingOperationCount);
+        Assert.False(queuedRead.IsCompleted);
+        Assert.False(queuedWrite.IsCompleted);
+
+        queue.RWLock.Rollback(currentTransactionId);
+        queue.RWLock.Notify();
+
+        Assert.Equal(1, await queuedRead.WaitAsync(TimeSpan.FromSeconds(1)));
+        Assert.Equal(2, await queuedWrite.WaitAsync(TimeSpan.FromSeconds(1)));
+        Assert.Equal(0, conflictingOperationCount);
+    }
+
+    [Fact]
     public async Task LocalAbortCompletesManagerDecisionAfterDispatchAndBeforeCleanupSettles()
     {
         var manager = CreateParticipant(
