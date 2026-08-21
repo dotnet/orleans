@@ -1,6 +1,6 @@
 ## Build, test, and style commands
 
-* The repo builds with the .NET SDK from `global.json` (`10.0.203`, roll-forward `major`). Do not edit `global.json` unless explicitly asked.
+* The repo builds with the .NET SDK from `global.json` (`10.0.400`, roll-forward `major`). Do not edit `global.json` unless explicitly asked.
 * Build the solution with `dotnet build Orleans.slnx -bl`. CI uses this form and uploads the binlog.
 * On Windows, `.\Build.cmd` runs `build.ps1`, which restores, builds, and packs `Orleans.slnx`, writes restore/build/pack binlogs, and outputs packages under `Artifacts\<Configuration>`. Set `BuildConfiguration=Release` to build release artifacts.
 * Run tests with `dotnet test --solution Orleans.slnx --framework net10.0 --minimum-expected-tests 1 --max-parallel-test-modules 1`. CI also runs `net8.0`; source projects default to `net8.0;net10.0`.
