@@ -47,6 +47,10 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Test coverage reporting
+      if: matrix.os == 'ubuntu-latest'
+      shell: pwsh
+      run: ./.github/scripts/test-summarize-coverage.ps1
     - name: Build
       run: dotnet build -bl
     - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -1095,7 +1099,88 @@ jobs:
         retention-days: 1
         path: |
           **/TestResults/*
+          !**/*.coverage
+          !**/*.cobertura.xml
           **/logs/*
+  coverage:
+    name: Code coverage (${{ matrix.suite }})
+    if: github.event_name == 'pull_request' && needs.test.result == 'success'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [BVT, SlowBVT, Functional]
+    steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Setup Node.js
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      with:
+        node-version: '24.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+      with:
+        global-json-file: global.json
+    - name: Download test results
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        name: test_output_test_${{ matrix.suite }}_ubuntu-latest_net10.0
+        path: test-results
+    - name: Build
+      run: dotnet build
+    - name: Collect coverage
+      shell: pwsh
+      run: >
+        ./.github/scripts/collect-coverage.ps1
+        -RepositoryRoot $env:GITHUB_WORKSPACE
+        -ResultsDirectory test-results
+        -Suite ${{ matrix.suite }}
+    - name: Archive coverage data
+      if: always()
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      with:
+        name: coverage_data_${{ matrix.suite }}
+        if-no-files-found: error
+        retention-days: 1
+        path: "**/*.coverage"
+  coverage-merge:
+    name: Merge code coverage
+    if: github.event_name == 'pull_request'
+    needs: coverage
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+    - name: Setup .NET
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+      with:
+        dotnet-version: '10.0.400'
+    - name: Download coverage data
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        pattern: coverage_data_*
+        path: coverage-data
+        merge-multiple: true
+    - name: Merge coverage
+      run: |
+        dotnet tool install --tool-path .tools dotnet-coverage --version 18.5.2
+        mkdir -p TestResults
+        .tools/dotnet-coverage merge "coverage-data/**/*.coverage" \
+          --output TestResults/coverage.cobertura.xml \
+          --output-format cobertura \
+          --remove-input-files \
+          --nologo
+    - name: Archive coverage
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      with:
+        name: coverage_output
+        if-no-files-found: error
+        retention-days: 1
+        path: TestResults/coverage.cobertura.xml
   test-codegenerator:
     name: Test Code Generator
     runs-on: ${{ matrix.os }}

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Configuration>
+  <IncludeTestAssembly>False</IncludeTestAssembly>
+  <ExcludeAssembliesWithoutSources>MissingAll</ExcludeAssembliesWithoutSources>
+  <CodeCoverage>
+    <Sources>
+      <Include>
+        <Source>.*[\\/]src[\\/].*</Source>
+      </Include>
+      <Exclude>
+        <Source>.*[\\/](bin|obj)[\\/].*</Source>
+      </Exclude>
+    </Sources>
+    <EnableDynamicManagedInstrumentation>True</EnableDynamicManagedInstrumentation>
+    <EnableStaticManagedInstrumentation>False</EnableStaticManagedInstrumentation>
+  </CodeCoverage>
+</Configuration>
