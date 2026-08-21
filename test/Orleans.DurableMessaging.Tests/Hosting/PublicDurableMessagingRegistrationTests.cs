@@ -64,22 +64,6 @@ public sealed class PublicDurableMessagingRegistrationTests
     }
 
     [Fact]
-    public async Task AddDurableMessaging_StateManagerWithoutObserverSupportFailsWithSpecificDiagnostic()
-    {
-        var services = new ServiceCollection();
-        services.AddDurableMessaging();
-        services.AddScoped<IJournaledStateManager, RollbackOnlyStateManager>();
-        await using var provider = services.BuildServiceProvider();
-        var extensionType = services.Single(descriptor => descriptor.ServiceType.Name == "DurableInboxExtension").ServiceType;
-
-        var exception = Assert.Throws<InvalidOperationException>(() => provider.GetRequiredService(extensionType));
-
-        Assert.Contains("Durable messaging", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("IJournaledStateManager.RegisterObserver", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("observer support", exception.Message, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
     public async Task AddDurableMessaging_DoesNotReplaceUnrelatedConstructionErrors()
     {
         var services = new ServiceCollection();
@@ -115,8 +99,6 @@ public sealed class PublicDurableMessagingRegistrationTests
 
     private class RollbackOnlyStateManager : IJournaledStateManager
     {
-        public bool SupportsRollback => true;
-        public virtual bool SupportsObservers => false;
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
         public void RegisterState(string name, IJournaledState state) { }
         public virtual void RegisterObserver(IJournaledStateObserver observer) =>
@@ -134,7 +116,6 @@ public sealed class PublicDurableMessagingRegistrationTests
 
     private sealed class FullyCapableStateManager : RollbackOnlyStateManager
     {
-        public override bool SupportsObservers => true;
         public override void RegisterObserver(IJournaledStateObserver observer) { }
     }
 }

@@ -125,8 +125,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         ArgumentNullException.ThrowIfNull(pumpResults);
         ArgumentNullException.ThrowIfNull(jobTimeProvider);
         ArgumentNullException.ThrowIfNull(options);
-        DurableMessagingStateManagerCapabilities.Validate(manager);
-
         _stateManager = manager;
         _messages = messages;
         _grainFactory = grainFactory;
@@ -147,7 +145,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         _maxDeliveryAttempts = options.Value.MaxDeliveryAttempts;
         _batchSize = options.Value.OutboxBatchSize;
         jobHandlers.Register(JobName, this);
-        manager.RegisterObserver(this);
+        DurableMessagingStateManagerCapabilities.RegisterObserver(manager, this);
 
         // Subscribe to the grain lifecycle to start pumping on activation
         var lifecycle = grainContext.ObservableLifecycle;
@@ -328,8 +326,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             QueueEnsureJobScheduled(replaceExisting: true);
         }
     }
-
-    public void OnRecoveryStarted() => _recoveryCompleted = false;
 
     /// <summary>
     /// Removes a message after successful delivery.

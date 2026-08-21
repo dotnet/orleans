@@ -521,15 +521,21 @@ public sealed class DurableOutboxDeliveryBatchTests
         private long[] _durableVersions = states.Select(static state => state.Version).ToArray();
         private IJournaledStateObserver? _observer;
 
-        public bool SupportsRollback => true;
-        public bool SupportsObservers => supportsObservers;
         public int WriteCount { get; private set; }
         public int WriteCompletedCount { get; private set; }
         public int RevertCount { get; private set; }
 
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
         public void RegisterState(string name, IJournaledState state) { }
-        public void RegisterObserver(IJournaledStateObserver observer) => _observer = observer;
+        public void RegisterObserver(IJournaledStateObserver observer)
+        {
+            if (!supportsObservers)
+            {
+                throw new NotSupportedException();
+            }
+
+            _observer = observer;
+        }
 
         public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state)
         {
@@ -588,7 +594,6 @@ public sealed class DurableOutboxDeliveryBatchTests
             }
 
             _durableVersions = _states.Select(static state => state.Version).ToArray();
-            _observer?.OnRecoveryStarted();
             _observer?.OnRecoveryCompleted();
             return default;
         }

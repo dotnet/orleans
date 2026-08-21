@@ -122,8 +122,6 @@ internal sealed partial class DurableInboxExtension :
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(jobTimeProvider);
         ArgumentNullException.ThrowIfNull(options);
-        DurableMessagingStateManagerCapabilities.Validate(stateManager);
-
         _grainContext = grainContext;
         _grainFactory = grainFactory;
         _timerRegistry = timerRegistry;
@@ -149,7 +147,7 @@ internal sealed partial class DurableInboxExtension :
         _maxProcessingAttempts = options.MaxProcessingAttempts;
         _batchSize = options.InboxBatchSize;
         _retryDelay = options.BackpressureRetryDelay;
-        stateManager.RegisterObserver(this);
+        DurableMessagingStateManagerCapabilities.RegisterObserver(stateManager, this);
         jobHandlers.Register(JobName, this);
         grainContext.ObservableLifecycle.Subscribe(
             RuntimeTypeNameFormatter.Format(GetType()),
@@ -385,8 +383,6 @@ internal sealed partial class DurableInboxExtension :
     public void OnWriteCompleted()
     {
     }
-
-    public void OnRecoveryStarted() => _recoveryCompleted = false;
 
     public void OnRecoveryCompleted()
     {
