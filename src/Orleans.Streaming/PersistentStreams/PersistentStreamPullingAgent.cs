@@ -53,6 +53,7 @@ namespace Orleans.Streams
         {
             Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver? receiver, int maxCacheAddCount);
             Task RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now);
+            Task<bool> DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken);
             Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> GetPubSubCache();
             Task RunQueuePump(QueueId myQueueId, CancellationToken cancellationToken);
             Task Shutdown();
@@ -120,6 +121,9 @@ namespace Orleans.Streams
 
                 return Task.CompletedTask;
             }).Unwrap();
+
+        Task<bool> ITestAccessor.DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken)
+            => this.RunOrQueueTaskResult(() => DoHandshakeWithConsumer(consumerData, cacheToken)).Unwrap();
 
         Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> ITestAccessor.GetPubSubCache()
             => this.RunOrQueueTaskResult(() => (IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>)new Dictionary<QualifiedStreamId, StreamConsumerCollection>(pubSubCache));
@@ -342,11 +346,6 @@ namespace Orleans.Streams
 
             if (await DoHandshakeWithConsumer(data, cacheToken))
             {
-                if (data.LastToken is DeliveryToken deliveryToken)
-                {
-                    data.LastProcessedToken = deliveryToken.Token;
-                }
-
                 data.PendingStartToken = null;
                 data.IsRegistered = true;
                 StreamingEvents.EmitSubscriptionAttached(streamProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, Silo);
@@ -362,6 +361,7 @@ namespace Orleans.Streams
             if (IsShutdown) return false;
 
             StreamHandshakeToken? requestedHandshakeToken = null;
+            var effectiveStartToken = cacheToken ?? consumerData.PendingStartToken;
             // if not cache, then we can't get cursor and there is no reason to ask consumer for token.
             if (queueCache != null)
             {
@@ -379,6 +379,7 @@ namespace Orleans.Streams
                     var requestedToken = requestedHandshakeToken?.Token;
                     if (requestedToken != null)
                     {
+                        effectiveStartToken = requestedToken;
                         consumerData.SafeDisposeCursor(logger);
                         try
                         {
@@ -388,6 +389,7 @@ namespace Orleans.Streams
                         {
                             // A cold stream's triggering batch is the receiver's first available
                             // message, so resume there if the consumer's prior token was evicted.
+                            effectiveStartToken = cacheToken;
                             consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, cacheToken);
                         }
                     }
@@ -418,13 +420,17 @@ namespace Orleans.Streams
                 try
                 {
                     var registrationToken = cacheToken ?? consumerData.PendingStartToken;
+                    effectiveStartToken = registrationToken;
                     consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, registrationToken);
                 }
                 catch (Exception)
                 {
                     consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, null); // just in case last GetCacheCursor failed.
+                    effectiveStartToken = null;
                 }
             }
+
+            consumerData.LastProcessedToken = effectiveStartToken ?? consumerData.LastProcessedToken;
             return true;
         }
 
