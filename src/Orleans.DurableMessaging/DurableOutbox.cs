@@ -348,6 +348,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             _scheduledOwnershipId = null;
             _scheduledOwnershipDueTime = null;
         }
+
+        if (_pendingMessageIds.Count > 0 && !_jobScheduleConfirmed)
+        {
+            QueueEnsureJobScheduled(replaceExisting: false);
+        }
     }
 
     public void OnDeleteCompleted()
@@ -764,7 +769,9 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                         return;
                     }
 
-                    if (!replaceExisting && !string.IsNullOrEmpty(_jobId.Value))
+                    if (!replaceExisting
+                        && !string.IsNullOrEmpty(_jobId.Value)
+                        && _jobScheduleConfirmed)
                     {
                         return;
                     }

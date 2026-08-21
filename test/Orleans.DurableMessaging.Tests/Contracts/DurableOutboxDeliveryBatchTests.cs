@@ -330,7 +330,7 @@ public sealed class DurableOutboxDeliveryBatchTests
     [Fact]
     public async Task MessageAddedAfterWriteCaptureRemainsFencedForNextCommit()
     {
-        var fixture = new OutboxFixture(hasDurableMessage: false);
+        var fixture = new OutboxFixture(hasDurableMessage: false, runTimersImmediately: true);
         fixture.Send(fixture.Envelope);
         var reentrantEnvelope = fixture.CreateEnvelope(Guid.NewGuid());
 
@@ -338,6 +338,8 @@ public sealed class DurableOutboxDeliveryBatchTests
 
         Assert.False(fixture.IsPending(fixture.MessageId));
         Assert.True(fixture.IsPending(reentrantEnvelope.MessageId));
+        await fixture.WaitForEnsureJobTimersAsync();
+        Assert.Equal(1, fixture.ScheduledJobCount);
         await fixture.CommitAsync();
         Assert.Equal(0, fixture.PendingMessageCount);
     }
@@ -540,6 +542,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         private readonly MethodInfo _deliverMethod;
         private readonly Instrument _outboxDepthInstrument;
         private readonly FieldInfo _pendingMessageIdsField;
+        private readonly ImmediateTimerRegistry? _immediateTimerRegistry;
 
         public OutboxFixture(
             Func<CancellationToken, ValueTask<DeliveryResult>>? deliver = null,
@@ -552,7 +555,8 @@ public sealed class DurableOutboxDeliveryBatchTests
             ITimerRegistry? timerRegistry = null,
             TimeProvider? jobTimeProvider = null,
             TimeSpan? backpressureRetryDelay = null,
-            string? durableJobId = null)
+            string? durableJobId = null,
+            bool runTimersImmediately = false)
         {
             MessageId = Guid.NewGuid();
             SenderId = GrainId.Create("sender", "1");
@@ -591,8 +595,14 @@ public sealed class DurableOutboxDeliveryBatchTests
             grainContext.GrainInstance.Returns(new object());
             grainContext.ObservableLifecycle.Returns(Substitute.For<IGrainLifecycle>());
 
-            TimerRegistry = timerRegistry ?? Substitute.For<ITimerRegistry>();
-            JobManager = jobManager ?? Substitute.For<ILocalDurableJobManager>();
+            TimerRegistry = timerRegistry
+                ?? (runTimersImmediately
+                    ? _immediateTimerRegistry = new ImmediateTimerRegistry()
+                    : Substitute.For<ITimerRegistry>());
+            JobManager = jobManager
+                ?? (runTimersImmediately
+                    ? new RecordingJobManager()
+                    : Substitute.For<ILocalDurableJobManager>());
             var outboxType = GetInternalType("Orleans.DurableMessaging.DurableOutbox");
             var instrumentsType = GetInternalType("Orleans.DurableMessaging.DurableMessagingInstruments");
             var instruments = instrumentsType
@@ -667,6 +677,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         public TestDurableValue<string> CompletedJobId { get; }
         public TestDurableValue<long> JobSequence { get; }
         public int PendingMessageCount => GetPendingMessageIds().Count;
+        public int ScheduledJobCount => Assert.IsType<RecordingJobManager>(JobManager).ScheduleCount;
 
         public Task DeliverAsync() =>
             DeliverWithCancellationAsync(TestContext.Current.CancellationToken);
@@ -771,6 +782,9 @@ public sealed class DurableOutboxDeliveryBatchTests
 
         public ValueTask CommitAsync() => Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
+        public Task WaitForEnsureJobTimersAsync() =>
+            _immediateTimerRegistry?.WaitForCallbacksAsync() ?? Task.CompletedTask;
+
         public bool IsPending(Guid messageId) => GetPendingMessageIds().Contains(messageId);
 
         public DurableEnvelope CreateEquivalentEnvelope() => CreateEnvelope(MessageId);
@@ -802,6 +816,58 @@ public sealed class DurableOutboxDeliveryBatchTests
                 DurableEnvelope envelope,
                 CancellationToken cancellationToken = default) =>
                 deliver(envelope, cancellationToken);
+        }
+
+        private sealed class RecordingJobManager : ILocalDurableJobManager
+        {
+            private int _scheduleCount;
+
+            public int ScheduleCount => Volatile.Read(ref _scheduleCount);
+
+            public Task<DurableJob> ScheduleJobAsync(
+                ScheduleJobRequest request,
+                CancellationToken cancellationToken)
+            {
+                Interlocked.Increment(ref _scheduleCount);
+                return Task.FromResult(new DurableJob
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Name = request.JobName,
+                    DueTime = request.DueTime,
+                    TargetGrainId = request.Target,
+                    Metadata = request.Metadata,
+                    ShardId = "test",
+                });
+            }
+
+            public Task<bool> TryCancelDurableJobAsync(
+                DurableJob job,
+                CancellationToken cancellationToken) => Task.FromResult(true);
+        }
+
+        private sealed class ImmediateTimerRegistry : ITimerRegistry
+        {
+            private readonly List<Task> _callbacks = [];
+
+            [Obsolete]
+            public IDisposable RegisterTimer(
+                IGrainContext grainContext,
+                Func<object?, Task> callback,
+                object? state,
+                TimeSpan dueTime,
+                TimeSpan period) => throw new NotSupportedException();
+
+            public IGrainTimer RegisterGrainTimer<TState>(
+                IGrainContext grainContext,
+                Func<TState, CancellationToken, Task> callback,
+                TState state,
+                GrainTimerCreationOptions options)
+            {
+                _callbacks.Add(callback(state, CancellationToken.None));
+                return Substitute.For<IGrainTimer>();
+            }
+
+            public Task WaitForCallbacksAsync() => Task.WhenAll(_callbacks);
         }
 
         private sealed class TestGrainFactory(IDurableInboxExtension inbox) : IGrainFactory

@@ -606,6 +606,30 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
+    public async Task MissingResumeStateWithUnsupportedPendingWriteSamplingReschedules()
+    {
+        var (runtime, _, manager, _) = CreateRuntime();
+        manager.PendingWriteByteCount = -1;
+        var result = await runtime.ExecuteJobAsync(
+            CreateRunContext(TaskId.Parse("root/missing"), generation: 1),
+            default);
+
+        Assert.NotSame(DurableJobRunResult.Completed, result);
+    }
+
+    [Fact]
+    public async Task PermanentlyMissingResumeStateEventuallyCompletes()
+    {
+        var (runtime, _, manager, _) = CreateRuntime();
+        manager.PendingWriteByteCount = -1;
+        var context = CreateRunContext(TaskId.Parse("root/missing"), generation: 1);
+        Assert.NotSame(DurableJobRunResult.Completed, await runtime.ExecuteJobAsync(context, default));
+        var result = await runtime.ExecuteJobAsync(context, default);
+
+        Assert.Same(DurableJobRunResult.Completed, result);
+    }
+
+    [Fact]
     public async Task LocalDelayRemainsPendingUntilResumeAndRecoveryReschedulesIt()
     {
         var (runtime, storage, _, transport) = CreateRuntime();
@@ -1049,6 +1073,26 @@ public sealed class DurableTaskRuntimeInvariantTests
                 default).AsTask());
 
         Assert.Contains("another operation", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompletionDecisionRejectsExpiredTombstoneBeforePolling()
+    {
+        var (runtime, storage, _, _) = CreateRuntime();
+        var decisionId = TaskId.Parse("root/decision");
+        var candidateId = TaskId.Parse("root/candidate");
+        var decision = storage.GetOrCreate(decisionId);
+        decision.RequestFingerprint = "$completion-decision:expired";
+        decision.TombstonedAt = runtime.UtcNow;
+        storage.GetOrCreate(candidateId);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runtime.SelectCompletionAsync(
+                decisionId,
+                [candidateId],
+                default).AsTask());
+
+        Assert.Contains("retained result has expired", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1717,6 +1761,7 @@ public sealed class DurableTaskRuntimeInvariantTests
     {
         private readonly List<IJournaledStateObserver> _observers = [];
         public int WriteCount { get; private set; }
+        public long PendingWriteByteCount { get; set; }
         public Action? BeforeWrite { get; set; }
         public Func<ValueTask>? AfterWriteStarted { get; set; }
         public bool SupportsRollback => true;
