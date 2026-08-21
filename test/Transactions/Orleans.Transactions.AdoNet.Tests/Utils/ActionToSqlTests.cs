@@ -25,7 +25,7 @@ public sealed class ActionToSqlTests
     {
         var result = ActionToSql.InsertSql("T", new List<string> { "Col" }, "@");
 
-        Assert.Equal("INSERT INTO T (Col) VALUES (@Col);", result);
+        Assert.Equal("INSERT INTO T (Col) VALUES (@Col)", result);
     }
 
     [Fact]
@@ -33,7 +33,7 @@ public sealed class ActionToSqlTests
     {
         var result = ActionToSql.InsertSql("T", new List<string> { "A", "B", "C" }, "@");
 
-        Assert.Equal("INSERT INTO T (A,B,C) VALUES (@A,@B,@C);", result);
+        Assert.Equal("INSERT INTO T (A,B,C) VALUES (@A,@B,@C)", result);
         // secondary: columns appear in declared order
         Assert.True(result.IndexOf("@A") < result.IndexOf("@B"));
         Assert.True(result.IndexOf("@B") < result.IndexOf("@C"));
@@ -45,7 +45,7 @@ public sealed class ActionToSqlTests
         var result = ActionToSql.InsertSql("T", new List<string> { "A", "B", "C" }, ":");
 
         // Oracle uses ':' prefix, not '@'
-        Assert.Equal("INSERT INTO T (A,B,C) VALUES (:A,:B,:C);", result);
+        Assert.Equal("INSERT INTO T (A,B,C) VALUES (:A,:B,:C)", result);
         Assert.DoesNotContain("@", result);
     }
 
@@ -55,7 +55,7 @@ public sealed class ActionToSqlTests
         // Documents current behavior: empty column list produces empty parens.
         var result = ActionToSql.InsertSql("T", new List<string>(), "@");
 
-        Assert.Equal("INSERT INTO T () VALUES ();", result);
+        Assert.Equal("INSERT INTO T () VALUES ()", result);
         Assert.StartsWith("INSERT INTO T", result);
     }
 
@@ -68,7 +68,7 @@ public sealed class ActionToSqlTests
     {
         var result = ActionToSql.UpdateSql("T", new List<string> { "A" }, new List<string> { "B" }, "@");
 
-        Assert.Equal("UPDATE T SET A=@A WHERE B=@B;", result);
+        Assert.Equal("UPDATE T SET A=@A WHERE B=@B", result);
     }
 
     [Fact]
@@ -76,7 +76,7 @@ public sealed class ActionToSqlTests
     {
         var result = ActionToSql.UpdateSql("T", new List<string> { "A", "B" }, new List<string> { "C", "D" }, "@");
 
-        Assert.Equal("UPDATE T SET A=@A,B=@B WHERE C=@C AND D=@D;", result);
+        Assert.Equal("UPDATE T SET A=@A,B=@B WHERE C=@C AND D=@D", result);
         // SET columns are comma-separated (not AND-separated)
         Assert.Contains(",", result.Substring(0, result.IndexOf("WHERE")));
         // WHERE columns are AND-separated
@@ -88,7 +88,7 @@ public sealed class ActionToSqlTests
     {
         var result = ActionToSql.UpdateSql("T", new List<string> { "A" }, new List<string> { "B" }, ":");
 
-        Assert.Equal("UPDATE T SET A=:A WHERE B=:B;", result);
+        Assert.Equal("UPDATE T SET A=:A WHERE B=:B", result);
         Assert.DoesNotContain("@", result);
     }
 
@@ -101,7 +101,7 @@ public sealed class ActionToSqlTests
     {
         var result = ActionToSql.DeleteSql("T", new List<string> { "A", "B" }, "@");
 
-        Assert.Equal("DELETE FROM T WHERE A=@A AND B=@B;", result);
+        Assert.Equal("DELETE FROM T WHERE A=@A AND B=@B", result);
         Assert.StartsWith("DELETE FROM T", result);
     }
 
@@ -111,7 +111,7 @@ public sealed class ActionToSqlTests
         // Passing null whereList omits the WHERE clause entirely.
         var result = ActionToSql.DeleteSql("T", null!, "@");
 
-        Assert.Equal("DELETE FROM T;", result);
+        Assert.Equal("DELETE FROM T", result);
         Assert.DoesNotContain("WHERE", result);
     }
 
@@ -120,7 +120,7 @@ public sealed class ActionToSqlTests
     {
         var result = ActionToSql.DeleteSql("T", new List<string> { "A" }, ":");
 
-        Assert.Equal("DELETE FROM T WHERE A=:A;", result);
+        Assert.Equal("DELETE FROM T WHERE A=:A", result);
         Assert.DoesNotContain("@", result);
     }
 
@@ -150,7 +150,7 @@ public sealed class ActionToSqlTests
             new List<string> { "O" },
             "@");
 
-        Assert.Equal("SELECT S FROM T WHERE W=@W ORDER BY O ASC;", result);
+        Assert.Equal("SELECT S FROM T WHERE W=@W ORDER BY O ASC", result);
     }
 
     [Fact]
@@ -163,7 +163,7 @@ public sealed class ActionToSqlTests
             new List<string> { "O1", "O2" },
             "@");
 
-        Assert.EndsWith("ORDER BY O1,O2 ASC;", result);
+        Assert.EndsWith("ORDER BY O1,O2 ASC", result);
     }
 
     [Fact]
@@ -171,7 +171,7 @@ public sealed class ActionToSqlTests
     {
         var result = ActionToSql.QuerySimpleSql("T", new List<string> { "S" }, null, null, "@");
 
-        Assert.Equal("SELECT S FROM T;", result);
+        Assert.Equal("SELECT S FROM T", result);
     }
 
     [Fact]
@@ -185,7 +185,7 @@ public sealed class ActionToSqlTests
             "@",
             orderBy: "DESC");
 
-        Assert.EndsWith(" ORDER BY W DESC;", result);
+        Assert.EndsWith(" ORDER BY W DESC", result);
     }
 
     [Fact]
@@ -194,7 +194,7 @@ public sealed class ActionToSqlTests
         var result = ActionToSql.QuerySimpleSql("T", new List<string> { "A", "B", "C" }, null, null, "@");
 
         // All columns appear in SELECT clause in order
-        Assert.Equal("SELECT A,B,C FROM T;", result);
+        Assert.Equal("SELECT A,B,C FROM T", result);
         // Columns are comma-separated
         Assert.Contains("A,B,C", result);
     }
