@@ -88,7 +88,6 @@ Most grains only need a contract, an implementation, a stable key, and regular r
 
 - [Request scheduling and reentrancy](request-scheduling.md)
 - [Response streaming with IAsyncEnumerable](response-streaming.md)
-- [Timers and reminders overview](timers-and-reminders.md)
 - [Grain timers](timers.md)
 - [Reminders](reminders.md)
 - [Observers](observers.md)
