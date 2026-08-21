@@ -2,7 +2,6 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans;
-using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
 using StackExchange.Redis;

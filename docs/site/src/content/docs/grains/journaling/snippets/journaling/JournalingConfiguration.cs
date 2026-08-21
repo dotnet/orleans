@@ -3,6 +3,7 @@ using Azure.Data.Tables;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
 
