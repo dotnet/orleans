@@ -382,12 +382,6 @@ namespace Orleans.EventSourcing.Common
 
 namespace Orleans.EventSourcing.CustomStorage
 {
-    [System.AttributeUsage(System.AttributeTargets.Class)]
-    public sealed partial class CustomStorageProviderAttribute : System.Attribute
-    {
-        public string ProviderName { get { throw null; } set { } }
-    }
-
     public partial interface ICustomStorageFactory
     {
         ICustomStorageInterface<TState, TDelta> CreateCustomStorage<TState, TDelta>(Runtime.GrainId grainId);
@@ -403,8 +397,6 @@ namespace Orleans.EventSourcing.CustomStorage
 
     public partial class LogConsistencyProvider : ILogViewAdaptorFactory
     {
-        public LogConsistencyProvider(Configuration.CustomStorageLogConsistencyOptions options, System.IServiceProvider? serviceProvider) { }
-
         public LogConsistencyProvider(Configuration.CustomStorageLogConsistencyOptions options) { }
 
         public string? PrimaryCluster { get { throw null; } }
@@ -533,7 +525,13 @@ namespace Orleans.Hosting
     {
         public static ISiloBuilder AddCustomStorageBasedLogConsistencyProvider(this ISiloBuilder builder, string name = "LogStorage", string? primaryCluster = null) { throw null; }
 
+        public static ISiloBuilder AddCustomStorageBasedLogConsistencyProvider<TCustomStorageFactory>(this ISiloBuilder builder, string name = "LogStorage", string? primaryCluster = null)
+            where TCustomStorageFactory : class, EventSourcing.CustomStorage.ICustomStorageFactory { throw null; }
+
         public static ISiloBuilder AddCustomStorageBasedLogConsistencyProviderAsDefault(this ISiloBuilder builder, string? primaryCluster = null) { throw null; }
+
+        public static ISiloBuilder AddCustomStorageBasedLogConsistencyProviderAsDefault<TCustomStorageFactory>(this ISiloBuilder builder, string? primaryCluster = null)
+            where TCustomStorageFactory : class, EventSourcing.CustomStorage.ICustomStorageFactory { throw null; }
     }
 
     public static partial class LogStorageSiloBuilderExtensions
