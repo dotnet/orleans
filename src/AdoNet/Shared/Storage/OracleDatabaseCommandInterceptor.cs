@@ -26,6 +26,7 @@ namespace Orleans.Tests.SqlUtils
         public static readonly ICommandInterceptor Instance = new OracleCommandInterceptor();
 
         private readonly Lazy<Action<IDbDataParameter>> setClobOracleDbTypeAction;
+        private readonly Lazy<Action<IDbDataParameter>> setNClobOracleDbTypeAction;
         private readonly Lazy<Action<IDbDataParameter>> setBlobOracleDbTypeAction;
         private readonly Lazy<Action<IDbCommand>> setCommandBindByNameAction;
 
@@ -33,6 +34,7 @@ namespace Orleans.Tests.SqlUtils
         private OracleCommandInterceptor()
         {
             setClobOracleDbTypeAction = new Lazy<Action<IDbDataParameter>>(() => BuildSetOracleDbTypeAction("Clob"));
+            setNClobOracleDbTypeAction = new Lazy<Action<IDbDataParameter>>(() => BuildSetOracleDbTypeAction("NClob"));
             setBlobOracleDbTypeAction = new Lazy<Action<IDbDataParameter>>(() => BuildSetOracleDbTypeAction("Blob"));
             setCommandBindByNameAction = new Lazy<Action<IDbCommand>>(BuildSetBindByNameAction);
         }
@@ -95,14 +97,13 @@ namespace Orleans.Tests.SqlUtils
 
                 //String parameters are mapped to NVarChar2 OracleDbType which is limited to 4000 bytes
                 //This sets the OracleType explicitly to CLOB
-                if (commandParameter.ParameterName == "PayloadJson")
-                { 
-                    setClobOracleDbTypeAction.Value(commandParameter);
+                if (IsNClobParameter(commandParameter.ParameterName))
+                {
+                    setNClobOracleDbTypeAction.Value(commandParameter);
                     continue;
                 }
 
-                //Same like above
-                if (commandParameter.ParameterName == "PayloadXml")
+                if (IsClobParameter(commandParameter.ParameterName))
                 { 
                     setClobOracleDbTypeAction.Value(commandParameter);
                     continue;
@@ -125,6 +126,12 @@ namespace Orleans.Tests.SqlUtils
                 }
             }
         }
+
+        internal static bool IsClobParameter(string parameterName)
+            => parameterName is "PayloadJson" or "PayloadXml";
+
+        internal static bool IsNClobParameter(string parameterName)
+            => parameterName is "MetadataJson";
     }
 }
 
