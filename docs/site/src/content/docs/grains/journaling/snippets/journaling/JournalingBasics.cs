@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans;
 
 namespace Orleans.Docs.Snippets.Journaling;
 
@@ -26,4 +27,3 @@ public sealed class ShoppingCartGrain(
             new Dictionary<string, int>(items));
 }
 // </durable_shopping_cart>
-
