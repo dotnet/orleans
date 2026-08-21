@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using Orleans.Runtime;
 using Orleans.Streams;
 using OrleansAWSUtils.Streams;
@@ -26,12 +25,12 @@ public class SQSDataAdapter : ISQSDataAdapter
     /// </summary>
     /// <param name="sqsMessage"></param>
     /// <returns></returns>
-    public virtual IBatchContainer GetBatchContainer(SQSMessage sqsMessage, ref long sequenceNumber)
+    public virtual IBatchContainer FromQueueMessage(SQSMessage sqsMessage, long sequenceId)
     {
         return SQSBatchContainer.FromSQSMessage(
             serializer.GetSerializer<SQSBatchContainer>(),
             sqsMessage,
-            Interlocked.Increment(ref sequenceNumber));
+            sequenceId);
     }
 
     public virtual SQSMessage ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)

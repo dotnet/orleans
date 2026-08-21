@@ -37,8 +37,8 @@ namespace OrleansAWSUtils.Storage
         private string? queueUrl;
         private AmazonSQSClient sqsClient = null!;
 
-        private List<string> receiveAttributes;
-        private List<string> receiveMessageAttributes;
+        private readonly List<string> receiveMessageSystemAttributes;
+        private readonly List<string> receiveMessageAttributes;
 
 
         /// <summary>
@@ -62,8 +62,14 @@ namespace OrleansAWSUtils.Storage
             Logger = loggerFactory.CreateLogger<SQSStorage>();
             CreateClient();
 
-            receiveAttributes = [..sqsOptions.ReceiveAttributes];
+            receiveMessageSystemAttributes = [.. sqsOptions.ReceiveMessageSystemAttributes];
             receiveMessageAttributes = [.. sqsOptions.ReceiveMessageAttributes];
+
+            if (sqsOptions.FifoQueue)
+            {
+                if (!receiveMessageSystemAttributes.Contains(MessageSystemAttributeName.SequenceNumber))
+                    receiveMessageSystemAttributes.Add(MessageSystemAttributeName.SequenceNumber);
+            }
         }
 
         private void ParseDataConnectionString(string dataConnectionString)
@@ -159,29 +165,19 @@ namespace OrleansAWSUtils.Storage
             {
                 if (string.IsNullOrWhiteSpace(await GetQueueUrl()))
                 {
-                    var createQueueRequest = new CreateQueueRequest(QueueName);
+                    var createQueueRequest = new CreateQueueRequest(QueueName)
+                    {
+                        Attributes = [],
+                    };
 
                     if (sqsOptions.FifoQueue)
                     {
                         // The stream must have these attributes to be a valid FIFO queue.
-                        createQueueRequest.Attributes = new()
-                        {
-                            { QueueAttributeName.FifoQueue, "true" },
-                            { QueueAttributeName.FifoThroughputLimit, "perMessageGroupId" },
-                            { QueueAttributeName.DeduplicationScope, "messageGroup" },
-                            { QueueAttributeName.ContentBasedDeduplication, "true" },
-                        };
+                        createQueueRequest.Attributes.Add(QueueAttributeName.FifoQueue, "true");
+                        createQueueRequest.Attributes.Add(QueueAttributeName.FifoThroughputLimit, "perMessageGroupId");
+                        createQueueRequest.Attributes.Add(QueueAttributeName.DeduplicationScope, "messageGroup");
+                        createQueueRequest.Attributes.Add(QueueAttributeName.ContentBasedDeduplication, "true");
 
-                        // We require to bring down the AWS set SequenceNumber when on a FIFO queue
-                        // in order to populate the SQSFIFOSequenceToken from it.
-
-                        if (!receiveMessageAttributes.Contains(MessageSystemAttributeName.SequenceNumber))
-                            receiveMessageAttributes.Add(MessageSystemAttributeName.SequenceNumber);
-                        if (!receiveMessageAttributes.Contains(MessageSystemAttributeName.MessageGroupId))
-                            receiveMessageAttributes.Add(MessageSystemAttributeName.MessageGroupId);
-
-                        // FIFO Queue does not support Long Polling
-                        sqsOptions.ReceiveWaitTimeSeconds = null;
                     }
 
                     if (sqsOptions.ReceiveWaitTimeSeconds.HasValue)
@@ -269,7 +265,7 @@ namespace OrleansAWSUtils.Storage
                 {
                     QueueUrl = queueUrl,
                     MaxNumberOfMessages = count <= MAX_NUMBER_OF_MESSAGE_TO_PEEK ? count : MAX_NUMBER_OF_MESSAGE_TO_PEEK,
-                    AttributeNames = receiveAttributes,
+                    MessageSystemAttributeNames = receiveMessageSystemAttributes,
                     MessageAttributeNames = receiveMessageAttributes,
                 };
 
@@ -277,7 +273,7 @@ namespace OrleansAWSUtils.Storage
                     request.WaitTimeSeconds = sqsOptions.ReceiveWaitTimeSeconds.Value;
 
                 var response = await sqsClient.ReceiveMessageAsync(request);
-                return response.Messages;
+                return response.Messages ?? [];
             }
             catch (Exception exc)
             {
@@ -324,6 +320,11 @@ namespace OrleansAWSUtils.Storage
                 }
 
                 var messagesToDelete = messages.ToArray();
+                if (messagesToDelete.Length == 0)
+                {
+                    return;
+                }
+
                 foreach (var message in messagesToDelete)
                 {
                     ValidateMessageForDeletion(message);
@@ -341,10 +342,16 @@ namespace OrleansAWSUtils.Storage
                     };
 
                     var result = await sqsClient.DeleteMessageBatchAsync(deleteRequest);
-                    foreach (var failed in result.Failed)
+                    var failedEntries = result.Failed ?? [];
+                    foreach (var failed in failedEntries)
                     {
                         Logger.LogWarning("Failed to delete message {MessageId} from SQS queue {QueueName}. Error code: {ErrorCode}. Error message: {ErrorMessage}",
                                 failed.Id, QueueName, failed.Code, failed.Message);
+                    }
+
+                    if (failedEntries.Count > 0)
+                    {
+                        throw new InvalidOperationException($"Amazon SQS failed to delete {failedEntries.Count} message(s) from queue {QueueName}.");
                     }
                 }
             }

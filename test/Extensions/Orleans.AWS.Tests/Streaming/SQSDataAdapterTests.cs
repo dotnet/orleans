@@ -2,257 +2,257 @@ using System.Collections.Concurrent;
 using System.Data;
 using System.Globalization;
 using System.Text;
+using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Streams;
-using OrleansAWSUtils.Streams;
-using AWSUtils.Tests.StorageTests;
-using TestExtensions;
-using Xunit;
-using OrleansAWSUtils.Storage;
-using Orleans.Configuration;
 using Orleans.Serialization;
 using Orleans.Streaming.SQS.Streams;
+using Orleans.Streams;
+using OrleansAWSUtils.Storage;
+using OrleansAWSUtils.Streams;
+using TestExtensions;
+using Xunit;
 using Message = Amazon.SQS.Model.Message;
 
-namespace AWSUtils.Tests.Streaming
+namespace AWSUtils.Tests.Streaming;
+
+[TestCategory("AWS"), TestCategory("SQS")]
+[Collection(TestEnvironmentFixture.DefaultCollection)]
+public class SQSDataAdapterTests : IAsyncLifetime
 {
-    [TestCategory("AWS"), TestCategory("SQS")]
-    [Collection(TestEnvironmentFixture.DefaultCollection)]
-    public class SQSDataAdapterTests : IAsyncLifetime
+    private readonly ITestOutputHelper output;
+    private readonly TestEnvironmentFixture fixture;
+    private const int NumBatches = 20;
+    private const int NumMessagesPerBatch = 20;
+    private readonly string clusterId;
+    public static readonly string SQS_STREAM_PROVIDER_NAME = "SQSAdapterTests";
+    private readonly TimeSpan QueuePollRate = TimeSpan.FromSeconds(1);
+
+    public SQSDataAdapterTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
     {
-        private readonly ITestOutputHelper output;
-        private readonly TestEnvironmentFixture fixture;
-        private const int NumBatches = 20;
-        private const int NumMessagesPerBatch = 20;
-        private readonly string clusterId;
-        public static readonly string SQS_STREAM_PROVIDER_NAME = "SQSAdapterTests";
-        private readonly TimeSpan QueuePollRate = TimeSpan.FromSeconds(1);
-
-        public SQSDataAdapterTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
+        if (!AWSTestConstants.IsSqsAvailable)
         {
-            if (!AWSTestConstants.IsSqsAvailable)
-            {
-                throw Xunit.Sdk.SkipException.ForSkip("Empty connection string");
-            }
-
-            this.output = output;
-            this.fixture = fixture;
-            this.clusterId = MakeClusterId();
+            throw Xunit.Sdk.SkipException.ForSkip("Empty connection string");
         }
 
-        public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+        this.output = output;
+        this.fixture = fixture;
+        this.clusterId = MakeClusterId();
+    }
 
-        public async ValueTask DisposeAsync()
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(AWSTestConstants.SqsConnectionString))
         {
-            if (!string.IsNullOrWhiteSpace(AWSTestConstants.SqsConnectionString))
-            {
-                await SQSStreamProviderUtils.DeleteAllUsedQueues(
-                    SQS_STREAM_PROVIDER_NAME,
-                    this.clusterId,
-                    AWSTestConstants.SqsConnectionString,
-                    NullLoggerFactory.Instance);
-            }
+            await SQSStreamProviderUtils.DeleteAllUsedQueues(
+                SQS_STREAM_PROVIDER_NAME,
+                this.clusterId,
+                AWSTestConstants.SqsConnectionString,
+                NullLoggerFactory.Instance);
         }
+    }
 
-        [Fact]
-        public async Task SendAndReceiveFromSQS()
+    [Fact]
+    public async Task SendAndReceiveFromSQS()
+    {
+        var options = new SqsOptions
         {
-            var options = new SqsOptions
-            {
-                ConnectionString = AWSTestConstants.SqsConnectionString,
-                ReceiveMessageAttributes = new[] { "StreamId" }.ToList()
-            };
-            var clusterOptions = new ClusterOptions { ServiceId = this.clusterId };
-            var dataAdapter = new StringOrIntSqlDataAdapter(fixture.Serializer);
-            var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), Options.Create(clusterOptions), dataAdapter, NullLoggerFactory.Instance);
-            adapterFactory.Init();
-            await SendAndReceiveFromQueueAdapter(adapterFactory);
-        }
+            ConnectionString = AWSTestConstants.SqsConnectionString,
+            ReceiveMessageAttributes = new[] { "StreamId" }.ToList()
+        };
+        var clusterOptions = new ClusterOptions { ServiceId = this.clusterId };
+        var dataAdapter = new StringOrIntSqlDataAdapter(fixture.Serializer);
+        var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), Options.Create(clusterOptions), dataAdapter, NullLoggerFactory.Instance);
+        adapterFactory.Init();
+        await SendAndReceiveFromQueueAdapter(adapterFactory);
+    }
 
-        private async Task SendAndReceiveFromQueueAdapter(IQueueAdapterFactory adapterFactory)
+    private async Task SendAndReceiveFromQueueAdapter(IQueueAdapterFactory adapterFactory)
+    {
+        IQueueAdapter adapter = await adapterFactory.CreateAdapter(CancellationToken.None);
+        IQueueAdapterCache cache = adapterFactory.GetQueueAdapterCache();
+
+        // Create receiver per queue
+        IStreamQueueMapper mapper = adapterFactory.GetStreamQueueMapper();
+        Dictionary<QueueId, IQueueAdapterReceiver> receivers = mapper.GetAllQueues().ToDictionary(queueId => queueId, adapter.CreateReceiver);
+        Dictionary<QueueId, IQueueCache> caches = mapper.GetAllQueues().ToDictionary(queueId => queueId, cache.CreateQueueCache);
+
+        await Task.WhenAll(receivers.Values.Select(receiver => receiver.Initialize(TimeSpan.FromSeconds(5))));
+
+        // test using 2 streams
+        Guid streamId1 = Guid.NewGuid();
+        Guid streamId2 = Guid.NewGuid();
+
+        int receivedBatches = 0;
+        var streamsPerQueue = new ConcurrentDictionary<QueueId, HashSet<StreamId>>();
+
+        // reader threads (at most 2 active queues because only two streams)
+        var work = new List<Task>();
+        foreach (KeyValuePair<QueueId, IQueueAdapterReceiver> receiverKvp in receivers)
         {
-            IQueueAdapter adapter = await adapterFactory.CreateAdapter(CancellationToken.None);
-            IQueueAdapterCache cache = adapterFactory.GetQueueAdapterCache();
-
-            // Create receiver per queue
-            IStreamQueueMapper mapper = adapterFactory.GetStreamQueueMapper();
-            Dictionary<QueueId, IQueueAdapterReceiver> receivers = mapper.GetAllQueues().ToDictionary(queueId => queueId, adapter.CreateReceiver);
-            Dictionary<QueueId, IQueueCache> caches = mapper.GetAllQueues().ToDictionary(queueId => queueId, cache.CreateQueueCache);
-
-            await Task.WhenAll(receivers.Values.Select(receiver => receiver.Initialize(TimeSpan.FromSeconds(5))));
-
-            // test using 2 streams
-            Guid streamId1 = Guid.NewGuid();
-            Guid streamId2 = Guid.NewGuid();
-
-            int receivedBatches = 0;
-            var streamsPerQueue = new ConcurrentDictionary<QueueId, HashSet<StreamId>>();
-
-            // reader threads (at most 2 active queues because only two streams)
-            var work = new List<Task>();
-            foreach (KeyValuePair<QueueId, IQueueAdapterReceiver> receiverKvp in receivers)
+            QueueId queueId = receiverKvp.Key;
+            var receiver = receiverKvp.Value;
+            var qCache = caches[queueId];
+            Task task = Task.Run(async () =>
             {
-                QueueId queueId = receiverKvp.Key;
-                var receiver = receiverKvp.Value;
-                var qCache = caches[queueId];
-                Task task = Task.Run(async () =>
+                while (receivedBatches < NumBatches)
                 {
-                    while (receivedBatches < NumBatches)
+                    var messages = (await receiver.GetQueueMessagesAsync(
+                        SQSStorage.MAX_NUMBER_OF_MESSAGE_TO_PEEK,
+                        CancellationToken.None)).ToArray();
+                    if (!messages.Any())
                     {
-                        var messages = (await receiver.GetQueueMessagesAsync(
-                            SQSStorage.MAX_NUMBER_OF_MESSAGE_TO_PEEK,
-                            CancellationToken.None)).ToArray();
-                        if (!messages.Any())
-                        {
-                            await Task.Delay(QueuePollRate);
-                            continue;
-                        }
-                        foreach (var message in messages.Cast<SQSBatchContainer>())
-                        {
-                            streamsPerQueue.AddOrUpdate(queueId,
-                                id => new HashSet<StreamId> { message.StreamId },
-                                (id, set) =>
-                                {
-                                    set.Add(message.StreamId);
-                                    return set;
-                                });
-                            output.WriteLine("Queue {0} received message on stream {1}", queueId,
-                                message.StreamId);
-                            Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<int>().Count());  // "Half the events were ints"
-                            Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<string>().Count());  // "Half the events were strings"
-                        }
-                        Interlocked.Add(ref receivedBatches, messages.Length);
-                        qCache.AddToCache(messages);
+                        await Task.Delay(QueuePollRate);
+                        continue;
                     }
-                });
-                work.Add(task);
-            }
-
-            // send events
-            List<object> events = CreateEvents(NumMessagesPerBatch);
-            work.Add(Task.Run(async () =>
-            {
-                foreach (var streamId in Enumerable.Range(0, NumBatches).Select(i => i % 2 == 0 ? streamId1 : streamId2))
-                {
-                    await adapter.QueueMessageBatchAsync(
-                        StreamId.Create(streamId.ToString(), streamId),
-                        events.Take(NumMessagesPerBatch).ToArray(),
-                        null,
-                        RequestContextExtensions.Export(this.fixture.DeepCopier));
-                }
-            }));
-            await Task.WhenAll(work);
-
-            // Wait for everything to be consumed.
-            await Task.Delay(QueuePollRate * 2);
-
-            // Make sure we got back everything we sent
-            Assert.Equal(NumBatches, receivedBatches);
-
-            // check to see if all the events are in the cache and we can enumerate through them
-            StreamSequenceToken firstInCache = new EventSequenceTokenV2(0);
-            foreach (KeyValuePair<QueueId, HashSet<StreamId>> kvp in streamsPerQueue)
-            {
-                var receiver = receivers[kvp.Key];
-                var qCache = caches[kvp.Key];
-
-                foreach (StreamId streamGuid in kvp.Value)
-                {
-                    // read all messages in cache for stream
-                    IQueueCacheCursor cursor = qCache.GetCacheCursor(streamGuid, firstInCache);
-                    int messageCount = 0;
-                    StreamSequenceToken? tenthInCache = null;
-                    StreamSequenceToken lastToken = firstInCache;
-                    while (cursor.MoveNext())
+                    foreach (var message in messages.Cast<SQSBatchContainer>())
                     {
-                        Exception? ex;
-                        messageCount++;
-                        IBatchContainer? batch = cursor.GetCurrent(out ex);
-                        Assert.NotNull(batch);
-                        output.WriteLine("Token: {0}", batch.SequenceToken);
-                        Assert.True(batch.SequenceToken.CompareTo(lastToken) >= 0, $"order check for event {messageCount}");
-                        lastToken = batch.SequenceToken;
-                        if (messageCount == 10)
-                        {
-                            tenthInCache = batch.SequenceToken;
-                        }
+                        streamsPerQueue.AddOrUpdate(queueId,
+                            id => new HashSet<StreamId> { message.StreamId },
+                            (id, set) =>
+                            {
+                                set.Add(message.StreamId);
+                                return set;
+                            });
+                        output.WriteLine("Queue {0} received message on stream {1}", queueId,
+                            message.StreamId);
+                        Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<int>().Count());  // "Half the events were ints"
+                        Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<string>().Count());  // "Half the events were strings"
                     }
-                    output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
-                    Assert.Equal(NumBatches / 2, messageCount);
-                    Assert.NotNull(tenthInCache);
+                    Interlocked.Add(ref receivedBatches, messages.Length);
+                    qCache.AddToCache(messages);
+                }
+            });
+            work.Add(task);
+        }
 
-                    // read all messages from the 10th
-                    cursor = qCache.GetCacheCursor(streamGuid, tenthInCache);
-                    messageCount = 0;
-                    while (cursor.MoveNext())
+        // send events
+        List<object> events = CreateEvents(NumMessagesPerBatch);
+        work.Add(Task.Run(async () =>
+        {
+            foreach (var streamId in Enumerable.Range(0, NumBatches).Select(i => i % 2 == 0 ? streamId1 : streamId2))
+            {
+                await adapter.QueueMessageBatchAsync(
+                    StreamId.Create(streamId.ToString(), streamId),
+                    events.Take(NumMessagesPerBatch).ToArray(),
+                    null,
+                    RequestContextExtensions.Export(this.fixture.DeepCopier));
+            }
+        }));
+        await Task.WhenAll(work);
+
+        // Wait for everything to be consumed.
+        await Task.Delay(QueuePollRate * 2);
+
+        // Make sure we got back everything we sent
+        Assert.Equal(NumBatches, receivedBatches);
+
+        // check to see if all the events are in the cache and we can enumerate through them
+        StreamSequenceToken firstInCache = new EventSequenceTokenV2(0);
+        foreach (KeyValuePair<QueueId, HashSet<StreamId>> kvp in streamsPerQueue)
+        {
+            var receiver = receivers[kvp.Key];
+            var qCache = caches[kvp.Key];
+
+            foreach (StreamId streamGuid in kvp.Value)
+            {
+                // read all messages in cache for stream
+                IQueueCacheCursor cursor = qCache.GetCacheCursor(streamGuid, firstInCache);
+                int messageCount = 0;
+                StreamSequenceToken? tenthInCache = null;
+                StreamSequenceToken lastToken = firstInCache;
+                while (cursor.MoveNext())
+                {
+                    Exception? ex;
+                    messageCount++;
+                    IBatchContainer? batch = cursor.GetCurrent(out ex);
+                    Assert.NotNull(batch);
+                    output.WriteLine("Token: {0}", batch.SequenceToken);
+                    Assert.True(batch.SequenceToken.CompareTo(lastToken) >= 0, $"order check for event {messageCount}");
+                    lastToken = batch.SequenceToken;
+                    if (messageCount == 10)
                     {
-                        messageCount++;
+                        tenthInCache = batch.SequenceToken;
                     }
-                    output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
-                    const int expected = NumBatches / 2 - 10 + 1; // all except the first 10, including the 10th (10 + 1)
-                    Assert.Equal(expected, messageCount);
                 }
-            }
-        }
+                output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
+                Assert.Equal(NumBatches / 2, messageCount);
+                Assert.NotNull(tenthInCache);
 
-        private static List<object> CreateEvents(int count)
-        {
-            return Enumerable.Range(0, count).Select(i =>
-            {
-                if (i % 2 == 0)
+                // read all messages from the 10th
+                cursor = qCache.GetCacheCursor(streamGuid, tenthInCache);
+                messageCount = 0;
+                while (cursor.MoveNext())
                 {
-                    return Random.Shared.Next(int.MaxValue) as object;
+                    messageCount++;
                 }
-                return Random.Shared.Next(int.MaxValue).ToString(CultureInfo.InvariantCulture);
-            }).ToList();
+                output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
+                const int expected = NumBatches / 2 - 10 + 1; // all except the first 10, including the 10th (10 + 1)
+                Assert.Equal(expected, messageCount);
+            }
+        }
+    }
+
+    private static List<object> CreateEvents(int count)
+    {
+        return Enumerable.Range(0, count).Select(i =>
+        {
+            if (i % 2 == 0)
+            {
+                return Random.Shared.Next(int.MaxValue) as object;
+            }
+            return Random.Shared.Next(int.MaxValue).ToString(CultureInfo.InvariantCulture);
+        }).ToList();
+    }
+
+    internal static string MakeClusterId()
+    {
+        const string DeploymentIdFormat = "cluster-{0}";
+        string now = DateTime.UtcNow.ToString("yyyy-MM-dd-hh-mm-ss-ffff");
+        return string.Format(DeploymentIdFormat, now);
+    }
+
+    private class StringOrIntSqlDataAdapter : SQSDataAdapter
+    {
+        public StringOrIntSqlDataAdapter(Serializer serializer) : base(serializer)
+        {
         }
 
-        internal static string MakeClusterId()
+        public override IBatchContainer FromQueueMessage(Message sqsMessage, long sequenceId)
         {
-            const string DeploymentIdFormat = "cluster-{0}";
-            string now = DateTime.UtcNow.ToString("yyyy-MM-dd-hh-mm-ss-ffff");
-            return string.Format(DeploymentIdFormat, now);
+            // Example extracts the StreamId as an attribute instead of it being serialized in the body.
+            if (!sqsMessage.MessageAttributes.TryGetValue("StreamId", out var streamIdStr))
+                throw new DataException("SQS Message did not contain a StreamId attribute.");
+            var streamId = StreamId.Parse(Encoding.UTF8.GetBytes(streamIdStr.StringValue));
+
+            // Contrived example sends strings as quoted, and longs as unquoted.
+            var events = sqsMessage.Body.Split(Environment.NewLine)
+                .Select(x => (object)(x.StartsWith('"') ? x.Trim('"') : int.Parse(x)))
+                .ToList();
+
+            return new SQSBatchContainer(
+                streamId,
+                events,
+                new Dictionary<string, object>(),
+                new EventSequenceTokenV2(sequenceId)
+            );
         }
 
-        private class StringOrIntSqlDataAdapter : SQSDataAdapter
+        public override Message ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
         {
-            public StringOrIntSqlDataAdapter(Serializer serializer) : base(serializer)
+            // Contrived example sends strings as quoted, and longs as unquoted.
+            var serializedData = string.Join(Environment.NewLine,
+                events.Select(x => x is string ? $"\"{x}\"" : x?.ToString() ?? string.Empty));
+
+            // Example includes the StreamId as an attribute.
+            return new Message
             {
-            }
-
-            public override IBatchContainer GetBatchContainer(Message sqsMessage, ref long sequenceNumber)
-            {
-                // Example extracts the StreamId as an attribute instead of it being serialized in the body.
-                if (!sqsMessage.MessageAttributes.TryGetValue("StreamId", out var streamIdStr))
-                    throw new DataException("SQS Message did not contain a StreamId attribute.");
-                var streamId = StreamId.Parse(Encoding.UTF8.GetBytes(streamIdStr.StringValue));
-
-                // Contrived example sends strings as quoted, and longs as unquoted.
-                var events = sqsMessage.Body.Split(Environment.NewLine)
-                    .Select(x => (object)(x.StartsWith('"') ? x.Trim('"') : int.Parse(x)))
-                    .ToList();
-
-                return new SQSBatchContainer(
-                    streamId,
-                    events,
-                    new Dictionary<string, object>(),
-                    new EventSequenceTokenV2(Interlocked.Increment(ref sequenceNumber))
-                );
-            }
-
-            public override Message ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
-            {
-                // Contrived example sends strings as quoted, and longs as unquoted.
-                var serializedData = string.Join(Environment.NewLine,
-                    events.Select(x => x is string ? $"\"{x}\"" : x.ToString()));
-
-                // Example includes the StreamId as an attribute.
-                return new Message
-                {
-                    MessageAttributes = new()
+                MessageAttributes = new()
                     {
                         {
                             "StreamId",
@@ -263,9 +263,8 @@ namespace AWSUtils.Tests.Streaming
                             }
                         }
                     },
-                    Body = serializedData
-                };
-            }
+                Body = serializedData
+            };
         }
     }
 }

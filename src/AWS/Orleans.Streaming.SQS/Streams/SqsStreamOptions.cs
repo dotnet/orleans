@@ -17,14 +17,14 @@ namespace Orleans.Configuration
         public string ConnectionString { get; set; } = null!;
 
         /// <summary>
-        /// Specifies which SQS Attributes should be retrieved about the SQS message from the Queue.
+        /// Specifies which Amazon SQS system attributes are retrieved with each message.
         /// </summary>
-        public List<string> ReceiveAttributes { get; set; } = new();
+        public List<string> ReceiveMessageSystemAttributes { get; set; } = [];
 
         /// <summary>
-        /// Specifies which Message Attributes should be retrieved with the SQS messages.
+        /// Specifies which application-defined message attributes are retrieved with each message.
         /// </summary>
-        public List<string> ReceiveMessageAttributes { get; set; } = new();
+        public List<string> ReceiveMessageAttributes { get; set; } = [];
 
         /// <summary>
         /// The optional duration to long-poll for new SQS messages.
@@ -40,6 +40,9 @@ namespace Orleans.Configuration
         /// </summary>
         public int? VisibilityTimeoutSeconds { get; set; }
 
+        /// <summary>
+        /// Configures the provider to use Amazon SQS FIFO queues and preserve ordering per stream.
+        /// </summary>
         public bool FifoQueue { get; set; }
     }
 }

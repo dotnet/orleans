@@ -1,15 +1,15 @@
-using Orleans.Streams;
-using OrleansAWSUtils.Storage;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 using Amazon.SQS.Model;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Streaming.SQS.Streams;
-using System.Linq;
+using Orleans.Streams;
+using OrleansAWSUtils.Storage;
 
 namespace OrleansAWSUtils.Streams
 {
@@ -17,7 +17,7 @@ namespace OrleansAWSUtils.Streams
     {
         protected readonly string ServiceId;
         private readonly ISQSDataAdapter dataAdapter;
-        protected SqsOptions sqsOptions;
+        private readonly SqsOptions sqsOptions;
         private readonly IConsistentRingStreamQueueMapper streamQueueMapper;
         protected readonly ConcurrentDictionary<QueueId, SQSStorage> Queues = new ConcurrentDictionary<QueueId, SQSStorage>();
         private readonly ILoggerFactory loggerFactory;
@@ -28,7 +28,10 @@ namespace OrleansAWSUtils.Streams
 
         public SQSAdapter(ISQSDataAdapter dataAdapter, IConsistentRingStreamQueueMapper streamQueueMapper, ILoggerFactory loggerFactory, SqsOptions sqsOptions, string serviceId, string providerName)
         {
-            if (sqsOptions is null) throw new ArgumentNullException(nameof(sqsOptions));
+            ArgumentNullException.ThrowIfNull(dataAdapter);
+            ArgumentNullException.ThrowIfNull(streamQueueMapper);
+            ArgumentNullException.ThrowIfNull(loggerFactory);
+            ArgumentNullException.ThrowIfNull(sqsOptions);
             if (string.IsNullOrEmpty(serviceId)) throw new ArgumentNullException(nameof(serviceId));
             this.loggerFactory = loggerFactory;
             this.sqsOptions = sqsOptions;
@@ -61,15 +64,20 @@ namespace OrleansAWSUtils.Streams
             var sqsRequest = new SendMessageRequest(string.Empty, sqsMessage.Body);
             if (this.sqsOptions.FifoQueue)
             {
-                // Ensure the SQS Queue ensures FIFO order of messages over this QueueId.
-                sqsRequest.MessageGroupId = streamId.ToString();
+                sqsRequest.MessageGroupId = CreateMessageGroupId(streamId);
+                sqsRequest.MessageDeduplicationId = Guid.NewGuid().ToString("N");
             }
 
-            foreach (var attr in sqsMessage.MessageAttributes)
+            if (sqsMessage.MessageAttributes is { Count: > 0 } messageAttributes)
             {
-                sqsRequest.MessageAttributes.Add(attr.Key, attr.Value);
+                sqsRequest.MessageAttributes = new Dictionary<string, MessageAttributeValue>(messageAttributes);
             }
             await queue.AddMessage(sqsRequest);
+        }
+
+        private static string CreateMessageGroupId(StreamId streamId)
+        {
+            return Convert.ToHexString(SHA256.HashData(streamId.FullKey.Span));
         }
     }
 }

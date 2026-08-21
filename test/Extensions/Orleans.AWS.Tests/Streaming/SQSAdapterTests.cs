@@ -1,20 +1,18 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
+using Orleans.Streaming.SQS.Streams;
 using Orleans.Streams;
+using OrleansAWSUtils.Storage;
 using OrleansAWSUtils.Streams;
-using AWSUtils.Tests.StorageTests;
 using TestExtensions;
 using Xunit;
-using OrleansAWSUtils.Storage;
-using Orleans.Configuration;
-using Orleans.Serialization;
-using Orleans.Serialization.Session;
-using Orleans.Streaming.SQS.Streams;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace AWSUtils.Tests.Streaming
 {
@@ -137,12 +135,17 @@ namespace AWSUtils.Tests.Streaming
 
             // send events
             List<object> events = CreateEvents(NumMessagesPerBatch);
-            work.Add(Task.Factory.StartNew(() => Enumerable.Range(0, NumBatches)
-                .Select(i => i % 2 == 0 ? streamId1 : streamId2)
-                .ToList()
-                .ForEach(streamId =>
-                    adapter.QueueMessageBatchAsync(StreamId.Create(streamId.ToString(), streamId),
-                        events.Take(NumMessagesPerBatch).ToArray(), null!, RequestContextExtensions.Export(this.fixture.DeepCopier)!).Wait())));
+            work.Add(Task.Run(async () =>
+            {
+                foreach (var streamId in Enumerable.Range(0, NumBatches).Select(i => i % 2 == 0 ? streamId1 : streamId2))
+                {
+                    await adapter.QueueMessageBatchAsync(
+                        StreamId.Create(streamId.ToString(), streamId),
+                        events.Take(NumMessagesPerBatch).ToArray(),
+                        null,
+                        RequestContextExtensions.Export(this.fixture.DeepCopier));
+                }
+            }));
             await Task.WhenAll(work);
 
             // Wait for everything to be consumed.

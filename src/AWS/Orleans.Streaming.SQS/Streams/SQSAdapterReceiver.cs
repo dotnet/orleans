@@ -1,13 +1,13 @@
-using Orleans;
-using Orleans.Streams;
-using OrleansAWSUtils.Storage;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans;
 using Orleans.Configuration;
 using Orleans.Streaming.SQS.Streams;
+using Orleans.Streams;
+using OrleansAWSUtils.Storage;
 using SQSMessage = Amazon.SQS.Model.Message;
 
 namespace OrleansAWSUtils.Streams
@@ -22,6 +22,7 @@ namespace OrleansAWSUtils.Streams
         private Task? outstandingTask;
         private readonly ILogger logger;
         private readonly ISQSDataAdapter dataAdapter;
+        private readonly List<PendingDelivery> pending = [];
 
         public QueueId Id { get; private set; }
 
@@ -67,6 +68,7 @@ namespace OrleansAWSUtils.Streams
             {
                 // remember that we shut down so we never try to read from the queue again.
                 queue = null;
+                pending.Clear();
             }
         }
 
@@ -86,7 +88,22 @@ namespace OrleansAWSUtils.Streams
                 if (!messages.Any())
                     return Array.Empty<IBatchContainer>();
 
-                List<IBatchContainer> messageBatch = messages.Select(x => dataAdapter.GetBatchContainer(x, ref lastReadMessage)).ToList();
+                var messageBatch = new List<IBatchContainer>();
+                var pendingDeliveries = new List<PendingDelivery>();
+                foreach (var message in messages)
+                {
+                    if (!string.IsNullOrEmpty(message.MessageId))
+                    {
+                        pending.RemoveAll(item => string.Equals(item.Message.MessageId, message.MessageId, StringComparison.Ordinal));
+                    }
+
+                    var sequenceId = Interlocked.Increment(ref lastReadMessage);
+                    var batch = dataAdapter.FromQueueMessage(message, sequenceId);
+                    messageBatch.Add(batch);
+                    pendingDeliveries.Add(new PendingDelivery(batch, message));
+                }
+
+                pending.AddRange(pendingDeliveries);
                 return messageBatch;
             }
             finally
@@ -101,8 +118,21 @@ namespace OrleansAWSUtils.Streams
             {
                 var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.
                 if (messages.Count == 0 || queueRef == null) return;
-                List<SQSMessage> cloudQueueMessages = messages.Cast<SQSBatchContainer>().Select(b => b.Message).ToList();
-                outstandingTask = queue.DeleteMessages(cloudQueueMessages);
+
+                var cloudQueueMessages = new List<SQSMessage>();
+                foreach (var message in messages)
+                {
+                    var index = pending.FindIndex(item => ReferenceEquals(item.Batch, message));
+                    if (index >= 0)
+                    {
+                        cloudQueueMessages.Add(pending[index].Message);
+                        pending.RemoveAt(index);
+                    }
+                }
+
+                if (cloudQueueMessages.Count == 0) return;
+
+                outstandingTask = queueRef.DeleteMessages(cloudQueueMessages);
                 try
                 {
                     await outstandingTask;
@@ -123,5 +153,7 @@ namespace OrleansAWSUtils.Streams
             Message = "Exception upon DeleteMessage on queue {Id}. Ignoring."
         )]
         private static partial void LogWarningDeleteMessageException(ILogger logger, Exception exception, QueueId id);
+
+        private sealed record PendingDelivery(IBatchContainer Batch, SQSMessage Message);
     }
 }

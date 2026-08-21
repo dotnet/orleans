@@ -3,16 +3,17 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Providers.Streams.Common;
-using Orleans.Streams;
-using Orleans.Configuration;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Configuration.Overrides;
+using Orleans.Providers.Streams.Common;
+using Orleans.Serialization;
 using Orleans.Streaming.SQS.Streams;
+using Orleans.Streams;
 
 namespace OrleansAWSUtils.Streams
 {
-    /// <summary> Factory class for Azure Queue based stream provider.</summary>
+    /// <summary>Factory class for the Amazon SQS stream provider.</summary>
     public class SQSAdapterFactory : IQueueAdapterFactory
     {
         private readonly string providerName;
@@ -37,6 +38,10 @@ namespace OrleansAWSUtils.Streams
             ISQSDataAdapter dataAdapter, 
             ILoggerFactory loggerFactory)
         {
+            ArgumentNullException.ThrowIfNull(sqsOptions);
+            ArgumentNullException.ThrowIfNull(queueMapperOptions);
+            ArgumentNullException.ThrowIfNull(cacheOptions);
+            ArgumentNullException.ThrowIfNull(clusterOptions);
             ArgumentNullException.ThrowIfNull(dataAdapter);
             ArgumentNullException.ThrowIfNull(loggerFactory);
 
@@ -47,10 +52,26 @@ namespace OrleansAWSUtils.Streams
             this.loggerFactory = loggerFactory;
             streamQueueMapper = new HashRingBasedStreamQueueMapper(queueMapperOptions, this.providerName);
 
-            if (sqsOptions.FifoQueue)
-                adapterCache = new StreamIdPartitionedQueueAdapterCache(cacheOptions, this.providerName, this.loggerFactory);
-            else
-                adapterCache = new SimpleQueueAdapterCache(cacheOptions, this.providerName, this.loggerFactory);
+            adapterCache = new SimpleQueueAdapterCache(cacheOptions, this.providerName, this.loggerFactory);
+        }
+
+        public SQSAdapterFactory(
+            string name,
+            SqsOptions sqsOptions,
+            HashRingStreamQueueMapperOptions queueMapperOptions,
+            SimpleQueueCacheOptions cacheOptions,
+            IOptions<ClusterOptions> clusterOptions,
+            Serializer serializer,
+            ILoggerFactory loggerFactory)
+            : this(
+                name,
+                sqsOptions,
+                queueMapperOptions,
+                cacheOptions,
+                clusterOptions,
+                new SQSDataAdapter(serializer),
+                loggerFactory)
+        {
         }
 
         /// <summary> Init the factory.</summary>
@@ -63,7 +84,7 @@ namespace OrleansAWSUtils.Streams
             }
         }
 
-        /// <summary>Creates the Azure Queue based adapter.</summary>
+        /// <summary>Creates the Amazon SQS queue adapter.</summary>
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
             var adapter = new SQSAdapter(this.dataAdapter, this.streamQueueMapper, this.loggerFactory, this.sqsOptions, this.clusterOptions.ServiceId, this.providerName);
