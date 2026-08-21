@@ -19,7 +19,9 @@ namespace Orleans.Transactions.AdoNet.Tests;
 /// uninitialized instance and then set the <c>options</c> field via reflection
 /// so that only the method under test is exercised — no DI, no silo.
 /// </summary>
-[TestCategory("BVT"), TestCategory("Transactions")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Transactions")]
 public sealed class TransactionalStateStorageFactoryTests
 {
     // -----------------------------------------------------------------------

@@ -7,7 +7,9 @@ using Xunit;
 
 namespace Orleans.Transactions.AdoNet.Tests;
 
-[TestCategory("BVT"), TestCategory("Transactions")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Transactions")]
 public sealed class RelationalStorageTests
 {
     [Fact]
