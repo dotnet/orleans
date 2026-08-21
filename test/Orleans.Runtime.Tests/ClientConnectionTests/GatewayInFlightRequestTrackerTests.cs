@@ -15,7 +15,7 @@ public class GatewayInFlightRequestTrackerTests
     private static readonly SiloAddress Silo1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 1);
     private static readonly SiloAddress Silo2 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 22222), 2);
 
-    [Fact, TestCategory("BVT")]
+    [Fact]
     public void OneWayMessagesAreNotTracked()
     {
         var tracker = CreateTracker();
@@ -26,7 +26,7 @@ public class GatewayInFlightRequestTrackerTests
         Assert.Equal(0, tracker.Count);
     }
 
-    [Fact, TestCategory("BVT")]
+    [Fact]
     public void RequestsWithoutFinalDestinationAreNotTracked()
     {
         var tracker = CreateTracker();
@@ -39,7 +39,7 @@ public class GatewayInFlightRequestTrackerTests
         Assert.Equal(0, tracker.Count);
     }
 
-    [Fact, TestCategory("BVT")]
+    [Fact]
     public void SystemTargetRequestsAreNotTracked()
     {
         var tracker = CreateTracker();
@@ -52,7 +52,7 @@ public class GatewayInFlightRequestTrackerTests
         Assert.Equal(0, tracker.Count);
     }
 
-    [Fact, TestCategory("BVT")]
+    [Fact]
     public void StatusResponseRetainsRequest()
     {
         var tracker = CreateTracker();
@@ -65,7 +65,7 @@ public class GatewayInFlightRequestTrackerTests
         Assert.Equal(1, tracker.Count);
     }
 
-    [Theory, TestCategory("BVT")]
+    [Theory]
     [InlineData((int)Message.ResponseTypes.Success)]
     [InlineData((int)Message.ResponseTypes.Error)]
     [InlineData((int)Message.ResponseTypes.Rejection)]
@@ -81,7 +81,7 @@ public class GatewayInFlightRequestTrackerTests
         Assert.Equal(0, tracker.Count);
     }
 
-    [Fact, TestCategory("BVT")]
+    [Fact]
     public void NonResponseMessageDoesNotCompleteRequest()
     {
         var tracker = CreateTracker();
@@ -94,7 +94,7 @@ public class GatewayInFlightRequestTrackerTests
         Assert.Equal(1, tracker.Count);
     }
 
-    [Fact, TestCategory("BVT")]
+    [Fact]
     public void RemoveForSiloRemovesOnlyRequestsForThatDestination()
     {
         var tracker = CreateTracker();
@@ -116,7 +116,7 @@ public class GatewayInFlightRequestTrackerTests
         Assert.Equal(0, tracker.Count);
     }
 
-    [Fact, TestCategory("BVT")]
+    [Fact]
     public void ClearRemovesAllRequestsOnDisconnect()
     {
         var tracker = CreateTracker();
@@ -132,7 +132,7 @@ public class GatewayInFlightRequestTrackerTests
         Assert.False(tracker.TryComplete(CreateResponse(request2, Message.ResponseTypes.Error)));
     }
 
-    [Fact, TestCategory("BVT")]
+    [Fact]
     public void SnapshotDoesNotRetainBodyOrMutableCacheHeader()
     {
         var tracker = CreateTracker();
@@ -156,7 +156,7 @@ public class GatewayInFlightRequestTrackerTests
         Assert.Empty(snapshot.CacheInvalidationHeader!);
     }
 
-    [Fact, TestCategory("BVT")]
+    [Fact]
     public void ExplicitTimeToLiveControlsExpiry()
     {
         var timeProvider = new FakeTimeProvider();
@@ -174,7 +174,7 @@ public class GatewayInFlightRequestTrackerTests
         Assert.Equal(0, tracker.Count);
     }
 
-    [Fact, TestCategory("BVT")]
+    [Fact]
     public void ResponseTimeoutControlsExpiryWhenTimeToLiveIsAbsent()
     {
         var timeProvider = new FakeTimeProvider();
@@ -190,7 +190,7 @@ public class GatewayInFlightRequestTrackerTests
         Assert.Equal(0, tracker.Count);
     }
 
-    [Fact, TestCategory("BVT")]
+    [Fact]
     public void NonPositiveResponseTimeoutDoesNotTrackRequestWithoutTimeToLive()
     {
         var tracker = CreateTracker(responseTimeout: TimeSpan.Zero);

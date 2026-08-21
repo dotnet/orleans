@@ -62,7 +62,7 @@ namespace UnitTests.MembershipTests
             await Assert.ThrowsAsync<SiloUnavailableException>(() => promise);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Liveness")]
+        [Fact, TestCategory("Liveness")]
         public async Task SiloUngracefulShutdown_GatewayForwardedRequestBreaks()
         {
             var runtimeClient = Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
