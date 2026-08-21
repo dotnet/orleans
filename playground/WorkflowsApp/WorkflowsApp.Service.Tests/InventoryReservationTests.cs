@@ -91,7 +91,7 @@ public sealed class InventoryReservationTests : IClassFixture<InventoryReservati
         Assert.Contains("order-1", notification);
         Assert.Contains("Widget=5", notification);
 
-        await Task.Delay(200);
+        await Task.Delay(200, TestContext.Current.CancellationToken);
         Assert.Single(await notifications.GetNotificationsAsync());
     }
 
@@ -99,7 +99,7 @@ public sealed class InventoryReservationTests : IClassFixture<InventoryReservati
     public async Task DurableTask_RemoteCallsUseDurableMessaging()
     {
         var grain = _fixture.Cluster.Client.GetGrain<IHelloWorkflowGrain>(Guid.NewGuid().ToString("N"));
-        var handle = await grain.RunSample().ScheduleAsync();
+        var handle = await grain.RunSample().ScheduleAsync(TestContext.Current.CancellationToken);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         var result = await handle.WaitAsync(timeout.Token);
@@ -154,8 +154,8 @@ public sealed class InventoryReservationTests : IClassFixture<InventoryReservati
 
         public InProcessTestCluster Cluster { get; }
 
-        public Task InitializeAsync() => Cluster.DeployAsync();
+        public ValueTask InitializeAsync() => new(Cluster.DeployAsync());
 
-        public Task DisposeAsync() => Cluster.DisposeAsync().AsTask();
+        public ValueTask DisposeAsync() => Cluster.DisposeAsync();
     }
 }
