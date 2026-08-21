@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Time.Testing;
 using Orleans.TestingHost.Utils;
 using Xunit;
 
@@ -55,29 +56,80 @@ public class TestingUtilsTests
     [Fact]
     public async Task WaitUntilSucceededAsync_ReturnsFalseAtDeadline()
     {
-        var result = await TestingUtils.WaitUntilSucceededAsync(
-            _ => Task.FromResult(false),
-            TimeSpan.FromMilliseconds(50),
-            TimeSpan.FromSeconds(1),
-            TestContext.Current.CancellationToken);
+        var timeProvider = new FakeTimeProvider();
+        var timeout = TimeSpan.FromSeconds(1);
+        var predicateInvoked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        Assert.False(result);
+        var waitTask = TestingUtils.WaitUntilSucceededAsync(
+            _ =>
+            {
+                predicateInvoked.SetResult();
+                return Task.FromResult(false);
+            },
+            timeout,
+            TimeSpan.FromSeconds(1),
+            TestContext.Current.CancellationToken,
+            timeProvider);
+
+        await predicateInvoked.Task.WaitAsync(TestContext.Current.CancellationToken);
+        timeProvider.Advance(timeout);
+
+        Assert.False(await waitTask);
     }
 
     [Fact]
-    public async Task WaitUntilSucceededAsync_LongPredicateCrossingDeadlineDoesNotSucceed()
+    public async Task WaitUntilSucceededAsync_PredicateCompletingBeforeDeadlineSucceeds()
     {
-        var predicateSettled = false;
+        var timeProvider = new FakeTimeProvider();
+        var timeout = TimeSpan.FromSeconds(1);
+        var predicateStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releasePredicate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        var result = await TestingUtils.WaitUntilSucceededAsync(
+        var waitTask = TestingUtils.WaitUntilSucceededAsync(
             async _ =>
             {
-                await Task.Delay(TimeSpan.FromMilliseconds(100));
+                predicateStarted.SetResult();
+                await releasePredicate.Task;
+                return true;
+            },
+            timeout,
+            delayOnFail: null,
+            TestContext.Current.CancellationToken,
+            timeProvider);
+
+        await predicateStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        timeProvider.Advance(timeout - TimeSpan.FromTicks(1));
+        releasePredicate.SetResult();
+
+        Assert.True(await waitTask);
+    }
+
+    [Fact]
+    public async Task WaitUntilSucceededAsync_PredicateCompletingAtDeadlineDoesNotSucceed()
+    {
+        var timeProvider = new FakeTimeProvider();
+        var timeout = TimeSpan.FromSeconds(1);
+        var predicateStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releasePredicate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var predicateSettled = false;
+
+        var waitTask = TestingUtils.WaitUntilSucceededAsync(
+            async _ =>
+            {
+                predicateStarted.SetResult();
+                await releasePredicate.Task;
                 predicateSettled = true;
                 return true;
             },
-            TimeSpan.FromMilliseconds(25),
-            cancellationToken: TestContext.Current.CancellationToken);
+            timeout,
+            delayOnFail: null,
+            TestContext.Current.CancellationToken,
+            timeProvider);
+
+        await predicateStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        timeProvider.Advance(timeout);
+        releasePredicate.SetResult();
+        var result = await waitTask;
 
         Assert.False(result);
         Assert.True(predicateSettled);
@@ -86,19 +138,30 @@ public class TestingUtilsTests
     [Fact]
     public async Task WaitUntilAsync_LegacyOverloadDoesNotInvokePredicateAfterDeadline()
     {
+        var timeProvider = new FakeTimeProvider();
+        var timeout = TimeSpan.FromSeconds(1);
+        var predicateStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releasePredicate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var calls = 0;
 
 #pragma warning disable xUnit1051 // This test verifies the legacy overload's deadline behavior.
-        var exception = await Assert.ThrowsAsync<TimeoutException>(() => TestingUtils.WaitUntilAsync(
+        var waitTask = TestingUtils.WaitUntilAsync(
             async (bool _) =>
             {
                 calls++;
-                await Task.Delay(TimeSpan.FromMilliseconds(100));
+                predicateStarted.SetResult();
+                await releasePredicate.Task;
                 return false;
             },
-            TimeSpan.FromMilliseconds(25),
-            TimeSpan.FromSeconds(1)));
+            timeout,
+            TimeSpan.FromSeconds(1),
+            timeProvider);
 #pragma warning restore xUnit1051
+
+        await predicateStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        timeProvider.Advance(timeout);
+        releasePredicate.SetResult();
+        var exception = await Assert.ThrowsAsync<TimeoutException>(() => waitTask);
 
         Assert.Equal(1, calls);
         Assert.Contains(nameof(TestingUtilsTests), exception.Message);
@@ -133,17 +196,27 @@ public class TestingUtilsTests
     [Fact]
     public async Task WaitUntilAsync_PropagatesDeadlineCancellationAndReportsPredicateExpression()
     {
+        var timeProvider = new FakeTimeProvider();
+        var timeout = TimeSpan.FromSeconds(1);
+        var predicateStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var calls = 0;
 
-        var exception = await Assert.ThrowsAsync<TimeoutException>(() => TestingUtils.WaitUntilAsync(
+        var waitTask = TestingUtils.WaitUntilAsync(
             async (_, cancellationToken) =>
             {
                 calls++;
+                predicateStarted.SetResult();
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
                 return false;
             },
-            TimeSpan.FromMilliseconds(25),
-            cancellationToken: TestContext.Current.CancellationToken));
+            timeout,
+            delayOnFail: null,
+            TestContext.Current.CancellationToken,
+            timeProvider);
+
+        await predicateStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        timeProvider.Advance(timeout);
+        var exception = await Assert.ThrowsAsync<TimeoutException>(() => waitTask);
 
         Assert.Equal(1, calls);
         Assert.Contains("async (_, cancellationToken) =>", exception.Message);
