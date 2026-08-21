@@ -450,10 +450,15 @@ public class StateManagerTests : JournalingTestBase
 
         var expected = new InconsistentStateException("Expected storage write conflict.");
         storage.NextAppendException = expected;
+        storage.BlockNextRead = true;
         dictionary.Add("second", 2);
 
-        var exception = await Assert.ThrowsAsync<InconsistentStateException>(
-            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        var failedWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        await storage.BlockedReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(failedWrite.IsCompleted);
+
+        storage.AllowBlockedRead.SetResult();
+        var exception = await Assert.ThrowsAsync<InconsistentStateException>(() => failedWrite);
         Assert.Same(expected, exception);
 
         await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
@@ -1515,6 +1520,12 @@ public class StateManagerTests : JournalingTestBase
 
         public Exception? NextAppendException { get; set; }
 
+        public bool BlockNextRead { get; set; }
+
+        public TaskCompletionSource BlockedReadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowBlockedRead { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public int ReadConsumeCount { get; private set; }
 
         public void ResetReadConsumeCount() => ReadConsumeCount = 0;
@@ -1527,9 +1538,16 @@ public class StateManagerTests : JournalingTestBase
 
         public TaskCompletionSource AllowReplace { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+        public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(consumer);
+
+            if (BlockNextRead)
+            {
+                BlockNextRead = false;
+                BlockedReadStarted.SetResult();
+                await AllowBlockedRead.Task.WaitAsync(cancellationToken);
+            }
 
             if (ConcatenateReads)
             {
@@ -1558,11 +1576,10 @@ public class StateManagerTests : JournalingTestBase
                     consumer.Complete(metadata: null);
                 }
 
-                return default;
+                return;
             }
 
             consumer.Read(GetSegments(), metadata: null, complete: true);
-            return default;
 
             IEnumerable<ReadOnlyMemory<byte>> GetSegments()
             {

@@ -164,6 +164,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
         var needsRecovery = true;
+        WorkItem? recoveryTrigger = null;
+        Exception? recoveryTriggerException = null;
         while (!_shutdownCancellation.Token.IsCancellationRequested)
         {
             try
@@ -175,8 +177,20 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                 {
                     if (needsRecovery)
                     {
-                        await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
-                        needsRecovery = false;
+                        try
+                        {
+                            await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                            needsRecovery = false;
+                        }
+                        finally
+                        {
+                            if (recoveryTrigger is { } trigger)
+                            {
+                                trigger.SetException(recoveryTriggerException!);
+                                recoveryTrigger = null;
+                                recoveryTriggerException = null;
+                            }
+                        }
                     }
 
                     WorkItem workItem;
@@ -520,10 +534,16 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             }
                         }
 
-                        workItem.SetException(exception);
                         if (IsRecoverySignal(exception))
                         {
+                            Debug.Assert(recoveryTrigger is null);
+                            recoveryTrigger = workItem;
+                            recoveryTriggerException = exception;
                             needsRecovery = true;
+                        }
+                        else
+                        {
+                            workItem.SetException(exception);
                         }
                     }
                     finally
