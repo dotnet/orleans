@@ -321,7 +321,7 @@ namespace Orleans.Runtime.Messaging
                                 if (!HandleReceiveMessageFailure(message, exception))
                                 {
                                     throw;
-                                }   
+                                }
                             }
                         } while (requiredBytes == 0);
                     }
