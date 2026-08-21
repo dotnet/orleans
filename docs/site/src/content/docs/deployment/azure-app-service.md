@@ -25,7 +25,7 @@ The maintained topology uses:
 
 - A dedicated Premium v3 App Service plan with at least three workers in the maintained sample.
 - One application process and one Orleans silo on every worker.
-- `WEBSITE_PRIVATE_IP` and an allocated `WEBSITE_PRIVATE_PORTS` value as the advertised silo endpoint.
+- `WEBSITE_PRIVATE_IP` and the first port in the comma-separated `WEBSITE_PRIVATE_PORTS` allocation as the advertised silo endpoint.
 - A cohosted local Orleans client, with the Orleans gateway disabled.
 - Azure Table Storage for clustering and grain state, authorized by managed identity.
 - Separate production and staging cluster IDs with a shared stable service ID.
