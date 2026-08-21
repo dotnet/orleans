@@ -10,7 +10,9 @@ public sealed class MultiSiloDurableMessagingCollection : ICollectionFixture<Mul
 }
 
 [Collection(MultiSiloDurableMessagingCollection.Name)]
-[TestCategory("Functional"), TestCategory("Journaling")]
+[TestSuite("Functional")]
+[TestProvider("None")]
+[TestArea("DurableMessaging")]
 public sealed class MultiSiloDurableMessagingFailoverTests(MultiSiloDurableMessagingClusterFixture fixture)
 {
     [Fact]

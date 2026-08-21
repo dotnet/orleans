@@ -8,7 +8,6 @@ using Xunit;
 
 namespace NonSilo.Tests.ScheduledJobs;
 
-[TestCategory("BVT"), TestCategory("DurableJobs")]
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestArea("DurableJobs")]
