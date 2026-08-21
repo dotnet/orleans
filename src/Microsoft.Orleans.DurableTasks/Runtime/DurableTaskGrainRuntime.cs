@@ -8,6 +8,8 @@ using Orleans.DurableTasks.Protocol;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -33,6 +35,8 @@ internal sealed partial class DurableTaskGrainRuntime(
     private readonly Dictionary<TaskId, IScheduledTaskHandle> _taskHandles = [];
     private readonly Dictionary<TaskId, IDurableTaskRequest> _pendingStarts = [];
     private readonly Dictionary<TaskId, IDurableTaskRequest> _committingStarts = [];
+    private readonly Dictionary<TaskId, DurableTaskResponse> _pendingHandleResponses = [];
+    private readonly Dictionary<TaskId, DurableTaskResponse> _committingHandleResponses = [];
     private readonly HashSet<(TaskId TaskId, GrainId Target)> _preStagedCancellations = [];
     private readonly DurableTaskGrainRuntimeShared _shared = shared;
     private readonly IDurableTaskGrainStorage _storage = storage;
@@ -52,17 +56,44 @@ internal sealed partial class DurableTaskGrainRuntime(
         CancellationToken cancellationToken)
     {
         ThrowIfStopping();
-        if (_storage.TryGetTask(decisionId, out var decision)
-            && decision.Result is { IsCompleted: true } recorded)
+        var fingerprint = GetCompletionDecisionFingerprint(candidates);
+        if (_storage.TryGetTask(decisionId, out var decision))
         {
-            var winner = recorded.GetResult<TaskId>();
-            if (!candidates.Contains(winner))
+            if (decision.Request is not null
+                || !decision.RemoteTarget.IsDefault
+                || decision.RemoteRequestFingerprint is not null
+                || !decision.CallerId.IsDefault
+                || decision.DueTime is not null
+                || (decision.RequestFingerprint is { } existingFingerprint
+                    && !string.Equals(existingFingerprint, fingerprint, StringComparison.Ordinal))
+                || (decision.RequestFingerprint is null
+                    && TryGetScheduledTaskHandle(decisionId, out _)))
             {
                 throw new InvalidOperationException(
-                    $"Durable completion decision '{decisionId}' was recorded for candidate '{winner}', which is not in the supplied candidate set.");
+                    $"Durable completion decision '{decisionId}' is already associated with another operation.");
             }
 
-            return winner;
+            if (decision.RequestFingerprint is null)
+            {
+                _storage.SetRequestFingerprint(decisionId, decision, fingerprint);
+            }
+
+            if (decision.Result is { IsCompleted: true } recorded)
+            {
+                var winner = recorded.GetResult<TaskId>();
+                if (!candidates.Contains(winner))
+                {
+                    throw new InvalidOperationException(
+                        $"Durable completion decision '{decisionId}' was recorded for candidate '{winner}', which is not in the supplied candidate set.");
+                }
+
+                return winner;
+            }
+        }
+        else
+        {
+            decision = _storage.GetOrCreateTask(decisionId, request: null);
+            _storage.SetRequestFingerprint(decisionId, decision, fingerprint);
         }
 
         while (true)
@@ -85,6 +116,21 @@ internal sealed partial class DurableTaskGrainRuntime(
 
             await Task.Delay(TimeSpan.FromMilliseconds(10), _shared.TimeProvider, cancellationToken);
         }
+    }
+
+    private static string GetCompletionDecisionFingerprint(IReadOnlyList<TaskId> candidates)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        Span<byte> length = stackalloc byte[sizeof(int)];
+        foreach (var candidate in candidates)
+        {
+            var value = Encoding.UTF8.GetBytes(candidate.ToString());
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(length, value.Length);
+            hash.AppendData(length);
+            hash.AppendData(value);
+        }
+
+        return $"$completion-decision:{Convert.ToHexString(hash.GetHashAndReset())}";
     }
 
     /// <summary>
@@ -286,7 +332,10 @@ internal sealed partial class DurableTaskGrainRuntime(
         return DurableJobRunResult.Completed;
     }
 
-    internal void AcceptResponse(TaskId taskId, DurableTaskResponse response)
+    internal void AcceptResponse(TaskId taskId, DurableTaskResponse response) =>
+        CompleteTaskHandle(taskId, AcceptResponseCore(taskId, response));
+
+    private DurableTaskResponse AcceptResponseCore(TaskId taskId, DurableTaskResponse response)
     {
         ThrowIfStopping();
         if (!response.IsCompleted)
@@ -305,10 +354,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             _storage.SetResponse(taskId, state, response);
         }
 
-        if (_taskHandles.TryGetValue(taskId, out var handle) && handle is TaskHandle localHandle)
-        {
-            localHandle.TrySetResponse(winningResponse);
-        }
+        return winningResponse;
     }
 
     internal async ValueTask AcceptResponseAsync(
@@ -329,13 +375,18 @@ internal sealed partial class DurableTaskGrainRuntime(
                 $"Durable task '{taskId}' does not accept completions from grain '{target}'.");
         }
 
-        AcceptResponse(taskId, response);
+        var winningResponse = AcceptResponseCore(taskId, response);
         var transport = _messageTransport ?? throw new InvalidOperationException(
             "Durable messaging is not configured. Call AddDurableTasks on the silo builder.");
         transport.SendCompletionAck(GrainId, target, taskId);
         if (persist)
         {
             await _storage.WriteAsync(cancellationToken);
+            CompleteTaskHandle(taskId, winningResponse);
+        }
+        else
+        {
+            _pendingHandleResponses[taskId] = winningResponse;
         }
     }
 
@@ -608,6 +659,12 @@ internal sealed partial class DurableTaskGrainRuntime(
         {
             _committingStarts[entry.Key] = entry.Value;
         }
+
+        _committingHandleResponses.Clear();
+        foreach (var entry in _pendingHandleResponses)
+        {
+            _committingHandleResponses[entry.Key] = entry.Value;
+        }
     }
 
     public void OnWriteCompleted()
@@ -619,12 +676,21 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         _committingStarts.Clear();
+        foreach (var (taskId, response) in _committingHandleResponses)
+        {
+            _pendingHandleResponses.Remove(taskId);
+            CompleteTaskHandle(taskId, response);
+        }
+
+        _committingHandleResponses.Clear();
     }
 
     public void OnRecoveryCompleted()
     {
         _pendingStarts.Clear();
         _committingStarts.Clear();
+        _pendingHandleResponses.Clear();
+        _committingHandleResponses.Clear();
         _preStagedCancellations.Clear();
     }
 
@@ -865,15 +931,24 @@ internal sealed partial class DurableTaskGrainRuntime(
             }
         }
 
-        if (_taskHandles.TryGetValue(taskId, out var handle))
+        if (persist)
         {
-            if (handle is TaskHandle localHandle)
-            {
-                localHandle.TrySetResponse(winningResponse);
-            }
+            CompleteTaskHandle(taskId, winningResponse);
+        }
+        else
+        {
+            _pendingHandleResponses[taskId] = winningResponse;
         }
 
         PruneCompletedTasks();
+    }
+
+    private void CompleteTaskHandle(TaskId taskId, DurableTaskResponse response)
+    {
+        if (_taskHandles.TryGetValue(taskId, out var handle) && handle is TaskHandle localHandle)
+        {
+            localHandle.TrySetResponse(response);
+        }
     }
 
     private bool PruneCompletedTasks()

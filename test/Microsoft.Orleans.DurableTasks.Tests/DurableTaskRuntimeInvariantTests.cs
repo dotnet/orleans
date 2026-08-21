@@ -268,6 +268,49 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
+    public async Task CompletionHandleAdvancesOnlyAfterCommit()
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var taskId = TaskId.Parse("root/remote");
+        var target = GrainId.Create("target", "one");
+        var state = storage.GetOrCreate(taskId);
+        storage.SetRemoteRequest(taskId, state, target, "fingerprint");
+        var handle = runtime.GetScheduledTaskHandle(taskId);
+
+        await runtime.AcceptResponseAsync(
+            taskId,
+            DurableTaskResponse.FromResult(42),
+            target,
+            default,
+            persist: false);
+
+        Assert.False((await handle.PollAsync(new PollingOptions { PollTimeout = TimeSpan.Zero }, default)).IsCompleted);
+        await manager.WriteStateAsync(default);
+        Assert.Equal(42, (await handle.WaitAsync(default)).GetResult<int>());
+    }
+
+    [Fact]
+    public async Task RecoveryDiscardsProvisionalCompletionHandle()
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var taskId = TaskId.Parse("root/remote");
+        var target = GrainId.Create("target", "one");
+        var state = storage.GetOrCreate(taskId);
+        storage.SetRemoteRequest(taskId, state, target, "fingerprint");
+        var handle = runtime.GetScheduledTaskHandle(taskId);
+
+        await runtime.AcceptResponseAsync(
+            taskId,
+            DurableTaskResponse.FromResult(42),
+            target,
+            default,
+            persist: false);
+        await manager.RevertPendingChangesAsync(default);
+
+        Assert.False((await handle.PollAsync(new PollingOptions { PollTimeout = TimeSpan.Zero }, default)).IsCompleted);
+    }
+
+    [Fact]
     public async Task PreCanceledInboxInvocationStagesOneCompletion()
     {
         var (runtime, _, _, transport) = CreateRuntime();
@@ -701,12 +744,15 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task RecordedCompletionDecisionMustBelongToCandidateSet()
+    public async Task CompletionDecisionMustRetainCandidateIdentity()
     {
         var (runtime, storage, _, _) = CreateRuntime();
         var decisionId = TaskId.Parse("root/decision");
         var recordedWinner = TaskId.Parse("root/one");
-        storage.GetOrCreate(decisionId).Result = DurableTaskResponse.FromResult(recordedWinner);
+        storage.GetOrCreate(recordedWinner).Result = DurableTaskResponse.Completed;
+        Assert.Equal(
+            recordedWinner,
+            await runtime.SelectCompletionAsync(decisionId, [recordedWinner], default));
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => runtime.SelectCompletionAsync(
@@ -714,7 +760,23 @@ public sealed class DurableTaskRuntimeInvariantTests
                 [TaskId.Parse("root/two")],
                 default).AsTask());
 
-        Assert.Contains("not in the supplied candidate set", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("another operation", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompletionDecisionRejectsExistingChildOperation()
+    {
+        var (runtime, _, _, _) = CreateRuntime();
+        var decisionId = TaskId.Parse("root/decision");
+        await runtime.ScheduleDelayAsync(decisionId, runtime.UtcNow.AddMinutes(1), default);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runtime.SelectCompletionAsync(
+                decisionId,
+                [TaskId.Parse("root/candidate")],
+                default).AsTask());
+
+        Assert.Contains("another operation", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
