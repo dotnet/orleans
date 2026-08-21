@@ -35,6 +35,7 @@
   <Folder Name="/site/src/content/docs/grains/snippets/testing/" />
   <Folder Name="/site/src/content/docs/grains/snippets/testing/orleans-testing/">
     <Project Path="site/src/content/docs/grains/snippets/testing/orleans-testing/Sample.OrleansTesting/Sample.OrleansTesting.csproj" />
+    <Project Path="site/src/content/docs/grains/snippets/testing/orleans-testing/Sample.OrleansTesting.MSTest/Sample.OrleansTesting.MSTest.csproj" />
   </Folder>
   <Folder Name="/site/src/content/docs/grains/snippets/timers/">
     <Project Path="site/src/content/docs/grains/snippets/timers/Timers.csproj" />
