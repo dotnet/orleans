@@ -30,7 +30,6 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILocalSiloDetails _localSiloDetails;
         private readonly TimeProvider _timeProvider;
         private readonly CancellationTokenSource _stoppingCancellation = new();
-        private Func<TimeSpan> _getTotalPauseDuration = GC.GetTotalPauseDuration;
 #if NET9_0_OR_GREATER
         private readonly Lock _lockObj = new();
 #else
@@ -98,7 +97,6 @@ namespace Orleans.Runtime.MembershipService
             int MissedProbes { get; }
             int ProbeTimeoutSampleCount { get; }
             TimeSpan CurrentProbeTimeout { get; }
-            Func<TimeSpan> GetTotalPauseDuration { set; }
         }
 
         /// <summary>
@@ -114,7 +112,6 @@ namespace Orleans.Runtime.MembershipService
         int ITestAccessor.MissedProbes => _failedProbes;
         int ITestAccessor.ProbeTimeoutSampleCount => _failureDetector?.SampleCount ?? 0;
         TimeSpan ITestAccessor.CurrentProbeTimeout => _failureDetector?.GetTimeout() ?? _clusterMembershipOptions.CurrentValue.ProbeTimeout;
-        Func<TimeSpan> ITestAccessor.GetTotalPauseDuration { set => _getTotalPauseDuration = value; }
 
         /// <summary>
         /// Start the monitor.
@@ -211,7 +208,9 @@ namespace Orleans.Runtime.MembershipService
                     var timeout = CalculateProbeTimeout(failureDetector, options, localDegradationScore, isDirectProbe, Debugger.IsAttached);
                     probeStartTimestamp = _timeProvider.GetTimestamp();
                     using var cancellation = new CancellationTokenSource(timeout, _timeProvider);
-                    var gcPauseBefore = isDirectProbe ? _getTotalPauseDuration() : TimeSpan.Zero;
+                    var gcPauseBefore = isDirectProbe
+                        ? _localSiloHealthMonitor.TotalGarbageCollectionPauseDuration
+                        : TimeSpan.Zero;
 
                     if (isDirectProbe)
                     {
@@ -372,7 +371,7 @@ namespace Orleans.Runtime.MembershipService
                 // Check if a GC pause consumed a significant portion of the probe timeout.
                 // If so, the local silo may have been unable to process the response in time,
                 // so we treat this as an inconclusive result rather than a failure.
-                var gcPauseDuring = _getTotalPauseDuration() - gcPauseBefore;
+                var gcPauseDuring = _localSiloHealthMonitor.TotalGarbageCollectionPauseDuration - gcPauseBefore;
                 if (probeTimedOut && gcPauseDuring >= probeTimeout.Multiply(0.25))
                 {
                     LogWarningProbeFailureDuringGcPause(_log, id, TargetSiloAddress, roundTripTime, gcPauseDuring, _failedProbes);

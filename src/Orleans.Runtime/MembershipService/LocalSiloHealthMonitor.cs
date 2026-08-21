@@ -54,6 +54,11 @@ namespace Orleans.Runtime.MembershipService
     internal interface ILocalSiloHealthMonitor
     {
         /// <summary>
+        /// Gets the total duration of garbage collection pauses since process start.
+        /// </summary>
+        TimeSpan TotalGarbageCollectionPauseDuration { get; }
+
+        /// <summary>
         /// Returns the aggregate local health status over the provided interval.
         /// </summary>
         /// <param name="startTimestamp">The inclusive start of the interval to aggregate.</param>
@@ -171,6 +176,9 @@ namespace Orleans.Runtime.MembershipService
 
         /// <inheritdoc />
         public ImmutableArray<string> Complaints { get; private set; } = [];
+
+        /// <inheritdoc />
+        public TimeSpan TotalGarbageCollectionPauseDuration => GC.GetTotalPauseDuration();
 
         /// <inheritdoc />
         public LocalSiloHealthStatus GetLocalHealthStatus(

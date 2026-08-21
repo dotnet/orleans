@@ -262,7 +262,7 @@ namespace NonSilo.Tests.Membership
                 _localSiloDetails,
                 timeProvider);
             var totalPauseDuration = TimeSpan.Zero;
-            ((ITestAccessor)monitor).GetTotalPauseDuration = () => totalPauseDuration;
+            _localSiloHealthMonitor.TotalGarbageCollectionPauseDuration.Returns(_ => totalPauseDuration);
 
             try
             {
@@ -294,8 +294,8 @@ namespace NonSilo.Tests.Membership
         {
             _clusterMembershipOptions.ProbeTimeout = TimeSpan.FromSeconds(2);
             var pauseSample = 0;
-            ((ITestAccessor)_monitor).GetTotalPauseDuration = () =>
-                Interlocked.Increment(ref pauseSample) % 2 == 1 ? TimeSpan.Zero : _clusterMembershipOptions.ProbeTimeout;
+            _localSiloHealthMonitor.TotalGarbageCollectionPauseDuration.Returns(_ =>
+                Interlocked.Increment(ref pauseSample) % 2 == 1 ? TimeSpan.Zero : _clusterMembershipOptions.ProbeTimeout);
 
             _prober.Probe(default!, default).ThrowsAsyncForAnyArgs(new Exception("nope"));
             _prober.ProbeIndirectly(default!, default!, default, default).ThrowsAsyncForAnyArgs(new InvalidOperationException("No"));
