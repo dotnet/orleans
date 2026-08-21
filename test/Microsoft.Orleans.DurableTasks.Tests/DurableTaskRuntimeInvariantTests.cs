@@ -52,6 +52,31 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
+    public async Task OrdinaryGrainActivationFailsBeforeUsingUninitializedJournalAdapter()
+    {
+        var (runtime, _, _, _) = CreateRuntime(initialize: false);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runtime.SignalCancellationAsync(TaskId.Parse("root"), default).AsTask());
+
+        Assert.Contains(nameof(DurableGrain), exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OrdinaryGrainActivationRejectsPollingAndDiagnostics()
+    {
+        var (runtime, _, _, _) = CreateRuntime(initialize: false);
+        var extension = (IDurableTaskGrainExtension)runtime;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runtime.SubscribeOrPollAsync(TaskId.Parse("root"), default, default).AsTask());
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await extension.GetTasksAsync().GetAsyncEnumerator().MoveNextAsync());
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await extension.GetRunningTasksAsync().GetAsyncEnumerator().MoveNextAsync());
+    }
+
+    [Fact]
     public async Task InboxSchedulingStartsOnlyAfterCommit()
     {
         var (runtime, _, manager, _) = CreateRuntime();
@@ -69,6 +94,28 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         await invoked.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(1, request.CreateTaskCallCount);
+    }
+
+    [Fact]
+    public async Task DeferredStartRechecksCommittedCancellationBeforeInvocation()
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var request = CreateRequest(1);
+        var taskId = TaskId.Parse("root");
+        await runtime.ScheduleFromInboxAsync(taskId, request, default);
+        manager.AfterWriteStarted = () =>
+        {
+            manager.AfterWriteStarted = null;
+            var state = storage.Get(taskId);
+            storage.RequestCancellation(taskId, state);
+            return default;
+        };
+
+        await manager.WriteStateAsync(default);
+        await WaitUntilAsync(() => storage.Get(taskId).Result is { IsCompleted: true });
+
+        Assert.Equal(0, request.CreateTaskCallCount);
+        Assert.Equal(DurableTaskStatus.Canceled, storage.Get(taskId).Result!.Status);
     }
 
     [Fact]
@@ -389,6 +436,27 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         Assert.Equal(42, storage.Get(taskId).Result!.GetResult<int>());
         Assert.Equal(expectedTarget, Assert.Single(transport.CompletionAcknowledgements).Target);
+    }
+
+    [Fact]
+    public async Task RootRemoteScheduleCreatesCallerStateBeforeAdvertisingCompletion()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var taskId = TaskId.Parse("root/remote");
+        var request = CreateRemoteRequest(1);
+        var target = request.Context!.TargetId;
+        transport.BeforeSendInvocation = (_, sentTarget, sentTaskId, _) =>
+        {
+            var state = storage.Get(sentTaskId);
+            Assert.Equal(target, sentTarget);
+            Assert.Equal(target, state.RemoteTarget);
+            Assert.NotNull(state.RemoteRequestFingerprint);
+        };
+
+        await runtime.ScheduleRemoteAsync(taskId, request, default);
+
+        Assert.Equal(1, manager.WriteCount);
+        Assert.True(request.Context.SupportsDurableCompletion);
     }
 
     [Fact]
@@ -1498,11 +1566,12 @@ public sealed class DurableTaskRuntimeInvariantTests
         TestStorage Storage,
         TestStateManager Manager,
         RecordingDurableTaskMessageTransport Transport) CreateRuntime(
-            TimeSpan? resultRetentionPeriod = null)
+            TimeSpan? resultRetentionPeriod = null,
+            bool initialize = true)
     {
         var manager = new TestStateManager();
         var storage = new TestStorage(manager);
-        return CreateRuntime(storage, manager, resultRetentionPeriod);
+        return CreateRuntime(storage, manager, resultRetentionPeriod, initialize);
     }
 
     private static (
@@ -1512,7 +1581,8 @@ public sealed class DurableTaskRuntimeInvariantTests
         RecordingDurableTaskMessageTransport Transport) CreateRuntime(
             TestStorage storage,
             TestStateManager manager,
-            TimeSpan? resultRetentionPeriod = null)
+            TimeSpan? resultRetentionPeriod = null,
+            bool initialize = true)
     {
         var context = Substitute.For<IGrainContext>();
         context.GrainId.Returns(GrainId.Create("test", "one"));
@@ -1529,6 +1599,10 @@ public sealed class DurableTaskRuntimeInvariantTests
             CreateSerializer());
         var transport = new RecordingDurableTaskMessageTransport();
         var runtime = new DurableTaskGrainRuntime(storage, shared, [transport], manager);
+        if (initialize)
+        {
+            runtime.InitializeForActivation();
+        }
         manager.RegisterObserver(runtime);
         return (runtime, storage, manager, transport);
     }

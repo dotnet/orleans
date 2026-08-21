@@ -170,9 +170,17 @@ public class VolatileDurableTaskGrainStorage(
 
     public void RequestCancellation(TaskId taskId, IDurableTaskState state)
     {
-        var typedState = GetState(state);
-        typedState.CancellationRequestedAt = _timeProvider.GetUtcNow();
-        AddOrUpdateTask(taskId, typedState);
+        _ = GetState(state);
+        if (!_workingCopy.TryGetValue(taskId, out var current)
+            || current.CompletedAt.HasValue
+            || current.CancellationRequestedAt.HasValue)
+        {
+            return;
+        }
+
+        var updated = CopyState(current);
+        updated.CancellationRequestedAt = _timeProvider.GetUtcNow();
+        _workingCopy[taskId] = updated;
     }
 
     public void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, long generation)

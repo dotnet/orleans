@@ -31,6 +31,7 @@ internal sealed class DurableTaskGrainParticipant(
             nameof(DurableTaskGrainParticipant),
             GrainLifecycleStage.Activate,
             this);
+        runtime.InitializeForActivation();
     }
 
     public Task OnStart(CancellationToken cancellationToken = default) =>
