@@ -84,8 +84,8 @@ provisional state from a concurrently running handler.
 
 ## Durable RPC incubation
 
-The `Orleans.DurableTasks` and `System.Distributed.DurableTasks` assemblies
-are source-only, incubating components. Neither is published as a NuGet package.
+The `Orleans.DurableTasks.Abstractions` and `Microsoft.Orleans.DurableTasks`
+assemblies are source-only, incubating components. Neither is published as a NuGet package.
 Documentation and samples must not present them as externally consumable until their
 ownership and publication model is decided.
 
