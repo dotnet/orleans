@@ -1,7 +1,7 @@
 ---
 title: Orleans how-to guides
 description: Task-oriented recipes for configuring, deploying, and operating Orleans applications.
-ms.date: 08/11/2026
+ms.date: 08/21/2026
 ms.topic: how-to
 ---
 
@@ -36,7 +36,8 @@ If you are learning Orleans from an empty directory, start with the [tutorials a
 ## Use Orleans features
 
 - [Persist grain state](../grains/grain-persistence/index.md)
-- [Add reminders and timers](../grains/timers-and-reminders.md)
+- [Schedule activation-scoped work with grain timers](../grains/timers.md)
+- [Schedule durable work with reminders](../grains/reminders.md)
 - [Configure Amazon DynamoDB reminders](../grains/reminders/dynamodb.md)
 - [Configure streams](../streaming/stream-providers.md)
 - [Use response streaming](../grains/response-streaming.md)

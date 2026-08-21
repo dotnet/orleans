@@ -1,79 +1,49 @@
 ---
 title: Grain timers and reminders
-description: Schedule activation-scoped and durable periodic work in Orleans.
-ms.date: 08/20/2026
+description: Choose between activation-scoped grain timers and durable reminders in Orleans.
+ms.date: 08/21/2026
 ms.topic: concept-article
 ---
 
 # Grain timers and reminders
 
-Orleans provides two mechanisms for periodic grain work:
+Orleans schedules periodic grain work through two mechanisms with distinct ownership and durability guarantees:
 
-- **Grain timers** belong to one activation. They stop when that activation deactivates or its silo fails.
-- **Reminders** belong to a logical grain. Their definitions are stored and can reactivate the grain after deactivation or cluster restart.
+| Mechanism | Owner | Schedule storage | Activation behavior | Typical cadence |
+|---|---|---|---|---|
+| [Grain timer](timers.md) | One grain activation | Activation memory | Executes on the current activation and ends with it | Frequent work while an activation is active |
+| [Reminder](reminders.md) | One logical grain | Configured reminder provider | Activates the grain when a tick is delivered and resumes after cluster recovery | Work measured in minutes, hours, or days |
 
-Use a timer for frequent, activation-scoped work. Use a reminder when the schedule must survive activation changes and occasional missed ticks are acceptable.
+Choose a grain timer when the work belongs to the current activation. Choose a reminder when the schedule belongs to the grain identity and must survive activation and cluster lifecycle changes.
 
 ## Grain timers
 
-Register timers with <xref:Orleans.GrainBaseExtensions.RegisterGrainTimer*>. <xref:Orleans.Grain.RegisterTimer*> is obsolete.
+Grain timers execute callbacks as grain turns on one activation. The runtime schedules the next tick after the current callback completes, so a timer callback never overlaps itself.
 
-:::code language="csharp" source="../snippets/compiled/Grains/WorkersAndTimersSnippets.cs" id="grain_timer":::
-<xref:Orleans.GrainBaseExtensions.RegisterGrainTimer*> returns <xref:Orleans.Runtime.IGrainTimer>. Dispose it to stop the timer, or call <xref:Orleans.Runtime.IGrainTimer.Change*> to change its due time and period.
+See [Grain timers](timers.md) for registration, callback scheduling, interleaving, activation lifetime, cancellation, and troubleshooting.
 
-### Timer behavior
+<a id="timer-behavior"></a>
 
-<xref:Orleans.Runtime.GrainTimerCreationOptions> controls scheduling:
-
-| Property | Default | Behavior |
-|---|---:|---|
-| <xref:Orleans.Runtime.GrainTimerCreationOptions.DueTime> | Required | Delay before the first callback. |
-| <xref:Orleans.Runtime.GrainTimerCreationOptions.Period> | Required | Delay from callback completion until the next callback. |
-| <xref:Orleans.Runtime.GrainTimerCreationOptions.Interleave> | `false` | Whether callbacks can interleave with other grain requests. |
-| <xref:Orleans.Runtime.GrainTimerCreationOptions.KeepAlive> | `false` | Whether timer activity extends activation lifetime. |
-
-A timer callback never overlaps itself. Orleans waits for the callback task to complete before measuring the next period. Exceptions are logged, and later ticks continue.
-
-The callback token is canceled when the timer is disposed or the grain begins deactivating. Timer callbacks execute as grain turns, participate in call filters and tracing, and don't interleave with other requests unless configured or allowed by the grain's reentrancy settings.
+The [timer behavior reference](timers.md#timer-behavior) describes the guarantees controlled by <xref:Orleans.Runtime.GrainTimerCreationOptions>.
 
 ## Reminders
 
-A grain receiving reminders implements <xref:Orleans.IRemindable>:
+Reminders persist a schedule for a logical grain. Reminder delivery follows normal grain request scheduling and activates the grain when needed. The provider preserves the schedule while each tick is generated and delivered by the runtime.
 
-:::code language="csharp" source="../snippets/compiled/Grains/WorkersAndTimersSnippets.cs" id="remindable_report_grain":::
-Register or update a reminder from the grain:
+See [Reminders](reminders.md) for registration, durable scheduling, timing constraints, provider configuration, missed-tick reconciliation, and troubleshooting.
 
-:::code language="csharp" source="../snippets/compiled/Grains/WorkersAndTimersSnippets.cs" id="register_reminder":::
-Cancel it explicitly:
+<a id="reminder-behavior"></a>
 
-:::code language="csharp" source="../snippets/compiled/Grains/WorkersAndTimersSnippets.cs" id="unregister_reminder":::
-Store the reminder name, not the <xref:Orleans.Runtime.IGrainReminder> handle, across activations. Handles aren't guaranteed to remain valid beyond the activation that retrieved them.
+The [reminder delivery reference](reminders.md#reminder-behavior) explains durable definitions, volatile tick delivery, reactivation, and recovery.
 
-### Reminder behavior
+<a id="reminder-timing-constraints"></a>
 
-Reminder definitions are durable, but individual tick messages aren't. If the cluster is unavailable at a scheduled time, that occurrence can be missed. The next scheduled tick still occurs. Reminder delivery follows normal grain request scheduling and can activate an inactive grain.
-
-Reminders are intended for periods measured in minutes, hours, or days, not high-frequency scheduling. A common pattern is for a reminder to wake a grain and create a finer-grained local timer.
-
-### Reminder timing constraints
-
-Reminder timing is subject to the following constraints:
-
-- `dueTime` must be greater than or equal to `TimeSpan.Zero`; a zero `dueTime` means the first tick is scheduled immediately.
-- `dueTime` cannot be negative or <xref:System.Threading.Timeout.InfiniteTimeSpan>.
-- `period` must be greater than `TimeSpan.Zero`.
-- `period` cannot be negative, zero, or <xref:System.Threading.Timeout.InfiniteTimeSpan>.
-- The runtime rejects `period` values below the lower bound configured by <xref:Orleans.Hosting.ReminderOptions.MinimumReminderPeriod?displayProperty=nameWithType> (default: one minute).
-- `dueTime` is also bounded by the remaining <xref:System.DateTime> range from the time of registration. A value which would place the first tick after <xref:System.DateTime.MaxValue> is rejected rather than clamped. Later occurrences are scheduled from the persisted start time and period.
-
-There is no special `period` value that means "fire once and never again." To model a one-shot reminder, create a valid reminder with a positive `period`, then unregister it in the first callback or after the first tick. `TimeSpan.Zero` and negative values are rejected by the runtime rather than treated as a one-shot schedule.
+The [reminder timing constraints](reminders.md#reminder-timing-constraints) define valid due times and periods.
 
 ## Configure reminder storage
 
-Every silo must configure a reminder provider. Production deployments should use a durable provider such as Azure Table, ADO.NET, Redis, or [Cosmos DB](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Cosmos). In-memory reminders are suitable only for local development and tests because definitions are lost when the cluster stops.
-
-Configure each provider through the API supplied by its package. See [Configure Amazon DynamoDB reminders](reminders/dynamodb.md) for a compiled example which configures DynamoDB clustering and reminder storage independently. For other compiled in-repository examples, see the [reminder configuration snippets](https://github.com/dotnet/orleans/tree/main/docs/site/src/content/docs/grains/snippets/timers). When composing resources with Aspire, see [Orleans and Aspire integration](../host/aspire-integration.md).
+Every silo configures one reminder provider. See [Configure reminder storage](reminders.md#configure-reminder-storage) for production providers, development configuration, and provider-specific guidance.
 
 ## POCO grains
 
-Grains implementing <xref:Orleans.IGrainBase> directly can use the same extension APIs. Inject <xref:Orleans.Timers.ITimerRegistry> or <xref:Orleans.Timers.IReminderRegistry> when lower-level registration is required. See [POCO grains](../migration-guide.md#poco-grains-and-igrainbase) for the interface-only grain model.
+Grains implementing <xref:Orleans.IGrainBase> directly use the same timer and reminder extension APIs. The dedicated [grain timer](timers.md#poco-grains) and [reminder](reminders.md#poco-grains) pages describe the lower-level registries available through dependency injection.
