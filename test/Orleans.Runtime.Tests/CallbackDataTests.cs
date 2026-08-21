@@ -22,10 +22,18 @@ public class CallbackDataTests
         cancellation.Cancel();
         var completion = new TestResponseCompletionSource();
         var unregisterCount = 0;
-        var callback = CreateCallback(
+        CallbackDataOwner owner = default;
+        owner = CallbackDataPool.Rent(
+            CreateSharedData(_ =>
+            {
+                Interlocked.Increment(ref unregisterCount);
+                CallbackDataPool.Return(owner);
+            }),
             completion,
-            _ => Interlocked.Increment(ref unregisterCount),
+            new Message(),
             CreateInstruments(serviceProvider));
+        using var lease = owner.Acquire();
+        var callback = lease.Value;
 
         callback.SubscribeForCancellation(cancellation.Token);
 
@@ -38,65 +46,89 @@ public class CallbackDataTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
-    public void CancellationSubscriptionAfterCompletionDoesNotRetainCallback()
+    public void CancellationSubscriptionAfterCompletionDoesNotRetainCompletionSource()
     {
         using var serviceProvider = CreateServiceProvider();
         using var cancellation = new CancellationTokenSource();
 
-        var callbackReference = CreateCompletedCallback(cancellation.Token, CreateInstruments(serviceProvider));
+        var completionReference = CreateCompletedCallback(cancellation.Token, CreateInstruments(serviceProvider));
 
-        for (var attempt = 0; attempt < 10 && callbackReference.IsAlive; attempt++)
+        for (var attempt = 0; attempt < 10 && completionReference.IsAlive; attempt++)
         {
             GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
             GC.WaitForPendingFinalizers();
         }
 
-        Assert.False(callbackReference.IsAlive);
+        Assert.False(completionReference.IsAlive);
         GC.KeepAlive(cancellation);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void StaleOwnerCannotLeaseReusedCallback()
     {
         using var serviceProvider = CreateServiceProvider();
         var instruments = CreateInstruments(serviceProvider);
-        var callback = CallbackDataPool.Get();
-        callback.Initialize(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
-        var staleOwner = new CallbackDataOwner(callback);
+        var staleOwner = CallbackDataPool.Rent(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
+        var lease = staleOwner.Acquire();
+        var callback = lease.Value;
+        lease.Dispose();
         CallbackDataPool.Return(staleOwner);
 
-        var reusedCallback = CallbackDataPool.Get();
+        var currentOwner = CallbackDataPool.Rent(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
+        using var currentLease = currentOwner.Acquire();
+        var reusedCallback = currentLease.Value;
         Assert.Same(callback, reusedCallback);
-        reusedCallback.Initialize(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
-        var currentOwner = new CallbackDataOwner(reusedCallback);
 
         using var staleLease = staleOwner.Acquire();
         Assert.False(staleLease.TryGetValue(out _));
-        using var currentLease = currentOwner.Acquire();
-        Assert.True(currentLease.TryGetValue(out var currentCallback));
-        Assert.Same(reusedCallback, currentCallback);
 
         CallbackDataPool.Return(currentOwner);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void ActiveLeaseDelaysCallbackReuse()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var instruments = CreateInstruments(serviceProvider);
+        var firstOwner = CallbackDataPool.Rent(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
+        var firstLease = firstOwner.Acquire();
+        var firstCallback = firstLease.Value;
+        CallbackDataPool.Return(firstOwner);
+
+        var secondOwner = CallbackDataPool.Rent(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
+        using var secondLease = secondOwner.Acquire();
+        Assert.NotSame(firstCallback, secondLease.Value);
+        CallbackDataPool.Return(secondOwner);
+
+        firstLease.Dispose();
+
+        var reusedOwner = CallbackDataPool.Rent(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
+        using var reusedLease = reusedOwner.Acquire();
+        Assert.Same(firstCallback, reusedLease.Value);
+        CallbackDataPool.Return(reusedOwner);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference CreateCompletedCallback(CancellationToken cancellationToken, ApplicationRequestInstruments instruments)
     {
-        var callback = CreateCallback(new TestResponseCompletionSource(), _ => { }, instruments);
+        var completion = new TestResponseCompletionSource();
+        CallbackDataOwner owner = default;
+        owner = CallbackDataPool.Rent(
+            CreateSharedData(_ => CallbackDataPool.Return(owner)),
+            completion,
+            new Message(),
+            instruments);
+        using var lease = owner.Acquire();
+        var callback = lease.Value;
 
         callback.OnHostShutdown();
         callback.SubscribeForCancellation(cancellationToken);
 
-        return new WeakReference(callback);
-    }
-
-    private static CallbackData CreateCallback(
-        IResponseCompletionSource completion,
-        Action<Message> unregister,
-        ApplicationRequestInstruments instruments)
-    {
-        var shared = CreateSharedData(unregister);
-        return new CallbackData(shared, completion, new Message(), instruments);
+        return new WeakReference(completion);
     }
 
     private static SharedCallbackData CreateSharedData(Action<Message>? unregister = null) =>

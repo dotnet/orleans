@@ -290,9 +290,9 @@ namespace Orleans
 
             if (!oneWay)
             {
-                var callbackData = CallbackDataPool.Get();
-                callbackData.Initialize(this.sharedCallbackData, context!, message, _applicationRequestInstruments);
-                var owner = new CallbackDataOwner(callbackData);
+                var owner = CallbackDataPool.Rent(this.sharedCallbackData, context!, message, _applicationRequestInstruments);
+                using var lease = owner.Acquire();
+                var callbackData = lease.Value;
                 if (!callbacks.TryAdd(message.Id, owner))
                 {
                     CallbackDataPool.Return(owner);
@@ -300,12 +300,6 @@ namespace Orleans
                 }
 
                 // Cancellation can run synchronously during registration.
-                using var lease = owner.Acquire();
-                if (!lease.TryGetValue(out callbackData))
-                {
-                    return;
-                }
-
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
@@ -356,7 +350,7 @@ namespace Orleans
                     if (lease.TryGetValue(out var callback))
                     {
                         var request = callback.Message;
-                        callback.OnStatusUpdate(response.Id, status);
+                        callback.OnStatusUpdate(status);
                         if (status.Diagnostics != null && status.Diagnostics.Count > 0)
                         {
                             LogReceivedStatusUpdateForPendingRequest(logger, request, new(status.Diagnostics));
@@ -389,17 +383,14 @@ namespace Orleans
             if (found)
             {
                 using var removedLease = removedOwner.Acquire();
-                if (removedLease.TryGetValue(out var callbackData))
+                try
                 {
-                    callbackData.DoCallback(response);
+                    removedLease.Value.DoCallback(response);
                 }
-                else
+                finally
                 {
-                    LogDebugNoCallbackForResponseMessage(logger, response);
+                    CallbackDataPool.Return(removedOwner);
                 }
-
-                // Release the owner's reference - this will return to pool when all leases are released
-                CallbackDataPool.Return(removedOwner);
             }
             else
             {
@@ -411,7 +402,6 @@ namespace Orleans
         {
             if (callbacks.TryRemove(id, out var owner))
             {
-                // Release the owner's reference - this will return to pool when all leases are released
                 CallbackDataPool.Return(owner);
             }
         }
