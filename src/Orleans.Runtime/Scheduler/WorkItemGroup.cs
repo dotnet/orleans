@@ -56,6 +56,8 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
         get { lock (_lockObj) { return _workItems.Count; } }
     }
 
+    internal bool IsCurrentTask(Task task) => ReferenceEquals(_currentTask, task);
+
     public WorkItemGroup(
         IGrainContext grainContext,
         IOptions<SchedulingOptions> schedulingOptions,
@@ -119,7 +121,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
         }
     }
 
-    internal void ReserveExecution()
+    internal ActivationStartup BeginActivationStartup()
     {
         lock (_lockObj)
         {
@@ -129,10 +131,11 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
             }
 
             _state = WorkGroupStatus.Running;
+            return new(this);
         }
     }
 
-    internal void RunTaskSynchronously(Task task)
+    private void RunTaskSynchronously(Task task)
     {
         long taskStart;
         lock (_lockObj)
@@ -170,7 +173,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
         }
     }
 
-    internal void ReleaseExecution()
+    private void ReleaseExecution()
     {
         lock (_lockObj)
         {
@@ -185,6 +188,54 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
             {
                 _state = WorkGroupStatus.Waiting;
             }
+        }
+    }
+
+    private void AbortExecution()
+    {
+        lock (_lockObj)
+        {
+            if (_state != WorkGroupStatus.Running || _currentTask is not null)
+            {
+                throw new InvalidOperationException($"Cannot abort execution while {this} is {_state}.");
+            }
+
+            _workItems.Clear();
+            _state = WorkGroupStatus.Waiting;
+        }
+    }
+    // One-shot scheduler reservation used while an activation is published and constructed.
+    internal sealed class ActivationStartup : IDisposable
+    {
+        private WorkItemGroup? _owner;
+        private int _constructorStarted;
+
+        internal ActivationStartup(WorkItemGroup owner)
+        {
+            _owner = owner;
+        }
+
+        public void RunConstructor(Task task)
+        {
+            if (Interlocked.Exchange(ref _constructorStarted, 1) != 0)
+            {
+                throw new InvalidOperationException("The activation constructor has already been run.");
+            }
+
+            (_owner ?? throw new ObjectDisposedException(nameof(ActivationStartup)))
+                .RunTaskSynchronously(task);
+        }
+
+        public void Dispose() => Interlocked.Exchange(ref _owner, null)?.ReleaseExecution();
+
+        public void Abort()
+        {
+            if (Volatile.Read(ref _constructorStarted) != 0)
+            {
+                throw new InvalidOperationException("An activation startup cannot be aborted after construction has begun.");
+            }
+
+            Interlocked.Exchange(ref _owner, null)?.AbortExecution();
         }
     }
 

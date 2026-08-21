@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Diagnostics;
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime;
 
@@ -326,22 +327,52 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
     {
         Debug.Assert(!_terminated, "CreateWorker must not be called on a terminated stateless worker context.");
         var address = GrainAddress.GetAddress(Address.SiloAddress, Address.GrainId, ActivationId.NewId());
-        var newWorker = (ActivationData)((IDeferredGrainContextActivator)_innerActivator).CreateDeferredContext(address, []);
+        var preparedContext = ((IPreparedGrainContextActivator)_innerActivator).CreatePreparedContext(address, []);
+        var newWorker = (ActivationData)preparedContext.Context;
+        IDisposable activationStartup;
+        var startAttempted = false;
+        try
+        {
+            // Observe the create/destroy lifecycle of the activation
+            newWorker.SetComponent<IActivationLifecycleObserver>(this);
+            _workers.Add(newWorker);
+            startAttempted = true;
+            activationStartup = preparedContext.Start();
+        }
+        catch
+        {
+            if (!startAttempted)
+            {
+                preparedContext.Abort();
+                _workers.Remove(newWorker);
+            }
 
-        // Observe the create/destroy lifecycle of the activation
-        newWorker.SetComponent<IActivationLifecycleObserver>(this);
-        _workers.Add(newWorker);
-        newWorker.Start();
+            throw;
+        }
 
-        // If this is a new worker and there is a message in scope, try to get the request context and activate the worker
-        var requestContext = (message as Message)?.RequestContextData ?? [];
-        var cancellation = new CancellationTokenSource(_shared.Shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
+        using (activationStartup)
+        {
+            try
+            {
+                // If this is a new worker and there is a message in scope, try to get the request context and activate the worker
+                var requestContext = (message as Message)?.RequestContextData ?? [];
+                var cancellation = new CancellationTokenSource(_shared.Shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
+                newWorker.Activate(requestContext, cancellation.Token);
+                StatelessWorkerEvents.EmitWorkerCreated(this, newWorker, _workers.Count);
 
-        newWorker.Activate(requestContext, cancellation.Token);
-        newWorker.StartMessageLoop();
-        StatelessWorkerEvents.EmitWorkerCreated(this, newWorker, _workers.Count);
-
-        return newWorker;
+                return newWorker;
+            }
+            catch (Exception exception)
+            {
+                newWorker.Deactivate(
+                    new DeactivationReason(
+                        DeactivationReasonCode.ActivationFailed,
+                        exception,
+                        "Error starting stateless worker activation."),
+                    CancellationToken.None);
+                throw;
+            }
+        }
     }
 
     private void DeactivateInternal(DeactivationReason reason, CancellationToken cancellationToken)

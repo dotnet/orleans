@@ -151,6 +151,37 @@ namespace UnitTests.General
             }
         }
 
+        [Fact, TestCategory("BVT")]
+        public async Task BuiltInActivatorCreateContextStartsContext()
+        {
+            var primary = Assert.IsType<InProcessSiloHandle>(fixture.HostedCluster.Primary);
+            var services = primary.ServiceProvider;
+            var grainType = services.GetRequiredService<GrainTypeResolver>().GetGrainType(typeof(ExplicitlyRegisteredSimpleDIGrain));
+            var address = GrainAddress.NewActivationAddress(
+                primary.SiloAddress,
+                GrainId.Create(grainType, Guid.NewGuid().ToString()));
+            IGrainContextActivator? activator = null;
+            foreach (var provider in services.GetServices<IGrainContextActivatorProvider>())
+            {
+                if (provider.TryGet(grainType, out activator))
+                {
+                    break;
+                }
+            }
+
+            Assert.NotNull(activator);
+            var context = Assert.IsType<ActivationData>(activator.CreateContext(address, []));
+            try
+            {
+                Assert.NotNull(context.GrainInstance);
+            }
+            finally
+            {
+                context.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Test completed."));
+                await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(10));
+            }
+        }
+
         /// <summary>
         /// Custom grain activator that bypasses dependency injection entirely.
         /// Implements both IGrainActivator (for creation/disposal) and IConfigureGrainTypeComponents
