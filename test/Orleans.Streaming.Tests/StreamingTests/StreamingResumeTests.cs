@@ -1,6 +1,12 @@
 #nullable enable
 
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
+using Orleans.Providers;
+using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Orleans.Streams;
+using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -19,6 +25,67 @@ public abstract class StreamingResumeTests : TestClusterPerTest
 
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(100);
     private static readonly TimeSpan WaitTimeout = TimeSpan.FromSeconds(30);
+
+    protected async Task WaitForStreamProviderReadyAsync()
+    {
+        await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+
+        var managementGrain = this.Client.GetGrain<IManagementGrain>(0);
+        var activeSilos = this.HostedCluster.GetActiveSilos().ToArray();
+        var expectedSiloCount = activeSilos.Length;
+        var providerQueueCounts = (await Task.WhenAll(activeSilos.Select(
+            silo => GetProviderQueueCountAsync(
+                this.HostedCluster.GetSiloServiceProvider(silo.SiloAddress),
+                StreamProviderName))))
+            .Distinct()
+            .ToArray();
+        var expectedQueueCount = Assert.Single(providerQueueCounts);
+        await managementGrain.SendControlCommandToProvider<PersistentStreamProvider>(
+            StreamProviderName,
+            (int)PersistentStreamProviderCommand.StartAgents);
+
+        // Guard against a subsequent membership notification racing the serialized StartAgents command.
+        var consecutiveReadyObservations = 0;
+        const int requiredReadyObservations = 3;
+        await TestingUtils.WaitUntilAsync(
+            async lastTry =>
+            {
+                var states = await managementGrain.SendControlCommandToProvider<PersistentStreamProvider>(
+                    StreamProviderName,
+                    (int)PersistentStreamProviderCommand.GetAgentsState);
+                var agentCounts = await managementGrain.SendControlCommandToProvider<PersistentStreamProvider>(
+                    StreamProviderName,
+                    (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
+                var runningAgentCounts = agentCounts.Select(Convert.ToInt32).ToArray();
+                var ready = states.Length == expectedSiloCount
+                    && runningAgentCounts.Length == expectedSiloCount
+                    && states.All(state => Convert.ToInt32(state) == (int)StreamLifecycleOptions.RunState.AgentsStarted)
+                    && runningAgentCounts.Sum() == expectedQueueCount;
+                consecutiveReadyObservations = ready ? consecutiveReadyObservations + 1 : 0;
+
+                if (lastTry)
+                {
+                    Assert.Equal(expectedSiloCount, states.Length);
+                    Assert.Equal(expectedSiloCount, runningAgentCounts.Length);
+                    Assert.All(states, state => Assert.Equal((int)StreamLifecycleOptions.RunState.AgentsStarted, Convert.ToInt32(state)));
+                    Assert.Equal(expectedQueueCount, runningAgentCounts.Sum());
+                    Assert.True(
+                        consecutiveReadyObservations >= requiredReadyObservations,
+                        $"Stream provider readiness was observed {consecutiveReadyObservations} consecutive time(s), but {requiredReadyObservations} were required.");
+                }
+
+                return consecutiveReadyObservations >= requiredReadyObservations;
+            },
+            WaitTimeout,
+            delayOnFail: PollInterval);
+    }
+
+    internal static async Task<int> GetProviderQueueCountAsync(IServiceProvider services, string streamProviderName)
+    {
+        var adapterFactory = services.GetRequiredKeyedService<IQueueAdapterFactory>(streamProviderName);
+        await adapterFactory.CreateAdapter(CancellationToken.None);
+        return adapterFactory.GetStreamQueueMapper().GetAllQueues().Count();
+    }
 
     [Fact]
     public virtual async Task ResumeAfterInactivity()
