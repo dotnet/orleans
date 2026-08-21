@@ -11,7 +11,6 @@ internal class CursorsCounter
 
     public CursorsCounter()
     {
-        
     }
 
     private CursorsCounter(int initialCount)

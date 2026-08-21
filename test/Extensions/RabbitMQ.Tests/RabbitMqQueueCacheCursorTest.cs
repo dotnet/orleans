@@ -7,6 +7,7 @@ using Xunit;
 
 namespace RabbitMQ.Tests;
 
+[TestSuite("BVT"), TestProvider("None"), TestArea("Streaming")]
 public class RabbitMqQueueCacheCursorTest
 {
     [Fact]
@@ -114,7 +115,7 @@ public class RabbitMqQueueCacheCursorTest
 
         cursor.Refresh(new EventSequenceTokenV2(0));
         var currentMessage = cursor.GetCurrent(exception: out _);
-        Assert.Equal(currentMessage.SequenceToken.SequenceNumber, initialToken);
+        Assert.Equal(initialToken, currentMessage.SequenceToken.SequenceNumber);
     }
 
     [Fact]
@@ -152,8 +153,6 @@ public class RabbitMqQueueCacheCursorTest
         }));
         return processingMessages;
     }
-
-
-    private RabbitMqQueueCacheCursor CreateCacheCursor(ConcurrentQueue<RabbitMqBatchContainer> processingMessages, EventSequenceTokenV2 handshakeToken)
+    private static RabbitMqQueueCacheCursor CreateCacheCursor(ConcurrentQueue<RabbitMqBatchContainer> processingMessages, EventSequenceTokenV2 handshakeToken)
         => new(handshakeToken, processingMessages, _ => { }, () => processingMessages, () => { });
 }

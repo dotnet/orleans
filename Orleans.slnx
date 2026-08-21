@@ -27,10 +27,6 @@
     <Project Path="playground/DashboardCohosted/DashboardCohosted.csproj" />
     <Project Path="playground/DashboardSeparateHost/DashboardSeparateHost.csproj" />
   </Folder>
-  <Folder Name="/samples/Streaming/RabbitMQ/">
-    <Project Path="samples/Streaming/RabbitMQ/RabbitMQ.AppHost/RabbitMQ.AppHost.csproj" />
-    <Project Path="samples/Streaming/RabbitMQ/RabbitMQ.Silo/RabbitMQ.Silo.csproj" />
-  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path="Directory.Build.props" />
