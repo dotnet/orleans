@@ -5,7 +5,6 @@ using Orleans.EntityFrameworkCore.Tests.Infrastructure;
 using Orleans.GrainDirectory.EntityFrameworkCore.Data;
 using Orleans.Runtime;
 using Tester.Directories;
-using Xunit.Abstractions;
 
 namespace Orleans.EntityFrameworkCore.Tests.GrainDirectory;
 
@@ -32,7 +31,7 @@ public abstract class EFCoreGrainDirectoryTestsBase<TDbContext, TETag> :
     protected override EFCoreGrainDirectory<TDbContext, TETag> CreateGrainDirectory() =>
         _directory ?? throw new InvalidOperationException("The grain directory has not been initialized.");
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _fixture = new EFCoreDatabaseFixture<TDbContext>(
             Database,
@@ -43,7 +42,7 @@ public abstract class EFCoreGrainDirectoryTestsBase<TDbContext, TETag> :
         _directory = CreateDirectory(_clusterId);
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_fixture is not null)
         {
@@ -51,7 +50,7 @@ public abstract class EFCoreGrainDirectoryTestsBase<TDbContext, TETag> :
         }
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UnregisterMany_RemovesOnlyMatchingActivations()
     {
         const int count = 25;
@@ -95,7 +94,7 @@ public abstract class EFCoreGrainDirectoryTestsBase<TDbContext, TETag> :
         Assert.Equal(registeredMismatch.ActivationId.ToParsableString(), retainedRecord.ActivationId);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UnregisterSilos_RemovesOnlyRequestedSilosInCurrentCluster()
     {
         var addresses = new[]
@@ -129,7 +128,7 @@ public abstract class EFCoreGrainDirectoryTestsBase<TDbContext, TETag> :
         Assert.Equal(addresses[1].SiloAddress!.ToParsableString(), retainedRecord.SiloAddress);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UnregisterSilos_DoesNotCrossClusterBoundary()
     {
         var secondaryClusterId = $"secondary-{Guid.NewGuid():N}";
@@ -152,7 +151,7 @@ public abstract class EFCoreGrainDirectoryTestsBase<TDbContext, TETag> :
         Assert.Equal(secondaryAddress.ActivationId.ToParsableString(), retainedRecord.ActivationId);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Register_StaleETagUpdateFailsAndPreservesWinner()
     {
         var address = CreateAddress(300, 30);
@@ -184,7 +183,7 @@ public abstract class EFCoreGrainDirectoryTestsBase<TDbContext, TETag> :
         Assert.Equal(address.ActivationId, lookup.ActivationId);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Participate_SubscribesAtRuntimeInitialize()
     {
         var lifecycle = new RecordingSiloLifecycle();
@@ -199,7 +198,7 @@ public abstract class EFCoreGrainDirectoryTestsBase<TDbContext, TETag> :
         Assert.True(lifecycle.Started);
     }
 
-    [SkippableFact]
+    [Fact]
     public void ToGrainAddress_MapsAllAddressFields()
     {
         var expected = CreateAddress(400, 40);

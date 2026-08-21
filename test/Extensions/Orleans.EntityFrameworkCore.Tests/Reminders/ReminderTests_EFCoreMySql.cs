@@ -4,10 +4,7 @@ using TestExtensions;
 
 namespace Orleans.EntityFrameworkCore.Tests.Reminders;
 
-[TestCategory("Reminders")]
-[TestCategory("EFCore")]
-[TestCategory(EFCoreTestCategories.MySql)]
-[TestCategory(EFCoreTestCategories.MySqlProvider)]
+[TestArea("EFCore")]
 [TestSuite("Functional")]
 [TestProvider(EFCoreTestCategories.MySqlProvider)]
 [TestArea("Reminders")]

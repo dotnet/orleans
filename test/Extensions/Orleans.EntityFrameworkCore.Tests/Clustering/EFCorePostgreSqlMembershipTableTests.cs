@@ -5,11 +5,7 @@ using UnitTests;
 
 namespace Orleans.EntityFrameworkCore.Tests.Clustering;
 
-[TestCategory("Membership")]
-[TestCategory("EFCore")]
-[TestCategory(EFCoreTestCategories.PostgreSql)]
-[TestCategory(EFCoreTestCategories.PostgreSqlProvider)]
-[TestCategory(EFCoreTestCategories.Functional)]
+[TestArea("EFCore")]
 [TestSuite("Functional")]
 [TestProvider(EFCoreTestCategories.PostgreSqlProvider)]
 [TestArea("Membership")]

@@ -33,7 +33,7 @@ public class EFCoreDatabaseFixture<TDbContext> : IAsyncLifetime
     public IDbContextFactory<TDbContext> Factory =>
         _factory ?? throw new InvalidOperationException("The database fixture has not been initialized.");
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var configuredConnectionString = _database.RequireConnectionString();
         ConnectionString = _database.WithDatabase(configuredConnectionString, _databaseName);
@@ -47,7 +47,7 @@ public class EFCoreDatabaseFixture<TDbContext> : IAsyncLifetime
         await _database.MigrateAsync(_factory);
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_factory is not null)
         {

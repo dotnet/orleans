@@ -3,7 +3,9 @@ using TestExtensions;
 
 namespace Orleans.EntityFrameworkCore.Tests.ETags;
 
-[TestCategory(EFCoreTestCategories.Unit)]
+[TestArea("EFCore")]
+[TestProvider("None")]
+[TestSuite("BVT")]
 public sealed class GuidETagConverterTests
 {
     private const string ExpectedGuid = "a0b1c2d3-e4f5-4678-9123-456789abcdef";

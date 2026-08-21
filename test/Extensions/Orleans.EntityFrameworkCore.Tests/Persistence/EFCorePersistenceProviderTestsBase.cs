@@ -8,7 +8,6 @@ using Orleans.Persistence.EntityFrameworkCore.Data;
 using Orleans.Runtime;
 using Orleans.Storage;
 using UnitTests.Persistence;
-using Xunit.Abstractions;
 
 namespace Orleans.EntityFrameworkCore.Tests.Persistence;
 
@@ -29,7 +28,7 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
         _testOutput = testOutput;
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var provider = new TProvider();
         _databaseFixture = new EFCoreDatabaseFixture<TDbContext>(
@@ -54,7 +53,7 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
         _storage = EFStorageFactory.Create<TDbContext, TETag>(_services, StorageName);
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_services is not null)
         {
@@ -67,7 +66,7 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
         }
     }
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public async Task ReadMissingState_UsesDependencyInjectionAndMarksRecordMissing()
     {
         var state = new GrainState<DependencyConstructedState> { ETag = "stale-caller-value" };
@@ -83,7 +82,7 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
         Assert.Empty(await ReadAllRecords());
     }
 
-    [SkippableTheory, TestCategory(EFCoreTestCategories.Functional)]
+    [Theory, TestSuite(EFCoreTestCategories.Functional)]
     [InlineData(null)]
     [InlineData(15 * 32 * 1024 - 256)]
     [InlineData(15 * 64 * 1024 - 256)]
@@ -106,7 +105,7 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
         Assert.Equal(grainId.Key.ToString(), record.GrainId);
     }
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public async Task ValidUpdate_ChangesDataAndRotatesETag()
     {
         var grainId = NewGrainId("valid-update");
@@ -125,7 +124,7 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
         Assert.Single(await ReadAllRecords());
     }
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public async Task WildcardWrite_OverwritesWinnerAndReturnsActualRotatedETag()
     {
         var grainId = NewGrainId("wildcard");
@@ -146,7 +145,7 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
         Assert.Equal(replacement.ETag, read.ETag);
     }
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public async Task DuplicateInsertWithoutETag_FailsAndPreservesOriginal()
     {
         var grainId = NewGrainId("duplicate");
@@ -165,7 +164,7 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
         Assert.Single(await ReadAllRecords());
     }
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public async Task StaleWrite_ThrowsInconsistentStateException_AndPreservesWinner()
     {
         var grainId = NewGrainId("stale-write");
@@ -190,7 +189,7 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
         Assert.Single(await ReadAllRecords());
     }
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public async Task StaleClear_ThrowsInconsistentStateException_AndPreservesRow()
     {
         var grainId = NewGrainId("stale-clear");
@@ -214,7 +213,7 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
         Assert.Single(await ReadAllRecords());
     }
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public async Task ClearExistingState_RemovesRecordAndResetsCaller()
     {
         var grainId = NewGrainId("clear");
@@ -234,7 +233,7 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
         Assert.Empty(await ReadAllRecords());
     }
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public async Task ClearMissingState_IsIdempotentButClaimedExistingRowFailsConcurrency()
     {
         var grainId = NewGrainId("clear-missing");
@@ -255,7 +254,7 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
         Assert.Empty(await ReadAllRecords());
     }
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public async Task CompleteFourColumnKey_IsolatesServiceTypeStateAndGrainId()
     {
         var primaryId = NewGrainId("primary");
@@ -288,7 +287,7 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
         Assert.Equal(2, records.Select(record => record.GrainId).Distinct().Count());
     }
 
-    [SkippableFact, TestCategory(EFCoreTestCategories.Functional)]
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
     public void Participate_LogsNamedStorageInitializationAndFactoryCreatesStorage()
     {
         Storage.Participate(new NoopSiloLifecycle());

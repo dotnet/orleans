@@ -50,7 +50,7 @@ public abstract class EFCoreMembershipTableTestsBase<TDbContext, TETag> :
         return Task.FromResult(_isolatedConnectionString);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task MembershipTable_InitializationCreatesReadableVersion()
     {
         var data = await CreateMembershipTable(clusterId).ReadAll();
@@ -60,43 +60,43 @@ public abstract class EFCoreMembershipTableTestsBase<TDbContext, TETag> :
         Assert.False(string.IsNullOrWhiteSpace(data.Version.VersionEtag));
     }
 
-    [SkippableFact]
+    [Fact]
     public Task MembershipTable_GetGateways_UsesActiveNonZeroProxyPorts() =>
         MembershipTable_GetGateways();
 
-    [SkippableFact]
+    [Fact]
     public Task MembershipTable_ReadAll_EmptyTable_ReturnsInitialVersion() =>
         MembershipTable_ReadAll_EmptyTable();
 
-    [SkippableFact]
+    [Fact]
     public Task MembershipTable_InsertRow_AdvancesVersionAndAddsMember() =>
         MembershipTable_InsertRow();
 
-    [SkippableFact]
+    [Fact]
     public Task MembershipTable_ReadRow_RejectsDuplicatesAndStaleVersion() =>
         MembershipTable_ReadRow_Insert_Read();
 
-    [SkippableFact]
+    [Fact]
     public Task MembershipTable_ReadAll_ReturnsInsertedMemberAndETags() =>
         MembershipTable_ReadAll_Insert_ReadAll();
 
-    [SkippableFact]
+    [Fact]
     public Task MembershipTable_UpdateRow_EnforcesRowAndTableETags() =>
         MembershipTable_UpdateRow();
 
-    [SkippableFact]
+    [Fact]
     public Task MembershipTable_ParallelUpdates_AdvanceEverySuccessfulVersion() =>
         MembershipTable_UpdateRowInParallel();
 
-    [SkippableFact]
+    [Fact]
     public Task MembershipTable_UpdateIAmAlive_PreservesTableVersion() =>
         MembershipTable_UpdateIAmAlive();
 
-    [SkippableFact]
+    [Fact]
     public Task MembershipTable_CleanupDefunctSilos_PreservesActiveAndRecentMembers() =>
         MembershipTable_CleanupDefunctSiloEntries();
 
-    [SkippableFact]
+    [Fact]
     public async Task InitializeMembershipTable_False_DoesNotCreateVersionTwice()
     {
         var table = CreateMembershipTable(clusterId);
@@ -122,7 +122,7 @@ public abstract class EFCoreMembershipTableTestsBase<TDbContext, TETag> :
         Assert.Equal(beforeETag, CreateETagConverter().FromDbETag(after.ETag));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task InitializeMembershipTable_ConcurrentFirstInitializationSucceeds()
     {
         var raceClusterId = $"initialization-race-{Guid.NewGuid():N}";
@@ -141,7 +141,7 @@ public abstract class EFCoreMembershipTableTestsBase<TDbContext, TETag> :
         Assert.False(string.IsNullOrWhiteSpace(CreateETagConverter().FromDbETag(cluster.ETag)));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task GatewayProvider_ExposesConfiguredMaxStalenessAndIsUpdatable()
     {
         var refreshPeriod = TimeSpan.FromSeconds(37);
@@ -157,7 +157,7 @@ public abstract class EFCoreMembershipTableTestsBase<TDbContext, TETag> :
         Assert.Empty(gateways);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DeleteMembershipTableEntries_OnlyDeletesRequestedCluster()
     {
         var primaryTable = CreateMembershipTable(clusterId);
@@ -183,7 +183,7 @@ public abstract class EFCoreMembershipTableTestsBase<TDbContext, TETag> :
         Assert.Equal(1, retained.Version.Version);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task SuspectingLists_RoundTripSpecialValues()
     {
         var table = CreateMembershipTable(clusterId);
