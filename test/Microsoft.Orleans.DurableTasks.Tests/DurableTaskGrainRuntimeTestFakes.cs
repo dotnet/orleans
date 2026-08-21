@@ -30,6 +30,7 @@ internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessage
 
     public List<(GrainId Sender, GrainId Target, TaskId TaskId, IDurableTaskRequest Request)> Invocations { get; } = [];
     public List<(GrainId Sender, GrainId Target, TaskId TaskId, DurableTaskResponse Response)> Completions { get; } = [];
+    public List<(GrainId Sender, GrainId Target, TaskId TaskId)> CompletionAcknowledgements { get; } = [];
     public List<(GrainId Sender, GrainId Target, TaskId TaskId)> Cancellations { get; } = [];
     public List<(GrainId Target, TaskId TaskId, DateTimeOffset DueTime)> ScheduledResumes { get; } = [];
     public int CommitCount { get; private set; }
@@ -38,7 +39,8 @@ internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessage
     public void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request) => Invocations.Add((sender, target, taskId, request));
 
     public void SendCompletion(GrainId sender, GrainId target, TaskId taskId, DurableTaskResponse response) => Completions.Add((sender, target, taskId, response));
-    public void SendCompletionAck(GrainId sender, GrainId target, TaskId taskId) { }
+    public void SendCompletionAck(GrainId sender, GrainId target, TaskId taskId) =>
+        CompletionAcknowledgements.Add((sender, target, taskId));
 
     public void SendCancellation(GrainId sender, GrainId target, TaskId taskId) => Cancellations.Add((sender, target, taskId));
 

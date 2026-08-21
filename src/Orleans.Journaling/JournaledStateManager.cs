@@ -612,7 +612,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                         {
                             lock (_lock)
                             {
-                                _state = ManagerState.Fenced;
+                                _state = ManagerState.Recovering;
                             }
 
                             Debug.Assert(recoveryTrigger is null);
@@ -629,9 +629,9 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                     _state = ManagerState.Fenced;
                                 }
                             }
-
-                            workItem.SetException(exception);
                         }
+
+                        workItem.SetException(exception);
                     }
                     finally
                     {

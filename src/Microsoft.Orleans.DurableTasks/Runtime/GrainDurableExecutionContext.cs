@@ -24,9 +24,6 @@ internal sealed class GrainDurableExecutionContext(
     private Dictionary<string, int>? _nextChildIds;
     private readonly object _idLock = new();
 
-    // The sequence number for unnamed children.
-    private int _nextSequenceNumber = 0;
-
     public override DateTimeOffset UtcNow => runtime.UtcNow;
 
     protected override ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(
@@ -95,6 +92,12 @@ internal sealed class GrainDurableExecutionContext(
         IReadOnlyList<TaskId> candidates,
         CancellationToken cancellationToken)
     {
+        ThrowIfNotChildTaskId(decisionId);
+        foreach (var candidate in candidates)
+        {
+            ThrowIfNotChildTaskId(candidate);
+        }
+
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
         return await runtime.SelectCompletionAsync(decisionId, candidates, executionCts.Token);
     }
@@ -103,28 +106,26 @@ internal sealed class GrainDurableExecutionContext(
     {
         lock (_idLock)
         {
-            if (string.IsNullOrWhiteSpace(name))
+            var baseId = base.CreateChildTaskId(name);
+            if (name is null)
             {
-                var sequenceNumber = _nextSequenceNumber++;
-                return TaskId.Child(sequenceNumber.ToString(CultureInfo.InvariantCulture));
+                return baseId;
             }
-            else
-            {
-                ref var nextSequenceNumber = ref CollectionsMarshal.GetValueRefOrAddDefault(_nextChildIds ??= [], name, out _);
-                var sequenceNumber = nextSequenceNumber++;
-                if (sequenceNumber > 0)
-                {
-                    return TaskId.Child($"{name}.{sequenceNumber.ToString(CultureInfo.InvariantCulture)}");
-                }
 
-                return TaskId.Child(name);
+            ref var nextSequenceNumber = ref CollectionsMarshal.GetValueRefOrAddDefault(_nextChildIds ??= [], name, out _);
+            var sequenceNumber = nextSequenceNumber++;
+            if (sequenceNumber > 0)
+            {
+                return TaskId.Child($"{name}.{sequenceNumber.ToString(CultureInfo.InvariantCulture)}");
             }
+
+            return baseId;
         }
     }
 
     private void ThrowIfNotChildTaskId(TaskId taskId)
     {
-        if (!TaskId.IsAncestorOf(taskId))
+        if (taskId == TaskId || !TaskId.IsAncestorOf(taskId))
         {
             throw new InvalidOperationException($"The provided task ID '{taskId}' is not a descendant of this task '{TaskId}'.");
         }
