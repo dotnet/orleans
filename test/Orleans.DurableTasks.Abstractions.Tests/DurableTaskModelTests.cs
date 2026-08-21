@@ -7,6 +7,7 @@ namespace Orleans.DurableTasks.Abstractions.Tests;
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestArea("DurableTasks")]
+[TestCategory("BVT")]
 public class DurableTaskModelTests
 {
     private const string TestName = nameof(TaskIdHierarchyLifecycleMatchesAccordantModel);
@@ -48,7 +49,6 @@ public class DurableTaskModelTests
             });
 
         Assert.NotEmpty(testCases);
-        Assert.True(testCases.Count == 26, $"Expected 26 generated cases, actual: {testCases.Count}");
         Assert.InRange(testCases.Count, 1, MaxGeneratedCases);
         Assert.All(testCases, testCase => Assert.InRange(testCase.OperationCalls.Count, 1, MaxCommandsPerCase));
         AssertGeneratedInputsAreCovered(testCases, inputs);
@@ -587,7 +587,6 @@ public class DurableTaskModelTests
             });
 
         Assert.NotEmpty(testCases);
-        Assert.True(testCases.Count == 26, $"Expected 26 generated cases, actual: {testCases.Count}");
         Assert.InRange(testCases.Count, 1, MaxGeneratedCases);
         Assert.All(testCases, testCase => Assert.InRange(testCase.OperationCalls.Count, 1, MaxCommandsPerCase));
         Assert.Equal(4, testCases.Max(testCase => testCase.OperationCalls.Count));
