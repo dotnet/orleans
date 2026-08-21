@@ -2,7 +2,7 @@
 title: Model collections of grains
 description: Model bounded catalogs, partitioned indexes, query stores, paging, and bulk operations over Orleans grains.
 ms.date: 08/21/2026
-ms.topic: concept-article
+ms.topic: how-to
 ---
 
 # Model collections of grains
@@ -22,7 +22,7 @@ A grain key identifies a logical grain, and <xref:Orleans.IGrainFactory.GetGrain
 | Ad hoc filtering, sorting, reporting, or full-text search | Query an external read model and resolve the returned grain keys |
 | Incremental delivery of one query result | Return <xref:System.Collections.Generic.IAsyncEnumerable`1> from the registry, index, or query grain |
 
-Collection state usually stores grain keys and the minimum fields needed for routing, filtering, or ordering. Resolve typed [grain references](grain-references.md) from those keys when invoking members. Persist a grain reference when retaining its interface relationship is useful.
+Collection state usually stores grain keys and the minimum fields needed for routing, filtering, or ordering. Resolve typed [grain references](../grains/grain-references.md) from those keys when invoking members. Persist a grain reference when retaining its interface relationship is useful.
 
 ## Choose grains or stored values
 
@@ -62,7 +62,7 @@ Collection membership and member state often occupy different records. Choose th
 | Update model | Completion contract |
 |---|---|
 | Member data and membership share one grain state record | The awaited state write durably records both changes |
-| Member and index use Orleans transactional state | An [Orleans transaction](transactions.md) commits both changes atomically |
+| Member and index use Orleans transactional state | An [Orleans transaction](../grains/transactions.md) commits both changes atomically |
 | One external database owns member data and indexes | A database transaction commits the data and queryable index together |
 | Grain state is authoritative and a separate read model is updated asynchronously | A durable event or outbox drives an idempotent projector; queries expose the documented projection lag |
 
@@ -72,11 +72,11 @@ For asynchronous indexes, retain enough information to replay updates and reconc
 
 ## Query and page results
 
-Use a database or search service as the query authority when the workload needs ad hoc predicates, sorting, aggregation, or reporting. Query for grain keys and the fields needed to order the result, then resolve grain references for commands or current domain behavior. The [grain persistence](grain-persistence/index.md) abstraction reads and writes records by grain identity; a grain or application service can access a query-oriented database model directly.
+Use a database or search service as the query authority when the workload needs ad hoc predicates, sorting, aggregation, or reporting. Query for grain keys and the fields needed to order the result, then resolve grain references for commands or current domain behavior. The [grain persistence](../grains/grain-persistence/index.md) abstraction reads and writes records by grain identity; a grain or application service can access a query-oriented database model directly.
 
 Use continuation tokens for resumable paging. A token can carry the routing version, shard or partition, last ordering value, and last grain key. Treat tokens as opaque application contracts and version their encoded form.
 
-[Response streaming](response-streaming.md) progressively delivers one live query result with pull-based flow control. A page with a continuation token provides a durable resume boundary when a caller must continue after cancellation, timeout, grain deactivation, or process failure.
+[Response streaming](../grains/response-streaming.md) progressively delivers one live query result with pull-based flow control. A page with a continuation token provides a durable resume boundary when a caller must continue after cancellation, timeout, grain deactivation, or process failure.
 
 ## Examples
 
