@@ -12,8 +12,8 @@ using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
 using Orleans.Streaming;
-using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 using Orleans.Streams.Filtering;
+using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 using TagList = System.Diagnostics.TagList;
 
 namespace Orleans.Streams

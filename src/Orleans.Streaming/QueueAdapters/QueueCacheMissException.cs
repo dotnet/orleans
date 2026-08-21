@@ -32,6 +32,7 @@ namespace Orleans.Streams
         [Id(2)]
         public string? High { get; private set; }
 
+        [field: NonSerialized]
         internal StreamSequenceToken? LowToken { get; }
 
         /// <summary>
