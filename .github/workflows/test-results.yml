@@ -55,8 +55,7 @@ jobs:
       contents: read
       actions: read
       checks: write
-      issues: write
-      pull-requests: read
+      pull-requests: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout trusted reporter
