@@ -172,6 +172,12 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     public void Send(DurableEnvelope envelope)
     {
         EnsureMetricsActive();
+        if (envelope.SenderId != _grainContext.GrainId)
+        {
+            throw new InvalidOperationException(
+                $"Durable outbox sender '{envelope.SenderId}' does not match the owning grain '{_grainContext.GrainId}'.");
+        }
+
         if (_messages.TryGetValue(envelope.MessageId, out var existingEnvelope))
         {
             if (!AreEquivalent(existingEnvelope, envelope))

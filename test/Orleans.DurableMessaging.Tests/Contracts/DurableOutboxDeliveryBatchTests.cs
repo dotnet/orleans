@@ -38,6 +38,20 @@ public sealed class DurableOutboxDeliveryBatchTests
     }
 
     [Fact]
+    public void SenderMustMatchOwningGrain()
+    {
+        var fixture = new OutboxFixture(hasDurableMessage: false);
+        var envelope = fixture.CreateEnvelope(
+            Guid.NewGuid(),
+            senderId: GrainId.Create("sender", "spoofed"));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => fixture.Send(envelope));
+
+        Assert.Contains("does not match the owning grain", exception.Message, StringComparison.Ordinal);
+        Assert.Empty(fixture.Messages);
+    }
+
+    [Fact]
     public async Task DurableDuplicateFollowedByNoOpWriteDoesNotFenceDelivery()
     {
         var fixture = new OutboxFixture();
@@ -434,10 +448,13 @@ public sealed class DurableOutboxDeliveryBatchTests
 
         public DurableEnvelope CreateConflictingEnvelope() => CreateEnvelope(MessageId, routeKey: "conflict");
 
-        public DurableEnvelope CreateEnvelope(Guid messageId, string routeKey = "test") => new()
+        public DurableEnvelope CreateEnvelope(
+            Guid messageId,
+            string routeKey = "test",
+            GrainId? senderId = null) => new()
         {
             MessageId = messageId,
-            SenderId = SenderId,
+            SenderId = senderId ?? SenderId,
             ReceiverId = ReceiverId,
             RouteKey = routeKey,
             CorrelationKey = HierarchicalKey.Create("operation/1"),
