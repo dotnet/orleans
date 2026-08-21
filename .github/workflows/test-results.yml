@@ -117,10 +117,10 @@ jobs:
              "repos/$GITHUB_REPOSITORY/check-runs/$check_id" \
              --input coverage-check-update.json
           else
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "repos/$GITHUB_REPOSITORY/check-runs" \
-            --input coverage-check.json
+           gh api \
+             --method POST \
+             -H "Accept: application/vnd.github+json" \
+             -H "X-GitHub-Api-Version: 2022-11-28" \
+             "repos/$GITHUB_REPOSITORY/check-runs" \
+             --input coverage-check.json
           fi

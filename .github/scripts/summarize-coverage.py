@@ -2,7 +2,7 @@
 
 import argparse
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import xml.etree.ElementTree as ET
 
 
@@ -28,12 +28,20 @@ def get_repository_path(filename, source_root):
     normalized_source_root = str(source_root.resolve()).replace("\\", "/").rstrip("/")
     source_prefix = f"{normalized_source_root}/"
     if normalized.casefold().startswith(source_prefix.casefold()):
-        return f"src/{normalized[len(source_prefix):]}"
+        relative_path = normalized[len(source_prefix) :]
+    elif normalized.startswith(DETERMINISTIC_SOURCE_PREFIX):
+        relative_path = normalized[len(DETERMINISTIC_SOURCE_PREFIX) :]
+    else:
+        return None
 
-    if normalized.startswith(DETERMINISTIC_SOURCE_PREFIX):
-        return f"src/{normalized[len(DETERMINISTIC_SOURCE_PREFIX):]}"
+    path_parts = PurePosixPath(relative_path).parts
+    is_build_output = any(
+        part.casefold() in ("bin", "obj") for part in path_parts
+    )
+    if ".." in path_parts or is_build_output:
+        return None
 
-    return None
+    return f"src/{relative_path}"
 
 
 def read_report(coverage_report, source_root):
@@ -78,11 +86,6 @@ def read_report(coverage_report, source_root):
 
             line_key = (repository_path, line_number)
             measured_lines[line_key] = measured_lines.get(line_key, False) or hits > 0
-
-    if not measured_lines:
-        raise RuntimeError(
-            "Coverage report contains no measured lines under the source root"
-        )
 
     return measured_lines
 

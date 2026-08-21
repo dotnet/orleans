@@ -3,6 +3,14 @@
   <IncludeTestAssembly>False</IncludeTestAssembly>
   <ExcludeAssembliesWithoutSources>MissingAll</ExcludeAssembliesWithoutSources>
   <CodeCoverage>
+    <Sources>
+      <Include>
+        <Source>.*[\\/]src[\\/].*</Source>
+      </Include>
+      <Exclude>
+        <Source>.*[\\/](bin|obj)[\\/].*</Source>
+      </Exclude>
+    </Sources>
     <EnableDynamicManagedInstrumentation>False</EnableDynamicManagedInstrumentation>
     <EnableStaticManagedInstrumentation>True</EnableStaticManagedInstrumentation>
     <EnableStaticManagedInstrumentationRestore>True</EnableStaticManagedInstrumentationRestore>

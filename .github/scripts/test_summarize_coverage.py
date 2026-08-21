@@ -32,6 +32,37 @@ class ReadReportTests(unittest.TestCase):
             measured_lines,
         )
 
+    def test_read_report_accepts_report_without_source_lines(self):
+        report = self.root / "coverage.cobertura.xml"
+        report.write_text(
+            self._report_xml(self.root / "test" / "ExampleTests.cs"),
+            encoding="utf-8",
+        )
+
+        measured_lines = SUMMARIZE_COVERAGE.read_report(report, self.source_root)
+
+        self.assertEqual({}, measured_lines)
+
+    def test_read_report_ignores_generated_build_sources(self):
+        report = self.root / "coverage.cobertura.xml"
+        report.write_text(
+            self._report_xml(self.source_root / "Example" / "obj" / "Generated.g.cs"),
+            encoding="utf-8",
+        )
+
+        measured_lines = SUMMARIZE_COVERAGE.read_report(report, self.source_root)
+
+        self.assertEqual({}, measured_lines)
+
+    def test_get_repository_path_rejects_parent_traversal(self):
+        filename = f"{self.source_root}/../test/ExampleTests.cs"
+
+        repository_path = SUMMARIZE_COVERAGE.get_repository_path(
+            filename, self.source_root
+        )
+
+        self.assertIsNone(repository_path)
+
     def test_read_report_rejects_utf16_with_doctype(self):
         report = self.root / "coverage.cobertura.xml"
         report.write_text(
