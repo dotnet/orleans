@@ -8,6 +8,7 @@ namespace Orleans.DurableTasks.Abstractions.Tests;
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestArea("DurableTasks")]
+[TestCategory("BVT")]
 public class DurableTaskTests
 {
     [Fact]
@@ -1784,6 +1785,7 @@ public class DurableTaskTests
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestArea("DurableTasks")]
+[TestCategory("BVT")]
 public class SchedulingTests
 {
     [Fact]
