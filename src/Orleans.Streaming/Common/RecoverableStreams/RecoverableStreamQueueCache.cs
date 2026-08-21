@@ -191,6 +191,17 @@ namespace Orleans.Providers.Streams.Common
         /// <inheritdoc />
         public void Dispose()
         {
+            CachedMessage? lastPurged = null;
+            var itemsPurged = 0;
+            while (_cache.Oldest is { } oldest)
+            {
+                lastPurged = oldest;
+                itemsPurged++;
+                _cache.RemoveOldestMessage();
+            }
+
+            _evictionStrategy.OnPurgeCompleted(lastPurged, itemsPurged);
+            _currentBuffer = null;
             _evictionStrategy.OnPurged = null;
         }
 
