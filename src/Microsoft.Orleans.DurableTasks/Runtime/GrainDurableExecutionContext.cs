@@ -3,8 +3,6 @@ using System;
 using System.Collections.Generic;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
-using System.Globalization;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
@@ -20,8 +18,7 @@ internal sealed class GrainDurableExecutionContext(
     private readonly TaskScheduler _scheduler = scheduler;
     private readonly CancellationToken _shutdownToken = shutdownToken;
 
-    // The sequence number for named children.
-    private Dictionary<string, int>? _nextChildIds;
+    private HashSet<string>? _childNames;
     private readonly object _idLock = new();
 
     public override DateTimeOffset UtcNow => runtime.UtcNow;
@@ -112,11 +109,9 @@ internal sealed class GrainDurableExecutionContext(
                 return baseId;
             }
 
-            ref var nextSequenceNumber = ref CollectionsMarshal.GetValueRefOrAddDefault(_nextChildIds ??= [], name, out _);
-            var sequenceNumber = nextSequenceNumber++;
-            if (sequenceNumber > 0)
+            if (!(_childNames ??= new(StringComparer.Ordinal)).Add(name))
             {
-                return TaskId.Child($"{name}.{sequenceNumber.ToString(CultureInfo.InvariantCulture)}");
+                return base.CreateChildTaskId(null);
             }
 
             return baseId;

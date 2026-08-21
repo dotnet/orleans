@@ -61,6 +61,7 @@ public class DurableTaskState : IDurableTaskState
     [Id(12)]
     public string? RemoteRequestFingerprint { get; set; }
 
+    /// <inheritdoc cref="IDurableTaskState.CallerId"/>
     [Id(13)]
     public GrainId CallerId { get; set; }
 
