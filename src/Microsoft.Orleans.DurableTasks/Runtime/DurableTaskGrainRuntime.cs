@@ -191,10 +191,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         TryGetExecutionContext(taskId, out var executionContext);
         _storage.RequestCancellation(taskId, state);
-        await SetResponseAsync(
-            taskId,
-            DurableTaskResponse.FromException(new OperationCanceledException()),
-            cancellationToken);
+        await _storage.WriteAsync(cancellationToken);
         if (executionContext is not null)
         {
             var cancellation = DurableTaskRuntimeHelper.RequestCancellationAsync(
@@ -202,6 +199,11 @@ internal sealed partial class DurableTaskGrainRuntime(
                 CancellationToken.None);
             await cancellation.WaitAsync(cancellationToken);
         }
+
+        await SetResponseAsync(
+            taskId,
+            DurableTaskResponse.FromException(new OperationCanceledException()),
+            cancellationToken);
     }
 
     public async ValueTask<DurableTaskResponse> ScheduleDelayAsync(
