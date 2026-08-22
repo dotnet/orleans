@@ -22,8 +22,10 @@ namespace Orleans.Serialization.Session
         public SerializerSessionPool(TypeCodec typeCodec, WellKnownTypeCollection wellKnownTypes, CodecProvider codecProvider)
         {
             CodecProvider = codecProvider;
-            var sessionPoolPolicy = new SerializerSessionPoolPolicy(typeCodec, wellKnownTypes, codecProvider, ReturnSession);
+            var returner = new WeakPoolReturner<SerializerSession>();
+            var sessionPoolPolicy = new SerializerSessionPoolPolicy(typeCodec, wellKnownTypes, codecProvider, returner.Return);
             _sessionPool = new ConcurrentObjectPool<SerializerSession, SerializerSessionPoolPolicy>(sessionPoolPolicy);
+            returner.SetPool(_sessionPool);
         }
 
         /// <summary>
@@ -39,12 +41,6 @@ namespace Orleans.Serialization.Session
 
         /// <inheritdoc/>
         public void Dispose() => _sessionPool.Dispose();
-
-        /// <summary>
-        /// Returns a session to the pool.
-        /// </summary>
-        /// <param name="session">The session.</param>
-        private void ReturnSession(SerializerSession session) => _sessionPool.Return(session);
 
         private readonly struct SerializerSessionPoolPolicy : IPooledObjectPolicy<SerializerSession>
         {
