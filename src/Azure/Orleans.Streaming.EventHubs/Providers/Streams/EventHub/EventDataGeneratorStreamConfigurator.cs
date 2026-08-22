@@ -63,12 +63,13 @@ namespace Orleans.Hosting.Developer
             Action<Action<IServiceCollection>> configureServicesDelegate)
             : base(name, configureServicesDelegate, EventDataGeneratorAdapterFactory.Create)
         {
-            this.ConfigureDelegate(services => services            .ConfigureNamedOptionForLogging<EventHubOptions>(name)
-            .ConfigureNamedOptionForLogging<EventHubReceiverOptions>(name)
-            .ConfigureNamedOptionForLogging<EventHubStreamCachePressureOptions>(name)
-            .ConfigureNamedOptionForLogging<EventHubStreamCacheMemoryOptions>(name)
-            .AddTransient<IConfigurationValidator>(sp => new EventHubStreamCacheMemoryOptionsValidator(sp.GetOptionsByName<EventHubStreamCacheMemoryOptions>(name), name))
-            .AddTransient<IConfigurationValidator>(sp => new StreamCheckpointerConfigurationValidator(sp, name)));
+            this.ConfigureDelegate(services => services
+                .ConfigureNamedOptionForLogging<EventHubOptions>(name)
+                .ConfigureNamedOptionForLogging<EventHubReceiverOptions>(name)
+                .ConfigureNamedOptionForLogging<EventHubStreamCachePressureOptions>(name)
+                .ConfigureNamedOptionForLogging<EventHubStreamCacheMemoryOptions>(name)
+                .AddTransient<IConfigurationValidator>(sp => new EventHubStreamCacheMemoryOptionsValidator(sp.GetOptionsByName<EventHubStreamCacheMemoryOptions>(name), name))
+                .AddTransient<IConfigurationValidator>(sp => new StreamCheckpointerConfigurationValidator(sp, name)));
         }
     }
 }
