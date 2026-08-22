@@ -162,7 +162,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
             return await runtime.ScheduleRemoteAsync(taskId, this, cancellationToken);
         }
 
-        Context.SupportsDurableCompletion = false;
+        PrepareClientContext(Context);
         var targetGrain = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         return await targetGrain.ScheduleAsync(taskId, this, cancellationToken);
     }
@@ -194,8 +194,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
                 : await runtime.GetScheduledTaskHandle(executionContext.TaskId).WaitAsync(durableCts.Token);
         }
 
-        Context.CallerId = default;
-        Context.SupportsDurableCompletion = false;
+        PrepareClientContext(Context);
 
         var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         using var cts = new CancellationTokenSource();
@@ -239,6 +238,12 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
 
         runtime = localProxy;
         return true;
+    }
+
+    internal static void PrepareClientContext(DurableTaskRequestContext context)
+    {
+        context.CallerId = default;
+        context.SupportsDurableCompletion = false;
     }
 
     /// <inheritdoc/>
@@ -342,7 +347,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
             return await runtime.ScheduleRemoteAsync(taskId, this, cancellationToken);
         }
 
-        Context.SupportsDurableCompletion = false;
+        DurableTaskRequest.PrepareClientContext(Context);
         var targetGrain = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         return await targetGrain.ScheduleAsync(taskId, this, cancellationToken);
     }
@@ -374,8 +379,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
                 : await runtime.GetScheduledTaskHandle(executionContext.TaskId).WaitAsync(durableCts.Token);
         }
 
-        Context.CallerId = default;
-        Context.SupportsDurableCompletion = false;
+        DurableTaskRequest.PrepareClientContext(Context);
 
         var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         using var cts = new CancellationTokenSource();

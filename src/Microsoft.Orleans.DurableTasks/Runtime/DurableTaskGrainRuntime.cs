@@ -272,6 +272,17 @@ internal sealed partial class DurableTaskGrainRuntime(
                 $"Durable task '{taskId}' is already associated with a different request.");
         }
 
+        if (state.TombstonedAt.HasValue)
+        {
+            throw new InvalidOperationException(
+                $"Durable task '{taskId}' completed and its retained result has expired.");
+        }
+
+        if (state.Result is { IsCompleted: true } completed)
+        {
+            return completed;
+        }
+
         if (state.RemoteTarget.IsDefault || state.RemoteRequestFingerprint is null)
         {
             _storage.SetRemoteRequest(taskId, state, context.TargetId, fingerprint);
@@ -596,6 +607,12 @@ internal sealed partial class DurableTaskGrainRuntime(
         {
             throw new InvalidOperationException(
                 $"The durable task request targets grain '{requestContext.TargetId}', not receiver '{GrainId}'.");
+        }
+
+        if (persist)
+        {
+            requestContext.CallerId = default;
+            requestContext.SupportsDurableCompletion = false;
         }
 
         var fingerprint = IDurableTaskRequest.GetFingerprint(request, _shared.Serializer);

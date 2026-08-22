@@ -79,6 +79,22 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
+    public void ClientSchedulingClearsUntrustedCallerIdentity()
+    {
+        var context = new DurableTaskRequestContext
+        {
+            CallerId = GrainId.Create("forged", "caller"),
+            TargetId = GrainId.Create("target", "one"),
+            SupportsDurableCompletion = true,
+        };
+
+        DurableTaskRequest.PrepareClientContext(context);
+
+        Assert.Equal(default, context.CallerId);
+        Assert.False(context.SupportsDurableCompletion);
+    }
+
+    [Fact]
     public void CompletionWaiterRemainsUntilAcknowledgedAndTombstoneRetainsIdentity()
     {
         var destination = GrainId.Create("caller", "one");

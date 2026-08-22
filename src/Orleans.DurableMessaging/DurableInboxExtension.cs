@@ -61,6 +61,7 @@ internal sealed partial class DurableInboxExtension :
     private readonly CancellationTokenSource _shutdownCts = new();
     private int _metricsActive;
     private int _reportedDepth;
+    private int _recoveryJobScheduleQueued;
     private bool _recoveryCompleted;
 
     /// <summary>
@@ -388,6 +389,51 @@ internal sealed partial class DurableInboxExtension :
     {
         _recoveryCompleted = true;
         ReconcileInboxDepth();
+        if (GetDurableInboxCount() > 0 && string.IsNullOrEmpty(_jobId.Value))
+        {
+            QueueRecoveryJobSchedule();
+        }
+    }
+
+    private void QueueRecoveryJobSchedule()
+    {
+        if (Interlocked.Exchange(ref _recoveryJobScheduleQueued, 1) != 0)
+        {
+            return;
+        }
+
+        var state = new RecoveryJobScheduleTimerState(this);
+        state.Handle.Attach(_timerRegistry.RegisterGrainTimer(
+            _grainContext,
+            static (state, cancellationToken) => state.RunAsync(cancellationToken),
+            state,
+            new GrainTimerCreationOptions(TimeSpan.Zero, Timeout.InfiniteTimeSpan)
+            {
+                Interleave = false,
+                KeepAlive = true
+            }));
+    }
+
+    private async Task EnsureRecoveryJobScheduledAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        try
+        {
+            if (GetDurableInboxCount() == 0 || !string.IsNullOrEmpty(_jobId.Value))
+            {
+                return;
+            }
+
+            await EnsureJobScheduledUnderGateAsync(
+                cancellationToken,
+                persistState: true,
+                replaceExisting: true).ConfigureAwait(true);
+            ScheduleLocalDrain();
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     public async ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
@@ -935,6 +981,11 @@ internal sealed partial class DurableInboxExtension :
         Message = "Reclaimed orphaned inbox job ownership {OwnershipId} for grain {GrainId}")]
     private static partial void LogOrphanedJobReclaimed(ILogger logger, string ownershipId, GrainId grainId);
 
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Failed to restore durable inbox job ownership for grain {GrainId}")]
+    private static partial void LogRecoveryJobScheduleError(ILogger logger, Exception exception, GrainId grainId);
+
     private sealed class PumpTimerState(
         DurableInboxExtension owner,
         DurableMessagingPumpExecution execution,
@@ -958,6 +1009,46 @@ internal sealed partial class DurableInboxExtension :
             finally
             {
                 Handle.Complete();
+            }
+        }
+    }
+
+    private sealed class RecoveryJobScheduleTimerState(DurableInboxExtension owner)
+    {
+        public OneShotTimerHandle Handle { get; } = new();
+
+        public async Task RunAsync(CancellationToken cancellationToken)
+        {
+            var retry = false;
+            try
+            {
+                await owner.EnsureRecoveryJobScheduledAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) when (
+                cancellationToken.IsCancellationRequested || owner._shutdownCts.IsCancellationRequested)
+            {
+            }
+            catch (Exception exception)
+            {
+                LogRecoveryJobScheduleError(owner._logger, exception, owner._grainContext.GrainId);
+                using var retryCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken,
+                    owner._shutdownCts.Token);
+                await Task.Delay(
+                    owner._retryDelay,
+                    owner._jobTimeProvider,
+                    retryCancellation.Token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                retry = !retryCancellation.IsCancellationRequested;
+            }
+            finally
+            {
+                Volatile.Write(ref owner._recoveryJobScheduleQueued, 0);
+                Handle.Complete();
+            }
+
+            if (retry)
+            {
+                owner.QueueRecoveryJobSchedule();
             }
         }
     }

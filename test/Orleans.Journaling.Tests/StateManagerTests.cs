@@ -646,6 +646,34 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task StateManager_AutomaticRecoveryFailureRejectsNewMutationsUntilRevert()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+
+        await sut.Lifecycle.OnStart();
+        dictionary.Add("persisted", 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        storage.NextAppendException = new InconsistentStateException("Expected write conflict.");
+        storage.NextReadException = new IOException("Expected recovery failure.");
+        dictionary.Add("discarded", 2);
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+
+        dictionary.Add("new", 3);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        Assert.Contains("RevertPendingChangesAsync", exception.Message, StringComparison.Ordinal);
+
+        await sut.Manager.RevertPendingChangesAsync(CancellationToken.None);
+        Assert.Equal(1, dictionary["persisted"]);
+        Assert.False(dictionary.ContainsKey("discarded"));
+        Assert.False(dictionary.ContainsKey("new"));
+    }
+
+    [Fact]
     public async Task StateManager_RevertPendingChanges_RestoresLastDurableState()
     {
         var storage = new CapturingStorage();
@@ -944,6 +972,29 @@ public class StateManagerTests : JournalingTestBase
         value.Value = 3;
         await sut.Manager.WriteStateAsync(CancellationToken.None);
         Assert.Equal(3, value.Value);
+    }
+
+    [Fact]
+    public async Task StateManager_InconsistentStateDuringExplicitRevertRemainsFenced()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+
+        await sut.Lifecycle.OnStart();
+        value.Value = 1;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        value.Value = 2;
+        storage.NextReadException = new InconsistentStateException("Expected explicit recovery conflict.");
+
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask());
+        var writeException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        Assert.Contains("fenced", writeException.Message, StringComparison.OrdinalIgnoreCase);
+
+        await sut.Manager.RevertPendingChangesAsync(CancellationToken.None);
+        Assert.Equal(1, value.Value);
     }
 
     [Fact]

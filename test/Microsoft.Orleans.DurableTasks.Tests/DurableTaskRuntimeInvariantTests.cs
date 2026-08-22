@@ -460,6 +460,49 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
+    public async Task RootRemoteScheduleReturnsPersistedTerminalResultWithoutResending()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var taskId = TaskId.Parse("root/remote");
+        var request = CreateRemoteRequest(1);
+        var state = storage.GetOrCreate(taskId);
+        storage.SetRemoteRequest(
+            taskId,
+            state,
+            request.Context!.TargetId,
+            IDurableTaskRequest.GetFingerprint(request, CreateSerializer()));
+        storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(42));
+
+        var response = await runtime.ScheduleRemoteAsync(taskId, request, default);
+
+        Assert.Equal(42, response.GetResult<int>());
+        Assert.Empty(transport.Invocations);
+        Assert.Equal(0, manager.WriteCount);
+    }
+
+    [Fact]
+    public async Task RootRemoteScheduleRejectsExpiredTombstoneWithoutResending()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var taskId = TaskId.Parse("root/remote");
+        var request = CreateRemoteRequest(1);
+        var state = storage.GetOrCreate(taskId);
+        storage.SetRemoteRequest(
+            taskId,
+            state,
+            request.Context!.TargetId,
+            IDurableTaskRequest.GetFingerprint(request, CreateSerializer()));
+        state.TombstonedAt = runtime.UtcNow;
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runtime.ScheduleRemoteAsync(taskId, request, default).AsTask());
+
+        Assert.Contains("retained result has expired", exception.Message, StringComparison.Ordinal);
+        Assert.Empty(transport.Invocations);
+        Assert.Equal(0, manager.WriteCount);
+    }
+
+    [Fact]
     public async Task CompletionHandleAdvancesOnlyAfterCommit()
     {
         var (runtime, storage, manager, _) = CreateRuntime();
@@ -654,6 +697,21 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.Empty(storage.Tasks);
         Assert.Equal(0, manager.WriteCount);
         Assert.Equal(0, request.CreateTaskCallCount);
+    }
+
+    [Fact]
+    public async Task DirectScheduleClearsForgedCallerIdentity()
+    {
+        var (runtime, storage, _, _) = CreateRuntime();
+        var request = CreateRequest(1);
+        request.Context!.CallerId = GrainId.Create("forged", "caller");
+        request.Context.SupportsDurableCompletion = true;
+        var taskId = TaskId.Parse("root");
+
+        _ = await ((IDurableTaskServer)runtime).ScheduleAsync(taskId, request);
+
+        Assert.Equal(default, storage.Get(taskId).CallerId);
+        Assert.Empty(storage.Get(taskId).CompletionDestinations);
     }
 
     [Fact]
