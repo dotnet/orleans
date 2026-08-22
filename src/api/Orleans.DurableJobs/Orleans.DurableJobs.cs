@@ -85,9 +85,19 @@ namespace Orleans.DurableJobs
         public const string DurableJobs = "Orleans.DurableJobs";
     }
 
+    public partial interface IDurableJobFeatureHandler
+    {
+        System.Threading.Tasks.ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, System.Threading.CancellationToken cancellationToken);
+    }
+
     public partial interface IDurableJobHandler
     {
         System.Threading.Tasks.Task ExecuteJobAsync(IJobRunContext context, System.Threading.CancellationToken cancellationToken);
+    }
+
+    public partial interface IDurableJobHandlerRegistry
+    {
+        void Register(string jobName, IDurableJobFeatureHandler handler);
     }
 
     public partial interface IJobRunContext
@@ -204,6 +214,8 @@ namespace Orleans.Hosting
 
     public sealed partial class DurableJobsOptions
     {
+        public System.TimeSpan CompletedJobAttemptRetentionPeriod { get { throw null; } set { } }
+
         public bool ConcurrencySlowStartEnabled { get { throw null; } set { } }
 
         public System.TimeSpan JobStatusPollInterval { get { throw null; } set { } }
