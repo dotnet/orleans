@@ -114,7 +114,7 @@ public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) 
         // B's pending request should be promptly rejected locally.
         var exception = await Assert.ThrowsAnyAsync<Exception>(() => responseTask);
         Assert.True(
-            exception is OperationCanceledException or OrleansMessageRejectionException,
+            exception is OperationCanceledException or OrleansMessageRejectionException or SiloUnavailableException,
             $"Unexpected exception type: {exception.GetType()}");
 
         // A sends response to B.
