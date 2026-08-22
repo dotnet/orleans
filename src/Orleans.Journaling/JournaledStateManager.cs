@@ -208,7 +208,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             {
                                 if (fenceOnFailure)
                                 {
-                                    _state = ManagerState.Ready;
+                                    _state = ManagerState.RecoveryPending;
                                 }
                             }
 
@@ -1015,6 +1015,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             throw new InvalidOperationException("The journaled state manager has not been initialized.");
         }
 
+        // Recovery-pending operations are queued as retry triggers; recovery completes before they are processed.
         ThrowIfWritesFenced();
     }
 
@@ -1300,6 +1301,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     {
         Unknown,
         Ready,
+        RecoveryPending,
         Recovering,
         Fenced
     }
