@@ -118,12 +118,7 @@ public class AzureBlobReadStateStreamingBenchmark
             return new BlobServiceClient(new Uri(blobUriValue), TestDefaultConfiguration.TokenCredential);
         }
 
-        if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
-        {
-            throw new InvalidOperationException("OrleansDataConnectionString must be set for Azure Blob benchmarks.");
-        }
-
-        return new BlobServiceClient(TestDefaultConfiguration.DataConnectionString);
+        return new BlobServiceClient(TestDefaultConfiguration.AzureStorageConnectionString);
     }
 
     private static AzureBlobStorageOptions CreateOptions(
