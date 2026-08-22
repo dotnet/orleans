@@ -7,10 +7,9 @@ namespace Orleans.Reminders.Concurrency;
 /// <see cref="ReminderThrottleConfigBuilder.SlowStart"/>.
 /// </summary>
 /// <remarks>
-/// <para>Slow-start mitigates cold-start thundering herds: when a silo first starts, or assumes
-/// responsibility for a new range of reminders after a membership change, thousands of
-/// reminders can become due at once. The reduced initial capacity lets the silo's caches,
-/// connection pools, and thread pool warm up before the configured full capacity is unlocked.</para>
+/// <para>Slow-start mitigates cold-start thundering herds when a silo starts and many reminders
+/// become due at once. The reduced initial capacity lets the silo's caches, connection pools,
+/// and thread pool warm up before the configured full capacity is unlocked.</para>
 /// <para>Slow-start mirrors the equivalent behavior in <c>DurableJobsOptions</c>
 /// (<c>SlowStartInitialConcurrency</c>, <c>SlowStartInterval</c>).</para>
 /// </remarks>
@@ -26,6 +25,11 @@ public sealed class SlowStartConfig
         if (interval <= TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(nameof(interval), interval, "Interval must be greater than zero.");
+        }
+
+        if (interval > ReminderThrottleTime.MaxTimerDelay)
+        {
+            throw new ArgumentOutOfRangeException(nameof(interval), interval, $"Interval must be less than or equal to {ReminderThrottleTime.MaxTimerDelay}.");
         }
 
         InitialCapacity = initialCapacity;

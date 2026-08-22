@@ -65,7 +65,7 @@ namespace Orleans.Runtime.ReminderService
             _timeProvider = timeProvider;
             _reminderInstruments = reminderInstruments;
             _reminderInstruments.RegisterActiveRemindersObserve(() => localReminders.Count);
-            _deliveryThrottle = deliveryThrottle ?? NoOpReminderDeliveryThrottle.Instance;
+            _deliveryThrottle = deliveryThrottle;
             _throttleInstruments = throttleInstruments;
             startedTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.logger = shared.LoggerFactory.CreateLogger<LocalReminderService>();
@@ -1208,7 +1208,7 @@ namespace Orleans.Runtime.ReminderService
                             // tardiness sample) since the grain never observes them.
                             var preThrottleNow = _shared._timeProvider.GetUtcNow().UtcDateTime;
                             var provisionalStatus = new TickStatus(entry.StartAt, entry.Period, preThrottleNow);
-                            var context = new ReminderDeliveryContext(entry.GrainId, entry.ReminderName, provisionalStatus);
+                            var context = new ReminderDeliveryContext(entry.GrainId, entry.ReminderName, provisionalStatus, scheduledTick.TickTime);
                             ReminderDeliveryLease lease;
                             if (ReferenceEquals(_shared._deliveryThrottle, NoOpReminderDeliveryThrottle.Instance))
                             {
@@ -1238,6 +1238,8 @@ namespace Orleans.Runtime.ReminderService
                                     var skippedAt = _shared._timeProvider.GetUtcNow().UtcDateTime;
                                     var skippedStatus = new TickStatus(entry.StartAt, entry.Period, skippedAt);
                                     ReminderEvents.EmitTickSkipped(entry.GrainId, entry.ReminderName, skippedStatus, lease.SkipReason!.Value, lease.TierName, lease.WaitedFor, _shared.Silo);
+                                    previousTickTime = scheduledTick.TickTime;
+                                    previousScheduleVersion = scheduledTick.ScheduleVersion;
                                     continue;
                                 }
 

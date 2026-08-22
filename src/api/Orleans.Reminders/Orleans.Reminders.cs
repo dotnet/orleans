@@ -250,7 +250,7 @@ namespace Orleans.Reminders.Concurrency
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
-        public ReminderDeliveryContext(Runtime.GrainId grainId, string reminderName, Runtime.TickStatus status, System.Collections.Immutable.ImmutableArray<Runtime.GrainInterfaceType> implementedInterfaces = default) { }
+        public ReminderDeliveryContext(Runtime.GrainId grainId, string reminderName, Runtime.TickStatus status, System.DateTime scheduledTickTime, System.Collections.Immutable.ImmutableArray<Runtime.GrainInterfaceType> implementedInterfaces = default) { }
 
         public System.DateTime DueTime { get { throw null; } }
 
@@ -261,6 +261,8 @@ namespace Orleans.Reminders.Concurrency
         public System.Collections.Immutable.ImmutableArray<Runtime.GrainInterfaceType> ImplementedInterfaces { get { throw null; } }
 
         public string ReminderName { get { throw null; } }
+
+        public System.DateTime ScheduledTickTime { get { throw null; } }
 
         public Runtime.TickStatus Status { get { throw null; } }
     }

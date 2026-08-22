@@ -146,6 +146,10 @@ internal sealed class OverloadReminderAdmissionGate : IReminderAdmissionGate
                 : waitBudget.Duration;
 
             await Task.Delay(sleepFor, _timeProvider, cancellationToken).ConfigureAwait(false);
+            if (budget.GetRemainingWaitBudget().TimedOut)
+            {
+                return GateAcquireResult.Skipped(ReminderSkipReason.SiloOverloaded);
+            }
         }
 
         return GateAcquireResult.Admitted;
@@ -184,6 +188,11 @@ internal sealed class SlowStartReminderAdmissionGate : IReminderAdmissionGate
     public async ValueTask<GateAcquireResult> AcquireAsync(ReminderDeliveryContext context, ReminderAcquireBudget budget, CancellationToken cancellationToken)
     {
         _ = context;
+        if (Volatile.Read(ref _currentCapacity) >= _targetCapacity)
+        {
+            return GateAcquireResult.Admitted;
+        }
+
         if (_semaphore.Wait(0))
         {
             return GateAcquireResult.AdmittedWithRelease(() => _semaphore.Release());
@@ -198,10 +207,28 @@ internal sealed class SlowStartReminderAdmissionGate : IReminderAdmissionGate
         if (waitBudget.Duration == Timeout.InfiniteTimeSpan)
         {
             await _semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+            if (cancellationToken.IsCancellationRequested)
+            {
+                _semaphore.Release();
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
             return GateAcquireResult.AdmittedWithRelease(() => _semaphore.Release());
         }
 
         var acquired = await WaitSemaphoreWithTimeoutAsync(waitBudget.Duration, cancellationToken).ConfigureAwait(false);
+        if (acquired && cancellationToken.IsCancellationRequested)
+        {
+            _semaphore.Release();
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        if (acquired && budget.GetRemainingWaitBudget().TimedOut)
+        {
+            _semaphore.Release();
+            return GateAcquireResult.Skipped(ReminderSkipReason.SlowStartLimited);
+        }
+
         return acquired
             ? GateAcquireResult.AdmittedWithRelease(() => _semaphore.Release())
             : GateAcquireResult.Skipped(ReminderSkipReason.SlowStartLimited);
@@ -314,10 +341,28 @@ internal sealed class LocalConcurrencyReminderAdmissionGate : IReminderAdmission
         if (waitBudget.Duration == Timeout.InfiniteTimeSpan)
         {
             await _semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+            if (cancellationToken.IsCancellationRequested)
+            {
+                _semaphore.Release();
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
             return GateAcquireResult.AdmittedWithRelease(() => _semaphore.Release());
         }
 
         var acquired = await WaitSemaphoreWithTimeoutAsync(waitBudget.Duration, cancellationToken).ConfigureAwait(false);
+        if (acquired && cancellationToken.IsCancellationRequested)
+        {
+            _semaphore.Release();
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        if (acquired && budget.GetRemainingWaitBudget().TimedOut)
+        {
+            _semaphore.Release();
+            return GateAcquireResult.Skipped(ReminderSkipReason.AcquireTimeout);
+        }
+
         return acquired
             ? GateAcquireResult.AdmittedWithRelease(() => _semaphore.Release())
             : GateAcquireResult.Skipped(ReminderSkipReason.AcquireTimeout);
@@ -359,7 +404,7 @@ internal sealed class LocalRateReminderAdmissionGate : IReminderAdmissionGate
     public async ValueTask<GateAcquireResult> AcquireAsync(ReminderDeliveryContext context, ReminderAcquireBudget budget, CancellationToken cancellationToken)
     {
         _ = context;
-        var waitFor = _tokenBucket.TryConsumeOrComputeWait();
+        var waitFor = _tokenBucket.TryConsumeOrComputeWait(cancellationToken);
         if (waitFor == TimeSpan.Zero)
         {
             return GateAcquireResult.Admitted;
@@ -379,18 +424,20 @@ internal sealed class LocalRateReminderAdmissionGate : IReminderAdmissionGate
             }
 
             await Task.Delay(waitFor, _timeProvider, cancellationToken).ConfigureAwait(false);
-
-            waitFor = _tokenBucket.TryConsumeOrComputeWait();
-            if (waitFor == TimeSpan.Zero)
-            {
-                return GateAcquireResult.Admitted;
-            }
+            cancellationToken.ThrowIfCancellationRequested();
 
             waitBudget = budget.GetRemainingWaitBudget();
             if (waitBudget.Duration == TimeSpan.Zero)
             {
                 return GateAcquireResult.Skipped(ReminderSkipReason.AcquireTimeout);
             }
+
+            waitFor = _tokenBucket.TryConsumeOrComputeWait(cancellationToken);
+            if (waitFor == TimeSpan.Zero)
+            {
+                return GateAcquireResult.Admitted;
+            }
+
         }
     }
 
@@ -429,10 +476,11 @@ internal sealed class LocalRateReminderAdmissionGate : IReminderAdmissionGate
             }
         }
 
-        public TimeSpan TryConsumeOrComputeWait()
+        public TimeSpan TryConsumeOrComputeWait(CancellationToken cancellationToken)
         {
             lock (_lock)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 Refill();
                 if (_tokens >= 1.0)
                 {
