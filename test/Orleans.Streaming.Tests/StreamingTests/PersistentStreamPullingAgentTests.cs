@@ -752,7 +752,7 @@ namespace UnitTests.StreamingTests
             var exception = new QueueCacheMissException(requestedToken, oldestToken, newestToken);
 
             var recoveryToken = await RunCacheMissRecovery(exception, requestedToken, newestToken);
-            Assert.Same(oldestToken, recoveryToken);
+            Assert.Equal(oldestToken, recoveryToken);
         }
 
         [TestSuite("BVT")]
