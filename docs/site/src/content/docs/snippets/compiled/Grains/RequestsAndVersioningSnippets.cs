@@ -239,12 +239,12 @@ namespace Documentation.Grains.ReadScaling
         [property: Id(0)] ProductSnapshot Product,
         [property: Id(1)] string Recommendation);
 
-    public interface IProductRecommendations
-    {
-        ValueTask<string> GetRecommendation(string productId);
-    }
-
     // <single_writer_interleaved_readers>
+public interface IProductRecommendations
+{
+    ValueTask<string> GetRecommendation(string productId);
+}
+
 public interface IProductGrain : IGrainWithStringKey
 {
     [ReadOnly]
