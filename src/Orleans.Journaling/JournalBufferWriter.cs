@@ -208,6 +208,18 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
         }
     }
 
+    internal int BufferedLength
+    {
+        get
+        {
+            lock (_lock)
+            {
+                ThrowIfDisposed();
+                return _buffer.Length;
+            }
+        }
+    }
+
     internal void Consume(ArcBuffer buffer)
     {
         lock (_lock)

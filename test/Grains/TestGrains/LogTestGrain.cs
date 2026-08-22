@@ -160,6 +160,13 @@ namespace TestGrains
             return RefreshNow();
         }
 
+        public async Task RaiseEventsWithUnsupportedSecond()
+        {
+            RaiseEvent(new UpdateA { Val = 41 });
+            RaiseEvent(new UnsupportedLogEvent());
+            await ConfirmEvents();
+        }
+
         public Task<int> GetConfirmedVersion()
         {
             return Task.FromResult(this.Version);
@@ -196,4 +203,6 @@ namespace TestGrains
         }
 
     }
+
+    internal sealed class UnsupportedLogEvent;
 }
