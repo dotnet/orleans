@@ -42,7 +42,7 @@ Code in different requests doesn't run simultaneously, but multiple incomplete c
 ### Method-level interleaving
 
 :::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="interleaving_method_attributes":::
-`ReadOnly` is a scheduling promise. Active read-only requests can interleave with one another and collectively exclude writable requests until every read-only request completes, unless another interleaving policy permits overlap. Keep grain state unchanged from a read-only method.
+`ReadOnly` is a scheduling promise that the method preserves grain state. Active read-only requests can interleave with one another and collectively exclude writable requests until every read-only request completes, unless another interleaving policy permits overlap. See [Scale grain reads](read-scaling.md) for a single-writer example and the application-managed read-model pattern.
 
 ### Predicate-based interleaving
 
