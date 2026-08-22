@@ -137,6 +137,7 @@ public sealed class DisseminationNamespaceOptions
     /// <summary>
     /// Gets or sets how long a namespace value remains useful.
     /// </summary>
+    /// <value>The lifetime is 30 seconds by default and must be greater than zero.</value>
     public TimeSpan StaleItemTtl { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>

@@ -74,9 +74,9 @@ internal sealed class DisseminationNamespaceOptionsValidator
                 $"{owner}.{nameof(DisseminationNamespaceOptions.MaxCoalescingDelay)} must be between 1 millisecond and {MaxTimerPeriod}.");
         }
 
-        if (options.StaleItemTtl <= options.MaxCoalescingDelay)
+        if (options.StaleItemTtl <= TimeSpan.Zero)
         {
-            return ValidateOptionsResult.Fail($"{owner}.{nameof(DisseminationNamespaceOptions.StaleItemTtl)} must be greater than {nameof(DisseminationNamespaceOptions.MaxCoalescingDelay)}.");
+            return ValidateOptionsResult.Fail($"{owner}.{nameof(DisseminationNamespaceOptions.StaleItemTtl)} must be greater than 0.");
         }
 
         if (options.ExpectedUpdateCadence <= TimeSpan.Zero)
