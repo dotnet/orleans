@@ -44,6 +44,18 @@ public sealed class DurableJobsOptions
     public TimeSpan JobStatusPollInterval { get; set; } = TimeSpan.FromSeconds(1);
 
     /// <summary>
+    /// Gets or sets how long a grain activation retains completed durable job attempt identities
+    /// to suppress delayed duplicate deliveries. An attempt is identified by job ID, execution generation,
+    /// and dequeue count. Default: 10 minutes.
+    /// </summary>
+    /// <remarks>
+    /// Deduplication is also bounded to the most recent 65,536 completed executions per activation.
+    /// This horizon covers duplicate deliveries which arrive at the same activation. Application-specific
+    /// durable state provides deduplication across activation failure or migration.
+    /// </remarks>
+    public TimeSpan CompletedJobAttemptRetentionPeriod { get; set; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>
     /// Gets or sets the maximum number of jobs that can be executed concurrently on a single silo.
     /// Default: 10,000 × processor count.
     /// </summary>
@@ -204,6 +216,10 @@ public sealed partial class DurableJobsOptionsValidator : IConfigurationValidato
         if (options.JobStatusPollInterval <= TimeSpan.Zero)
         {
             throw new OrleansConfigurationException("DurableJobsOptions.JobStatusPollInterval must be greater than zero.");
+        }
+        if (options.CompletedJobAttemptRetentionPeriod <= TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.CompletedJobAttemptRetentionPeriod must be greater than zero.");
         }
         if (options.ShouldRetry is null)
         {
